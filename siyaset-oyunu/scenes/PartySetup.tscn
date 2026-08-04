@@ -1,10 +1,10 @@
-[gd_scene load_steps=4 format=3 uid="uid://h1i2j3k4l5m6n"]
+[gd_scene format=3 uid="uid://bpcdyqmhqvn4"]
 
-[ext_resource type="Script" path="res://scripts/party_setup.gd" id="1"]
-[ext_resource type="Theme" path="res://assets/ui/main_theme.tres" id="2"]
-[ext_resource type="Script" path="res://scripts/smooth_scroll_container.gd" id="3"]
+[ext_resource type="Script" uid="uid://cg8mmf61xkoss" path="res://scripts/party_setup.gd" id="1"]
+[ext_resource type="Theme" uid="uid://cmjk3bfl8mavr" path="res://assets/ui/main_theme.tres" id="2"]
+[ext_resource type="Script" uid="uid://b0s8i0bj1nqrh" path="res://scripts/smooth_scroll_container.gd" id="3"]
 
-[node name="PartySetup" type="Control"]
+[node name="PartySetup" type="Control" unique_id=1479822869]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -14,7 +14,7 @@ grow_vertical = 2
 theme = ExtResource("2")
 script = ExtResource("1")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="Background" type="ColorRect" parent="." unique_id=1060603329]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -23,14 +23,14 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.09, 0.1, 0.14, 1)
 
-[node name="TopBar" type="Control" parent="."]
+[node name="TopBar" type="Control" parent="." unique_id=1133533483]
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
 offset_bottom = 74.0
 grow_horizontal = 2
 
-[node name="TopBarBg" type="ColorRect" parent="TopBar"]
+[node name="TopBarBg" type="ColorRect" parent="TopBar" unique_id=1186739441]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -39,7 +39,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.13, 0.14, 0.19, 1)
 
-[node name="TopBarBox" type="VBoxContainer" parent="TopBar"]
+[node name="TopBarBox" type="VBoxContainer" parent="TopBar" unique_id=2073647285]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -54,30 +54,29 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 2
 
-[node name="CountdownLabel" type="Label" parent="TopBar/TopBarBox"]
+[node name="CountdownLabel" type="Label" parent="TopBar/TopBarBox" unique_id=1557016216]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 24
-horizontal_alignment = 1
 text = "Süre: 01:00"
-
-[node name="ReadyCountLabel" type="Label" parent="TopBar/TopBarBox"]
-unique_name_in_owner = true
-layout_mode = 2
 horizontal_alignment = 1
-modulate = Color(1, 1, 1, 0.7)
-text = "Hazır: 0 / 0"
 
-[node name="LeftPreview" type="Control" parent="."]
+[node name="ReadyCountLabel" type="Label" parent="TopBar/TopBarBox" unique_id=123863934]
+unique_name_in_owner = true
+modulate = Color(1, 1, 1, 0.7)
+layout_mode = 2
+text = "Hazır: 0 / 0"
+horizontal_alignment = 1
+
+[node name="LeftPreview" type="Control" parent="." unique_id=1281205664]
 layout_mode = 1
-anchors_preset = 15
 anchor_right = 0.5
 anchor_bottom = 1.0
 offset_top = 74.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="PreviewBg" type="ColorRect" parent="LeftPreview"]
+[node name="PreviewBg" type="ColorRect" parent="LeftPreview" unique_id=1177751968]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(420, 420)
 layout_mode = 1
@@ -94,7 +93,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.83, 0.18, 0.18, 1)
 
-[node name="PreviewIcon" type="TextureRect" parent="LeftPreview/PreviewBg"]
+[node name="PreviewIcon" type="TextureRect" parent="LeftPreview/PreviewBg" unique_id=1555146424]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 8
@@ -106,12 +105,13 @@ offset_left = -140.0
 offset_top = -140.0
 offset_right = 140.0
 offset_bottom = 140.0
+grow_horizontal = 2
+grow_vertical = 2
 expand_mode = 1
 stretch_mode = 5
 
-[node name="RightPanel" type="Control" parent="."]
+[node name="RightPanel" type="Control" parent="." unique_id=2105173490]
 layout_mode = 1
-anchors_preset = 15
 anchor_left = 0.5
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -119,7 +119,7 @@ offset_top = 74.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Background" type="ColorRect" parent="RightPanel"]
+[node name="Background" type="ColorRect" parent="RightPanel" unique_id=1799353267]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -128,7 +128,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.13, 0.14, 0.19, 1)
 
-[node name="Margin" type="MarginContainer" parent="RightPanel"]
+[node name="Margin" type="MarginContainer" parent="RightPanel" unique_id=321717466]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -140,114 +140,114 @@ theme_override_constants/margin_top = 24
 theme_override_constants/margin_right = 32
 theme_override_constants/margin_bottom = 24
 
-[node name="Scroll" type="ScrollContainer" parent="RightPanel/Margin"]
+[node name="Scroll" type="ScrollContainer" parent="RightPanel/Margin" unique_id=989213884]
 layout_mode = 2
 horizontal_scroll_mode = 0
 script = ExtResource("3")
 
-[node name="VBox" type="VBoxContainer" parent="RightPanel/Margin/Scroll"]
+[node name="VBox" type="VBoxContainer" parent="RightPanel/Margin/Scroll" unique_id=506533097]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 10
 
-[node name="TitleLabel" type="Label" parent="RightPanel/Margin/Scroll/VBox"]
+[node name="TitleLabel" type="Label" parent="RightPanel/Margin/Scroll/VBox" unique_id=1439790902]
 layout_mode = 2
-horizontal_alignment = 1
 theme_override_font_sizes/font_size = 26
 text = "Partini Kur"
-
-[node name="HSeparator0" type="HSeparator" parent="RightPanel/Margin/Scroll/VBox"]
-layout_mode = 2
-
-[node name="NameLabel" type="Label" parent="RightPanel/Margin/Scroll/VBox"]
-layout_mode = 2
 horizontal_alignment = 1
-text = "Parti Adı"
 
-[node name="NameEdit" type="LineEdit" parent="RightPanel/Margin/Scroll/VBox"]
+[node name="HSeparator0" type="HSeparator" parent="RightPanel/Margin/Scroll/VBox" unique_id=695007347]
+layout_mode = 2
+
+[node name="NameLabel" type="Label" parent="RightPanel/Margin/Scroll/VBox" unique_id=2090511481]
+layout_mode = 2
+text = "Parti Adı"
+horizontal_alignment = 1
+
+[node name="NameEdit" type="LineEdit" parent="RightPanel/Margin/Scroll/VBox" unique_id=1374996871]
 unique_name_in_owner = true
 layout_mode = 2
 placeholder_text = "Parti adı"
 alignment = 1
 
-[node name="NameHintLabel" type="Label" parent="RightPanel/Margin/Scroll/VBox"]
+[node name="NameHintLabel" type="Label" parent="RightPanel/Margin/Scroll/VBox" unique_id=430812991]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
-horizontal_alignment = 1
 text = "2-11 karakter"
-
-[node name="HSeparator1" type="HSeparator" parent="RightPanel/Margin/Scroll/VBox"]
-layout_mode = 2
-
-[node name="IconLabel" type="Label" parent="RightPanel/Margin/Scroll/VBox"]
-layout_mode = 2
 horizontal_alignment = 1
-text = "İkon"
 
-[node name="IconGrid" type="GridContainer" parent="RightPanel/Margin/Scroll/VBox"]
+[node name="HSeparator1" type="HSeparator" parent="RightPanel/Margin/Scroll/VBox" unique_id=1380766236]
+layout_mode = 2
+
+[node name="IconLabel" type="Label" parent="RightPanel/Margin/Scroll/VBox" unique_id=1455321018]
+layout_mode = 2
+text = "İkon"
+horizontal_alignment = 1
+
+[node name="IconGrid" type="GridContainer" parent="RightPanel/Margin/Scroll/VBox" unique_id=371899215]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 4
-columns = 10
 theme_override_constants/h_separation = 6
 theme_override_constants/v_separation = 6
+columns = 10
 
-[node name="HSeparator2" type="HSeparator" parent="RightPanel/Margin/Scroll/VBox"]
+[node name="HSeparator2" type="HSeparator" parent="RightPanel/Margin/Scroll/VBox" unique_id=1292805283]
 layout_mode = 2
 
-[node name="IconColorLabel" type="Label" parent="RightPanel/Margin/Scroll/VBox"]
+[node name="IconColorLabel" type="Label" parent="RightPanel/Margin/Scroll/VBox" unique_id=1031698928]
 layout_mode = 2
-horizontal_alignment = 1
 text = "İkon Rengi"
+horizontal_alignment = 1
 
-[node name="IconColorRow" type="HFlowContainer" parent="RightPanel/Margin/Scroll/VBox"]
+[node name="IconColorRow" type="HFlowContainer" parent="RightPanel/Margin/Scroll/VBox" unique_id=805435095]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-alignment = 1
 theme_override_constants/h_separation = 5
 theme_override_constants/v_separation = 5
+alignment = 1
 
-[node name="BgColorLabel" type="Label" parent="RightPanel/Margin/Scroll/VBox"]
+[node name="BgColorLabel" type="Label" parent="RightPanel/Margin/Scroll/VBox" unique_id=1131569091]
 layout_mode = 2
-horizontal_alignment = 1
 text = "Arka Plan Rengi"
+horizontal_alignment = 1
 
-[node name="BgColorRow" type="HFlowContainer" parent="RightPanel/Margin/Scroll/VBox"]
+[node name="BgColorRow" type="HFlowContainer" parent="RightPanel/Margin/Scroll/VBox" unique_id=734240133]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-alignment = 1
 theme_override_constants/h_separation = 5
 theme_override_constants/v_separation = 5
+alignment = 1
 
-[node name="HSeparator3" type="HSeparator" parent="RightPanel/Margin/Scroll/VBox"]
+[node name="HSeparator3" type="HSeparator" parent="RightPanel/Margin/Scroll/VBox" unique_id=459483643]
 layout_mode = 2
 
-[node name="IdeologyLabel" type="Label" parent="RightPanel/Margin/Scroll/VBox"]
+[node name="IdeologyLabel" type="Label" parent="RightPanel/Margin/Scroll/VBox" unique_id=979430651]
 layout_mode = 2
-horizontal_alignment = 1
 text = "İdeoloji"
+horizontal_alignment = 1
 
-[node name="IdeologyContainer" type="VBoxContainer" parent="RightPanel/Margin/Scroll/VBox"]
+[node name="IdeologyContainer" type="VBoxContainer" parent="RightPanel/Margin/Scroll/VBox" unique_id=481483727]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="HSeparator3b" type="HSeparator" parent="RightPanel/Margin/Scroll/VBox"]
+[node name="HSeparator3b" type="HSeparator" parent="RightPanel/Margin/Scroll/VBox" unique_id=2089995144]
 layout_mode = 2
 
-[node name="RandomButton" type="Button" parent="RightPanel/Margin/Scroll/VBox"]
+[node name="RandomButton" type="Button" parent="RightPanel/Margin/Scroll/VBox" unique_id=493911054]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 text = "🎲 Rastgele"
 
-[node name="HSeparator4" type="HSeparator" parent="RightPanel/Margin/Scroll/VBox"]
+[node name="HSeparator4" type="HSeparator" parent="RightPanel/Margin/Scroll/VBox" unique_id=1623326340]
 layout_mode = 2
 
-[node name="ReadyButton" type="Button" parent="RightPanel/Margin/Scroll/VBox"]
+[node name="ReadyButton" type="Button" parent="RightPanel/Margin/Scroll/VBox" unique_id=1401694460]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 52)
 layout_mode = 2

@@ -36,7 +36,7 @@ signal party_setup_finished
 
 ## Röle sunucusunun adresi. relay-server/ deploy edildikten sonra buradaki
 ## adresi gerçek deploy URL'i ile değiştir (örn. "wss://<servis-adin>.onrender.com").
-const RELAY_URL := "wss://siyaset-oyunu-relay.onrender.com"
+const RELAY_URL := "wss://siyaset-oyunu-test-experimental.onrender.com"
 
 const RelayMultiplayerPeerScript := preload("res://scripts/relay_multiplayer_peer.gd")
 
@@ -100,8 +100,11 @@ func create_room(player_name: String) -> void:
 	var peer := RelayMultiplayerPeerScript.new()
 	peer.room_created.connect(_on_relay_room_created)
 	peer.room_error.connect(_on_relay_error)
-	multiplayer.multiplayer_peer = peer
+	# SceneMultiplayer, atama anında peer'in en azindan "connecting" durumunda
+	# olmasini zorunlu tutuyor; o yuzden once baglanmayi baslatip (durumu
+	# CONNECTING'e cekip) sonra multiplayer_peer'a atiyoruz.
 	peer.start_create_room(RELAY_URL, local_player_name)
+	multiplayer.multiplayer_peer = peer
 
 func _on_relay_room_created(code: String) -> void:
 	if not is_host or room_code != "":
@@ -131,8 +134,8 @@ func join_room(code: String, player_name: String) -> void:
 	is_host = false
 	var peer := RelayMultiplayerPeerScript.new()
 	peer.room_error.connect(_on_relay_error)
-	multiplayer.multiplayer_peer = peer
 	peer.start_join_room(RELAY_URL, _pending_code, local_player_name)
+	multiplayer.multiplayer_peer = peer
 
 ## Oyuncu kendi isteğiyle odadan ayrılır. Ayrılan kişi lobi sahibiyse
 ## (host tarafında bu durum peer_disconnected ile algılanıp odanın tamamen

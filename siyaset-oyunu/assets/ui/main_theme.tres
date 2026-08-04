@@ -1,0 +1,41 @@
+[gd_resource type="Theme" format=3 uid="uid://cmjk3bfl8mavr"]
+
+[ext_resource type="Texture2D" uid="uid://cvqbv3f857576" path="res://assets/ui/button_normal.png" id="1"]
+[ext_resource type="Texture2D" uid="uid://cpc5g6u6v06rc" path="res://assets/ui/button_hover.png" id="2"]
+[ext_resource type="Texture2D" uid="uid://kvux287nned1" path="res://assets/ui/button_pressed.png" id="3"]
+[ext_resource type="Texture2D" uid="uid://c61um0fvvjmn5" path="res://assets/ui/button_disabled.png" id="4"]
+
+[sub_resource type="StyleBoxTexture" id="SB_disabled"]
+texture = ExtResource("4")
+texture_margin_left = 8.0
+texture_margin_top = 8.0
+texture_margin_right = 8.0
+texture_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxTexture" id="SB_hover"]
+texture = ExtResource("2")
+texture_margin_left = 8.0
+texture_margin_top = 8.0
+texture_margin_right = 8.0
+texture_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxTexture" id="SB_normal"]
+texture = ExtResource("1")
+texture_margin_left = 8.0
+texture_margin_top = 8.0
+texture_margin_right = 8.0
+texture_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxTexture" id="SB_pressed"]
+texture = ExtResource("3")
+texture_margin_left = 8.0
+texture_margin_top = 8.0
+texture_margin_right = 8.0
+texture_margin_bottom = 8.0
+
+[resource]
+Button/styles/disabled = SubResource("SB_disabled")
+Button/styles/focus = SubResource("SB_hover")
+Button/styles/hover = SubResource("SB_hover")
+Button/styles/normal = SubResource("SB_normal")
+Button/styles/pressed = SubResource("SB_pressed")

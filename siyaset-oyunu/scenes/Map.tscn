@@ -1,0 +1,22 @@
+[gd_scene load_steps=5 format=3 uid="uid://c8m1q2r3s4t5u"]
+
+[ext_resource type="Script" path="res://scripts/province_map.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/province_overlay.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/seat_markers.gd" id="3"]
+[ext_resource type="Texture2D" path="res://assets/ui/pm_circle.png" id="4"]
+
+[node name="Map" type="Node2D"]
+script = ExtResource("1")
+svg_path = "res://assets/maps/turkey_map.svg"
+target_pixel_width = 2400.0
+
+[node name="Background" type="Sprite2D" parent="."]
+
+[node name="Overlay" type="Node2D" parent="."]
+script = ExtResource("2")
+
+[node name="SeatMarkers" type="Node2D" parent="."]
+script = ExtResource("3")
+dot_texture = ExtResource("4")
+dot_radius = 4.0
+dot_spacing = 1.0

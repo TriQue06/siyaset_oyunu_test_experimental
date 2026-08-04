@@ -1,0 +1,144 @@
+[gd_scene format=3 uid="uid://cc2dv7lqytpbt"]
+
+[ext_resource type="Script" path="res://scripts/settings_overlay.gd" id="1"]
+[ext_resource type="Theme" path="res://assets/ui/main_theme.tres" id="2"]
+
+[node name="SettingsOverlay" type="CanvasLayer"]
+script = ExtResource("1")
+layer = 100
+
+[node name="OpenSettingsButton" type="Button" parent="."]
+unique_name_in_owner = true
+theme = ExtResource("2")
+layout_mode = 1
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -132.0
+offset_top = -60.0
+offset_right = -16.0
+offset_bottom = -16.0
+grow_horizontal = 0
+grow_vertical = 0
+text = "⚙ Ayarlar"
+
+[node name="FullScreenPanel" type="Control" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+theme = ExtResource("2")
+
+[node name="Background" type="ColorRect" parent="FullScreenPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.09, 0.1, 0.14, 1)
+
+[node name="CenterBox" type="VBoxContainer" parent="FullScreenPanel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -220.0
+offset_top = -140.0
+offset_right = 220.0
+offset_bottom = 140.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 16
+
+[node name="TitleLabel" type="Label" parent="FullScreenPanel/CenterBox"]
+layout_mode = 2
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 28
+text = "Oyun Ayarları"
+
+[node name="FpsLabel" type="Label" parent="FullScreenPanel/CenterBox"]
+unique_name_in_owner = true
+layout_mode = 2
+horizontal_alignment = 1
+text = "FPS Sınırı: 144"
+
+[node name="FpsSlider" type="HSlider" parent="FullScreenPanel/CenterBox"]
+unique_name_in_owner = true
+layout_mode = 2
+max_value = 7.0
+step = 1.0
+value = 4.0
+tick_count = 8
+ticks_on_borders = true
+
+[node name="VsyncRow" type="HBoxContainer" parent="FullScreenPanel/CenterBox"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 8
+
+[node name="VsyncLabel" type="Label" parent="FullScreenPanel/CenterBox/VsyncRow"]
+layout_mode = 2
+text = "VSync"
+
+[node name="VsyncCheck" type="CheckButton" parent="FullScreenPanel/CenterBox/VsyncRow"]
+unique_name_in_owner = true
+layout_mode = 2
+button_pressed = true
+
+[node name="DisplayModeLabel" type="Label" parent="FullScreenPanel/CenterBox"]
+layout_mode = 2
+horizontal_alignment = 1
+text = "Ekran Modu"
+
+[node name="DisplayModeRow" type="HBoxContainer" parent="FullScreenPanel/CenterBox"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 8
+
+[node name="WindowedButton" type="Button" parent="FullScreenPanel/CenterBox/DisplayModeRow"]
+unique_name_in_owner = true
+layout_mode = 2
+toggle_mode = true
+text = "Pencereli"
+
+[node name="FullscreenButton" type="Button" parent="FullScreenPanel/CenterBox/DisplayModeRow"]
+unique_name_in_owner = true
+layout_mode = 2
+toggle_mode = true
+text = "Tam Ekran"
+
+[node name="F11HintLabel" type="Label" parent="FullScreenPanel/CenterBox"]
+layout_mode = 2
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 12
+modulate = Color(1, 1, 1, 0.5)
+text = "(F11 ile de değiştirebilirsin)"
+
+[node name="StreamerModeRow" type="HBoxContainer" parent="FullScreenPanel/CenterBox"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 8
+
+[node name="StreamerModeLabel" type="Label" parent="FullScreenPanel/CenterBox/StreamerModeRow"]
+layout_mode = 2
+text = "Yayıncı Modu"
+
+[node name="StreamerModeCheck" type="CheckButton" parent="FullScreenPanel/CenterBox/StreamerModeRow"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="CloseButton" type="Button" parent="FullScreenPanel/CenterBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(200, 56)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "Kapat (ESC)"

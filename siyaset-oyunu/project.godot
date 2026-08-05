@@ -23,6 +23,8 @@ MultiplayerManager="*res://scripts/multiplayer_manager.gd"
 IdeologyAxes="*res://scripts/ideology_axes.gd"
 PartyPresets="*res://scripts/party_presets.gd"
 PartyManager="*res://scripts/party_manager.gd"
+CardPresets="*res://scripts/card_presets.gd"
+CardManager="*res://scripts/card_manager.gd"
 SettingsOverlay="*res://scenes/SettingsOverlay.tscn"
 SceneTransition="*res://scenes/SceneTransition.tscn"
 

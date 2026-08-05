@@ -153,7 +153,7 @@ theme_override_constants/separation = 10
 [node name="TitleLabel" type="Label" parent="RightPanel/Margin/Scroll/VBox" unique_id=1439790902]
 layout_mode = 2
 theme_override_font_sizes/font_size = 26
-text = "Partini Kur"
+text = "PARTİNİ KUR"
 horizontal_alignment = 1
 
 [node name="HSeparator0" type="HSeparator" parent="RightPanel/Margin/Scroll/VBox" unique_id=695007347]
@@ -167,7 +167,7 @@ horizontal_alignment = 1
 [node name="NameEdit" type="LineEdit" parent="RightPanel/Margin/Scroll/VBox" unique_id=1374996871]
 unique_name_in_owner = true
 layout_mode = 2
-placeholder_text = "Parti adı"
+placeholder_text = "Parti adını gir"
 alignment = 1
 
 [node name="NameHintLabel" type="Label" parent="RightPanel/Margin/Scroll/VBox" unique_id=430812991]
@@ -191,7 +191,7 @@ layout_mode = 2
 size_flags_horizontal = 4
 theme_override_constants/h_separation = 6
 theme_override_constants/v_separation = 6
-columns = 10
+columns = 12
 
 [node name="HSeparator2" type="HSeparator" parent="RightPanel/Margin/Scroll/VBox" unique_id=1292805283]
 layout_mode = 2
@@ -242,7 +242,7 @@ layout_mode = 2
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
-text = "🎲 Rastgele"
+text = "🎲 Beni Şaşırt"
 
 [node name="HSeparator4" type="HSeparator" parent="RightPanel/Margin/Scroll/VBox" unique_id=1623326340]
 layout_mode = 2

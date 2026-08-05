@@ -20,11 +20,32 @@ var _dragging := false
 var _last_drag_pos := Vector2.ZERO
 var _velocity := Vector2.ZERO
 var _wheel_target := Vector2.ZERO
+var _wheel_active := false # tekerlek hedefine dogru yumusak yaklasma su an aktif mi
+var _internal_update := false # scroll_horizontal/vertical'i BIZ yaziyoruz, disaridan degil
 
 func _ready() -> void:
 	_wheel_target = Vector2(scroll_horizontal, scroll_vertical)
 	gui_input.connect(_on_gui_input)
+	# Scrollbar'lari dogrudan fareyle surukleme, gui_input'tan degil bu
+	# sinyalden gecer; _wheel_target'i onunla senkron tutmazsak, kullanicinin
+	# scrollbar'i surukleyisiyle bizim eski hedefe "yumusak yaklasma" mantigimiz
+	# birbiriyle cekisip titremeye/bug'a yol aciyordu.
+	var h_bar := get_h_scroll_bar()
+	var v_bar := get_v_scroll_bar()
+	if h_bar != null:
+		h_bar.value_changed.connect(_on_scrollbar_value_changed)
+	if v_bar != null:
+		v_bar.value_changed.connect(_on_scrollbar_value_changed)
 	set_process(true)
+
+func _on_scrollbar_value_changed(_value: float) -> void:
+	if _internal_update or _dragging:
+		return
+	# Kullanici scrollbar'i dogrudan surukluyor (ya da tikladi): bizim
+	# hedefimizi ve momentum hizimizi anlik konuma senkronla ki cekismesin.
+	_wheel_active = false
+	_velocity = Vector2.ZERO
+	_wheel_target = Vector2(scroll_horizontal, scroll_vertical)
 
 func _get_max_scroll() -> Vector2:
 	var h_bar := get_h_scroll_bar()
@@ -41,6 +62,7 @@ func _on_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_MIDDLE:
 		if event.pressed:
 			_dragging = true
+			_wheel_active = false
 			_last_drag_pos = event.global_position
 			_velocity = Vector2.ZERO
 			_wheel_target = Vector2(scroll_horizontal, scroll_vertical)
@@ -48,9 +70,11 @@ func _on_gui_input(event: InputEvent) -> void:
 			_dragging = false
 		accept_event()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
+		_wheel_active = true
 		_wheel_target.y = clampf(_wheel_target.y - WHEEL_STEP, 0.0, _get_max_scroll().y)
 		accept_event()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+		_wheel_active = true
 		_wheel_target.y = clampf(_wheel_target.y + WHEEL_STEP, 0.0, _get_max_scroll().y)
 		accept_event()
 	elif event is InputEventMouseMotion and _dragging:
@@ -58,8 +82,10 @@ func _on_gui_input(event: InputEvent) -> void:
 		var delta: Vector2 = motion.global_position - _last_drag_pos
 		_last_drag_pos = motion.global_position
 		var max_scroll := _get_max_scroll()
+		_internal_update = true
 		scroll_horizontal = clampi(scroll_horizontal - int(delta.x), 0, int(max_scroll.x))
 		scroll_vertical = clampi(scroll_vertical - int(delta.y), 0, int(max_scroll.y))
+		_internal_update = false
 		_wheel_target = Vector2(scroll_horizontal, scroll_vertical)
 		var dt := maxf(get_process_delta_time(), 0.0001)
 		var target_velocity: Vector2 = -delta / dt
@@ -73,18 +99,27 @@ func _process(delta: float) -> void:
 		return
 
 	# Tekerlek hedefine yumuşak yaklaşma (kullanıcı tekerlek çevirdiyse).
-	var current := Vector2(scroll_horizontal, scroll_vertical)
-	if current.distance_to(_wheel_target) > 0.5:
-		var eased := current.lerp(_wheel_target, minf(1.0, WHEEL_EASE_SPEED * delta))
-		scroll_horizontal = int(round(eased.x))
-		scroll_vertical = int(round(eased.y))
-		return
+	# Sadece _wheel_active iken calisir; kullanici scrollbar'i dogrudan
+	# surukluyorsa _on_scrollbar_value_changed bunu kapatir, cekisme olmaz.
+	if _wheel_active:
+		var current := Vector2(scroll_horizontal, scroll_vertical)
+		if current.distance_to(_wheel_target) > 0.5:
+			var eased := current.lerp(_wheel_target, minf(1.0, WHEEL_EASE_SPEED * delta))
+			_internal_update = true
+			scroll_horizontal = int(round(eased.x))
+			scroll_vertical = int(round(eased.y))
+			_internal_update = false
+			return
+		else:
+			_wheel_active = false
 
 	# Bırakınca momentum: sürtünmeyle yavaşlayarak kaymaya devam eder.
 	if _velocity.length() > MIN_VELOCITY:
 		var new_scroll := Vector2(scroll_horizontal, scroll_vertical) + _velocity * delta
+		_internal_update = true
 		scroll_horizontal = clampi(int(round(new_scroll.x)), 0, int(max_scroll.x))
 		scroll_vertical = clampi(int(round(new_scroll.y)), 0, int(max_scroll.y))
+		_internal_update = false
 		_wheel_target = Vector2(scroll_horizontal, scroll_vertical)
 		_velocity = _velocity.lerp(Vector2.ZERO, minf(1.0, FRICTION * delta))
 		# Kenara çarpınca momentum'u kes (zıplamasın).

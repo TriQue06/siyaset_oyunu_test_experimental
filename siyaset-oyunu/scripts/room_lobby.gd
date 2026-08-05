@@ -20,6 +20,15 @@ const SLIDE_DURATION := 0.2
 @onready var party_duration_value_label: Label = %PartyDurationValueLabel
 @onready var side_close_button: Button = %SideCloseButton
 
+@onready var axis_start_slider: HSlider = %AxisStartSlider
+@onready var axis_start_value_label: Label = %AxisStartValueLabel
+@onready var axis_increment_slider: HSlider = %AxisIncrementSlider
+@onready var axis_increment_value_label: Label = %AxisIncrementValueLabel
+@onready var axis_max_enabled_check: CheckButton = %AxisMaxEnabledCheck
+@onready var axis_max_value_row: HBoxContainer = %AxisMaxValueRow
+@onready var axis_max_value_slider: HSlider = %AxisMaxValueSlider
+@onready var axis_max_value_value_label: Label = %AxisMaxValueValueLabel
+
 var _settings_open: bool = false
 var _center_base_x: float = 0.0
 
@@ -41,6 +50,23 @@ func _ready() -> void:
 	party_duration_slider.max_value = MultiplayerManager.PARTY_DURATION_OPTIONS.size() - 1
 	party_duration_slider.step = 1
 	party_duration_slider.value_changed.connect(_on_party_duration_slider_changed)
+
+	axis_start_slider.min_value = MultiplayerManager.AXIS_SHARPNESS_START_MIN
+	axis_start_slider.max_value = MultiplayerManager.AXIS_SHARPNESS_START_MAX
+	axis_start_slider.step = 0.5
+	axis_start_slider.value_changed.connect(_on_axis_start_slider_changed)
+
+	axis_increment_slider.min_value = MultiplayerManager.AXIS_SHARPNESS_INCREMENT_MIN
+	axis_increment_slider.max_value = MultiplayerManager.AXIS_SHARPNESS_INCREMENT_MAX
+	axis_increment_slider.step = 0.1
+	axis_increment_slider.value_changed.connect(_on_axis_increment_slider_changed)
+
+	axis_max_enabled_check.toggled.connect(_on_axis_max_enabled_toggled)
+
+	axis_max_value_slider.min_value = 0
+	axis_max_value_slider.max_value = MultiplayerManager.AXIS_SHARPNESS_CAP_OPTIONS.size() - 1
+	axis_max_value_slider.step = 1
+	axis_max_value_slider.value_changed.connect(_on_axis_max_value_slider_changed)
 
 	MultiplayerManager.player_list_updated.connect(_refresh)
 	MultiplayerManager.settings_updated.connect(_refresh_settings_display)
@@ -98,6 +124,10 @@ func _refresh() -> void:
 
 	threshold_slider.editable = am_owner
 	party_duration_slider.editable = am_owner
+	axis_start_slider.editable = am_owner
+	axis_increment_slider.editable = am_owner
+	axis_max_enabled_check.disabled = not am_owner
+	axis_max_value_slider.editable = am_owner
 	_refresh_settings_display()
 
 func _refresh_settings_display() -> void:
@@ -112,6 +142,21 @@ func _refresh_settings_display() -> void:
 	if not party_duration_slider.has_focus():
 		var idx := MultiplayerManager.PARTY_DURATION_OPTIONS.find(duration)
 		party_duration_slider.value = idx if idx != -1 else 0
+
+	axis_start_value_label.text = "%.1f" % MultiplayerManager.axis_sharpness_start
+	if not axis_start_slider.has_focus():
+		axis_start_slider.value = MultiplayerManager.axis_sharpness_start
+
+	axis_increment_value_label.text = "%.1f" % MultiplayerManager.axis_sharpness_increment
+	if not axis_increment_slider.has_focus():
+		axis_increment_slider.value = MultiplayerManager.axis_sharpness_increment
+
+	axis_max_enabled_check.button_pressed = MultiplayerManager.axis_sharpness_max_enabled
+	axis_max_value_row.visible = MultiplayerManager.axis_sharpness_max_enabled
+	axis_max_value_value_label.text = "%.0f" % MultiplayerManager.axis_sharpness_max_value
+	if not axis_max_value_slider.has_focus():
+		var cap_idx := MultiplayerManager.AXIS_SHARPNESS_CAP_OPTIONS.find(MultiplayerManager.axis_sharpness_max_value)
+		axis_max_value_slider.value = cap_idx if cap_idx != -1 else 0
 
 func _format_party_duration(seconds: int) -> String:
 	if seconds == MultiplayerManager.PARTY_DURATION_UNLIMITED:
@@ -129,6 +174,20 @@ func _on_threshold_slider_changed(value: float) -> void:
 func _on_party_duration_slider_changed(index: float) -> void:
 	var seconds: int = MultiplayerManager.PARTY_DURATION_OPTIONS[int(index)]
 	MultiplayerManager.set_party_setup_duration(seconds)
+
+func _on_axis_start_slider_changed(value: float) -> void:
+	MultiplayerManager.set_axis_sharpness_start(value)
+
+func _on_axis_increment_slider_changed(value: float) -> void:
+	MultiplayerManager.set_axis_sharpness_increment(value)
+
+func _on_axis_max_enabled_toggled(enabled: bool) -> void:
+	axis_max_value_row.visible = enabled
+	MultiplayerManager.set_axis_sharpness_max_enabled(enabled)
+
+func _on_axis_max_value_slider_changed(index: float) -> void:
+	var value: float = MultiplayerManager.AXIS_SHARPNESS_CAP_OPTIONS[int(index)]
+	MultiplayerManager.set_axis_sharpness_max_value(value)
 
 func _refresh_code_display() -> void:
 	var shown := "•••••" if GameSettings.streamer_mode else MultiplayerManager.room_code

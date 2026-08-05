@@ -1,6 +1,11 @@
 extends Node2D
 ## ProvinceMap'in ÇOCUĞU olarak eklenir (bkz. Map.tscn). İllerin üstüne, o
-## ildeki milletvekili sandalyelerini pm_circle.png noktaları halinde çizer.
+## ildeki milletvekili sandalyelerini noktalar halinde çizer.
+##
+## Noktalar bir raster texture (Sprite2D) yerine _draw()/draw_circle ile
+## VEKTÖR olarak çiziliyor (antialiased) — harita hangi ölçekte gösterilirse
+## gösterilsin (ne kadar büyütülürse büyütülsün) her zaman keskin/pürüzsüz
+## kalır, pikselleşmez.
 ##
 ## Yerleşim algoritması, geliştiricinin "projeksiyon_hesaplayici" web
 ## uygulamasındaki getDotLayout() / çarpışma-önleyici fizik motorunun
@@ -8,16 +13,23 @@ extends Node2D
 ## için satır/sütun grid'i), komşu illerin dot grupları görsel olarak
 ## çakışıyorsa (özellikle küçük/bitişik illerde olur) birbirini yumuşakça iter.
 
-@export var dot_texture: Texture2D
-@export var dot_radius: float = 4.0     # pm_circle.png yarıçapı (harita/viewBox birimi)
-@export var dot_spacing: float = 1.0    # aynı gruptaki noktalar arası boşluk
+@export var dot_radius: float = 5.5     # nokta yarıçapı (harita/viewBox birimi)
+@export var dot_outline_width: float = 1.8  # siyah kontur kalınlığı
+@export var dot_outline_color: Color = Color(0.11, 0.12, 0.13) # eksen_projeksiyon: #1c1e21
+@export var dot_spacing: float = 1.5    # aynı gruptaki noktalar arası boşluk
 @export var push_iterations: int = 20
 @export var return_strength: float = 0.04   # orijinal merkeze çekilme hızı
 @export var push_strength: float = 0.2      # çakışan gruplar arası itme hızı
+## Çarpışma fiziğinde kullanılan "sanal" grup yarıçapı, gerçek ızgara
+## yarıçapının bu katı kadar büyük tutulur — komşu illerin grupları arasında
+## ekstra boşluk bırakır, kenar noktaları görsel olarak iç içe girmesin diye
+## (eksen_projeksiyon'daki 10.5/7.25 = ~1.45 oranındaki fikrin genellemesi).
+@export var collision_radius_factor: float = 1.6
 
 # province_id -> Array[Color] (o ildeki her sandalye için bir renk, parti rengi)
 var _seats: Dictionary = {}
-var _sprite_pool: Array = []
+# Array[{"pos": Vector2, "color": Color}] — _draw() bunu tek seferde çizer.
+var _dots: Array = []
 
 @onready var _province_map = get_parent()
 
@@ -70,11 +82,10 @@ func _get_dot_layout(n: int) -> Array:
 	return layout
 
 func _rebuild() -> void:
-	for s in _sprite_pool:
-		s.queue_free()
-	_sprite_pool.clear()
+	_dots.clear()
 
-	if _province_map == null or dot_texture == null:
+	if _province_map == null:
+		queue_redraw()
 		return
 
 	var cell := dot_radius * 2.0 + dot_spacing
@@ -90,7 +101,7 @@ func _rebuild() -> void:
 		var rows := layout.size()
 		var grid_w := max_cols * cell
 		var grid_h := rows * cell
-		var radius := sqrt(pow(grid_w * 0.5, 2) + pow(grid_h * 0.5, 2)) * 0.95
+		var radius := sqrt(pow(grid_w * 0.5, 2) + pow(grid_h * 0.5, 2)) * 0.95 * collision_radius_factor
 		var center: Vector2 = _province_map.get_province_centroid(province_id)
 		groups.append({
 			"orig": center,
@@ -121,6 +132,8 @@ func _rebuild() -> void:
 	for g in groups:
 		_spawn_group(g.pos, g.layout, g.colors, cell)
 
+	queue_redraw()
+
 func _spawn_group(center: Vector2, layout: Array, colors: Array, cell: float) -> void:
 	var rows := layout.size()
 	var total_h := rows * cell - dot_spacing
@@ -132,12 +145,15 @@ func _spawn_group(center: Vector2, layout: Array, colors: Array, cell: float) ->
 		var start_x := center.x - total_w * 0.5 + dot_radius
 		for col in cols:
 			var pos := Vector2(start_x + col * cell, start_y + row * cell)
-			var spr := Sprite2D.new()
-			spr.texture = dot_texture
-			spr.centered = true
-			spr.position = pos
-			spr.modulate = colors[idx]
-			spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-			add_child(spr)
-			_sprite_pool.append(spr)
+			_dots.append({"pos": pos, "color": colors[idx]})
 			idx += 1
+
+func _draw() -> void:
+	# Kontur efekti: önce biraz daha büyük siyah bir daire, üstüne parti
+	# renginde asıl nokta (eksen_projeksiyon'daki stroke="#1c1e21" konturuna
+	# karşılık gelir, Godot'ta draw_circle'ın outline parametresi olmadığı
+	# için iki daire üst üste çizilerek taklit ediliyor).
+	for dot in _dots:
+		draw_circle(dot["pos"], dot_radius + dot_outline_width, dot_outline_color, true, -1.0, true)
+	for dot in _dots:
+		draw_circle(dot["pos"], dot_radius, dot["color"], true, -1.0, true)

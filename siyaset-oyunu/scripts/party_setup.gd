@@ -92,8 +92,9 @@ func _process(delta: float) -> void:
 
 func _update_countdown_label() -> void:
 	if _unlimited_time:
-		countdown_label.text = "Süre: Sınırsız"
+		countdown_label.visible = false
 		return
+	countdown_label.visible = true
 	var seconds := int(ceil(_time_left))
 	countdown_label.text = "Süre: %02d:%02d" % [seconds / 60, seconds % 60]
 
@@ -184,12 +185,19 @@ func _on_icon_selected(index: int) -> void:
 
 func _on_icon_color_selected(index: int) -> void:
 	_selected_icon_color = PartyPresets.COLORS[index]
+	# İkon rengi değişince, arka plan satırındaki "dolu" (taken) durumu da
+	# değişmiş olabilir — SADECE kendi satırını değil, İKİSİNİ de yeniden kur.
+	# Önceden sadece kendi satırı yenileniyordu, bu da diğer satırın bir süre
+	# BAYAT (stale) kalıp çakışan bir rengin yanlışlıkla tıklanabilmesine yol
+	# açabiliyordu.
 	_build_color_row(icon_color_row, _on_icon_color_selected)
+	_build_color_row(bg_color_row, _on_bg_color_selected)
 	_update_preview()
 	_push_party()
 
 func _on_bg_color_selected(index: int) -> void:
 	_selected_bg_color = PartyPresets.COLORS[index]
+	_build_color_row(icon_color_row, _on_icon_color_selected)
 	_build_color_row(bg_color_row, _on_bg_color_selected)
 	_update_preview()
 	_push_party()
@@ -278,11 +286,20 @@ func _push_party() -> void:
 
 ## "Kilitle ve Hazır Ver" / iptal: kilitliyken tüm seçim kontrolleri
 ## devre dışı kalır (yanlışlıkla değiştirilemesin diye), tekrar basınca açılır.
+## Kilitlerken parti verisi + hazır bayrağı TEK bir atomik çağrıyla
+## (set_party_and_ready) birlikte gönderiliyor — hızlıca art arda
+## seç+kilitle yapılırsa host'un "hazır"ı partinin SON hâli ulaşmadan
+## uygulayıp oyunu erken/varsayılan veriyle başlatma riski bu şekilde
+## tamamen ortadan kalkıyor (bkz. PartyManager.set_party_and_ready).
 func _on_ready_pressed() -> void:
 	_is_locked = not _is_locked
 	_set_controls_disabled(_is_locked)
 	ready_button.text = "✕ İptal Et" if _is_locked else "🔒 Kilitle ve Hazır Ver"
-	PartyManager.set_ready(_is_locked)
+	if _is_locked:
+		if PartyManager.is_valid_name(_party_name):
+			PartyManager.set_party_and_ready(_party_name, _selected_icon_index, _selected_icon_color, _selected_bg_color, _ideology, true)
+	else:
+		PartyManager.set_ready(false)
 
 func _set_controls_disabled(disabled: bool) -> void:
 	name_edit.editable = not disabled

@@ -43,11 +43,21 @@ static func is_valid_name(party_name: String) -> bool:
 	var length := party_name.length()
 	return length >= NAME_MIN_LENGTH and length <= NAME_MAX_LENGTH
 
+## İkon rengi ile arka plan rengi ASLA aynı olamaz — istemci tarafı bunu UI
+## seviyesinde (taken renk butonları) engelliyor ama bir istemci tarafı gecikmesi/
+## bug'ı yüzünden çakışan bir çift yine de gönderilirse, HOST burada son
+## savunma hattı olarak reddeder (aksi hâlde ikon, arka planla aynı renkte
+## görünmez olurdu — "arka plan rengi kabul olmuyor" gibi algılanabilir).
+static func is_valid_colors(icon_color: Color, bg_color: Color) -> bool:
+	return not icon_color.is_equal_approx(bg_color)
+
 ## Bu oyuncunun parti verisini ayarlar (isim/ikon/renk/ideoloji seçimi
 ## değiştikçe çağrılır). ideology: IdeologyAxes.is_valid_start_ideology()'yi
 ## geçmeli (kuruluşta uç/nötr yasak).
 func set_my_party(party_name: String, icon_index: int, icon_color: Color, bg_color: Color, ideology: Dictionary) -> void:
 	if not is_valid_name(party_name):
+		return
+	if not is_valid_colors(icon_color, bg_color):
 		return
 	if not IdeologyAxes.is_valid_start_ideology(ideology):
 		return
@@ -61,6 +71,31 @@ func set_my_party(party_name: String, icon_index: int, icon_color: Color, bg_col
 		_apply_party(my_id, party_name, icon_index, icon_color, bg_color, ideology)
 	else:
 		_request_set_party.rpc_id(1, party_name, icon_index, icon_color, bg_color, ideology)
+
+## Parti verisini ve hazır durumunu AYNI ANDA, TEK bir RPC ile ayarlar.
+## "Kilitle ve Hazır Ver"e basınca kullanılmalı — set_my_party() sonra ayrı
+## bir set_ready(true) çağrısı YAPMA: iki ayrı RPC arasında (özellikle
+## hızlıca art arda basılırsa) host'un "hazır" bayrağını partinin SON
+## değişikliği ulaşmadan uygulayıp oyunu erken başlatma riski olurdu — bu
+## fonksiyon ikisini TEK mesajda birleştirerek bunu imkansız kılar.
+func set_party_and_ready(party_name: String, icon_index: int, icon_color: Color, bg_color: Color, ideology: Dictionary, is_ready_value: bool) -> void:
+	if not is_valid_name(party_name):
+		return
+	if not is_valid_colors(icon_color, bg_color):
+		return
+	if not IdeologyAxes.is_valid_start_ideology(ideology):
+		return
+	if MultiplayerManager.room_code == "":
+		_apply_party_local_only(party_name, icon_index, icon_color, bg_color, ideology)
+		var id := multiplayer.get_unique_id()
+		parties[id]["ready"] = is_ready_value
+		parties_updated.emit()
+		return
+	var my_id := multiplayer.get_unique_id()
+	if MultiplayerManager.is_host:
+		_apply_party_and_ready(my_id, party_name, icon_index, icon_color, bg_color, ideology, is_ready_value)
+	else:
+		_request_set_party_and_ready.rpc_id(1, party_name, icon_index, icon_color, bg_color, ideology, is_ready_value)
 
 ## Bu oyuncunun hazır durumunu ayarlar ("Kilitle ve Hazır Ver" / iptal).
 func set_ready(is_ready_value: bool) -> void:
@@ -81,6 +116,26 @@ func reset() -> void:
 	if not MultiplayerManager.is_host:
 		return
 	parties.clear()
+	_sync_parties.rpc(parties)
+	parties_updated.emit()
+
+## Oyun sırasında (kart oynanınca vb.) bir partinin ideoloji eksenini kaydırır.
+## Sadece host çağırır (bkz. CardManager._apply_play). Oyun ortasında uç/nötr
+## yasağı YOKTUR, sadece [-3, 3] aralığına sıkıştırılır.
+func apply_ideology_delta(peer_id: int, axis: String, delta: int) -> void:
+	# room_code == "" : aktif oda yok (örn. sahne editörde tek başına test) —
+	# yerel önizleme için host kontrolünü atla.
+	if MultiplayerManager.room_code != "" and not MultiplayerManager.is_host:
+		return
+	if not parties.has(peer_id):
+		return
+	var ideology: Dictionary = parties[peer_id].get("ideology", IdeologyAxes.default_values())
+	var new_value: int = IdeologyAxes.clamp_value(int(ideology.get(axis, 0)) + delta)
+	ideology[axis] = new_value
+	parties[peer_id]["ideology"] = ideology
+	if MultiplayerManager.room_code == "":
+		parties_updated.emit()
+		return
 	_sync_parties.rpc(parties)
 	parties_updated.emit()
 
@@ -110,6 +165,20 @@ func _apply_party(peer_id: int, party_name: String, icon_index: int, icon_color:
 	_sync_parties.rpc(parties)
 	parties_updated.emit()
 
+func _apply_party_and_ready(peer_id: int, party_name: String, icon_index: int, icon_color: Color, bg_color: Color, ideology: Dictionary, is_ready_value: bool) -> void:
+	parties[peer_id] = {
+		"name": party_name,
+		"icon_index": icon_index,
+		"icon_color": icon_color,
+		"bg_color": bg_color,
+		"ideology": ideology,
+		"ready": is_ready_value,
+	}
+	_sync_parties.rpc(parties)
+	parties_updated.emit()
+	if is_ready_value and all_ready():
+		MultiplayerManager.finish_party_setup()
+
 func _apply_ready(peer_id: int, is_ready_value: bool) -> void:
 	if not parties.has(peer_id):
 		parties[peer_id] = {}
@@ -125,6 +194,8 @@ func _request_set_party(party_name: String, icon_index: int, icon_color: Color, 
 		return
 	if not is_valid_name(party_name):
 		return
+	if not is_valid_colors(icon_color, bg_color):
+		return
 	if not IdeologyAxes.is_valid_start_ideology(ideology):
 		return
 	var sender_id := multiplayer.get_remote_sender_id()
@@ -136,6 +207,19 @@ func _request_set_ready(is_ready_value: bool) -> void:
 		return
 	var sender_id := multiplayer.get_remote_sender_id()
 	_apply_ready(sender_id, is_ready_value)
+
+@rpc("any_peer", "reliable")
+func _request_set_party_and_ready(party_name: String, icon_index: int, icon_color: Color, bg_color: Color, ideology: Dictionary, is_ready_value: bool) -> void:
+	if not MultiplayerManager.is_host:
+		return
+	if not is_valid_name(party_name):
+		return
+	if not is_valid_colors(icon_color, bg_color):
+		return
+	if not IdeologyAxes.is_valid_start_ideology(ideology):
+		return
+	var sender_id := multiplayer.get_remote_sender_id()
+	_apply_party_and_ready(sender_id, party_name, icon_index, icon_color, bg_color, ideology, is_ready_value)
 
 @rpc("authority", "reliable")
 func _sync_parties(new_parties: Dictionary) -> void:

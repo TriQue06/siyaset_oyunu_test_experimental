@@ -48,17 +48,33 @@ func _ready() -> void:
 func _scan_icons() -> void:
 	icon_paths.clear()
 	var dir := DirAccess.open(ICONS_DIR)
-	if dir == null:
-		push_warning("İkon klasörü bulunamadı: %s" % ICONS_DIR)
-		return
-	dir.list_dir_begin()
-	var file_name := dir.get_next()
-	while file_name != "":
-		if not dir.current_is_dir() and file_name.get_extension().to_lower() == "svg":
-			icon_paths.append(ICONS_DIR.path_join(file_name))
-		file_name = dir.get_next()
-	dir.list_dir_end()
-	icon_paths.sort()
+	if dir != null:
+		dir.list_dir_begin()
+		var file_name := dir.get_next()
+		while file_name != "":
+			if not dir.current_is_dir() and file_name.get_extension().to_lower() == "svgdata":
+				icon_paths.append(ICONS_DIR.path_join(file_name))
+			file_name = dir.get_next()
+		dir.list_dir_end()
+		icon_paths.sort()
+
+	if icon_paths.is_empty():
+		# Bazı export ayarlarında dizin taraması (DirAccess) paketlenmiş
+		# kaynaklarda güvenilmez olabiliyor; dosya adları icon_01..icon_NN
+		# şeklinde sıralı olduğu için, tarama boş dönerse dosyaların
+		# gerçekten var olup olmadığını deneyerek (FileAccess.file_exists)
+		# bir yedek liste oluşturuyoruz.
+		var i := 1
+		while true:
+			var candidate := ICONS_DIR.path_join("icon_%02d.svgdata" % i)
+			if not FileAccess.file_exists(candidate):
+				break
+			icon_paths.append(candidate)
+			i += 1
+		if not icon_paths.is_empty():
+			push_warning("İkon dizini taranamadı, %d ikon yedek listeyle bulundu." % icon_paths.size())
+		else:
+			push_warning("İkon klasörü bulunamadı: %s" % ICONS_DIR)
 
 func icon_count() -> int:
 	return icon_paths.size()

@@ -30,7 +30,6 @@ var _transfer_channel: int = 0
 var _refusing_new_connections: bool = false
 
 var _incoming: Array = [] # her biri: {"sender": int, "data": PackedByteArray}
-var _last_packet_peer: int = 0
 
 var _pending_mode: int = -1 # 0=create, 1=join
 var _pending_name: String = ""
@@ -138,7 +137,6 @@ func _get_packet_script() -> PackedByteArray:
 	if _incoming.is_empty():
 		return PackedByteArray()
 	var entry: Dictionary = _incoming.pop_front()
-	_last_packet_peer = entry["sender"]
 	return entry["data"]
 
 func _put_packet_script(p_buffer: PackedByteArray) -> int:
@@ -175,7 +173,17 @@ func _set_target_peer(p_peer: int) -> void:
 	_target_peer = p_peer
 
 func _get_packet_peer() -> int:
-	return _last_packet_peer
+	# ÖNEMLİ: bunu _get_packet_script()'ten BAĞIMSIZ, kuyruğun BAŞINDAKİ
+	# paketten (henüz pop ETMEDEN, sadece bakarak) okuyoruz. Önceden
+	# _get_packet_script() çağrılana kadar güncellenmeyen ayrı bir "son
+	# gönderen" değişkeni tutuyorduk — Godot bu iki fonksiyonu her paket
+	# için hangi sırayla çağırdığına bağlı olarak, gönderen bilgisi bir
+	# paket GERİDEN gelebiliyordu (ör. B'nin isteği yanlışlıkla A'nın
+	# göndericisi sanılabiliyordu). Artık ikisi tamamen bağımsız ve her
+	# zaman kuyruğun aynı (ilk) elemanına bakıyor, sıra sorunu imkansız.
+	if _incoming.is_empty():
+		return 0
+	return _incoming[0]["sender"]
 
 func _is_server() -> bool:
 	return _unique_id == 1

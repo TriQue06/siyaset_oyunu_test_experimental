@@ -211,3 +211,94 @@ layout_mode = 2
 max_value = 4.0
 tick_count = 5
 ticks_on_borders = true
+
+[node name="HSeparator3" type="HSeparator" parent="SettingsSidePanel/Margin/VBox"]
+layout_mode = 2
+
+[node name="AxisSharpnessTitle" type="Label" parent="SettingsSidePanel/Margin/VBox"]
+layout_mode = 2
+text = "Eksen Keskinliği"
+theme_override_font_sizes/font_size = 15
+
+[node name="AxisStartRow" type="HBoxContainer" parent="SettingsSidePanel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="AxisStartRowLabel" type="Label" parent="SettingsSidePanel/Margin/VBox/AxisStartRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Başlangıç"
+
+[node name="AxisStartValueLabel" type="Label" parent="SettingsSidePanel/Margin/VBox/AxisStartRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "0.5"
+horizontal_alignment = 2
+
+[node name="AxisStartSlider" type="HSlider" parent="SettingsSidePanel/Margin/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 0.5
+max_value = 5.0
+step = 0.5
+value = 0.5
+
+[node name="AxisIncrementRow" type="HBoxContainer" parent="SettingsSidePanel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="AxisIncrementRowLabel" type="Label" parent="SettingsSidePanel/Margin/VBox/AxisIncrementRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Artış Miktarı"
+
+[node name="AxisIncrementValueLabel" type="Label" parent="SettingsSidePanel/Margin/VBox/AxisIncrementRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "0.5"
+horizontal_alignment = 2
+
+[node name="AxisIncrementSlider" type="HSlider" parent="SettingsSidePanel/Margin/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 0.0
+max_value = 1.0
+step = 0.1
+value = 0.5
+
+[node name="AxisMaxEnabledRow" type="HBoxContainer" parent="SettingsSidePanel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="AxisMaxEnabledLabel" type="Label" parent="SettingsSidePanel/Margin/VBox/AxisMaxEnabledRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Maks. Keskinlik Sınırlı"
+
+[node name="AxisMaxEnabledCheck" type="CheckButton" parent="SettingsSidePanel/Margin/VBox/AxisMaxEnabledRow"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="AxisMaxValueRow" type="HBoxContainer" parent="SettingsSidePanel/Margin/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="AxisMaxValueRowLabel" type="Label" parent="SettingsSidePanel/Margin/VBox/AxisMaxValueRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Tavan"
+
+[node name="AxisMaxValueValueLabel" type="Label" parent="SettingsSidePanel/Margin/VBox/AxisMaxValueRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "10"
+horizontal_alignment = 2
+
+[node name="AxisMaxValueSlider" type="HSlider" parent="SettingsSidePanel/Margin/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+max_value = 4.0
+tick_count = 5
+ticks_on_borders = true
+value = 1.0

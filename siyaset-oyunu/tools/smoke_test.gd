@@ -14,6 +14,7 @@ func _initialize() -> void:
 		"res://scenes/SceneTransition.tscn",
 		"res://scenes/PartySetup.tscn",
 		"res://scenes/GameScreen.tscn",
+		"res://scenes/ElectionResults.tscn",
 	]
 	for path in scenes:
 		print("--- loading ", path, " ---")

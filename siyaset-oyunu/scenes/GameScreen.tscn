@@ -3,6 +3,18 @@
 [ext_resource type="Script" uid="uid://cnu4od1d25ymv" path="res://scripts/game_screen.gd" id="1"]
 [ext_resource type="Theme" uid="uid://cmjk3bfl8mavr" path="res://assets/ui/main_theme.tres" id="2"]
 [ext_resource type="PackedScene" uid="uid://c8m1q2r3s4t5u" path="res://scenes/Map.tscn" id="3"]
+[ext_resource type="Script" path="res://scripts/parliament_diagram.gd" id="4"]
+[ext_resource type="Script" path="res://scripts/vote_share_panel.gd" id="5"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_turnindicator"]
+bg_color = Color(0.13, 0.14, 0.19, 0.95)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+shadow_color = Color(0, 0, 0, 0.38)
+shadow_size = 8
+shadow_offset = Vector2(0, 3)
 
 [node name="GameScreen" type="Control" unique_id=958546920]
 layout_mode = 3
@@ -11,6 +23,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 theme = ExtResource("2")
 script = ExtResource("1")
 
@@ -21,33 +34,48 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 color = Color(0.09, 0.1, 0.14, 1)
 
 [node name="MapHolder" parent="." unique_id=1009808577 instance=ExtResource("3")]
 unique_name_in_owner = true
 
-[node name="PlaceholderLabel" type="Label" parent="." unique_id=803109735]
+[node name="DeckButton" type="TextureButton" parent="." unique_id=3821004411]
+unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -220.0
-offset_top = -20.0
-offset_right = 220.0
-offset_bottom = 20.0
-grow_horizontal = 2
+anchor_left = 1.0
+anchor_top = 0.28
+anchor_right = 1.0
+anchor_bottom = 0.28
+offset_left = -346.0
+offset_top = -144.0
+offset_right = -130.0
+offset_bottom = 144.0
+grow_horizontal = 0
 grow_vertical = 2
-theme_override_font_sizes/font_size = 22
-text = "Oyun başladı — dönem döngüsü henüz burada değil"
-horizontal_alignment = 1
+ignore_texture_size = true
+stretch_mode = 5
+
+[node name="PassButton" type="Button" parent="." unique_id=3821004430]
+unique_name_in_owner = true
+layout_mode = 1
+anchor_left = 1.0
+anchor_top = 0.28
+anchor_right = 1.0
+anchor_bottom = 0.28
+offset_left = -346.0
+offset_top = 154.0
+offset_right = -130.0
+offset_bottom = 190.0
+grow_horizontal = 0
+grow_vertical = 2
+text = "Pas Geç"
 
 [node name="PlayerPanel" type="Control" parent="." unique_id=1341816534]
 layout_mode = 1
 anchor_left = 1.0
 anchor_right = 1.0
-anchor_bottom = 1.0
+anchor_bottom = 0.62
 offset_left = -120.0
 grow_horizontal = 0
 grow_vertical = 2
@@ -66,6 +94,145 @@ grow_horizontal = 2
 grow_vertical = 2
 alignment = 1
 theme_override_constants/separation = 14
+
+[node name="BottomArea" type="Control" parent="." unique_id=3821004440]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_top = 0.62
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="ChamberSplit" type="HBoxContainer" parent="BottomArea" unique_id=3821004441]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="ParliamentChamber" type="MarginContainer" parent="BottomArea/ChamberSplit" unique_id=3821004442]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 16
+
+[node name="ParliamentDiagram" type="Control" parent="BottomArea/ChamberSplit/ParliamentChamber" unique_id=3821004445]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("4")
+
+[node name="VoteChamber" type="MarginContainer" parent="BottomArea/ChamberSplit" unique_id=3821004446]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 16
+
+[node name="VoteVBox" type="VBoxContainer" parent="BottomArea/ChamberSplit/VoteChamber" unique_id=3821004447]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="VoteTitle" type="Label" parent="BottomArea/ChamberSplit/VoteChamber/VoteVBox" unique_id=3821004448]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+modulate = Color(1, 1, 1, 0.6)
+text = "SON OY ORANLARI"
+
+[node name="VoteScroll" type="ScrollContainer" parent="BottomArea/ChamberSplit/VoteChamber/VoteVBox" unique_id=3821004450]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+mouse_filter = 2
+
+[node name="VoteSharePanel" type="VBoxContainer" parent="BottomArea/ChamberSplit/VoteChamber/VoteVBox/VoteScroll" unique_id=3821004449]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+script = ExtResource("5")
+
+[node name="TurnIndicator" type="PanelContainer" parent="." unique_id=3821004420]
+unique_name_in_owner = true
+theme_override_styles/panel = SubResource("StyleBoxFlat_turnindicator")
+layout_mode = 1
+anchors_preset = 0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = 190.0
+offset_bottom = 74.0
+
+[node name="TurnIndicatorMargin" type="MarginContainer" parent="TurnIndicator" unique_id=3821004421]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
+
+[node name="TurnIndicatorRow" type="HBoxContainer" parent="TurnIndicator/TurnIndicatorMargin" unique_id=3821004422]
+layout_mode = 2
+alignment = 0
+theme_override_constants/separation = 8
+
+[node name="TurnIndicatorBadgeSlot" type="Control" parent="TurnIndicator/TurnIndicatorMargin/TurnIndicatorRow" unique_id=3821004423]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(42, 42)
+layout_mode = 2
+
+[node name="TurnIndicatorLabel" type="Label" parent="TurnIndicator/TurnIndicatorMargin/TurnIndicatorRow" unique_id=3821004424]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 4
+text = "Sıra: -"
+autowrap_mode = 2
+theme_override_font_sizes/font_size = 14
+
+[node name="GameSettingsLabel" type="Label" parent="." unique_id=3821004450]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 0
+offset_left = 16.0
+offset_top = 82.0
+offset_right = 240.0
+offset_bottom = 110.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "Baraj: %0"
+
+[node name="HandArea" type="Control" parent="." unique_id=3821004412]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="HandContainer" type="HBoxContainer" parent="HandArea" unique_id=3821004413]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+theme_override_constants/separation = 8
 
 [node name="HoverTooltip" type="PanelContainer" parent="." unique_id=2118611278]
 unique_name_in_owner = true

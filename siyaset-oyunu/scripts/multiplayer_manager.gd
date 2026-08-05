@@ -54,6 +54,21 @@ const PARTY_DURATION_OPTIONS: Array[int] = [0, 30, 60, 90, 120]
 const PARTY_DURATION_UNLIMITED := 0
 const PARTY_DURATION_DEFAULT := PARTY_DURATION_UNLIMITED
 
+# --- Eksen keskinliği: her kart oynanışında ideoloji kayması, giderek büyüyen
+# bir çarpanla ölçeklenir (bkz. CardManager.current_axis_sharpness). Oyun
+# başında AXIS_SHARPNESS_START_DEFAULT'tan başlar, her kartta
+# AXIS_SHARPNESS_INCREMENT_DEFAULT kadar artar; "sınırlı" seçildiyse
+# AXIS_SHARPNESS_CAP_OPTIONS'taki bir tavanda durur.
+const AXIS_SHARPNESS_START_MIN := 0.5
+const AXIS_SHARPNESS_START_MAX := 5.0
+const AXIS_SHARPNESS_START_DEFAULT := 0.5
+const AXIS_SHARPNESS_INCREMENT_MIN := 0.0
+const AXIS_SHARPNESS_INCREMENT_MAX := 1.0
+const AXIS_SHARPNESS_INCREMENT_DEFAULT := 0.5
+const AXIS_SHARPNESS_CAP_OPTIONS: Array[float] = [5.0, 10.0, 15.0, 20.0, 25.0]
+const AXIS_SHARPNESS_MAX_ENABLED_DEFAULT := false
+const AXIS_SHARPNESS_MAX_VALUE_DEFAULT := 10.0
+
 var room_code: String = ""
 var is_host: bool = false
 var owner_id: int = 1
@@ -64,6 +79,10 @@ var players: Dictionary = {}
 # --- Lobi ayarları (lobi sahibi yetkili, tüm oyunculara senkronize) ---
 var election_threshold: float = THRESHOLD_DEFAULT
 var party_setup_duration: int = PARTY_DURATION_DEFAULT
+var axis_sharpness_start: float = AXIS_SHARPNESS_START_DEFAULT
+var axis_sharpness_increment: float = AXIS_SHARPNESS_INCREMENT_DEFAULT
+var axis_sharpness_max_enabled: bool = AXIS_SHARPNESS_MAX_ENABLED_DEFAULT
+var axis_sharpness_max_value: float = AXIS_SHARPNESS_MAX_VALUE_DEFAULT
 
 var _pending_code: String = ""
 var _has_synced_once: bool = false
@@ -86,6 +105,19 @@ static func snap_party_duration(value: int) -> int:
 			closest = option
 	return closest
 
+static func snap_axis_sharpness_start(value: float) -> float:
+	return clampf(value, AXIS_SHARPNESS_START_MIN, AXIS_SHARPNESS_START_MAX)
+
+static func snap_axis_sharpness_increment(value: float) -> float:
+	return clampf(value, AXIS_SHARPNESS_INCREMENT_MIN, AXIS_SHARPNESS_INCREMENT_MAX)
+
+static func snap_axis_sharpness_max_value(value: float) -> float:
+	var closest: float = AXIS_SHARPNESS_CAP_OPTIONS[0]
+	for option in AXIS_SHARPNESS_CAP_OPTIONS:
+		if absf(option - value) < absf(closest - value):
+			closest = option
+	return closest
+
 ## Röle sunucusu üzerinden bir oda kurar (bu oyuncu host + lobi sahibi olur).
 ## Sonuç asenkrondur: başarılı olursa room_created(code), olmazsa
 ## connection_error(reason) sinyali yayınlanır.
@@ -96,6 +128,10 @@ func create_room(player_name: String) -> void:
 	_closing = false
 	election_threshold = THRESHOLD_DEFAULT
 	party_setup_duration = PARTY_DURATION_DEFAULT
+	axis_sharpness_start = AXIS_SHARPNESS_START_DEFAULT
+	axis_sharpness_increment = AXIS_SHARPNESS_INCREMENT_DEFAULT
+	axis_sharpness_max_enabled = AXIS_SHARPNESS_MAX_ENABLED_DEFAULT
+	axis_sharpness_max_value = AXIS_SHARPNESS_MAX_VALUE_DEFAULT
 	players.clear()
 	var peer := RelayMultiplayerPeerScript.new()
 	peer.room_created.connect(_on_relay_room_created)
@@ -158,7 +194,7 @@ func transfer_ownership(new_owner_id: int) -> void:
 		return
 	if is_host:
 		owner_id = new_owner_id
-		_sync_player_list.rpc(players, owner_id, election_threshold, party_setup_duration)
+		_sync_player_list.rpc(players, owner_id, election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
 		player_list_updated.emit()
 	else:
 		_request_transfer_ownership.rpc_id(1, new_owner_id)
@@ -171,7 +207,7 @@ func set_election_threshold(value: float) -> void:
 	var snapped := snap_threshold(value)
 	if is_host:
 		election_threshold = snapped
-		_sync_settings.rpc(election_threshold, party_setup_duration)
+		_sync_settings.rpc(election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
 		settings_updated.emit()
 	else:
 		_request_set_threshold.rpc_id(1, snapped)
@@ -184,10 +220,61 @@ func set_party_setup_duration(value: int) -> void:
 	var snapped := snap_party_duration(value)
 	if is_host:
 		party_setup_duration = snapped
-		_sync_settings.rpc(election_threshold, party_setup_duration)
+		_sync_settings.rpc(election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
 		settings_updated.emit()
 	else:
 		_request_set_party_duration.rpc_id(1, snapped)
+
+## Eksen keskinliğinin başlangıç değerini ayarlar (0.5-5.0). Sadece mevcut
+## lobi sahibi çağırabilir.
+func set_axis_sharpness_start(value: float) -> void:
+	if not is_local_owner():
+		return
+	var snapped := snap_axis_sharpness_start(value)
+	if is_host:
+		axis_sharpness_start = snapped
+		_sync_settings.rpc(election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+		settings_updated.emit()
+	else:
+		_request_set_axis_sharpness_start.rpc_id(1, snapped)
+
+## Eksen keskinliğinin her kartta artış miktarını ayarlar (0.0-1.0). Sadece
+## mevcut lobi sahibi çağırabilir.
+func set_axis_sharpness_increment(value: float) -> void:
+	if not is_local_owner():
+		return
+	var snapped := snap_axis_sharpness_increment(value)
+	if is_host:
+		axis_sharpness_increment = snapped
+		_sync_settings.rpc(election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+		settings_updated.emit()
+	else:
+		_request_set_axis_sharpness_increment.rpc_id(1, snapped)
+
+## Eksen keskinliğinin bir tavanı olup olmayacağını (sınırlı/sınırsız) ayarlar.
+## Sadece mevcut lobi sahibi çağırabilir.
+func set_axis_sharpness_max_enabled(enabled: bool) -> void:
+	if not is_local_owner():
+		return
+	if is_host:
+		axis_sharpness_max_enabled = enabled
+		_sync_settings.rpc(election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+		settings_updated.emit()
+	else:
+		_request_set_axis_sharpness_max_enabled.rpc_id(1, enabled)
+
+## Eksen keskinliği "sınırlı" iken kullanılacak tavan değerini ayarlar
+## (5/10/15/20/25). Sadece mevcut lobi sahibi çağırabilir.
+func set_axis_sharpness_max_value(value: float) -> void:
+	if not is_local_owner():
+		return
+	var snapped := snap_axis_sharpness_max_value(value)
+	if is_host:
+		axis_sharpness_max_value = snapped
+		_sync_settings.rpc(election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+		settings_updated.emit()
+	else:
+		_request_set_axis_sharpness_max_value.rpc_id(1, snapped)
 
 ## Oyunu başlatır: herkesi Parti Kurulum ekranına geçirir. Sadece mevcut lobi
 ## sahibi çağırabilir; en az MIN_PLAYERS_TO_START oyuncu gerekir.
@@ -209,6 +296,10 @@ func _reset_state() -> void:
 	owner_id = 1
 	election_threshold = THRESHOLD_DEFAULT
 	party_setup_duration = PARTY_DURATION_DEFAULT
+	axis_sharpness_start = AXIS_SHARPNESS_START_DEFAULT
+	axis_sharpness_increment = AXIS_SHARPNESS_INCREMENT_DEFAULT
+	axis_sharpness_max_enabled = AXIS_SHARPNESS_MAX_ENABLED_DEFAULT
+	axis_sharpness_max_value = AXIS_SHARPNESS_MAX_VALUE_DEFAULT
 	_has_synced_once = false
 	_closing = false
 
@@ -234,7 +325,7 @@ func _on_peer_disconnected(id: int) -> void:
 		return
 	if players.has(id):
 		players.erase(id)
-	_sync_player_list.rpc(players, owner_id, election_threshold, party_setup_duration)
+	_sync_player_list.rpc(players, owner_id, election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
 	player_list_updated.emit()
 
 ## Sadece host çağırır: tüm istemcileri bilgilendirip sunucuyu kapatır.
@@ -260,6 +351,7 @@ func _broadcast_game_start() -> void:
 func finish_party_setup() -> void:
 	if not is_host:
 		return
+	CardManager.init_game()
 	_notify_party_setup_finished.rpc()
 	party_setup_finished.emit()
 
@@ -285,7 +377,7 @@ func _request_join(code: String, player_name: String) -> void:
 		multiplayer.multiplayer_peer.disconnect_peer(sender_id)
 		return
 	players[sender_id] = {"name": player_name}
-	_sync_player_list.rpc(players, owner_id, election_threshold, party_setup_duration)
+	_sync_player_list.rpc(players, owner_id, election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
 	player_list_updated.emit()
 
 @rpc("authority", "reliable")
@@ -294,11 +386,15 @@ func _join_rejected(reason: String) -> void:
 	join_failed.emit(reason)
 
 @rpc("authority", "reliable")
-func _sync_player_list(new_players: Dictionary, new_owner: int, threshold: float, duration: int) -> void:
+func _sync_player_list(new_players: Dictionary, new_owner: int, threshold: float, duration: int, axis_start: float, axis_increment: float, axis_max_enabled: bool, axis_max_value: float) -> void:
 	players = new_players
 	owner_id = new_owner
 	election_threshold = threshold
 	party_setup_duration = duration
+	axis_sharpness_start = axis_start
+	axis_sharpness_increment = axis_increment
+	axis_sharpness_max_enabled = axis_max_enabled
+	axis_sharpness_max_value = axis_max_value
 	if not is_host and not _has_synced_once:
 		_has_synced_once = true
 		join_succeeded.emit()
@@ -313,7 +409,7 @@ func _request_transfer_ownership(new_owner_id: int) -> void:
 	if sender_id != owner_id or not players.has(new_owner_id):
 		return
 	owner_id = new_owner_id
-	_sync_player_list.rpc(players, owner_id, election_threshold, party_setup_duration)
+	_sync_player_list.rpc(players, owner_id, election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
 	player_list_updated.emit()
 
 ## Host-olmayan mevcut sahip, baraj değiştirmek istediğinde host'a istek yollar.
@@ -325,7 +421,7 @@ func _request_set_threshold(value: float) -> void:
 	if sender_id != owner_id:
 		return
 	election_threshold = snap_threshold(value)
-	_sync_settings.rpc(election_threshold, party_setup_duration)
+	_sync_settings.rpc(election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
 	settings_updated.emit()
 
 ## Host-olmayan mevcut sahip, parti kurulum süresini değiştirmek istediğinde
@@ -338,13 +434,59 @@ func _request_set_party_duration(value: int) -> void:
 	if sender_id != owner_id:
 		return
 	party_setup_duration = snap_party_duration(value)
-	_sync_settings.rpc(election_threshold, party_setup_duration)
+	_sync_settings.rpc(election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+	settings_updated.emit()
+
+## Host-olmayan mevcut sahip, eksen keskinliği ayarlarından birini değiştirmek
+## istediğinde host'a istek yollar.
+@rpc("any_peer", "reliable")
+func _request_set_axis_sharpness_start(value: float) -> void:
+	if not is_host:
+		return
+	if multiplayer.get_remote_sender_id() != owner_id:
+		return
+	axis_sharpness_start = snap_axis_sharpness_start(value)
+	_sync_settings.rpc(election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+	settings_updated.emit()
+
+@rpc("any_peer", "reliable")
+func _request_set_axis_sharpness_increment(value: float) -> void:
+	if not is_host:
+		return
+	if multiplayer.get_remote_sender_id() != owner_id:
+		return
+	axis_sharpness_increment = snap_axis_sharpness_increment(value)
+	_sync_settings.rpc(election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+	settings_updated.emit()
+
+@rpc("any_peer", "reliable")
+func _request_set_axis_sharpness_max_enabled(enabled: bool) -> void:
+	if not is_host:
+		return
+	if multiplayer.get_remote_sender_id() != owner_id:
+		return
+	axis_sharpness_max_enabled = enabled
+	_sync_settings.rpc(election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+	settings_updated.emit()
+
+@rpc("any_peer", "reliable")
+func _request_set_axis_sharpness_max_value(value: float) -> void:
+	if not is_host:
+		return
+	if multiplayer.get_remote_sender_id() != owner_id:
+		return
+	axis_sharpness_max_value = snap_axis_sharpness_max_value(value)
+	_sync_settings.rpc(election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
 	settings_updated.emit()
 
 @rpc("authority", "reliable")
-func _sync_settings(threshold: float, duration: int) -> void:
+func _sync_settings(threshold: float, duration: int, axis_start: float, axis_increment: float, axis_max_enabled: bool, axis_max_value: float) -> void:
 	election_threshold = threshold
 	party_setup_duration = duration
+	axis_sharpness_start = axis_start
+	axis_sharpness_increment = axis_increment
+	axis_sharpness_max_enabled = axis_max_enabled
+	axis_sharpness_max_value = axis_max_value
 	settings_updated.emit()
 
 ## Host-olmayan mevcut sahip, oyunu başlatmak istediğinde host'a istek yollar.

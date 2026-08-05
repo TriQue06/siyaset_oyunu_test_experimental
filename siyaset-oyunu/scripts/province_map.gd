@@ -16,7 +16,7 @@ signal province_hovered(province_id: String)  # "" = hover left every province
 ## boyut için yeniden çizilmesi gibi. Böylece harita ne kadar büyütülürse
 ## büyütülsün piksel/blok görünmez; gerekirse refresh_background() ile daha
 ## yüksek çözünürlükte yeniden üretilebilir (örn. ileride zoom eklenince).
-@export var svg_path: String = "res://assets/maps/turkey_map.svg"
+@export var svg_path: String = "res://assets/maps/turkey_map.svgdata"
 # Rasterin hedef piksel genişliği. Ne kadar büyükse o kadar keskin ama o
 # kadar bellek/yükleme süresi — ekranda ne kadar büyük gösterileceğine göre
 # ayarlanmalı.

@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Milletvekili Noktası Konum Editörü</title>
+<style>
+  body { margin: 0; font-family: system-ui, sans-serif; background: #1a1a1f; color: #eee; display: flex; height: 100vh; }
+  #sidebar { width: 320px; padding: 12px; box-sizing: border-box; background: #22222a; overflow-y: auto; }
+  #canvasWrap { flex: 1; overflow: auto; position: relative; }
+  canvas { image-rendering: pixelated; cursor: crosshair; display: block; }
+  h1 { font-size: 15px; margin: 0 0 10px; }
+  h2 { font-size: 12px; opacity: .7; margin: 16px 0 4px; text-transform: uppercase; }
+  label { display: block; font-size: 12px; margin: 8px 0 3px; }
+  input[type=file] { width: 100%; font-size: 11px; }
+  input[type=number] { width: 60px; }
+  select { width: 100%; }
+  button { width: 100%; padding: 8px; margin-top: 6px; background: #3a3a46; color: #eee; border: 1px solid #555; border-radius: 4px; cursor: pointer; }
+  button:hover { background: #46465a; }
+  #status { font-size: 11px; opacity: .75; white-space: pre-wrap; margin-top: 10px; }
+  #provList { max-height: 220px; overflow-y: auto; font-size: 11px; border: 1px solid #444; margin-top: 6px; }
+  #provList div { padding: 3px 6px; cursor: pointer; }
+  #provList div:hover { background: #3a3a46; }
+  #provList div.selected { background: #4a6a9a; }
+  #provList div.locked::after { content: " ★"; color: #ffd35a; }
+  .row { display: flex; gap: 6px; align-items: center; }
+</style>
+</head>
+<body>
+<div id="sidebar">
+  <h1>Milletvekili Noktası Konum Editörü</h1>
+
+  <h2>1. Dosyaları yükle</h2>
+  <label>Harita PNG (assets/maps/turkey_map.png)</label>
+  <input type="file" id="fileMap" accept="image/png">
+  <label>province_pixel_map.json (data/)</label>
+  <input type="file" id="fileGrid" accept=".json">
+  <label>province_seats.json (data/, opsiyonel — nokta sayısı önizlemesi için)</label>
+  <input type="file" id="fileSeats" accept=".json">
+  <label>province_seat_centers.json (data/ — mevcut konum belgesi, düzenlemeye devam etmek için)</label>
+  <input type="file" id="fileOffsets" accept=".json">
+
+  <h2>2. İl seç</h2>
+  <select id="provSelect"></select>
+  <div id="provList"></div>
+
+  <h2>3. Ayarlar</h2>
+  <div class="row"><label style="width:110px">Zoom (px/hücre)</label><input type="number" id="zoomInput" value="6" min="2" max="20"></div>
+  <div class="row"><label style="width:110px">Önizleme nokta sayısı (seats.json yoksa)</label><input type="number" id="fallbackSeats" value="5" min="1" max="60"></div>
+
+  <button id="btnReset">Seçili ili sıfırla (otomatik konuma dön)</button>
+  <button id="btnExport">province_seat_centers.json İNDİR (tüm iller)</button>
+
+  <div id="status">Dosyaları yükleyip haritada bir ile tıkla, sonra sürükleyerek nokta grubunun konumunu ayarla. ★ işaretli iller elle düzenlenmiş (kilitli) demektir.</div>
+</div>
+<div id="canvasWrap">
+  <canvas id="canvas"></canvas>
+</div>
+
+<script>
+let mapImg = null;
+let gridData = null;   // {width,height,ids,grid,centers,pixel_counts}
+let seatsData = null;  // province_id -> seat count
+let offsets = {};      // province_id -> [x,y] merkez (ham grid-pixel, +0.5 YOK)
+let selectedProvince = null;
+let dragging = false;
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+function zoom() { return parseInt(document.getElementById('zoomInput').value) || 6; }
+
+document.getElementById('fileMap').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const img = new Image();
+  img.onload = () => { mapImg = img; render(); };
+  img.src = URL.createObjectURL(f);
+});
+
+document.getElementById('fileGrid').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    gridData = JSON.parse(reader.result);
+    populateProvinceList();
+    render();
+  };
+  reader.readAsText(f);
+});
+
+document.getElementById('fileSeats').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => { seatsData = JSON.parse(reader.result); render(); };
+  reader.readAsText(f);
+});
+
+document.getElementById('fileOffsets').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => { offsets = JSON.parse(reader.result); populateProvinceList(); render(); };
+  reader.readAsText(f);
+});
+
+function populateProvinceList() {
+  if (!gridData) return;
+  const sel = document.getElementById('provSelect');
+  sel.innerHTML = '';
+  const listDiv = document.getElementById('provList');
+  listDiv.innerHTML = '';
+  const ids = gridData.ids.slice().sort();
+  for (const id of ids) {
+    const opt = document.createElement('option');
+    opt.value = id; opt.textContent = id;
+    sel.appendChild(opt);
+    const row = document.createElement('div');
+    row.textContent = id;
+    row.dataset.id = id;
+    if (offsets[id]) row.classList.add('locked');
+    row.addEventListener('click', () => { selectProvince(id); });
+    listDiv.appendChild(row);
+  }
+  sel.addEventListener('change', () => selectProvince(sel.value));
+}
+
+function selectProvince(id) {
+  selectedProvince = id;
+  document.getElementById('provSelect').value = id;
+  for (const row of document.querySelectorAll('#provList div')) {
+    row.classList.toggle('selected', row.dataset.id === id);
+  }
+  render();
+}
+
+function currentPos(id) {
+  // offsets[id] varsa onu, yoksa province_pixel_map.json'daki merkezi kullan
+  // (ikisi de AYNI birim: ham grid-pixel koordinatı, +0.5 YOK).
+  if (offsets[id]) return offsets[id];
+  if (gridData.centers[id]) return gridData.centers[id];
+  return [gridData.width / 2, gridData.height / 2];
+}
+
+// seat_markers.gd _get_dot_layout ile BİREBİR aynı mantık.
+function getDotLayout(n) {
+  if (n <= 0) return [];
+  const fixed = {1:[1],2:[2],3:[3],4:[2,2],5:[3,2],6:[3,3],7:[2,3,2],8:[3,3,2],9:[3,3,3]};
+  if (fixed[n]) return fixed[n];
+  let cols;
+  if (n > 20) cols = Math.min(Math.ceil(Math.sqrt(n * 1.2)), 7);
+  else cols = Math.min(Math.ceil(Math.sqrt(n * 1.5)), 8);
+  const rows = Math.ceil(n / cols);
+  const layout = [];
+  let remaining = n;
+  for (let i = 0; i < rows; i++) {
+    const r = Math.ceil(remaining / (rows - i));
+    layout.push(r);
+    remaining -= r;
+  }
+  return layout;
+}
+
+// seat_markers.gd sabitleri (dot_radius/dot_spacing) HARİTA BİRİMİNDE
+// (MAP_UNIT_SCALE=4 çarpanlı); burada grid-pixel uzayında çalıştığımız için
+// 4'e bölüyoruz.
+const MAP_UNIT_SCALE = 4;
+const DOT_RADIUS = 4.6 / MAP_UNIT_SCALE;
+const DOT_SPACING = 4.4 / MAP_UNIT_SCALE;
+
+// seat_markers.gd _spawn_group() ile BİREBİR aynı iki aşamalı mantık: önce
+// ham (bounding-box ortalı) konumlar hesaplanır, sonra GERÇEK ağırlık
+// merkezi bulunup fark kadar TÜM noktalar kaydırılır (son satır genelde
+// eksik dolduğu için bounding-box merkeziyle ağırlık merkezi aynı değildir
+// — Godot artık ağırlık merkezini kullanıyor, editör de aynısını yapmalı).
+function drawGroupPreview(centerPxX, centerPxY, seatCount, z, highlight) {
+  const cell = (DOT_RADIUS * 2 + DOT_SPACING) * z;
+  const layout = getDotLayout(seatCount);
+  const rows = layout.length;
+  const totalH = rows * cell - DOT_SPACING * z;
+  const startY = centerPxY - totalH / 2 + DOT_RADIUS * z;
+  const raw = [];
+  let sumX = 0, sumY = 0;
+  for (let row = 0; row < rows; row++) {
+    const cols = layout[row];
+    const totalW = cols * cell - DOT_SPACING * z;
+    const startX = centerPxX - totalW / 2 + DOT_RADIUS * z;
+    for (let col = 0; col < cols; col++) {
+      const x = startX + col * cell;
+      const y = startY + row * cell;
+      raw.push([x, y]);
+      sumX += x; sumY += y;
+    }
+  }
+  if (raw.length === 0) return;
+  const correctionX = centerPxX - sumX / raw.length;
+  const correctionY = centerPxY - sumY / raw.length;
+  const half = DOT_RADIUS * z;
+  for (const [x, y] of raw) {
+    ctx.fillStyle = highlight ? '#ffd35a' : 'rgba(255,255,255,0.55)';
+    ctx.fillRect(x + correctionX - half, y + correctionY - half, half * 2, half * 2);
+  }
+}
+
+function render() {
+  if (!gridData) return;
+  const z = zoom();
+  canvas.width = gridData.width * z;
+  canvas.height = gridData.height * z;
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (mapImg) ctx.drawImage(mapImg, 0, 0, canvas.width, canvas.height);
+
+  for (const id of gridData.ids) {
+    const pos = currentPos(id);
+    // +0.5: Godot tarafı (province_map.gd / seat_markers.gd) her hücreyi
+    // (pos+0.5)*ölçek konumunda, yani hücrenin MERKEZİNDE çiziyor — burada
+    // aynı ofseti uygulamazsak nokta hücrenin köşesine çizilir ve oyundaki
+    // gerçek konumla YARIM HÜCRE kayar (bu, "konumlar aynı değil" bug'ının
+    // sebebiydi).
+    const px = (pos[0] + 0.5) * z, py = (pos[1] + 0.5) * z;
+    const seatCount = seatsData && seatsData[id] ? seatsData[id] : parseInt(document.getElementById('fallbackSeats').value) || 5;
+    const isSelected = id === selectedProvince;
+    drawGroupPreview(px, py, seatCount, z, isSelected);
+    if (offsets[id]) {
+      ctx.strokeStyle = '#ffd35a';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(px - 2, py - 2, 4, 4);
+    }
+    if (isSelected) {
+      ctx.strokeStyle = '#4ad3ff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(px, py, 8, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+}
+
+canvas.addEventListener('mousedown', e => {
+  if (!selectedProvince || !gridData) return;
+  dragging = true;
+  updateFromMouse(e);
+});
+canvas.addEventListener('mousemove', e => { if (dragging) updateFromMouse(e); });
+window.addEventListener('mouseup', () => { dragging = false; });
+
+function updateFromMouse(e) {
+  const rect = canvas.getBoundingClientRect();
+  const z = zoom();
+  // -0.5: render()'daki +0.5 ofsetinin tersi — depolanan/export edilen değer
+  // HER ZAMAN "ham" (hücre merkezi değil, province_pixel_map.json'daki
+  // "centers" ile aynı ham birim) olmalı.
+  const x = (e.clientX - rect.left) / z - 0.5;
+  const y = (e.clientY - rect.top) / z - 0.5;
+  offsets[selectedProvince] = [Math.round(x * 10) / 10, Math.round(y * 10) / 10];
+  populateProvinceList();
+  selectProvince(selectedProvince);
+}
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  if (!selectedProvince) return;
+  delete offsets[selectedProvince];
+  populateProvinceList();
+  selectProvince(selectedProvince);
+});
+
+document.getElementById('btnExport').addEventListener('click', () => {
+  if (!gridData) { alert('Once province_pixel_map.json yukle.'); return; }
+  // EKSIKSIZ statik belge: haritadaki TUM iller, her biri icin merkez noktasi.
+  // Elle tasinmamis iller de ilin piksel-merkeziyle acikca yaziliyor ki belge
+  // bu haritanin tam bir kaydi olsun ("hangi il nerede" hicbir yerde ortuk
+  // kalmasin).
+  const payload = {};
+  for (const id of gridData.ids.slice().sort()) {
+    const p = currentPos(id);
+    payload[id] = [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10];
+  }
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'province_seat_centers.json';
+  a.click();
+});
+</script>
+</body>
+</html>

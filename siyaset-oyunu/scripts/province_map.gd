@@ -1,114 +1,104 @@
 extends Node2D
-## Vector election map: draws the SVG background, loads province polygon/
-## center data (precomputed offline from the SVG's <path> elements, see
-## tools/svg_to_provinces.py), and provides click/hover detection plus
-## per-province coloring — all in the SVG's own coordinate space (viewBox
-## units), so everything (background, polygons, seat markers) stays aligned
-## without any manual scale bookkeeping.
+## PIXEL-ART harita: artık vektör SVG/poligon YOK. Türkiye, elle çizilmiş
+## düşük çözünürlüklü (data/province_pixel_map.json'daki "width"x"height",
+## bkz. tools/pixel_art_province_colors.csv ile üretilen renk paleti) bir
+## piksel ızgarası olarak temsil ediliyor: her piksel hangi ile aitse o ilin
+## indeksini tutuyor (-1 = deniz/il dışı). Arka plan görseli
+## (assets/maps/turkey_map_pixelart.png) NEAREST filtre ile büyütülüyor ki
+## piksel blokları netliğini korusun, bulanıklaşmasın.
 ##
-## Province ids are the SVG path ids (lowercase, no diacritics, e.g. "adana").
+## Tıklama/hover algılama artık point-in-polygon DEĞİL, doğrudan ızgara
+## lookup (O(1)); il boyama da polygon triangulation DEĞİL, ızgaraya göre
+## piksel piksel yeniden boyanan bir ImageTexture (bkz. province_overlay.gd).
 
 signal province_clicked(province_id: String)
 signal province_hovered(province_id: String)  # "" = hover left every province
 
-## Godot'un sabit çözünürlüklü SVG import'una GÜVENMİYORUZ — kaynak SVG'yi
-## çalışma zamanında (SvgRaster ile) rasterize ediyoruz, tıpkı fontların her
-## boyut için yeniden çizilmesi gibi. Böylece harita ne kadar büyütülürse
-## büyütülsün piksel/blok görünmez; gerekirse refresh_background() ile daha
-## yüksek çözünürlükte yeniden üretilebilir (örn. ileride zoom eklenince).
-@export var svg_path: String = "res://assets/maps/turkey_map.svgdata"
-# Rasterin hedef piksel genişliği. Ne kadar büyükse o kadar keskin ama o
-# kadar bellek/yükleme süresi — ekranda ne kadar büyük gösterileceğine göre
-# ayarlanmalı.
-@export var target_pixel_width: float = 2400.0
+@export var pixel_map_path: String = "res://data/province_pixel_map.json"
+@export var pixel_texture_path: String = "res://assets/maps/turkey_map.png"
+## 1 piksel-ızgara hücresi = bu kadar "harita/local" birimi. Diğer tüm
+## bileşenler (seat_markers.gd'deki dot_radius/dot_spacing, game_screen.gd'deki
+## MAP_NATIVE_SIZE) bu birimle uyumlu olacak şekilde ayarlanmalı.
+const MAP_UNIT_SCALE := 4.0
 
-@export var data_path: String = "res://data/provinces.json"
-# SVG'nin viewBox boyutu (turkey_map.svg: viewBox="0 0 1024 500"). Polygon
-# verisi bu birimlerde; raster çözünürlüğü ne olursa olsun background
-# sprite'ı hep bu boyuta sığdırırız ki poligonlarla piksel-hizalı kalsın.
-@export var svg_viewbox_size: Vector2 = Vector2(1024, 500)
+var grid_width: int = 0
+var grid_height: int = 0
+var ids: Array = []              # index -> province_id
+var _id_to_index: Dictionary = {}  # province_id -> index
+var _grid: PackedInt32Array = PackedInt32Array()  # index -> province index (-1 = deniz)
+var _centers: Dictionary = {}    # province_id -> Vector2 (harita/local birimi)
 
-# province_id -> {"polygons": Array[PackedVector2Array], "center": Vector2}
-var provinces: Dictionary = {}
 var _hovered_id: String = ""
 
 @onready var background: Sprite2D = $Background
 @onready var overlay = $Overlay
 
 func _ready() -> void:
+	_load_pixel_map()
 	_apply_background()
-	_load_province_data()
+	overlay.setup(self)
 	set_process_unhandled_input(true)
+
+func _load_pixel_map() -> void:
+	if not FileAccess.file_exists(pixel_map_path):
+		push_warning("Pixel map data file not found: %s" % pixel_map_path)
+		return
+	var file := FileAccess.open(pixel_map_path, FileAccess.READ)
+	var parsed = JSON.parse_string(file.get_as_text())
+	if parsed == null:
+		push_warning("Pixel map data could not be parsed: %s" % pixel_map_path)
+		return
+
+	grid_width = int(parsed["width"])
+	grid_height = int(parsed["height"])
+	ids = parsed["ids"]
+	_id_to_index.clear()
+	for i in ids.size():
+		_id_to_index[ids[i]] = i
+
+	var raw_grid: Array = parsed["grid"]
+	_grid = PackedInt32Array()
+	_grid.resize(raw_grid.size())
+	for i in raw_grid.size():
+		_grid[i] = int(raw_grid[i])
+
+	var raw_centers: Dictionary = parsed["centers"]
+	_centers.clear()
+	for province_id in raw_centers.keys():
+		var c: Array = raw_centers[province_id]
+		# +0.5: piksel hücresinin KÖŞESİ değil MERKEZİ (dot layout/centroid
+		# hesapları için daha doğru).
+		_centers[province_id] = (Vector2(c[0], c[1]) + Vector2(0.5, 0.5)) * MAP_UNIT_SCALE
 
 func _apply_background() -> void:
 	if not background:
 		return
 	background.centered = false
-	# Proje genelinde pixel-art haritalar için varsayılan filtre "Nearest";
-	# bu SVG kaynaklı vektör harita için burada "Linear" ile eziyoruz.
-	background.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	refresh_background(target_pixel_width)
-
-## SVG'yi verilen hedef piksel genişliğinde YENİDEN rasterize eder ve
-## background'a uygular. Harita çok daha büyük gösterilecekse (zoom vb.)
-## daha yüksek bir target_pixel_width ile tekrar çağrılabilir.
-func refresh_background(new_target_pixel_width: float) -> void:
-	target_pixel_width = new_target_pixel_width
-	var scale := target_pixel_width / svg_viewbox_size.x
-	var tex := SvgRaster.load_texture(svg_path, scale)
-	if tex == null:
-		return
-	background.texture = tex
-	var tex_size := tex.get_size()
-	if tex_size.x > 0 and tex_size.y > 0:
-		background.scale = Vector2(svg_viewbox_size.x / tex_size.x, svg_viewbox_size.y / tex_size.y)
-
-func _load_province_data() -> void:
-	provinces.clear()
-	if not FileAccess.file_exists(data_path):
-		push_warning("Province data file not found: %s" % data_path)
-		return
-	var file := FileAccess.open(data_path, FileAccess.READ)
-	var parsed = JSON.parse_string(file.get_as_text())
-	if parsed == null:
-		push_warning("Province data could not be parsed: %s" % data_path)
-		return
-
-	var polygons_for_overlay: Dictionary = {}
-	for province_id in parsed.keys():
-		var entry: Dictionary = parsed[province_id]
-		var polygons: Array = []
-		for raw_points in entry["polygons"]:
-			var packed := PackedVector2Array()
-			for p in raw_points:
-				packed.append(Vector2(p[0], p[1]))
-			polygons.append(packed)
-		var center_arr: Array = entry["center"]
-		provinces[province_id] = {
-			"polygons": polygons,
-			"center": Vector2(center_arr[0], center_arr[1]),
-		}
-		polygons_for_overlay[province_id] = polygons
-
-	overlay.polygons_by_province = polygons_for_overlay
+	background.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	background.texture = load(pixel_texture_path)
+	background.scale = Vector2(MAP_UNIT_SCALE, MAP_UNIT_SCALE)
 
 func get_province_centroid(province_id: String) -> Vector2:
-	if provinces.has(province_id):
-		return provinces[province_id]["center"]
-	return Vector2.ZERO
+	return _centers.get(province_id, Vector2.ZERO)
 
 func get_all_province_ids() -> Array:
-	return provinces.keys()
+	return ids.duplicate()
 
+## local_pos: bu Node2D'nin (Map'in) local koordinat uzayında bir nokta.
 func get_province_id_at(local_pos: Vector2) -> String:
-	for province_id in provinces.keys():
-		for polygon in provinces[province_id]["polygons"]:
-			if Geometry2D.is_point_in_polygon(local_pos, polygon):
-				return province_id
-	return ""
+	if grid_width <= 0 or grid_height <= 0:
+		return ""
+	var px := int(floor(local_pos.x / MAP_UNIT_SCALE))
+	var py := int(floor(local_pos.y / MAP_UNIT_SCALE))
+	if px < 0 or py < 0 or px >= grid_width or py >= grid_height:
+		return ""
+	var idx: int = _grid[py * grid_width + px]
+	if idx < 0 or idx >= ids.size():
+		return ""
+	return ids[idx]
 
 func _unhandled_input(event: InputEvent) -> void:
-	if provinces.is_empty():
+	if ids.is_empty():
 		return
 	if event is InputEventMouseMotion:
 		var local := to_local(event.global_position)
@@ -128,7 +118,7 @@ func set_province_color(province_id: String, color: Color) -> void:
 		overlay.colors.erase(province_id)
 	else:
 		overlay.colors[province_id] = color
-	overlay.queue_redraw()
+	overlay.mark_dirty()
 
 ## Paints several provinces at once and redraws only once (performance).
 func set_province_colors(id_to_color: Dictionary) -> void:
@@ -138,8 +128,8 @@ func set_province_colors(id_to_color: Dictionary) -> void:
 			overlay.colors.erase(province_id)
 		else:
 			overlay.colors[province_id] = color
-	overlay.queue_redraw()
+	overlay.mark_dirty()
 
 func clear_overlay() -> void:
 	overlay.colors.clear()
-	overlay.queue_redraw()
+	overlay.mark_dirty()

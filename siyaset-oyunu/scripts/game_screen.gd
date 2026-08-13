@@ -13,7 +13,6 @@ extends Control
 ## BottomArea.anchor_top = 0.62 ile birebir eşleşmeli.
 const TOP_AREA_HEIGHT_RATIO := 0.62
 const MAP_FILL_RATIO := 0.92
-const MAP_NATIVE_SIZE := Vector2(1024, 500)
 # Sağda oyuncu daireleri için ayrılan, PANELSİZ (tamamen boş) şerit genişliği.
 const PLAYER_STRIP_WIDTH := 120.0
 # Harita ile oyuncu şeridi arasında, deste butonu için ayrılan şerit.
@@ -27,6 +26,8 @@ const BADGE_ICON_PIXEL_SIZE := 64
 const CARD_DISPLAY_SCALE := 2.0
 const CARD_DISPLAY_SIZE := Vector2(72, 96) * CARD_DISPLAY_SCALE
 const CARD_HOVER_LIFT_SPEED := 12.0
+const TAP_MAX_HOLD_MS := 250
+const TAP_MAX_MOVE_PX := 10.0
 
 const SHADOW_OFFSET := Vector2(4, 5)
 const SHADOW_COLOR := Color(0, 0, 0, 0.38)
@@ -72,33 +73,14 @@ func _ready() -> void:
 	pass_button.pressed.connect(_on_pass_pressed)
 
 	await get_tree().process_frame
-	var viewport_size := get_viewport_rect().size
-	# Harita SADECE üst bölgeye (TOP_AREA_HEIGHT_RATIO) ve sağdaki deste/
-	# oyuncu şeridi hariç kalan genişliğe sığacak şekilde ölçekleniyor —
-	# geniş, dikdörtgen bir alanı doldurması hedefleniyor.
-	var reserved_width := PLAYER_STRIP_WIDTH + DECK_STRIP_WIDTH
-	var available_width := viewport_size.x - reserved_width
-	var available_height := viewport_size.y * TOP_AREA_HEIGHT_RATIO
-	var fit_scale: float = minf(available_width / MAP_NATIVE_SIZE.x, available_height / MAP_NATIVE_SIZE.y) * MAP_FILL_RATIO
-	map_holder.scale = Vector2(fit_scale, fit_scale)
-	map_holder.position = Vector2(
-		available_width * 0.5 - MAP_NATIVE_SIZE.x * 0.5 * fit_scale,
-		available_height * 0.5 - MAP_NATIVE_SIZE.y * 0.5 * fit_scale
-	)
-	_add_map_shadow(MAP_NATIVE_SIZE, fit_scale)
-
-	# Alt haznenin (parlamento + oy oranları, aralarındaki boşluk dahil)
-	# TOPLAM yatay genişliği, haritanın GERÇEKTEN kapladığı genişlikle
-	# birebir aynı ve onunla hizalı olsun.
-	var map_rendered_width: float = MAP_NATIVE_SIZE.x * fit_scale
-	bottom_area.offset_left = map_holder.position.x
-	bottom_area.offset_right = map_holder.position.x + map_rendered_width - viewport_size.x
-
-	# Elde bekleyen kartların satırı, yarısı ekranın altından taşacak şekilde
-	# aşağı kaydırılıyor; hover eden tek kart kendi içinde yukarı çıkıp
-	# tamamı görünür (bkz. _build_hand_card).
-	hand_container.offset_top = CARD_DISPLAY_SIZE.y * 0.5
-	hand_container.offset_bottom = CARD_DISPLAY_SIZE.y * 0.5
+	_apply_layout()
+	# Tam ekrana geçip çıkınca / pencere yeniden boyutlanınca yerleşimi TEKRAR
+	# hesapla. Aksi hâlde anchor'a bağlı elemanlar (oyuncu paneli, deste, kart
+	# eli) yeni boyuta göre kendiliğinden kayarken, aşağıda mutlak piksel
+	# olarak hesaplanan harita ölçeği/konumu ve alt hazne kenarları ESKİ
+	# viewport boyutunda kalıyordu — ikisi birbirinden kopup "UI elemanları
+	# bazen birbirine yaklaşıyor/uzaklaşıyor" şikayetine yol açıyordu.
+	get_viewport().size_changed.connect(_apply_layout)
 
 	hover_tooltip.hide()
 	PartyManager.parties_updated.connect(_on_parties_updated)
@@ -112,6 +94,49 @@ func _ready() -> void:
 	_rebuild_hand()
 	_on_turn_changed(CardManager.current_turn_peer_id())
 	_refresh_results_panels()
+
+## Viewport boyutuna bağlı TÜM mutlak-piksel yerleşim hesapları burada — hem
+## açılışta hem her yeniden boyutlanmada (tam ekran vb.) çağrılır.
+func _apply_layout() -> void:
+	if map_holder == null or map_holder.grid_width <= 0:
+		return
+	var viewport_size := get_viewport_rect().size
+	# Harita SADECE üst bölgeye (TOP_AREA_HEIGHT_RATIO) ve sağdaki deste/
+	# oyuncu şeridi hariç kalan genişliğe sığacak şekilde ölçekleniyor —
+	# geniş, dikdörtgen bir alanı doldurması hedefleniyor.
+	var reserved_width := PLAYER_STRIP_WIDTH + DECK_STRIP_WIDTH
+	var available_width := viewport_size.x - reserved_width
+	var available_height := viewport_size.y * TOP_AREA_HEIGHT_RATIO
+	# Haritanın "doğal" (native) piksel boyutu sabit bir const DEĞİL —
+	# pixel-art asset (assets/maps/turkey_map.png) her değiştiğinde boyutu
+	# değişebiliyor, o yüzden province_map.gd'nin YÜKLEDİĞİ gerçek ızgara
+	# boyutundan (grid_width/height * MAP_UNIT_SCALE) runtime'da hesaplanıyor.
+	var map_native_size: Vector2 = Vector2(map_holder.grid_width, map_holder.grid_height) * map_holder.MAP_UNIT_SCALE
+	var fit_scale: float = minf(available_width / map_native_size.x, available_height / map_native_size.y) * MAP_FILL_RATIO
+	map_holder.scale = Vector2(fit_scale, fit_scale)
+	map_holder.position = Vector2(
+		available_width * 0.5 - map_native_size.x * 0.5 * fit_scale,
+		available_height * 0.5 - map_native_size.y * 0.5 * fit_scale
+	)
+
+	# Alt haznenin (parlamento + oy oranları, aralarındaki boşluk dahil)
+	# TOPLAM yatay genişliği, haritanın GERÇEKTEN kapladığı genişlikle
+	# birebir aynı ve onunla hizalı olsun.
+	var map_rendered_width: float = map_native_size.x * fit_scale
+	bottom_area.offset_left = map_holder.position.x
+	bottom_area.offset_right = map_holder.position.x + map_rendered_width - viewport_size.x
+
+	# Elde bekleyen kartların satırı, yarısı ekranın altından taşacak şekilde
+	# aşağı kaydırılıyor; hover eden tek kart kendi içinde yukarı çıkıp
+	# tamamı görünür (bkz. _build_hand_card).
+	hand_container.offset_top = CARD_DISPLAY_SIZE.y * 0.5
+	hand_container.offset_bottom = CARD_DISPLAY_SIZE.y * 0.5
+
+	# Harita ölçeği değişti => vekil kareleri yeni ölçeğe göre yeniden piksel
+	# hizalanmalı (bkz. seat_markers.gd _draw).
+	var seat_markers := map_holder.get_node_or_null("SeatMarkers")
+	if seat_markers != null:
+		seat_markers.queue_redraw()
 	_build_debug_label()
 
 ## GEÇİCİ teşhis etiketi: sol alt köşede, bu istemcinin kendi peer id'sini ve
@@ -192,9 +217,14 @@ func _refresh_province_winner_colors() -> void:
 				winner_id = peer_id
 		if winner_id == -1:
 			continue
+		# İlin rengi, salt çoğunluk olsun olmasın, DOĞRUDAN o ilde en çok
+		# koltuğu alan partinin kendi rengi — TAM OPAK (alfa 1.0). Önceden
+		# 0.85 alfa kullanılıyordu; pixel-art haritada bu, ilin ORİJİNAL
+		# (varsayılan) piksel-art renginin %15'inin altından sızıp "kısmen
+		# boyanmış" gibi görünmesine yol açıyordu — kullanıcı isteğiyle o
+		# ilin pikselleri artık TAMAMEN parti rengi oluyor, karışım yok.
 		var party_color: Color = PartyManager.parties.get(winner_id, {}).get("bg_color", Color(0.5, 0.5, 0.5))
-		var is_dominant: bool = winner_seats > total_seats_here / 2.0
-		party_color.a = 0.8 if is_dominant else 0.6
+		party_color.a = 1.0
 		_province_base_colors[province_id] = party_color
 		map_holder.set_province_color(province_id, party_color)
 
@@ -435,9 +465,31 @@ func _build_hand_card(card_type: String, hand_index: int) -> Control:
 
 	card.mouse_entered.connect(func(): holder.set_meta("lift_target", -CARD_DISPLAY_SIZE.y * 0.5))
 	card.mouse_exited.connect(func(): holder.set_meta("lift_target", 0.0))
+	# İleride bu kartlar başka partilere/illere/parlamentoya SÜRÜKLENEBİLECEK
+	# (drag & drop) — o yüzden basılı tutmak TEK BAŞINA kartı oynatmamalı,
+	# sadece "bas ve hemen bırak" (gerçek bir tık) kart kullanmalı. Bunu
+	# ayırt etmek için basma anının zamanını/konumunu kaydedip, bırakma
+	# anında hem kısa sürede (TAP_MAX_HOLD_MS) hem de neredeyse aynı yerde
+	# (TAP_MAX_MOVE_PX) bırakılmışsa "tık" sayıyoruz; aksi halde (uzun
+	# basılı tutma) hiçbir şey yapmıyoruz — bu, ileride sürükleme
+	# mekaniğinin devreye gireceği dal.
+	card.set_meta("press_time_ms", -1)
+	card.set_meta("press_pos", Vector2.ZERO)
 	card.gui_input.connect(func(event: InputEvent):
-		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-			_on_hand_card_clicked(hand_index)
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed:
+				card.set_meta("press_time_ms", Time.get_ticks_msec())
+				card.set_meta("press_pos", event.position)
+			else:
+				var press_time_ms: int = card.get_meta("press_time_ms", -1)
+				if press_time_ms < 0:
+					return
+				card.set_meta("press_time_ms", -1)
+				var elapsed: int = Time.get_ticks_msec() - press_time_ms
+				var press_pos: Vector2 = card.get_meta("press_pos", Vector2.ZERO)
+				var moved: float = press_pos.distance_to(event.position)
+				if elapsed <= TAP_MAX_HOLD_MS and moved <= TAP_MAX_MOVE_PX:
+					_on_hand_card_clicked(hand_index)
 	)
 
 	wrapper.add_child(holder)
@@ -590,15 +642,6 @@ func _add_shadow_behind(control: Control, texture: Texture2D) -> void:
 	parent.add_child(shadow)
 	parent.move_child(shadow, control.get_index())
 
-func _add_map_shadow(map_native_size: Vector2, map_scale: float) -> void:
-	var shadow := ColorRect.new()
-	shadow.color = SHADOW_COLOR
-	shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	shadow.size = map_native_size * map_scale
-	shadow.position = map_holder.position + SHADOW_OFFSET * 2.0
-	var parent := map_holder.get_parent()
-	parent.add_child(shadow)
-	parent.move_child(shadow, map_holder.get_index())
 
 func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 	var is_self := peer_id == multiplayer.get_unique_id()

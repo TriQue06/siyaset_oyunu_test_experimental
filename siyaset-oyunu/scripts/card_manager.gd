@@ -195,8 +195,6 @@ func play_card(hand_index: int) -> void:
 		var card_type: String = hand[hand_index]
 		card_played.emit(id, card_type)
 		hand.remove_at(hand_index)
-		if current_axis_sharpness <= 0.0:
-			current_axis_sharpness = MultiplayerManager.axis_sharpness_start
 		_apply_card_effect(id, card_type)
 		inventories_updated.emit()
 		return
@@ -286,12 +284,30 @@ func _compute_placeholder_province_results(national_weights: Dictionary, nationa
 		var seats_here: int = _province_seat_counts.get(province_id, 0)
 		if seats_here <= 0:
 			continue
-		var local_weights: Dictionary = {}
-		var local_total := 0.0
+		var base_weights: Dictionary = {}
+		var base_total := 0.0
 		for peer_id in national_weights.keys():
 			var w: float = float(national_weights[peer_id]) * randf_range(0.6, 1.4)
-			local_weights[peer_id] = w
-			local_total += w
+			base_weights[peer_id] = w
+			base_total += w
+		if base_total <= 0.0:
+			continue
+
+		# EKSEN KESKİNLİĞİ (current_axis_sharpness) BURADA uygulanır: il payları
+		# current_axis_sharpness üssüne yükseltilip yeniden normalize edilir
+		# (klasik "sharpening"/softmax mantığı). current_axis_sharpness=1 iken
+		# etkisiz; >1 iken öndeki parti o ildeki üstünlüğünü ABARTIR (sonuçlar
+		# daha keskin/kararlı); <1 iken paylar birbirine yaklaşır (daha
+		# belirsiz). Her TUR bittiğinde (bkz. _finish_round_if_needed)
+		# current_axis_sharpness biraz daha büyür, yani seçim sonuçları oyun
+		# ilerledikçe gittikçe daha keskinleşir — kart etkisiyle İLGİSİZ.
+		var local_weights: Dictionary = {}
+		var local_total := 0.0
+		for peer_id in base_weights.keys():
+			var share: float = base_weights[peer_id] / base_total
+			var sharpened: float = pow(maxf(share, 0.0001), current_axis_sharpness)
+			local_weights[peer_id] = sharpened
+			local_total += sharpened
 		if local_total <= 0.0:
 			continue
 
@@ -318,8 +334,14 @@ func _finish_round_if_needed(wrapped: bool) -> void:
 	if not wrapped:
 		return
 	round_number += 1
+	# Eksen keskinliği HER TUR bittiğinde artar (kart oynanışında DEĞİL —
+	# bkz. _apply_card_effect'teki not). Lobi ayarında "sınırlı" seçildiyse
+	# bir tavanda durur.
+	current_axis_sharpness += MultiplayerManager.axis_sharpness_increment
+	if MultiplayerManager.axis_sharpness_max_enabled:
+		current_axis_sharpness = minf(current_axis_sharpness, MultiplayerManager.axis_sharpness_max_value)
 	_compute_placeholder_results()
-	_notify_round_completed.rpc(last_vote_shares, last_seats, last_province_results, round_number)
+	_notify_round_completed.rpc(last_vote_shares, last_seats, last_province_results, round_number, current_axis_sharpness)
 	# Host RPC'nin kendi yerel çağrısına GÜVENMİYOR (bkz. _apply_play'deki not) —
 	# sinyali burada da doğrudan yayınlıyoruz ki host'un ekranı da geçsin.
 	round_completed.emit()
@@ -363,23 +385,18 @@ func _apply_play(peer_id: int, hand_index: int) -> void:
 	_finish_round_if_needed(wrapped)
 
 ## Kartın etkisini ilgili partinin ideoloji eksenine uygular (bkz.
-## CardPresets.CARD_EFFECTS). Etkinin büyüklüğü current_axis_sharpness ile
-## ölçeklenir (eksen keskinliği) — sonra keskinlik bir artış payı kadar
-## büyür (lobi ayarında "sınırlı" seçildiyse bir tavanda durur). Sadece host
-## tarafında (any_peer istekleri de dahil, host doğrulayıp uyguladıktan
-## sonra) çağrılır.
+## CardPresets.CARD_EFFECTS). Her kart HER ZAMAN tam olarak CardPresets'teki
+## sabit ±1 kaymayı uygular — tur/round fark etmeksizin. "Eksen keskinliği"
+## (current_axis_sharpness) BURADA KULLANILMAZ; o, il bazlı seçim sonuçlarının
+## ne kadar keskin/kararlı çıkacağını belirleyen AYRI bir mekanizma (bkz.
+## _compute_placeholder_province_results ve _finish_round_if_needed'daki
+## her-turda-bir artış). Sadece host tarafında (any_peer istekleri de dahil,
+## host doğrulayıp uyguladıktan sonra) çağrılır.
 func _apply_card_effect(peer_id: int, card_type: String) -> void:
 	var effect: Dictionary = CardPresets.CARD_EFFECTS.get(card_type, {})
 	if effect.is_empty():
 		return
-	var scaled_delta: int = int(round(float(effect["delta"]) * current_axis_sharpness))
-	if scaled_delta == 0:
-		scaled_delta = signi(effect["delta"])
-	PartyManager.apply_ideology_delta(peer_id, effect["axis"], scaled_delta)
-
-	current_axis_sharpness += MultiplayerManager.axis_sharpness_increment
-	if MultiplayerManager.axis_sharpness_max_enabled:
-		current_axis_sharpness = minf(current_axis_sharpness, MultiplayerManager.axis_sharpness_max_value)
+	PartyManager.apply_ideology_delta(peer_id, effect["axis"], int(effect["delta"]))
 
 func _apply_pass(peer_id: int) -> void:
 	if peer_id != current_turn_peer_id():
@@ -452,9 +469,10 @@ func _notify_passed(new_inventories: Dictionary, new_turn_order: Array, new_turn
 	turn_changed.emit(current_turn_peer_id())
 
 @rpc("authority", "reliable")
-func _notify_round_completed(new_vote_shares: Dictionary, new_seats: Dictionary, new_province_results: Dictionary, new_round_number: int) -> void:
+func _notify_round_completed(new_vote_shares: Dictionary, new_seats: Dictionary, new_province_results: Dictionary, new_round_number: int, new_axis_sharpness: float) -> void:
 	last_vote_shares = new_vote_shares
 	last_seats = new_seats
 	last_province_results = new_province_results
 	round_number = new_round_number
+	current_axis_sharpness = new_axis_sharpness
 	round_completed.emit()

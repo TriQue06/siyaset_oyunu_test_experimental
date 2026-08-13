@@ -40,8 +40,32 @@ func set_data(entries: Array) -> void:
 	if max_percent <= 0.0:
 		max_percent = 1.0
 
+	# Üst boşluk ("spacer"): satırlar az olduğunda (örn. tek parti) liste
+	# ScrollContainer'ın en üstüne yapışmasın, DÜŞEY OLARAK ORTALANMIŞ gibi
+	# görünsün diye. VBoxContainer'ın kendisi ScrollContainer içinde her
+	# zaman İÇERİĞİ KADAR yükseklik alır (scroll edilebilsin diye), bu
+	# yüzden Container'ın "alignment" özelliği burada işe yaramaz — bunun
+	# yerine mevcut boşluğun yarısı kadar boş bir Control ekleyip satırları
+	# manuel olarak aşağı itiyoruz.
+	var top_spacer := Control.new()
+	top_spacer.custom_minimum_size = Vector2(0, 0)
+	add_child(top_spacer)
+
 	for e in entries:
 		add_child(_build_row(e["name"], e["color"], e["percent"], int(e.get("seats", 0)), max_percent))
+
+	call_deferred("_apply_vertical_centering", top_spacer, entries.size())
+
+func _apply_vertical_centering(top_spacer: Control, row_count: int) -> void:
+	if not is_instance_valid(top_spacer) or row_count <= 0:
+		return
+	var scroll_parent := get_parent()
+	if scroll_parent == null:
+		return
+	var available: float = scroll_parent.size.y
+	var content_height: float = row_count * BAR_HEIGHT + maxf(0.0, float(row_count - 1)) * ROW_SEPARATION
+	var spacer_height: float = maxf(0.0, (available - content_height) * 0.5)
+	top_spacer.custom_minimum_size = Vector2(0, spacer_height)
 
 func _build_row(party_name: String, color: Color, percent: float, seats: int, max_percent: float) -> Control:
 	var row := HBoxContainer.new()

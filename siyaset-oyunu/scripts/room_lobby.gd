@@ -58,7 +58,7 @@ func _ready() -> void:
 
 	axis_increment_slider.min_value = MultiplayerManager.AXIS_SHARPNESS_INCREMENT_MIN
 	axis_increment_slider.max_value = MultiplayerManager.AXIS_SHARPNESS_INCREMENT_MAX
-	axis_increment_slider.step = 0.1
+	axis_increment_slider.step = 0.05
 	axis_increment_slider.value_changed.connect(_on_axis_increment_slider_changed)
 
 	axis_max_enabled_check.toggled.connect(_on_axis_max_enabled_toggled)

@@ -111,6 +111,8 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_top = -10.0
+offset_bottom = -10.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
@@ -121,9 +123,9 @@ layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 theme_override_constants/margin_left = 24
-theme_override_constants/margin_top = 8
+theme_override_constants/margin_top = 0
 theme_override_constants/margin_right = 12
-theme_override_constants/margin_bottom = 16
+theme_override_constants/margin_bottom = 24
 
 [node name="ParliamentDiagram" type="Control" parent="BottomArea/ChamberSplit/ParliamentChamber" unique_id=3821004445]
 unique_name_in_owner = true
@@ -136,9 +138,9 @@ layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 theme_override_constants/margin_left = 12
-theme_override_constants/margin_top = 8
+theme_override_constants/margin_top = 14
 theme_override_constants/margin_right = 24
-theme_override_constants/margin_bottom = 16
+theme_override_constants/margin_bottom = 10
 
 [node name="VoteVBox" type="VBoxContainer" parent="BottomArea/ChamberSplit/VoteChamber" unique_id=3821004447]
 layout_mode = 2

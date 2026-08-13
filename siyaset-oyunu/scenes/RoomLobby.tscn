@@ -255,7 +255,7 @@ text = "Artış Miktarı"
 [node name="AxisIncrementValueLabel" type="Label" parent="SettingsSidePanel/Margin/VBox/AxisIncrementRow"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "0.5"
+text = "0.25"
 horizontal_alignment = 2
 
 [node name="AxisIncrementSlider" type="HSlider" parent="SettingsSidePanel/Margin/VBox"]
@@ -263,8 +263,8 @@ unique_name_in_owner = true
 layout_mode = 2
 min_value = 0.0
 max_value = 1.0
-step = 0.1
-value = 0.5
+step = 0.05
+value = 0.25
 
 [node name="AxisMaxEnabledRow" type="HBoxContainer" parent="SettingsSidePanel/Margin/VBox"]
 layout_mode = 2

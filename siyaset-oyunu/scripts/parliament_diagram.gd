@@ -14,6 +14,14 @@ extends Control
 const SPAN := 180.0          # yay açısı (derece) — orijinal JS: SPAN
 const SEAT_RADIUS_FACTOR := 0.8  # orijinal JS: SRF
 
+## Türkiye haritasındaki kalın beyaz kontur ile aynı görsel dilde, koltuk
+## noktalarının HER BİRİNİN arkasına biraz daha büyük beyaz bir daire
+## çizilir; koltuklar birbirine yakın olduğu için bitişik beyaz daireler
+## görsel olarak birleşip tüm diyagramın etrafında tek parça, kalın beyaz
+## bir kontur izlenimi yaratır.
+@export var outline_width: float = 3.2
+@export var outline_color: Color = Color(1, 1, 1, 0.95)
+
 var _dot_positions: Array = [] # Array[Vector2], normalize (x: 0..2, merkez=1 / y: 0..~1)
 var _dot_colors: Array = []    # Array[Color], _dot_positions ile aynı sırada
 var _seat_radius_norm: float = 0.0 # normalize koltuk yarıçapı (tüm noktalar için sabit)
@@ -52,11 +60,19 @@ func _draw() -> void:
 	var scale: float = minf(size.x * 0.5, size.y * 0.96)
 	var origin := Vector2(size.x * 0.5, size.y * 0.98)
 	var dot_radius: float = maxf(2.5, _seat_radius_norm * scale)
+	var pixel_positions: Array = []
 	for i in _dot_positions.size():
 		var p: Vector2 = _dot_positions[i]
-		var pixel_pos := origin + Vector2(p.x - 1.0, -p.y) * scale
-		# antialiased=true: kenarları pürüzsüz, "SVG kalitesi" görünüm.
-		draw_circle(pixel_pos, dot_radius, _dot_colors[i], true, -1.0, true)
+		pixel_positions.append(origin + Vector2(p.x - 1.0, -p.y) * scale)
+	# Pixel-art harita/UI ile tutarlı olsun diye artık antialiased YUVARLAK
+	# değil, keskin kenarlı KARE koltuklar çiziliyor (draw_rect, antialiased
+	# kapalı) — köşeleri net, bulanıklık yok.
+	for pixel_pos in pixel_positions:
+		var outline_half: float = dot_radius + outline_width
+		draw_rect(Rect2(pixel_pos - Vector2(outline_half, outline_half), Vector2(outline_half, outline_half) * 2.0), outline_color, true)
+	for i in _dot_positions.size():
+		var half: float = dot_radius
+		draw_rect(Rect2(pixel_positions[i] - Vector2(half, half), Vector2(half, half) * 2.0), _dot_colors[i], true)
 
 	# eksen_projeksiyon'daki gibi, yayın altında ortalanmış toplam sandalye
 	# sayısı (createParliamentArch'taki <text>{total}</text> karşılığı).

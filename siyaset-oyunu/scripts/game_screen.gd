@@ -26,6 +26,9 @@ const BADGE_ICON_PIXEL_SIZE := 64
 const CARD_DISPLAY_SCALE := 2.0
 const CARD_DISPLAY_SIZE := Vector2(72, 96) * CARD_DISPLAY_SCALE
 const CARD_HOVER_LIFT_SPEED := 12.0
+## Parti profil kartının (politic_profile.png, 77x53) büyütme katı. TAM SAYI
+## olmalı — pixel-art keskinliği ancak tam sayı katlarda korunur.
+const PROFILE_CARD_SCALE := 4
 const TAP_MAX_HOLD_MS := 250
 const TAP_MAX_MOVE_PX := 10.0
 
@@ -46,9 +49,8 @@ const PLAY_POP_DURATION := 0.18   # ortada küçülüp "puf" kaybolma
 @onready var turn_indicator: PanelContainer = %TurnIndicator
 @onready var turn_indicator_label: Label = %TurnIndicatorLabel
 @onready var turn_indicator_badge_slot: Control = %TurnIndicatorBadgeSlot
-@onready var hover_tooltip: PanelContainer = %HoverTooltip
-@onready var hover_tooltip_title: Label = %HoverTooltipTitle
-@onready var hover_tooltip_axes: VBoxContainer = %HoverTooltipAxes
+@onready var hover_tooltip: Control = %HoverTooltip
+@onready var hover_tooltip_image: TextureRect = %HoverTooltipImage
 @onready var parliament_diagram: ParliamentDiagram = %ParliamentDiagram
 @onready var vote_share_panel: VoteSharePanel = %VoteSharePanel
 @onready var game_settings_label: Label = %GameSettingsLabel
@@ -413,6 +415,8 @@ func _rebuild_hand() -> void:
 	_refresh_deck_button()
 
 func _process(delta: float) -> void:
+	_update_avatar_hover()
+
 	var i := _hand_holders.size() - 1
 	while i >= 0:
 		var holder: Control = _hand_holders[i]
@@ -650,9 +654,24 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 	# oval'a dönüşürdü. SHRINK_CENTER ile hep AVATAR_SIZE genişliğinde,
 	# sütunda ortalanmış kalır.
 	wrap.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	wrap.mouse_entered.connect(_on_avatar_hovered.bind(peer_id))
-	wrap.mouse_exited.connect(_on_avatar_unhovered.bind(peer_id))
+	# Hangi oyuncuya ait olduğu düğümün ÜSTÜNDE saklanıyor: hover tespiti
+	# (bkz. _update_avatar_hover) ve tooltip konumlandırma, panelin çocuk
+	# SIRASINA güvenmek yerine bunu okuyor. Panel yeniden kurulurken eski
+	# (queue_free edilmiş ama henüz silinmemiş) düğümler listede bir süre
+	# daha durabildiği için index bazlı eşleme güvenilir değil.
+	wrap.set_meta("peer_id", peer_id)
 	return wrap
+
+## peer_id'ye ait avatar düğümünü bulur (yoksa null). Silinmek üzere işaretli
+## düğümleri atlar.
+func _find_avatar_node(peer_id: int) -> Control:
+	for child in player_panel_list.get_children():
+		if not is_instance_valid(child) or child.is_queued_for_deletion():
+			continue
+		var control := child as Control
+		if control != null and control.get_meta("peer_id", -1) == peer_id:
+			return control
+	return null
 
 ## Bir partinin "logosu": arka plan renkli yuvarlak + ikon. Avatar panelinde
 ## ve tur göstergesinde (daha küçük) aynı görsel kullanılıyor. is_self=true
@@ -665,6 +684,9 @@ func _build_badge(party: Dictionary, size: Vector2, icon_pixel_size: int, is_sel
 
 	var bg_color: Color = party.get("bg_color", Color(0.3, 0.3, 0.3))
 	var circle := Panel.new()
+	# Rozetin içindekiler tamamen DEKORATİF — fare girdisini yutmasınlar
+	# (Panel varsayılanı STOP, TextureRect varsayılanı PASS'tir).
+	circle.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	circle.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var style := StyleBoxFlat.new()
 	style.bg_color = bg_color
@@ -692,6 +714,7 @@ func _build_badge(party: Dictionary, size: Vector2, icon_pixel_size: int, is_sel
 
 	if party.has("icon_index"):
 		var icon := TextureRect.new()
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		icon.texture = PartyPresets.get_icon_texture(party["icon_index"], icon_pixel_size)
 		icon.modulate = party.get("icon_color", Color.WHITE)
 		icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
@@ -707,60 +730,65 @@ func _build_badge(party: Dictionary, size: Vector2, icon_pixel_size: int, is_sel
 
 	return wrap
 
-func _on_avatar_hovered(peer_id: int) -> void:
-	_hovered_peer_id = peer_id
-	_show_tooltip_for(peer_id)
-
-func _on_avatar_unhovered(peer_id: int) -> void:
-	if _hovered_peer_id == peer_id:
-		_hovered_peer_id = -1
+## Avatar hover'ı, Control'ün mouse_entered/mouse_exited sinyalleriyle DEĞİL,
+## her karede gerçek fare konumuna bakarak belirleniyor. Sinyal yaklaşımı iki
+## ayrı nedenle güvenilmezdi:
+##   1) Rozetin içindeki renkli daire (Panel) varsayılan olarak STOP filtreli
+##      ve tüm alanı kaplıyor; fare daire ile ikon arasında geçerken hover
+##      hedefi değişip dıştaki kapsayıcıya mouse_exited attırıyordu — yani
+##      imleç logonun üstünden hiç çıkmadığı hâlde profil kartı kayboluyordu.
+##   2) Parti verisi güncellenince panel komple yeniden kuruluyor; silinen
+##      eski avatarlar da mouse_exited yayınlayıp kartı kapatıyordu.
+## Konumdan hesaplayınca ikisi de tamamen ortadan kalkıyor.
+func _update_avatar_hover() -> void:
+	if hover_tooltip == null:
+		return
+	var mouse_pos := get_viewport().get_mouse_position()
+	var found := -1
+	for child in player_panel_list.get_children():
+		if not is_instance_valid(child) or child.is_queued_for_deletion():
+			continue
+		var avatar := child as Control
+		if avatar == null:
+			continue
+		if Rect2(avatar.global_position, avatar.size).has_point(mouse_pos):
+			found = avatar.get_meta("peer_id", -1)
+			break
+	if found == _hovered_peer_id:
+		return
+	_hovered_peer_id = found
+	if found == -1:
 		hover_tooltip.hide()
+	else:
+		_show_tooltip_for(found)
 
 func _show_tooltip_for(peer_id: int) -> void:
 	var party: Dictionary = PartyManager.parties.get(peer_id, {})
-	var pname: String = MultiplayerManager.players.get(peer_id, {}).get("name", "?")
-	hover_tooltip_title.text = party.get("name", pname)
-
-	for child in hover_tooltip_axes.get_children():
-		child.queue_free()
-
 	var ideology: Dictionary = party.get("ideology", IdeologyAxes.default_values())
-	for axis in IdeologyAxes.AXES:
-		var value: int = ideology.get(axis, 0)
-		var row := VBoxContainer.new()
-		row.add_theme_constant_override("separation", 2)
 
-		var label := Label.new()
-		label.text = "%s: %+d" % [_axis_title(axis), value]
-		label.add_theme_font_size_override("font_size", 13)
-		row.add_child(label)
+	# Kartın TAMAMI tek bir pixel-art görsel: politic_profile.png'in üstüne
+	# partinin ideolojisine karşılık gelen üç eksen görseli yapıştırılmış hâli
+	# (bkz. party_profile.gd).
+	hover_tooltip_image.texture = PartyProfile.build_texture(ideology)
 
-		var bar := TextureRect.new()
-		bar.texture = AxisVisual.get_axis_texture(axis, value)
-		bar.custom_minimum_size = Vector2(154, 22)
-		row.add_child(bar)
-
-		hover_tooltip_axes.add_child(row)
+	# Pixel-art keskin kalsın diye TAM SAYI katıyla büyütülüyor.
+	var native_size := PartyProfile.get_native_size()
+	if native_size == Vector2i.ZERO:
+		return
+	hover_tooltip.size = Vector2(native_size) * PROFILE_CARD_SCALE
 
 	# Tooltip'i, hover edilen avatarın hemen soluna yerleştir.
-	var avatar_index := _ordered_peer_ids().find(peer_id)
-	if avatar_index != -1 and avatar_index < player_panel_list.get_child_count():
-		var avatar: Control = player_panel_list.get_child(avatar_index)
-		var avatar_global_pos := avatar.global_position
-		hover_tooltip.show()
-		await get_tree().process_frame
-		var tooltip_size := hover_tooltip.size
-		hover_tooltip.global_position = avatar_global_pos - Vector2(tooltip_size.x + 12, 0)
-	else:
-		hover_tooltip.show()
-
-func _axis_title(axis: String) -> String:
-	match axis:
-		"economic":
-			return "Ekonomi"
-		"social":
-			return "Toplum"
-		"administrative":
-			return "İdare"
-		_:
-			return axis
+	var avatar := _find_avatar_node(peer_id)
+	if avatar != null:
+		# Dikeyde avatarla ORTALA, yatayda avatarın soluna koy. Ekranın
+		# üstünden/altından taşmasın diye viewport içine sıkıştırılıyor.
+		var viewport_size := get_viewport_rect().size
+		hover_tooltip.global_position = Vector2(
+			avatar.global_position.x - hover_tooltip.size.x - 12.0,
+			clampf(
+				avatar.global_position.y + avatar.size.y * 0.5 - hover_tooltip.size.y * 0.5,
+				8.0,
+				maxf(8.0, viewport_size.y - hover_tooltip.size.y - 8.0)
+			)
+		)
+	hover_tooltip.show()

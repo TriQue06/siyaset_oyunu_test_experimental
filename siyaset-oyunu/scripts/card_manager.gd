@@ -52,8 +52,15 @@ var last_seats: Dictionary = {}
 # milletvekili noktaları ve il hover kutusu bunu kullanır.
 var last_province_results: Dictionary = {}
 
-const PROVINCES_DATA_PATH := "res://data/provinces.json"
 const PROVINCE_SEATS_PATH := "res://data/province_seats.json"
+## Seçim hesabına giren illerin listesi. YETKİLİ KAYNAK province_seats.json'dur
+## (bir ilin oyunda var olması demek, ona koltuk atanmış olması demektir).
+## Vaktiyle bu liste artık kullanılmayan data/provinces.json'dan (eski vektör
+## harita verisi, pixel-art haritaya geçişten kalma) okunuyordu; o dosya 81 il
+## içerdiği için birleştirmeyle kaldırılan 14 il hâlâ listede geliyordu.
+## Sonuçları bozmuyordu (koltuğu 0 olanlar atlanıyordu) ama iki dosyanın
+## sessizce ayrışmasına açıktı — koltuk dosyasına eklenen yeni bir il, eski
+## dosyada olmadığı için görmezden gelinirdi.
 var _province_ids: Array = []
 # province_id -> int (o ildeki GERÇEK milletvekili sayısı).
 var _province_seat_counts: Dictionary = {}
@@ -67,7 +74,6 @@ const RESYNC_INTERVAL := 4.0
 var _resync_timer := 0.0
 
 func _ready() -> void:
-	_load_province_ids()
 	_load_province_seat_counts()
 	set_process(true)
 
@@ -80,37 +86,31 @@ func _process(delta: float) -> void:
 	_resync_timer = 0.0
 	_sync_state.rpc(inventories, turn_order, current_turn_index, has_drawn_this_turn, current_axis_sharpness)
 
-func _load_province_ids() -> void:
-	if not FileAccess.file_exists(PROVINCES_DATA_PATH):
-		return
-	var file := FileAccess.open(PROVINCES_DATA_PATH, FileAccess.READ)
-	var parsed = JSON.parse_string(file.get_as_text())
-	if parsed == null:
-		return
-	_province_ids = parsed.keys()
-
-## Gerçek il bazlı milletvekili sayılarını yükler (bkz. data/province_seats.json).
-## Bulunamazsa TOTAL_SEATS, illere eşit/yaklaşık dağıtılmış bir yedek listeye düşer.
+## Gerçek il bazlı milletvekili sayılarını yükler (bkz. data/province_seats.json)
+## ve il listesini (_province_ids) bu dosyadan türetir. TOTAL_SEATS de buradaki
+## sayıların toplamıdır — yani il ekleyip çıkarmak ya da bir ilin koltuk
+## sayısını değiştirmek için SADECE bu dosyayı düzenlemek yeterli.
 func _load_province_seat_counts() -> void:
 	_province_seat_counts.clear()
-	if FileAccess.file_exists(PROVINCE_SEATS_PATH):
-		var file := FileAccess.open(PROVINCE_SEATS_PATH, FileAccess.READ)
-		var parsed = JSON.parse_string(file.get_as_text())
-		if parsed is Dictionary:
-			for province_id in parsed.keys():
-				_province_seat_counts[province_id] = int(parsed[province_id])
-			var sum := 0
-			for v in _province_seat_counts.values():
-				sum += v
-			if sum > 0:
-				TOTAL_SEATS = sum
-			return
-	push_warning("data/province_seats.json bulunamadı, illere yaklaşık eşit dağıtılıyor.")
-	if _province_ids.is_empty():
+	_province_ids.clear()
+	if not FileAccess.file_exists(PROVINCE_SEATS_PATH):
+		push_warning("data/province_seats.json bulunamadı — il bazlı seçim sonucu üretilemeyecek.")
 		return
-	var per_province: int = maxi(1, TOTAL_SEATS / _province_ids.size())
-	for province_id in _province_ids:
-		_province_seat_counts[province_id] = per_province
+	var file := FileAccess.open(PROVINCE_SEATS_PATH, FileAccess.READ)
+	var parsed = JSON.parse_string(file.get_as_text())
+	if not (parsed is Dictionary):
+		push_warning("data/province_seats.json okunamadı — il bazlı seçim sonucu üretilemeyecek.")
+		return
+	var sum := 0
+	for province_id in parsed.keys():
+		var seats := int(parsed[province_id])
+		if seats <= 0:
+			continue
+		_province_seat_counts[province_id] = seats
+		_province_ids.append(province_id)
+		sum += seats
+	if sum > 0:
+		TOTAL_SEATS = sum
 
 # peer_id -> Array[String] (her biri CardPresets.CARD_TYPES'tan biri)
 var inventories: Dictionary = {}

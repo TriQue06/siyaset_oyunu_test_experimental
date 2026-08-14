@@ -41,7 +41,10 @@ const RELAY_URL := "wss://siyaset-oyunu-test-experimental.onrender.com"
 const RelayMultiplayerPeerScript := preload("res://scripts/relay_multiplayer_peer.gd")
 
 const MAX_PLAYERS := 8
-const MIN_PLAYERS_TO_START := 3
+## TEST AMAÇLI 2'ye düşürüldü (tasarım gereği asıl değer 3). Tek başına
+## birden fazla instance açıp hızlı deneme yapabilmek için — yayına
+## alınmadan önce tekrar 3 yapılmalı.
+const MIN_PLAYERS_TO_START := 2
 
 const THRESHOLD_MIN := 0.0
 const THRESHOLD_MAX := 10.0

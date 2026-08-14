@@ -236,7 +236,7 @@ grow_vertical = 0
 mouse_filter = 2
 theme_override_constants/separation = 8
 
-[node name="HoverTooltip" type="PanelContainer" parent="." unique_id=2118611278]
+[node name="HoverTooltip" type="Control" parent="." unique_id=2118611278]
 unique_name_in_owner = true
 layout_mode = 1
 offset_left = 400.0
@@ -245,28 +245,15 @@ offset_right = 620.0
 offset_bottom = 240.0
 mouse_filter = 2
 
-[node name="HoverTooltipBg" type="ColorRect" parent="HoverTooltip" unique_id=27405166]
-layout_mode = 2
-color = Color(0.08, 0.08, 0.11, 0.95)
-
-[node name="HoverTooltipMargin" type="MarginContainer" parent="HoverTooltip" unique_id=176830054]
-layout_mode = 2
-theme_override_constants/margin_left = 12
-theme_override_constants/margin_top = 10
-theme_override_constants/margin_right = 12
-theme_override_constants/margin_bottom = 10
-
-[node name="HoverTooltipVBox" type="VBoxContainer" parent="HoverTooltip/HoverTooltipMargin" unique_id=567057978]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="HoverTooltipTitle" type="Label" parent="HoverTooltip/HoverTooltipMargin/HoverTooltipVBox" unique_id=152663322]
+[node name="HoverTooltipImage" type="TextureRect" parent="HoverTooltip" unique_id=152663322]
 unique_name_in_owner = true
-layout_mode = 2
-theme_override_font_sizes/font_size = 18
-text = "Parti Adı"
-
-[node name="HoverTooltipAxes" type="VBoxContainer" parent="HoverTooltip/HoverTooltipMargin/HoverTooltipVBox" unique_id=586446413]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 6
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture_filter = 1
+expand_mode = 1
+stretch_mode = 5

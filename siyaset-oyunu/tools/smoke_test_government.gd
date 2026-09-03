@@ -1,0 +1,164 @@
+extends SceneTree
+## Hükümet kurma / oylama / vekil çalma kurallarının uçtan uca testi.
+
+var mm
+var pm
+var cm
+var gm
+var gp
+var cp
+var fails := 0
+
+func check(label: String, ok: bool, detail: String = "") -> void:
+	if not ok:
+		fails += 1
+	print("  %s %s%s" % ["[OK] " if ok else "[HATA]", label, ("  -> " + detail) if detail != "" else ""])
+
+func setup_parties(seats: Dictionary) -> void:
+	mm.players = {}
+	pm.parties = {}
+	cm.last_seats = {}
+	cm.last_vote_shares = {}
+	var i := 0
+	for peer_id in seats.keys():
+		mm.players[peer_id] = {"name": "Oyuncu%d" % peer_id}
+		pm.parties[peer_id] = {
+			"name": "Parti%d" % peer_id, "icon_index": i % 6,
+			"icon_color": Color.WHITE, "bg_color": Color(0.2 * i, 0.4, 0.6),
+			"ideology": {"economic": 0, "social": 0, "administrative": 0}, "ready": true,
+		}
+		cm.last_seats[peer_id] = seats[peer_id]
+		cm.last_vote_shares[peer_id] = float(seats[peer_id])
+		i += 1
+	cm.turn_order = seats.keys()
+
+func _initialize() -> void:
+	await process_frame
+	await process_frame
+	mm = root.get_node("MultiplayerManager")
+	pm = root.get_node("PartyManager")
+	cm = root.get_node("CardManager")
+	gm = root.get_node("GovernmentManager")
+	gp = root.get_node("GovernmentPresets")
+	cp = root.get_node("CardPresets")
+	mm.room_code = ""  # yerel mod: RPC yok, doğrudan uygula
+
+	print("=== 1) GOREV SIRASI (koltuk sayisina gore) ===")
+	# 2 en cok vekile sahip ama 3'un oy orani daha yuksek olsa bile sira 2'de olmali
+	setup_parties({1: 100, 2: 180, 3: 110})
+	cm.last_vote_shares = {1: 30.0, 2: 20.0, 3: 50.0}
+	gm.start_formation()
+	check("gorev en cok VEKILI olana verildi", gm.mandate_peer_id() == 2,
+		"beklenen 2, gelen %d" % gm.mandate_peer_id())
+	check("sira dogru (2 > 3 > 1)", gm.mandate_order == [2, 3, 1], str(gm.mandate_order))
+	check("faz FORMING", gm.phase == gm.Phase.FORMING)
+	check("toplam sandalye 390", gm.total_seats() == 390, str(gm.total_seats()))
+
+	print("")
+	print("=== 2) TEKLIF KABUL (hayir oylari salt cogunlugu GECMEZ) ===")
+	var assign := {}
+	for post in gp.POSTS:
+		assign[post["id"]] = 2
+	assign[gp.POST_DEPUTY_PM] = 3   # ortak: 3
+	gm._apply_government_proposal(gm.mandate_peer_id(), assign)
+	check("faz VOTING", gm.phase == gm.Phase.VOTING)
+	gm._apply_vote(2, true)    # 180 evet
+	gm._apply_vote(3, false)   # 110 hayir
+	gm._apply_vote(1, false)   # 100 hayir  => 210 hayir > 195 ? EVET, dusmeli
+	check("210 hayir > 195 esik -> REDDEDILDI", not gm.has_government(),
+		"hukumet: %s" % str(gm.government))
+	check("hak azaldi (2/3 kaldi)", gm.attempts_left() == 2, str(gm.attempts_left()))
+	check("gorev hala 2'de", gm.mandate_peer_id() == 2)
+
+	print("")
+	print("=== 3) AZINLIK HUKUMETI GECEBILIR (muhalefet dagilirsa) ===")
+	gm._apply_government_proposal(gm.mandate_peer_id(), assign)
+	gm._apply_vote(2, true)    # 180 evet
+	gm._apply_vote(3, true)    # 110 evet
+	gm._apply_vote(1, false)   # 100 hayir  => 100 < 195, gecmeli
+	check("hukumet KURULDU", gm.has_government())
+	check("ana iktidar partisi = basbakanligi tutan", gm.main_gov_peer_id == 2, str(gm.main_gov_peer_id))
+	check("faz GOVERNING", gm.phase == gm.Phase.GOVERNING)
+	check("hukumet partileri [2,3]", gm.government_party_ids().has(2) and gm.government_party_ids().has(3),
+		str(gm.government_party_ids()))
+	check("salt cogunluk VAR (290/390)", gm.has_majority(), "%d/%d" % [gm.government_seats(), gm.total_seats()])
+
+	print("")
+	print("=== 4) PUANLAR (bakanlik+1, byrd+2, basbakan+3) ===")
+	# 2: basbakanlik(3) + 8 bakanlik(8) = 11 ; 3: basbakan yrd (2)
+	check("2 tur puani 11", gm.round_points_of(2) == 11, str(gm.round_points_of(2)))
+	check("3 tur puani 2", gm.round_points_of(3) == 2, str(gm.round_points_of(3)))
+	gm.award_round_scores()
+	gm.award_round_scores()
+	check("puan BIRIKIYOR (2 tur -> 22)", gm.score_of(2) == 22, str(gm.score_of(2)))
+	check("puan BIRIKIYOR (2 tur -> 4)", gm.score_of(3) == 4, str(gm.score_of(3)))
+
+	print("")
+	print("=== 5) VEKIL CALMA ===")
+	var before_total: int = gm.total_seats()
+	check("kendinden calamaz", not cm.is_valid_steal_target(1, 1))
+	check("meclis disindan calamaz", not cm.is_valid_steal_target(1, 99))
+	cm.last_seats[3] = 1
+	check("tek vekilliden calamaz", not cm.is_valid_steal_target(1, 3))
+	cm.last_seats[3] = 110
+	check("gecerli hedef", cm.is_valid_steal_target(1, 3))
+	cm._apply_steal(1, 2, "steal_strong")
+	check("toplam sandalye DEGISMEDI (sifir toplamli)", gm.total_seats() == before_total,
+		"%d -> %d" % [before_total, gm.total_seats()])
+	# 1'in altina dusurememe
+	cm.last_seats[3] = 1
+	cm.last_seats[1] = 100
+	cm._apply_steal(1, 3, "steal_strong")
+	check("hedef 1'in ALTINA dusmedi", int(cm.last_seats[3]) >= 1, str(cm.last_seats[3]))
+
+	print("")
+	print("=== 6) DESTE HAVUZU (kosullu kartlar) ===")
+	var pool: Array = cm._draw_pool()
+	check("vekil calma kartlari destede (meclis var)", pool.has("steal_strong"))
+	check("gensoru DESTEDE DEGIL (hukumet cogunlukta)", not pool.has("gensoru"),
+		"hukumet %d/%d" % [gm.government_seats(), gm.total_seats()])
+	# Hukumeti azinliga dusur
+	cm.last_seats = {1: 300, 2: 50, 3: 40}
+	check("hukumet artik AZINLIK", not gm.has_majority(), "%d/%d" % [gm.government_seats(), gm.total_seats()])
+	pool = cm._draw_pool()
+	check("gensoru DESTEYE GIRDI", pool.has("gensoru"))
+
+	print("")
+	print("=== 7) GENSORU ===")
+	gm.submit_censure(1)
+	check("faz VOTING", gm.phase == gm.Phase.VOTING)
+	check("teklif turu censure", gm.proposal_kind == gm.KIND_CENSURE)
+	gm._apply_vote(1, true)    # 300 evet (gensoru kabul)
+	gm._apply_vote(2, false)
+	gm._apply_vote(3, false)   # 90 hayir -> 90 < 195, gensoru GECER
+	check("hukumet DUSTU", not gm.has_government())
+	check("yeniden kurma asamasi basladi", gm.phase == gm.Phase.FORMING)
+	check("gorev en buyuk partide (1)", gm.mandate_peer_id() == 1, str(gm.mandate_peer_id()))
+	check("puanlar KORUNDU", gm.score_of(2) == 22, str(gm.score_of(2)))
+
+	print("")
+	print("=== 8) 3 TEKLIF HAKKI BITINCE SIRA DEVREDER ===")
+	setup_parties({1: 200, 2: 190})
+	gm.start_formation()
+	check("gorev 1de (200 vekil)", gm.mandate_peer_id() == 1)
+	# Simdi gercek red senaryosu: 2 daha buyuk olsun
+	setup_parties({1: 100, 2: 290})
+	gm.start_formation()
+	check("gorev 2'de (290 vekil)", gm.mandate_peer_id() == 2)
+	var a3 := {}
+	for post in gp.POSTS:
+		a3[post["id"]] = 2
+	for attempt in 3:
+		gm._apply_government_proposal(gm.mandate_peer_id(), a3)
+		gm._apply_vote(2, false)
+		gm._apply_vote(1, false)   # 390 hayir -> her seferinde red
+	check("3 red sonrasi sira DEVRETTI (1'e)", gm.mandate_peer_id() == 1,
+		"gelen %d, index %d" % [gm.mandate_peer_id(), gm.mandate_index])
+	check("hak sifirlandi (3)", gm.attempts_left() == 3, str(gm.attempts_left()))
+
+	print("")
+	if fails == 0:
+		print("=== TUM TESTLER GECTI ===")
+	else:
+		print("=== %d TEST BASARISIZ ===" % fails)
+	quit()

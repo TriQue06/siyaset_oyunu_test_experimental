@@ -125,13 +125,50 @@ mouse_filter = 2
 theme_override_constants/margin_left = 24
 theme_override_constants/margin_top = 0
 theme_override_constants/margin_right = 12
-theme_override_constants/margin_bottom = 24
+theme_override_constants/margin_bottom = 8
 
-[node name="ParliamentDiagram" type="Control" parent="BottomArea/ChamberSplit/ParliamentChamber" unique_id=3821004445]
-unique_name_in_owner = true
+[node name="ParliamentVBox" type="VBoxContainer" parent="BottomArea/ChamberSplit/ParliamentChamber" unique_id=3821004460]
 layout_mode = 2
 mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="ParliamentDiagram" type="Control" parent="BottomArea/ChamberSplit/ParliamentChamber/ParliamentVBox" unique_id=3821004445]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
 script = ExtResource("4")
+
+[node name="VoteButtonRow" type="HBoxContainer" parent="BottomArea/ChamberSplit/ParliamentChamber/ParliamentVBox" unique_id=3821004461]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 14
+
+[node name="VoteYesButton" type="TextureButton" parent="BottomArea/ChamberSplit/ParliamentChamber/ParliamentVBox/VoteButtonRow" unique_id=3821004462]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(48, 48)
+layout_mode = 2
+ignore_texture_size = true
+stretch_mode = 0
+texture_filter = 1
+
+[node name="VoteNoButton" type="TextureButton" parent="BottomArea/ChamberSplit/ParliamentChamber/ParliamentVBox/VoteButtonRow" unique_id=3821004463]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(48, 48)
+layout_mode = 2
+ignore_texture_size = true
+stretch_mode = 0
+texture_filter = 1
+
+[node name="ProposalLabel" type="Label" parent="BottomArea/ChamberSplit/ParliamentChamber/ParliamentVBox" unique_id=3821004464]
+unique_name_in_owner = true
+layout_mode = 2
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 12
+modulate = Color(1, 1, 1, 0.75)
+text = ""
+autowrap_mode = 2
 
 [node name="VoteChamber" type="MarginContainer" parent="BottomArea/ChamberSplit" unique_id=3821004446]
 layout_mode = 2
@@ -201,17 +238,56 @@ text = "Sıra: -"
 autowrap_mode = 2
 theme_override_font_sizes/font_size = 14
 
-[node name="GameSettingsLabel" type="Label" parent="." unique_id=3821004450]
-unique_name_in_owner = true
+[node name="LeftOverlay" type="VBoxContainer" parent="." unique_id=3821004470]
 layout_mode = 1
 anchors_preset = 0
 offset_left = 16.0
 offset_top = 82.0
-offset_right = 240.0
-offset_bottom = 110.0
+offset_right = 250.0
+offset_bottom = 400.0
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="GameSettingsLabel" type="Label" parent="LeftOverlay" unique_id=3821004450]
+unique_name_in_owner = true
+layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 13
 text = "Baraj: %0"
+
+[node name="GovernmentPanel" type="PanelContainer" parent="LeftOverlay" unique_id=3821004471]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+
+[node name="GovernmentMargin" type="MarginContainer" parent="LeftOverlay/GovernmentPanel" unique_id=3821004472]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 7
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
+
+[node name="GovernmentVBox" type="VBoxContainer" parent="LeftOverlay/GovernmentPanel/GovernmentMargin" unique_id=3821004473]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="ScorePanel" type="PanelContainer" parent="LeftOverlay" unique_id=3821004474]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+
+[node name="ScoreMargin" type="MarginContainer" parent="LeftOverlay/ScorePanel" unique_id=3821004475]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 7
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
+
+[node name="ScoreVBox" type="VBoxContainer" parent="LeftOverlay/ScorePanel/ScoreMargin" unique_id=3821004476]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 3
 
 [node name="HandArea" type="Control" parent="." unique_id=3821004412]
 unique_name_in_owner = true

@@ -32,6 +32,8 @@ signal card_played(peer_id: int, card_type: String)
 ## ekranında yayınlanır — GameScreen bunu dinleyip seçim sonuçları
 ## animasyonuna geçer (bkz. last_vote_shares/last_seats).
 signal round_completed
+## Milletvekili dağılımı seçim DIŞI bir sebeple değişti (vekil çalma kartı).
+signal seats_changed
 
 const MAX_HAND_SIZE := 5
 ## NOT: Gerçek bir oylama/sandık mekaniği henüz tasarlanmadı. Şimdilik her
@@ -131,13 +133,26 @@ func current_turn_peer_id() -> int:
 		return -1
 	return turn_order[current_turn_index % turn_order.size()]
 
+## Hükümet kurulurken ya da mecliste bir teklif oylanırken TUR DURUR: kimse
+## kart çekemez, oynayamaz, pas geçemez. Aksi hâlde hükümet kurma ekranı
+## açıkken oyun arkada akmaya devam ediyordu.
+func is_turn_blocked() -> bool:
+	return GovernmentManager.phase == GovernmentManager.Phase.FORMING \
+		or GovernmentManager.phase == GovernmentManager.Phase.VOTING
+
 func is_my_turn() -> bool:
 	return current_turn_peer_id() == multiplayer.get_unique_id()
 
 func can_draw() -> bool:
+	if is_turn_blocked():
+		return false
 	if not is_my_turn() or has_drawn_this_turn:
 		return false
 	return my_inventory().size() < MAX_HAND_SIZE
+
+## Sıra bende VE tur akışı engellenmemiş mi? (UI bunu kullanmalı.)
+func can_act() -> bool:
+	return is_my_turn() and not is_turn_blocked()
 
 ## Sadece host çağırır (Parti Kurulum bitip GameScreen'e geçilirken):
 ## envanterleri sıfırlar, oynama sırasını rastgele belirler, herkese yayınlar.
@@ -171,7 +186,7 @@ func draw_card() -> void:
 			inventories[id] = []
 		if inventories[id].size() >= MAX_HAND_SIZE:
 			return
-		var card_type := CardPresets.random_card_type()
+		var card_type := CardPresets.random_from(_draw_pool())
 		card_drawn.emit(id, card_type)
 		inventories[id].insert(inventories[id].size() / 2, card_type)
 		inventories_updated.emit()
@@ -183,10 +198,27 @@ func draw_card() -> void:
 	else:
 		_request_draw.rpc_id(1)
 
+## Desteden çekilebilecek kartlar. İdeoloji kartları her zaman vardır; özel
+## kartlar ancak KOŞULLARI oluşunca girer:
+##   - vekil çalma: ilk seçim yapıldıktan sonra (meclis oluştuktan sonra)
+##   - gensoru: kurulu bir hükümet varken ve o hükümet salt çoğunluğun
+##     ALTINA düştüğünde (dinamik kontrol mekanizması)
+func _draw_pool() -> Array:
+	var pool: Array = CardPresets.IDEOLOGY_CARD_TYPES.duplicate()
+	if not last_seats.is_empty():
+		for card_type in CardPresets.STEAL_CARD_TYPES:
+			pool.append(card_type)
+	if GovernmentManager.has_government() and not GovernmentManager.has_majority():
+		pool.append(CardPresets.CENSURE_CARD_TYPE)
+	return pool
+
 ## Sırası gelen oyuncu, elindeki bir kartı oynayınca çağırır (hand_index:
 ## my_inventory() içindeki sırası). Sıra kendisinde değilse hiçbir şey yapmaz.
 ## Turu bir sonraki oyuncuya devreder.
-func play_card(hand_index: int) -> void:
+##
+## target_peer_id: sadece HEDEF GEREKTİREN kartlar için (vekil çalma) —
+## hedef partinin peer_id'si. Diğer kartlarda -1 bırakılır.
+func play_card(hand_index: int, target_peer_id: int = -1) -> void:
 	if MultiplayerManager.room_code == "":
 		var id := multiplayer.get_unique_id()
 		var hand: Array = inventories.get(id, [])
@@ -195,22 +227,22 @@ func play_card(hand_index: int) -> void:
 		var card_type: String = hand[hand_index]
 		card_played.emit(id, card_type)
 		hand.remove_at(hand_index)
-		_apply_card_effect(id, card_type)
+		_apply_card_effect(id, card_type, target_peer_id)
 		inventories_updated.emit()
 		return
-	if not is_my_turn():
+	if not can_act():
 		return
 	if MultiplayerManager.is_host:
-		_apply_play(multiplayer.get_unique_id(), hand_index)
+		_apply_play(multiplayer.get_unique_id(), hand_index, target_peer_id)
 	else:
-		_request_play.rpc_id(1, hand_index)
+		_request_play.rpc_id(1, hand_index, target_peer_id)
 
 ## Sırası gelen oyuncu, kart çekmek/oynamak istemeden turu bir sonraki
 ## oyuncuya devretmek için çağırır (kart oynamadan geçer).
 func pass_turn() -> void:
 	if MultiplayerManager.room_code == "":
 		return
-	if not is_my_turn():
+	if not can_act():
 		return
 	if MultiplayerManager.is_host:
 		_apply_pass(multiplayer.get_unique_id())
@@ -340,11 +372,19 @@ func _finish_round_if_needed(wrapped: bool) -> void:
 	current_axis_sharpness += MultiplayerManager.axis_sharpness_increment
 	if MultiplayerManager.axis_sharpness_max_enabled:
 		current_axis_sharpness = minf(current_axis_sharpness, MultiplayerManager.axis_sharpness_max_value)
+	# Biten turda görevde olan hükümet, görev puanlarını KAZANIR. Puan
+	# birikimlidir: iktidarda kalmak kazandırır, düşürmek engeller.
+	GovernmentManager.award_round_scores()
+
 	_compute_placeholder_results()
 	_notify_round_completed.rpc(last_vote_shares, last_seats, last_province_results, round_number, current_axis_sharpness)
 	# Host RPC'nin kendi yerel çağrısına GÜVENMİYOR (bkz. _apply_play'deki not) —
 	# sinyali burada da doğrudan yayınlıyoruz ki host'un ekranı da geçsin.
 	round_completed.emit()
+
+	# Yeni meclis oluştu: hükümet kurma görevi en çok vekili olan partiye
+	# verilir (bkz. GovernmentManager.start_formation).
+	GovernmentManager.start_formation()
 
 func _apply_draw(peer_id: int) -> void:
 	if peer_id != current_turn_peer_id() or has_drawn_this_turn:
@@ -353,7 +393,7 @@ func _apply_draw(peer_id: int) -> void:
 		inventories[peer_id] = []
 	if inventories[peer_id].size() >= MAX_HAND_SIZE:
 		return
-	var card_type := CardPresets.random_card_type()
+	var card_type := CardPresets.random_from(_draw_pool())
 	# Yeni kart, elin ORTASINA yerleşir (envanter ortadan ikiye ayrılıp
 	# arasına girer). İlk turda el boşsa zaten tek başına ortada kalır.
 	var insert_index: int = inventories[peer_id].size() / 2
@@ -368,15 +408,19 @@ func _apply_draw(peer_id: int) -> void:
 	inventories_updated.emit()
 	turn_changed.emit(current_turn_peer_id())
 
-func _apply_play(peer_id: int, hand_index: int) -> void:
+func _apply_play(peer_id: int, hand_index: int, target_peer_id: int = -1) -> void:
 	if peer_id != current_turn_peer_id():
 		return
 	var hand: Array = inventories.get(peer_id, [])
 	if hand_index < 0 or hand_index >= hand.size():
 		return
 	var card_type: String = hand[hand_index]
+	# Hedef gerektiren kart (vekil çalma), GEÇERLİ bir hedef olmadan
+	# oynanamaz — kart elde kalır, boşa harcanmaz.
+	if CardPresets.needs_target(card_type) and not is_valid_steal_target(peer_id, target_peer_id):
+		return
 	hand.remove_at(hand_index)
-	_apply_card_effect(peer_id, card_type)
+	_apply_card_effect(peer_id, card_type, target_peer_id)
 	var wrapped := _advance_turn()
 	_notify_played.rpc(peer_id, card_type, inventories, turn_order, current_turn_index, has_drawn_this_turn, current_axis_sharpness)
 	card_played.emit(peer_id, card_type)
@@ -392,11 +436,81 @@ func _apply_play(peer_id: int, hand_index: int) -> void:
 ## _compute_placeholder_province_results ve _finish_round_if_needed'daki
 ## her-turda-bir artış). Sadece host tarafında (any_peer istekleri de dahil,
 ## host doğrulayıp uyguladıktan sonra) çağrılır.
-func _apply_card_effect(peer_id: int, card_type: String) -> void:
+func _apply_card_effect(peer_id: int, card_type: String, target_peer_id: int = -1) -> void:
+	if CardPresets.needs_target(card_type):
+		_apply_steal(peer_id, target_peer_id, card_type)
+		return
+	if CardPresets.is_censure_card(card_type):
+		# Gensoru: hükümeti düşürmek üzere meclise getirilen teklif.
+		GovernmentManager.submit_censure(peer_id)
+		return
 	var effect: Dictionary = CardPresets.CARD_EFFECTS.get(card_type, {})
 	if effect.is_empty():
 		return
 	PartyManager.apply_ideology_delta(peer_id, effect["axis"], int(effect["delta"]))
+
+## Bir partiden vekil çalınabilir mi? Kendinden çalınamaz, meclis dışı partiden
+## çalınamaz ve hedefin en az 2 vekili olmalı (1'in altına DÜŞÜRÜLEMEZ).
+func is_valid_steal_target(peer_id: int, target_peer_id: int) -> bool:
+	if target_peer_id == -1 or target_peer_id == peer_id:
+		return false
+	if not last_seats.has(target_peer_id):
+		return false
+	return int(last_seats[target_peer_id]) > 1
+
+## Hedef partiden rastgele sayıda milletvekilini çalıp kartı oynayana aktarır.
+## Aralık kartın gücüne göre (bkz. CardPresets.STEAL_RANGES), her değer eşit
+## olasılıkta. Hedefin vekil sayısı ASLA 1'in altına düşmez.
+func _apply_steal(peer_id: int, target_peer_id: int, card_type: String) -> void:
+	if not is_valid_steal_target(peer_id, target_peer_id):
+		return
+	var range_info: Dictionary = CardPresets.STEAL_RANGES.get(card_type, {})
+	if range_info.is_empty():
+		return
+	var wanted: int = randi_range(int(range_info["min"]), int(range_info["max"]))
+	var stealable: int = maxi(0, int(last_seats[target_peer_id]) - 1)
+	var amount: int = mini(wanted, stealable)
+	if amount <= 0:
+		return
+
+	# Çalınan vekiller RASTGELE SEÇİM ÇEVRELERİNDEN alınır: hedefin her bir
+	# vekili için torbaya o ilin adı atılır, torba karıştırılır ve baştan
+	# `amount` kadarı transfer edilir — böylece büyük illerden çalınma
+	# olasılığı doğal olarak vekil sayısıyla orantılı olur. İl bazlı dağılım
+	# değiştiği için HARİTA da (il renkleri + vekil kareleri) buna göre
+	# güncellenir.
+	var bag: Array = []
+	for province_id in last_province_results.keys():
+		var entry: Dictionary = last_province_results[province_id]
+		var here: int = int(entry.get(target_peer_id, {}).get("seats", 0))
+		for i in here:
+			bag.append(province_id)
+	bag.shuffle()
+
+	var moved := 0
+	for province_id in bag:
+		if moved >= amount:
+			break
+		var entry: Dictionary = last_province_results[province_id]
+		var target_entry: Dictionary = entry.get(target_peer_id, {})
+		if int(target_entry.get("seats", 0)) <= 0:
+			continue
+		target_entry["seats"] = int(target_entry["seats"]) - 1
+		entry[target_peer_id] = target_entry
+		var thief_entry: Dictionary = entry.get(peer_id, {"percent": 0.0, "seats": 0})
+		thief_entry["seats"] = int(thief_entry.get("seats", 0)) + 1
+		entry[peer_id] = thief_entry
+		last_province_results[province_id] = entry
+		moved += 1
+
+	# İl bazlı veri yoksa (ör. henüz seçim olmadıysa) ulusal toplamdan düş.
+	if moved == 0:
+		moved = amount
+
+	last_seats[target_peer_id] = int(last_seats[target_peer_id]) - moved
+	last_seats[peer_id] = int(last_seats.get(peer_id, 0)) + moved
+	_notify_seats_changed.rpc(last_seats, last_province_results)
+	seats_changed.emit()
 
 func _apply_pass(peer_id: int) -> void:
 	if peer_id != current_turn_peer_id():
@@ -414,10 +528,10 @@ func _request_draw() -> void:
 	_apply_draw(multiplayer.get_remote_sender_id())
 
 @rpc("any_peer", "reliable")
-func _request_play(hand_index: int) -> void:
+func _request_play(hand_index: int, target_peer_id: int = -1) -> void:
 	if not MultiplayerManager.is_host:
 		return
-	_apply_play(multiplayer.get_remote_sender_id(), hand_index)
+	_apply_play(multiplayer.get_remote_sender_id(), hand_index, target_peer_id)
 
 @rpc("any_peer", "reliable")
 func _request_pass() -> void:
@@ -467,6 +581,12 @@ func _notify_passed(new_inventories: Dictionary, new_turn_order: Array, new_turn
 	has_drawn_this_turn = new_has_drawn
 	inventories_updated.emit()
 	turn_changed.emit(current_turn_peer_id())
+
+@rpc("authority", "reliable")
+func _notify_seats_changed(new_seats: Dictionary, new_province_results: Dictionary) -> void:
+	last_seats = new_seats
+	last_province_results = new_province_results
+	seats_changed.emit()
 
 @rpc("authority", "reliable")
 func _notify_round_completed(new_vote_shares: Dictionary, new_seats: Dictionary, new_province_results: Dictionary, new_round_number: int, new_axis_sharpness: float) -> void:

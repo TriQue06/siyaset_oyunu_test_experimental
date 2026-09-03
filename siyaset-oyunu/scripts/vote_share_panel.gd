@@ -15,6 +15,10 @@ const SEAT_BADGE_WIDTH := 30.0
 const NAME_FONT_SIZE := 12
 const PERCENT_FONT_SIZE := 11
 const NAME_COLOR := Color(0.62, 0.62, 0.65) # eksen_projeksiyon: #888
+## Parti liderinin (oyuncunun) adı — parti adının hemen altında, daha küçük
+## ve daha soluk.
+const LEADER_FONT_SIZE := 9
+const LEADER_COLOR := Color(0.52, 0.52, 0.56)
 const SEAT_BADGE_BG := Color(0.09, 0.09, 0.09) # eksen_projeksiyon: #111
 const BAR_BG_COLOR := Color(1, 1, 1, 0.07)      # eksen_projeksiyon: var(--surface-alt) yaklaşık karşılığı
 
@@ -52,7 +56,7 @@ func set_data(entries: Array) -> void:
 	add_child(top_spacer)
 
 	for e in entries:
-		add_child(_build_row(e["name"], e["color"], e["percent"], int(e.get("seats", 0)), max_percent))
+		add_child(_build_row(e["name"], e["color"], e["percent"], int(e.get("seats", 0)), max_percent, String(e.get("leader", ""))))
 
 	call_deferred("_apply_vertical_centering", top_spacer, entries.size())
 
@@ -67,19 +71,34 @@ func _apply_vertical_centering(top_spacer: Control, row_count: int) -> void:
 	var spacer_height: float = maxf(0.0, (available - content_height) * 0.5)
 	top_spacer.custom_minimum_size = Vector2(0, spacer_height)
 
-func _build_row(party_name: String, color: Color, percent: float, seats: int, max_percent: float) -> Control:
+func _build_row(party_name: String, color: Color, percent: float, seats: int, max_percent: float, leader_name: String = "") -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
 
+	# Parti adı ve ALTINDA parti liderinin (oyuncunun) adı.
+	var name_box := VBoxContainer.new()
+	name_box.custom_minimum_size = Vector2(NAME_LABEL_WIDTH, 0)
+	name_box.add_theme_constant_override("separation", 0)
+	name_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+
 	var name_label := Label.new()
 	name_label.text = party_name
-	name_label.custom_minimum_size = Vector2(NAME_LABEL_WIDTH, 0)
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	name_label.clip_text = true
 	name_label.add_theme_font_size_override("font_size", NAME_FONT_SIZE)
 	name_label.add_theme_color_override("font_color", NAME_COLOR)
-	row.add_child(name_label)
+	name_box.add_child(name_label)
+
+	if leader_name != "":
+		var leader_label := Label.new()
+		leader_label.text = leader_name
+		leader_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		leader_label.clip_text = true
+		leader_label.add_theme_font_size_override("font_size", LEADER_FONT_SIZE)
+		leader_label.add_theme_color_override("font_color", LEADER_COLOR)
+		name_box.add_child(leader_label)
+
+	row.add_child(name_box)
 
 	var seat_badge := PanelContainer.new()
 	seat_badge.custom_minimum_size = Vector2(SEAT_BADGE_WIDTH, 0)

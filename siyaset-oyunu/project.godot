@@ -25,6 +25,8 @@ PartyPresets="*res://scripts/party_presets.gd"
 PartyManager="*res://scripts/party_manager.gd"
 CardPresets="*res://scripts/card_presets.gd"
 CardManager="*res://scripts/card_manager.gd"
+GovernmentPresets="*res://scripts/government_presets.gd"
+GovernmentManager="*res://scripts/government_manager.gd"
 SettingsOverlay="*res://scenes/SettingsOverlay.tscn"
 SceneTransition="*res://scenes/SceneTransition.tscn"
 

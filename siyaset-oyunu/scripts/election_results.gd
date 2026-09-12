@@ -1,5 +1,5 @@
 extends Control
-## Bir tur/dönem tamamlanınca (CardManager.round_completed) GameScreen'den
+## Seçim yapılınca (CardManager.election_completed) GameScreen'den
 ## fade ile buraya geçilir: her partinin çubuk grafiği birkaç kez rastgele
 ## artıp azalır, sonra gerçek oy oranına "oturur". Kısa bir bekleme sonrası
 ## otomatik olarak GameScreen'e geri fade ile dönülür.
@@ -15,7 +15,10 @@ const HOLD_AFTER := 1.5
 @onready var title_label: Label = %TitleLabel
 
 func _ready() -> void:
-	title_label.text = "Tur %d Sonuçları" % maxi(1, CardManager.round_number - 1)
+	title_label.text = "%s Sonuçları — %d. Tur" % [
+		"Erken Seçim" if CardManager.last_election_was_early else "Seçim",
+		maxi(1, CardManager.last_election_round),
+	]
 
 	var entries := _build_sorted_entries()
 	var columns: Array = []
@@ -43,6 +46,7 @@ func _build_sorted_entries() -> Array:
 			"color": party.get("bg_color", Color(0.5, 0.5, 0.5)),
 			"percent": CardManager.last_vote_shares[peer_id],
 			"seats": CardManager.last_seats.get(peer_id, 0),
+			"below_threshold": not CardManager.passed_threshold.has(peer_id),
 		})
 	return entries
 
@@ -74,7 +78,7 @@ func _build_column(entry: Dictionary) -> Dictionary:
 	wrapper.add_child(name_label)
 
 	var seats_label := Label.new()
-	seats_label.text = "%d sandalye" % entry["seats"]
+	seats_label.text = "%d sandalye%s" % [entry["seats"], " (baraj altı)" if entry["below_threshold"] else ""]
 	seats_label.add_theme_font_size_override("font_size", 11)
 	seats_label.modulate.a = 0.7
 	seats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

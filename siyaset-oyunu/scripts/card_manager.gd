@@ -1,105 +1,141 @@
 extends Node
-## Autoload. Oyuncuların kart envanterini, oynama sırasını (turn order) ve
-## kimin turu olduğunu tutar/senkronize eder. MultiplayerManager/PartyManager
-## desenle aynı: host yetkili, host-olmayan bir istemcinin isteği önce host'a
-## "any_peer" RPC ile gider, host uygulayıp herkese "authority" RPC ile yayınlar.
+## Autoload. Kart envanteri, oynama sırası, tur/seçim döngüsü, seçim sonuçları
+## ve oyun sonu. Host yetkili: host-olmayan istemcinin isteği önce host'a
+## "any_peer" RPC ile gider, host doğrulayıp uygular ve herkese yayınlar.
 ##
-## Oynama sırası: oyun (GameScreen) başladığında host, o anki oyuncuları
-## RASTGELE sıralayıp turn_order'a yazar. Sağ paneldeki oyuncu listesi bu
-## sırayla (yukarıdan aşağıya) gösterilir; current_turn_index de aynı diziyi
-## işaret eder.
+## TUR AKIŞI (bir oyuncunun sırası)
+##   1. İSTERSE desteden en fazla bir kart çeker (el sınırı MAX_HAND_SIZE).
+##   2. Sonra bir kart oynar YA DA pas geçer; sıra sonrakine geçer.
+##   3. GameRules.TURN_TIMEOUT içinde bir şey yapmazsa otomatik pas geçilir.
+##   Hükümet kurulurken / meclis oylarken tur DURUR (is_turn_blocked).
 ##
-## Tur akışı (KESİN kurallar):
-##   1. Sırası gelen oyuncu İSTERSE deste butonuna basıp kart çeker — ama bir
-##      turda EN FAZLA BİR KEZ (has_drawn_this_turn) VE envanterinde
-##      MAX_HAND_SIZE'dan az kart varsa.
-##      Bu, animasyon amaçlı sadece o oyuncunun ekranında görünen
-##      card_drawn sinyalini tetikler.
-##   2. Sonra oyuncu YA elindeki bir kartı oynar (play_card) YA DA pas geçer
-##      (pass_turn) — ikisi de turu bir sonraki oyuncuya devreder.
-##      play_card, HERKESİN ekranında görünen card_played sinyalini tetikler.
+## TUR SONU (herkes birer kez oynayınca) — bkz. GameRules
+##   - görevdeki hükümet makam puanlarını alır, eksen keskinliği artar,
+##   - son tursa oyun biter; seçim turuysa (ya da hükümet kurulamadıysa
+##     ERKEN SEÇİM) seçim yapılır ve hükümet kurma aşaması başlar,
+##   - tur sonu bir oylamanın ortasına denk gelirse oylama bitene kadar ertelenir.
+##
+## AĞ SENKRONU
+##   Host her yetkili değişiklikte TÜM durumu bir "olay" ile birlikte yayınlar
+##   (_receive_state) ve state_version'ı artırır. İl bazlı sonuçlar büyük
+##   olduğu için sadece değiştiklerinde pakete eklenir. Host ayrıca
+##   HEARTBEAT_INTERVAL'de bir sadece sürüm numaralarını yollar; sürümü farklı
+##   olan istemci (bir mesajı kaçırmışsa) tam durumu kendisi ister. Eskiden
+##   burada her 4 sn'de koşulsuz tam yayın vardı — asıl sebep röle peer'ının
+##   64 KB'lık WebSocket tamponunun büyük paketlerde taşmasıydı (bkz.
+##   relay_multiplayer_peer.gd BUFFER_SIZE).
 
 signal inventories_updated
 signal turn_order_updated
 signal turn_changed(peer_id: int)
-## Sadece ÇEKEN oyuncunun kendi ekranında animasyon oynatması için: state
-## güncellenmeden HEMEN ÖNCE yayınlanır (my_inventory() hâlâ ESKİ hali verir).
+## Sadece animasyon için: state güncellenmeden HEMEN ÖNCE yayınlanır
+## (my_inventory() hâlâ ESKİ eli verir).
 signal card_drawn(peer_id: int, card_type: String)
-## HERKESİN ekranında animasyon oynatması için: state güncellenmeden HEMEN
-## ÖNCE yayınlanır (my_inventory() hâlâ kartın SİLİNMEDEN ÖNCEKİ halini verir).
+## HERKESİN ekranında animasyon için: state güncellenmeden HEMEN ÖNCE yayınlanır.
 signal card_played(peer_id: int, card_type: String)
-## Bir "tur" (herkes sırayla bir kez oynayınca) tamamlanınca HERKESİN
-## ekranında yayınlanır — GameScreen bunu dinleyip seçim sonuçları
-## animasyonuna geçer (bkz. last_vote_shares/last_seats).
-signal round_completed
-## Milletvekili dağılımı seçim DIŞI bir sebeple değişti (vekil çalma kartı).
+## Seçimsiz bir tur bitti (hükümet puanlarını aldı, keskinlik arttı).
+signal round_advanced
+## Seçim yapıldı (last_vote_shares / last_seats / last_province_results güncel).
+signal election_completed
+## Milletvekili dağılımı seçim DIŞI bir sebeple değişti (vekil çalma, ayrılan oyuncu).
 signal seats_changed
+## Oyun bitti (bkz. final_ranking, game_end_reason).
+signal game_over
 
 const MAX_HAND_SIZE := 5
-## NOT: Gerçek bir oylama/sandık mekaniği henüz tasarlanmadı. Şimdilik her
-## turun sonunda PLACEHOLDER bir oy oranı hesaplanıyor (ideolojinin
-## merkezden uzaklığına hafif ağırlık + rastgelelik) — ileride gerçek
-## mekanikle değiştirilecek, arayüz/akış şimdiden buna göre kuruldu.
-## Koltuk SAYILARI (TOTAL_SEATS ve il başına dağılım) İSE GERÇEK: TBMM'nin
-## il bazlı milletvekili dağılımından alınmış (bkz. data/province_seats.json;
-## İstanbul/İzmir/Ankara/Bursa'nın seçim bölgeleri tek il olarak birleştirildi).
+const HEARTBEAT_INTERVAL := 5.0
+const PROVINCE_SEATS_PATH := "res://data/province_seats.json"
+
+## Koltuk SAYILARI GERÇEK: TBMM'nin il bazlı milletvekili dağılımı (bkz.
+## data/province_seats.json; İstanbul/İzmir/Ankara/Bursa'nın seçim bölgeleri
+## tek il olarak birleştirildi). Bu değer dosyadaki sayıların toplamıdır.
 var TOTAL_SEATS := 390
 
-var round_number: int = 1
-# peer_id -> float (yüzde, toplamı 100). Son biten turun sonucu.
-var last_vote_shares: Dictionary = {}
-# peer_id -> int (TOTAL_SEATS'e göre dağıtılmış koltuk sayısı).
-var last_seats: Dictionary = {}
-# province_id -> { peer_id -> {"percent": float, "seats": int} }. Haritadaki
-# milletvekili noktaları ve il hover kutusu bunu kullanır.
-var last_province_results: Dictionary = {}
+# peer_id -> Array[String] (her biri CardPresets.CARD_TYPES'tan biri)
+var inventories: Dictionary = {}
+# Array[int]: oynama sırasına göre peer_id'ler.
+var turn_order: Array = []
+# turn_order içindeki index; sırası gelen oyuncu turn_order[current_turn_index].
+var current_turn_index: int = 0
+# Sırası gelen oyuncu bu turda ZATEN kart çekti mi (bir turda en fazla 1 çekiş).
+var has_drawn_this_turn: bool = false
+## Eksen keskinliği: il bazlı seçim sonuçlarının ne kadar keskin çıkacağını
+## belirleyen üs (bkz. ElectionModel). MultiplayerManager.axis_sharpness_start'tan
+## başlar, HER TUR SONUNDA axis_sharpness_increment kadar artar (lobi ayarında
+## "sınırlı" seçildiyse axis_sharpness_max_value'da durur). Kartların ideoloji
+## kaymasını ETKİLEMEZ — kartlar her zaman sabit ±1 kaydırır.
+var current_axis_sharpness: float = 0.5
 
-const PROVINCE_SEATS_PATH := "res://data/province_seats.json"
-## Seçim hesabına giren illerin listesi. YETKİLİ KAYNAK province_seats.json'dur
-## (bir ilin oyunda var olması demek, ona koltuk atanmış olması demektir).
-## Vaktiyle bu liste artık kullanılmayan data/provinces.json'dan (eski vektör
-## harita verisi, pixel-art haritaya geçişten kalma) okunuyordu; o dosya 81 il
-## içerdiği için birleştirmeyle kaldırılan 14 il hâlâ listede geliyordu.
-## Sonuçları bozmuyordu (koltuğu 0 olanlar atlanıyordu) ama iki dosyanın
-## sessizce ayrışmasına açıktı — koltuk dosyasına eklenen yeni bir il, eski
-## dosyada olmadığı için görmezden gelinirdi.
+## Şu an oynanan tur (1'den başlar).
+var round_number: int = 1
+## Son seçimin yapıldığı tur (0 = henüz seçim yok) ve erken seçim olup olmadığı.
+var last_election_round: int = 0
+var last_election_was_early: bool = false
+# peer_id -> float (yüzde, toplamı 100). Son seçimin sonucu.
+var last_vote_shares: Dictionary = {}
+# peer_id -> int. Son seçimden bu yana (vekil çalma dahil) milletvekili dağılımı.
+var last_seats: Dictionary = {}
+# province_id -> { peer_id -> {"percent": float, "seats": int} }
+var last_province_results: Dictionary = {}
+# Son seçimde barajı geçen peer_id'ler.
+var passed_threshold: Array = []
+
+var game_finished: bool = false
+## [{peer_id, name, leader, color, score, seats}], kazanan başta.
+var final_ranking: Array = []
+var game_end_reason: String = ""
+
+var state_version: int = 0
+
+# Seçim hesabına giren iller ve koltuk sayıları (yetkili kaynak province_seats.json).
 var _province_ids: Array = []
-# province_id -> int (o ildeki GERÇEK milletvekili sayısı).
 var _province_seat_counts: Dictionary = {}
 
-## Ara sıra (nadiren) bir istemciye giden delta broadcast (_notify_played vb.)
-## ağ katmanında kaybolabiliyor — o istemci o zaman eski tur durumunda takılı
-## kalıyor. Bunu kendiliğinden düzeltmek için host, birkaç saniyede bir TÜM
-## durumu (_sync_state) yeniden yayınlıyor; hiçbir şey değişmemişse zararsız,
-## bir şey kaçmışsa birkaç saniye içinde kendini onarıyor.
-const RESYNC_INTERVAL := 4.0
-var _resync_timer := 0.0
+var _turn_time_left: float = GameRules.TURN_TIMEOUT
+var _turn_deadline_ms: int = 0
+var _round_end_pending: bool = false
+var _heartbeat_timer: float = 0.0
+var _rng := RandomNumberGenerator.new()
 
 func _ready() -> void:
+	_rng.randomize()
 	_load_province_seat_counts()
-	set_process(true)
 
 func _process(delta: float) -> void:
-	if not MultiplayerManager.is_host or MultiplayerManager.room_code == "":
+	if MultiplayerManager.room_code == "" or not MultiplayerManager.is_host:
 		return
-	_resync_timer += delta
-	if _resync_timer < RESYNC_INTERVAL:
-		return
-	_resync_timer = 0.0
-	_sync_state.rpc(inventories, turn_order, current_turn_index, has_drawn_this_turn, current_axis_sharpness)
+	tick(delta)
 
-## Gerçek il bazlı milletvekili sayılarını yükler (bkz. data/province_seats.json)
-## ve il listesini (_province_ids) bu dosyadan türetir. TOTAL_SEATS de buradaki
-## sayıların toplamıdır — yani il ekleyip çıkarmak ya da bir ilin koltuk
-## sayısını değiştirmek için SADECE bu dosyayı düzenlemek yeterli.
+func _is_local_only() -> bool:
+	return MultiplayerManager.room_code == ""
+
+func _is_authority() -> bool:
+	return _is_local_only() or MultiplayerManager.is_host
+
+## Host'un zamanlayıcıları (tur süresi, heartbeat). _process çağırır; testler
+## doğrudan çağırabilir.
+func tick(delta: float) -> void:
+	if not _is_authority():
+		return
+	if not turn_order.is_empty() and not game_finished and not is_turn_blocked():
+		_turn_time_left -= delta
+		if _turn_time_left <= 0.0:
+			_apply_pass(current_turn_peer_id())
+	if not _is_local_only():
+		_heartbeat_timer += delta
+		if _heartbeat_timer >= HEARTBEAT_INTERVAL:
+			_heartbeat_timer = 0.0
+			_heartbeat.rpc(state_version, GovernmentManager.state_version, PartyManager.state_version)
+
+## Gerçek il bazlı milletvekili sayılarını yükler. İl eklemek/çıkarmak ya da
+## koltuk sayısını değiştirmek için SADECE data/province_seats.json yeterli.
 func _load_province_seat_counts() -> void:
 	_province_seat_counts.clear()
 	_province_ids.clear()
 	if not FileAccess.file_exists(PROVINCE_SEATS_PATH):
 		push_warning("data/province_seats.json bulunamadı — il bazlı seçim sonucu üretilemeyecek.")
 		return
-	var file := FileAccess.open(PROVINCE_SEATS_PATH, FileAccess.READ)
-	var parsed = JSON.parse_string(file.get_as_text())
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(PROVINCE_SEATS_PATH))
 	if not (parsed is Dictionary):
 		push_warning("data/province_seats.json okunamadı — il bazlı seçim sonucu üretilemeyecek.")
 		return
@@ -114,30 +150,18 @@ func _load_province_seat_counts() -> void:
 	if sum > 0:
 		TOTAL_SEATS = sum
 
-# peer_id -> Array[String] (her biri CardPresets.CARD_TYPES'tan biri)
-var inventories: Dictionary = {}
-# Array[int]: oynama sırasına göre peer_id'ler.
-var turn_order: Array = []
-# turn_order içindeki index; sırası gelen oyuncu turn_order[current_turn_index].
-var current_turn_index: int = 0
-# Sırası gelen oyuncu bu turda ZATEN kart çekti mi (bir turda en fazla 1 çekiş).
-var has_drawn_this_turn: bool = false
-## Eksen keskinliği: her kart oynanışında ideoloji kayma miktarını çarpan bir
-## katsayı. MultiplayerManager.axis_sharpness_start'tan başlar, her kart
-## oynanışında axis_sharpness_increment kadar artar (lobi ayarında "sınırlı"
-## seçildiyse axis_sharpness_max_value'da durur).
-var current_axis_sharpness: float = 0.5
+# --- Sorgular ---------------------------------------------------------------
 
 func current_turn_peer_id() -> int:
 	if turn_order.is_empty():
 		return -1
 	return turn_order[current_turn_index % turn_order.size()]
 
-## Hükümet kurulurken ya da mecliste bir teklif oylanırken TUR DURUR: kimse
-## kart çekemez, oynayamaz, pas geçemez. Aksi hâlde hükümet kurma ekranı
-## açıkken oyun arkada akmaya devam ediyordu.
+## Hükümet kurulurken, mecliste bir teklif oylanırken ya da oyun bittiyse
+## TUR DURUR: kimse kart çekemez, oynayamaz, pas geçemez.
 func is_turn_blocked() -> bool:
-	return GovernmentManager.phase == GovernmentManager.Phase.FORMING \
+	return game_finished \
+		or GovernmentManager.phase == GovernmentManager.Phase.FORMING \
 		or GovernmentManager.phase == GovernmentManager.Phase.VOTING
 
 func is_my_turn() -> bool:
@@ -154,10 +178,38 @@ func can_draw() -> bool:
 func can_act() -> bool:
 	return is_my_turn() and not is_turn_blocked()
 
-## Sadece host çağırır (Parti Kurulum bitip GameScreen'e geçilirken):
-## envanterleri sıfırlar, oynama sırasını rastgele belirler, herkese yayınlar.
+func my_inventory() -> Array:
+	return inventories.get(multiplayer.get_unique_id(), [])
+
+## Sıradaki oyuncunun kalan süresi (saniye).
+func turn_seconds_left() -> float:
+	if is_turn_blocked():
+		return GameRules.TURN_TIMEOUT
+	if _is_authority():
+		return maxf(0.0, _turn_time_left)
+	return maxf(0.0, float(_turn_deadline_ms - Time.get_ticks_msec()) / 1000.0)
+
+## Bir partiden vekil çalınabilir mi? Kendinden çalınamaz, meclis dışı partiden
+## çalınamaz ve hedefin en az 2 vekili olmalı (1'in altına DÜŞÜRÜLEMEZ).
+func is_valid_steal_target(peer_id: int, target_peer_id: int) -> bool:
+	if target_peer_id == -1 or target_peer_id == peer_id:
+		return false
+	if not last_seats.has(target_peer_id):
+		return false
+	return int(last_seats[target_peer_id]) > 1
+
+## İdeoloji kartı bir RAKİBE oynanabilir mi? (-1 / kendisi = kendi partisi.)
+func is_valid_ideology_target(peer_id: int, target_peer_id: int) -> bool:
+	if target_peer_id == -1 or target_peer_id == peer_id:
+		return true
+	return turn_order.has(target_peer_id)
+
+# --- Oyun başlangıcı --------------------------------------------------------
+
+## Sadece host çağırır (Parti Kurulum bitip GameScreen'e geçilirken): tüm oyun
+## durumunu sıfırlar, oynama sırasını rastgele belirler, herkese yayınlar.
 func init_game() -> void:
-	if not MultiplayerManager.is_host:
+	if not _is_authority():
 		return
 	inventories.clear()
 	for peer_id in MultiplayerManager.players.keys():
@@ -167,20 +219,27 @@ func init_game() -> void:
 	current_turn_index = 0
 	has_drawn_this_turn = false
 	current_axis_sharpness = MultiplayerManager.axis_sharpness_start
-	_sync_state.rpc(inventories, turn_order, current_turn_index, has_drawn_this_turn, current_axis_sharpness)
-	inventories_updated.emit()
-	turn_order_updated.emit()
-	turn_changed.emit(current_turn_peer_id())
+	round_number = 1
+	last_election_round = 0
+	last_election_was_early = false
+	last_vote_shares = {}
+	last_seats = {}
+	last_province_results = {}
+	passed_threshold = []
+	game_finished = false
+	final_ranking = []
+	game_end_reason = ""
+	_turn_time_left = GameRules.TURN_TIMEOUT
+	_round_end_pending = false
+	GovernmentManager.reset()
+	_push_state({"type": "full"}, true)
 
-func my_inventory() -> Array:
-	return inventories.get(multiplayer.get_unique_id(), [])
+# --- Oyuncu eylemleri -------------------------------------------------------
 
-## Sırası gelen oyuncu, deste butonuna basınca çağırır: envanterine rastgele
-## bir kart ekler. Sırası değilse, bu turda zaten çektiyse ya da eli
-## MAX_HAND_SIZE'a ulaştıysa hiçbir şey yapmaz.
+## Sırası gelen oyuncu, deste butonuna basınca çağırır.
 func draw_card() -> void:
-	if MultiplayerManager.room_code == "":
-		# Aktif oda yok (örn. sahne editörde tek başına test) — yerel önizleme.
+	if _is_local_only() and turn_order.is_empty():
+		# Aktif oyun yok (örn. sahne editörde tek başına test) — yerel önizleme.
 		var id := multiplayer.get_unique_id()
 		if not inventories.has(id):
 			inventories[id] = []
@@ -193,7 +252,7 @@ func draw_card() -> void:
 		return
 	if not can_draw():
 		return
-	if MultiplayerManager.is_host:
+	if _is_authority():
 		_apply_draw(multiplayer.get_unique_id())
 	else:
 		_request_draw.rpc_id(1)
@@ -201,8 +260,7 @@ func draw_card() -> void:
 ## Desteden çekilebilecek kartlar. İdeoloji kartları her zaman vardır; özel
 ## kartlar ancak KOŞULLARI oluşunca girer:
 ##   - vekil çalma: ilk seçim yapıldıktan sonra (meclis oluştuktan sonra)
-##   - gensoru: kurulu bir hükümet varken ve o hükümet salt çoğunluğun
-##     ALTINA düştüğünde (dinamik kontrol mekanizması)
+##   - gensoru: kurulu bir hükümet salt çoğunluğun ALTINA düştüğünde
 func _draw_pool() -> Array:
 	var pool: Array = CardPresets.IDEOLOGY_CARD_TYPES.duplicate()
 	if not last_seats.is_empty():
@@ -212,14 +270,15 @@ func _draw_pool() -> Array:
 		pool.append(CardPresets.CENSURE_CARD_TYPE)
 	return pool
 
-## Sırası gelen oyuncu, elindeki bir kartı oynayınca çağırır (hand_index:
-## my_inventory() içindeki sırası). Sıra kendisinde değilse hiçbir şey yapmaz.
-## Turu bir sonraki oyuncuya devreder.
+## Sırası gelen oyuncu elindeki bir kartı oynar (hand_index: my_inventory()
+## içindeki sırası).
 ##
-## target_peer_id: sadece HEDEF GEREKTİREN kartlar için (vekil çalma) —
-## hedef partinin peer_id'si. Diğer kartlarda -1 bırakılır.
+## target_peer_id:
+##   - vekil çalma kartlarında ZORUNLU hedef parti,
+##   - ideoloji kartlarında İSTEĞE BAĞLI: -1 ise kendi partisine, bir rakip
+##     verilirse O PARTİNİN eksenini kaydırır (rakibi seçmenden uzaklaştırma).
 func play_card(hand_index: int, target_peer_id: int = -1) -> void:
-	if MultiplayerManager.room_code == "":
+	if _is_local_only() and turn_order.is_empty():
 		var id := multiplayer.get_unique_id()
 		var hand: Array = inventories.get(id, [])
 		if hand_index < 0 or hand_index >= hand.size():
@@ -232,257 +291,103 @@ func play_card(hand_index: int, target_peer_id: int = -1) -> void:
 		return
 	if not can_act():
 		return
-	if MultiplayerManager.is_host:
+	if _is_authority():
 		_apply_play(multiplayer.get_unique_id(), hand_index, target_peer_id)
 	else:
 		_request_play.rpc_id(1, hand_index, target_peer_id)
 
-## Sırası gelen oyuncu, kart çekmek/oynamak istemeden turu bir sonraki
-## oyuncuya devretmek için çağırır (kart oynamadan geçer).
+## Kart oynamadan turu bir sonraki oyuncuya devreder.
 func pass_turn() -> void:
-	if MultiplayerManager.room_code == "":
+	if turn_order.is_empty() or not can_act():
 		return
-	if not can_act():
-		return
-	if MultiplayerManager.is_host:
+	if _is_authority():
 		_apply_pass(multiplayer.get_unique_id())
 	else:
 		_request_pass.rpc_id(1)
 
-## Sırayı bir sonrakine devreder; herkes bu "lap"ta bir kez oynadıysa
-## (index başa sardıysa) true döner — tur/dönem tamamlandı demektir.
-func _advance_turn() -> bool:
-	var size: int = maxi(1, turn_order.size())
-	var wrapped: bool = (current_turn_index + 1) >= size
-	current_turn_index = (current_turn_index + 1) % size
-	has_drawn_this_turn = false
-	return wrapped
-
-## PLACEHOLDER: gerçek oylama mekaniği gelene kadar, her partinin ideoloji
-## "aşırılığına" (merkezden uzaklığına) hafif bir ağırlık + rastgelelik
-## katarak oy oranı üretir, TOTAL_SEATS'e en büyük kalan yöntemiyle
-## (largest remainder) koltuk olarak dağıtır.
-func _compute_placeholder_results() -> void:
-	var weights: Dictionary = {}
-	var total_weight := 0.0
-	for peer_id in turn_order:
-		var party: Dictionary = PartyManager.parties.get(peer_id, {})
-		var ideology: Dictionary = party.get("ideology", IdeologyAxes.default_values())
-		var extremeness := 0.0
-		for axis in IdeologyAxes.AXES:
-			extremeness += absf(float(ideology.get(axis, 0)))
-		var weight: float = 1.0 + extremeness * 0.15 + randf() * 1.5
-		weights[peer_id] = weight
-		total_weight += weight
-
-	last_vote_shares.clear()
-	last_seats.clear()
-	if total_weight <= 0.0:
+## İstemci: tam durumu host'tan ister (heartbeat sürüm uyuşmazlığında).
+func request_full_sync() -> void:
+	if _is_authority():
 		return
+	_request_full_sync.rpc_id(1)
 
-	var seat_floats: Dictionary = {}
-	var assigned_seats := 0
-	for peer_id in weights.keys():
-		var percent: float = (weights[peer_id] / total_weight) * 100.0
-		last_vote_shares[peer_id] = percent
-		var raw_seats: float = (weights[peer_id] / total_weight) * TOTAL_SEATS
-		seat_floats[peer_id] = raw_seats
-		last_seats[peer_id] = int(floor(raw_seats))
-		assigned_seats += last_seats[peer_id]
-
-	# Kalan koltukları (yuvarlama artıkları) en büyük ondalık kısmı olanlara sırayla dağıt.
-	var remaining: int = TOTAL_SEATS - assigned_seats
-	var by_remainder: Array = weights.keys()
-	by_remainder.sort_custom(func(a, b): return (seat_floats[a] - floor(seat_floats[a])) > (seat_floats[b] - floor(seat_floats[b])))
-	for i in remaining:
-		if i >= by_remainder.size():
-			break
-		last_seats[by_remainder[i]] += 1
-
-	_compute_placeholder_province_results(weights, total_weight)
-
-## İl bazlı GERÇEK milletvekili sayılarını (bkz. _province_seat_counts,
-## data/province_seats.json) kullanır; sadece o koltukların PARTİLER ARASI
-## dağılımı hâlâ placeholder (ulusal ağırlıklara il-özel rastgele sapma
-## katıp largest-remainder ile paylaştırma). Harita üzerindeki milletvekili
-## noktaları ve il hover kutusu bunu kullanıyor.
-func _compute_placeholder_province_results(national_weights: Dictionary, national_total_weight: float) -> void:
-	last_province_results.clear()
-	if _province_ids.is_empty() or national_total_weight <= 0.0:
-		return
-
-	# Her il icin parti oy orani/koltugu: ulusal agirliga il-ozel rastgele sapma katip normalize et.
-	for province_id in _province_ids:
-		var seats_here: int = _province_seat_counts.get(province_id, 0)
-		if seats_here <= 0:
-			continue
-		var base_weights: Dictionary = {}
-		var base_total := 0.0
-		for peer_id in national_weights.keys():
-			var w: float = float(national_weights[peer_id]) * randf_range(0.6, 1.4)
-			base_weights[peer_id] = w
-			base_total += w
-		if base_total <= 0.0:
-			continue
-
-		# EKSEN KESKİNLİĞİ (current_axis_sharpness) BURADA uygulanır: il payları
-		# current_axis_sharpness üssüne yükseltilip yeniden normalize edilir
-		# (klasik "sharpening"/softmax mantığı). current_axis_sharpness=1 iken
-		# etkisiz; >1 iken öndeki parti o ildeki üstünlüğünü ABARTIR (sonuçlar
-		# daha keskin/kararlı); <1 iken paylar birbirine yaklaşır (daha
-		# belirsiz). Her TUR bittiğinde (bkz. _finish_round_if_needed)
-		# current_axis_sharpness biraz daha büyür, yani seçim sonuçları oyun
-		# ilerledikçe gittikçe daha keskinleşir — kart etkisiyle İLGİSİZ.
-		var local_weights: Dictionary = {}
-		var local_total := 0.0
-		for peer_id in base_weights.keys():
-			var share: float = base_weights[peer_id] / base_total
-			var sharpened: float = pow(maxf(share, 0.0001), current_axis_sharpness)
-			local_weights[peer_id] = sharpened
-			local_total += sharpened
-		if local_total <= 0.0:
-			continue
-
-		var entry: Dictionary = {}
-		var local_seat_floats: Dictionary = {}
-		var local_assigned := 0
-		for peer_id in local_weights.keys():
-			var percent: float = (local_weights[peer_id] / local_total) * 100.0
-			var raw_seats: float = (local_weights[peer_id] / local_total) * seats_here
-			local_seat_floats[peer_id] = raw_seats
-			var s: int = int(floor(raw_seats))
-			entry[peer_id] = {"percent": percent, "seats": s}
-			local_assigned += s
-		var local_remaining: int = seats_here - local_assigned
-		var local_by_remainder: Array = local_weights.keys()
-		local_by_remainder.sort_custom(func(a, b): return (local_seat_floats[a] - floor(local_seat_floats[a])) > (local_seat_floats[b] - floor(local_seat_floats[b])))
-		for i in local_remaining:
-			if i >= local_by_remainder.size():
-				break
-			entry[local_by_remainder[i]]["seats"] += 1
-		last_province_results[province_id] = entry
-
-func _finish_round_if_needed(wrapped: bool) -> void:
-	if not wrapped:
-		return
-	round_number += 1
-	# Eksen keskinliği HER TUR bittiğinde artar (kart oynanışında DEĞİL —
-	# bkz. _apply_card_effect'teki not). Lobi ayarında "sınırlı" seçildiyse
-	# bir tavanda durur.
-	current_axis_sharpness += MultiplayerManager.axis_sharpness_increment
-	if MultiplayerManager.axis_sharpness_max_enabled:
-		current_axis_sharpness = minf(current_axis_sharpness, MultiplayerManager.axis_sharpness_max_value)
-	# Biten turda görevde olan hükümet, görev puanlarını KAZANIR. Puan
-	# birikimlidir: iktidarda kalmak kazandırır, düşürmek engeller.
-	GovernmentManager.award_round_scores()
-
-	_compute_placeholder_results()
-	_notify_round_completed.rpc(last_vote_shares, last_seats, last_province_results, round_number, current_axis_sharpness)
-	# Host RPC'nin kendi yerel çağrısına GÜVENMİYOR (bkz. _apply_play'deki not) —
-	# sinyali burada da doğrudan yayınlıyoruz ki host'un ekranı da geçsin.
-	round_completed.emit()
-
-	# Yeni meclis oluştu: hükümet kurma görevi en çok vekili olan partiye
-	# verilir (bkz. GovernmentManager.start_formation).
-	GovernmentManager.start_formation()
+# --- Host tarafı: uygulama --------------------------------------------------
 
 func _apply_draw(peer_id: int) -> void:
-	if peer_id != current_turn_peer_id() or has_drawn_this_turn:
+	if is_turn_blocked() or peer_id != current_turn_peer_id() or has_drawn_this_turn:
 		return
 	if not inventories.has(peer_id):
 		inventories[peer_id] = []
 	if inventories[peer_id].size() >= MAX_HAND_SIZE:
 		return
 	var card_type := CardPresets.random_from(_draw_pool())
-	# Yeni kart, elin ORTASINA yerleşir (envanter ortadan ikiye ayrılıp
-	# arasına girer). İlk turda el boşsa zaten tek başına ortada kalır.
-	var insert_index: int = inventories[peer_id].size() / 2
-	inventories[peer_id].insert(insert_index, card_type)
-	has_drawn_this_turn = true
-	_notify_drawn.rpc(peer_id, card_type, inventories, turn_order, current_turn_index, has_drawn_this_turn)
-	# Host bu fonksiyonu KENDİ eylemi için de çağırıyor (bkz. draw_card()) ve
-	# .rpc()'nin göndericide de otomatik çalışacağına GÜVENMİYORUZ — PartyManager
-	# ile aynı desen: state'i zaten doğrudan değiştirdik, sinyali de doğrudan
-	# yayınlıyoruz ki host'un kendi ekranı da her zaman güncellensin.
 	card_drawn.emit(peer_id, card_type)
-	inventories_updated.emit()
-	turn_changed.emit(current_turn_peer_id())
+	# Yeni kart elin ORTASINA yerleşir.
+	inventories[peer_id].insert(inventories[peer_id].size() / 2, card_type)
+	has_drawn_this_turn = true
+	_push_state({"type": "drawn", "peer_id": peer_id, "card": card_type})
 
 func _apply_play(peer_id: int, hand_index: int, target_peer_id: int = -1) -> void:
-	if peer_id != current_turn_peer_id():
+	if is_turn_blocked() or peer_id != current_turn_peer_id():
 		return
 	var hand: Array = inventories.get(peer_id, [])
 	if hand_index < 0 or hand_index >= hand.size():
 		return
 	var card_type: String = hand[hand_index]
-	# Hedef gerektiren kart (vekil çalma), GEÇERLİ bir hedef olmadan
-	# oynanamaz — kart elde kalır, boşa harcanmaz.
+	# Geçersiz hedefle oynanan kart elde kalır, boşa harcanmaz.
 	if CardPresets.needs_target(card_type) and not is_valid_steal_target(peer_id, target_peer_id):
 		return
-	hand.remove_at(hand_index)
-	_apply_card_effect(peer_id, card_type, target_peer_id)
-	var wrapped := _advance_turn()
-	_notify_played.rpc(peer_id, card_type, inventories, turn_order, current_turn_index, has_drawn_this_turn, current_axis_sharpness)
+	if CardPresets.is_ideology_card(card_type) and not is_valid_ideology_target(peer_id, target_peer_id):
+		return
 	card_played.emit(peer_id, card_type)
-	inventories_updated.emit()
-	turn_changed.emit(current_turn_peer_id())
+	hand.remove_at(hand_index)
+	var seats_changed_now := _apply_card_effect(peer_id, card_type, target_peer_id)
+	var wrapped := _advance_turn()
+	_push_state({"type": "played", "peer_id": peer_id, "card": card_type,
+		"target": target_peer_id, "seats_changed": seats_changed_now}, seats_changed_now)
 	_finish_round_if_needed(wrapped)
 
-## Kartın etkisini ilgili partinin ideoloji eksenine uygular (bkz.
-## CardPresets.CARD_EFFECTS). Her kart HER ZAMAN tam olarak CardPresets'teki
-## sabit ±1 kaymayı uygular — tur/round fark etmeksizin. "Eksen keskinliği"
-## (current_axis_sharpness) BURADA KULLANILMAZ; o, il bazlı seçim sonuçlarının
-## ne kadar keskin/kararlı çıkacağını belirleyen AYRI bir mekanizma (bkz.
-## _compute_placeholder_province_results ve _finish_round_if_needed'daki
-## her-turda-bir artış). Sadece host tarafında (any_peer istekleri de dahil,
-## host doğrulayıp uyguladıktan sonra) çağrılır.
-func _apply_card_effect(peer_id: int, card_type: String, target_peer_id: int = -1) -> void:
+func _apply_pass(peer_id: int) -> void:
+	if is_turn_blocked() or peer_id != current_turn_peer_id():
+		return
+	var wrapped := _advance_turn()
+	_push_state({"type": "passed", "peer_id": peer_id})
+	_finish_round_if_needed(wrapped)
+
+## Kartın etkisini uygular. Milletvekili dağılımı değiştiyse true döner.
+func _apply_card_effect(peer_id: int, card_type: String, target_peer_id: int = -1) -> bool:
 	if CardPresets.needs_target(card_type):
-		_apply_steal(peer_id, target_peer_id, card_type)
-		return
+		return _apply_steal(peer_id, target_peer_id, card_type)
 	if CardPresets.is_censure_card(card_type):
-		# Gensoru: hükümeti düşürmek üzere meclise getirilen teklif.
 		GovernmentManager.submit_censure(peer_id)
-		return
+		return false
 	var effect: Dictionary = CardPresets.CARD_EFFECTS.get(card_type, {})
 	if effect.is_empty():
-		return
-	PartyManager.apply_ideology_delta(peer_id, effect["axis"], int(effect["delta"]))
-
-## Bir partiden vekil çalınabilir mi? Kendinden çalınamaz, meclis dışı partiden
-## çalınamaz ve hedefin en az 2 vekili olmalı (1'in altına DÜŞÜRÜLEMEZ).
-func is_valid_steal_target(peer_id: int, target_peer_id: int) -> bool:
-	if target_peer_id == -1 or target_peer_id == peer_id:
 		return false
-	if not last_seats.has(target_peer_id):
-		return false
-	return int(last_seats[target_peer_id]) > 1
+	var affected := peer_id
+	if target_peer_id != -1 and target_peer_id != peer_id and turn_order.has(target_peer_id):
+		affected = target_peer_id
+	PartyManager.apply_ideology_delta(affected, effect["axis"], int(effect["delta"]))
+	return false
 
 ## Hedef partiden rastgele sayıda milletvekilini çalıp kartı oynayana aktarır.
-## Aralık kartın gücüne göre (bkz. CardPresets.STEAL_RANGES), her değer eşit
-## olasılıkta. Hedefin vekil sayısı ASLA 1'in altına düşmez.
-func _apply_steal(peer_id: int, target_peer_id: int, card_type: String) -> void:
+## Aralık kartın gücüne göre (CardPresets.STEAL_RANGES). Vekiller RASTGELE
+## SEÇİM ÇEVRELERİNDEN alınır (büyük illerden çalınma olasılığı vekil sayısıyla
+## orantılı); il bazlı ve ulusal toplamlar HER ZAMAN birlikte değişir.
+func _apply_steal(peer_id: int, target_peer_id: int, card_type: String) -> bool:
 	if not is_valid_steal_target(peer_id, target_peer_id):
-		return
+		return false
 	var range_info: Dictionary = CardPresets.STEAL_RANGES.get(card_type, {})
 	if range_info.is_empty():
-		return
-	var wanted: int = randi_range(int(range_info["min"]), int(range_info["max"]))
-	var stealable: int = maxi(0, int(last_seats[target_peer_id]) - 1)
-	var amount: int = mini(wanted, stealable)
+		return false
+	var wanted: int = _rng.randi_range(int(range_info["min"]), int(range_info["max"]))
+	var amount: int = mini(wanted, maxi(0, int(last_seats[target_peer_id]) - 1))
 	if amount <= 0:
-		return
+		return false
 
-	# Çalınan vekiller RASTGELE SEÇİM ÇEVRELERİNDEN alınır: hedefin her bir
-	# vekili için torbaya o ilin adı atılır, torba karıştırılır ve baştan
-	# `amount` kadarı transfer edilir — böylece büyük illerden çalınma
-	# olasılığı doğal olarak vekil sayısıyla orantılı olur. İl bazlı dağılım
-	# değiştiği için HARİTA da (il renkleri + vekil kareleri) buna göre
-	# güncellenir.
 	var bag: Array = []
 	for province_id in last_province_results.keys():
-		var entry: Dictionary = last_province_results[province_id]
-		var here: int = int(entry.get(target_peer_id, {}).get("seats", 0))
+		var here: int = int(last_province_results[province_id].get(target_peer_id, {}).get("seats", 0))
 		for i in here:
 			bag.append(province_id)
 	bag.shuffle()
@@ -500,26 +405,250 @@ func _apply_steal(peer_id: int, target_peer_id: int, card_type: String) -> void:
 		var thief_entry: Dictionary = entry.get(peer_id, {"percent": 0.0, "seats": 0})
 		thief_entry["seats"] = int(thief_entry.get("seats", 0)) + 1
 		entry[peer_id] = thief_entry
-		last_province_results[province_id] = entry
 		moved += 1
 
-	# İl bazlı veri yoksa (ör. henüz seçim olmadıysa) ulusal toplamdan düş.
+	# İl bazlı veri yoksa hiçbir şey taşınmaz: harita ile meclisin ayrışmasına
+	# (eski "ulusal toplamdan düş" yedeği) izin vermiyoruz.
 	if moved == 0:
-		moved = amount
-
+		return false
 	last_seats[target_peer_id] = int(last_seats[target_peer_id]) - moved
 	last_seats[peer_id] = int(last_seats.get(peer_id, 0)) + moved
-	_notify_seats_changed.rpc(last_seats, last_province_results)
-	seats_changed.emit()
+	return true
 
-func _apply_pass(peer_id: int) -> void:
-	if peer_id != current_turn_peer_id():
+## Sırayı bir sonrakine devreder; index başa sardıysa (tur bitti) true döner.
+func _advance_turn() -> bool:
+	var size: int = maxi(1, turn_order.size())
+	var wrapped: bool = (current_turn_index + 1) >= size
+	current_turn_index = (current_turn_index + 1) % size
+	has_drawn_this_turn = false
+	_turn_time_left = GameRules.TURN_TIMEOUT
+	return wrapped
+
+# --- Tur sonu / seçim / oyun sonu -------------------------------------------
+
+func _finish_round_if_needed(wrapped: bool) -> void:
+	if not wrapped or game_finished:
 		return
-	var wrapped := _advance_turn()
-	_notify_passed.rpc(inventories, turn_order, current_turn_index, has_drawn_this_turn)
-	inventories_updated.emit()
-	turn_changed.emit(current_turn_peer_id())
+	if is_turn_blocked():
+		# Örn. turun son kartı gensoruydu: oylama bitince tur kapanacak.
+		_round_end_pending = true
+		return
+	_finish_round()
+
+func _finish_round() -> void:
+	_round_end_pending = false
+	# Biten turda görevde olan hükümet görev puanlarını KAZANIR (birikimli).
+	GovernmentManager.award_round_scores()
+	var finished_round := round_number
+	round_number += 1
+	current_axis_sharpness += MultiplayerManager.axis_sharpness_increment
+	if MultiplayerManager.axis_sharpness_max_enabled:
+		current_axis_sharpness = minf(current_axis_sharpness, MultiplayerManager.axis_sharpness_max_value)
+
+	if finished_round >= GameRules.MAX_ROUNDS:
+		_end_game("%d tur tamamlandı." % GameRules.MAX_ROUNDS)
+		return
+
+	var scheduled := GameRules.is_election_round(finished_round)
+	var no_government := not last_seats.is_empty() \
+		and not GovernmentManager.has_government() \
+		and GovernmentManager.phase == GovernmentManager.Phase.IDLE
+	if last_seats.is_empty() or scheduled or no_government:
+		_hold_election(finished_round, no_government and not scheduled)
+	else:
+		_push_state({"type": "round"})
+
+func _hold_election(finished_round: int, early: bool) -> void:
+	var ideologies: Dictionary = {}
+	for peer_id in turn_order:
+		ideologies[peer_id] = PartyManager.parties.get(peer_id, {}).get("ideology", IdeologyAxes.default_values())
+	var result := ElectionModel.compute(ideologies, _province_seat_counts, ElectionModel.load_province_voters(),
+		MultiplayerManager.election_threshold, current_axis_sharpness, _rng)
+	last_vote_shares = result["vote_shares"]
+	last_seats = result["seats"]
+	last_province_results = result["province_results"]
+	passed_threshold = result["passed_threshold"]
+	last_election_round = finished_round
+	last_election_was_early = early
+	_push_state({"type": "election"}, true)
+	# Yeni meclis: hükümet kurma görevi en çok vekili olan partiye verilir.
+	GovernmentManager.start_formation()
+
+func _end_game(reason: String) -> void:
+	game_finished = true
+	game_end_reason = reason
+	final_ranking = []
+	var ids: Array = turn_order.duplicate()
+	ids.sort_custom(func(a, b):
+		var sa := GovernmentManager.score_of(a)
+		var sb := GovernmentManager.score_of(b)
+		if sa != sb:
+			return sa > sb
+		var va := int(last_seats.get(a, 0))
+		var vb := int(last_seats.get(b, 0))
+		if va != vb:
+			return va > vb
+		return a < b
+	)
+	for peer_id in ids:
+		var party: Dictionary = PartyManager.parties.get(peer_id, {})
+		final_ranking.append({
+			"peer_id": peer_id,
+			"name": party.get("name", "?"),
+			"leader": MultiplayerManager.players.get(peer_id, {}).get("name", "?"),
+			"color": party.get("bg_color", Color(0.5, 0.5, 0.5)),
+			"score": GovernmentManager.score_of(peer_id),
+			"seats": int(last_seats.get(peer_id, 0)),
+		})
+	GovernmentManager.end_game()
+	_push_state({"type": "game_over"})
+
+## GovernmentManager, tur akışını engelleyen bir aşamadan (kurma/oylama)
+## çıkıldığında çağırır: sıradaki oyuncunun süresi baştan başlar ve ertelenmiş
+## bir tur sonu varsa şimdi işlenir.
+func on_block_state_changed() -> void:
+	if not _is_authority() or turn_order.is_empty() or game_finished or is_turn_blocked():
+		return
+	_turn_time_left = GameRules.TURN_TIMEOUT
+	if _round_end_pending:
+		_finish_round()
+	else:
+		_push_state({"type": "timer"})
+
+## Host: oyun sırasında ayrılan oyuncuyu sıradan, envanterden, meclisten ve
+## hükümet süreçlerinden çıkarır. Onsuz sırası gelen/oy bekleyen oyun kilitlenirdi.
+func remove_player(peer_id: int) -> void:
+	if not _is_authority():
+		return
+	var idx := turn_order.find(peer_id)
+	if idx == -1:
+		return
+	var was_current := idx == current_turn_index
+	turn_order.remove_at(idx)
+	inventories.erase(peer_id)
+	last_seats.erase(peer_id)
+	last_vote_shares.erase(peer_id)
+	passed_threshold.erase(peer_id)
+	for province_id in last_province_results.keys():
+		last_province_results[province_id].erase(peer_id)
+
+	var wrapped := false
+	if idx < current_turn_index:
+		current_turn_index -= 1
+	elif was_current:
+		has_drawn_this_turn = false
+		_turn_time_left = GameRules.TURN_TIMEOUT
+		if current_turn_index >= turn_order.size():
+			current_turn_index = 0
+			wrapped = true
+
+	if game_finished:
+		_push_state({"type": "player_left", "peer_id": peer_id}, true)
+		return
+	GovernmentManager.remove_player(peer_id)
+	_push_state({"type": "player_left", "peer_id": peer_id}, true)
+	if turn_order.size() < GameRules.MIN_PLAYERS_TO_CONTINUE:
+		_end_game("Yeterli oyuncu kalmadı.")
+		return
 	_finish_round_if_needed(wrapped)
+
+# --- Senkronizasyon ---------------------------------------------------------
+
+func _pack_state(include_results: bool) -> Dictionary:
+	var state := {
+		"version": state_version,
+		"inventories": inventories,
+		"turn_order": turn_order,
+		"turn_index": current_turn_index,
+		"has_drawn": has_drawn_this_turn,
+		"sharpness": current_axis_sharpness,
+		"round": round_number,
+		"turn_time_left": _turn_time_left,
+		"last_election_round": last_election_round,
+		"early": last_election_was_early,
+		"vote_shares": last_vote_shares,
+		"seats": last_seats,
+		"passed": passed_threshold,
+		"game_finished": game_finished,
+		"final_ranking": final_ranking,
+		"end_reason": game_end_reason,
+	}
+	if include_results:
+		state["province_results"] = last_province_results
+	return state
+
+func _apply_state(state: Dictionary) -> void:
+	state_version = int(state["version"])
+	inventories = state["inventories"]
+	turn_order = state["turn_order"]
+	current_turn_index = int(state["turn_index"])
+	has_drawn_this_turn = bool(state["has_drawn"])
+	current_axis_sharpness = float(state["sharpness"])
+	round_number = int(state["round"])
+	_turn_deadline_ms = Time.get_ticks_msec() + int(float(state["turn_time_left"]) * 1000.0)
+	last_election_round = int(state["last_election_round"])
+	last_election_was_early = bool(state["early"])
+	last_vote_shares = state["vote_shares"]
+	last_seats = state["seats"]
+	passed_threshold = state["passed"]
+	game_finished = bool(state["game_finished"])
+	final_ranking = state["final_ranking"]
+	game_end_reason = str(state["end_reason"])
+	if state.has("province_results"):
+		last_province_results = state["province_results"]
+
+## Host: durumu (sürümü artırarak) herkese yayınlar ve olayın sinyallerini
+## kendi tarafında da doğrudan atar (.rpc() göndericide çalışmaz).
+func _push_state(event: Dictionary, include_results: bool = false) -> void:
+	state_version += 1
+	if not _is_local_only():
+		_receive_state.rpc(_pack_state(include_results or event.get("type", "") in ["full", "election", "player_left"]), event)
+	_emit_post_event(event)
+
+func _emit_post_event(event: Dictionary) -> void:
+	var type: String = event.get("type", "")
+	inventories_updated.emit()
+	if type in ["full", "player_left"]:
+		turn_order_updated.emit()
+	turn_changed.emit(current_turn_peer_id())
+	match type:
+		"election":
+			election_completed.emit()
+		"round":
+			round_advanced.emit()
+		"game_over":
+			game_over.emit()
+		"full", "player_left":
+			seats_changed.emit()
+		"played":
+			if bool(event.get("seats_changed", false)):
+				seats_changed.emit()
+
+@rpc("authority", "reliable")
+func _receive_state(state: Dictionary, event: Dictionary) -> void:
+	# Animasyon sinyalleri ESKİ state üzerinden kurulsun diye önce bunlar.
+	match str(event.get("type", "")):
+		"drawn":
+			card_drawn.emit(int(event["peer_id"]), str(event["card"]))
+		"played":
+			card_played.emit(int(event["peer_id"]), str(event["card"]))
+	_apply_state(state)
+	_emit_post_event(event)
+
+@rpc("authority", "reliable")
+func _heartbeat(card_version: int, gov_version: int, party_version: int) -> void:
+	if card_version != state_version:
+		request_full_sync()
+	if gov_version != GovernmentManager.state_version:
+		GovernmentManager.request_full_sync()
+	if party_version != PartyManager.state_version:
+		PartyManager.request_full_sync()
+
+@rpc("any_peer", "reliable")
+func _request_full_sync() -> void:
+	if not MultiplayerManager.is_host:
+		return
+	_receive_state.rpc_id(multiplayer.get_remote_sender_id(), _pack_state(true), {"type": "full"})
 
 @rpc("any_peer", "reliable")
 func _request_draw() -> void:
@@ -538,61 +667,3 @@ func _request_pass() -> void:
 	if not MultiplayerManager.is_host:
 		return
 	_apply_pass(multiplayer.get_remote_sender_id())
-
-@rpc("authority", "reliable")
-func _sync_state(new_inventories: Dictionary, new_turn_order: Array, new_turn_index: int, new_has_drawn: bool, new_axis_sharpness: float) -> void:
-	inventories = new_inventories
-	turn_order = new_turn_order
-	current_turn_index = new_turn_index
-	has_drawn_this_turn = new_has_drawn
-	current_axis_sharpness = new_axis_sharpness
-	inventories_updated.emit()
-	turn_order_updated.emit()
-	turn_changed.emit(current_turn_peer_id())
-
-@rpc("authority", "reliable")
-func _notify_drawn(peer_id: int, card_type: String, new_inventories: Dictionary, new_turn_order: Array, new_turn_index: int, new_has_drawn: bool) -> void:
-	# Sinyal, state GÜNCELLENMEDEN önce yayınlanır ki dinleyen taraf (sadece
-	# çeken oyuncunun kendi ekranı) "eski" eli görüp animasyonu ona göre kursun.
-	card_drawn.emit(peer_id, card_type)
-	inventories = new_inventories
-	turn_order = new_turn_order
-	current_turn_index = new_turn_index
-	has_drawn_this_turn = new_has_drawn
-	inventories_updated.emit()
-	turn_changed.emit(current_turn_peer_id())
-
-@rpc("authority", "reliable")
-func _notify_played(peer_id: int, card_type: String, new_inventories: Dictionary, new_turn_order: Array, new_turn_index: int, new_has_drawn: bool, new_axis_sharpness: float) -> void:
-	card_played.emit(peer_id, card_type)
-	inventories = new_inventories
-	turn_order = new_turn_order
-	current_turn_index = new_turn_index
-	has_drawn_this_turn = new_has_drawn
-	current_axis_sharpness = new_axis_sharpness
-	inventories_updated.emit()
-	turn_changed.emit(current_turn_peer_id())
-
-@rpc("authority", "reliable")
-func _notify_passed(new_inventories: Dictionary, new_turn_order: Array, new_turn_index: int, new_has_drawn: bool) -> void:
-	inventories = new_inventories
-	turn_order = new_turn_order
-	current_turn_index = new_turn_index
-	has_drawn_this_turn = new_has_drawn
-	inventories_updated.emit()
-	turn_changed.emit(current_turn_peer_id())
-
-@rpc("authority", "reliable")
-func _notify_seats_changed(new_seats: Dictionary, new_province_results: Dictionary) -> void:
-	last_seats = new_seats
-	last_province_results = new_province_results
-	seats_changed.emit()
-
-@rpc("authority", "reliable")
-func _notify_round_completed(new_vote_shares: Dictionary, new_seats: Dictionary, new_province_results: Dictionary, new_round_number: int, new_axis_sharpness: float) -> void:
-	last_vote_shares = new_vote_shares
-	last_seats = new_seats
-	last_province_results = new_province_results
-	round_number = new_round_number
-	current_axis_sharpness = new_axis_sharpness
-	round_completed.emit()

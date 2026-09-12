@@ -20,6 +20,10 @@ const CHIP_SIZE := Vector2(34, 34)
 @onready var propose_button: Button = %ProposeButton
 @onready var back_button: Button = %BackButton
 
+## Başlığın süre sayacı eklenmemiş hali.
+var _title_base: String = ""
+var _last_shown_second: int = -1
+
 var _step: int = Step.PARTNERS
 ## Hükümete girecek partiler (peer_id listesi).
 var _partners: Array = []
@@ -50,6 +54,15 @@ func _on_phase_changed() -> void:
 	if GovernmentManager.phase != GovernmentManager.Phase.FORMING or not GovernmentManager.is_my_mandate():
 		SceneTransition.fade_to_scene("res://scenes/GameScreen.tscn")
 
+func _process(_delta: float) -> void:
+	var second := int(ceil(GovernmentManager.phase_seconds_left()))
+	if second != _last_shown_second:
+		_last_shown_second = second
+		_update_title()
+
+func _update_title() -> void:
+	title_label.text = "%s   ⏱ %s" % [_title_base, GameRules.format_seconds(GovernmentManager.phase_seconds_left())]
+
 func _rebuild() -> void:
 	for child in post_list.get_children():
 		child.queue_free()
@@ -57,15 +70,15 @@ func _rebuild() -> void:
 
 	var attempt: int = GovernmentManager.MAX_ATTEMPTS - GovernmentManager.attempts_left() + 1
 	if _step == Step.PARTNERS:
-		title_label.text = "1/2 — Hükümet Ortakları"
-		info_label.text = "Hükümete girecek partileri seç. Kendi partin her zaman dahildir.\n%d. teklif hakkın (toplam %d)." % [
+		_title_base = "1/2 — Hükümet Ortakları"
+		info_label.text = "Hükümete girecek partileri seç. Kendi partin her zaman dahildir.\nGörev verdiğin her ortak oylamada EVET demezse teklif düşer. Süre dolarsa hak yanar.\n%d. teklif hakkın (toplam %d)." % [
 			attempt, GovernmentManager.MAX_ATTEMPTS,
 		]
 		propose_button.text = "Dağıtıma Geç"
 		back_button.visible = false
 		_build_partner_rows()
 	else:
-		title_label.text = "2/2 — Görev Dağılımı"
+		_title_base = "2/2 — Görev Dağılımı"
 		info_label.text = "10 görevi ortaklar arasında paylaştır. Başbakanlık kimdeyse ANA İKTİDAR PARTİSİ odur.\nMecliste %d sandalye var; teklifin düşmesi için HAYIR oylarının %d sandalyeyi geçmesi gerekir." % [
 			GovernmentManager.total_seats(), GovernmentManager.total_seats() / 2,
 		]
@@ -74,6 +87,7 @@ func _rebuild() -> void:
 		_build_post_rows()
 
 	_refresh_summary()
+	_update_title()
 
 # --- 1. Aşama: ortak seçimi -------------------------------------------------
 

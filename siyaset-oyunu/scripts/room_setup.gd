@@ -24,7 +24,15 @@ func _ready() -> void:
 	MultiplayerManager.connection_error.connect(_on_connection_error)
 	MultiplayerManager.join_failed.connect(_on_join_failed)
 	MultiplayerManager.join_succeeded.connect(_on_join_succeeded)
+	MultiplayerManager.connection_status.connect(_on_connection_status)
 	gui_input.connect(_on_background_gui_input)
+	# Oda (oyun ortasında bile) kapandıysa buraya sebebiyle birlikte dönülür.
+	if MultiplayerManager.last_close_reason != "":
+		status_label.text = MultiplayerManager.last_close_reason
+		MultiplayerManager.last_close_reason = ""
+
+func _on_connection_status(text: String) -> void:
+	status_label.text = text
 
 ## Yayıncı modu açıkken kod kutusu, elle yazılsa da yapıştırılsa da
 ## noktalarla gizlenir (LineEdit.secret zaten girişin kaynağına bakmaz,

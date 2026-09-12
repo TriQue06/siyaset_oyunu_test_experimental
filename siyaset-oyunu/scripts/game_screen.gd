@@ -18,13 +18,7 @@ const PLAYER_STRIP_WIDTH := 120.0
 # Harita ile oyuncu şeridi arasında, deste butonu için ayrılan şerit.
 const DECK_STRIP_WIDTH := 230.0
 const AVATAR_SIZE := 56.0
-## Sağdaki oyuncu panelindeki parti logolarının pixel-art çerçevesi.
-## Çerçevenin ortasındaki saydam delik, logonun görüneceği alandır; deliğin
-## konumu/boyutu koda GÖMÜLMÜYOR, PNG taranarak bulunuyor (bkz.
-## _ensure_frame_loaded) — çerçeveyi yeniden çizersen kod değişmeden uyar.
-const PARTY_FRAME_PATH := "res://assets/ui/party_profile_picture_frame.png"
-## Çerçevenin büyütme katı. TAM SAYI olmalı, yoksa pixel-art bulanıklaşır.
-const PARTY_FRAME_SCALE := 2
+## Parti logoları (çerçeve dahil) party_badge.gd'de; sol paneller government_hud.gd'de.
 const AVATAR_ICON_PIXEL_SIZE := 96
 const BADGE_ICON_PIXEL_SIZE := 64
 
@@ -73,7 +67,7 @@ const PLAY_POP_DURATION := 0.18   # ortada küçülüp "puf" kaybolma
 ## Hedef seçmeyi bekleyen "vekil çalma" kartının el içindeki sırası (-1 = yok).
 var _pending_target_hand_index: int = -1
 ## Seçim sonucu animasyonuna geçilirken true olur; hükümet kurma ekranına
-## erken atlamayı engeller (bkz. _on_round_completed).
+## erken atlamayı engeller (bkz. _on_election_completed).
 var _leaving_for_results: bool = false
 var _waiting_overlay: Control
 var _waiting_label: Label
@@ -84,6 +78,11 @@ var _hovered_province_id: String = ""
 # province_id -> Color (kazanan partinin rengi) — hover'dan çıkınca buna dönülür.
 var _province_base_colors: Dictionary = {}
 var _province_tooltip: PanelContainer
+var _game_over_overlay: Control
+## Ekranın üstünde kısa süre görünen bilgi yazısı (teklif sonucu, yeni tur…).
+var _toast: Label
+## Sayaç yazıları sadece gösterilen saniye değişince yenilensin diye.
+var _last_countdown_key: int = -1
 
 func _ready() -> void:
 	map_holder.province_hovered.connect(_on_province_hovered)
@@ -113,12 +112,16 @@ func _ready() -> void:
 	CardManager.inventories_updated.connect(_rebuild_hand)
 	CardManager.card_drawn.connect(_on_card_drawn)
 	CardManager.card_played.connect(_on_card_played)
-	CardManager.round_completed.connect(_on_round_completed)
+	CardManager.election_completed.connect(_on_election_completed)
+	CardManager.round_advanced.connect(_on_round_advanced)
+	CardManager.game_over.connect(_on_game_over)
 	CardManager.seats_changed.connect(_on_seats_changed)
+	GovernmentManager.proposal_resolved.connect(_on_proposal_resolved)
 
 	UiSkin.skin_panel(government_panel, UiSkin.PANEL_DARK)
 	UiSkin.skin_panel(score_panel, UiSkin.PANEL_DARK)
 	_build_waiting_overlay()
+	_build_toast()
 	vote_yes_button.pressed.connect(_on_vote_pressed.bind(true))
 	vote_no_button.pressed.connect(_on_vote_pressed.bind(false))
 	GovernmentManager.phase_changed.connect(_on_government_phase_changed)
@@ -134,6 +137,8 @@ func _ready() -> void:
 	_refresh_score_panel()
 	_refresh_vote_ui()
 	_on_government_phase_changed()
+	if CardManager.game_finished:
+		_on_game_over()
 
 ## Viewport boyutuna bağlı TÜM mutlak-piksel yerleşim hesapları burada — hem
 ## açılışta hem her yeniden boyutlanmada (tam ekran vb.) çağrılır.
@@ -177,42 +182,12 @@ func _apply_layout() -> void:
 	var seat_markers := map_holder.get_node_or_null("SeatMarkers")
 	if seat_markers != null:
 		seat_markers.queue_redraw()
-	_build_debug_label()
 
-## GEÇİCİ teşhis etiketi: sol alt köşede, bu istemcinin kendi peer id'sini ve
-## CardManager'ın kimin sırası olduğunu düşündüğünü gösterir. "3. oyuncunun
-## sırası gelince oynanamıyor" hatasının kaynağını bulmak için — sorun
-## çözülünce kaldırılabilir.
-func _build_debug_label() -> void:
-	var label := Label.new()
-	label.name = "DebugTurnLabel"
-	label.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	label.offset_left = 16.0
-	label.offset_top = -100.0
-	label.offset_right = 420.0
-	label.offset_bottom = -70.0
-	label.add_theme_font_size_override("font_size", 12)
-	label.modulate = Color(1, 1, 0.4, 0.85)
-	add_child(label)
-	CardManager.turn_changed.connect(func(_p): _update_debug_label(label))
-	_update_debug_label(label)
-
-func _update_debug_label(label: Label) -> void:
-	label.text = "[DEBUG] benim id: %d | CardManager sırası: %d | turn_order: %s | index: %d/%d | is_host: %s" % [
-		multiplayer.get_unique_id(),
-		CardManager.current_turn_peer_id(),
-		str(CardManager.turn_order),
-		CardManager.current_turn_index,
-		CardManager.turn_order.size(),
-		str(MultiplayerManager.is_host),
-	]
-
-## Bir tur/dönem tamamlanınca (herkes sırayla bir kez oynayınca) HERKESİN
-## ekranında tetiklenir: ekran kararıp seçim sonuçları animasyon ekranına
-## geçilir, oradan otomatik olarak buraya (yeni bir GameScreen örneğine) geri
-## dönülür — dönüşte _ready() zaten en güncel sonuçları _refresh_results_panels
-## ile gösterir.
-func _on_round_completed() -> void:
+## Seçim yapılınca HERKESİN ekranında tetiklenir: ekran kararıp seçim
+## sonuçları animasyon ekranına geçilir, oradan otomatik olarak buraya (yeni
+## bir GameScreen örneğine) geri dönülür — dönüşte _ready() en güncel
+## sonuçları _refresh_results_panels ile gösterir.
+func _on_election_completed() -> void:
 	# Seçim sonucu animasyonuna geçiyoruz. Hükümet kurma görevi aynı anda
 	# atandığı için (bkz. CardManager._finish_round_if_needed), aşağıdaki
 	# bayrak olmadan _on_government_phase_changed hemen devreye girip görevli
@@ -221,6 +196,59 @@ func _on_round_completed() -> void:
 	# GameScreen'e dönüldüğünde _ready() içindeki kontrol görevi devralıyor.
 	_leaving_for_results = true
 	SceneTransition.fade_to_scene("res://scenes/ElectionResults.tscn")
+
+## Seçimsiz bir tur bitti: hükümet puanlarını aldı, yeni tur başladı.
+func _on_round_advanced() -> void:
+	_refresh_game_settings_label()
+	_refresh_score_panel()
+	_refresh_government_panel()
+	_show_toast("%d. tur başladı" % CardManager.round_number)
+
+func _on_game_over() -> void:
+	_refresh_score_panel()
+	if _game_over_overlay != null and is_instance_valid(_game_over_overlay):
+		return
+	_game_over_overlay = GameOverOverlay.new()
+	add_child(_game_over_overlay)
+
+func _on_proposal_resolved(_accepted: bool, _kind: String, _proposer_id: int) -> void:
+	if GovernmentManager.last_resolution_reason != "":
+		_show_toast(GovernmentManager.last_resolution_reason)
+
+func _build_toast() -> void:
+	_toast = Label.new()
+	_toast.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_toast.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_toast.offset_top = 16.0
+	_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_toast.add_theme_font_size_override("font_size", 18)
+	_toast.add_theme_color_override("font_outline_color", Color.BLACK)
+	_toast.add_theme_constant_override("outline_size", 6)
+	_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_toast.z_index = 110
+	_toast.modulate.a = 0.0
+	add_child(_toast)
+
+func _show_toast(text: String) -> void:
+	if _toast == null:
+		return
+	_toast.text = text
+	var tw := create_tween()
+	tw.tween_property(_toast, "modulate:a", 1.0, 0.2)
+	tw.tween_interval(2.5)
+	tw.tween_property(_toast, "modulate:a", 0.0, 0.4)
+
+## Tur / kurma / oylama sayaçları. Yazılar sadece gösterilen saniye değişince
+## yenilenir (her karede label yeniden yazılmasın).
+func _refresh_countdowns() -> void:
+	var key := int(ceil(CardManager.turn_seconds_left())) * 1000 + int(ceil(GovernmentManager.phase_seconds_left()))
+	if key == _last_countdown_key:
+		return
+	_last_countdown_key = key
+	_update_turn_indicator_text()
+	proposal_label.text = GovernmentHud.proposal_status_text(multiplayer.get_unique_id())
+	if _waiting_overlay != null and _waiting_overlay.visible:
+		_refresh_waiting_overlay()
 
 func _refresh_results_panels() -> void:
 	var ids: Array = CardManager.last_vote_shares.keys()
@@ -302,7 +330,12 @@ func _refresh_map_seat_markers() -> void:
 			seat_markers.set_seats(province_id, colors)
 
 func _refresh_game_settings_label() -> void:
-	game_settings_label.text = "Baraj: %%%s" % _format_threshold(MultiplayerManager.election_threshold)
+	var next_election := GameRules.next_election_round(CardManager.round_number)
+	game_settings_label.text = "Baraj: %%%s  ·  Tur %d/%d  ·  %s" % [
+		_format_threshold(MultiplayerManager.election_threshold),
+		mini(CardManager.round_number, GameRules.MAX_ROUNDS), GameRules.MAX_ROUNDS,
+		("Seçim: %d. tur sonunda" % next_election) if next_election != -1 else "Seçim kalmadı",
+	]
 
 func _format_threshold(value: float) -> String:
 	if is_equal_approx(value, round(value)):
@@ -430,11 +463,19 @@ func _update_turn_indicator() -> void:
 		return
 	turn_indicator.show()
 	var party: Dictionary = PartyManager.parties.get(peer_id, {})
+	_update_turn_indicator_text()
+	var badge := PartyBadge.build(party, turn_indicator_badge_slot.custom_minimum_size, BADGE_ICON_PIXEL_SIZE)
+	turn_indicator_badge_slot.add_child(badge)
+
+func _update_turn_indicator_text() -> void:
+	var peer_id := CardManager.current_turn_peer_id()
+	if peer_id == -1:
+		return
+	var party: Dictionary = PartyManager.parties.get(peer_id, {})
 	var pname: String = party.get("name", MultiplayerManager.players.get(peer_id, {}).get("name", "?"))
 	var suffix := " (Sen)" if peer_id == multiplayer.get_unique_id() else ""
-	turn_indicator_label.text = "Sıra:\n%s%s" % [pname, suffix]
-	var badge := _build_badge(party, turn_indicator_badge_slot.custom_minimum_size, BADGE_ICON_PIXEL_SIZE)
-	turn_indicator_badge_slot.add_child(badge)
+	var timer := "" if CardManager.is_turn_blocked() else "\n⏱ %s" % GameRules.format_seconds(CardManager.turn_seconds_left())
+	turn_indicator_label.text = "Sıra:\n%s%s%s" % [pname, suffix, timer]
 
 func _refresh_deck_button() -> void:
 	deck_button.disabled = not CardManager.can_draw()
@@ -470,6 +511,7 @@ func _rebuild_hand() -> void:
 
 func _process(delta: float) -> void:
 	_update_avatar_hover()
+	_refresh_countdowns()
 
 	var i := _hand_holders.size() - 1
 	while i >= 0:
@@ -581,10 +623,20 @@ func _on_hand_card_dropped(hand_index: int) -> void:
 	var hand := CardManager.my_inventory()
 	if hand_index < 0 or hand_index >= hand.size():
 		return
-	if not CardPresets.needs_target(hand[hand_index]):
-		return
+	var card_type: String = hand[hand_index]
 	var target := _party_under_mouse()
-	if target == -1 or not CardManager.is_valid_steal_target(multiplayer.get_unique_id(), target):
+	if target == -1:
+		return
+	var me := multiplayer.get_unique_id()
+	if CardPresets.needs_target(card_type):
+		if not CardManager.is_valid_steal_target(me, target):
+			return
+	elif CardPresets.is_ideology_card(card_type):
+		# İdeoloji kartı bir partinin üstüne bırakılırsa O partinin ekseni
+		# kayar (rakibi seçmenden uzaklaştırmak için); tıklamak = kendi partine.
+		if not CardManager.is_valid_ideology_target(me, target):
+			return
+	else:
 		return
 	_cancel_targeting()
 	CardManager.play_card(hand_index, target)
@@ -785,7 +837,7 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 	# use_frame=true: sağdaki oyuncu panelindeki logolar pixel-art çerçeveli.
 	# (Tur göstergesindeki küçük rozet, istendiği gibi eski prosedürel
 	# görünümünde bırakıldı — orası çerçeve istenmedi.)
-	var wrap := _build_badge(party, Vector2(AVATAR_SIZE, AVATAR_SIZE), AVATAR_ICON_PIXEL_SIZE, is_self, true)
+	var wrap := PartyBadge.build(party, Vector2(AVATAR_SIZE, AVATAR_SIZE), AVATAR_ICON_PIXEL_SIZE, is_self, true)
 	# VBoxContainer içindeki çocukları yatayda gerebilir; bu olmadan daire
 	# oval'a dönüşürdü. SHRINK_CENTER ile hep AVATAR_SIZE genişliğinde,
 	# sütunda ortalanmış kalır.
@@ -813,198 +865,6 @@ func _find_avatar_node(peer_id: int) -> Control:
 		if control != null and control.get_meta("peer_id", -1) == peer_id:
 			return control
 	return null
-
-static var _frame_texture: Texture2D = null
-static var _frame_interior := Rect2i()
-static var _frame_loaded := false
-
-## Çerçeve PNG'sini yükler ve ORTASINDAKİ SAYDAM DELİĞİ bulur (logonun
-## çizileceği alan). Deliği, "dışarıdan flood fill" ile buluyoruz: kenarlardan
-## başlayıp erişilebilen tüm saydam pikseller DIŞARISI sayılıyor; geriye kalan
-## saydam pikseller çerçevenin içine hapsolmuş delik oluyor. Böylece çerçevenin
-## dış hatları yuvarlak/düzensiz olsa bile delik doğru bulunur.
-static func _ensure_frame_loaded() -> void:
-	if _frame_loaded:
-		return
-	_frame_loaded = true
-	_frame_texture = load(PARTY_FRAME_PATH)
-	if _frame_texture == null:
-		push_warning("Parti çerçevesi bulunamadı: %s" % PARTY_FRAME_PATH)
-		return
-	var image := _frame_texture.get_image()
-	if image == null:
-		return
-	if image.is_compressed():
-		image.decompress()
-	image.convert(Image.FORMAT_RGBA8)
-
-	var w := image.get_width()
-	var h := image.get_height()
-	var outside := {}
-	var stack: Array[Vector2i] = []
-	for x in w:
-		stack.append(Vector2i(x, 0))
-		stack.append(Vector2i(x, h - 1))
-	for y in h:
-		stack.append(Vector2i(0, y))
-		stack.append(Vector2i(w - 1, y))
-	while not stack.is_empty():
-		var p: Vector2i = stack.pop_back()
-		if p.x < 0 or p.y < 0 or p.x >= w or p.y >= h:
-			continue
-		if outside.has(p):
-			continue
-		if image.get_pixel(p.x, p.y).a >= 0.04:
-			continue
-		outside[p] = true
-		stack.append(Vector2i(p.x + 1, p.y))
-		stack.append(Vector2i(p.x - 1, p.y))
-		stack.append(Vector2i(p.x, p.y + 1))
-		stack.append(Vector2i(p.x, p.y - 1))
-
-	var min_p := Vector2i(w, h)
-	var max_p := Vector2i(-1, -1)
-	for y in h:
-		for x in w:
-			var p := Vector2i(x, y)
-			if image.get_pixel(x, y).a >= 0.04 or outside.has(p):
-				continue
-			min_p = min_p.min(p)
-			max_p = max_p.max(p)
-	if max_p.x < min_p.x:
-		push_warning("Parti çerçevesinde saydam iç boşluk bulunamadı: %s" % PARTY_FRAME_PATH)
-		return
-	_frame_interior = Rect2i(min_p, max_p - min_p + Vector2i.ONE)
-
-## Bir partinin "logosu": arka plan renkli yuvarlak + ikon. Avatar panelinde
-## ve tur göstergesinde (daha küçük) aynı görsel kullanılıyor. is_self=true
-## ise (sağdaki oyuncu panelinde kendi partin) belirgin şekilde vurgulanır —
-## herkes kendi avatarını hemen ayırt edebilsin.
-##
-## use_frame=true ise prosedürel yuvarlak/kenarlık yerine pixel-art çerçeve
-## (PARTY_FRAME_PATH) kullanılır; parti rengi ve ikon çerçevenin ortasındaki
-## deliğe yerleştirilip çerçeve EN ÜSTE çizilir, böylece delik dışına taşan
-## kısımlar çerçeve tarafından kapatılır ve logo tam daire görünür.
-func _build_badge(party: Dictionary, size: Vector2, icon_pixel_size: int, is_self: bool = false, use_frame: bool = false) -> Control:
-	if use_frame:
-		_ensure_frame_loaded()
-		if _frame_texture != null and _frame_interior.size.x > 0:
-			return _build_framed_badge(party, icon_pixel_size, is_self)
-	var wrap := Control.new()
-	wrap.custom_minimum_size = size
-	wrap.mouse_filter = Control.MOUSE_FILTER_STOP
-
-	var bg_color: Color = party.get("bg_color", Color(0.3, 0.3, 0.3))
-	var circle := Panel.new()
-	# Rozetin içindekiler tamamen DEKORATİF — fare girdisini yutmasınlar
-	# (Panel varsayılanı STOP, TextureRect varsayılanı PASS'tir).
-	circle.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	circle.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var style := StyleBoxFlat.new()
-	style.bg_color = bg_color
-	style.set_corner_radius_all(int(size.y / 2.0))
-	if is_self:
-		style.border_width_bottom = 4
-		style.border_width_top = 4
-		style.border_width_left = 4
-		style.border_width_right = 4
-		style.border_color = Color(1.0, 0.82, 0.15, 1.0)
-		style.shadow_size = 10
-		style.shadow_color = Color(1.0, 0.82, 0.15, 0.45)
-		style.shadow_offset = Vector2.ZERO
-	else:
-		style.border_width_bottom = 2
-		style.border_width_top = 2
-		style.border_width_left = 2
-		style.border_width_right = 2
-		style.border_color = Color(1, 1, 1, 0.5)
-		style.shadow_size = 6
-		style.shadow_color = SHADOW_COLOR
-		style.shadow_offset = Vector2(2, 3)
-	circle.add_theme_stylebox_override("panel", style)
-	wrap.add_child(circle)
-
-	if party.has("icon_index"):
-		var icon := TextureRect.new()
-		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		icon.texture = PartyPresets.get_icon_texture(party["icon_index"], icon_pixel_size)
-		icon.modulate = party.get("icon_color", Color.WHITE)
-		icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon.set_anchors_preset(Control.PRESET_FULL_RECT)
-		var margin := size.y * 0.22
-		icon.offset_left = margin
-		icon.offset_top = margin
-		icon.offset_right = -margin
-		icon.offset_bottom = -margin
-		wrap.add_child(icon)
-
-	return wrap
-
-## Pixel-art çerçeveli rozet. Çizim sırası: parti rengi -> ikon -> ÇERÇEVE.
-## Renk ve ikon, çerçevenin saydam deliğinin SINIR KUTUSUNU dolduruyor; delik
-## yuvarlak olduğu için kutunun köşeleri çerçevenin opak halkasının altında
-## kalıyor ve dışarıdan tam daire görünüyor.
-func _build_framed_badge(party: Dictionary, icon_pixel_size: int, is_self: bool) -> Control:
-	var frame_size := Vector2(_frame_texture.get_size()) * PARTY_FRAME_SCALE
-	var interior_pos := Vector2(_frame_interior.position) * PARTY_FRAME_SCALE
-	var interior_size := Vector2(_frame_interior.size) * PARTY_FRAME_SCALE
-
-	var wrap := Control.new()
-	wrap.custom_minimum_size = frame_size
-	wrap.size = frame_size
-	wrap.mouse_filter = Control.MOUSE_FILTER_STOP
-
-	var fill := ColorRect.new()
-	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	fill.color = party.get("bg_color", Color(0.3, 0.3, 0.3))
-	fill.position = interior_pos
-	fill.size = interior_size
-	wrap.add_child(fill)
-
-	if party.has("icon_index"):
-		var icon := TextureRect.new()
-		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		icon.texture = PartyPresets.get_icon_texture(party["icon_index"], icon_pixel_size)
-		icon.modulate = party.get("icon_color", Color.WHITE)
-		icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		# Delik yuvarlak; ikon köşelere taşıp kırpılmasın diye biraz içeri al.
-		var inset := interior_size * 0.14
-		icon.position = interior_pos + inset
-		icon.size = interior_size - inset * 2.0
-		wrap.add_child(icon)
-
-	var frame := TextureRect.new()
-	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	frame.texture = _frame_texture
-	frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	frame.stretch_mode = TextureRect.STRETCH_SCALE
-	frame.position = Vector2.ZERO
-	frame.size = frame_size
-	if is_self:
-		# Kendi partin: çerçeveyi altın renge boyayarak vurgula (prosedürel
-		# kenarlık artık yok, vurgu çerçevenin kendi üstünden veriliyor).
-		frame.modulate = Color(1.35, 1.12, 0.55, 1.0)
-	wrap.add_child(frame)
-
-	# "Vekil çalma" kartıyla hedef seçerken yanan vurgu (PNG), normalde gizli.
-	var halo := TextureRect.new()
-	halo.name = "TargetHalo"
-	halo.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	halo.texture = load("res://assets/ui/target_highlight.png")
-	halo.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	halo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	halo.stretch_mode = TextureRect.STRETCH_SCALE
-	halo.position = Vector2.ZERO
-	halo.size = frame_size
-	halo.hide()
-	wrap.add_child(halo)
-
-	return wrap
 
 ## Avatar hover'ı, Control'ün mouse_entered/mouse_exited sinyalleriyle DEĞİL,
 ## her karede gerçek fare konumuna bakarak belirleniyor. Sinyal yaklaşımı iki
@@ -1089,7 +949,8 @@ func _on_government_phase_changed() -> void:
 	_rebuild_hand()
 	if _leaving_for_results:
 		return  # önce seçim sonuçları oynasın (bkz. _on_round_completed)
-	if GovernmentManager.phase == GovernmentManager.Phase.FORMING and GovernmentManager.is_my_mandate():
+	if GovernmentManager.phase == GovernmentManager.Phase.FORMING and GovernmentManager.is_my_mandate() \
+			and not CardManager.game_finished:
 		SceneTransition.fade_to_scene("res://scenes/GovernmentFormation.tscn")
 
 ## Görevli olmayan herkes, teklif meclise gelene kadar bu perdeyi görür.
@@ -1099,10 +960,11 @@ func _refresh_waiting_overlay() -> void:
 	if not _waiting_overlay.visible:
 		return
 	var holder: int = GovernmentManager.mandate_peer_id()
-	_waiting_label.text = "HÜKÜMET KURULUYOR\n\n%s (%s)\ngörev dağılımını hazırlıyor…\n\n%d. teklif hakkı" % [
+	_waiting_label.text = "HÜKÜMET KURULUYOR\n\n%s (%s)\ngörev dağılımını hazırlıyor…\n\n%d. teklif hakkı  ·  ⏱ %s" % [
 		_party_name_of(holder),
 		_leader_name_of(holder),
-		GovernmentManager.MAX_ATTEMPTS - GovernmentManager.attempts_left() + 1,
+		GovernmentManager.current_attempt_number(),
+		GameRules.format_seconds(GovernmentManager.phase_seconds_left()),
 	]
 
 func _build_waiting_overlay() -> void:
@@ -1154,103 +1016,16 @@ func _refresh_vote_ui() -> void:
 		vote_no_button.texture_hover = null
 		vote_no_button.texture_pressed = null
 
-	proposal_label.text = _proposal_status_text()
-
-func _proposal_status_text() -> String:
-	match GovernmentManager.phase:
-		GovernmentManager.Phase.FORMING:
-			var holder: int = GovernmentManager.mandate_peer_id()
-			if holder == -1:
-				return ""
-			return "%s hükümet kuruyor… (%d. teklif hakkı)" % [
-				_party_name_of(holder),
-				GovernmentManager.MAX_ATTEMPTS - GovernmentManager.attempts_left() + 1,
-			]
-		GovernmentManager.Phase.VOTING:
-			var kind_text := "GENSORU" if GovernmentManager.proposal_kind == GovernmentManager.KIND_CENSURE else "HÜKÜMET TEKLİFİ"
-			var voted: int = GovernmentManager.votes.size()
-			var total: int = GovernmentManager.voter_ids().size()
-			var mine := ""
-			if GovernmentManager.has_voted(multiplayer.get_unique_id()):
-				mine = "  (oyun: %s)" % ("EVET" if GovernmentManager.my_vote() else "HAYIR")
-			return "%s oylanıyor — %d/%d oy verdi%s" % [kind_text, voted, total, mine]
-		_:
-			return ""
+	proposal_label.text = GovernmentHud.proposal_status_text(multiplayer.get_unique_id())
 
 func _party_name_of(peer_id: int) -> String:
-	return PartyManager.parties.get(peer_id, {}).get("name", "?")
+	return GovernmentHud.party_name_of(peer_id)
 
 func _leader_name_of(peer_id: int) -> String:
-	return MultiplayerManager.players.get(peer_id, {}).get("name", "?")
+	return GovernmentHud.leader_name_of(peer_id)
 
-## Kurulu hükümetin partileri ve ANA İKTİDAR PARTİSİ (başbakanlığı tutan).
 func _refresh_government_panel() -> void:
-	for child in government_vbox.get_children():
-		child.queue_free()
+	GovernmentHud.fill_government_panel(government_vbox)
 
-	var title := Label.new()
-	title.add_theme_font_size_override("font_size", 12)
-	title.modulate = Color(1, 1, 1, 0.65)
-	title.text = "HÜKÜMET"
-	government_vbox.add_child(title)
-
-	if not GovernmentManager.has_government():
-		var none := Label.new()
-		none.add_theme_font_size_override("font_size", 13)
-		none.text = "Hükümet yok"
-		government_vbox.add_child(none)
-		return
-
-	for peer_id in GovernmentManager.government_party_ids():
-		var row := Label.new()
-		row.add_theme_font_size_override("font_size", 13)
-		var is_main: bool = peer_id == GovernmentManager.main_gov_peer_id
-		row.text = "%s%s  (+%d)" % [
-			"★ " if is_main else "· ",
-			_party_name_of(peer_id),
-			GovernmentManager.round_points_of(peer_id),
-		]
-		row.modulate = PartyManager.parties.get(peer_id, {}).get("bg_color", Color.WHITE).lightened(0.35)
-		government_vbox.add_child(row)
-
-	var strength := Label.new()
-	strength.add_theme_font_size_override("font_size", 12)
-	var seats := GovernmentManager.government_seats()
-	var total := GovernmentManager.total_seats()
-	strength.text = "%d/%d sandalye — %s" % [
-		seats, total,
-		"çoğunluk var" if GovernmentManager.has_majority() else "AZINLIK",
-	]
-	strength.modulate = Color(1, 1, 1, 0.7) if GovernmentManager.has_majority() else Color(1, 0.6, 0.5, 0.95)
-	government_vbox.add_child(strength)
-
-## Puan tablosu — oyuncular sürekli görebilsin diye kalıcı olarak ekranda.
 func _refresh_score_panel() -> void:
-	for child in score_vbox.get_children():
-		child.queue_free()
-
-	var title := Label.new()
-	title.add_theme_font_size_override("font_size", 12)
-	title.modulate = Color(1, 1, 1, 0.65)
-	title.text = "PUAN TABLOSU"
-	score_vbox.add_child(title)
-
-	var ids: Array = _ordered_peer_ids().duplicate()
-	ids.sort_custom(func(a, b):
-		var sa := GovernmentManager.score_of(a)
-		var sb := GovernmentManager.score_of(b)
-		if sa != sb:
-			return sa > sb
-		return CardManager.last_seats.get(a, 0) > CardManager.last_seats.get(b, 0)
-	)
-	for peer_id in ids:
-		var row := Label.new()
-		row.add_theme_font_size_override("font_size", 13)
-		row.text = "%d  %s (%s)" % [
-			GovernmentManager.score_of(peer_id),
-			_party_name_of(peer_id),
-			_leader_name_of(peer_id),
-		]
-		if peer_id == multiplayer.get_unique_id():
-			row.modulate = Color(1.0, 0.85, 0.35)
-		score_vbox.add_child(row)
+	GovernmentHud.fill_score_panel(score_vbox, _ordered_peer_ids(), multiplayer.get_unique_id())

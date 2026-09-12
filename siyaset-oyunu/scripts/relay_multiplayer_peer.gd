@@ -20,6 +20,18 @@ enum FrameType {
 signal room_created(code: String)
 signal room_error(reason: String)
 signal room_closed_by_relay(reason: String)
+## Bağlantı SLOW_CONNECT_NOTICE_SEC'ten uzun sürüyor (ör. ücretsiz sunucu uyanıyor).
+signal connecting_slow
+
+## WebSocketPeer'ın varsayılan giriş/çıkış tamponları 64 KB. Bir karede
+## gönderilen RPC'lerin toplamı bunu aşınca (seçim sonucu il bazlı sonuçları
+## taşır; 8 oyuncuda onlarca KB) send() ERR_OUT_OF_MEMORY ile paketi SESSİZCE
+## düşürüyordu — "istemci eski tur durumunda takılı kalıyor" hatasının kökü.
+const BUFFER_SIZE := 1 << 22 # 4 MB
+const MAX_QUEUED_PACKETS := 16384
+const SLOW_CONNECT_NOTICE_SEC := 4.0
+## Ücretsiz Render sunucusu uykudan ~30-60 sn'de kalkar.
+const CONNECT_TIMEOUT_SEC := 75.0
 
 var _ws: WebSocketPeer = WebSocketPeer.new()
 var _status: int = MultiplayerPeer.CONNECTION_DISCONNECTED
@@ -35,6 +47,10 @@ var _pending_mode: int = -1 # 0=create, 1=join
 var _pending_name: String = ""
 var _pending_code: String = ""
 var _sent_hello: bool = false
+## ROOM_OK / ROOM_ERR alındı mı (ya da bağlantı kurulamadığı bildirildi mi).
+var _handshake_done: bool = false
+var _slow_notified: bool = false
+var _connect_started_ms: int = 0
 
 func start_create_room(relay_url: String, player_name: String) -> void:
 	_pending_mode = FrameType.CREATE_ROOM
@@ -50,6 +66,13 @@ func start_join_room(relay_url: String, code: String, player_name: String) -> vo
 func _connect(relay_url: String) -> void:
 	_status = MultiplayerPeer.CONNECTION_CONNECTING
 	_sent_hello = false
+	_handshake_done = false
+	_slow_notified = false
+	_connect_started_ms = Time.get_ticks_msec()
+	# Tampon ayarları bağlantı KURULMADAN önce yapılmalı.
+	_ws.inbound_buffer_size = BUFFER_SIZE
+	_ws.outbound_buffer_size = BUFFER_SIZE
+	_ws.max_queued_packets = MAX_QUEUED_PACKETS
 	var err := _ws.connect_to_url(relay_url)
 	if err != OK:
 		_status = MultiplayerPeer.CONNECTION_DISCONNECTED
@@ -75,6 +98,18 @@ func _poll() -> void:
 	_ws.poll()
 	var state := _ws.get_ready_state()
 
+	if not _handshake_done:
+		var elapsed := float(Time.get_ticks_msec() - _connect_started_ms) / 1000.0
+		if elapsed >= SLOW_CONNECT_NOTICE_SEC and not _slow_notified:
+			_slow_notified = true
+			connecting_slow.emit()
+		if elapsed >= CONNECT_TIMEOUT_SEC:
+			_handshake_done = true
+			_ws.close()
+			_status = MultiplayerPeer.CONNECTION_DISCONNECTED
+			room_error.emit("Sunucuya bağlanılamadı (zaman aşımı).")
+			return
+
 	if state == WebSocketPeer.STATE_OPEN and not _sent_hello:
 		_send_hello()
 
@@ -82,7 +117,13 @@ func _poll() -> void:
 		# connection_succeeded/connection_failed/server_disconnected sinyalleri
 		# MultiplayerPeer'da degil, ust seviye MultiplayerAPI'de yasar; o da bu
 		# durumu _get_connection_status()'u her frame yoklayarak kendisi anlar.
+		# Oda kurulmadan kapandıysa (sunucuya hiç ulaşılamadı) oda KURAN taraf
+		# da haber alsın diye ayrıca room_error yayınlıyoruz.
+		var failed_handshake := not _handshake_done
+		_handshake_done = true
 		_status = MultiplayerPeer.CONNECTION_DISCONNECTED
+		if failed_handshake:
+			room_error.emit("Sunucuya bağlanılamadı.")
 		return
 
 	while _ws.get_available_packet_count() > 0:
@@ -99,11 +140,13 @@ func _handle_frame(pkt: PackedByteArray) -> void:
 				return
 			var code := pkt.slice(1, 6).get_string_from_ascii()
 			var peer_id := pkt.decode_s32(6)
+			_handshake_done = true
 			_unique_id = peer_id
 			_status = MultiplayerPeer.CONNECTION_CONNECTED
 			room_created.emit(code)
 		FrameType.ROOM_ERR:
 			var reason := pkt.slice(1).get_string_from_utf8()
+			_handshake_done = true
 			_status = MultiplayerPeer.CONNECTION_DISCONNECTED
 			room_error.emit(reason)
 		FrameType.PEER_CONNECTED:
@@ -131,7 +174,7 @@ func _get_available_packet_count() -> int:
 	return _incoming.size()
 
 func _get_max_packet_size() -> int:
-	return 1 << 16
+	return BUFFER_SIZE
 
 func _get_packet_script() -> PackedByteArray:
 	if _incoming.is_empty():
@@ -149,7 +192,11 @@ func _put_packet_script(p_buffer: PackedByteArray) -> int:
 	target_bytes.encode_s32(0, _target_peer)
 	frame.append_array(target_bytes)
 	frame.append_array(p_buffer)
-	return _ws.send(frame)
+	var err := _ws.send(frame)
+	if err != OK:
+		# SceneMultiplayer bu dönüş değerini yok sayıyor; sessiz kayıp olmasın.
+		push_error("Röle: paket gönderilemedi (%s, %d bayt)." % [error_string(err), frame.size()])
+	return err
 
 func _get_packet_channel() -> int:
 	return 0

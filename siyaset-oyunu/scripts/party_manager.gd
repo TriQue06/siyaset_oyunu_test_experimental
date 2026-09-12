@@ -23,6 +23,9 @@ const NAME_MAX_LENGTH := 11
 #   "ready": bool,
 # }
 var parties: Dictionary = {}
+## Her yayında artar; istemci heartbeat'te farklı görürse tam durumu ister
+## (bkz. CardManager._heartbeat).
+var state_version: int = 0
 
 func my_party() -> Dictionary:
 	return parties.get(multiplayer.get_unique_id(), {})
@@ -116,7 +119,7 @@ func reset() -> void:
 	if not MultiplayerManager.is_host:
 		return
 	parties.clear()
-	_sync_parties.rpc(parties)
+	_broadcast_parties()
 	parties_updated.emit()
 
 ## Oyun sırasında (kart oynanınca vb.) bir partinin ideoloji eksenini kaydırır.
@@ -136,7 +139,7 @@ func apply_ideology_delta(peer_id: int, axis: String, delta: int) -> void:
 	if MultiplayerManager.room_code == "":
 		parties_updated.emit()
 		return
-	_sync_parties.rpc(parties)
+	_broadcast_parties()
 	parties_updated.emit()
 
 func _apply_party_local_only(party_name: String, icon_index: int, icon_color: Color, bg_color: Color, ideology: Dictionary) -> void:
@@ -162,7 +165,7 @@ func _apply_party(peer_id: int, party_name: String, icon_index: int, icon_color:
 		"ideology": ideology,
 		"ready": was_ready,
 	}
-	_sync_parties.rpc(parties)
+	_broadcast_parties()
 	parties_updated.emit()
 
 func _apply_party_and_ready(peer_id: int, party_name: String, icon_index: int, icon_color: Color, bg_color: Color, ideology: Dictionary, is_ready_value: bool) -> void:
@@ -174,7 +177,7 @@ func _apply_party_and_ready(peer_id: int, party_name: String, icon_index: int, i
 		"ideology": ideology,
 		"ready": is_ready_value,
 	}
-	_sync_parties.rpc(parties)
+	_broadcast_parties()
 	parties_updated.emit()
 	if is_ready_value and all_ready():
 		MultiplayerManager.finish_party_setup()
@@ -183,7 +186,7 @@ func _apply_ready(peer_id: int, is_ready_value: bool) -> void:
 	if not parties.has(peer_id):
 		parties[peer_id] = {}
 	parties[peer_id]["ready"] = is_ready_value
-	_sync_parties.rpc(parties)
+	_broadcast_parties()
 	parties_updated.emit()
 	if all_ready():
 		MultiplayerManager.finish_party_setup()
@@ -221,7 +224,24 @@ func _request_set_party_and_ready(party_name: String, icon_index: int, icon_colo
 	var sender_id := multiplayer.get_remote_sender_id()
 	_apply_party_and_ready(sender_id, party_name, icon_index, icon_color, bg_color, ideology, is_ready_value)
 
+func _broadcast_parties() -> void:
+	state_version += 1
+	_sync_parties.rpc(parties, state_version)
+
+## İstemci: tam durumu host'tan ister (heartbeat sürüm uyuşmazlığında).
+func request_full_sync() -> void:
+	if MultiplayerManager.room_code == "" or MultiplayerManager.is_host:
+		return
+	_request_full_sync.rpc_id(1)
+
+@rpc("any_peer", "reliable")
+func _request_full_sync() -> void:
+	if not MultiplayerManager.is_host:
+		return
+	_sync_parties.rpc_id(multiplayer.get_remote_sender_id(), parties, state_version)
+
 @rpc("authority", "reliable")
-func _sync_parties(new_parties: Dictionary) -> void:
+func _sync_parties(new_parties: Dictionary, version: int) -> void:
 	parties = new_parties
+	state_version = version
 	parties_updated.emit()

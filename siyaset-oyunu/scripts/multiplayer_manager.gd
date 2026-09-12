@@ -7,8 +7,12 @@ extends Node
 ## - Oda kodu: 5 haneli, sadece büyük İngilizce harf (A-Z), rakam yok.
 ## - Lobi sahipliği başka bir oyuncuya devredilebilir; kod bundan etkilenmez,
 ##   aynı kalır.
-## - O ANKİ lobi sahibi odadan ayrılırsa (bağlantısı kesilirse) oda TAMAMEN
-##   kapanır ve içindeki herkes (host dahil) odadan çıkarılır.
+## - Host OLMAYAN bir lobi sahibi ayrılırsa oda kapanmaz, sahiplik host'a
+##   geçer. HOST ayrılırsa oda kapanır: tüm oyun durumu host'ta yaşadığı ve
+##   röle sunucusu oyunu çalıştırmadığı için devralınamaz; herkes oda
+##   ekranına sebebiyle birlikte döner.
+## - Oyun başladıktan sonra odaya katılınamaz. Oyun sırasında ayrılan oyuncu
+##   sıradan/meclisten/hükümet süreçlerinden çıkarılır (CardManager.remove_player).
 ## - "is_host" = bu instance'ın ENet SUNUCUSU olması (her zaman ilk kurucu,
 ##   peer id 1). "owner_id" = LOBİ SAHİBİ rolü — devredilebilir, host'tan
 ##   BAĞIMSIZ bir kavramdır (devredilirse host olmayan bir istemci sahip
@@ -33,10 +37,18 @@ signal room_closed(reason: String)
 signal settings_updated
 signal game_started
 signal party_setup_finished
+## Bağlantı sürerken kullanıcıya gösterilecek ara bilgi (örn. sunucu uyanıyor).
+signal connection_status(text: String)
 
-## Röle sunucusunun adresi. relay-server/ deploy edildikten sonra buradaki
-## adresi gerçek deploy URL'i ile değiştir (örn. "wss://<servis-adin>.onrender.com").
-const RELAY_URL := "wss://siyaset-oyunu-test-experimental.onrender.com"
+## Varsayılan röle sunucusu. Kodu değiştirmeden başka bir sunucu kullanmak
+## için (öncelik sırasıyla):
+##   1. komut satırı:   godot -- --relay=wss://ornek.com
+##   2. ortam değişkeni: SIYASET_RELAY_URL=wss://ornek.com
+##   3. proje ayarı:     siyaset/network/relay_url
+const DEFAULT_RELAY_URL := "wss://siyaset-oyunu-test-experimental.onrender.com"
+const RELAY_URL_SETTING := "siyaset/network/relay_url"
+
+enum Stage { LOBBY, PARTY_SETUP, IN_GAME }
 
 const RelayMultiplayerPeerScript := preload("res://scripts/relay_multiplayer_peer.gd")
 
@@ -90,12 +102,42 @@ var axis_sharpness_max_value: float = AXIS_SHARPNESS_MAX_VALUE_DEFAULT
 var _pending_code: String = ""
 var _has_synced_once: bool = false
 var _closing: bool = false
+var _connect_error_reported: bool = false
+
+## Sadece host'ta anlamlı: oda şu an hangi aşamada.
+var stage: int = Stage.LOBBY
+## Oda kapanınca sebebi; oda ekranı açılınca gösterilir.
+var last_close_reason: String = ""
 
 func _ready() -> void:
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	multiplayer.connected_to_server.connect(_on_connected_to_server)
 	multiplayer.connection_failed.connect(_on_connection_failed)
 	multiplayer.server_disconnected.connect(_on_server_disconnected)
+	room_closed.connect(_on_room_closed_any)
+
+static func relay_url() -> String:
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--relay="):
+			return arg.substr("--relay=".length())
+	var env := OS.get_environment("SIYASET_RELAY_URL")
+	if env != "":
+		return env
+	return str(ProjectSettings.get_setting(RELAY_URL_SETTING, DEFAULT_RELAY_URL))
+
+## Oda nerede kapanırsa kapansın (oyun ekranı, parti kurulum, hükümet kurma…)
+## oyuncu oda ekranına döner; eskiden sadece oda lobisi bunu dinlediği için
+## oyun ortasında host ayrılınca diğerleri ölü bir ekranda kalıyordu.
+func _on_room_closed_any(reason: String) -> void:
+	last_close_reason = reason
+	var scene := get_tree().current_scene
+	var path: String = scene.scene_file_path if scene != null else ""
+	if path in ["res://scenes/RoomLobby.tscn", "res://scenes/RoomSetup.tscn", "res://scenes/Lobby.tscn"]:
+		return
+	get_tree().change_scene_to_file.call_deferred("res://scenes/RoomSetup.tscn")
+
+func _on_relay_connecting_slow() -> void:
+	connection_status.emit("Sunucu uyanıyor olabilir (ücretsiz sunucu uykudan kalkarken ~1 dk sürebilir)…")
 
 static func snap_threshold(value: float) -> float:
 	value = clampf(value, THRESHOLD_MIN, THRESHOLD_MAX)
@@ -137,12 +179,14 @@ func create_room(player_name: String) -> void:
 	axis_sharpness_max_value = AXIS_SHARPNESS_MAX_VALUE_DEFAULT
 	players.clear()
 	var peer := RelayMultiplayerPeerScript.new()
+	_connect_error_reported = false
 	peer.room_created.connect(_on_relay_room_created)
 	peer.room_error.connect(_on_relay_error)
+	peer.connecting_slow.connect(_on_relay_connecting_slow)
 	# SceneMultiplayer, atama anında peer'in en azindan "connecting" durumunda
 	# olmasini zorunlu tutuyor; o yuzden once baglanmayi baslatip (durumu
 	# CONNECTING'e cekip) sonra multiplayer_peer'a atiyoruz.
-	peer.start_create_room(RELAY_URL, local_player_name)
+	peer.start_create_room(relay_url(), local_player_name)
 	multiplayer.multiplayer_peer = peer
 
 func _on_relay_room_created(code: String) -> void:
@@ -155,11 +199,15 @@ func _on_relay_room_created(code: String) -> void:
 	player_list_updated.emit()
 
 func _on_relay_error(reason: String) -> void:
+	if _connect_error_reported:
+		return
 	if is_host and room_code == "":
+		_connect_error_reported = true
 		multiplayer.multiplayer_peer = null
 		is_host = false
 		connection_error.emit(reason)
 	elif not is_host and not _has_synced_once:
+		_connect_error_reported = true
 		multiplayer.multiplayer_peer = null
 		join_failed.emit(reason)
 
@@ -172,8 +220,10 @@ func join_room(code: String, player_name: String) -> void:
 	_closing = false
 	is_host = false
 	var peer := RelayMultiplayerPeerScript.new()
+	_connect_error_reported = false
 	peer.room_error.connect(_on_relay_error)
-	peer.start_join_room(RELAY_URL, _pending_code, local_player_name)
+	peer.connecting_slow.connect(_on_relay_connecting_slow)
+	peer.start_join_room(relay_url(), _pending_code, local_player_name)
 	multiplayer.multiplayer_peer = peer
 
 ## Oyuncu kendi isteğiyle odadan ayrılır. Ayrılan kişi lobi sahibiyse
@@ -305,15 +355,26 @@ func _reset_state() -> void:
 	axis_sharpness_max_value = AXIS_SHARPNESS_MAX_VALUE_DEFAULT
 	_has_synced_once = false
 	_closing = false
+	stage = Stage.LOBBY
 
 # --- Bağlantı olayları -------------------------------------------------
 
 func _on_connected_to_server() -> void:
 	_request_join.rpc_id(1, _pending_code, local_player_name)
 
+## Röle peer'ı aynı hatayı room_error ile de bildirebilir; kullanıcıya tek
+## mesaj gitsin, ve oda KURARKEN düşen bağlantı "katılma" hatası sanılmasın.
 func _on_connection_failed() -> void:
+	if _connect_error_reported:
+		return
+	_connect_error_reported = true
+	var hosting := is_host
 	multiplayer.multiplayer_peer = null
-	join_failed.emit("Sunucuya ulaşılamadı.")
+	if hosting:
+		is_host = false
+		connection_error.emit("Sunucuya ulaşılamadı.")
+	else:
+		join_failed.emit("Sunucuya ulaşılamadı.")
 
 func _on_server_disconnected() -> void:
 	_reset_state()
@@ -322,14 +383,22 @@ func _on_server_disconnected() -> void:
 func _on_peer_disconnected(id: int) -> void:
 	if not is_host or _closing:
 		return
+	var was_player := players.has(id)
+	players.erase(id)
 	if id == owner_id:
-		# Lobi sahibi ayrıldı: oda herkes için tamamen kapanır.
-		_close_room("Oda sahibi ayrıldı, oda kapatıldı.")
-		return
-	if players.has(id):
-		players.erase(id)
+		# Host olmayan lobi sahibi ayrıldı: oda kapanmaz, sahiplik host'a geçer.
+		owner_id = multiplayer.get_unique_id()
 	_sync_player_list.rpc(players, owner_id, election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
 	player_list_updated.emit()
+	if not was_player:
+		return
+	match stage:
+		Stage.PARTY_SETUP:
+			# Ayrılan kişi "hazır" bekleniyordu; kalanların hepsi hazırsa başla.
+			if PartyManager.all_ready():
+				finish_party_setup()
+		Stage.IN_GAME:
+			CardManager.remove_player(id)
 
 ## Sadece host çağırır: tüm istemcileri bilgilendirip sunucuyu kapatır.
 func _close_room(reason: String) -> void:
@@ -345,6 +414,7 @@ func _close_room(reason: String) -> void:
 
 ## Sadece host çağırır: parti verilerini sıfırlayıp herkesi oyuna başlatır.
 func _broadcast_game_start() -> void:
+	stage = Stage.PARTY_SETUP
 	PartyManager.reset()
 	_notify_game_start.rpc()
 	game_started.emit()
@@ -352,8 +422,11 @@ func _broadcast_game_start() -> void:
 ## Sadece host çağırır (Parti Kurulum ekranındaki geri sayım host'ta bitince):
 ## herkesi Oyun Ekranı'na geçirir.
 func finish_party_setup() -> void:
-	if not is_host:
+	# Aşama kontrolü: süre dolması, son "hazır" ve bir oyuncunun ayrılması aynı
+	# anda olursa oyun iki kez başlatılmasın.
+	if not is_host or stage != Stage.PARTY_SETUP:
 		return
+	stage = Stage.IN_GAME
 	CardManager.init_game()
 	_notify_party_setup_finished.rpc()
 	party_setup_finished.emit()
@@ -377,6 +450,10 @@ func _request_join(code: String, player_name: String) -> void:
 		return
 	if players.size() >= MAX_PLAYERS:
 		_join_rejected.rpc_id(sender_id, "Oda dolu.")
+		multiplayer.multiplayer_peer.disconnect_peer(sender_id)
+		return
+	if stage != Stage.LOBBY:
+		_join_rejected.rpc_id(sender_id, "Bu odada oyun zaten başladı.")
 		multiplayer.multiplayer_peer.disconnect_peer(sender_id)
 		return
 	players[sender_id] = {"name": player_name}

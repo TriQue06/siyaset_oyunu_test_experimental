@@ -63,7 +63,8 @@ func _build_menu() -> void:
 
 	var backdrop := ColorRect.new()
 	backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
-	backdrop.color = Color(0, 0, 0, 0.6)
+	# Arkadaki ekranın yazıları menü başlığıyla karışmasın diye neredeyse opak.
+	backdrop.color = Color(0.05, 0.05, 0.08, 0.92)
 	_menu.add_child(backdrop)
 
 	var center := CenterContainer.new()

@@ -250,6 +250,21 @@ func leave_room() -> void:
 		multiplayer.multiplayer_peer.close()
 	_reset_state()
 
+## ESC menüsündeki "Oyundan Ayrıl": oyuncu odadan düzgünce çıkar ve ana menüye
+## döner. Host OLMAYAN oyuncu ayrılınca host bunu peer_disconnected ile görür
+## ve oyunu ona uyarlar (sıradan/meclisten/oylamadan/hükümetten çıkarır, bkz.
+## CardManager.remove_player). HOST ayrılırsa oyun durumu onda yaşadığı için
+## oda kapanır; diğerlerine önce sebep bildirilir.
+func leave_game() -> void:
+	if room_code != "" and is_host and multiplayer.multiplayer_peer != null:
+		_closing = true
+		_notify_room_closed.rpc("Oda sahibi oyundan ayrıldı, oda kapatıldı.")
+		# RPC'nin ağa çıkması için birkaç kare bekle.
+		for i in 3:
+			await get_tree().process_frame
+	leave_room()
+	get_tree().change_scene_to_file("res://scenes/Lobby.tscn")
+
 ## Lobi sahipliği rolü — ağ host'u olup olmamasından BAĞIMSIZDIR.
 func is_local_owner() -> bool:
 	return multiplayer.get_unique_id() == owner_id

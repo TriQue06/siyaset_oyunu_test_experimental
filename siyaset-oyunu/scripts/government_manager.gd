@@ -1,11 +1,12 @@
 extends Node
-## Autoload. Hükümet kurma görevi, meclis teklifleri ve oylama.
+## Autoload. Hükümet kurma görevi, meclis teklifleri (hükümet, gensoru, YASA)
+## ve oylama.
 ##
 ## AKIŞ
 ##   1) Seçim sonuçlanır  -> start_formation() (host çağırır)
 ##   2) En çok MİLLETVEKİLİ olan parti hükümet kurma görevini alır
 ##      (oy oranına göre DEĞİL — bkz. _build_mandate_order).
-##   3) Görevli, GovernmentFormation sahnesinde 10 görevi paylaştırıp teklif
+##   3) Görevli, GovernmentFormation sahnesinde görevleri paylaştırıp teklif
 ##      eder -> submit_government_proposal(). Süresi GameRules.FORMATION_TIMEOUT.
 ##   4) Teklif meclise gelir, tüm partiler evet/hayır oylar
 ##      (GameRules.VOTE_TIMEOUT; oy vermeyen ÇEKİMSER sayılır).
@@ -22,6 +23,10 @@ extends Node
 ## GENSORU: Hükümetin toplam milletvekili salt çoğunluğun altına düşerse
 ## gensoru kartı desteye girer. Kabul edilirse hükümet düşer ve kurma aşaması
 ## baştan başlar.
+##
+## YASA: Yasa kartı oynanınca meclise gelir (hükümet olsun olmasın, kurma
+## aşaması dışında). EVET milletvekilleri HAYIR'dan fazlaysa geçer (çekimserler
+## sayılmaz). Kamuoyu sonuçlarını CardManager.apply_law_result uygular.
 
 signal phase_changed
 signal government_changed
@@ -33,6 +38,7 @@ enum Phase { IDLE, FORMING, VOTING, GOVERNING }
 
 const KIND_GOVERNMENT := "government"
 const KIND_CENSURE := "censure"
+const KIND_LAW := "law"
 ## Bir partinin hükümet kurma hakkı (3. teklif de geçmezse sıra devreder).
 const MAX_ATTEMPTS := 3
 
@@ -47,6 +53,9 @@ var proposal_kind: String = ""
 var proposal_peer_id: int = -1
 var proposal_assignments: Dictionary = {}  # post_id -> peer_id
 var votes: Dictionary = {}                 # peer_id -> bool (true = evet)
+## Yasa teklifinde: yasa kartı türü ve teklif geldiği andaki hükümet partileri.
+var proposal_law: String = ""
+var proposal_gov_ids: Array = []
 ## Son teklif/süre sonucunun okunabilir açıklaması (UI'da gösterilir).
 var last_resolution_reason: String = ""
 
@@ -174,6 +183,10 @@ func has_voted(peer_id: int) -> bool:
 func my_vote() -> Variant:
 	return votes.get(multiplayer.get_unique_id(), null)
 
+## Şu an bir yasa meclise getirilebilir mi? (Meclis oluşmuş, kurma/oylama yok.)
+func can_submit_law() -> bool:
+	return (phase == Phase.GOVERNING or phase == Phase.IDLE) and not voter_ids().is_empty()
+
 ## Kurma/oylama aşamasında kalan süre (saniye); diğer aşamalarda 0.
 func phase_seconds_left() -> float:
 	if phase != Phase.FORMING and phase != Phase.VOTING:
@@ -184,6 +197,17 @@ func phase_seconds_left() -> float:
 
 func _party_name(peer_id: int) -> String:
 	return PartyManager.parties.get(peer_id, {}).get("name", "?")
+
+## Aktif oylamadaki EVET ve HAYIR milletvekili toplamları.
+func vote_seat_totals() -> Vector2i:
+	var yes := 0
+	var no := 0
+	for peer_id in votes.keys():
+		if bool(votes[peer_id]):
+			yes += seats_of(peer_id)
+		else:
+			no += seats_of(peer_id)
+	return Vector2i(yes, no)
 
 # --- Host tarafı: aşama yönetimi -------------------------------------------
 
@@ -241,6 +265,8 @@ func _clear_proposal() -> void:
 	proposal_kind = ""
 	proposal_peer_id = -1
 	proposal_assignments = {}
+	proposal_law = ""
+	proposal_gov_ids = []
 	votes = {}
 
 ## Görevlinin bir teklif hakkı yanar (red ya da süre dolması); haklar biterse
@@ -286,6 +312,19 @@ func submit_censure(peer_id: int) -> void:
 	votes = {}
 	_set_phase(Phase.VOTING)
 	_push_state()
+
+## Yasa teklifi (yasa kartı oynanınca CardManager çağırır).
+func submit_law(peer_id: int, law_type: String) -> bool:
+	if not _is_authority() or not can_submit_law() or not CardPresets.is_law_card(law_type):
+		return false
+	_clear_proposal()
+	proposal_kind = KIND_LAW
+	proposal_peer_id = peer_id
+	proposal_law = law_type
+	proposal_gov_ids = government_party_ids()
+	_set_phase(Phase.VOTING)
+	_push_state()
+	return true
 
 func cast_vote(approve: bool) -> void:
 	if _is_authority():
@@ -338,18 +377,21 @@ func _apply_vote(peer_id: int, approve: bool) -> void:
 	else:
 		_push_state()
 
-func _no_seats() -> int:
-	var no_seats := 0
-	for peer_id in votes.keys():
-		if not bool(votes[peer_id]):
-			no_seats += seats_of(peer_id)
-	return no_seats
+func _undecided_seats() -> int:
+	var undecided := 0
+	for peer_id in voter_ids():
+		if not votes.has(peer_id):
+			undecided += seats_of(peer_id)
+	return undecided
 
 ## Kalan oylar sonucu artık değiştiremiyor mu?
 func _outcome_decided() -> bool:
+	var totals := vote_seat_totals()
+	var undecided := _undecided_seats()
+	if proposal_kind == KIND_LAW:
+		return totals.x > totals.y + undecided or totals.y >= totals.x + undecided
 	var total := total_seats()
-	var no_seats := _no_seats()
-	if no_seats * 2 > total:
+	if totals.y * 2 > total:
 		return true  # red kesin
 	if proposal_kind == KIND_GOVERNMENT:
 		for partner in proposal_partner_ids():
@@ -357,18 +399,35 @@ func _outcome_decided() -> bool:
 				return false  # ortağın rızası bekleniyor
 			if not bool(votes[partner]):
 				return true  # ortak reddetti
-	var undecided := 0
-	for peer_id in voter_ids():
-		if not votes.has(peer_id):
-			undecided += seats_of(peer_id)
-	return (no_seats + undecided) * 2 <= total  # kabul kesin
+	return (totals.y + undecided) * 2 <= total  # kabul kesin
 
 func _resolve_proposal() -> void:
-	# Salt çoğunluk = %50 + 1. Bu eşiği AŞAN "hayır" teklifi düşürür; oy
-	# vermeyenler çekimser sayılır.
-	var rejected: bool = _no_seats() * 2 > total_seats()
 	var kind := proposal_kind
 	var proposer := proposal_peer_id
+	var totals := vote_seat_totals()
+
+	if kind == KIND_LAW:
+		# Çekimserler sayılmaz: EVET milletvekili HAYIR'dan fazlaysa geçer.
+		var passed: bool = totals.x > totals.y
+		var law_type := proposal_law
+		var gov_ids := proposal_gov_ids.duplicate()
+		var votes_copy := votes.duplicate()
+		_clear_proposal()
+		_set_phase(Phase.GOVERNING if has_government() else Phase.IDLE)
+		last_resolution_reason = "%s %s (EVET %d – HAYIR %d)." % [
+			CardPresets.card_title(law_type), "kabul edildi" if passed else "reddedildi", totals.x, totals.y]
+		# Kamuoyu sonuçları ÖNCE: fazın açılması ertelenmiş bir tur sonunu (ve
+		# seçimi) tetikleyebilir, seçim bu sonuçları görmeli.
+		CardManager.apply_law_result(proposer, law_type, votes_copy, passed, gov_ids)
+		_push_state()
+		if not _is_local_only():
+			_notify_resolved.rpc(passed, kind, proposer)
+		proposal_resolved.emit(passed, kind, proposer)
+		return
+
+	# Salt çoğunluk = %50 + 1. Bu eşiği AŞAN "hayır" teklifi düşürür; oy
+	# vermeyenler çekimser sayılır.
+	var rejected: bool = totals.y * 2 > total_seats()
 	var reason := "Meclis çoğunluğu HAYIR dedi." if rejected else ""
 	if kind == KIND_GOVERNMENT and not rejected:
 		for partner in proposal_partner_ids():
@@ -416,6 +475,7 @@ func remove_player(peer_id: int) -> void:
 	if not _is_authority():
 		return
 	votes.erase(peer_id)
+	proposal_gov_ids.erase(peer_id)
 
 	# 1) Başbakanlığı tutan parti ayrıldıysa hükümet düşer; diğer görevleri
 	#    ana iktidar partisine devredilir.
@@ -478,6 +538,8 @@ func _pack_state() -> Dictionary:
 		"proposal_kind": proposal_kind,
 		"proposal_peer_id": proposal_peer_id,
 		"proposal_assignments": proposal_assignments,
+		"proposal_law": proposal_law,
+		"proposal_gov_ids": proposal_gov_ids,
 		"votes": votes,
 		"government": government,
 		"main_gov_peer_id": main_gov_peer_id,
@@ -533,6 +595,8 @@ func _sync_state(state: Dictionary) -> void:
 	proposal_kind = str(state["proposal_kind"])
 	proposal_peer_id = int(state["proposal_peer_id"])
 	proposal_assignments = state["proposal_assignments"]
+	proposal_law = str(state["proposal_law"])
+	proposal_gov_ids = state["proposal_gov_ids"]
 	votes = state["votes"]
 	government = state["government"]
 	main_gov_peer_id = int(state["main_gov_peer_id"])

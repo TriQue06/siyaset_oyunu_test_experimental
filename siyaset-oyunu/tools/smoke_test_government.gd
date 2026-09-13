@@ -85,12 +85,12 @@ func _initialize() -> void:
 
 	print("")
 	print("=== 4) PUANLAR (bakanlik+1, byrd+2, basbakan+3) ===")
-	# 2: basbakanlik(3) + 8 bakanlik(8) = 11 ; 3: basbakan yrd (2)
-	check("2 tur puani 11", gm.round_points_of(2) == 11, str(gm.round_points_of(2)))
+	# 2: basbakanlik(3) + 6 bakanlik(6) = 9 ; 3: basbakan yrd (2)
+	check("2 tur puani 9", gm.round_points_of(2) == 9, str(gm.round_points_of(2)))
 	check("3 tur puani 2", gm.round_points_of(3) == 2, str(gm.round_points_of(3)))
 	gm.award_round_scores()
 	gm.award_round_scores()
-	check("puan BIRIKIYOR (2 tur -> 22)", gm.score_of(2) == 22, str(gm.score_of(2)))
+	check("puan BIRIKIYOR (2 tur -> 18)", gm.score_of(2) == 18, str(gm.score_of(2)))
 	check("puan BIRIKIYOR (2 tur -> 4)", gm.score_of(3) == 4, str(gm.score_of(3)))
 
 	print("")
@@ -134,7 +134,7 @@ func _initialize() -> void:
 	check("hukumet DUSTU", not gm.has_government())
 	check("yeniden kurma asamasi basladi", gm.phase == gm.Phase.FORMING)
 	check("gorev en buyuk partide (1)", gm.mandate_peer_id() == 1, str(gm.mandate_peer_id()))
-	check("puanlar KORUNDU", gm.score_of(2) == 22, str(gm.score_of(2)))
+	check("puanlar KORUNDU", gm.score_of(2) == 18, str(gm.score_of(2)))
 
 	print("")
 	print("=== 8) 3 TEKLIF HAKKI BITINCE SIRA DEVREDER ===")

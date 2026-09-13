@@ -3,7 +3,7 @@ extends Control
 ##
 ##   1) ORTAKLAR: hükümete hangi partiler girecek seçilir. Görevi alan parti
 ##      her zaman dahildir ve çıkarılamaz.
-##   2) DAĞITIM: 10 görev (1 başbakanlık, 1 başbakan yardımcılığı, 8 bakanlık)
+##   2) DAĞITIM: görevler (1 başbakanlık, 1 başbakan yardımcılığı, bakanlıklar)
 ##      SADECE seçilen ortaklar arasında paylaştırılır.
 ##
 ## Sonra "Teklifte Bulun" ile teklif meclise gider. Bu sahne yalnızca görevli
@@ -81,8 +81,8 @@ func _rebuild() -> void:
 		_build_partner_rows()
 	else:
 		_title_base = "2/2 — Görev Dağılımı"
-		info_label.text = "10 görevi ortaklar arasında paylaştır. Başbakanlık kimdeyse ANA İKTİDAR PARTİSİ odur.\nMecliste %d sandalye var; teklifin düşmesi için HAYIR oylarının %d sandalyeyi geçmesi gerekir." % [
-			GovernmentManager.total_seats(), GovernmentManager.total_seats() / 2,
+		info_label.text = "%d görevi ortaklar arasında paylaştır. Başbakanlık kimdeyse ANA İKTİDAR PARTİSİ odur.\nMecliste %d sandalye var; teklifin düşmesi için HAYIR oylarının %d sandalyeyi geçmesi gerekir." % [
+			GovernmentPresets.POSTS.size(), GovernmentManager.total_seats(), GovernmentManager.total_seats() / 2,
 		]
 		propose_button.text = "Teklifte Bulun"
 		back_button.visible = true

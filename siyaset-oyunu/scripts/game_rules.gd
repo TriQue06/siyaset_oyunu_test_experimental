@@ -15,7 +15,8 @@ extends RefCounted
 ##     (eşitlikte milletvekili sayısı).
 
 const ELECTION_INTERVAL := 3
-const MAX_ROUNDS := 12
+## GEÇİCİ olarak iki katına çıkarıldı (12 -> 24) ki oyun geç bitsin.
+const MAX_ROUNDS := 24
 
 ## Süre sınırları (saniye). AFK kalan tek bir oyuncu oyunu kilitleyemesin diye.
 ## Tur süresi dolarsa otomatik pas; hükümet kurma süresi dolarsa o teklif

@@ -129,10 +129,43 @@ static func fill_score_panel(box: VBoxContainer, peer_ids: Array, my_id: int) ->
 		leader_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(leader_label)
 
+		# Ulusal kamuoyu (seçime taşınan artı/eksi).
+		var opinion := CardManager.national_of(peer_id)
+		var opinion_label := _label("%+.1f" % opinion, 11, ProvincePanel._opinion_color(opinion))
+		opinion_label.tooltip_text = "Ulusal kamuoyu"
+		opinion_label.mouse_filter = Control.MOUSE_FILTER_PASS
+		row.add_child(opinion_label)
+
 		var score_label := _label(str(GovernmentManager.score_of(peer_id)), 16)
 		score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		row.add_child(score_label)
 		box.add_child(row)
+
+## Yasa oylaması: 1. satır yasa ve oy durumu, 2. satır oyuncunun TABANININ
+## beklentisi ve EVET/HAYIR'ın kamuoyuna etkisi.
+static func _law_status_text(my_id: int, time_text: String) -> String:
+	var law_type := GovernmentManager.proposal_law
+	var totals := GovernmentManager.vote_seat_totals()
+	var first := "YASA: %s (%s) — %s getirdi · EVET %d / HAYIR %d · %s" % [
+		CardPresets.card_title(law_type), CardPresets.law_direction_text(law_type),
+		party_name_of(GovernmentManager.proposal_peer_id), totals.x, totals.y, time_text,
+	]
+	if GovernmentManager.has_voted(my_id):
+		return first + "\nOyun: %s" % ("EVET" if GovernmentManager.my_vote() else "HAYIR")
+	if not GovernmentManager.voter_ids().has(my_id):
+		return first
+	return first + "\n" + law_expectation_text(my_id)
+
+## "Tabanın EVET bekliyor · EVET +0.5 / HAYIR −1.6 kamuoyu"
+static func law_expectation_text(my_id: int) -> String:
+	var expectation := CardManager.law_expectation(my_id, GovernmentManager.proposal_law)
+	var base_text := "Tabanın kayıtsız"
+	if expectation > 0:
+		base_text = "Tabanın EVET bekliyor"
+	elif expectation < 0:
+		base_text = "Tabanın HAYIR bekliyor"
+	return "%s · EVET %+.1f / HAYIR %+.1f kamuoyu" % [
+		base_text, CardManager.preview_law_vote(my_id, true), CardManager.preview_law_vote(my_id, false)]
 
 ## Meclis butonlarının altındaki durum metni (kalan süre dahil).
 static func proposal_status_text(my_id: int) -> String:
@@ -146,6 +179,8 @@ static func proposal_status_text(my_id: int) -> String:
 				party_name_of(holder), GovernmentManager.current_attempt_number(), time_text,
 			]
 		GovernmentManager.Phase.VOTING:
+			if GovernmentManager.proposal_kind == GovernmentManager.KIND_LAW:
+				return _law_status_text(my_id, time_text)
 			var kind_text := "GENSORU" if GovernmentManager.proposal_kind == GovernmentManager.KIND_CENSURE else "HÜKÜMET TEKLİFİ"
 			var mine := ""
 			if GovernmentManager.has_voted(my_id):

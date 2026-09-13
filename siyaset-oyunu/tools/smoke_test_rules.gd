@@ -110,7 +110,7 @@ func _initialize() -> void:
 	check("secim turlari 1,4,7,10", GameRules.is_election_round(1) and GameRules.is_election_round(4) \
 		and GameRules.is_election_round(10) and not GameRules.is_election_round(2) and not GameRules.is_election_round(3))
 	check("sonraki secim 2 -> 4", GameRules.next_election_round(2) == 4)
-	check("son secimden sonra -1", GameRules.next_election_round(11) == -1)
+	check("son secimden sonra -1", GameRules.next_election_round(GameRules.MAX_ROUNDS - 1) == -1)
 
 	print("")
 	print("=== 4) TUR AKISI + ILK SECIM ===")

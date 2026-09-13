@@ -64,8 +64,13 @@ static func support(party_ideology: Dictionary, voter_center: Dictionary) -> flo
 ##   "seats":            peer_id -> toplam milletvekili
 ##   "province_results": province_id -> { peer_id -> {"percent", "seats"} }
 ##   "passed_threshold": barajı geçen peer_id'ler
+##   modifiers: {"national": {peer_id -> puan}, "local": {province_id -> {peer_id -> puan}}}
+##              — KAMUOYU (bkz. PublicOpinion.multiplier). Boşsa etkisiz.
 static func compute(parties: Dictionary, province_seats: Dictionary, voters: Dictionary,
-		threshold_percent: float, sharpness: float, rng: RandomNumberGenerator) -> Dictionary:
+		threshold_percent: float, sharpness: float, rng: RandomNumberGenerator,
+		modifiers: Dictionary = {}) -> Dictionary:
+	var national_mod: Dictionary = modifiers.get("national", {})
+	var local_mod: Dictionary = modifiers.get("local", {})
 	var vote_shares: Dictionary = {}
 	var seats: Dictionary = {}
 	var province_results: Dictionary = {}
@@ -99,10 +104,12 @@ static func compute(parties: Dictionary, province_seats: Dictionary, voters: Dic
 	for province_id in province_ids:
 		var seats_here: int = int(province_seats[province_id])
 		var center: Dictionary = voters.get(province_id, {})
+		var local_here: Dictionary = local_mod.get(province_id, {})
 		var raw: Dictionary = {}
 		var raw_total := 0.0
 		for peer_id in peer_ids:
-			var w: float = support(parties[peer_id], center) * float(swing[peer_id]) \
+			var opinion: float = PublicOpinion.multiplier(float(national_mod.get(peer_id, 0.0)), float(local_here.get(peer_id, 0.0)))
+			var w: float = support(parties[peer_id], center) * float(swing[peer_id]) * opinion \
 				* rng.randf_range(1.0 - PROVINCE_NOISE, 1.0 + PROVINCE_NOISE)
 			raw[peer_id] = w
 			raw_total += w

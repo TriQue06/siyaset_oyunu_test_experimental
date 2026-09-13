@@ -24,6 +24,9 @@ const BAR_BG_COLOR := Color(1, 1, 1, 0.07)      # eksen_projeksiyon: var(--surfa
 
 ## Satırlar kaydırma kutusundan kısaysa dikey olarak ortalansın mı?
 @export var center_vertically: bool = false
+## Dar alanlar (sol panel) için: lider adı gösterilmez, çubuk alçak — satır
+## başına daha az yer kaplar, 8 partide de liste okunur kalır.
+@export var compact: bool = false
 
 func _ready() -> void:
 	add_theme_constant_override("separation", ROW_SEPARATION)
@@ -59,7 +62,7 @@ func set_data(entries: Array) -> void:
 	add_child(top_spacer)
 
 	for e in entries:
-		add_child(_build_row(e["name"], e["color"], e["percent"], int(e.get("seats", 0)), max_percent, String(e.get("leader", ""))))
+		add_child(_build_row(e["name"], e["color"], e["percent"], int(e.get("seats", 0)), max_percent, "" if compact else String(e.get("leader", ""))))
 
 	call_deferred("_apply_vertical_centering", top_spacer, entries.size())
 
@@ -121,7 +124,7 @@ func _build_row(party_name: String, color: Color, percent: float, seats: int, ma
 
 	var bar_bg := Panel.new()
 	bar_bg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bar_bg.custom_minimum_size = Vector2(0, BAR_HEIGHT)
+	bar_bg.custom_minimum_size = Vector2(0, BAR_HEIGHT * (0.8 if compact else 1.0))
 	var bg_style := StyleBoxFlat.new()
 	bg_style.bg_color = BAR_BG_COLOR
 	bar_bg.add_theme_stylebox_override("panel", bg_style)

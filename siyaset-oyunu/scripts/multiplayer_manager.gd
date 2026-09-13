@@ -115,6 +115,22 @@ func _ready() -> void:
 	multiplayer.connection_failed.connect(_on_connection_failed)
 	multiplayer.server_disconnected.connect(_on_server_disconnected)
 	room_closed.connect(_on_room_closed_any)
+	_wake_relay()
+
+## Oyun açılır açılmaz röle sunucusuna basit bir HTTP isteği atar. Ücretsiz
+## sunucu kullanılmayınca uyuyor ve uyanması 30-60 sn sürüyor; oyuncu menüde
+## adını girip "Oda Kur"a basana kadar sunucu büyük ölçüde uyanmış olur.
+## Sonuç önemsiz (hata da olsa sessizce yok sayılır). Headless testlerde atlanır.
+func _wake_relay() -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	var url := relay_url().replace("wss://", "https://").replace("ws://", "http://")
+	var request := HTTPRequest.new()
+	request.timeout = 90.0
+	add_child(request)
+	request.request_completed.connect(func(_result, _code, _headers, _body): request.queue_free())
+	if request.request(url) != OK:
+		request.queue_free()
 
 static func relay_url() -> String:
 	for arg in OS.get_cmdline_user_args():

@@ -10,7 +10,7 @@ extends RefCounted
 ## çerçeveyi yeniden çizersen kod değişmeden uyar.
 const FRAME_PATH := "res://assets/ui/party_profile_picture_frame.png"
 ## Çerçevenin büyütme katı. TAM SAYI olmalı, yoksa pixel-art bulanıklaşır.
-const FRAME_SCALE := 2
+const FRAME_SCALE := 4
 const SHADOW_COLOR := Color(0, 0, 0, 0.38)
 
 static var _frame_texture: Texture2D = null
@@ -20,11 +20,12 @@ static var _frame_loaded := false
 ## is_self=true ise kendi partin belirgin şekilde vurgulanır. use_frame=true
 ## ise prosedürel yuvarlak yerine pixel-art çerçeve kullanılır (çerçeve
 ## yüklenemezse prosedürel görünüme düşer).
-static func build(party: Dictionary, size: Vector2, icon_pixel_size: int, is_self: bool = false, use_frame: bool = false) -> Control:
+static func build(party: Dictionary, size: Vector2, icon_pixel_size: int, is_self: bool = false,
+		use_frame: bool = false, frame_scale: int = FRAME_SCALE) -> Control:
 	if use_frame:
 		_ensure_frame_loaded()
 		if _frame_texture != null and _frame_interior.size.x > 0:
-			return _build_framed(party, icon_pixel_size, is_self)
+			return _build_framed(party, icon_pixel_size, is_self, frame_scale)
 	var wrap := Control.new()
 	wrap.custom_minimum_size = size
 	wrap.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -128,10 +129,17 @@ static func _ensure_frame_loaded() -> void:
 ## Çizim sırası: parti rengi -> ikon -> ÇERÇEVE -> hedef vurgusu. Renk ve ikon
 ## deliğin sınır kutusunu doldurur; kutunun köşeleri çerçevenin opak halkasının
 ## altında kaldığı için dışarıdan tam daire görünür.
-static func _build_framed(party: Dictionary, icon_pixel_size: int, is_self: bool) -> Control:
-	var frame_size := Vector2(_frame_texture.get_size()) * FRAME_SCALE
-	var interior_pos := Vector2(_frame_interior.position) * FRAME_SCALE
-	var interior_size := Vector2(_frame_interior.size) * FRAME_SCALE
+## Çerçeveli rozetin verilen ölçekteki piksel yüksekliği (çerçeve yoksa 0).
+static func frame_height(frame_scale: int = FRAME_SCALE) -> float:
+	_ensure_frame_loaded()
+	if _frame_texture == null:
+		return 0.0
+	return float(_frame_texture.get_height() * frame_scale)
+
+static func _build_framed(party: Dictionary, icon_pixel_size: int, is_self: bool, frame_scale: int) -> Control:
+	var frame_size := Vector2(_frame_texture.get_size()) * frame_scale
+	var interior_pos := Vector2(_frame_interior.position) * frame_scale
+	var interior_size := Vector2(_frame_interior.size) * frame_scale
 
 	var wrap := Control.new()
 	wrap.custom_minimum_size = frame_size

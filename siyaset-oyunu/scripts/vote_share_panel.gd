@@ -22,6 +22,9 @@ const LEADER_COLOR := Color(0.52, 0.52, 0.56)
 const SEAT_BADGE_BG := Color(0.09, 0.09, 0.09) # eksen_projeksiyon: #111
 const BAR_BG_COLOR := Color(1, 1, 1, 0.07)      # eksen_projeksiyon: var(--surface-alt) yaklaşık karşılığı
 
+## Satırlar kaydırma kutusundan kısaysa dikey olarak ortalansın mı?
+@export var center_vertically: bool = false
+
 func _ready() -> void:
 	add_theme_constant_override("separation", ROW_SEPARATION)
 
@@ -64,7 +67,9 @@ func _apply_vertical_centering(top_spacer: Control, row_count: int) -> void:
 	if not is_instance_valid(top_spacer) or row_count <= 0:
 		return
 	var scroll_parent := get_parent()
-	if scroll_parent == null:
+	# Sol paneldeki gibi başlığın hemen altından başlaması gereken listelerde
+	# ortalama kapalı (center_vertically = false).
+	if not center_vertically or not (scroll_parent is ScrollContainer):
 		return
 	var available: float = scroll_parent.size.y
 	var content_height: float = row_count * BAR_HEIGHT + maxf(0.0, float(row_count - 1)) * ROW_SEPARATION

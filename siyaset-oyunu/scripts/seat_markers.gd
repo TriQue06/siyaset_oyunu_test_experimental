@@ -218,12 +218,20 @@ func _centroid_anchor(center: Vector2, layout: Array, cell: float) -> Vector2:
 func _draw() -> void:
 	if _groups.is_empty():
 		return
-	var xform := get_global_transform()
+	# GERÇEK ekran pikseli: düğümün kendi global dönüşümü, projenin
+	# "canvas_items" esnetme ölçeğini İÇERMİYOR. Pencere temel çözünürlükten
+	# farklı boyuttayken bu kesirli ölçek yüzünden "tam piksele hizalı" sanılan
+	# kareler gerçekte piksel sınırlarına farklı düşüyor, bazı karelerin
+	# konturu kalın bazılarınınki ince görünüyordu. Viewport'un nihai
+	# (esnetme) dönüşümünü de katınca hizalama gerçek piksellerde yapılıyor.
+	var xform := get_viewport().get_final_transform() * get_global_transform_with_canvas()
 	var scale: float = maxf(0.0001, xform.get_scale().x)
 	var inv := xform.affine_inverse()
 
 	var dot_half_px: int = maxi(1, int(roundf(dot_radius * scale)))
-	var outline_half_px: int = maxi(dot_half_px + 1, int(roundf((dot_radius + dot_outline_width) * scale)))
+	# Kontur kalınlığı AYRI yuvarlanıyor: iki boyutu bağımsız yuvarlamak ölçeğe
+	# göre konturu 1 piksel oynatabiliyordu.
+	var outline_half_px: int = dot_half_px + maxi(1, int(roundf(dot_outline_width * scale)))
 	var cell := dot_radius * 2.0 + dot_spacing
 	var step_px: int = maxi(outline_half_px * 2 + min_screen_gap_px, int(roundf(cell * scale)))
 

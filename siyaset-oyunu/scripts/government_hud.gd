@@ -1,8 +1,13 @@
 class_name GovernmentHud
 extends RefCounted
-## Oyun ekranının sol panelleri (hükümet, puan tablosu) ve meclis durum
-## metni. game_screen.gd'den ayrıldı; hepsi mevcut autoload durumundan
-## okuyarak çizer, kendi durumu yoktur.
+## Oyun ekranının sol panelindeki kategoriler (hükümet, puan tablosu) ve
+## meclis durum metni. Hepsi mevcut autoload durumundan okuyarak çizer,
+## kendi durumu yoktur.
+
+const BADGE_SIZE := Vector2(26, 26)
+const BADGE_ICON_PIXEL_SIZE := 48
+const TITLE_COLOR := Color(1, 1, 1, 0.6)
+const DIM_COLOR := Color(1, 1, 1, 0.55)
 
 static func party_name_of(peer_id: int) -> String:
 	return PartyManager.parties.get(peer_id, {}).get("name", "?")
@@ -19,25 +24,77 @@ static func _label(text: String, font_size: int, modulate: Color = Color.WHITE) 
 	label.text = text
 	label.add_theme_font_size_override("font_size", font_size)
 	label.modulate = modulate
+	label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	return label
 
-## Kurulu hükümetin partileri ve ANA İKTİDAR PARTİSİ (başbakanlığı tutan).
+static func section_title(text: String) -> Label:
+	return _label(text, 12, TITLE_COLOR)
+
+static func _badge(peer_id: int) -> Control:
+	var badge := PartyBadge.build(PartyManager.parties.get(peer_id, {}), BADGE_SIZE, BADGE_ICON_PIXEL_SIZE)
+	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.tooltip_text = party_name_of(peer_id)
+	return badge
+
+## "Başbakan: [logo] Parti" satırı.
+static func _post_row(title: String, peer_id: int) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	var title_label := _label(title, 12, DIM_COLOR)
+	title_label.custom_minimum_size = Vector2(92, 0)
+	row.add_child(title_label)
+	if peer_id == -1:
+		row.add_child(_label("—", 13))
+		return row
+	row.add_child(_badge(peer_id))
+	var name_label := _label(party_name_of(peer_id), 13)
+	name_label.clip_text = true
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(name_label)
+	return row
+
+## Kurulu hükümet: başbakan ve yardımcısının partisi, her partinin bakanlık
+## sayısı (logo + sayı) ve meclis gücü.
 static func fill_government_panel(box: VBoxContainer) -> void:
 	_clear(box)
-	box.add_child(_label("HÜKÜMET", 12, Color(1, 1, 1, 0.65)))
+	box.add_child(section_title("HÜKÜMET"))
 
 	if not GovernmentManager.has_government():
-		box.add_child(_label("Hükümet yok", 13))
+		box.add_child(_label("Hükümet yok", 13, DIM_COLOR))
 		return
 
+	var government: Dictionary = GovernmentManager.government
+	box.add_child(_post_row("Başbakan", int(government.get(GovernmentPresets.POST_PM, -1))))
+	box.add_child(_post_row("Başbakan Yrd.", int(government.get(GovernmentPresets.POST_DEPUTY_PM, -1))))
+
+	# Bakanlık sayıları, hükümet partilerinin sırasıyla.
+	var ministries: Dictionary = {}
+	for post_id in government.keys():
+		if post_id == GovernmentPresets.POST_PM or post_id == GovernmentPresets.POST_DEPUTY_PM:
+			continue
+		var peer_id: int = int(government[post_id])
+		ministries[peer_id] = int(ministries.get(peer_id, 0)) + 1
+
+	var ministry_row := HBoxContainer.new()
+	ministry_row.add_theme_constant_override("separation", 6)
+	var ministry_title := _label("Bakanlıklar", 12, DIM_COLOR)
+	ministry_title.custom_minimum_size = Vector2(92, 0)
+	ministry_row.add_child(ministry_title)
+	var chips := HFlowContainer.new()
+	chips.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	chips.add_theme_constant_override("h_separation", 10)
+	chips.add_theme_constant_override("v_separation", 4)
 	for peer_id in GovernmentManager.government_party_ids():
-		var is_main: bool = peer_id == GovernmentManager.main_gov_peer_id
-		var color: Color = PartyManager.parties.get(peer_id, {}).get("bg_color", Color.WHITE)
-		box.add_child(_label("%s%s  (+%d)" % [
-			"★ " if is_main else "· ",
-			party_name_of(peer_id),
-			GovernmentManager.round_points_of(peer_id),
-		], 13, color.lightened(0.35)))
+		if not ministries.has(peer_id):
+			continue
+		var chip := HBoxContainer.new()
+		chip.add_theme_constant_override("separation", 3)
+		chip.add_child(_badge(peer_id))
+		chip.add_child(_label("×%d" % int(ministries[peer_id]), 14))
+		chips.add_child(chip)
+	ministry_row.add_child(chips)
+	box.add_child(ministry_row)
 
 	var seats := GovernmentManager.government_seats()
 	var total := GovernmentManager.total_seats()
@@ -45,10 +102,11 @@ static func fill_government_panel(box: VBoxContainer) -> void:
 	box.add_child(_label("%d/%d sandalye — %s" % [seats, total, "çoğunluk var" if majority else "AZINLIK"],
 		12, Color(1, 1, 1, 0.7) if majority else Color(1, 0.6, 0.5, 0.95)))
 
-## Puan tablosu — oyuncular sürekli görebilsin diye kalıcı olarak ekranda.
+## Puan tablosu: logo, parti adı, oyuncu adı ve sağda puan. Her satır TEK
+## satır yüksekliğinde — 8 oyuncuda da sol panele sığsın.
 static func fill_score_panel(box: VBoxContainer, peer_ids: Array, my_id: int) -> void:
 	_clear(box)
-	box.add_child(_label("PUAN TABLOSU", 12, Color(1, 1, 1, 0.65)))
+	box.add_child(section_title("PUAN TABLOSU"))
 	var ids: Array = peer_ids.duplicate()
 	ids.sort_custom(func(a, b):
 		var sa := GovernmentManager.score_of(a)
@@ -58,9 +116,23 @@ static func fill_score_panel(box: VBoxContainer, peer_ids: Array, my_id: int) ->
 		return int(CardManager.last_seats.get(a, 0)) > int(CardManager.last_seats.get(b, 0))
 	)
 	for peer_id in ids:
-		box.add_child(_label("%d  %s (%s)" % [
-			GovernmentManager.score_of(peer_id), party_name_of(peer_id), leader_name_of(peer_id),
-		], 13, Color(1.0, 0.85, 0.35) if peer_id == my_id else Color.WHITE))
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 6)
+		row.add_child(_badge(peer_id))
+
+		var party_label := _label(party_name_of(peer_id), 13,
+			Color(1.0, 0.85, 0.35) if peer_id == my_id else Color.WHITE)
+		row.add_child(party_label)
+
+		var leader_label := _label(leader_name_of(peer_id), 11, DIM_COLOR)
+		leader_label.clip_text = true
+		leader_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(leader_label)
+
+		var score_label := _label(str(GovernmentManager.score_of(peer_id)), 16)
+		score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		row.add_child(score_label)
+		box.add_child(row)
 
 ## Meclis butonlarının altındaki durum metni (kalan süre dahil).
 static func proposal_status_text(my_id: int) -> String:

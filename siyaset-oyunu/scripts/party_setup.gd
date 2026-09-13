@@ -1,7 +1,7 @@
 extends Control
 ## Parti Kurulum ekranı — HER OYUNCUYA ÖZEL, tam ekran, harita YOK. Solda
-## partinin kocaman bir önizlemesi, sağda ayar paneli (isim, ikon, renkler,
-## ideoloji).
+## partinin kocaman bir önizlemesi, sağda ayar paneli (isim, ikon, arka plan
+## rengi, ideoloji). İkon rengi seçilmez, her zaman beyazdır.
 ##
 ## İDEOLOJİ KURALI: kuruluşta her eksen (economic/social/administrative)
 ## SADECE {-2,-1,1,2} değerlerinden biri olabilir — uç (-3/+3) ve nötr (0)
@@ -23,6 +23,9 @@ const SWATCH_SIZE := 24.0
 const ICON_BUTTON_SIZE := 30.0
 const GRID_ICON_PIXEL_SIZE := 60       # ızgaradaki küçük ikonlar için raster boyutu
 const PREVIEW_ICON_PIXEL_SIZE := 480   # kocaman önizleme için raster boyutu
+## Parti ikonları her zaman beyaz. Beyaz arka plan bu yüzden seçilemez
+## (ikon görünmez olurdu).
+const ICON_COLOR := Color.WHITE
 
 # Eksen başına görünen başlık + uç etiketleri (- ve + yönü).
 const AXIS_LABELS := {
@@ -38,7 +41,6 @@ const AXIS_LABELS := {
 @onready var name_edit: LineEdit = %NameEdit
 @onready var name_hint_label: Label = %NameHintLabel
 @onready var icon_grid: GridContainer = %IconGrid
-@onready var icon_color_row: HFlowContainer = %IconColorRow
 @onready var bg_color_row: HFlowContainer = %BgColorRow
 @onready var ideology_container: VBoxContainer = %IdeologyContainer
 @onready var random_button: Button = %RandomButton
@@ -46,7 +48,6 @@ const AXIS_LABELS := {
 
 var _party_name: String = ""
 var _selected_icon_index: int = 0
-var _selected_icon_color: Color = PartyPresets.COLORS[21]  # beyaz
 var _selected_bg_color: Color = PartyPresets.COLORS[0]     # kırmızı
 var _ideology: Dictionary = {}
 var _ideology_sliders: Dictionary = {}   # axis -> HSlider
@@ -67,8 +68,7 @@ func _ready() -> void:
 	name_edit.text_changed.connect(_on_name_changed)
 
 	_build_icon_grid()
-	_build_color_row(icon_color_row, _on_icon_color_selected)
-	_build_color_row(bg_color_row, _on_bg_color_selected)
+	_build_color_row()
 	_build_ideology_rows()
 	random_button.pressed.connect(_on_random_pressed)
 	ready_button.pressed.connect(_on_ready_pressed)
@@ -139,43 +139,32 @@ func _refresh_icon_grid_selection() -> void:
 		var btn: TextureButton = icon_grid.get_child(i)
 		btn.self_modulate = Color(1, 1, 0.4) if i == _selected_icon_index else Color.WHITE
 
-## Bir rengin, DİĞER (karşı) seçim için o an kullanımda olup olmadığını
-## döner — ikon rengi ile arka plan rengi ASLA aynı olamaz.
-func _is_color_taken_by_other(row: HFlowContainer, color: Color) -> bool:
-	if row == icon_color_row:
-		return color.is_equal_approx(_selected_bg_color)
-	return color.is_equal_approx(_selected_icon_color)
+## Arka plan rengi seçilebilir mi? İkonla aynı renk (beyaz) olamaz.
+static func _is_allowed_bg_color(color: Color) -> bool:
+	return not color.is_equal_approx(ICON_COLOR)
 
-func _build_color_row(row: HFlowContainer, callback: Callable) -> void:
-	for child in row.get_children():
+func _build_color_row() -> void:
+	for child in bg_color_row.get_children():
 		child.queue_free()
 	for i in PartyPresets.COLORS.size():
 		var color: Color = PartyPresets.COLORS[i]
-		var taken := _is_color_taken_by_other(row, color)
+		var allowed := _is_allowed_bg_color(color)
 		var btn := Button.new()
 		btn.custom_minimum_size = Vector2(SWATCH_SIZE, SWATCH_SIZE)
-		btn.disabled = taken
-		btn.modulate = Color(1, 1, 1, 0.35) if taken else Color(1, 1, 1, 1)
+		btn.disabled = not allowed or _is_locked
+		btn.modulate = Color(1, 1, 1, 1) if allowed else Color(1, 1, 1, 0.35)
 		var style := StyleBoxFlat.new()
 		style.bg_color = color
 		style.set_corner_radius_all(4)
-		style.border_width_bottom = 2
-		style.border_width_top = 2
-		style.border_width_left = 2
-		style.border_width_right = 2
-		style.border_color = Color(1, 1, 1, 0.9) if _is_selected_color(row, color) else Color(0, 0, 0, 0.4)
+		style.set_border_width_all(2)
+		style.border_color = Color(1, 1, 1, 0.9) if color.is_equal_approx(_selected_bg_color) else Color(0, 0, 0, 0.4)
 		btn.add_theme_stylebox_override("normal", style)
 		btn.add_theme_stylebox_override("hover", style)
 		btn.add_theme_stylebox_override("pressed", style)
 		btn.add_theme_stylebox_override("disabled", style)
-		if not taken:
-			btn.pressed.connect(callback.bind(i))
-		row.add_child(btn)
-
-func _is_selected_color(row: HFlowContainer, color: Color) -> bool:
-	if row == icon_color_row:
-		return color.is_equal_approx(_selected_icon_color)
-	return color.is_equal_approx(_selected_bg_color)
+		if allowed:
+			btn.pressed.connect(_on_bg_color_selected.bind(i))
+		bg_color_row.add_child(btn)
 
 func _on_icon_selected(index: int) -> void:
 	_selected_icon_index = index
@@ -183,22 +172,9 @@ func _on_icon_selected(index: int) -> void:
 	_update_preview()
 	_push_party()
 
-func _on_icon_color_selected(index: int) -> void:
-	_selected_icon_color = PartyPresets.COLORS[index]
-	# İkon rengi değişince, arka plan satırındaki "dolu" (taken) durumu da
-	# değişmiş olabilir — SADECE kendi satırını değil, İKİSİNİ de yeniden kur.
-	# Önceden sadece kendi satırı yenileniyordu, bu da diğer satırın bir süre
-	# BAYAT (stale) kalıp çakışan bir rengin yanlışlıkla tıklanabilmesine yol
-	# açabiliyordu.
-	_build_color_row(icon_color_row, _on_icon_color_selected)
-	_build_color_row(bg_color_row, _on_bg_color_selected)
-	_update_preview()
-	_push_party()
-
 func _on_bg_color_selected(index: int) -> void:
 	_selected_bg_color = PartyPresets.COLORS[index]
-	_build_color_row(icon_color_row, _on_icon_color_selected)
-	_build_color_row(bg_color_row, _on_bg_color_selected)
+	_build_color_row()
 	_update_preview()
 	_push_party()
 
@@ -257,32 +233,28 @@ func _on_ideology_slider_changed(index: float, axis: String) -> void:
 	_ideology_value_labels[axis].text = "%+d" % value
 	_push_party()
 
-## Sadece ikon ve renkleri rastgeleler — İDEOLOJİYE DOKUNMAZ. İdeoloji daha
-## stratejik bir seçim olduğu için kazara "rastgele" ile karışmasın diye
+## Sadece ikon ve arka plan rengini rastgeleler — İDEOLOJİYE DOKUNMAZ. İdeoloji
+## daha stratejik bir seçim olduğu için kazara "rastgele" ile karışmasın diye
 ## kasıtlı olarak buraya dahil edilmedi.
 func _on_random_pressed() -> void:
 	_selected_icon_index = PartyPresets.random_icon_index()
-	_selected_icon_color = PartyPresets.random_color()
 	_selected_bg_color = PartyPresets.random_color()
-	# İkon rengiyle arka plan rengi asla aynı olamaz — çakışırsa arka planı
-	# başka bir renkle değiştirene kadar tekrar dene.
-	while _selected_bg_color.is_equal_approx(_selected_icon_color):
+	while not _is_allowed_bg_color(_selected_bg_color):
 		_selected_bg_color = PartyPresets.random_color()
 	_refresh_icon_grid_selection()
-	_build_color_row(icon_color_row, _on_icon_color_selected)
-	_build_color_row(bg_color_row, _on_bg_color_selected)
+	_build_color_row()
 	_update_preview()
 	_push_party()
 
 func _update_preview() -> void:
 	preview_bg.color = _selected_bg_color
 	preview_icon.texture = PartyPresets.get_icon_texture(_selected_icon_index, PREVIEW_ICON_PIXEL_SIZE)
-	preview_icon.modulate = _selected_icon_color
+	preview_icon.modulate = ICON_COLOR
 	preview_icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 
 func _push_party() -> void:
 	if PartyManager.is_valid_name(_party_name):
-		PartyManager.set_my_party(_party_name, _selected_icon_index, _selected_icon_color, _selected_bg_color, _ideology)
+		PartyManager.set_my_party(_party_name, _selected_icon_index, ICON_COLOR, _selected_bg_color, _ideology)
 
 ## "Kilitle ve Hazır Ver" / iptal: kilitliyken tüm seçim kontrolleri
 ## devre dışı kalır (yanlışlıkla değiştirilemesin diye), tekrar basınca açılır.
@@ -297,7 +269,7 @@ func _on_ready_pressed() -> void:
 	ready_button.text = "✕ İptal Et" if _is_locked else "🔒 Kilitle ve Hazır Ver"
 	if _is_locked:
 		if PartyManager.is_valid_name(_party_name):
-			PartyManager.set_party_and_ready(_party_name, _selected_icon_index, _selected_icon_color, _selected_bg_color, _ideology, true)
+			PartyManager.set_party_and_ready(_party_name, _selected_icon_index, ICON_COLOR, _selected_bg_color, _ideology, true)
 	else:
 		PartyManager.set_ready(false)
 
@@ -306,17 +278,7 @@ func _set_controls_disabled(disabled: bool) -> void:
 	random_button.disabled = disabled
 	for btn in icon_grid.get_children():
 		btn.disabled = disabled
-	if disabled:
-		for btn in icon_color_row.get_children():
-			btn.disabled = true
-		for btn in bg_color_row.get_children():
-			btn.disabled = true
-	else:
-		# Sadece "disabled=false" yapmak yeterli değil — ikon/arka plan rengi
-		# çakışma kısıtını (taken renkler) yeniden hesaplamak için satırları
-		# baştan kuruyoruz.
-		_build_color_row(icon_color_row, _on_icon_color_selected)
-		_build_color_row(bg_color_row, _on_bg_color_selected)
+	_build_color_row()
 	for axis in _ideology_sliders.keys():
 		_ideology_sliders[axis].editable = not disabled
 

@@ -53,26 +53,38 @@ func set_results(entries: Array) -> void:
 			idx += 1
 	queue_redraw()
 
+func _ready() -> void:
+	# Pencere ölçeği değişince kontrol boyutu aynı kalsa bile ekran piksel
+	# ızgarası değişir; kareler yeniden hizalanmalı.
+	get_viewport().size_changed.connect(queue_redraw)
+
 func _draw() -> void:
 	if _dot_positions.is_empty():
 		return
 	# x normalize [0,2] (merkez=1), y normalize [0,~1] — kontrol alanına sığdır.
 	var scale: float = minf(size.x * 0.5, size.y * 0.96)
 	var origin := Vector2(size.x * 0.5, size.y * 0.98)
-	var dot_radius: float = maxf(2.5, _seat_radius_norm * scale)
-	var pixel_positions: Array = []
-	for i in _dot_positions.size():
-		var p: Vector2 = _dot_positions[i]
-		pixel_positions.append(origin + Vector2(p.x - 1.0, -p.y) * scale)
-	# Pixel-art harita/UI ile tutarlı olsun diye artık antialiased YUVARLAK
-	# değil, keskin kenarlı KARE koltuklar çiziliyor (draw_rect, antialiased
-	# kapalı) — köşeleri net, bulanıklık yok.
-	for pixel_pos in pixel_positions:
-		var outline_half: float = dot_radius + outline_width
-		draw_rect(Rect2(pixel_pos - Vector2(outline_half, outline_half), Vector2(outline_half, outline_half) * 2.0), outline_color, true)
-	for i in _dot_positions.size():
-		var half: float = dot_radius
-		draw_rect(Rect2(pixel_positions[i] - Vector2(half, half), Vector2(half, half) * 2.0), _dot_colors[i], true)
+
+	# Keskin kenarlı KARE koltuklar, GERÇEK EKRAN PİKSELİNE hizalı çiziliyor.
+	# Proje "canvas_items" esnetme modunda: pencere boyutu temel çözünürlükten
+	# farklıyken arada kesirli bir ölçek var. Kareler bu ölçek hesaba katılmadan
+	# çizilince kontur kenarları piksel sınırlarına farklı düşüyor, bazı
+	# karelerin konturu kalın bazılarınınki ince görünüyordu. Burada merkezler
+	# ve boyutlar ekran pikselinde TAM SAYIYA yuvarlanıp yerel uzaya geri
+	# çevriliyor; kontur kalınlığı da tek başına yuvarlanıyor, böylece her
+	# karede birebir aynı.
+	var to_screen := get_viewport().get_final_transform() * get_global_transform_with_canvas()
+	var from_screen := to_screen.affine_inverse()
+	var screen_scale: float = maxf(0.0001, to_screen.get_scale().x)
+	var dot_half_px: int = maxi(1, int(roundf(maxf(2.5, _seat_radius_norm * scale) * screen_scale)))
+	var outline_px: int = maxi(1, int(roundf(outline_width * screen_scale)))
+	var centers_px: Array = []
+	for p in _dot_positions:
+		centers_px.append((to_screen * (origin + Vector2(p.x - 1.0, -p.y) * scale)).round())
+	for center_px in centers_px:
+		_draw_screen_square(from_screen, center_px, dot_half_px + outline_px, outline_color)
+	for i in centers_px.size():
+		_draw_screen_square(from_screen, centers_px[i], dot_half_px, _dot_colors[i])
 
 	# eksen_projeksiyon'daki gibi, yayın altında ortalanmış toplam sandalye
 	# sayısı (createParliamentArch'taki <text>{total}</text> karşılığı).
@@ -82,6 +94,11 @@ func _draw() -> void:
 		var text := str(_total_seats)
 		var text_width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 		draw_string(font, Vector2(size.x * 0.5 - text_width * 0.5, size.y - 4.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(1, 1, 1, 0.9))
+
+func _draw_screen_square(from_screen: Transform2D, center_px: Vector2, half_px: int, color: Color) -> void:
+	var top_left: Vector2 = from_screen * (center_px - Vector2(half_px, half_px))
+	var bottom_right: Vector2 = from_screen * (center_px + Vector2(half_px, half_px))
+	draw_rect(Rect2(top_left, bottom_right - top_left), color, true)
 
 # --- Koltuk yerleşim algoritması (createParliamentArch'ın birebir portu) ---
 

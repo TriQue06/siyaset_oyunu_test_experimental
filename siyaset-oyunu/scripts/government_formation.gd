@@ -61,7 +61,7 @@ func _process(_delta: float) -> void:
 		_update_title()
 
 func _update_title() -> void:
-	title_label.text = "%s   ⏱ %s" % [_title_base, GameRules.format_seconds(GovernmentManager.phase_seconds_left())]
+	title_label.text = "%s   (Süre: %s)" % [_title_base, GameRules.format_seconds(GovernmentManager.phase_seconds_left())]
 
 func _rebuild() -> void:
 	for child in post_list.get_children():

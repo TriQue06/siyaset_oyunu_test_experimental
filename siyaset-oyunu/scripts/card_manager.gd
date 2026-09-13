@@ -233,11 +233,10 @@ func is_valid_steal_target(peer_id: int, target_peer_id: int) -> bool:
 		return false
 	return int(last_seats[target_peer_id]) > 1
 
-## İdeoloji kartı bir RAKİBE oynanabilir mi? (-1 / kendisi = kendi partisi.)
+## İdeoloji kartı SADECE kendi partine oynanır: bir parti başka bir partinin
+## ideolojisini değiştiremez. (-1 ya da kendi id'si geçerli.)
 func is_valid_ideology_target(peer_id: int, target_peer_id: int) -> bool:
-	if target_peer_id == -1 or target_peer_id == peer_id:
-		return true
-	return turn_order.has(target_peer_id)
+	return target_peer_id == -1 or target_peer_id == peer_id
 
 ## Bu kart şu an bu hedeflerle oynanabilir mi? (Host doğrulaması ve UI.)
 func can_play_card(peer_id: int, card_type: String, target_peer_id: int = -1, target_province: String = "") -> bool:
@@ -423,8 +422,7 @@ func _draw_pool(peer_id: int = -1) -> Array:
 
 ## Sırası gelen oyuncu elindeki bir kartı oynar (hand_index: my_inventory()
 ## içindeki sırası).
-##   target_peer_id  : vekil çalmada ZORUNLU; ideoloji kartında isteğe bağlı
-##                     (rakibin eksenini kaydırmak için).
+##   target_peer_id  : sadece vekil çalmada (hedef parti).
 ##   target_province : miting ve yatırımda ZORUNLU.
 func play_card(hand_index: int, target_peer_id: int = -1, target_province: String = "") -> void:
 	if _is_local_only() and turn_order.is_empty():
@@ -525,10 +523,7 @@ func _apply_card_effect(peer_id: int, card_type: String, target_peer_id: int = -
 	var effect: Dictionary = CardPresets.CARD_EFFECTS.get(card_type, {})
 	if effect.is_empty():
 		return false
-	var affected := peer_id
-	if target_peer_id != -1 and target_peer_id != peer_id and turn_order.has(target_peer_id):
-		affected = target_peer_id
-	PartyManager.apply_ideology_delta(affected, effect["axis"], int(effect["delta"]))
+	PartyManager.apply_ideology_delta(peer_id, effect["axis"], int(effect["delta"]))
 	return false
 
 func _party_name(peer_id: int) -> String:

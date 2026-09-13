@@ -3,7 +3,7 @@ extends Node
 ## Godot'un kendi import sistemi export'a otomatik dahil eder.
 ##
 ## Kart grupları:
-##   - İDEOLOJİ : partinin (ya da sürüklenirse rakibin) eksenini ±1 kaydırır.
+##   - İDEOLOJİ : kartı oynayan partinin kendi eksenini ±1 kaydırır.
 ##   - MİTİNG   : seçilen ilde kamuoyu kazandırır; provokasyon riski var.
 ##   - YASA     : meclise bir yasa teklifi getirir (ekseni ve yönü var).
 ##   - YATIRIM  : sadece hükümet partilerine gelir; seçilen ile yatırım.
@@ -227,7 +227,7 @@ func card_description(card_type: String) -> String:
 	if is_ideology_card(card_type):
 		var effect: Dictionary = CARD_EFFECTS[card_type]
 		var info: Dictionary = AXIS_TITLES[effect["axis"]]
-		return "%s eksenini 1 birim %s yönüne kaydırır.\nTıkla: kendi partine · Bir partinin logosuna sürükle: o partiye." % [
+		return "%s eksenini 1 birim %s yönüne kaydırır.\nTıkla: partinin ekseni kayar (sadece kendi partine oynanır)." % [
 			info["title"], info["pos"] if int(effect["delta"]) > 0 else info["neg"]]
 	if needs_target(card_type):
 		var r: Dictionary = STEAL_RANGES[card_type]

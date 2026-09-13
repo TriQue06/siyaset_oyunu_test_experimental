@@ -192,7 +192,7 @@ func _initialize() -> void:
 	check("oylama suresi doldu -> oy vermeyen cekimser, teklif gecti", gm.has_government(), gm.last_resolution_reason)
 
 	print("")
-	print("=== 9) RAKIBE IDEOLOJI KARTI ===")
+	print("=== 9) IDEOLOJI KARTI SADECE KENDI PARTINE ===")
 	cm.current_turn_index = 0
 	var me: int = cm.current_turn_peer_id()
 	var rival: int = cm.turn_order[1]
@@ -200,8 +200,10 @@ func _initialize() -> void:
 	var rival_eco: int = int(pm.parties[rival]["ideology"]["economic"])
 	cm.inventories[me] = ["socialist"]
 	cm._apply_play(me, 0, rival)
-	check("rakibin ekseni kaydi", int(pm.parties[rival]["ideology"]["economic"]) == maxi(-3, rival_eco - 1))
-	check("kendi eksenim degismedi", int(pm.parties[me]["ideology"]["economic"]) == my_eco)
+	check("rakibe oynanamaz: rakibin ekseni degismedi", int(pm.parties[rival]["ideology"]["economic"]) == rival_eco)
+	check("rakibe oynanamaz: kart elde kaldi, sira gecmedi", cm.inventories[me].size() == 1 and cm.current_turn_peer_id() == me)
+	cm._apply_play(me, 0)
+	check("kendi partine oynandi: kendi eksenim kaydi", int(pm.parties[me]["ideology"]["economic"]) == maxi(-3, my_eco - 1))
 	cm.inventories[cm.current_turn_peer_id()] = ["capitalist"]
 	var idx_before_invalid: int = cm.current_turn_index
 	cm._apply_play(cm.current_turn_peer_id(), 0, 999)

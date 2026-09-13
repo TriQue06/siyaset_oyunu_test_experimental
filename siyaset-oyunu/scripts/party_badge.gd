@@ -185,7 +185,7 @@ static func _build_framed(party: Dictionary, icon_pixel_size: int, is_self: bool
 		frame.modulate = Color(1.35, 1.12, 0.55, 1.0)
 	wrap.add_child(frame)
 
-	# Hedef seçerken (vekil çalma / rakibe ideoloji kartı) yanan vurgu.
+	# Hedef seçerken (vekil çalma) yanan vurgu.
 	var halo := TextureRect.new()
 	halo.name = "TargetHalo"
 	halo.mouse_filter = Control.MOUSE_FILTER_IGNORE

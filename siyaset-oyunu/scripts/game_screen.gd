@@ -847,13 +847,15 @@ func _drop_target(card_type: String) -> Dictionary:
 			result["label"] = "Bu partiden vekil çalınamaz"
 			result["error"] = result["label"]
 	elif CardPresets.is_ideology_card(card_type):
+		# İdeoloji kartı sadece kendi partine: kendi logona bırakmak da tıklamak gibi.
 		var peer := _party_under_mouse()
-		result["peer"] = peer
-		if peer == -1:
-			result["label"] = "Bir partinin logosuna bırak (kendi partin için karta tıkla)"
-		elif CardManager.is_valid_ideology_target(me, peer):
+		if peer == me:
 			result["valid"] = true
-			result["label"] = "Bırak: %s partisinin ekseni kayar" % _party_name_of(peer)
+			result["label"] = "Bırak: partinin ekseni kayar"
+		else:
+			result["label"] = "İdeoloji kartı sadece kendi partine oynanır — karta tıkla"
+			if peer != -1:
+				result["error"] = "Başka bir partinin ideolojisini değiştiremezsin."
 	elif CardPresets.needs_province_target(card_type):
 		var province_id := _province_under_mouse()
 		result["province"] = province_id

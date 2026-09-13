@@ -64,28 +64,13 @@ static func _evaluate(bot: int, card_type: String) -> Dictionary:
 		return _eval_law(bot, card_type)
 	return {}
 
-## Kendini seçmene yaklaştırmak ya da en güçlü rakibi seçmenden uzaklaştırmak.
+## Kendi partisini seçmene yaklaştırıyorsa değerli (kart sadece kendi partine).
 static func _eval_ideology(bot: int, card_type: String) -> Dictionary:
 	var effect: Dictionary = CardPresets.CARD_EFFECTS[card_type]
 	var mine := _ideology(bot)
 	var moved := mine.duplicate()
 	moved[effect["axis"]] = IdeologyAxes.clamp_value(int(mine[effect["axis"]]) + int(effect["delta"]))
-	var best := {"score": (_electoral_strength(moved) - _electoral_strength(mine)) * 40.0, "peer": -1, "province": ""}
-
-	var rival := -1
-	for peer_id in CardManager.turn_order:
-		if peer_id == bot or CardManager.is_government_party(peer_id) and CardManager.is_government_party(bot):
-			continue
-		if rival == -1 or GovernmentManager.seats_of(peer_id) > GovernmentManager.seats_of(rival):
-			rival = peer_id
-	if rival != -1 and CardManager.can_play_card(bot, card_type, rival):
-		var theirs := _ideology(rival)
-		var pushed := theirs.duplicate()
-		pushed[effect["axis"]] = IdeologyAxes.clamp_value(int(theirs[effect["axis"]]) + int(effect["delta"]))
-		var loss := (_electoral_strength(theirs) - _electoral_strength(pushed)) * 30.0
-		if loss > float(best["score"]):
-			best = {"score": loss, "peer": rival, "province": ""}
-	return best
+	return {"score": (_electoral_strength(moved) - _electoral_strength(mine)) * 40.0, "peer": -1, "province": ""}
 
 ## Beklenen il kamuoyu kazancı × ilin vekil sayısı × partinin o ildeki şansı.
 static func _eval_miting(bot: int) -> Dictionary:

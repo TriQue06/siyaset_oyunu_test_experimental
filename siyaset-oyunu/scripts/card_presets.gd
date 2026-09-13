@@ -231,15 +231,16 @@ func card_description(card_type: String) -> String:
 			info["title"], info["pos"] if int(effect["delta"]) > 0 else info["neg"]]
 	if needs_target(card_type):
 		var r: Dictionary = STEAL_RANGES[card_type]
-		return "Seçtiğin partiden %d-%d milletvekili çalar (hedef en az 1 vekille kalır).\nTıkla, sonra sağdan bir parti seç." % [int(r["min"]), int(r["max"])]
+		return "Seçtiğin partiden %d-%d milletvekili çalar (hedef en az 1 vekille kalır).\nSağdaki bir partinin logosuna sürükle." % [int(r["min"]), int(r["max"])]
 	match card_type:
 		CENSURE_CARD_TYPE:
-			return "Hükümeti düşürmek için meclise gensoru önergesi verir. Azınlık hükümeti varken desteye girer."
+			return "Hükümeti düşürmek için meclise gensoru önergesi verir. Azınlık hükümeti varken desteye girer.
+Parlamento diyagramına sürükle."
 		MITING_CARD_TYPE:
-			return "Seçtiğin ilde miting: il kamuoyun +%.1f, ulusal +%.1f.\nİlin siyasi dengesine uzaksan PROVOKASYON riski artar (en fazla %%%d): il %.1f, ulusal %.1f.\nTıkla, sonra haritadan il seç." % [
+			return "Seçtiğin ilde miting: il kamuoyun +%.1f, ulusal +%.1f.\nİlin siyasi dengesine uzaksan PROVOKASYON riski artar (en fazla %%%d): il %.1f, ulusal %.1f.\nHaritada bir ilin üstüne sürükle." % [
 				PublicOpinion.MITING_LOCAL, PublicOpinion.MITING_NATIONAL, int(PublicOpinion.PROVOCATION_MAX_RISK * 100),
 				PublicOpinion.PROVOCATION_LOCAL, PublicOpinion.PROVOCATION_NATIONAL]
 		INVEST_CARD_TYPE:
-			return "Sadece hükümet partileri. Seçtiğin ile yatırım: sana il +%.1f ve ulusal +%.1f, hükümet ortaklarına il +%.1f. Herkes görür.\nTıkla, sonra haritadan il seç." % [
+			return "Sadece hükümet partileri. Seçtiğin ile yatırım: sana il +%.1f ve ulusal +%.1f, hükümet ortaklarına il +%.1f. Herkes görür.\nHaritada bir ilin üstüne sürükle." % [
 				PublicOpinion.INVEST_LOCAL, PublicOpinion.INVEST_NATIONAL, PublicOpinion.INVEST_PARTNER_LOCAL]
 	return ""

@@ -37,8 +37,10 @@ const HAND_CARD_SEPARATION := 8
 ## Parti profil kartının (politic_profile.png, 77x53) büyütme katı. TAM SAYI
 ## olmalı — pixel-art keskinliği ancak tam sayı katlarda korunur.
 const PROFILE_CARD_SCALE := 3
-const TAP_MAX_HOLD_MS := 250
+## Fare bu kadar kaydırılırsa tık değil SÜRÜKLEME başlar.
 const TAP_MAX_MOVE_PX := 10.0
+## Oylamada parlamento koltuklarının ve profil etiketlerinin rengi.
+const VOTE_COLORS := {1: Color(0.32, 0.82, 0.38), 0: Color(0.92, 0.78, 0.3), -1: Color(0.92, 0.3, 0.3)}
 
 const SHADOW_OFFSET := Vector2(4, 5)
 const SHADOW_COLOR := Color(0, 0, 0, 0.38)
@@ -101,6 +103,13 @@ var _target_hint: Label
 var _card_info: PanelContainer
 var _card_info_title: Label
 var _card_info_desc: Label
+var _abstain_button: Button
+## Sürüklenen kart (el içindeki sırası; -1 = sürükleme yok) ve imleci izleyen kopyası.
+var _drag_hand_index: int = -1
+var _drag_card_type: String = ""
+var _drag_ghost: TextureRect
+## Sürükleme sırasında el yeniden kurulmak istendi mi (bırakınca kurulur).
+var _hand_dirty: bool = false
 
 func _ready() -> void:
 	map_holder.province_hovered.connect(_on_province_hovered)
@@ -144,11 +153,19 @@ func _ready() -> void:
 	_build_toast()
 	_build_target_hint()
 	_build_card_info()
-	vote_yes_button.pressed.connect(_on_vote_pressed.bind(true))
-	vote_no_button.pressed.connect(_on_vote_pressed.bind(false))
+	vote_yes_button.pressed.connect(_on_vote_pressed.bind(GovernmentManager.VOTE_YES))
+	vote_no_button.pressed.connect(_on_vote_pressed.bind(GovernmentManager.VOTE_NO))
+	_abstain_button = Button.new()
+	_abstain_button.text = "Çekimser"
+	_abstain_button.custom_minimum_size = Vector2(96, 48)
+	UiSkin.skin_button(_abstain_button)
+	_abstain_button.pressed.connect(_on_vote_pressed.bind(GovernmentManager.VOTE_ABSTAIN))
+	vote_yes_button.get_parent().add_child(_abstain_button)
+	vote_yes_button.get_parent().move_child(_abstain_button, vote_yes_button.get_index() + 1)
 	GovernmentManager.phase_changed.connect(_on_government_phase_changed)
 	GovernmentManager.government_changed.connect(_refresh_government_panel)
 	GovernmentManager.proposal_changed.connect(_refresh_vote_ui)
+	GovernmentManager.proposal_changed.connect(_on_proposal_changed)
 	GovernmentManager.scores_changed.connect(_refresh_score_panel)
 
 	_rebuild_player_panel()
@@ -280,7 +297,6 @@ func _refresh_results_panels() -> void:
 	var ids: Array = CardManager.last_vote_shares.keys()
 	ids.sort_custom(func(a, b): return CardManager.last_vote_shares[a] > CardManager.last_vote_shares[b])
 	var vote_entries: Array = []
-	var seat_entries: Array = []
 	for peer_id in ids:
 		var party: Dictionary = PartyManager.parties.get(peer_id, {})
 		var pname: String = party.get("name", MultiplayerManager.players.get(peer_id, {}).get("name", "?"))
@@ -292,11 +308,33 @@ func _refresh_results_panels() -> void:
 			"percent": CardManager.last_vote_shares[peer_id],
 			"seats": CardManager.last_seats.get(peer_id, 0),
 		})
-		seat_entries.append({"seats": CardManager.last_seats.get(peer_id, 0), "color": color})
 	vote_share_panel.set_data(vote_entries)
-	parliament_diagram.set_results(seat_entries)
+	_refresh_parliament_diagram()
 	_refresh_map_seat_markers()
 	_refresh_province_winner_colors()
+
+## Parlamento diyagramı: koltuklar parti renginde; oylama sırasında oy vermiş
+## partilerin koltukları verdikleri oyun rengine (EVET/ÇEKİMSER/HAYIR) bürünür.
+## Parti sırası sabit kalır, koltuklar yer değiştirmez.
+func _refresh_parliament_diagram() -> void:
+	var ids: Array = CardManager.last_seats.keys()
+	ids.sort_custom(func(a, b):
+		return float(CardManager.last_vote_shares.get(a, 0.0)) > float(CardManager.last_vote_shares.get(b, 0.0)))
+	var voting := GovernmentManager.is_voting()
+	var entries: Array = []
+	for peer_id in ids:
+		var color: Color = PartyManager.parties.get(peer_id, {}).get("bg_color", Color(0.5, 0.5, 0.5))
+		if voting and GovernmentManager.votes.has(peer_id):
+			color = VOTE_COLORS[int(GovernmentManager.votes[peer_id])]
+		entries.append({"seats": int(CardManager.last_seats[peer_id]), "color": color})
+	parliament_diagram.set_results(entries)
+
+## Oylar değişti: diyagram renkleri, profillerdeki oy etiketleri ve (oylanan
+## hükümet için) sol panel güncellenir.
+func _on_proposal_changed() -> void:
+	_refresh_parliament_diagram()
+	_rebuild_player_panel()
+	_refresh_government_panel()
 
 ## Her ili, o ildeki milletvekili SAYISINDA (eşitlikte oy oranında) birinci
 ## olan partinin rengiyle boyar — eksen_projeksiyon/index.html'deki
@@ -543,6 +581,11 @@ func _refresh_hand_interactivity() -> void:
 # --- El (envanter) ----------------------------------------------------------
 
 func _rebuild_hand() -> void:
+	# Kart sürüklenirken el yeniden kurulursa sürüklenen düğüm silinir ve
+	# bırakma olayı hiç gelmez; bırakılınca kurulsun.
+	if _drag_hand_index != -1:
+		_hand_dirty = true
+		return
 	# El değişti: bekleyen hedef seçimi artık yanlış karta işaret edebilir.
 	_cancel_targeting()
 	if _card_info != null:
@@ -571,6 +614,8 @@ func _fit_hand_width(count: int) -> void:
 func _process(delta: float) -> void:
 	_update_avatar_hover()
 	_refresh_countdowns()
+	if _drag_ghost != null:
+		_update_drag()
 
 	var i := _hand_holders.size() - 1
 	while i >= 0:
@@ -648,44 +693,41 @@ func _build_hand_card(card_type: String, hand_index: int) -> Control:
 		holder.z_index = 0
 		_card_info.hide()
 	)
-	# İleride bu kartlar başka partilere/illere/parlamentoya SÜRÜKLENEBİLECEK
-	# (drag & drop) — o yüzden basılı tutmak TEK BAŞINA kartı oynatmamalı,
-	# sadece "bas ve hemen bırak" (gerçek bir tık) kart kullanmalı. Bunu
-	# ayırt etmek için basma anının zamanını/konumunu kaydedip, bırakma
-	# anında hem kısa sürede (TAP_MAX_HOLD_MS) hem de neredeyse aynı yerde
-	# (TAP_MAX_MOVE_PX) bırakılmışsa "tık" sayıyoruz; aksi halde (uzun
-	# basılı tutma) hiçbir şey yapmıyoruz — bu, ileride sürükleme
-	# mekaniğinin devreye gireceği dal.
-	card.set_meta("press_time_ms", -1)
+	# TIK ve SÜRÜKLEME: basılı tutup TAP_MAX_MOVE_PX'ten fazla kaydırınca
+	# sürükleme başlar (kartın kopyası imleci izler, bırakınca hedefe göre
+	# oynanır — bkz. _drop_target). Kaydırmadan bırakmak TIK sayılır.
+	# Basılan kontrol fare odağını tuttuğu için hareket ve bırakma olayları
+	# imleç kartın dışına çıksa da bu karta gelir.
+	card.set_meta("pressed", false)
 	card.set_meta("press_pos", Vector2.ZERO)
 	card.gui_input.connect(func(event: InputEvent):
-		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+			if _drag_hand_index != -1:
+				card.set_meta("pressed", false)
+				_end_drag()
+		elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
-				card.set_meta("press_time_ms", Time.get_ticks_msec())
+				card.set_meta("pressed", true)
 				card.set_meta("press_pos", event.position)
-			else:
-				var press_time_ms: int = card.get_meta("press_time_ms", -1)
-				if press_time_ms < 0:
-					return
-				card.set_meta("press_time_ms", -1)
-				var elapsed: int = Time.get_ticks_msec() - press_time_ms
-				var press_pos: Vector2 = card.get_meta("press_pos", Vector2.ZERO)
-				var moved: float = press_pos.distance_to(event.position)
-				if elapsed <= TAP_MAX_HOLD_MS and moved <= TAP_MAX_MOVE_PX:
+			elif card.get_meta("pressed", false):
+				card.set_meta("pressed", false)
+				if _drag_hand_index == hand_index:
+					_finish_drag()
+				elif _drag_hand_index == -1:
 					_on_hand_card_clicked(hand_index)
-				else:
-					# SÜRÜKLEME: kart bir partinin üstünde bırakıldıysa o
-					# partiyi hedef alarak oynanır (vekil çalma kartları).
-					_on_hand_card_dropped(hand_index)
+		elif event is InputEventMouseMotion and card.get_meta("pressed", false) and _drag_hand_index == -1:
+			var press_pos: Vector2 = card.get_meta("press_pos", Vector2.ZERO)
+			if press_pos.distance_to(event.position) > TAP_MAX_MOVE_PX:
+				_start_drag(hand_index, card_type, holder)
 	)
 
 	wrapper.add_child(holder)
 	_hand_holders.append(holder)
 	return wrapper
 
-## TEK TIK. Hedef gerektiren kartlarda (vekil çalma) kart hemen oynanmaz;
-## "hedef seçme" moduna girilir ve sağdaki parti panelinden bir parti
-## seçilmesi beklenir. Diğer kartlar doğrudan oynanır.
+## TEK TIK. İdeoloji kartları doğrudan kendi partine oynanır. Meclis kartları
+## (yasa, gensoru) parlamento diyagramına sürüklenmeli. Vekil çalma ve
+## miting/yatırımda sürüklemenin yanında tık + hedef seçme de çalışır.
 func _on_hand_card_clicked(hand_index: int) -> void:
 	if not CardManager.can_act():
 		return
@@ -704,6 +746,10 @@ func _on_hand_card_clicked(hand_index: int) -> void:
 			return
 		_begin_province_targeting(hand_index)
 		return
+	if CardPresets.is_law_card(card_type) or CardPresets.is_censure_card(card_type):
+		_show_toast("Kartı parlamento diyagramının üstüne sürükle." if CardManager.can_play_card(me, card_type) \
+			else _unplayable_reason(card_type))
+		return
 	if not CardManager.can_play_card(me, card_type):
 		_show_toast(_unplayable_reason(card_type))
 		return
@@ -717,31 +763,133 @@ func _unplayable_reason(card_type: String) -> String:
 		return "Gensoruyu sadece muhalefet, hükümet görevdeyken verebilir."
 	return "Bu kart şu an oynanamaz."
 
-## SÜRÜKLEYİP BIRAKMA. Kart bir partinin üstünde bırakıldıysa o parti hedef
-## alınarak oynanır; boşluğa bırakıldıysa hiçbir şey olmaz (kart elde kalır).
-func _on_hand_card_dropped(hand_index: int) -> void:
+# --- Sürükle-bırak -----------------------------------------------------------
+
+func _start_drag(hand_index: int, card_type: String, holder: Control) -> void:
 	if not CardManager.can_act():
 		return
-	var hand := CardManager.my_inventory()
-	if hand_index < 0 or hand_index >= hand.size():
-		return
-	var card_type: String = hand[hand_index]
-	var target := _party_under_mouse()
-	if target == -1:
-		return
-	var me := multiplayer.get_unique_id()
-	if CardPresets.needs_target(card_type):
-		if not CardManager.is_valid_steal_target(me, target):
-			return
-	elif CardPresets.is_ideology_card(card_type):
-		# İdeoloji kartı bir partinin üstüne bırakılırsa O partinin ekseni
-		# kayar (rakibi seçmenden uzaklaştırmak için); tıklamak = kendi partine.
-		if not CardManager.is_valid_ideology_target(me, target):
-			return
-	else:
-		return
 	_cancel_targeting()
-	CardManager.play_card(hand_index, target)
+	_drag_hand_index = hand_index
+	_drag_card_type = card_type
+	_card_info.hide()
+	holder.modulate.a = 0.35
+	_drag_ghost = TextureRect.new()
+	_drag_ghost.texture = CardPresets.get_card_texture(card_type)
+	_drag_ghost.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_drag_ghost.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_drag_ghost.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_drag_ghost.size = CARD_DISPLAY_SIZE * 0.6
+	_drag_ghost.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_drag_ghost.z_index = 150
+	add_child(_drag_ghost)
+	# Vekil çalmada geçerli hedef partiler vurgulanır.
+	if CardPresets.needs_target(card_type):
+		_pending_target_hand_index = hand_index
+		_refresh_target_highlights()
+	_update_drag()
+
+## Her kare: kopya imleci izler, imlecin altındaki hedef vurgulanır ve üstte
+## "bırakırsan ne olur" yazar.
+func _update_drag() -> void:
+	var mouse := get_viewport().get_mouse_position()
+	_drag_ghost.position = mouse - _drag_ghost.size * 0.5
+	var target := _drop_target(_drag_card_type)
+	_set_target_hint(String(target["label"]) + "  ·  Sağ tık: iptal")
+	var valid: bool = target["valid"]
+	_drag_ghost.modulate = Color(1, 1, 1, 0.95) if valid else Color(1, 0.75, 0.75, 0.8)
+	parliament_diagram.modulate = Color(1.3, 1.3, 1.05) if bool(target["parliament"]) else Color.WHITE
+	if CardPresets.needs_province_target(_drag_card_type):
+		var province_id: String = target["province"]
+		if province_id != _hovered_province_id:
+			_on_province_hovered(province_id)
+
+func _finish_drag() -> void:
+	var hand_index := _drag_hand_index
+	var target := _drop_target(_drag_card_type)
+	_end_drag()
+	if bool(target["valid"]):
+		CardManager.play_card(hand_index, int(target["peer"]), String(target["province"]))
+	elif String(target["error"]) != "":
+		_show_toast(target["error"])
+
+func _end_drag() -> void:
+	if _drag_ghost != null:
+		_drag_ghost.queue_free()
+		_drag_ghost = null
+	_drag_hand_index = -1
+	_drag_card_type = ""
+	parliament_diagram.modulate = Color.WHITE
+	if _hovered_province_id != "":
+		_on_province_hovered("")
+	_cancel_targeting()
+	if _hand_dirty:
+		_hand_dirty = false
+		_rebuild_hand()
+	else:
+		_refresh_hand_interactivity()
+
+## İmlecin altındaki bırakma hedefi. Dönüş:
+##   valid: bırakılırsa kart oynanır mı · peer / province: oynanacak hedef
+##   label: üstte gösterilen yönerge · error: geçersiz bırakmada gösterilecek neden
+##   parliament: imleç parlamento diyagramının üstünde mi (meclis kartları)
+func _drop_target(card_type: String) -> Dictionary:
+	var me := multiplayer.get_unique_id()
+	var result := {"valid": false, "peer": -1, "province": "", "label": "", "error": "", "parliament": false}
+	if CardPresets.needs_target(card_type):
+		var peer := _party_under_mouse()
+		result["peer"] = peer
+		if peer == -1:
+			result["label"] = "Vekil çalmak için sağdaki bir partinin logosuna bırak"
+		elif CardManager.is_valid_steal_target(me, peer):
+			result["valid"] = true
+			result["label"] = "Bırak: %s partisinden vekil çal" % _party_name_of(peer)
+		else:
+			result["label"] = "Bu partiden vekil çalınamaz"
+			result["error"] = result["label"]
+	elif CardPresets.is_ideology_card(card_type):
+		var peer := _party_under_mouse()
+		result["peer"] = peer
+		if peer == -1:
+			result["label"] = "Bir partinin logosuna bırak (kendi partin için karta tıkla)"
+		elif CardManager.is_valid_ideology_target(me, peer):
+			result["valid"] = true
+			result["label"] = "Bırak: %s partisinin ekseni kayar" % _party_name_of(peer)
+	elif CardPresets.needs_province_target(card_type):
+		var province_id := _province_under_mouse()
+		result["province"] = province_id
+		if province_id == "":
+			result["label"] = "Haritada bir ilin üstüne bırak"
+		elif card_type == CardPresets.INVEST_CARD_TYPE and not CardManager.is_government_party(me):
+			result["label"] = "Yatırımı sadece hükümet partileri yapabilir"
+			result["error"] = result["label"]
+		else:
+			result["valid"] = true
+			if card_type == CardPresets.MITING_CARD_TYPE:
+				result["label"] = "Bırak: %s'da miting · provokasyon riski %%%d" % [
+					province_id.capitalize(), int(round(CardManager.miting_risk(me, province_id) * 100.0))]
+			else:
+				result["label"] = "Bırak: %s'a yatırım" % province_id.capitalize()
+	elif CardPresets.is_law_card(card_type) or CardPresets.is_censure_card(card_type):
+		var over := parliament_diagram.get_global_rect().has_point(get_viewport().get_mouse_position())
+		result["parliament"] = over
+		if not over:
+			result["label"] = "Meclise getirmek için parlamento diyagramının üstüne bırak"
+		elif CardManager.can_play_card(me, card_type):
+			result["valid"] = true
+			result["label"] = "Bırak: meclise getir"
+		else:
+			result["label"] = _unplayable_reason(card_type)
+			result["error"] = result["label"]
+	return result
+
+## İmleç haritada hangi ilin üstünde? (Paneller ve alt hazne hariç.)
+func _province_under_mouse() -> String:
+	var mouse := get_viewport().get_mouse_position()
+	var viewport_size := get_viewport_rect().size
+	if mouse.x < LEFT_PANEL_WIDTH or mouse.x > viewport_size.x - RIGHT_COLUMN_WIDTH \
+			or mouse.y >= bottom_area.get_global_rect().position.y:
+		return ""
+	return map_holder.get_province_id_at(map_holder.get_global_transform().affine_inverse() * mouse)
 
 ## Fare şu an sağdaki parti panelinde hangi partinin üstünde?
 func _party_under_mouse() -> int:
@@ -1069,6 +1217,21 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 	# (queue_free edilmiş ama henüz silinmemiş) düğümler listede bir süre
 	# daha durabildiği için index bazlı eşleme güvenilir değil.
 	wrap.set_meta("peer_id", peer_id)
+	# Oylama sırasında logonun altında partinin oyu (ya da beklendiği) yazar.
+	if GovernmentManager.is_voting() and GovernmentManager.voter_ids().has(peer_id):
+		var voted: bool = GovernmentManager.votes.has(peer_id)
+		var tag := Label.new()
+		tag.text = GovernmentManager.vote_text(GovernmentManager.votes[peer_id]) if voted else "…"
+		tag.add_theme_font_size_override("font_size", 12)
+		tag.add_theme_color_override("font_color", VOTE_COLORS[int(GovernmentManager.votes[peer_id])] if voted else Color(1, 1, 1, 0.6))
+		tag.add_theme_color_override("font_outline_color", Color.BLACK)
+		tag.add_theme_constant_override("outline_size", 5)
+		tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var wrap_size: Vector2 = wrap.size if wrap.size != Vector2.ZERO else wrap.custom_minimum_size
+		tag.position = Vector2(-10, wrap_size.y - 18)
+		tag.size = Vector2(wrap_size.x + 20, 18)
+		wrap.add_child(tag)
 	# Hedef seçme modunda (vekil çalma kartı) bu partiye tıklanabilir.
 	wrap.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -1209,8 +1372,8 @@ func _build_waiting_overlay() -> void:
 
 	add_child(_waiting_overlay)
 
-func _on_vote_pressed(approve: bool) -> void:
-	GovernmentManager.cast_vote(approve)
+func _on_vote_pressed(choice: int) -> void:
+	GovernmentManager.cast_vote(choice)
 
 ## Oylama butonları: teklif yokken (ya da oyumu kullandıysam) GRİ ve
 ## tıklanamaz, oylama açıkken yeşil/kırmızı ve hover'lı. Hepsi PNG.
@@ -1221,6 +1384,7 @@ func _refresh_vote_ui() -> void:
 
 	vote_yes_button.disabled = not can_vote
 	vote_no_button.disabled = not can_vote
+	_abstain_button.disabled = not can_vote
 
 	if can_vote:
 		vote_yes_button.texture_normal = load("res://assets/ui/vote_yes_normal.png")
@@ -1240,10 +1404,12 @@ func _refresh_vote_ui() -> void:
 	# Yasa oylamasında butonların üstüne gelince kamuoyu etkisi görünsün.
 	var me := multiplayer.get_unique_id()
 	if can_vote and GovernmentManager.proposal_kind == GovernmentManager.KIND_LAW:
-		vote_yes_button.tooltip_text = "EVET: kamuoyun %+.1f" % CardManager.preview_law_vote(me, true)
-		vote_no_button.tooltip_text = "HAYIR: kamuoyun %+.1f" % CardManager.preview_law_vote(me, false)
+		vote_yes_button.tooltip_text = "EVET: kamuoyun %+.1f" % CardManager.preview_law_vote(me, GovernmentManager.VOTE_YES)
+		_abstain_button.tooltip_text = "ÇEKİMSER: kamuoyun %+.1f" % CardManager.preview_law_vote(me, GovernmentManager.VOTE_ABSTAIN)
+		vote_no_button.tooltip_text = "HAYIR: kamuoyun %+.1f" % CardManager.preview_law_vote(me, GovernmentManager.VOTE_NO)
 	else:
 		vote_yes_button.tooltip_text = ""
+		_abstain_button.tooltip_text = ""
 		vote_no_button.tooltip_text = ""
 
 	proposal_label.text = GovernmentHud.proposal_status_text(multiplayer.get_unique_id())

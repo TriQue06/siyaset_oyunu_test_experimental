@@ -45,7 +45,7 @@ signal opinion_event(text: String)
 ## Oyun bitti (bkz. final_ranking, game_end_reason).
 signal game_over
 
-const MAX_HAND_SIZE := 5
+const MAX_HAND_SIZE := 9
 const HEARTBEAT_INTERVAL := 5.0
 const PROVINCE_SEATS_PATH := "res://data/province_seats.json"
 ## İl başına saklanan son olay sayısı (il detay panelinde gösterilir).
@@ -291,15 +291,19 @@ func law_expectation(peer_id: int, law_type: String) -> int:
 		return 0
 	return PublicOpinion.law_expectation(PartyManager.parties.get(peer_id, {}).get("ideology", {}), law)
 
-## Oylamadaki yasaya bu parti EVET/HAYIR derse ulusal kamuoyu ne kadar değişir
-## (yasanın geçip geçmemesinden bağımsız kısım). UI oy butonlarında gösterir.
-func preview_law_vote(peer_id: int, yes: bool) -> float:
+## Oylamadaki yasaya bu parti EVET/ÇEKİMSER/HAYIR derse ulusal kamuoyu ne kadar
+## değişir (yasanın geçip geçmemesinden bağımsız kısım). UI oy butonlarında gösterir.
+func preview_law_vote(peer_id: int, choice) -> float:
 	if GovernmentManager.proposal_kind != GovernmentManager.KIND_LAW:
 		return 0.0
-	return _law_vote_delta(peer_id, GovernmentManager.proposal_law, yes,
+	return _law_vote_delta(peer_id, GovernmentManager.proposal_law, GovernmentManager.normalize_vote(choice),
 		GovernmentManager.proposal_peer_id, GovernmentManager.proposal_gov_ids)
 
-func _law_vote_delta(peer_id: int, law_type: String, yes: bool, proposer: int, gov_ids: Array) -> float:
+## Çekimser kalan parti tabanından ne ödül ne ceza alır.
+func _law_vote_delta(peer_id: int, law_type: String, choice: int, proposer: int, gov_ids: Array) -> float:
+	if choice == GovernmentManager.VOTE_ABSTAIN:
+		return 0.0
+	var yes := choice == GovernmentManager.VOTE_YES
 	var expectation := law_expectation(peer_id, law_type)
 	var delta := PublicOpinion.vote_base_delta(expectation, yes)
 	if yes and peer_id != proposer and gov_ids.has(peer_id) and not gov_ids.has(proposer):
@@ -539,7 +543,7 @@ func _apply_investment(peer_id: int, province_id: String) -> void:
 	_event_message = "%s, %s'a hükümet yatırımı getirdi." % [_party_name(peer_id), _province_name(province_id)]
 
 ## GovernmentManager, bir yasa oylaması sonuçlanınca (host) çağırır.
-##   votes  : peer_id -> bool (oy vermeyenler yok = çekimser, etkilenmez)
+##   votes  : peer_id -> GovernmentManager.VOTE_* (çekimser / oy vermeyen etkilenmez)
 ##   gov_ids: yasa meclise geldiği andaki hükümet partileri
 func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed: bool, gov_ids: Array) -> void:
 	if not _is_authority():
@@ -549,8 +553,11 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 		return
 	var voters := ElectionModel.load_province_voters()
 	for peer_id in votes.keys():
-		var yes: bool = bool(votes[peer_id])
-		_add_national(peer_id, _law_vote_delta(peer_id, law_type, yes, proposer, gov_ids))
+		var choice := GovernmentManager.normalize_vote(votes[peer_id])
+		if choice == GovernmentManager.VOTE_ABSTAIN:
+			continue
+		var yes := choice == GovernmentManager.VOTE_YES
+		_add_national(peer_id, _law_vote_delta(peer_id, law_type, choice, proposer, gov_ids))
 		# Tabanına TERS oy veren parti, yasanın yönüne eğilimli illerden az da
 		# olsa yeni seçmen çeker (kendi tabanında kaybettiğini tam telafi etmez).
 		var expectation := law_expectation(peer_id, law_type)

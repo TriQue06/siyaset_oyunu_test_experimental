@@ -133,14 +133,17 @@ func _initialize() -> void:
 	gm._apply_government_proposal(1, coalition)
 	gm._apply_vote(1, true)
 	gm._apply_vote(2, false)
+	check("herkes oy vermeden oylama bitmez", gm.phase == gm.Phase.VOTING)
+	gm._apply_vote(3, true)
 	check("ortak HAYIR dedi -> teklif dustu", not gm.has_government() and gm.phase == gm.Phase.FORMING)
 	check("sebep ortagin reddi", gm.last_resolution_reason.find("kabul etmedi") != -1, gm.last_resolution_reason)
 	check("teklif hakki yandi", gm.attempts_left() == 2)
 	gm._apply_government_proposal(1, coalition)
 	gm._apply_vote(2, true)
-	check("ortak evet dese de sonuc kesinlesmeden bekler", gm.phase == gm.Phase.VOTING)
+	check("ortak evet dese de herkes oy verene kadar bekler", gm.phase == gm.Phase.VOTING)
 	gm._apply_vote(1, true)
-	check("kalan oylar degistiremez -> erken kabul", gm.has_government() and gm.phase == gm.Phase.GOVERNING)
+	gm._apply_vote(3, false)
+	check("herkes oy verdi -> kabul", gm.has_government() and gm.phase == gm.Phase.GOVERNING)
 
 	print("")
 	print("=== 6) SECIMSIZ TURLAR: HUKUMET GOREVDE, PUAN BIRIKIR ===")
@@ -168,6 +171,8 @@ func _initialize() -> void:
 	check("gensoru oylamasi acildi", gm.phase == gm.Phase.VOTING)
 	check("tur sonu ERTELENDI", cm.round_number == round_before)
 	gm._apply_vote(1, false)
+	gm._apply_vote(2, false)
+	gm._apply_vote(3, false)
 	check("gensoru reddedildi, tur simdi kapandi", gm.phase == gm.Phase.GOVERNING and cm.round_number == round_before + 1,
 		"faz %d, tur %d" % [gm.phase, cm.round_number])
 
@@ -227,6 +232,7 @@ func _initialize() -> void:
 	check("ayrilanin vekilleri meclisten cikti", gm.total_seats() == 250, str(gm.total_seats()))
 	gm._apply_government_proposal(1, all_posts_to(1))
 	gm._apply_vote(1, true)
+	gm._apply_vote(3, true)
 	check("kalan meclisle hukumet kuruldu", gm.has_government())
 	cm.current_turn_index = 1
 	cm.remove_player(3)
@@ -244,6 +250,26 @@ func _initialize() -> void:
 	check("oyun bitti", cm.game_finished)
 	check("kazanan iktidar partisi", cm.final_ranking.size() == 3 and int(cm.final_ranking[0]["peer_id"]) == 1, str(cm.final_ranking))
 	check("oylama/kurma kapandi", gm.phase == gm.Phase.IDLE)
+
+	print("")
+	print("=== 13) CEKIMSER ===")
+	new_game({1: ideology(1, 1, 2), 2: ideology(-1, -1, 1), 3: ideology(2, 2, -1)})
+	pass_round()
+	cm.last_seats = {1: 150, 2: 140, 3: 100}
+	gm.start_formation()
+	var c3 := all_posts_to(1)
+	c3[gp.POST_DEPUTY_PM] = 2
+	gm._apply_government_proposal(1, c3)
+	gm._apply_vote(1, gm.VOTE_YES)
+	gm._apply_vote(3, gm.VOTE_YES)
+	check("herkes oy vermeden sonuclanmaz", gm.phase == gm.Phase.VOTING)
+	gm._apply_vote(2, gm.VOTE_ABSTAIN)
+	check("ortak cekimser -> riza yok, teklif dustu", not gm.has_government() and gm.last_resolution_reason.find("kabul etmedi") != -1, gm.last_resolution_reason)
+	gm._apply_government_proposal(1, all_posts_to(1))
+	gm._apply_vote(1, gm.VOTE_YES)
+	gm._apply_vote(2, gm.VOTE_ABSTAIN)
+	gm._apply_vote(3, gm.VOTE_NO)
+	check("cekimser HAYIR sayilmaz -> hukumet kuruldu", gm.has_government(), gm.last_resolution_reason)
 
 	print("")
 	if fails == 0:

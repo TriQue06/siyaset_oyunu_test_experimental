@@ -123,6 +123,7 @@ func _initialize() -> void:
 	gm._apply_government_proposal(1, coalition)
 	gm._apply_vote(1, true)
 	gm._apply_vote(2, true)
+	gm._apply_vote(3, false)
 	check("hukumet (1+2) kuruldu", gm.has_government() and gm.government_party_ids().size() == 2)
 	check("muhalefet yatirim oynayamaz", not cm.can_play_card(3, "yatirim", -1, "izmir"))
 	check("hukumet partisi oynayabilir", cm.can_play_card(1, "yatirim", -1, "izmir"))

@@ -8,14 +8,15 @@ extends Node
 ##      (oy oranına göre DEĞİL — bkz. _build_mandate_order).
 ##   3) Görevli, GovernmentFormation sahnesinde görevleri paylaştırıp teklif
 ##      eder -> submit_government_proposal(). Süresi GameRules.FORMATION_TIMEOUT.
-##   4) Teklif meclise gelir, tüm partiler evet/hayır oylar
-##      (GameRules.VOTE_TIMEOUT; oy vermeyen ÇEKİMSER sayılır).
+##   4) Teklif meclise gelir, tüm partiler EVET / ÇEKİMSER / HAYIR oylar.
+##      Oylama HERKES oy verene kadar (ya da GameRules.VOTE_TIMEOUT dolana
+##      kadar; oy vermeyen ÇEKİMSER sayılır) sürer, erken bitmez.
 ##      REDDEDİLME KOŞULLARI:
 ##        - HAYIR oylarının milletvekili toplamı salt çoğunluğu (%50 + 1)
 ##          geçerse (hükümet salt çoğunluğu OLMADAN da güvenoyu alabilir), ya da
 ##        - KOALİSYON RIZASI: kendisine görev önerilen bir ORTAK açıkça EVET
-##          demezse. Kimse rızası olmadan hükümete sokulamaz.
-##      Sonuç kesinleştiği an (kalan oylar değiştiremeyecekse) beklemeden açıklanır.
+##          demezse (çekimser de rıza değildir). Kimse rızası olmadan hükümete
+##          sokulamaz.
 ##   5) Reddedilirse ya da süre dolarsa aynı partinin MAX_ATTEMPTS hakkı vardır;
 ##      hepsi biterse görev bir sonraki en büyük partiye geçer. Kimse kuramazsa
 ##      faz IDLE olur ve tur sonunda ERKEN SEÇİM yapılır (bkz. CardManager).
@@ -42,6 +43,25 @@ const KIND_LAW := "law"
 ## Bir partinin hükümet kurma hakkı (3. teklif de geçmezse sıra devreder).
 const MAX_ATTEMPTS := 3
 
+## Oy değerleri (votes sözlüğünde saklanan).
+const VOTE_YES := 1
+const VOTE_ABSTAIN := 0
+const VOTE_NO := -1
+
+## bool (eski çağrılar: true = evet) ya da int oy değerini VOTE_* değerine çevirir.
+static func normalize_vote(value) -> int:
+	if value is bool:
+		return VOTE_YES if value else VOTE_NO
+	return clampi(int(value), VOTE_NO, VOTE_YES)
+
+static func vote_text(value) -> String:
+	match normalize_vote(value):
+		VOTE_YES:
+			return "EVET"
+		VOTE_NO:
+			return "HAYIR"
+	return "ÇEKİMSER"
+
 var phase: int = Phase.IDLE
 ## Koltuk sayısına göre BÜYÜKTEN KÜÇÜĞE sıralı peer_id listesi.
 var mandate_order: Array = []
@@ -52,7 +72,7 @@ var attempts_used: int = 0
 var proposal_kind: String = ""
 var proposal_peer_id: int = -1
 var proposal_assignments: Dictionary = {}  # post_id -> peer_id
-var votes: Dictionary = {}                 # peer_id -> bool (true = evet)
+var votes: Dictionary = {}                 # peer_id -> VOTE_YES / VOTE_ABSTAIN / VOTE_NO
 ## Yasa teklifinde: yasa kartı türü ve teklif geldiği andaki hükümet partileri.
 var proposal_law: String = ""
 var proposal_gov_ids: Array = []
@@ -198,16 +218,24 @@ func phase_seconds_left() -> float:
 func _party_name(peer_id: int) -> String:
 	return PartyManager.parties.get(peer_id, {}).get("name", "?")
 
-## Aktif oylamadaki EVET ve HAYIR milletvekili toplamları.
+## Aktif oylamadaki EVET ve HAYIR milletvekili toplamları (çekimserler hariç).
 func vote_seat_totals() -> Vector2i:
 	var yes := 0
 	var no := 0
 	for peer_id in votes.keys():
-		if bool(votes[peer_id]):
-			yes += seats_of(peer_id)
-		else:
-			no += seats_of(peer_id)
+		match int(votes[peer_id]):
+			VOTE_YES:
+				yes += seats_of(peer_id)
+			VOTE_NO:
+				no += seats_of(peer_id)
 	return Vector2i(yes, no)
+
+func abstain_seats() -> int:
+	var total := 0
+	for peer_id in votes.keys():
+		if int(votes[peer_id]) == VOTE_ABSTAIN:
+			total += seats_of(peer_id)
+	return total
 
 # --- Host tarafı: aşama yönetimi -------------------------------------------
 
@@ -326,11 +354,13 @@ func submit_law(peer_id: int, law_type: String) -> bool:
 	_push_state()
 	return true
 
-func cast_vote(approve: bool) -> void:
+## choice: VOTE_YES / VOTE_ABSTAIN / VOTE_NO (bool da kabul edilir).
+func cast_vote(choice) -> void:
+	var value := normalize_vote(choice)
 	if _is_authority():
-		_apply_vote(multiplayer.get_unique_id(), approve)
+		_apply_vote(multiplayer.get_unique_id(), value)
 	else:
-		_request_vote.rpc_id(1, approve)
+		_request_vote.rpc_id(1, value)
 
 ## İstemci: tam durumu host'tan ister (heartbeat sürüm uyuşmazlığında).
 func request_full_sync() -> void:
@@ -364,42 +394,26 @@ func _is_valid_assignment(assignments: Dictionary) -> bool:
 			return false
 	return _unique_values(assignments).has(mandate_peer_id())
 
-func _apply_vote(peer_id: int, approve: bool) -> void:
+## Oylama, sonuç önceden belli olsa bile HERKES oy verene (ya da süre
+## dolana) kadar sürer — herkes tavrını ortaya koyabilsin diye.
+func _apply_vote(peer_id: int, choice) -> void:
 	if phase != Phase.VOTING:
 		return
 	if not voter_ids().has(peer_id):
 		return
 	if votes.has(peer_id):
 		return  # oy değiştirilemez
-	votes[peer_id] = approve
-	if votes.size() >= voter_ids().size() or _outcome_decided():
+	votes[peer_id] = normalize_vote(choice)
+	if _all_voted():
 		_resolve_proposal()
 	else:
 		_push_state()
 
-func _undecided_seats() -> int:
-	var undecided := 0
+func _all_voted() -> bool:
 	for peer_id in voter_ids():
 		if not votes.has(peer_id):
-			undecided += seats_of(peer_id)
-	return undecided
-
-## Kalan oylar sonucu artık değiştiremiyor mu?
-func _outcome_decided() -> bool:
-	var totals := vote_seat_totals()
-	var undecided := _undecided_seats()
-	if proposal_kind == KIND_LAW:
-		return totals.x > totals.y + undecided or totals.y >= totals.x + undecided
-	var total := total_seats()
-	if totals.y * 2 > total:
-		return true  # red kesin
-	if proposal_kind == KIND_GOVERNMENT:
-		for partner in proposal_partner_ids():
-			if not votes.has(partner):
-				return false  # ortağın rızası bekleniyor
-			if not bool(votes[partner]):
-				return true  # ortak reddetti
-	return (totals.y + undecided) * 2 <= total  # kabul kesin
+			return false
+	return true
 
 func _resolve_proposal() -> void:
 	var kind := proposal_kind
@@ -431,7 +445,7 @@ func _resolve_proposal() -> void:
 	var reason := "Meclis çoğunluğu HAYIR dedi." if rejected else ""
 	if kind == KIND_GOVERNMENT and not rejected:
 		for partner in proposal_partner_ids():
-			if not (votes.has(partner) and bool(votes[partner])):
+			if int(votes.get(partner, VOTE_ABSTAIN)) != VOTE_YES:
 				rejected = true
 				reason = "%s koalisyona girmeyi kabul etmedi." % _party_name(partner)
 				break
@@ -518,7 +532,7 @@ func remove_player(peer_id: int) -> void:
 			else:
 				_set_phase(Phase.GOVERNING if has_government() else Phase.IDLE)
 			last_resolution_reason = "%s ayrıldığı için teklif düştü." % _party_name(peer_id)
-		elif votes.size() >= voter_ids().size() or _outcome_decided():
+		elif _all_voted():
 			_resolve_proposal()
 			return
 	elif phase == Phase.FORMING and mandate_index >= mandate_order.size():
@@ -574,10 +588,10 @@ func _request_government_proposal(assignments: Dictionary) -> void:
 	_apply_government_proposal(multiplayer.get_remote_sender_id(), assignments)
 
 @rpc("any_peer", "reliable")
-func _request_vote(approve: bool) -> void:
+func _request_vote(choice: int) -> void:
 	if not MultiplayerManager.is_host:
 		return
-	_apply_vote(multiplayer.get_remote_sender_id(), approve)
+	_apply_vote(multiplayer.get_remote_sender_id(), choice)
 
 @rpc("any_peer", "reliable")
 func _request_full_sync() -> void:

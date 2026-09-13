@@ -149,12 +149,17 @@ func run_client() -> void:
 		return
 	var card: String = cm.my_inventory()[0]
 	var before: Dictionary = pm.parties[me]["ideology"].duplicate()
-	cm.play_card(0)
+	# İlk seçimden önce deste sadece ideoloji ve miting kartı verir; miting il ister.
+	var is_miting := card == "miting"
+	cm.play_card(0, -1, "ankara" if is_miting else "")
 	# Sadece elin boşalmasını bekle: host sırasını anında geçip turu (ve seçimi)
 	# bitirebilir, o zaman sıra çoktan tekrar bize dönmüş olur.
 	if not await wait_until(func(): return cm.my_inventory().is_empty(), "kart oynama RPC'si (%s)" % card):
 		return
-	if not await wait_until(func(): return pm.parties[me]["ideology"] != before, "ideoloji değişimi senkronlandı"):
+	if is_miting:
+		if not await wait_until(func(): return cm.province_events.has("ankara"), "miting sonucu (il olayı) senkronlandı"):
+			return
+	elif not await wait_until(func(): return pm.parties[me]["ideology"] != before, "ideoloji değişimi senkronlandı"):
 		return
 	if not await wait_until(func(): return cm.last_election_round == 1 and cm.last_province_results.size() == 67,
 			"seçim sonucu (67 il, büyük paket) alındı"):

@@ -89,6 +89,11 @@ var state_version: int = 0
 var _phase_time_left: float = 0.0
 var _phase_deadline_ms: int = 0
 var _last_blocked: bool = false
+## Herkes oy verince sonuç bu kadar saniye bekletilir: kimin ne verdiği mecliste
+## (koltuk renkleri, profil etiketleri) görünsün. Testler 0 yapar.
+var result_hold_seconds: float = 2.5
+var _resolving: bool = false
+var _resolve_left: float = 0.0
 
 func _process(delta: float) -> void:
 	if MultiplayerManager.room_code == "" or not MultiplayerManager.is_host:
@@ -104,6 +109,12 @@ func _is_authority() -> bool:
 ## Host: kurma/oylama süre sınırları. _process çağırır; testler doğrudan çağırabilir.
 func tick(delta: float) -> void:
 	if not _is_authority():
+		return
+	if _resolving:
+		_resolve_left -= delta
+		if _resolve_left <= 0.0:
+			_resolving = false
+			_resolve_proposal()
 		return
 	if phase != Phase.FORMING and phase != Phase.VOTING:
 		return
@@ -296,6 +307,7 @@ func _clear_proposal() -> void:
 	proposal_law = ""
 	proposal_gov_ids = []
 	votes = {}
+	_resolving = false
 
 ## Görevlinin bir teklif hakkı yanar (red ya da süre dolması); haklar biterse
 ## görev sıradaki partiye geçer.
@@ -404,10 +416,18 @@ func _apply_vote(peer_id: int, choice) -> void:
 	if votes.has(peer_id):
 		return  # oy değiştirilemez
 	votes[peer_id] = normalize_vote(choice)
-	if _all_voted():
+	if not _all_voted():
+		_push_state()
+	elif result_hold_seconds <= 0.0:
 		_resolve_proposal()
 	else:
+		_resolving = true
+		_resolve_left = result_hold_seconds
 		_push_state()
+
+## Herkes oy verdi, sonuç birazdan açıklanacak (bkz. result_hold_seconds).
+func is_resolving() -> bool:
+	return phase == Phase.VOTING and _resolving
 
 func _all_voted() -> bool:
 	for peer_id in voter_ids():
@@ -560,6 +580,7 @@ func _pack_state() -> Dictionary:
 		"scores": scores,
 		"phase_time_left": _phase_time_left,
 		"reason": last_resolution_reason,
+		"resolving": _resolving,
 	}
 
 ## Host tarafı: durumu herkese yayınlar VE kendi sinyallerini doğrudan atar.
@@ -617,6 +638,7 @@ func _sync_state(state: Dictionary) -> void:
 	scores = state["scores"]
 	_phase_deadline_ms = Time.get_ticks_msec() + int(float(state["phase_time_left"]) * 1000.0)
 	last_resolution_reason = str(state["reason"])
+	_resolving = bool(state.get("resolving", false))
 	_emit_all()
 
 @rpc("authority", "reliable")

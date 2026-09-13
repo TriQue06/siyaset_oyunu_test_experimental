@@ -88,29 +88,20 @@ func _refresh() -> void:
 	var am_owner := MultiplayerManager.is_local_owner()
 	var local_id := multiplayer.get_unique_id()
 
+	var index := 0
 	for peer_id in MultiplayerManager.players.keys():
-		var pdata: Dictionary = MultiplayerManager.players[peer_id]
-		var row := HBoxContainer.new()
-
-		var label := Label.new()
-		var suffix := ""
-		if peer_id == MultiplayerManager.owner_id:
-			suffix += "  (Sahip)"
-		if peer_id == local_id:
-			suffix += "  (Sen)"
-		label.text = "%s%s" % [pdata.get("name", "?"), suffix]
-		label.custom_minimum_size = Vector2(220, 0)
-		row.add_child(label)
-
-		if am_owner and peer_id != local_id:
-			var transfer_btn := Button.new()
-			transfer_btn.text = "Sahipliği Devret"
-			transfer_btn.pressed.connect(func(): MultiplayerManager.transfer_ownership(peer_id))
-			row.add_child(transfer_btn)
-
-		player_list_box.add_child(row)
+		player_list_box.add_child(_build_player_card(peer_id, index, am_owner, local_id))
+		index += 1
 
 	var count := MultiplayerManager.players.size()
+	if am_owner and count < MultiplayerManager.MAX_PLAYERS:
+		var add_bot := Button.new()
+		add_bot.text = "+  Bot Ekle"
+		add_bot.custom_minimum_size = Vector2(0, 44)
+		UiSkin.skin_button(add_bot)
+		add_bot.modulate = Color(1, 1, 1, 0.8)
+		add_bot.pressed.connect(MultiplayerManager.add_bot)
+		player_list_box.add_child(add_bot)
 	info_label.text = "Oyuncular: %d / %d  (başlamak için en az %d gerekir)" % [
 		count, MultiplayerManager.MAX_PLAYERS, MultiplayerManager.MIN_PLAYERS_TO_START
 	]
@@ -129,6 +120,79 @@ func _refresh() -> void:
 	axis_max_enabled_check.disabled = not am_owner
 	axis_max_value_slider.editable = am_owner
 	_refresh_settings_display()
+
+## Her oyuncu bir kart: renkli baş harf rozeti, isim, etiketler (Sahip / Sen /
+## Bot) ve sahibe özel işlem (sahipliği devret ya da botu çıkar).
+func _build_player_card(peer_id: int, index: int, am_owner: bool, local_id: int) -> Control:
+	var pdata: Dictionary = MultiplayerManager.players[peer_id]
+	var is_bot := MultiplayerManager.is_bot(peer_id)
+	var player_name: String = pdata.get("name", "?")
+	var color: Color = PartyPresets.COLORS[(index * 7) % 20]
+
+	var card := PanelContainer.new()
+	UiSkin.skin_panel(card, UiSkin.PANEL)
+	card.custom_minimum_size = Vector2(420, 60)
+	if peer_id == local_id:
+		card.modulate = Color(1.08, 1.05, 0.9)
+
+	var margin := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, 8)
+	card.add_child(margin)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	margin.add_child(row)
+
+	var avatar := PanelContainer.new()
+	avatar.custom_minimum_size = Vector2(44, 44)
+	var avatar_style := StyleBoxFlat.new()
+	avatar_style.bg_color = color.darkened(0.2) if not is_bot else Color(0.35, 0.37, 0.42)
+	avatar_style.set_corner_radius_all(22)
+	avatar.add_theme_stylebox_override("panel", avatar_style)
+	var initial := Label.new()
+	initial.text = "🤖" if is_bot else player_name.substr(0, 1).to_upper()
+	initial.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	initial.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	initial.add_theme_font_size_override("font_size", 20)
+	avatar.add_child(initial)
+	row.add_child(avatar)
+
+	var info := VBoxContainer.new()
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.alignment = BoxContainer.ALIGNMENT_CENTER
+	info.add_theme_constant_override("separation", 0)
+	var name_label := Label.new()
+	name_label.text = player_name
+	name_label.add_theme_font_size_override("font_size", 18)
+	info.add_child(name_label)
+	var tags: Array[String] = []
+	if peer_id == MultiplayerManager.owner_id:
+		tags.append("★ Oda sahibi")
+	if peer_id == local_id:
+		tags.append("Sen")
+	if is_bot:
+		tags.append("Bot")
+	if not tags.is_empty():
+		var tag_label := Label.new()
+		tag_label.text = "  ·  ".join(tags)
+		tag_label.add_theme_font_size_override("font_size", 12)
+		tag_label.modulate = Color(1.0, 0.85, 0.4) if peer_id == MultiplayerManager.owner_id else Color(1, 1, 1, 0.6)
+		info.add_child(tag_label)
+	row.add_child(info)
+
+	if am_owner and peer_id != local_id:
+		var action := Button.new()
+		UiSkin.skin_button(action)
+		action.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		if is_bot:
+			action.text = "Çıkar"
+			action.pressed.connect(func(): MultiplayerManager.remove_bot(peer_id))
+		else:
+			action.text = "Sahipliği Devret"
+			action.pressed.connect(func(): MultiplayerManager.transfer_ownership(peer_id))
+		row.add_child(action)
+	return card
 
 func _refresh_settings_display() -> void:
 	var t := MultiplayerManager.election_threshold

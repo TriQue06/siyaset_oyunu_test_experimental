@@ -122,6 +122,41 @@ func reset() -> void:
 	_broadcast_parties()
 	parties_updated.emit()
 
+const BOT_PARTY_NAMES := ["Demokrasi", "Refah", "Birlik", "Vatan", "Atılım", "Hürriyet", "Kalkınma", "Adalet"]
+
+## Host: bir bot için hazır (kilitli) rastgele bir parti oluşturur.
+func add_bot_party(peer_id: int) -> void:
+	if MultiplayerManager.room_code != "" and not MultiplayerManager.is_host:
+		return
+	var used_names: Array = []
+	var used_colors: Array = []
+	for party in parties.values():
+		used_names.append(party.get("name", ""))
+		used_colors.append(party.get("bg_color", Color.TRANSPARENT))
+	var party_name := "Parti%d" % randi_range(10, 99)
+	var names := BOT_PARTY_NAMES.duplicate()
+	names.shuffle()
+	for candidate in names:
+		if not used_names.has(candidate):
+			party_name = candidate
+			break
+	var colors: Array = []
+	for color in PartyPresets.COLORS:
+		if not color.is_equal_approx(Color.WHITE) and not used_colors.has(color):
+			colors.append(color)
+	var bg: Color = colors[randi_range(0, colors.size() - 1)] if not colors.is_empty() else PartyPresets.COLORS[0]
+	parties[peer_id] = {
+		"name": party_name,
+		"icon_index": PartyPresets.random_icon_index(),
+		"icon_color": Color.WHITE,
+		"bg_color": bg,
+		"ideology": IdeologyAxes.random_start_ideology(),
+		"ready": true,
+	}
+	if MultiplayerManager.room_code != "":
+		_broadcast_parties()
+	parties_updated.emit()
+
 ## Oyun sırasında (kart oynanınca vb.) bir partinin ideoloji eksenini kaydırır.
 ## Sadece host çağırır (bkz. CardManager._apply_play). Oyun ortasında uç/nötr
 ## yasağı YOKTUR, sadece [-3, 3] aralığına sıkıştırılır.

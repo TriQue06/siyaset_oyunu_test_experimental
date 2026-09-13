@@ -67,6 +67,7 @@ func _initialize() -> void:
 	gm = root.get_node("GovernmentManager")
 	gp = root.get_node("GovernmentPresets")
 	mm.room_code = ""  # yerel mod
+	gm.result_hold_seconds = 0.0
 	mm.axis_sharpness_start = 1.0
 	mm.axis_sharpness_increment = 0.0
 	mm.election_threshold = 0.0

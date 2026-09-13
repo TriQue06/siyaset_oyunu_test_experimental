@@ -123,8 +123,12 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func open_menu() -> void:
 	_leave_armed = false
-	var in_room := MultiplayerManager.room_code != ""
-	_leave_button.visible = in_room
+	# Odada ya da (ağsız örnek oyun dahil) herhangi bir oyun ekranındayken görünür.
+	var scene := get_tree().current_scene
+	var scene_path: String = scene.scene_file_path if scene != null else ""
+	var in_game_scene: bool = scene_path in ["res://scenes/GameScreen.tscn", "res://scenes/GovernmentFormation.tscn",
+		"res://scenes/ElectionResults.tscn", "res://scenes/PartySetup.tscn"]
+	_leave_button.visible = MultiplayerManager.room_code != "" or in_game_scene
 	_leave_button.text = "Oyundan Ayrıl"
 	_leave_note.text = ""
 	_menu.show()
@@ -137,8 +141,12 @@ func _on_leave_pressed() -> void:
 	if not _leave_armed:
 		_leave_armed = true
 		_leave_button.text = "Emin misin? Ayrılmak için tekrar bas"
-		_leave_note.text = "Oda sahibisin: ayrılırsan oda herkes için kapanır." if MultiplayerManager.is_host \
-			else "Oyun sensiz devam eder; kartların ve vekillerin oyundan çıkarılır."
+		if MultiplayerManager.room_code == "":
+			_leave_note.text = "Oyun kapanır, ana menüye dönersin."
+		elif MultiplayerManager.is_host:
+			_leave_note.text = "Oda sahibisin: ayrılırsan oda herkes için kapanır."
+		else:
+			_leave_note.text = "Oyun sensiz devam eder; kartların ve vekillerin oyundan çıkarılır."
 		return
 	close_menu()
 	MultiplayerManager.leave_game()

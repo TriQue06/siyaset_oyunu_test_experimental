@@ -264,6 +264,72 @@ func leave_game() -> void:
 			await get_tree().process_frame
 	leave_room()
 	get_tree().change_scene_to_file("res://scenes/Lobby.tscn")
+	# Eski oyun ekranı gittikten sonra yerel oyun durumunu temizle.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	CardManager.abandon_game()
+	GovernmentManager.reset()
+	PartyManager.parties = {}
+
+# --- Botlar (sadece lobide, sahip ekler/çıkarır; host oynatır: BotManager) ---
+
+## Gerçek peer id'leriyle çakışmasın diye çok büyük sayılardan geriye doğru.
+const BOT_ID_BASE := 2000000000
+var _next_bot_index: int = 0
+
+func is_bot(peer_id: int) -> bool:
+	return bool(players.get(peer_id, {}).get("bot", false))
+
+func bot_ids() -> Array:
+	var ids: Array = []
+	for peer_id in players.keys():
+		if is_bot(peer_id):
+			ids.append(peer_id)
+	return ids
+
+func add_bot() -> void:
+	if not is_local_owner():
+		return
+	if is_host or room_code == "":
+		_apply_add_bot()
+	else:
+		_request_add_bot.rpc_id(1)
+
+func remove_bot(peer_id: int) -> void:
+	if not is_local_owner():
+		return
+	if is_host or room_code == "":
+		_apply_remove_bot(peer_id)
+	else:
+		_request_remove_bot.rpc_id(1, peer_id)
+
+func _apply_add_bot() -> void:
+	if players.size() >= MAX_PLAYERS or stage != Stage.LOBBY:
+		return
+	_next_bot_index += 1
+	players[BOT_ID_BASE - _next_bot_index] = {"name": "Bot %d" % _next_bot_index, "bot": true}
+	_broadcast_player_list()
+
+func _apply_remove_bot(peer_id: int) -> void:
+	if not is_bot(peer_id) or stage != Stage.LOBBY:
+		return
+	players.erase(peer_id)
+	_broadcast_player_list()
+
+func _broadcast_player_list() -> void:
+	if room_code != "" and multiplayer.multiplayer_peer != null:
+		_sync_player_list.rpc(players, owner_id, election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+	player_list_updated.emit()
+
+@rpc("any_peer", "reliable")
+func _request_add_bot() -> void:
+	if is_host and multiplayer.get_remote_sender_id() == owner_id:
+		_apply_add_bot()
+
+@rpc("any_peer", "reliable")
+func _request_remove_bot(peer_id: int) -> void:
+	if is_host and multiplayer.get_remote_sender_id() == owner_id:
+		_apply_remove_bot(peer_id)
 
 ## Lobi sahipliği rolü — ağ host'u olup olmamasından BAĞIMSIZDIR.
 func is_local_owner() -> bool:
@@ -274,7 +340,7 @@ func is_local_owner() -> bool:
 func transfer_ownership(new_owner_id: int) -> void:
 	if not is_local_owner():
 		return
-	if not players.has(new_owner_id):
+	if not players.has(new_owner_id) or is_bot(new_owner_id):
 		return
 	if is_host:
 		owner_id = new_owner_id
@@ -387,6 +453,7 @@ func _reset_state() -> void:
 	_has_synced_once = false
 	_closing = false
 	stage = Stage.LOBBY
+	_next_bot_index = 0
 
 # --- Bağlantı olayları -------------------------------------------------
 
@@ -447,6 +514,8 @@ func _close_room(reason: String) -> void:
 func _broadcast_game_start() -> void:
 	stage = Stage.PARTY_SETUP
 	PartyManager.reset()
+	for bot in bot_ids():
+		PartyManager.add_bot_party(bot)
 	_notify_game_start.rpc()
 	game_started.emit()
 
@@ -517,7 +586,7 @@ func _request_transfer_ownership(new_owner_id: int) -> void:
 	if not is_host:
 		return
 	var sender_id := multiplayer.get_remote_sender_id()
-	if sender_id != owner_id or not players.has(new_owner_id):
+	if sender_id != owner_id or not players.has(new_owner_id) or is_bot(new_owner_id):
 		return
 	owner_id = new_owner_id
 	_sync_player_list.rpc(players, owner_id, election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)

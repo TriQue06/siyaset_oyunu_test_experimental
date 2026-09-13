@@ -42,6 +42,7 @@ func _initialize() -> void:
 	gp = root.get_node("GovernmentPresets")
 	cp = root.get_node("CardPresets")
 	mm.room_code = ""  # yerel mod: RPC yok, doğrudan uygula
+	gm.result_hold_seconds = 0.0
 
 	print("=== 1) GOREV SIRASI (koltuk sayisina gore) ===")
 	# 2 en cok vekile sahip ama 3'un oy orani daha yuksek olsa bile sira 2'de olmali

@@ -200,6 +200,10 @@ static func proposal_status_text(my_id: int) -> String:
 				party_name_of(holder), GovernmentManager.current_attempt_number(), time_text,
 			]
 		GovernmentManager.Phase.VOTING:
+			if GovernmentManager.is_resolving():
+				var totals := GovernmentManager.vote_seat_totals()
+				return "Oylama tamamlandı — EVET %d / ÇEKİMSER %d / HAYIR %d · sonuç açıklanıyor…" % [
+					totals.x, GovernmentManager.abstain_seats(), totals.y]
 			if GovernmentManager.proposal_kind == GovernmentManager.KIND_LAW:
 				return _law_status_text(my_id, time_text)
 			var kind_text := "GENSORU" if GovernmentManager.proposal_kind == GovernmentManager.KIND_CENSURE else "HÜKÜMET TEKLİFİ"

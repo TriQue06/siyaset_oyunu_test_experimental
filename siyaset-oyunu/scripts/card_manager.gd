@@ -344,6 +344,28 @@ func init_game() -> void:
 	GovernmentManager.reset()
 	_push_state({"type": "full"}, true)
 
+## Oyundan ayrılınca YEREL oyun durumunu temizler (ağ yayını yok). Aksi hâlde
+## ana menüde de eski oyunun sırası/botları "yaşamaya" devam ederdi.
+func abandon_game() -> void:
+	inventories = {}
+	turn_order = []
+	current_turn_index = 0
+	has_drawn_this_turn = false
+	round_number = 1
+	last_election_round = 0
+	last_election_was_early = false
+	last_vote_shares = {}
+	last_seats = {}
+	last_province_results = {}
+	passed_threshold = []
+	national_support = {}
+	local_support = {}
+	province_events = {}
+	game_finished = false
+	final_ranking = []
+	game_end_reason = ""
+	_round_end_pending = false
+
 # --- Oyuncu eylemleri -------------------------------------------------------
 
 ## Sırası gelen oyuncu, deste butonuna basınca çağırır.

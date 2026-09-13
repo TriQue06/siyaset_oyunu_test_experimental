@@ -10,7 +10,7 @@ extends RefCounted
 ## çerçeveyi yeniden çizersen kod değişmeden uyar.
 const FRAME_PATH := "res://assets/ui/party_profile_picture_frame.png"
 ## Çerçevenin büyütme katı. TAM SAYI olmalı, yoksa pixel-art bulanıklaşır.
-const FRAME_SCALE := 4
+const FRAME_SCALE := 3
 const SHADOW_COLOR := Color(0, 0, 0, 0.38)
 
 static var _frame_texture: Texture2D = null
@@ -129,6 +129,13 @@ static func _ensure_frame_loaded() -> void:
 ## Çizim sırası: parti rengi -> ikon -> ÇERÇEVE -> hedef vurgusu. Renk ve ikon
 ## deliğin sınır kutusunu doldurur; kutunun köşeleri çerçevenin opak halkasının
 ## altında kaldığı için dışarıdan tam daire görünür.
+## Çerçeveli rozetin verilen ölçekteki piksel genişliği (çerçeve yoksa 0).
+static func frame_width(frame_scale: int = FRAME_SCALE) -> float:
+	_ensure_frame_loaded()
+	if _frame_texture == null:
+		return 0.0
+	return float(_frame_texture.get_width() * frame_scale)
+
 ## Çerçeveli rozetin verilen ölçekteki piksel yüksekliği (çerçeve yoksa 0).
 static func frame_height(frame_scale: int = FRAME_SCALE) -> float:
 	_ensure_frame_loaded()

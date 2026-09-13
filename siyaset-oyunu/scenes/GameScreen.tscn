@@ -44,15 +44,15 @@ unique_name_in_owner = true
 unique_name_in_owner = true
 layout_mode = 1
 anchor_left = 1.0
-anchor_top = 0.28
+anchor_top = 1.0
 anchor_right = 1.0
-anchor_bottom = 0.28
-offset_left = -346.0
-offset_top = -144.0
-offset_right = -130.0
-offset_bottom = 144.0
+anchor_bottom = 1.0
+offset_left = -148.0
+offset_top = -276.0
+offset_right = -52.0
+offset_bottom = -148.0
 grow_horizontal = 0
-grow_vertical = 2
+grow_vertical = 0
 ignore_texture_size = true
 stretch_mode = 5
 
@@ -60,15 +60,15 @@ stretch_mode = 5
 unique_name_in_owner = true
 layout_mode = 1
 anchor_left = 1.0
-anchor_top = 0.28
+anchor_top = 1.0
 anchor_right = 1.0
-anchor_bottom = 0.28
-offset_left = -346.0
-offset_top = 154.0
-offset_right = -130.0
-offset_bottom = 190.0
+anchor_bottom = 1.0
+offset_left = -184.0
+offset_top = -140.0
+offset_right = -16.0
+offset_bottom = -106.0
 grow_horizontal = 0
-grow_vertical = 2
+grow_vertical = 0
 text = "Pas Geç"
 
 [node name="PlayerPanel" type="Control" parent="." unique_id=1341816534]
@@ -76,13 +76,13 @@ layout_mode = 1
 anchor_left = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -120.0
+offset_left = -200.0
 offset_top = 76.0
-offset_bottom = -120.0
+offset_bottom = -286.0
 grow_horizontal = 0
 grow_vertical = 2
 
-[node name="PlayerPanelList" type="VBoxContainer" parent="PlayerPanel" unique_id=2066101759]
+[node name="PlayerPanelList" type="GridContainer" parent="PlayerPanel" unique_id=2066101759]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 8
@@ -90,18 +90,16 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -60.0
-offset_right = 60.0
 grow_horizontal = 2
 grow_vertical = 2
-alignment = 1
-theme_override_constants/separation = 6
+theme_override_constants/h_separation = 6
+theme_override_constants/v_separation = 6
 
 [node name="BottomArea" type="Control" parent="." unique_id=3821004440]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15
-anchor_top = 0.62
+anchor_top = 0.54
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
@@ -124,9 +122,9 @@ theme_override_constants/separation = 4
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
-theme_override_constants/margin_left = 24
+theme_override_constants/margin_left = 8
 theme_override_constants/margin_top = 0
-theme_override_constants/margin_right = 12
+theme_override_constants/margin_right = 8
 theme_override_constants/margin_bottom = 8
 
 [node name="ParliamentVBox" type="VBoxContainer" parent="BottomArea/ChamberSplit/ParliamentChamber" unique_id=3821004460]
@@ -175,11 +173,6 @@ autowrap_mode = 2
 max_lines_visible = 2
 text_overrun_behavior = 3
 
-[node name="ChamberSpacer" type="Control" parent="BottomArea/ChamberSplit" unique_id=3821004490]
-layout_mode = 2
-size_flags_horizontal = 3
-mouse_filter = 2
-
 [node name="TurnIndicator" type="PanelContainer" parent="." unique_id=3821004420]
 unique_name_in_owner = true
 theme_override_styles/panel = SubResource("StyleBoxFlat_turnindicator")
@@ -189,7 +182,7 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -240.0
+offset_left = -200.0
 offset_top = -96.0
 offset_right = -16.0
 offset_bottom = -16.0
@@ -210,23 +203,25 @@ theme_override_constants/separation = 8
 
 [node name="TurnIndicatorBadgeSlot" type="Control" parent="TurnIndicator/TurnIndicatorMargin/TurnIndicatorRow" unique_id=3821004423]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(42, 42)
+custom_minimum_size = Vector2(32, 32)
 layout_mode = 2
 
 [node name="TurnIndicatorLabel" type="Label" parent="TurnIndicator/TurnIndicatorMargin/TurnIndicatorRow" unique_id=3821004424]
 unique_name_in_owner = true
 layout_mode = 2
+size_flags_horizontal = 3
 size_flags_vertical = 4
 text = "Sıra: -"
-autowrap_mode = 2
-theme_override_font_sizes/font_size = 14
+theme_override_font_sizes/font_size = 13
+text_overrun_behavior = 3
+clip_text = true
 
 [node name="LeftPanel" type="PanelContainer" parent="." unique_id=3821004470]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 9
 anchor_bottom = 1.0
-offset_right = 300.0
+offset_right = 260.0
 grow_vertical = 2
 
 [node name="LeftMargin" type="MarginContainer" parent="LeftPanel" unique_id=3821004472]

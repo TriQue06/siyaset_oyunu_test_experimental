@@ -19,6 +19,8 @@ const CHIP_SIZE := Vector2(34, 34)
 @onready var summary_label: Label = %SummaryLabel
 @onready var propose_button: Button = %ProposeButton
 @onready var back_button: Button = %BackButton
+@onready var parliament_diagram: ParliamentDiagram = %ParliamentDiagram
+@onready var seat_list: VoteSharePanel = %SeatList
 
 ## Başlığın süre sayacı eklenmemiş hali.
 var _title_base: String = ""
@@ -87,7 +89,61 @@ func _rebuild() -> void:
 		_build_post_rows()
 
 	_refresh_summary()
+	_refresh_seat_view()
 	_update_title()
+
+## Soldaki meclis görünümü: her partinin sandalye sayısı (liste) ve parlamento
+## diyagramı. Hükümete seçilen ortaklar diyagramın solunda TAM renkli,
+## dışarıda kalanlar soluk — koalisyonun meclisteki ağırlığı bir bakışta görünür.
+func _refresh_seat_view() -> void:
+	var ids: Array = GovernmentManager.voter_ids()
+	ids.sort_custom(func(a, b):
+		var in_a: bool = _partners.has(a)
+		var in_b: bool = _partners.has(b)
+		if in_a != in_b:
+			return in_a
+		return GovernmentManager.seats_of(a) > GovernmentManager.seats_of(b)
+	)
+	var seat_entries: Array = []
+	var rows: Array = []
+	for peer_id in ids:
+		var party: Dictionary = PartyManager.parties.get(peer_id, {})
+		var color: Color = party.get("bg_color", Color(0.5, 0.5, 0.5))
+		var seats := GovernmentManager.seats_of(peer_id)
+		seat_entries.append({"seats": seats, "color": color if _partners.has(peer_id) else color.darkened(0.6)})
+		rows.append({
+			"name": party.get("name", "?"),
+			"leader": MultiplayerManager.players.get(peer_id, {}).get("name", ""),
+			"color": color,
+			"percent": float(CardManager.last_vote_shares.get(peer_id, 0.0)),
+			"seats": seats,
+		})
+	parliament_diagram.set_results(seat_entries)
+	seat_list.set_data(rows)
+
+## Dağıtım adımının başında: ortakları geri dönmeden ekleyip çıkarmak için.
+## Çıkarılan ortağın görevleri görevli partiye geçer (bkz. _build_post_rows).
+func _build_partner_bar() -> void:
+	var bar := HFlowContainer.new()
+	bar.add_theme_constant_override("h_separation", 8)
+	bar.add_theme_constant_override("v_separation", 6)
+	var title := Label.new()
+	title.text = "Ortaklar (tıkla: ekle/çıkar):"
+	title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	bar.add_child(title)
+	var me := multiplayer.get_unique_id()
+	for peer_id in GovernmentManager.voter_ids():
+		var in_gov: bool = _partners.has(peer_id)
+		var btn := Button.new()
+		UiSkin.skin_button(btn)
+		btn.text = "%s (%d)" % [PartyManager.parties.get(peer_id, {}).get("name", "?"), GovernmentManager.seats_of(peer_id)]
+		btn.modulate = Color.WHITE if in_gov else Color(1, 1, 1, 0.5)
+		btn.tooltip_text = "Görevli parti (sabit)" if peer_id == me else ("Hükümetten çıkar" if in_gov else "Hükümete ekle")
+		btn.disabled = peer_id == me
+		if peer_id != me:
+			btn.pressed.connect(_on_partner_toggled.bind(peer_id))
+		bar.add_child(btn)
+	post_list.add_child(bar)
 
 # --- 1. Aşama: ortak seçimi -------------------------------------------------
 
@@ -147,6 +203,7 @@ func _on_partner_toggled(peer_id: int) -> void:
 # --- 2. Aşama: görev dağılımı ----------------------------------------------
 
 func _build_post_rows() -> void:
+	_build_partner_bar()
 	for post in GovernmentPresets.POSTS:
 		var post_id: String = post["id"]
 		# Ortak listesi değiştiyse geçersiz kalan atamaları tazele.
@@ -298,8 +355,10 @@ func _on_back_pressed() -> void:
 
 func _on_primary_pressed() -> void:
 	if _step == Step.PARTNERS:
+		# Atamalar KORUNUR: geri dönüp ortak ekleyip/çıkarıp tekrar ilerleyince
+		# yapılan dağıtım kaybolmaz; sadece artık ortak olmayan partinin
+		# görevleri görevli partiye düşer (bkz. _build_post_rows).
 		_step = Step.DISTRIBUTE
-		_assignments.clear()
 		_rebuild()
 		return
 	propose_button.disabled = true

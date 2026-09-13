@@ -11,21 +11,21 @@ extends Control
 ## Ekranın üst kısmı (harita + oyuncu şeridi + deste); geri kalanı BottomArea
 ## (parlamento diyagramı + oy oranı paneli) — bkz. GameScreen.tscn'deki
 ## BottomArea.anchor_top = 0.62 ile birebir eşleşmeli.
-const TOP_AREA_HEIGHT_RATIO := 0.62
-const MAP_FILL_RATIO := 0.92
-# Sağda oyuncu daireleri için ayrılan, PANELSİZ (tamamen boş) şerit genişliği.
-const PLAYER_STRIP_WIDTH := 120.0
-# Harita ile oyuncu şeridi arasında, deste butonu için ayrılan şerit.
-const DECK_STRIP_WIDTH := 230.0
+const TOP_AREA_HEIGHT_RATIO := 0.54
+const MAP_FILL_RATIO := 0.98
+## Sağ sütun: üstte parti logoları, altta deste + Pas Geç + sıra göstergesi.
+## GameScreen.tscn'deki PlayerPanel/DeckButton/PassButton/TurnIndicator
+## offset'leri bu genişliğe göre ayarlı.
+const RIGHT_COLUMN_WIDTH := 200.0
+## Alt haznede meclisin (sol) aldığı pay; kalan sağ kısım el kartlarına.
+const PARLIAMENT_WIDTH_RATIO := 0.55
+const AVATAR_SEPARATION := 6.0
 const AVATAR_SIZE := 56.0
 ## Parti logoları (çerçeve dahil) party_badge.gd'de; sol paneller government_hud.gd'de.
-const AVATAR_ICON_PIXEL_SIZE := 192
+const AVATAR_ICON_PIXEL_SIZE := 144
 ## Soldaki tam boy bilgi panelinin genişliği — GameScreen.tscn'deki
 ## LeftPanel.offset_right ile birebir eşleşmeli.
-const LEFT_PANEL_WIDTH := 300.0
-## Sağ alttaki sıra göstergesi için ayrılan genişlik (GameScreen.tscn'deki
-## TurnIndicator.offset_left + kenar boşluğu); el kartları buraya taşmaz.
-const TURN_INDICATOR_RESERVED_WIDTH := 256.0
+const LEFT_PANEL_WIDTH := 260.0
 const BADGE_ICON_PIXEL_SIZE := 64
 
 # Kartlar 72x96 piksel native boyutta; Nearest filtre ile piksel-sanat
@@ -36,7 +36,7 @@ const CARD_HOVER_LIFT_SPEED := 12.0
 const HAND_CARD_SEPARATION := 8
 ## Parti profil kartının (politic_profile.png, 77x53) büyütme katı. TAM SAYI
 ## olmalı — pixel-art keskinliği ancak tam sayı katlarda korunur.
-const PROFILE_CARD_SCALE := 2
+const PROFILE_CARD_SCALE := 3
 const TAP_MAX_HOLD_MS := 250
 const TAP_MAX_MOVE_PX := 10.0
 
@@ -52,7 +52,7 @@ const PLAY_POP_DURATION := 0.18   # ortada küçülüp "puf" kaybolma
 @onready var map_holder: Node2D = %MapHolder
 @onready var deck_button: TextureButton = %DeckButton
 @onready var pass_button: Button = %PassButton
-@onready var player_panel_list: VBoxContainer = %PlayerPanelList
+@onready var player_panel_list: GridContainer = %PlayerPanelList
 @onready var hand_container: HBoxContainer = %HandContainer
 @onready var hand_area: Control = %HandArea
 @onready var turn_indicator: PanelContainer = %TurnIndicator
@@ -90,6 +90,8 @@ var _game_over_overlay: Control
 var _toast: Label
 ## Sayaç yazıları sadece gösterilen saniye değişince yenilensin diye.
 var _last_countdown_key: int = -1
+## Sağ sütundaki logoların o anki çerçeve ölçeği (bkz. _avatar_layout).
+var _avatar_scale: int = PartyBadge.FRAME_SCALE
 
 func _ready() -> void:
 	map_holder.province_hovered.connect(_on_province_hovered)
@@ -155,8 +157,7 @@ func _apply_layout() -> void:
 	# Harita SADECE üst bölgeye (TOP_AREA_HEIGHT_RATIO) ve sağdaki deste/
 	# oyuncu şeridi hariç kalan genişliğe sığacak şekilde ölçekleniyor —
 	# geniş, dikdörtgen bir alanı doldurması hedefleniyor.
-	var reserved_width := PLAYER_STRIP_WIDTH + DECK_STRIP_WIDTH
-	var available_width := viewport_size.x - reserved_width - LEFT_PANEL_WIDTH
+	var available_width := viewport_size.x - RIGHT_COLUMN_WIDTH - LEFT_PANEL_WIDTH
 	var available_height := viewport_size.y * TOP_AREA_HEIGHT_RATIO
 	# Haritanın "doğal" (native) piksel boyutu sabit bir const DEĞİL —
 	# pixel-art asset (assets/maps/turkey_map.png) her değiştiğinde boyutu
@@ -170,18 +171,14 @@ func _apply_layout() -> void:
 		available_height * 0.5 - map_native_size.y * 0.5 * fit_scale
 	)
 
-	# Alt haznenin (parlamento + oy oranları, aralarındaki boşluk dahil)
-	# TOPLAM yatay genişliği, haritanın GERÇEKTEN kapladığı genişlikle
-	# birebir aynı ve onunla hizalı olsun.
-	var map_rendered_width: float = map_native_size.x * fit_scale
-	bottom_area.offset_left = map_holder.position.x
-	bottom_area.offset_right = map_holder.position.x + map_rendered_width - viewport_size.x
-
-	# Meclis diyagramı ve oylama butonları alt haznenin SOL yarısında; el
-	# kartları SAĞ yarıda (sıra göstergesine kadar) ortalanır ki butonlar ve
-	# teklif yazısı kartların altında kalmasın.
-	hand_area.offset_left = map_holder.position.x + map_rendered_width * 0.5
-	hand_area.offset_right = -TURN_INDICATOR_RESERVED_WIDTH
+	# Alt hazne, sol panel ile sağ sütun arasındaki TÜM genişliği kullanır:
+	# solda meclis diyagramı + oylama (PARLIAMENT_WIDTH_RATIO), sağında el
+	# kartları. Kartlar böylece butonların ve teklif yazısının üstüne binmez.
+	var parliament_right: float = LEFT_PANEL_WIDTH + available_width * PARLIAMENT_WIDTH_RATIO
+	bottom_area.offset_left = LEFT_PANEL_WIDTH
+	bottom_area.offset_right = parliament_right - viewport_size.x
+	hand_area.offset_left = parliament_right
+	hand_area.offset_right = -RIGHT_COLUMN_WIDTH
 	_fit_hand_width(CardManager.my_inventory().size())
 
 	# Elde bekleyen kartların satırı, yarısı ekranın altından taşacak şekilde
@@ -451,7 +448,11 @@ func _ordered_peer_ids() -> Array:
 
 func _rebuild_player_panel() -> void:
 	for child in player_panel_list.get_children():
+		player_panel_list.remove_child(child)
 		child.queue_free()
+	var layout := _avatar_layout()
+	player_panel_list.columns = layout.x
+	_avatar_scale = layout.y
 
 	for peer_id in _ordered_peer_ids():
 		var party: Dictionary = PartyManager.parties.get(peer_id, {})
@@ -867,24 +868,29 @@ func _add_shadow_behind(control: Control, texture: Texture2D) -> void:
 	parent.move_child(shadow, control.get_index())
 
 
-## Sağdaki logolar normalde PartyBadge.FRAME_SCALE (4x) çerçeve ölçeğinde.
-## Oyuncu sayısı sütuna sığmayacak kadar fazlaysa pixel-art keskin kalsın diye
-## TAM SAYI bir alt ölçeğe inilir.
-func _avatar_frame_scale() -> int:
+## Sağ sütundaki logoların (sütun sayısı, çerçeve ölçeği). Önce tek sütunda
+## PartyBadge.FRAME_SCALE (3x) denenir; sığmazsa iki sütun, o da sığmazsa
+## pixel-art keskin kalsın diye TAM SAYI bir alt ölçek (2x).
+func _avatar_layout() -> Vector2i:
 	var count: int = maxi(1, _ordered_peer_ids().size())
-	var available: float = player_panel_list.get_parent().size.y
-	var separation: float = float(player_panel_list.get_theme_constant("separation"))
-	for s in [PartyBadge.FRAME_SCALE, 3, 2]:
-		if available <= 0.0 or count * PartyBadge.frame_height(s) + (count - 1) * separation <= available:
-			return s
-	return 2
+	var available: Vector2 = player_panel_list.get_parent().size
+	if available.y <= 0.0:
+		return Vector2i(1, PartyBadge.FRAME_SCALE)
+	for s in [PartyBadge.FRAME_SCALE, 2]:
+		for cols in [1, 2]:
+			var rows: int = int(ceil(float(count) / cols))
+			var h: float = rows * PartyBadge.frame_height(s) + (rows - 1) * AVATAR_SEPARATION
+			var w: float = cols * PartyBadge.frame_width(s) + (cols - 1) * AVATAR_SEPARATION
+			if h <= available.y and w <= available.x:
+				return Vector2i(cols, s)
+	return Vector2i(2, 2)
 
 func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 	var is_self := peer_id == multiplayer.get_unique_id()
 	# use_frame=true: sağdaki oyuncu panelindeki logolar pixel-art çerçeveli.
 	# (Tur göstergesindeki küçük rozet, istendiği gibi eski prosedürel
 	# görünümünde bırakıldı — orası çerçeve istenmedi.)
-	var wrap := PartyBadge.build(party, Vector2(AVATAR_SIZE, AVATAR_SIZE), AVATAR_ICON_PIXEL_SIZE, is_self, true, _avatar_frame_scale())
+	var wrap := PartyBadge.build(party, Vector2(AVATAR_SIZE, AVATAR_SIZE), AVATAR_ICON_PIXEL_SIZE, is_self, true, _avatar_scale)
 	# VBoxContainer içindeki çocukları yatayda gerebilir; bu olmadan daire
 	# oval'a dönüşürdü. SHRINK_CENTER ile hep AVATAR_SIZE genişliğinde,
 	# sütunda ortalanmış kalır.

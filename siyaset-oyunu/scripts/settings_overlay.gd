@@ -2,7 +2,7 @@ extends CanvasLayer
 ## Autoload sahne. Her ekranda:
 ##   - ESC: OYUN MENÜSÜ açılır/kapanır (Devam Et · Ayarlar · Oyundan Ayrıl).
 ##     Ayarlar paneli açıkken ESC önce onu kapatır.
-##   - Sağ üstteki "Ayarlar" butonu ayarlar panelini doğrudan açar.
+##   - Ayarlar paneli ESC menüsünden açılır (sağ üst köşede buton yok).
 ##   - F11: pencereli <-> tam ekran.
 ## Sahne değişimlerinden etkilenmez çünkü kökten (autoload) bağımsız yaşar.
 
@@ -49,7 +49,7 @@ func _ready() -> void:
 	streamer_mode_check.toggled.connect(_on_streamer_mode_toggled)
 
 	close_button.pressed.connect(close)
-	open_settings_button.pressed.connect(open)
+	open_settings_button.hide()  # ayarlar ESC menüsünden açılır
 	panel.hide()
 	_build_menu()
 

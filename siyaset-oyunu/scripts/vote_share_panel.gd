@@ -61,8 +61,13 @@ func set_data(entries: Array) -> void:
 	top_spacer.custom_minimum_size = Vector2(0, 0)
 	add_child(top_spacer)
 
+	if compact:
+		add_theme_constant_override("separation", 10)
 	for e in entries:
-		add_child(_build_row(e["name"], e["color"], e["percent"], int(e.get("seats", 0)), max_percent, "" if compact else String(e.get("leader", ""))))
+		if compact:
+			add_child(_build_compact_row(e, max_percent))
+		else:
+			add_child(_build_row(e["name"], e["color"], e["percent"], int(e.get("seats", 0)), max_percent, String(e.get("leader", ""))))
 
 	call_deferred("_apply_vertical_centering", top_spacer, entries.size())
 
@@ -78,6 +83,69 @@ func _apply_vertical_centering(top_spacer: Control, row_count: int) -> void:
 	var content_height: float = row_count * BAR_HEIGHT + maxf(0.0, float(row_count - 1)) * ROW_SEPARATION
 	var spacer_height: float = maxf(0.0, (available - content_height) * 0.5)
 	top_spacer.custom_minimum_size = Vector2(0, spacer_height)
+
+## Sol panel satırı: renk noktası · parti adı · vekil · yüzde, altında ince
+## yuvarlak çubuk (lider partiye göre). Barajı geçemeyen parti soluk.
+func _build_compact_row(e: Dictionary, max_percent: float) -> Control:
+	var below: bool = bool(e.get("below", false))
+	var color: Color = e["color"]
+	# Sağda boşluk: kaydırma çubuğu yüzde yazısının üstüne binmesin.
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_right", 12)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 4)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	margin.add_child(box)
+	if below:
+		box.modulate = Color(1, 1, 1, 0.5)
+
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 7)
+	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(top)
+	var dot := Panel.new()
+	dot.custom_minimum_size = Vector2(10, 10)
+	dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dot.add_theme_stylebox_override("panel", _rounded(color, 5))
+	top.add_child(dot)
+	var name_label := _plain_label(String(e["name"]), 13, Color(0.93, 0.94, 0.97))
+	name_label.clip_text = true
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(name_label)
+	top.add_child(_plain_label("baraj altı" if below else "%d mv" % int(e.get("seats", 0)), 11, Color(0.6, 0.64, 0.72)))
+	var percent_label := _plain_label("%%%.1f" % float(e["percent"]), 14, Color.WHITE)
+	percent_label.custom_minimum_size = Vector2(48, 0)
+	percent_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	top.add_child(percent_label)
+
+	var track := Panel.new()
+	track.custom_minimum_size = Vector2(0, 6)
+	track.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	track.add_theme_stylebox_override("panel", _rounded(Color(1, 1, 1, 0.08), 3))
+	box.add_child(track)
+	var fill := Panel.new()
+	fill.set_anchors_preset(Control.PRESET_LEFT_WIDE)
+	fill.anchor_right = clampf(float(e["percent"]) / max_percent, 0.02, 1.0)
+	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fill.add_theme_stylebox_override("panel", _rounded(color, 3))
+	track.add_child(fill)
+	return margin
+
+func _rounded(color: Color, radius: int) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = color
+	style.set_corner_radius_all(radius)
+	return style
+
+func _plain_label(text: String, font_size: int, color: Color) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", color)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return label
 
 func _build_row(party_name: String, color: Color, percent: float, seats: int, max_percent: float, leader_name: String = "") -> Control:
 	var row := HBoxContainer.new()

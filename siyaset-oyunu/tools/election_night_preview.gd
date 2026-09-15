@@ -37,7 +37,7 @@ func _initialize() -> void:
 	for i in 5:
 		await process_frame
 	var out := OS.get_user_data_dir()
-	for moment in [6.0, 18.0, 32.0, 45.0]:
+	for moment in [3.0, 9.0, 16.0, GameRules.ELECTION_NIGHT_SECONDS]:
 		scene._t = moment
 		scene._refresh_left = 0.0
 		scene._map_refresh_left = 0.0

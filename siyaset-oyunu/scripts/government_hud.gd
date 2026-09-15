@@ -61,7 +61,9 @@ static func _post_row(title: String, peer_id: int) -> Control:
 static func fill_government_panel(box: VBoxContainer) -> void:
 	_clear(box)
 	if GovernmentManager.is_voting() and GovernmentManager.proposal_kind == GovernmentManager.KIND_GOVERNMENT:
-		var title := section_title("OYLANAN HÜKÜMET — %s teklifi" % party_name_of(GovernmentManager.proposal_peer_id))
+		var title := section_title("%s — %s teklifi" % [
+			"KOALİSYON GÖRÜŞMESİ" if GovernmentManager.is_coalition_stage() else "OYLANAN HÜKÜMET",
+			party_name_of(GovernmentManager.proposal_peer_id)])
 		title.modulate = Color(1.0, 0.85, 0.35)
 		box.add_child(title)
 		_fill_cabinet(box, GovernmentManager.proposal_assignments)
@@ -204,6 +206,31 @@ static func law_expectation_text(my_id: int) -> String:
 		CardManager.preview_law_vote(my_id, GovernmentManager.VOTE_ABSTAIN),
 		CardManager.preview_law_vote(my_id, GovernmentManager.VOTE_NO)]
 
+## Hükümet teklifi: 1/2 koalisyon görüşmesi ya da 2/2 meclis oylaması.
+static func _government_status_text(my_id: int, time_text: String) -> String:
+	var eligible: Array = GovernmentManager.eligible_voter_ids()
+	var voted := 0
+	for peer_id in eligible:
+		if GovernmentManager.has_voted(peer_id):
+			voted += 1
+	var proposer := party_name_of(GovernmentManager.proposal_peer_id)
+	if GovernmentManager.is_coalition_stage():
+		var text := "1/2 KOALİSYON GÖRÜŞMESİ — %s teklifi · ortak onayı %d/%d · %s" % [
+			proposer, voted, eligible.size(), time_text]
+		if eligible.has(my_id) and not GovernmentManager.has_voted(my_id):
+			text += "\nORTAK önerildin: EVET kabul, diğerleri ret"
+		elif my_id == GovernmentManager.proposal_peer_id:
+			text += "\nOrtaklarının cevabı bekleniyor"
+		return text
+	var totals := GovernmentManager.vote_seat_totals()
+	var text2 := "2/2 MECLİS OYLAMASI — %s hükümeti · EVET %d / ÇEK. %d / HAYIR %d · %d/%d oy · %s" % [
+		proposer, totals.x, GovernmentManager.abstain_seats(), totals.y, voted, eligible.size(), time_text]
+	if GovernmentManager.has_voted(my_id):
+		text2 += "\nOyun: %s" % GovernmentManager.vote_text(GovernmentManager.my_vote())
+	elif eligible.has(my_id):
+		text2 += "\nHükümete HAYIR ülkeyi istikrarsızlaştırır: −%d puan" % GovernmentPresets.GOVERNMENT_NO_PENALTY
+	return text2
+
 ## Meclis butonlarının altındaki durum metni (kalan süre dahil).
 static func proposal_status_text(my_id: int) -> String:
 	var time_text := GameRules.format_seconds(GovernmentManager.phase_seconds_left())
@@ -222,15 +249,13 @@ static func proposal_status_text(my_id: int) -> String:
 					totals.x, GovernmentManager.abstain_seats(), totals.y]
 			if GovernmentManager.proposal_kind == GovernmentManager.KIND_LAW:
 				return _law_status_text(my_id, time_text)
-			var kind_text := "GENSORU" if GovernmentManager.proposal_kind == GovernmentManager.KIND_CENSURE else "HÜKÜMET TEKLİFİ"
+			if GovernmentManager.proposal_kind == GovernmentManager.KIND_GOVERNMENT:
+				return _government_status_text(my_id, time_text)
 			var mine := ""
 			if GovernmentManager.has_voted(my_id):
 				mine = "  (oyun: %s)" % GovernmentManager.vote_text(GovernmentManager.my_vote())
-			elif GovernmentManager.proposal_kind == GovernmentManager.KIND_GOVERNMENT \
-					and GovernmentManager.proposal_partner_ids().has(my_id):
-				mine = "  — ORTAK olarak önerildin; EVET demezsen teklif düşer"
-			return "%s oylanıyor — %d/%d oy, %s kaldı%s" % [
-				kind_text, GovernmentManager.votes.size(), GovernmentManager.voter_ids().size(), time_text, mine,
+			return "GENSORU oylanıyor — %d/%d oy, %s kaldı%s" % [
+				GovernmentManager.votes.size(), GovernmentManager.voter_ids().size(), time_text, mine,
 			]
 		_:
 			if GovernmentManager.last_resolution_reason != "":

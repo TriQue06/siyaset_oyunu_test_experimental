@@ -49,7 +49,7 @@ func _initialize() -> void:
 	while steps < 3000 and not cm.game_finished and cm.round_number <= 14:
 		steps += 1
 		if gm.phase == gm.Phase.VOTING:
-			for bot in gm.voter_ids():
+			for bot in gm.eligible_voter_ids():
 				if not gm.has_voted(bot):
 					gm._apply_vote(bot, brain.choose_vote(bot))
 					votes += 1

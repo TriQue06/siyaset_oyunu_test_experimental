@@ -7,17 +7,18 @@ extends Control
 ##     sandalyeleri dolan meclis diyagramı.
 ##   - Üstte CANLI etiketi, yayın saati ve açılan sandık oranı; altta SON DAKİKA
 ##     bandı ve kayan haber yazısı.
-## Sayımın kendisi ElectionNightSim'de. Süre bitince kesin sonuç bir süre
-## ekranda kalır, sonra GameScreen'e dönülür. "Sonuca Geç" sadece bu oyuncunun
-## ekranını atlatır; host hükümet kurma süresine bu yayının süresini ekler
-## (bkz. CardManager._hold_election).
+## Sayımın kendisi ElectionNightSim'de; her karede yeniden hesaplanıp çizilir
+## (harita GPU paletiyle boyanır, bkz. province_overlay.gd). Yayın ATLANAMAZ:
+## süre bitince kesin sonuç bir süre ekranda kalır, sonra GameScreen'e dönülür.
+## Host hükümet kurma süresine bu yayının süresini ekler (bkz.
+## CardManager._hold_election).
 
 const DURATION := GameRules.ELECTION_NIGHT_SECONDS
 const HOLD_AFTER := GameRules.ELECTION_NIGHT_HOLD
 const REFRESH_INTERVAL := 0.12
 ## Harita boyaması piksel piksel yapıldığı için daha seyrek yenilenir.
 const MAP_REFRESH_INTERVAL := 0.3
-const FLASH_SECONDS := 3.4
+const FLASH_SECONDS := 2.6
 const TICKER_SPEED := 120.0
 
 const BG_TOP := Color(0.04, 0.08, 0.19)
@@ -93,7 +94,6 @@ var _ticker_bg: Panel
 var _ticker_tag: Panel
 var _ticker_clip: Control
 var _ticker_label: Label
-var _skip_button: Button
 var _final_stamp: Label
 
 func _ready() -> void:
@@ -134,14 +134,9 @@ func _process(delta: float) -> void:
 		return
 	if not _finished:
 		_t = minf(_t + delta, DURATION)
-	_refresh_left -= delta
-	if _refresh_left <= 0.0:
-		_refresh_left = REFRESH_INTERVAL
-		_refresh()
-	_map_refresh_left -= delta
-	if _map_refresh_left <= 0.0:
-		_map_refresh_left = MAP_REFRESH_INTERVAL
-		_refresh_map()
+	# Her karede: sayım, harita ve meclis kare hızında akar.
+	_refresh()
+	_refresh_map()
 	_animate(delta)
 	if _finished and not _leaving:
 		_hold_left -= delta
@@ -213,7 +208,6 @@ func _refresh_map() -> void:
 		var c := float(p["c"])
 		if c <= 0.0:
 			colors[province_id] = UNCOUNTED
-			key += "-"
 			continue
 		var seats: Dictionary = p["seats"]
 		var shares: Dictionary = p["shares"]
@@ -228,11 +222,13 @@ func _refresh_map() -> void:
 				seat_colors.append(_party_color(peer_id))
 			key += "%s%d" % [str(peer_id), int(seats[peer_id])]
 		markers[province_id] = seat_colors
-		key += "%s/%d;" % [str(winner), int(c * 8.0)]
+		key += "%s;" % province_id
+	# İl renkleri her karede (sadece küçük palet dokusu güncellenir); vekil
+	# kareleri sadece dağılım değişince yeniden kurulur.
+	_map.set_province_colors(colors)
 	if key == _last_map_key:
 		return
 	_last_map_key = key
-	_map.set_province_colors(colors)
 	var seat_markers = _map.get_node_or_null("SeatMarkers")
 	if seat_markers != null:
 		seat_markers.set_all(markers)
@@ -293,7 +289,7 @@ func _animate(delta: float) -> void:
 
 func _push_flash(tag: String, text: String) -> void:
 	_flash_queue.append([tag, text])
-	while _flash_queue.size() > 3:  # geride kalmasın: canlı yayın
+	while _flash_queue.size() > 2:  # geride kalmasın: canlı yayın
 		_flash_queue.pop_front()
 
 func _detect_events() -> void:
@@ -362,8 +358,6 @@ func _finish() -> void:
 		_push_flash("SONUÇ", "Tüm sandıklar açıldı. Kesin olmayan sonuçlara göre birinci parti: %s  (%%%.1f · %d vekil)" % [
 			_party_name(winner), float(national[winner]), int(_sample["seats"].get(winner, 0))])
 	_final_stamp.visible = true
-	_skip_button.text = "Devam  ▸"
-	_map_refresh_left = 0.0
 	_ticker_label.text = _ticker_text()
 
 func _ticker_text() -> String:
@@ -379,14 +373,6 @@ func _ticker_text() -> String:
 	parts.append(FLAVOR[_ticker_round % FLAVOR.size()])
 	_ticker_round += 1
 	return "     ●     ".join(PackedStringArray(parts))
-
-func _on_skip_pressed() -> void:
-	if _finished:
-		_leave()
-		return
-	_flash_queue.clear()
-	_t = DURATION
-	_refresh_left = 0.0
 
 func _leave() -> void:
 	if _leaving:
@@ -512,11 +498,6 @@ func _build_ui() -> void:
 	_ticker_label = _label("", 18, Color.WHITE, false)
 	_ticker_clip.add_child(_ticker_label)
 
-	_skip_button = Button.new()
-	_skip_button.text = "Sonuca Geç  ▸▸"
-	UiSkin.skin_button(_skip_button)
-	_skip_button.pressed.connect(_on_skip_pressed)
-	add_child(_skip_button)
 
 func _layout() -> void:
 	var s := get_viewport_rect().size
@@ -530,10 +511,9 @@ func _layout() -> void:
 	_live_badge.size = Vector2(118, 40)
 	_title.position = Vector2(margin + 134, 8)
 	_subtitle.position = Vector2(margin + 136, 42)
-	var right_reserved := 200.0  # sağ üstteki Ayarlar butonu (SettingsOverlay)
-	_clock.position = Vector2(s.x - margin - right_reserved - 110, 10)
+	_clock.position = Vector2(s.x - margin - 110, 10)
 	_clock.size = Vector2(110, 50)
-	_counted.position = Vector2(s.x - margin - right_reserved - 470, 19)
+	_counted.position = Vector2(s.x - margin - 470, 19)
 	_counted.size = Vector2(340, 34)
 	_progress_bg.position = Vector2(0, top_h)
 	_progress_bg.size = Vector2(s.x, 6)
@@ -569,8 +549,6 @@ func _layout() -> void:
 	_majority_label.size = Vector2(right_w - 160, 24)
 	_parliament.position = Vector2(right_x, par_top + 30)
 	_parliament.size = Vector2(right_w, content_bottom - par_top - 30 - 54)
-	_skip_button.position = Vector2(s.x - margin - 196, content_bottom - 44)
-	_skip_button.size = Vector2(196, 44)
 
 	_ticker_bg.position = Vector2(0, s.y - bottom_h)
 	_ticker_bg.size = Vector2(s.x, bottom_h)

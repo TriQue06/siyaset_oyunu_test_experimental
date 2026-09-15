@@ -79,12 +79,13 @@ func _handle_turn(now: float) -> void:
 		CardManager._apply_pass(bot)
 
 func _handle_votes(now: float) -> void:
-	var key := "%s:%d:%s:%d:%d" % [GovernmentManager.proposal_kind, GovernmentManager.proposal_peer_id,
-		GovernmentManager.proposal_law, GovernmentManager.mandate_index, GovernmentManager.attempts_used]
+	var key := "%s:%d:%s:%d:%d:%d" % [GovernmentManager.proposal_kind, GovernmentManager.proposal_peer_id,
+		GovernmentManager.proposal_law, GovernmentManager.mandate_index, GovernmentManager.attempts_used,
+		GovernmentManager.proposal_stage]
 	if key != _vote_key:
 		_vote_key = key
 		_vote_due.clear()
-	for bot in GovernmentManager.voter_ids():
+	for bot in GovernmentManager.eligible_voter_ids():
 		if not MultiplayerManager.is_bot(bot) or GovernmentManager.has_voted(bot):
 			continue
 		if not _vote_due.has(bot):

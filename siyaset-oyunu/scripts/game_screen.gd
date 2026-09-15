@@ -34,9 +34,6 @@ const CARD_DISPLAY_SCALE := 2.0
 const CARD_DISPLAY_SIZE := Vector2(72, 96) * CARD_DISPLAY_SCALE
 const CARD_HOVER_LIFT_SPEED := 12.0
 const HAND_CARD_SEPARATION := 8
-## Parti profil kartının (politic_profile.png, 77x53) büyütme katı. TAM SAYI
-## olmalı — pixel-art keskinliği ancak tam sayı katlarda korunur.
-const PROFILE_CARD_SCALE := 3
 ## Fare bu kadar kaydırılırsa tık değil SÜRÜKLEME başlar.
 const TAP_MAX_MOVE_PX := 10.0
 ## Oylamada parlamento koltuklarının ve profil etiketlerinin rengi.
@@ -92,8 +89,8 @@ var _game_over_overlay: Control
 var _toast: Label
 ## Sayaç yazıları sadece gösterilen saniye değişince yenilensin diye.
 var _last_countdown_key: int = -1
-## Sağ sütundaki logoların o anki çerçeve ölçeği (bkz. _avatar_layout).
-var _avatar_scale: int = PartyBadge.FRAME_SCALE
+## Sağ sütundaki oyuncu kartlarının o anki yüksekliği (sütuna sığacak kadar).
+var _avatar_height: float = 64.0
 ## İl seçmeyi bekleyen kartın (miting/yatırım) el içindeki sırası (-1 = yok).
 var _pending_province_hand_index: int = -1
 var _province_panel: ProvincePanel
@@ -308,6 +305,7 @@ func _refresh_results_panels() -> void:
 			"color": color,
 			"percent": CardManager.last_vote_shares[peer_id],
 			"seats": CardManager.last_seats.get(peer_id, 0),
+			"below": not CardManager.passed_threshold.has(peer_id),
 		})
 	vote_share_panel.set_data(vote_entries)
 	_refresh_parliament_diagram()
@@ -516,9 +514,10 @@ func _rebuild_player_panel() -> void:
 	for child in player_panel_list.get_children():
 		player_panel_list.remove_child(child)
 		child.queue_free()
-	var layout := _avatar_layout()
-	player_panel_list.columns = layout.x
-	_avatar_scale = layout.y
+	var count: int = maxi(1, _ordered_peer_ids().size())
+	var available: float = player_panel_list.get_parent().size.y
+	_avatar_height = clampf((available - AVATAR_SEPARATION * (count - 1)) / count, 40.0, 72.0) if available > 0.0 else 64.0
+	player_panel_list.columns = 1
 
 	for peer_id in _ordered_peer_ids():
 		var party: Dictionary = PartyManager.parties.get(peer_id, {})
@@ -1187,54 +1186,75 @@ func _add_shadow_behind(control: Control, texture: Texture2D) -> void:
 	parent.move_child(shadow, control.get_index())
 
 
-## Sağ sütundaki logoların (sütun sayısı, çerçeve ölçeği). Önce tek sütunda
-## PartyBadge.FRAME_SCALE (3x) denenir; sığmazsa iki sütun, o da sığmazsa
-## pixel-art keskin kalsın diye TAM SAYI bir alt ölçek (2x).
-func _avatar_layout() -> Vector2i:
-	var count: int = maxi(1, _ordered_peer_ids().size())
-	var available: Vector2 = player_panel_list.get_parent().size
-	if available.y <= 0.0:
-		return Vector2i(1, PartyBadge.FRAME_SCALE)
-	for s in [PartyBadge.FRAME_SCALE, 2]:
-		for cols in [1, 2]:
-			var rows: int = int(ceil(float(count) / cols))
-			var h: float = rows * PartyBadge.frame_height(s) + (rows - 1) * AVATAR_SEPARATION
-			var w: float = cols * PartyBadge.frame_width(s) + (cols - 1) * AVATAR_SEPARATION
-			if h <= available.y and w <= available.x:
-				return Vector2i(cols, s)
-	return Vector2i(2, 2)
-
+## Sağ sütundaki oyuncu kartı: parti rengi şeridi, logo, parti ve oyuncu adı,
+## yer varsa vekil / oy oranı; oylamada partinin oyu. Kendi kartın altın
+## rengi parıltıyla ayrışır.
 func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 	var is_self := peer_id == multiplayer.get_unique_id()
-	# use_frame=true: sağdaki oyuncu panelindeki logolar pixel-art çerçeveli.
-	# (Tur göstergesindeki küçük rozet, istendiği gibi eski prosedürel
-	# görünümünde bırakıldı — orası çerçeve istenmedi.)
-	var wrap := PartyBadge.build(party, Vector2(AVATAR_SIZE, AVATAR_SIZE), AVATAR_ICON_PIXEL_SIZE, is_self, true, _avatar_scale)
-	# VBoxContainer içindeki çocukları yatayda gerebilir; bu olmadan daire
-	# oval'a dönüşürdü. SHRINK_CENTER ile hep AVATAR_SIZE genişliğinde,
-	# sütunda ortalanmış kalır.
-	wrap.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	# Hangi oyuncuya ait olduğu düğümün ÜSTÜNDE saklanıyor: hover tespiti
-	# (bkz. _update_avatar_hover) ve tooltip konumlandırma, panelin çocuk
-	# SIRASINA güvenmek yerine bunu okuyor. Panel yeniden kurulurken eski
-	# (queue_free edilmiş ama henüz silinmemiş) düğümler listede bir süre
-	# daha durabildiği için index bazlı eşleme güvenilir değil.
-	wrap.set_meta("peer_id", peer_id)
-	# Oylama sırasında logonun altında partinin oyu (ya da beklendiği) yazar.
-	if GovernmentManager.is_voting() and GovernmentManager.voter_ids().has(peer_id):
+	var color: Color = party.get("bg_color", Color(0.5, 0.5, 0.5))
+	var card := PanelContainer.new()
+	card.custom_minimum_size = Vector2(RIGHT_COLUMN_WIDTH - 16.0, _avatar_height)
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.09, 0.1, 0.14, 0.94)
+	style.set_corner_radius_all(8)
+	style.border_width_left = 6
+	style.border_color = color
+	style.content_margin_left = 12
+	style.content_margin_right = 8
+	style.content_margin_top = 4
+	style.content_margin_bottom = 4
+	if is_self:
+		style.shadow_color = Color(1.0, 0.82, 0.15, 0.55)
+		style.shadow_size = 5
+	card.add_theme_stylebox_override("panel", style)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(row)
+	var badge_size: float = clampf(_avatar_height - 16.0, 24.0, 44.0)
+	var badge := PartyBadge.build(party, Vector2(badge_size, badge_size), BADGE_ICON_PIXEL_SIZE)
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(badge)
+
+	var info := VBoxContainer.new()
+	info.add_theme_constant_override("separation", -2)
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(info)
+	info.add_child(_avatar_label(String(party.get("name", "?")), 14, Color(1.0, 0.85, 0.35) if is_self else Color.WHITE))
+	info.add_child(_avatar_label(_leader_name_of(peer_id) + ("  (Sen)" if is_self else ""), 11, Color(0.68, 0.72, 0.8)))
+	if _avatar_height >= 58.0 and CardManager.last_seats.has(peer_id):
+		info.add_child(_avatar_label("%d vekil · %%%.1f" % [int(CardManager.last_seats[peer_id]),
+			float(CardManager.last_vote_shares.get(peer_id, 0.0))], 11, Color(0.6, 0.65, 0.75)))
+
+	# Hangi oyuncuya ait olduğu düğümün ÜSTÜNDE saklanıyor: hover tespiti ve
+	# tooltip konumu panelin çocuk SIRASINA güvenmez (bkz. _update_avatar_hover).
+	card.set_meta("peer_id", peer_id)
+	# Oylama sırasında kartın sağında partinin oyu (ya da beklendiği) yazar.
+	if GovernmentManager.is_voting() and GovernmentManager.eligible_voter_ids().has(peer_id):
 		var voted: bool = GovernmentManager.votes.has(peer_id)
-		var tag := Label.new()
-		tag.text = GovernmentManager.vote_text(GovernmentManager.votes[peer_id]) if voted else "…"
-		tag.add_theme_font_size_override("font_size", 12)
-		tag.add_theme_color_override("font_color", VOTE_COLORS[int(GovernmentManager.votes[peer_id])] if voted else Color(1, 1, 1, 0.6))
-		tag.add_theme_color_override("font_outline_color", Color.BLACK)
-		tag.add_theme_constant_override("outline_size", 5)
-		tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var wrap_size: Vector2 = wrap.size if wrap.size != Vector2.ZERO else wrap.custom_minimum_size
-		tag.position = Vector2(-10, wrap_size.y - 18)
-		tag.size = Vector2(wrap_size.x + 20, 18)
-		wrap.add_child(tag)
+		var tag := _avatar_label(GovernmentManager.vote_text(GovernmentManager.votes[peer_id]) if voted else "…", 11,
+			VOTE_COLORS[int(GovernmentManager.votes[peer_id])] if voted else Color(1, 1, 1, 0.6))
+		tag.clip_text = false
+		tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(tag)
+	# Vekil çalma hedefi vurgusu (bkz. _refresh_target_highlights).
+	var halo := Panel.new()
+	halo.name = "TargetHalo"
+	halo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var halo_style := StyleBoxFlat.new()
+	halo_style.draw_center = false
+	halo_style.set_border_width_all(3)
+	halo_style.border_color = Color(1.0, 0.85, 0.3)
+	halo_style.set_corner_radius_all(8)
+	halo.add_theme_stylebox_override("panel", halo_style)
+	halo.visible = false
+	card.add_child(halo)
+	var wrap := card
 	# Hedef seçme modunda (vekil çalma kartı) bu partiye tıklanabilir.
 	wrap.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -1285,20 +1305,32 @@ func _update_avatar_hover() -> void:
 	else:
 		_show_tooltip_for(found)
 
+func _avatar_label(text: String, font_size: int, color: Color) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.clip_text = true
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", color)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return label
+
+## Parti profili (bkz. PartyInfoCard): hover edilen oyuncu kartının soluna.
 func _show_tooltip_for(peer_id: int) -> void:
-	var party: Dictionary = PartyManager.parties.get(peer_id, {})
-	var ideology: Dictionary = party.get("ideology", IdeologyAxes.default_values())
-
-	# Kartın TAMAMI tek bir pixel-art görsel: politic_profile.png'in üstüne
-	# partinin ideolojisine karşılık gelen üç eksen görseli yapıştırılmış hâli
-	# (bkz. party_profile.gd).
-	hover_tooltip_image.texture = PartyProfile.build_texture(ideology)
-
-	# Pixel-art keskin kalsın diye TAM SAYI katıyla büyütülüyor.
-	var native_size := PartyProfile.get_native_size()
-	if native_size == Vector2i.ZERO:
+	hover_tooltip_image.hide()
+	for child in hover_tooltip.get_children():
+		if child != hover_tooltip_image:
+			child.queue_free()
+	var card := PartyInfoCard.build(peer_id, multiplayer.get_unique_id())
+	card.modulate.a = 0.0
+	hover_tooltip.add_child(card)
+	hover_tooltip.show()
+	# Kapsayıcıların boyutu bir kare sonra kesinleşir; o zamana kadar görünmez.
+	await get_tree().process_frame
+	if _hovered_peer_id != peer_id or not is_instance_valid(card):
 		return
-	hover_tooltip.size = Vector2(native_size) * PROFILE_CARD_SCALE
+	card.reset_size()
+	hover_tooltip.size = card.size
+	card.modulate.a = 1.0
 
 	# Tooltip'i, hover edilen avatarın hemen soluna yerleştir.
 	var avatar := _find_avatar_node(peer_id)
@@ -1382,7 +1414,7 @@ func _on_vote_pressed(choice: int) -> void:
 ## tıklanamaz, oylama açıkken yeşil/kırmızı ve hover'lı. Hepsi PNG.
 func _refresh_vote_ui() -> void:
 	var can_vote: bool = GovernmentManager.is_voting() \
-		and GovernmentManager.voter_ids().has(multiplayer.get_unique_id()) \
+		and GovernmentManager.eligible_voter_ids().has(multiplayer.get_unique_id()) \
 		and not GovernmentManager.has_voted(multiplayer.get_unique_id())
 
 	vote_yes_button.disabled = not can_vote
@@ -1410,6 +1442,14 @@ func _refresh_vote_ui() -> void:
 		vote_yes_button.tooltip_text = "EVET: kamuoyun %+.1f" % CardManager.preview_law_vote(me, GovernmentManager.VOTE_YES)
 		_abstain_button.tooltip_text = "ÇEKİMSER: kamuoyun %+.1f" % CardManager.preview_law_vote(me, GovernmentManager.VOTE_ABSTAIN)
 		vote_no_button.tooltip_text = "HAYIR: kamuoyun %+.1f" % CardManager.preview_law_vote(me, GovernmentManager.VOTE_NO)
+	elif can_vote and GovernmentManager.is_coalition_stage():
+		vote_yes_button.tooltip_text = "EVET: koalisyona gir, teklif meclis oylamasına geçer"
+		_abstain_button.tooltip_text = "ÇEKİMSER: ret sayılır, teklif düşer"
+		vote_no_button.tooltip_text = "HAYIR: koalisyonu reddet, teklif düşer"
+	elif can_vote and GovernmentManager.proposal_kind == GovernmentManager.KIND_GOVERNMENT:
+		vote_yes_button.tooltip_text = ""
+		_abstain_button.tooltip_text = ""
+		vote_no_button.tooltip_text = "HAYIR: −%d puan (ülkeyi istikrarsızlaştırır)" % GovernmentPresets.GOVERNMENT_NO_PENALTY
 	else:
 		vote_yes_button.tooltip_text = ""
 		_abstain_button.tooltip_text = ""

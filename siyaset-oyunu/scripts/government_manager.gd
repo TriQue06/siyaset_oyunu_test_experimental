@@ -8,15 +8,17 @@ extends Node
 ##      (oy oranına göre DEĞİL — bkz. _build_mandate_order).
 ##   3) Görevli, GovernmentFormation sahnesinde görevleri paylaştırıp teklif
 ##      eder -> submit_government_proposal(). Süresi GameRules.FORMATION_TIMEOUT.
-##   4) Teklif meclise gelir, tüm partiler EVET / ÇEKİMSER / HAYIR oylar.
-##      Oylama HERKES oy verene kadar (ya da GameRules.VOTE_TIMEOUT dolana
+##   4) Teklif İKİ AŞAMADA oylanır. Teklif sahibinin oyu baştan EVET'tir.
+##      1. KOALİSYON GÖRÜŞMESİ: sadece görev önerilen ORTAKLAR oy verir. Biri
+##         bile EVET demezse (çekimser/süre dolması dahil) teklif reddedilir ve
+##         bir teklif hakkı yanar. Ortak yoksa (tek parti) bu aşama atlanır.
+##      2. MECLİS OYLAMASI: tüm partiler EVET / ÇEKİMSER / HAYIR oylar (ortakların
+##         oyu 1. aşamadan EVET gelir). HAYIR oylarının milletvekili toplamı
+##         salt çoğunluğu (%50 + 1) geçerse reddedilir — hükümet salt çoğunluğu
+##         OLMADAN da güvenoyu alabilir. Hükümete HAYIR diyen her parti
+##         GovernmentPresets.GOVERNMENT_NO_PENALTY puan kaybeder (istikrarsızlık).
+##      Her aşama HERKES oy verene kadar (ya da GameRules.VOTE_TIMEOUT dolana
 ##      kadar; oy vermeyen ÇEKİMSER sayılır) sürer, erken bitmez.
-##      REDDEDİLME KOŞULLARI:
-##        - HAYIR oylarının milletvekili toplamı salt çoğunluğu (%50 + 1)
-##          geçerse (hükümet salt çoğunluğu OLMADAN da güvenoyu alabilir), ya da
-##        - KOALİSYON RIZASI: kendisine görev önerilen bir ORTAK açıkça EVET
-##          demezse (çekimser de rıza değildir). Kimse rızası olmadan hükümete
-##          sokulamaz.
 ##   5) Reddedilirse ya da süre dolarsa aynı partinin MAX_ATTEMPTS hakkı vardır;
 ##      hepsi biterse görev bir sonraki en büyük partiye geçer. Kimse kuramazsa
 ##      faz IDLE olur ve tur sonunda ERKEN SEÇİM yapılır (bkz. CardManager).
@@ -44,6 +46,9 @@ const KIND_CENSURE := "censure"
 const KIND_LAW := "law"
 ## Bir partinin hükümet kurma hakkı (3. teklif de geçmezse sıra devreder).
 const MAX_ATTEMPTS := 3
+## Hükümet teklifinin oylama aşamaları (bkz. AKIŞ 4).
+const STAGE_COALITION := 1
+const STAGE_PARLIAMENT := 2
 
 ## Oy değerleri (votes sözlüğünde saklanan).
 const VOTE_YES := 1
@@ -78,6 +83,8 @@ var votes: Dictionary = {}                 # peer_id -> VOTE_YES / VOTE_ABSTAIN 
 ## Yasa teklifinde: yasa kartı türü ve teklif geldiği andaki hükümet partileri.
 var proposal_law: String = ""
 var proposal_gov_ids: Array = []
+## Hükümet teklifinin aşaması (STAGE_*); diğer tekliflerde 0.
+var proposal_stage: int = 0
 ## Son teklif/süre sonucunun okunabilir açıklaması (UI'da gösterilir).
 var last_resolution_reason: String = ""
 
@@ -174,6 +181,17 @@ func proposal_partner_ids() -> Array:
 	var ids := _unique_values(proposal_assignments)
 	ids.erase(proposal_peer_id)
 	return ids
+
+## Hükümet teklifi koalisyon görüşmesi (1. aşama) aşamasında mı?
+func is_coalition_stage() -> bool:
+	return phase == Phase.VOTING and proposal_kind == KIND_GOVERNMENT and proposal_stage == STAGE_COALITION
+
+## Açık oylamada şu an oy verebilecek partiler: koalisyon görüşmesinde sadece
+## ortaklar, diğer her durumda meclisteki herkes.
+func eligible_voter_ids() -> Array:
+	if proposal_kind == KIND_GOVERNMENT and proposal_stage == STAGE_COALITION:
+		return proposal_partner_ids()
+	return voter_ids()
 
 func _unique_values(assignments: Dictionary) -> Array:
 	var ids: Array = []
@@ -314,6 +332,7 @@ func _clear_proposal() -> void:
 	proposal_assignments = {}
 	proposal_law = ""
 	proposal_gov_ids = []
+	proposal_stage = 0
 	votes = {}
 	_resolving = false
 
@@ -442,9 +461,14 @@ func _apply_government_proposal(peer_id: int, assignments: Dictionary) -> void:
 	proposal_kind = KIND_GOVERNMENT
 	proposal_peer_id = peer_id
 	proposal_assignments = assignments.duplicate(true)
-	votes = {}
+	# Teklif sahibi kendi hükümetini oylamaz: oyu baştan EVET.
+	votes = {peer_id: VOTE_YES}
+	proposal_stage = STAGE_COALITION if not proposal_partner_ids().is_empty() else STAGE_PARLIAMENT
 	_set_phase(Phase.VOTING)
-	_push_state()
+	if _all_voted():
+		_begin_resolution()
+	else:
+		_push_state()
 
 ## Her görev dolu olmalı ve sadece meclise girmiş partilere verilebilmeli.
 ## Teklif sahibi hükümette olmak zorunda.
@@ -463,14 +487,19 @@ func _is_valid_assignment(assignments: Dictionary) -> bool:
 func _apply_vote(peer_id: int, choice) -> void:
 	if phase != Phase.VOTING:
 		return
-	if not voter_ids().has(peer_id):
+	if not eligible_voter_ids().has(peer_id):
 		return
 	if votes.has(peer_id):
 		return  # oy değiştirilemez
 	votes[peer_id] = normalize_vote(choice)
 	if not _all_voted():
 		_push_state()
-	elif result_hold_seconds <= 0.0:
+	else:
+		_begin_resolution()
+
+## Herkes oy verdi: sonuç result_hold_seconds bekletilip açıklanır.
+func _begin_resolution() -> void:
+	if result_hold_seconds <= 0.0:
 		_resolve_proposal()
 	else:
 		_resolving = true
@@ -482,7 +511,7 @@ func is_resolving() -> bool:
 	return phase == Phase.VOTING and _resolving
 
 func _all_voted() -> bool:
-	for peer_id in voter_ids():
+	for peer_id in eligible_voter_ids():
 		if not votes.has(peer_id):
 			return false
 	return true
@@ -511,16 +540,25 @@ func _resolve_proposal() -> void:
 		proposal_resolved.emit(passed, kind, proposer)
 		return
 
+	if kind == KIND_GOVERNMENT and proposal_stage == STAGE_COALITION:
+		_resolve_coalition_stage()
+		return
+
 	# Salt çoğunluk = %50 + 1. Bu eşiği AŞAN "hayır" teklifi düşürür; oy
 	# vermeyenler çekimser sayılır.
 	var rejected: bool = totals.y * 2 > total_seats()
 	var reason := "Meclis çoğunluğu HAYIR dedi." if rejected else ""
-	if kind == KIND_GOVERNMENT and not rejected:
-		for partner in proposal_partner_ids():
-			if int(votes.get(partner, VOTE_ABSTAIN)) != VOTE_YES:
-				rejected = true
-				reason = "%s koalisyona girmeyi kabul etmedi." % _party_name(partner)
-				break
+	# Hükümete HAYIR ülkeyi istikrarsızlaştırır: küçük bir puan kaybı.
+	var no_note := ""
+	if kind == KIND_GOVERNMENT:
+		var no_names: Array = []
+		for peer_id in votes.keys():
+			if int(votes[peer_id]) == VOTE_NO:
+				scores[peer_id] = score_of(peer_id) - GovernmentPresets.GOVERNMENT_NO_PENALTY
+				no_names.append(_party_name(peer_id))
+		if not no_names.is_empty():
+			no_note = " HAYIR diyenler −%d puan: %s." % [GovernmentPresets.GOVERNMENT_NO_PENALTY,
+				", ".join(PackedStringArray(no_names))]
 	var accepted := not rejected
 
 	if kind == KIND_GOVERNMENT:
@@ -530,9 +568,9 @@ func _resolve_proposal() -> void:
 			abandoned = false
 			_clear_proposal()
 			_set_phase(Phase.GOVERNING)
-			last_resolution_reason = "%s hükümeti güvenoyu aldı." % _party_name(main_gov_peer_id)
+			last_resolution_reason = "%s hükümeti güvenoyu aldı.%s" % [_party_name(main_gov_peer_id), no_note]
 		else:
-			last_resolution_reason = "Hükümet teklifi reddedildi: " + reason
+			last_resolution_reason = "Hükümet teklifi reddedildi: " + reason + no_note
 			_fail_attempt()
 	else: # KIND_CENSURE
 		if accepted:
@@ -560,6 +598,31 @@ func _resolve_proposal() -> void:
 	if not _is_local_only():
 		_notify_resolved.rpc(accepted, kind, proposer)
 	proposal_resolved.emit(accepted, kind, proposer)
+
+## 1. aşama (koalisyon görüşmesi) bitti: ortakların hepsi EVET dediyse teklif
+## meclis oylamasına geçer; biri bile EVET demezse teklif hakkı yanar.
+func _resolve_coalition_stage() -> void:
+	var proposer := proposal_peer_id
+	for partner in proposal_partner_ids():
+		if int(votes.get(partner, VOTE_ABSTAIN)) != VOTE_YES:
+			last_resolution_reason = "Koalisyon görüşmesi başarısız: %s ortak olmayı kabul etmedi." % _party_name(partner)
+			_fail_attempt()
+			_push_state()
+			if not _is_local_only():
+				_notify_resolved.rpc(false, KIND_GOVERNMENT, proposer)
+			proposal_resolved.emit(false, KIND_GOVERNMENT, proposer)
+			return
+	proposal_stage = STAGE_PARLIAMENT
+	_set_phase(Phase.VOTING)  # meclis oylamasına tam süre
+	last_resolution_reason = "Ortaklar anlaştı: %s hükümeti meclis oylamasında." % _party_name(proposer)
+	var text := last_resolution_reason
+	if _all_voted():
+		_begin_resolution()
+	else:
+		_push_state()
+	if not _is_local_only():
+		_notify_coalition.rpc(text)
+	coalition_changed.emit(text)
 
 ## Host: oyun sırasında ayrılan oyuncuyu hükümet süreçlerinden çıkarır.
 ## CardManager.remove_player, oyuncunun vekillerini meclisten sildikten SONRA
@@ -633,6 +696,7 @@ func _pack_state() -> Dictionary:
 		"proposal_assignments": proposal_assignments,
 		"proposal_law": proposal_law,
 		"proposal_gov_ids": proposal_gov_ids,
+		"proposal_stage": proposal_stage,
 		"votes": votes,
 		"government": government,
 		"main_gov_peer_id": main_gov_peer_id,
@@ -692,6 +756,7 @@ func _sync_state(state: Dictionary) -> void:
 	proposal_assignments = state["proposal_assignments"]
 	proposal_law = str(state["proposal_law"])
 	proposal_gov_ids = state["proposal_gov_ids"]
+	proposal_stage = int(state.get("proposal_stage", 0))
 	votes = state["votes"]
 	government = state["government"]
 	main_gov_peer_id = int(state["main_gov_peer_id"])

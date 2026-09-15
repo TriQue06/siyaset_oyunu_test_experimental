@@ -63,21 +63,29 @@ func _initialize() -> void:
 	assign[gp.POST_DEPUTY_PM] = 3   # ortak: 3
 	gm._apply_government_proposal(gm.mandate_peer_id(), assign)
 	check("faz VOTING", gm.phase == gm.Phase.VOTING)
-	gm._apply_vote(2, true)    # 180 evet
-	gm._apply_vote(3, false)   # 110 hayir
-	gm._apply_vote(1, false)   # 100 hayir  => 210 hayir > 195 ? EVET, dusmeli
-	check("210 hayir > 195 esik -> REDDEDILDI", not gm.has_government(),
+	check("teklif sahibinin oyu otomatik EVET", int(gm.votes.get(2, 99)) == gm.VOTE_YES, str(gm.votes))
+	check("1. asama: koalisyon gorusmesi", gm.is_coalition_stage())
+	check("1. asamada sadece ortak oy verir", gm.eligible_voter_ids() == [3], str(gm.eligible_voter_ids()))
+	gm._apply_vote(1, false)   # ortak degil: sayilmaz
+	check("ortak olmayanin oyu 1. asamada sayilmadi", not gm.votes.has(1))
+	gm._apply_vote(3, false)   # ortak reddetti
+	check("ortak HAYIR -> teklif REDDEDILDI", not gm.has_government() and gm.phase == gm.Phase.FORMING,
 		"hukumet: %s" % str(gm.government))
 	check("hak azaldi (2/3 kaldi)", gm.attempts_left() == 2, str(gm.attempts_left()))
 	check("gorev hala 2'de", gm.mandate_peer_id() == 2)
+	check("koalisyon reddinde puan cezasi yok", gm.score_of(3) == 0, str(gm.score_of(3)))
 
 	print("")
 	print("=== 3) AZINLIK HUKUMETI GECEBILIR (muhalefet dagilirsa) ===")
 	gm._apply_government_proposal(gm.mandate_peer_id(), assign)
-	gm._apply_vote(2, true)    # 180 evet
-	gm._apply_vote(3, true)    # 110 evet
+	gm._apply_vote(3, true)    # ortak kabul etti
+	check("2. asama: meclis oylamasi", gm.phase == gm.Phase.VOTING and not gm.is_coalition_stage())
+	check("ortagin ve teklif sahibinin EVET'i tasindi", int(gm.votes.get(2, 0)) == gm.VOTE_YES and int(gm.votes.get(3, 0)) == gm.VOTE_YES)
+	check("2. asamada herkes oy verebilir", gm.eligible_voter_ids().size() == 3)
 	gm._apply_vote(1, false)   # 100 hayir  => 100 < 195, gecmeli
 	check("hukumet KURULDU", gm.has_government())
+	check("hukumete HAYIR diyen -%d puan" % gp.GOVERNMENT_NO_PENALTY, gm.score_of(1) == -gp.GOVERNMENT_NO_PENALTY, str(gm.score_of(1)))
+	check("EVET diyenlere ceza yok", gm.score_of(2) == 0 and gm.score_of(3) == 0)
 	check("ana iktidar partisi = basbakanligi tutan", gm.main_gov_peer_id == 2, str(gm.main_gov_peer_id))
 	check("faz GOVERNING", gm.phase == gm.Phase.GOVERNING)
 	check("hukumet partileri [2,3]", gm.government_party_ids().has(2) and gm.government_party_ids().has(3),
@@ -143,16 +151,20 @@ func _initialize() -> void:
 	gm.start_formation()
 	check("gorev 1de (200 vekil)", gm.mandate_peer_id() == 1)
 	# Simdi gercek red senaryosu: 2 daha buyuk olsun
-	setup_parties({1: 100, 2: 290})
+	setup_parties({1: 110, 2: 180, 3: 100})
 	gm.start_formation()
-	check("gorev 2'de (290 vekil)", gm.mandate_peer_id() == 2)
+	check("gorev 2'de (180 vekil)", gm.mandate_peer_id() == 2)
 	var a3 := {}
 	for post in gp.POSTS:
 		a3[post["id"]] = 2
-	for attempt in 3:
+	gm._apply_government_proposal(gm.mandate_peer_id(), a3)
+	check("tek parti: koalisyon asamasi atlandi", gm.phase == gm.Phase.VOTING and not gm.is_coalition_stage())
+	gm._apply_vote(1, false)
+	gm._apply_vote(3, false)   # 210 hayir > 195 -> red
+	for attempt in 2:
 		gm._apply_government_proposal(gm.mandate_peer_id(), a3)
-		gm._apply_vote(2, false)
-		gm._apply_vote(1, false)   # 390 hayir -> her seferinde red
+		gm._apply_vote(1, false)
+		gm._apply_vote(3, false)
 	check("3 red sonrasi sira DEVRETTI (1'e)", gm.mandate_peer_id() == 1,
 		"gelen %d, index %d" % [gm.mandate_peer_id(), gm.mandate_index])
 	check("hak sifirlandi (3)", gm.attempts_left() == 3, str(gm.attempts_left()))

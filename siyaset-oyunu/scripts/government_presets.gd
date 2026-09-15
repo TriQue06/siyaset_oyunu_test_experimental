@@ -18,6 +18,9 @@ const WITHDRAW_SCORE_PENALTY := 3
 ## Ortağı çekildiği için TEK BAŞINA kalan ana iktidar partisi gensoruyla
 ## düşerse: çok daha büyük puan cezası.
 const ABANDONED_FALL_PENALTY := 8
+## Meclis oylamasında bir hükümet teklifine HAYIR diyen partinin puan kaybı
+## (koalisyon ya da azınlık fark etmez — ülkeyi istikrarsızlaştırır).
+const GOVERNMENT_NO_PENALTY := 1
 
 ## Sıra ÖNEMLİ: hükümet kurma ekranında bu sırayla listelenir.
 const POSTS: Array[Dictionary] = [

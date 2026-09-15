@@ -179,7 +179,7 @@ static func choose_vote(bot: int) -> int:
 			var d := ElectionModel.distance(_ideology(bot), _ideology(pm))
 			if d < 2.5:
 				return GovernmentManager.VOTE_YES
-			if d < 4.5:
+			if d < 5.0:  # HAYIR puan kaybettirir: sadece çok uzak hükümete
 				return GovernmentManager.VOTE_ABSTAIN
 			return GovernmentManager.VOTE_NO
 		GovernmentManager.KIND_CENSURE:

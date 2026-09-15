@@ -103,6 +103,8 @@ var last_province_results: Dictionary = {}
 var passed_threshold: Array = []
 ## peer_id -> int: son seçimde kazanılan vekil (vekil momentumu bununla ölçülür).
 var election_seats: Dictionary = {}
+## Son seçimin girdileri (sadece host/yerel; denge analizi için, senkronlanmaz).
+var last_election_inputs: Dictionary = {}
 
 ## GÜÇ (bkz. PublicOpinion)
 # peer_id -> float
@@ -715,6 +717,9 @@ func _apply_scout(peer_id: int, province_id: String) -> void:
 func _apply_propaganda(peer_id: int, target_peer_id: int, province_id: String) -> void:
 	var damage := PublicOpinion.propaganda_damage(party_strength(province_id, target_peer_id))
 	var gain := PublicOpinion.propaganda_gain(party_strength(province_id, peer_id))
+	# Taban: karalama il puanını PROPAGANDA_FLOOR'un altına itemez.
+	var current := local_of(province_id, target_peer_id)
+	damage = clampf(damage, 0.0, maxf(0.0, current - PublicOpinion.PROPAGANDA_FLOOR))
 	_add_local(province_id, target_peer_id, -damage)
 	_add_local(province_id, peer_id, gain)
 	_log_province(province_id, "%s, %s karşıtı kampanya yaptı (%s −%.1f, %s +%.1f)" % [
@@ -748,6 +753,14 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 	_push_state({"type": "opinion", "message": "%s %s — %s bu görüşe yakın illerde güçlendi%s. Partisi %s yönüne kaydı." % [
 		law["title"], "KABUL EDİLDİ" if passed else "reddedildi", _party_name(proposer),
 		" (2 kat)" if passed else "", law["side"]]})
+
+## GovernmentManager, reddedilen gensorudan sonra (host) çağırır: getiren parti
+## ulusal destek kaybeder. Durum GovernmentManager'ın yayınıyla birlikte gider.
+func apply_censure_rejected(peer_id: int) -> void:
+	if not _is_authority():
+		return
+	_add_national(peer_id, PublicOpinion.CENSURE_REJECTED_NATIONAL)
+	_push_state({"type": "opinion"})
 
 func _add_national(peer_id: int, amount: float) -> void:
 	if amount == 0.0 or peer_id == -1:
@@ -895,8 +908,17 @@ func election_modifiers() -> Dictionary:
 	return {"national": national, "local": activity_map()}
 
 func _hold_election(finished_round: int, early: bool) -> void:
-	var result := ElectionModel.compute(_ideologies(), _province_seat_counts, province_voters(),
-		MultiplayerManager.election_threshold, current_axis_sharpness, _rng, election_modifiers())
+	var mods := election_modifiers()
+	var ideologies := _ideologies().duplicate(true)
+	# Denge analizi (tools/balance_sim.gd) için seçimin girdileri; ağda gönderilmez.
+	last_election_inputs = {
+		"mods": mods, "ideologies": ideologies, "voters": province_voters(),
+		"sharpness": current_axis_sharpness, "threshold": MultiplayerManager.election_threshold,
+		"gov_ids": GovernmentManager.government_party_ids(), "organizations": organizations.duplicate(true),
+		"seats_before": last_seats.duplicate(),
+	}
+	var result := ElectionModel.compute(ideologies, _province_seat_counts, province_voters(),
+		MultiplayerManager.election_threshold, current_axis_sharpness, _rng, mods)
 	last_vote_shares = result["vote_shares"]
 	last_seats = result["seats"]
 	last_province_results = result["province_results"]

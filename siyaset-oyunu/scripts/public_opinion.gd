@@ -15,17 +15,19 @@ extends RefCounted
 ##
 ## Dengeyi değiştirmek için sadece bu dosyadaki sabitleri düzenlemek yeterli.
 
-const EFFECT_PER_POINT := 0.06
+## Denge simülasyonuyla ayarlandı (tools/balance_sim.gd): güç puanları seçimi
+## şanstan daha çok belirlesin, son turların hamleleri ağır bassın.
+const EFFECT_PER_POINT := 0.10
 const MIN_MULT := 0.3
 const MAX_MULT := 2.0
 ## Bir puanın mutlak değer olarak ulaşabileceği en yüksek seviye.
 const LIMIT := 10.0
-## Tur sonu sönme katsayıları.
-const NATIONAL_DECAY := 0.9
-const LOCAL_DECAY := 0.85
+## Tur sonu sönme katsayıları (düşük = eski hamleler çabuk unutulur).
+const NATIONAL_DECAY := 0.75
+const LOCAL_DECAY := 0.62
 
 # --- Miting -----------------------------------------------------------------
-const MITING_LOCAL := 3.0
+const MITING_LOCAL := 3.5
 const MITING_NATIONAL := 0.5
 const PROVOCATION_LOCAL := -2.5
 const PROVOCATION_NATIONAL := -1.0
@@ -47,11 +49,15 @@ const INVEST_PARTNER_LOCAL := 1.5
 
 # --- İktidar yorgunluğu -------------------------------------------------------
 ## Seçim anında hükümette olan her parti bu kadar ulusal eksiyle seçime girer.
-const GOVERNMENT_FATIGUE := -1.5
+const GOVERNMENT_FATIGUE := -1.6
+
+# --- Gensoru ------------------------------------------------------------------
+## Reddedilen gensoruyu getiren parti bu kadar ulusal destek kaybeder.
+const CENSURE_REJECTED_NATIONAL := -2.0
 
 # --- İl başkanlığı ------------------------------------------------------------
 ## Seviye başına KALICI aktivite (sönmez).
-const ORG_ACTIVITY_PER_LEVEL := 1.5
+const ORG_ACTIVITY_PER_LEVEL := 1.2
 ## Seviye başına miting provokasyon riskinin azalma oranı.
 const ORG_RISK_REDUCTION_PER_LEVEL := 0.25
 
@@ -74,7 +80,10 @@ const LAW_OPPOSITION_YES_ON_GOV := 0.8
 # --- Karalama -----------------------------------------------------------------
 ## Hedefin kaybı = DAMAGE / (1 + DEFENSE_FACTOR × hedefin il gücü)
 ## Karalayanın kazancı = GAIN × (1 + ATTACK_FACTOR × karalayanın il gücü)
-const PROPAGANDA_DAMAGE := 3.0
+const PROPAGANDA_DAMAGE := 3.5
+## Karalama bir partinin il puanını bunun altına İTEMEZ: parti sarsılır ama o
+## ilden silinmez, karşı kampanyayla toparlanabilir.
+const PROPAGANDA_FLOOR := -3.0
 const PROPAGANDA_GAIN := 1.0
 const PROPAGANDA_DEFENSE_FACTOR := 0.5
 const PROPAGANDA_ATTACK_FACTOR := 0.3

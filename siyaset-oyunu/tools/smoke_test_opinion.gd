@@ -244,6 +244,16 @@ func _initialize() -> void:
 	cm.inventories[3] = ["gensoru"]
 	check("elinde gensoru varsa tekrar gelmez", not cm._draw_weights(3).has("gensoru"))
 	check("hukumet partisi gensoru oynayamaz", not cm.can_play_card(1, "gensoru"))
+	cm.last_seats = {1: 200, 2: 100, 3: 90}
+	cm.national_support = {}
+	gm.submit_censure(3)
+	gm._apply_vote(3, gm.VOTE_YES)
+	gm._apply_vote(1, gm.VOTE_NO)
+	gm._apply_vote(2, gm.VOTE_NO)
+	check("reddedilen gensoru: hukumet gorevde", gm.has_government() and gm.phase == gm.Phase.GOVERNING, gm.last_resolution_reason)
+	check("reddedilen gensoruyu veren ulusal destek kaybeder", near(cm.national_of(3), PublicOpinion.CENSURE_REJECTED_NATIONAL),
+		"%.2f" % cm.national_of(3))
+	check("puan tablosu etkilenmez", gm.score_of(3) == 0 or gm.score_of(3) == -gp.GOVERNMENT_NO_PENALTY, str(gm.score_of(3)))
 
 	print("")
 	print("=== 8) SONME (IL BASKANLIGI SONMEZ) ===")
@@ -285,10 +295,20 @@ func _initialize() -> void:
 	check("karalama kendine oynanamaz", not cm.can_play_card(3, "karalama", 3, "ankara"))
 	check("karalama gecersiz partiye oynanamaz", not cm.can_play_card(3, "karalama", 99, "ankara"))
 	cm.current_turn_index = 0
-	var damage := PublicOpinion.propaganda_damage(cm.party_strength("ankara", 1))
+	var damage: float = minf(PublicOpinion.propaganda_damage(cm.party_strength("ankara", 1)), -PublicOpinion.PROPAGANDA_FLOOR)
 	cm._apply_play(3, 0, 1, "ankara")
 	check("karalama: hedefe eksi, yapana arti", near(cm.local_of("ankara", 1), -damage) and cm.local_of("ankara", 3) > 0.0,
 		"hedef %.2f, yapan %.2f" % [cm.local_of("ankara", 1), cm.local_of("ankara", 3)])
+	cm.local_support["ankara"][1] = -2.5
+	cm.inventories[3] = ["karalama"]
+	cm.current_turn_index = 0
+	cm._apply_play(3, 0, 1, "ankara")
+	check("karalama il puanini tabanin altina itemez", near(cm.local_of("ankara", 1), PublicOpinion.PROPAGANDA_FLOOR),
+		"%.2f" % cm.local_of("ankara", 1))
+	cm.inventories[3] = ["karalama"]
+	cm.current_turn_index = 0
+	cm._apply_play(3, 0, 1, "ankara")
+	check("tabandaki partiye karalama artik eksi yazmaz", near(cm.local_of("ankara", 1), PublicOpinion.PROPAGANDA_FLOOR))
 	check("ilde guclu partiye karalama daha az isler", PublicOpinion.propaganda_damage(6.0) < PublicOpinion.propaganda_damage(1.0))
 	check("ilde guclu karalayan daha cok kazanir", PublicOpinion.propaganda_gain(6.0) > PublicOpinion.propaganda_gain(1.0))
 	var weak: float = cm.party_strength("ankara", 2)

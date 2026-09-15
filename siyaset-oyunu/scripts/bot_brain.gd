@@ -219,7 +219,8 @@ static func _evaluate(bot: int, card_type: String, known: Dictionary) -> Diction
 		if not CardManager.can_play_card(bot, card_type):
 			return {}
 		var passes: bool = GovernmentManager.government_seats() * 2 <= GovernmentManager.total_seats()
-		return {"score": 6.0 if passes else 1.0, "peer": -1, "province": ""}
+		# Reddedilen gensoru getirene ulusal eksi yazar: geçmeyecekse elde tut.
+		return {"score": 6.0 if passes else 0.05, "peer": -1, "province": ""}
 	return {}
 
 ## Beklenen il gücü kazancı × ilin vekil sayısı × partinin o ildeki (bilinen) şansı.

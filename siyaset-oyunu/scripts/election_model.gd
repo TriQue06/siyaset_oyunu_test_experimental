@@ -26,8 +26,9 @@ const AXES := ["economic", "social", "administrative"]
 const SUPPORT_SIGMA := 2.0
 ## Ne kadar uzak olursa olsun her partinin il başına alabileceği asgari destek.
 const SUPPORT_FLOOR := 0.03
-const PROVINCE_NOISE := 0.15
-const NATIONAL_SWING := 0.10
+## Şans "yemeğin tuzu" kadar: denge simülasyonuyla kısıldı (0.15 / 0.10'dan).
+const PROVINCE_NOISE := 0.07
+const NATIONAL_SWING := 0.04
 
 static var _voters_cache: Dictionary = {}
 

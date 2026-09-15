@@ -763,7 +763,8 @@ func _hold_election(finished_round: int, early: bool) -> void:
 	_decay_opinion()
 	_push_state({"type": "election"}, true)
 	# Yeni meclis: hükümet kurma görevi en çok vekili olan partiye verilir.
-	GovernmentManager.start_formation()
+	# Seçim gecesi yayını herkesin ekranında oynarken kurma süresi yanmasın.
+	GovernmentManager.start_formation(GameRules.ELECTION_NIGHT_SECONDS + GameRules.ELECTION_NIGHT_HOLD + 2.0)
 
 func _end_game(reason: String) -> void:
 	game_finished = true

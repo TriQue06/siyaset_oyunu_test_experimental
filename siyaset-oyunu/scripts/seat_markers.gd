@@ -82,6 +82,11 @@ func clear_province(province_id: String) -> void:
 	_seats.erase(province_id)
 	_rebuild()
 
+## Tüm illeri tek seferde ayarlar (tek yeniden hesaplama). province_id -> Array[Color]
+func set_all(seats_by_province: Dictionary) -> void:
+	_seats = seats_by_province.duplicate()
+	_rebuild()
+
 func clear_all() -> void:
 	_seats.clear()
 	_rebuild()

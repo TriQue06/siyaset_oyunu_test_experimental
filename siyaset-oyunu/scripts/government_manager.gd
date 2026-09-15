@@ -266,7 +266,8 @@ func _set_phase(new_phase: int) -> void:
 
 ## Seçim sonuçlandığı an host çağırır: görev sırasını kurar ve birinci
 ## partiye hükümet kurma görevini verir.
-func start_formation() -> void:
+## extra_seconds: kurma süresine eklenir (seçim gecesi yayını izlenirken süre yanmasın).
+func start_formation(extra_seconds: float = 0.0) -> void:
 	if not _is_authority():
 		return
 	government.clear()
@@ -278,6 +279,8 @@ func start_formation() -> void:
 	last_resolution_reason = ""
 	abandoned = false
 	_set_phase(Phase.FORMING if not mandate_order.is_empty() else Phase.IDLE)
+	if phase == Phase.FORMING:
+		_phase_time_left += extra_seconds
 	_push_state()
 
 ## Tur bitiminde host çağırır: görevdeki partilere görev puanlarını yazar.

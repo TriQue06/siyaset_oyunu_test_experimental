@@ -99,6 +99,10 @@ func _handle_formation(now: float) -> void:
 	if not MultiplayerManager.is_bot(bot):
 		_form_key = ""
 		return
+	# Seçim gecesi yayını sürüyor (süreye eklenen pay): herkes izlerken teklif gelmesin.
+	if GovernmentManager.phase_seconds_left() > GameRules.FORMATION_TIMEOUT:
+		_form_key = ""
+		return
 	var key := "%d:%d:%d" % [bot, GovernmentManager.mandate_index, GovernmentManager.attempts_used]
 	if key != _form_key:
 		_form_key = key

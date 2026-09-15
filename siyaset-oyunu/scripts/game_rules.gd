@@ -24,6 +24,11 @@ const MAX_ROUNDS := 24
 const TURN_TIMEOUT := 60.0
 const FORMATION_TIMEOUT := 120.0
 const VOTE_TIMEOUT := 45.0
+## Seçim gecesi canlı sayım yayınının süresi ve bittikten sonra kesin sonucun
+## ekranda kaldığı süre (bkz. election_results.gd). Host, hükümet kurma
+## süresine bunları ekler.
+const ELECTION_NIGHT_SECONDS := 45.0
+const ELECTION_NIGHT_HOLD := 8.0
 
 ## Oyun ortasında oyuncular ayrılıp bu sayının altına düşülürse oyun biter.
 const MIN_PLAYERS_TO_CONTINUE := 2

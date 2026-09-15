@@ -56,6 +56,32 @@ static func support(party_ideology: Dictionary, voter_center: Dictionary) -> flo
 	var d := distance(party_ideology, voter_center)
 	return SUPPORT_FLOOR + exp(-(d * d) / (2.0 * SUPPORT_SIGMA * SUPPORT_SIGMA))
 
+## Rastgelelik OLMADAN bir ildeki beklenen oy payları (peer_id -> yüzde).
+## Anket kartı kullanır (hata payını CardManager ekler).
+static func expected_shares(parties: Dictionary, center: Dictionary, sharpness: float,
+		national_mod: Dictionary = {}, local_here: Dictionary = {}) -> Dictionary:
+	var peer_ids: Array = parties.keys()
+	peer_ids.sort()
+	var raw := {}
+	var raw_total := 0.0
+	for peer_id in peer_ids:
+		var opinion: float = PublicOpinion.multiplier(float(national_mod.get(peer_id, 0.0)), float(local_here.get(peer_id, 0.0)))
+		var w: float = support(parties[peer_id], center) * opinion
+		raw[peer_id] = w
+		raw_total += w
+	var result := {}
+	if raw_total <= 0.0:
+		return result
+	var power: float = maxf(sharpness, 0.01)
+	var sharp_total := 0.0
+	for peer_id in peer_ids:
+		var s: float = pow(maxf(float(raw[peer_id]) / raw_total, 0.0001), power)
+		result[peer_id] = s
+		sharp_total += s
+	for peer_id in peer_ids:
+		result[peer_id] = float(result[peer_id]) / sharp_total * 100.0
+	return result
+
 ## parties: peer_id -> ideoloji sözlüğü
 ## province_seats: province_id -> milletvekili sayısı
 ## voters: province_id -> seçmen merkezi (ideoloji sözlüğü)

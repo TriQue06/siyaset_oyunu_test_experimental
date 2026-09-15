@@ -13,12 +13,9 @@ const BODY_RECT := Rect2i(4, 33, 64, 59)
 const CARDS := {
 	"miting": Color("E8702A"),
 	"yatirim": Color("3FA34D"),
-	"law_privatization": Color("D9A21B"),
-	"law_nationalization": Color("B5651D"),
-	"law_family": Color("7B3FA0"),
-	"law_civil_rights": Color("C94FA8"),
-	"law_centralization": Color("2A7F8F"),
-	"law_local_government": Color("3AAFA9"),
+	"anket": Color("2F7FD1"),
+	"gozcu": Color("5A6B7D"),
+	"karalama": Color("A12B3A"),
 }
 
 func _initialize() -> void:

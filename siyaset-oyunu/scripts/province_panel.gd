@@ -1,11 +1,13 @@
 class_name ProvincePanel
 extends PanelContainer
-## Haritada bir ile TIKLAYINCA açılan il detay paneli. Oyuncu burada o ildeki
-## gücünü ve kimin ne yaptığını görür:
-##   - milletvekili sayısı, siyasi denge (seçmen eğilimi -> güncel denge),
-##   - partilerin son seçim oyu, milletvekili ve İL KAMUOYU puanı,
-##   - kendi partisi burada miting yaparsa provokasyon riski,
-##   - ildeki son olaylar (miting, provokasyon, yatırım).
+## Haritada bir ile TIKLAYINCA açılan il detay paneli:
+##   - milletvekili sayısı,
+##   - İSTİHBARATIN (sadece bu oyuncu): gözcü bilgisi (ilin görüşü, eksen başına
+##     uç ya da orta) ve son anket,
+##   - partilerin son seçim oyu, vekili, bu ildeki GÜCÜ (aktivite) ve il başkanlığı,
+##   - kendi partinin burada miting riski ve il başkanlığı durumu,
+##   - ildeki son olaylar.
+## İlin gerçek görüşü burada ASLA doğrudan gösterilmez — gözcü kartıyla öğrenilir.
 ## Durum değiştikçe GameScreen refresh() çağırır.
 
 signal closed
@@ -13,6 +15,7 @@ signal closed
 const PANEL_WIDTH := 340.0
 const BADGE_SIZE := Vector2(22, 22)
 const DIM := Color(1, 1, 1, 0.6)
+const INTEL_COLOR := Color(0.6, 0.85, 1.0)
 
 var province_id: String = ""
 var _body: VBoxContainer
@@ -51,7 +54,7 @@ func refresh() -> void:
 		child.queue_free()
 
 	var header := HBoxContainer.new()
-	var title := _label(province_id.capitalize(), 18)
+	var title := _label(ElectionNightSim.province_name(province_id), 18)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title)
 	var close_button := Button.new()
@@ -65,31 +68,40 @@ func refresh() -> void:
 	_body.add_child(header)
 	_body.add_child(_label("%d milletvekili" % CardManager.province_seat_count(province_id), 12, DIM))
 
-	_build_balance()
+	_build_intel()
 	_build_parties()
-	_build_risk()
+	_build_own()
 	_build_events()
 
 func _section(text: String) -> void:
 	_body.add_child(HSeparator.new())
 	_body.add_child(_label(text, 11, DIM))
 
-func _build_balance() -> void:
-	_section("SİYASİ DENGE  (seçmen eğilimi → güncel denge)")
-	var voters: Dictionary = ElectionModel.load_province_voters().get(province_id, {})
-	var balance := CardManager.province_balance(province_id)
-	for axis in IdeologyAxes.AXES:
-		var info: Dictionary = CardPresets.AXIS_TITLES[axis]
-		var value: float = float(balance.get(axis, 0.0))
-		var lean: String = info["pos"] if value > 0.25 else (info["neg"] if value < -0.25 else "Orta")
-		_body.add_child(_label("%s: %+.1f → %+.1f  (%s)" % [info["title"], float(voters.get(axis, 0.0)), value, lean], 12))
+func _build_intel() -> void:
+	var me := multiplayer.get_unique_id()
+	_section("İSTİHBARATIN  (sadece sen görürsün)")
+	if CardManager.has_scouted(me, province_id):
+		var center := CardManager.province_center(province_id)
+		for axis in IdeologyAxes.AXES:
+			_body.add_child(_label(CardPresets.leaning_text(axis, int(center.get(axis, 0))), 12, INTEL_COLOR))
+	else:
+		_body.add_child(_label("İlin görüşü bilinmiyor — Gözcü kartıyla öğren.", 12, DIM))
+	var poll := CardManager.poll_of(me, province_id)
+	if poll.is_empty():
+		return
+	_body.add_child(_label("Anket (%d. tur, ±%%%d hata):" % [int(poll.get("round", 0)), int(PublicOpinion.POLL_ERROR * 100)], 12, INTEL_COLOR))
+	var shares: Dictionary = poll.get("shares", {})
+	var ids: Array = shares.keys()
+	ids.sort_custom(func(a, b): return float(shares[a]) > float(shares[b]))
+	for peer_id in ids:
+		_body.add_child(_label("   %s  %%%.0f" % [GovernmentHud.party_name_of(int(peer_id)), float(shares[peer_id])], 12))
 
 func _build_parties() -> void:
-	_section("PARTİLER  (oy · mv · il kamuoyu)")
+	_section("PARTİLER  (oy · mv · güç · il başkanlığı)")
 	var results: Dictionary = CardManager.last_province_results.get(province_id, {})
 	var ids: Array = CardManager.turn_order.duplicate()
 	ids.sort_custom(func(a, b):
-		return float(results.get(a, {}).get("percent", 0.0)) > float(results.get(b, {}).get("percent", 0.0)))
+		return CardManager.activity_of(province_id, a) > CardManager.activity_of(province_id, b))
 	var me := multiplayer.get_unique_id()
 	for peer_id in ids:
 		var party: Dictionary = PartyManager.parties.get(peer_id, {})
@@ -104,25 +116,38 @@ func _build_parties() -> void:
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(name_label)
 		var entry: Dictionary = results.get(peer_id, {})
-		var stats := _label("%%%.1f · %d mv" % [float(entry.get("percent", 0.0)), int(entry.get("seats", 0))] if not entry.is_empty() else "—", 12, DIM)
+		var stats := _label("%%%.0f · %d" % [float(entry.get("percent", 0.0)), int(entry.get("seats", 0))] if not entry.is_empty() else "—", 12, DIM)
 		stats.autowrap_mode = TextServer.AUTOWRAP_OFF
 		row.add_child(stats)
-		var local := CardManager.local_of(province_id, peer_id)
-		var local_label := _label("%+.1f" % local, 12, _opinion_color(local))
-		local_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-		local_label.custom_minimum_size = Vector2(40, 0)
-		local_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		row.add_child(local_label)
+		var activity := CardManager.activity_of(province_id, peer_id)
+		var activity_label := _label("%+.1f" % activity, 12, _opinion_color(activity))
+		activity_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+		activity_label.custom_minimum_size = Vector2(40, 0)
+		activity_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		row.add_child(activity_label)
+		var level := CardManager.organization_level(province_id, peer_id)
+		var org_label := _label("B%d" % level if level > 0 else "—", 12, Color(0.55, 0.9, 0.85) if level > 0 else DIM)
+		org_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+		org_label.custom_minimum_size = Vector2(24, 0)
+		org_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		org_label.tooltip_text = "İl başkanlığı seviyesi"
+		org_label.mouse_filter = Control.MOUSE_FILTER_PASS
+		row.add_child(org_label)
 		_body.add_child(row)
 
-func _build_risk() -> void:
+func _build_own() -> void:
 	var me := multiplayer.get_unique_id()
 	if not PartyManager.parties.has(me):
 		return
-	_section("BURADA MİTİNG YAPARSAN")
+	_section("SEN BU İLDE")
 	var risk := CardManager.miting_risk(me, province_id)
 	var color := Color(0.6, 1.0, 0.6) if risk < 0.15 else (Color(1.0, 0.85, 0.4) if risk < 0.3 else Color(1.0, 0.5, 0.45))
-	_body.add_child(_label("Provokasyon riski: %%%d" % int(round(risk * 100.0)), 13, color))
+	_body.add_child(_label("Miting provokasyon riski: %%%d" % int(round(risk * 100.0)), 13, color))
+	var level := CardManager.organization_level(province_id, me)
+	var org_text := "İl başkanlığı yok" if level == 0 else "İl başkanlığı: seviye %d/%d" % [level, GameRules.ORG_MAX_LEVEL]
+	if level < GameRules.ORG_MAX_LEVEL:
+		org_text += "  ·  %s: %d mana" % ["kurmak" if level == 0 else "geliştirmek", GameRules.ORG_MANA_COST]
+	_body.add_child(_label(org_text, 12))
 
 func _build_events() -> void:
 	_section("SON OLAYLAR")

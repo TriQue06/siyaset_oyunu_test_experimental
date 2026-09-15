@@ -1,25 +1,17 @@
 extends Node
-## Autoload. Siyasi kart katalogu. Görseller normal PNG'ler (assets/cards/),
-## Godot'un kendi import sistemi export'a otomatik dahil eder.
+## Autoload. Kart ve hamle katalogu. Görseller normal PNG'ler (assets/cards/).
 ##
-## Kart grupları:
-##   - İDEOLOJİ : (artık desteden gelmez) partinin kendi eksenini ±1 kaydırır.
-##   - MİTİNG   : seçilen ilde kamuoyu kazandırır; provokasyon riski var.
-##   - YASA     : meclise bir yasa teklifi getirir (ekseni, yönü, kuvveti var).
-##                Oynayan partinin GÖRÜŞÜ yasanın yönünde kayar — partilerin
-##                ideolojisi artık sadece savundukları yasalarla değişir.
-##   - YATIRIM  : sadece hükümet partilerine gelir; seçilen ile yatırım.
+## DESTE KARTLARI (desteden çekilir; elden oynamak mana istemez):
+##   - MİTİNG    : seçilen ilde güç kazandırır; provokasyon riski var.
+##   - YATIRIM   : sadece hükümet partilerine gelir; seçilen ile yatırım.
+##   - ANKET     : bir ilin güncel oy tahmini (±%20 hata); sonucu sadece oynayan görür.
+##   - GÖZCÜ     : bir ilin görüşünü eksen başına uç/orta olarak gösterir (oynayana, kalıcı).
+##   - KARALAMA  : bir ilde bir partiyi karalar: ona eksi, oynayana artı.
 ##   - VEKİL ÇALMA / GENSORU : koşullu özel kartlar.
+## YASA bir kart DEĞİL, bir hamle türüdür (bkz. CardManager.propose_law): eksen
+## ve yön seçilir. Meclis akışı metin tabanlı olduğu için yasa "law:eksen:yön"
+## biçiminde bir metinle taşınır (bkz. law_type / law_data).
 ## Hangi kartın ne olasılıkla çekileceği CardManager._draw_weights'te.
-
-const IDEOLOGY_CARD_TYPES: Array[String] = [
-	"capitalist",
-	"conservative",
-	"federal",
-	"progressive",
-	"socialist",
-	"unitary",
-]
 
 ## Bir başka partiden milletvekili çalar. Kullanılırken HEDEF parti seçilir.
 const STEAL_CARD_TYPES: Array[String] = [
@@ -32,62 +24,20 @@ const STEAL_CARD_TYPES: Array[String] = [
 const CENSURE_CARD_TYPE := "gensoru"
 const MITING_CARD_TYPE := "miting"
 const INVEST_CARD_TYPE := "yatirim"
-
-## Yasa kartları: eksen, yön (+1: eksenin + ucu, -1: - ucu), başlık, açıklama.
-## ideology_axes.gd: economic -3 devletçi <-> +3 piyasacı; social -3 ilerici
-## <-> +3 muhafazakâr; administrative -3 federal <-> +3 üniter.
-const LAWS := {
-	"law_privatization": {"axis": "economic", "dir": 1, "title": "Özelleştirme Yasası",
-		"desc": "Kamu işletmelerini özelleştirir."},
-	"law_nationalization": {"axis": "economic", "dir": -1, "title": "Kamulaştırma Yasası",
-		"desc": "Stratejik sektörleri devletleştirir."},
-	"law_family": {"axis": "social", "dir": 1, "title": "Aileyi Koruma Yasası",
-		"desc": "Geleneksel aile yapısını destekler."},
-	"law_civil_rights": {"axis": "social", "dir": -1, "title": "Sivil Haklar Yasası",
-		"desc": "Bireysel hak ve özgürlükleri genişletir."},
-	"law_centralization": {"axis": "administrative", "dir": 1, "title": "Merkezi Yönetim Yasası",
-		"desc": "Yetkileri merkezi hükümette toplar."},
-	"law_local_government": {"axis": "administrative", "dir": -1, "title": "Yerel Yönetimler Yasası",
-		"desc": "Yetkileri il ve belediyelere devreder."},
-}
-
-const LAW_CARD_TYPES: Array[String] = [
-	"law_privatization",
-	"law_nationalization",
-	"law_family",
-	"law_civil_rights",
-	"law_centralization",
-	"law_local_government",
-]
-
-## Yasa kuvvetleri. Kart türü = temel yasa (Orta) ya da "_weak"/"_strong" eki.
-##   factor: kamuoyu etkileri (taban tepkisi, geçme/red bonusu) çarpanı
-##   shift : oynayan partinin görüşünün yasa yönünde kayma miktarı
-const LAW_STRENGTHS := {
-	"weak": {"label": "Hafif", "factor": 0.6, "shift": 1, "suffix": "_weak"},
-	"medium": {"label": "Orta", "factor": 1.0, "shift": 1, "suffix": ""},
-	"strong": {"label": "Güçlü", "factor": 1.6, "shift": 2, "suffix": "_strong"},
-}
+const POLL_CARD_TYPE := "anket"
+const SCOUT_CARD_TYPE := "gozcu"
+const PROPAGANDA_CARD_TYPE := "karalama"
 
 const CARD_TYPES: Array[String] = [
-	"capitalist",
-	"conservative",
-	"federal",
-	"progressive",
-	"socialist",
-	"unitary",
 	"steal_weak",
 	"steal_medium",
 	"steal_strong",
 	"gensoru",
 	"miting",
 	"yatirim",
-	"law_privatization",
-	"law_nationalization",
-	"law_family",
-	"law_civil_rights",
-	"law_centralization",
-	"law_local_government",
+	"anket",
+	"gozcu",
+	"karalama",
 ]
 
 const AXIS_TITLES := {
@@ -96,17 +46,15 @@ const AXIS_TITLES := {
 	"administrative": {"title": "İdare", "neg": "Federal", "pos": "Üniter"},
 }
 
-const CARD_NATIVE_SIZE := Vector2(72, 96)
-
-## Her kart oynanınca ilgili partinin ideoloji eksenini bu yönde 1 birim kaydırır.
-const CARD_EFFECTS := {
-	"capitalist": {"axis": "economic", "delta": 1},
-	"socialist": {"axis": "economic", "delta": -1},
-	"conservative": {"axis": "social", "delta": 1},
-	"progressive": {"axis": "social", "delta": -1},
-	"unitary": {"axis": "administrative", "delta": 1},
-	"federal": {"axis": "administrative", "delta": -1},
+## Yasa hamlesinin 6 seçeneği: eksen -> yön -> başlık.
+const LAW_TITLES := {
+	"economic": {-1: "Kamu Ekonomisi Yasası", 1: "Serbest Piyasa Yasası"},
+	"social": {-1: "Özgürlükler Yasası", 1: "Aile ve Gelenek Yasası"},
+	"administrative": {-1: "Yerel Yönetim Yasası", 1: "Güçlü Merkez Yasası"},
 }
+const LAW_PREFIX := "law:"
+
+const CARD_NATIVE_SIZE := Vector2(72, 96)
 
 ## Vekil çalma kartlarının çaldığı milletvekili aralığı (her değer eşit olası).
 const STEAL_RANGES := {
@@ -116,9 +64,8 @@ const STEAL_RANGES := {
 }
 
 ## Görseli yazısıyla birlikte çizilmiş kartlar. Diğerlerinin (placeholder
-## görselli yeni kartlar) adı oyunda kartın üstüne yazılır.
+## görselli kartlar) adı oyunda kartın üstüne yazılır.
 const BAKED_TITLE_TYPES: Array[String] = [
-	"capitalist", "conservative", "federal", "progressive", "socialist", "unitary",
 	"steal_weak", "steal_medium", "steal_strong", "gensoru",
 ]
 
@@ -132,63 +79,47 @@ func _ready() -> void:
 			_card_textures[card_type] = load(path)
 		else:
 			push_warning("Kart görseli bulunamadı: %s" % path)
-	# Yasa kuvvet varyantları temel yasanın görselini kullanır.
-	for base in LAW_CARD_TYPES:
-		for strength in LAW_STRENGTHS.values():
-			_card_textures[base + String(strength["suffix"])] = _card_textures.get(base)
 	_closed_texture = load("res://assets/cards/closed_cards.png")
 
 func get_card_texture(card_type: String) -> Texture2D:
-	return _card_textures.get(card_type, _card_textures.get(CENSURE_CARD_TYPE))
+	return _card_textures.get(card_type, _card_textures.get(MITING_CARD_TYPE))
 
 func get_closed_texture() -> Texture2D:
 	return _closed_texture
 
-func is_ideology_card(card_type: String) -> bool:
-	return CARD_EFFECTS.has(card_type)
-
-## Bu kart oynanırken hedef PARTİ seçilmesi gerekiyor mu?
+## Bu kart oynanırken hedef PARTİ seçilmesi gerekiyor mu? (vekil çalma)
 func needs_target(card_type: String) -> bool:
 	return STEAL_CARD_TYPES.has(card_type)
 
-## Bu kart oynanırken haritadan İL seçilmesi gerekiyor mu?
+## Bu kart oynanırken haritadan İL seçilmesi gerekiyor mu? (Karalamada ilden
+## sonra hedef parti de seçilir.)
 func needs_province_target(card_type: String) -> bool:
-	return card_type == MITING_CARD_TYPE or card_type == INVEST_CARD_TYPE
+	return card_type in [MITING_CARD_TYPE, INVEST_CARD_TYPE, POLL_CARD_TYPE, SCOUT_CARD_TYPE, PROPAGANDA_CARD_TYPE]
 
 func is_censure_card(card_type: String) -> bool:
 	return card_type == CENSURE_CARD_TYPE
 
+## Yasa hamlesinin türü: "law:economic:1".
+func law_type(axis: String, dir: int) -> String:
+	return "%s%s:%d" % [LAW_PREFIX, axis, 1 if dir > 0 else -1]
+
 func is_law_card(card_type: String) -> bool:
 	return not law_data(card_type).is_empty()
 
-## Yasa kartının verisi (temel yasa + kuvvet: strength/factor/shift/label);
-## yasa değilse boş sözlük.
+## {"axis", "dir", "title", "side"} ya da (yasa değilse) boş sözlük.
 func law_data(card_type: String) -> Dictionary:
-	for key in LAW_STRENGTHS.keys():
-		var suffix: String = LAW_STRENGTHS[key]["suffix"]
-		if suffix != "" and card_type.ends_with(suffix) and LAWS.has(card_type.trim_suffix(suffix)):
-			return _with_strength(card_type.trim_suffix(suffix), key)
-	if LAWS.has(card_type):
-		return _with_strength(card_type, "medium")
-	return {}
-
-func _with_strength(base: String, strength: String) -> Dictionary:
-	var law: Dictionary = LAWS[base].duplicate()
-	var info: Dictionary = LAW_STRENGTHS[strength]
-	law["base"] = base
-	law["strength"] = strength
-	law["factor"] = info["factor"]
-	law["shift"] = info["shift"]
-	law["label"] = info["label"]
-	return law
+	if not card_type.begins_with(LAW_PREFIX):
+		return {}
+	var parts := card_type.substr(LAW_PREFIX.length()).split(":")
+	if parts.size() != 2 or not LAW_TITLES.has(parts[0]):
+		return {}
+	var axis: String = parts[0]
+	var dir := 1 if int(parts[1]) > 0 else -1
+	var info: Dictionary = AXIS_TITLES[axis]
+	return {"axis": axis, "dir": dir, "title": LAW_TITLES[axis][dir], "side": info["pos"] if dir > 0 else info["neg"]}
 
 func has_baked_title(card_type: String) -> bool:
 	return BAKED_TITLE_TYPES.has(card_type)
-
-func random_from(pool: Array) -> String:
-	if pool.is_empty():
-		return IDEOLOGY_CARD_TYPES[randi_range(0, IDEOLOGY_CARD_TYPES.size() - 1)]
-	return pool[randi_range(0, pool.size() - 1)]
 
 ## weights: card_type -> ağırlık (>0). Ağırlıkla orantılı rastgele seçim.
 func weighted_pick(weights: Dictionary, rng: RandomNumberGenerator) -> String:
@@ -196,7 +127,7 @@ func weighted_pick(weights: Dictionary, rng: RandomNumberGenerator) -> String:
 	for card_type in weights.keys():
 		total += maxf(0.0, float(weights[card_type]))
 	if total <= 0.0:
-		return random_from([])
+		return MITING_CARD_TYPE
 	var roll := rng.randf() * total
 	for card_type in weights.keys():
 		roll -= maxf(0.0, float(weights[card_type]))
@@ -206,33 +137,12 @@ func weighted_pick(weights: Dictionary, rng: RandomNumberGenerator) -> String:
 
 ## Kartın üstüne basılacak kısa başlık (placeholder görselli kartlar için).
 func card_short_title(card_type: String) -> String:
-	if is_law_card(card_type):
-		var law := law_data(card_type)
-		return "YASA\n%s\n%s" % [String(law["title"]).replace(" Yasası", ""), law["label"]]
-	match card_type:
-		MITING_CARD_TYPE:
-			return "MİTİNG"
-		INVEST_CARD_TYPE:
-			return "YATIRIM"
 	return card_title(card_type).to_upper()
 
 func card_title(card_type: String) -> String:
 	if is_law_card(card_type):
-		var law := law_data(card_type)
-		return "%s (%s)" % [law["title"], law["label"]]
+		return String(law_data(card_type)["title"])
 	match card_type:
-		"capitalist":
-			return "Kapitalist"
-		"conservative":
-			return "Muhafazakar"
-		"federal":
-			return "Federal"
-		"progressive":
-			return "İlerici"
-		"socialist":
-			return "Sosyalist"
-		"unitary":
-			return "Üniter"
 		"steal_weak":
 			return "Vekil Çalma (Zayıf)"
 		"steal_medium":
@@ -245,40 +155,56 @@ func card_title(card_type: String) -> String:
 			return "Miting"
 		"yatirim":
 			return "Yatırım"
-		_:
-			return card_type
+		"anket":
+			return "Anket"
+		"gozcu":
+			return "Gözcü"
+		"karalama":
+			return "Karalama"
+	return card_type
 
 ## Yasanın yönünü okunur yazar: "Ekonomi → Piyasacı".
 func law_direction_text(card_type: String) -> String:
 	var law := law_data(card_type)
 	if law.is_empty():
 		return ""
-	var info: Dictionary = AXIS_TITLES[law["axis"]]
-	return "%s → %s" % [info["title"], info["pos"] if int(law["dir"]) > 0 else info["neg"]]
+	return "%s → %s" % [AXIS_TITLES[law["axis"]]["title"], law["side"]]
 
-## Kart üstüne gelince gösterilen açıklama.
+## Gözcü bilgisi: "Ekonomi: Devletçi" / "Ekonomi: Orta".
+func leaning_text(axis: String, value: int) -> String:
+	var info: Dictionary = AXIS_TITLES.get(axis, {"title": axis, "neg": "-", "pos": "+"})
+	var side: String = "Orta"
+	if value < 0:
+		side = info["neg"]
+	elif value > 0:
+		side = info["pos"]
+	return "%s: %s" % [info["title"], side]
+
+## Yasa dairesinin üstüne gelince gösterilen kısa açıklama.
+func law_description(card_type: String) -> String:
+	var law := law_data(card_type)
+	if law.is_empty():
+		return ""
+	return "Bu görüşe yakın illerde güç kazanırsın, zıt illerde kaybedersin.\nKabul edilirse etkisi 2 katı. Partin %s yönüne kayar." % law["side"]
+
+## Kart üstüne gelince gösterilen açıklama (kısa ve somut).
 func card_description(card_type: String) -> String:
 	if is_law_card(card_type):
-		var law := law_data(card_type)
-		return "%s (%s, %s kuvvet)\nPartinin görüşü bu yönde %d birim kayar.\nParlamento diyagramına sürükle: meclise gelir, herkes oylar. Geçerse getiren parti kamuoyu kazanır — muhalefetten geliyorsa çok daha fazla. Tabanına ters oy veren kamuoyu kaybeder. Kamuoyu etkileri x%.1f.\nMeclis kurulmadan önce oynanırsa oylamasız SEÇİM VAADİ olur." % [
-			law["desc"], law_direction_text(card_type), law["label"], int(law["shift"]), float(law["factor"])]
-	if is_ideology_card(card_type):
-		var effect: Dictionary = CARD_EFFECTS[card_type]
-		var info: Dictionary = AXIS_TITLES[effect["axis"]]
-		return "%s eksenini 1 birim %s yönüne kaydırır.\nTıkla: partinin ekseni kayar (sadece kendi partine oynanır)." % [
-			info["title"], info["pos"] if int(effect["delta"]) > 0 else info["neg"]]
+		return law_description(card_type)
 	if needs_target(card_type):
 		var r: Dictionary = STEAL_RANGES[card_type]
-		return "Seçtiğin partiden %d-%d milletvekili çalar (hedef en az 1 vekille kalır).\nSağdaki bir partinin logosuna sürükle." % [int(r["min"]), int(r["max"])]
+		return "Seçtiğin partiden %d-%d vekil çal.\nSağdaki bir parti kartına sürükle." % [int(r["min"]), int(r["max"])]
 	match card_type:
 		CENSURE_CARD_TYPE:
-			return "Hükümeti düşürmek için meclise gensoru önergesi verir. Azınlık hükümeti varken desteye girer.
-Parlamento diyagramına sürükle."
+			return "Hükümeti düşürmek için gensoru ver.\nMeclis diyagramına sürükle."
 		MITING_CARD_TYPE:
-			return "Seçtiğin ilde miting: il kamuoyun +%.1f, ulusal +%.1f.\nİlin siyasi dengesine uzaksan PROVOKASYON riski artar (en fazla %%%d): il %.1f, ulusal %.1f.\nHaritada bir ilin üstüne sürükle." % [
-				PublicOpinion.MITING_LOCAL, PublicOpinion.MITING_NATIONAL, int(PublicOpinion.PROVOCATION_MAX_RISK * 100),
-				PublicOpinion.PROVOCATION_LOCAL, PublicOpinion.PROVOCATION_NATIONAL]
+			return "Seçtiğin ilde güç kazan (+%.0f).\nİl sana uzaksa provokasyon riski var." % PublicOpinion.MITING_LOCAL
 		INVEST_CARD_TYPE:
-			return "Sadece hükümet partileri. Seçtiğin ile yatırım: sana il +%.1f ve ulusal +%.1f, hükümet ortaklarına il +%.1f. Herkes görür.\nHaritada bir ilin üstüne sürükle." % [
-				PublicOpinion.INVEST_LOCAL, PublicOpinion.INVEST_NATIONAL, PublicOpinion.INVEST_PARTNER_LOCAL]
+			return "Hükümet: seçtiğin ile yatırım.\nSen +%.0f, ortakların +%.1f güç kazanır." % [PublicOpinion.INVEST_LOCAL, PublicOpinion.INVEST_PARTNER_LOCAL]
+		POLL_CARD_TYPE:
+			return "Bir ilin güncel oy tahminini gör (±%%%d hata).\nSonucu sadece sen görürsün." % int(PublicOpinion.POLL_ERROR * 100)
+		SCOUT_CARD_TYPE:
+			return "Bir ilin görüşünü öğren: her eksende hangi uçta.\nSadece sen görürsün, kalıcıdır."
+		PROPAGANDA_CARD_TYPE:
+			return "Bir ilde bir partiyi karala: ona eksi, sana artı.\nİlde güçlü olan partiye az işler."
 	return ""

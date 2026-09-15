@@ -1,13 +1,10 @@
 extends Control
 ## Parti Kurulum ekranı — HER OYUNCUYA ÖZEL, tam ekran, harita YOK. Solda
 ## partinin kocaman bir önizlemesi, sağda ayar paneli (isim, ikon, arka plan
-## rengi, ideoloji). İkon rengi seçilmez, her zaman beyazdır.
+## rengi). İkon rengi seçilmez, her zaman beyazdır.
 ##
-## İDEOLOJİ KURALI: kuruluşta her eksen (economic/social/administrative)
-## SADECE {-2,-1,1,2} değerlerinden biri olabilir — uç (-3/+3) ve nötr (0)
-## YASAK (bkz. IdeologyAxes). Bu yüzden kaydırıcılar 0-3 ARASI İNDEKS
-## seçtirir, doğrudan değer değil; olası tek değer seti zaten bu dörtlü.
-## Uç/nötre ancak oyun içi ideoloji kartlarıyla ulaşılabilir.
+## İDEOLOJİ SEÇİLMEZ: her parti nötr başlar, görüşü oyunda sunduğu yasalarla
+## oluşur (bkz. IdeologyAxes). Sahnedeki ideoloji düğümleri gizlenir.
 ##
 ## Süre (lobi ayarından gelen party_setup_duration; 0 = SINIRSIZ) dolunca
 ## HOST otomatik olarak herkesi Oyun Ekranı'na geçirir. Bir oyuncu
@@ -61,7 +58,7 @@ func _ready() -> void:
 	_unlimited_time = MultiplayerManager.party_setup_duration == MultiplayerManager.PARTY_DURATION_UNLIMITED
 	_time_left = float(MultiplayerManager.party_setup_duration)
 	_party_name = "Parti%d" % randi_range(1, 99)
-	_ideology = IdeologyAxes.random_start_ideology()
+	_ideology = IdeologyAxes.default_values()
 
 	name_edit.text = _party_name
 	name_edit.max_length = PartyManager.NAME_MAX_LENGTH
@@ -69,7 +66,12 @@ func _ready() -> void:
 
 	_build_icon_grid()
 	_build_color_row()
-	_build_ideology_rows()
+	# İdeoloji seçimi yok: sahnedeki başlık, kaydırıcı kutusu ve ayırıcı gizlenir.
+	ideology_container.hide()
+	for node_name in ["IdeologyLabel", "HSeparator3b"]:
+		var node := ideology_container.get_parent().get_node_or_null(node_name)
+		if node != null:
+			node.hide()
 	random_button.pressed.connect(_on_random_pressed)
 	ready_button.pressed.connect(_on_ready_pressed)
 	MultiplayerManager.party_setup_finished.connect(_on_party_setup_finished)

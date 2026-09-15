@@ -109,7 +109,9 @@ func run_host() -> void:
 	if not await wait_until(func(): return cm.current_turn_peer_id() == 1, "client kart çekip oynadı, sıra host'ta"):
 		return
 	cm.pass_turn()
-	if not await wait_until(func(): return cm.last_election_round == 1, "tur bitti -> seçim yapıldı"):
+	# İlk seçim normalde 3. tur sonunda: test hızlı olsun diye host doğrudan yaptırır.
+	cm._hold_election(1, false)
+	if not await wait_until(func(): return cm.last_election_round == 1, "seçim yapıldı"):
 		return
 	if not await wait_until(func(): return _drive_government(1), "hükümet kuruldu"):
 		return
@@ -148,18 +150,16 @@ func run_client() -> void:
 	if not await wait_until(func(): return cm.my_inventory().size() == 1, "kart çekme RPC'si"):
 		return
 	var card: String = cm.my_inventory()[0]
-	var before: Dictionary = pm.parties[me]["ideology"].duplicate()
-	# İlk seçimden önce deste sadece ideoloji ve miting kartı verir; miting il ister.
-	var is_miting := card == "miting"
-	cm.play_card(0, -1, "ankara" if is_miting else "")
+	# İlk seçimden önce deste il kartları verir (miting, anket, gözcü, karalama).
+	cm.play_card(0, 1, "ankara")
 	# Sadece elin boşalmasını bekle: host sırasını anında geçip turu (ve seçimi)
 	# bitirebilir, o zaman sıra çoktan tekrar bize dönmüş olur.
 	if not await wait_until(func(): return cm.my_inventory().is_empty(), "kart oynama RPC'si (%s)" % card):
 		return
-	if is_miting:
-		if not await wait_until(func(): return cm.province_events.has("ankara"), "miting sonucu (il olayı) senkronlandı"):
-			return
-	elif not await wait_until(func(): return pm.parties[me]["ideology"] != before, "ideoloji değişimi senkronlandı"):
+	if not await wait_until(func(): return cm.province_events.has("ankara") or cm.intel.has(me),
+			"kart sonucu (il olayı / istihbarat) senkronlandı"):
+		return
+	if not await wait_until(func(): return cm.province_ideology.size() == 67, "illerin görüşü senkronlandı"):
 		return
 	if not await wait_until(func(): return cm.last_election_round == 1 and cm.last_province_results.size() == 67,
 			"seçim sonucu (67 il, büyük paket) alındı"):

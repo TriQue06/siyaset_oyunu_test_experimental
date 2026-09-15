@@ -1,7 +1,7 @@
 extends SceneTree
 ## 6 botlu hızlandırılmış oyun: BotBrain kararları beklemesiz uygulanır.
 ## Çalışma hatası çıkmamalı, oyun ilerlemeli, hükümet kurulmalı, botlar
-## farklı türde kartlar oynamalı.
+## farklı türde hamleler (kart, yasa, il başkanlığı) yapmalı.
 ##   godot --headless --script res://tools/smoke_test_bots.gd
 
 var mm
@@ -46,7 +46,7 @@ func _initialize() -> void:
 	var votes := 0
 	var steps := 0
 	var was_governing := false
-	while steps < 3000 and not cm.game_finished and cm.round_number <= 14:
+	while steps < 4000 and not cm.game_finished and cm.round_number <= 14:
 		steps += 1
 		if gm.phase == gm.Phase.VOTING:
 			for bot in gm.eligible_voter_ids():
@@ -58,35 +58,52 @@ func _initialize() -> void:
 			var holder: int = gm.mandate_peer_id()
 			gm._apply_government_proposal(holder, brain.build_government(holder))
 			if gm.phase == gm.Phase.FORMING:
-				gm.tick(GameRules.FORMATION_TIMEOUT + 1.0)  # geçersiz teklif: süre dolsun
+				gm.tick(GameRules.FORMATION_TIMEOUT + 100.0)  # geçersiz teklif: süre dolsun
 		else:
 			var bot: int = cm.current_turn_peer_id()
-			if cm.inventories.get(bot, []).size() < cm.MAX_HAND_SIZE:
-				cm._apply_draw(bot)
-			var play: Dictionary = brain.choose_play(bot)
-			if play.is_empty():
-				cm._apply_pass(bot)
-			else:
-				var card: String = cm.inventories[bot][int(play["index"])]
-				var before: int = cm.inventories[bot].size()
-				cm._apply_play(bot, int(play["index"]), int(play["peer"]), String(play["province"]))
-				if cm.inventories.get(bot, []).size() < before:
-					var cp = root.get_node("CardPresets")
-					var key: String = "law" if cp.is_law_card(card) else ("ideology" if cp.is_ideology_card(card) else card)
-					played[key] = int(played.get(key, 0)) + 1
-				elif cm.current_turn_peer_id() == bot and not cm.is_turn_blocked():
-					cm._apply_pass(bot)
+			var action: Dictionary = brain.choose_action(bot)
+			match String(action["type"]):
+				"law":
+					cm._apply_law(bot, String(action["law"]))
+					played["law"] = int(played.get("law", 0)) + 1
+				"organization":
+					cm._apply_organization(bot, String(action["province"]))
+					played["il_baskanligi"] = int(played.get("il_baskanligi", 0)) + 1
+				"pass":
+					cm._apply_pass(bot, true)
+					played["pas"] = int(played.get("pas", 0)) + 1
+				_:
+					if cm.inventories.get(bot, []).size() < cm.MAX_HAND_SIZE:
+						cm._apply_draw(bot)
+					var play: Dictionary = brain.choose_play(bot)
+					if play.is_empty():
+						cm._apply_pass(bot, false)
+					else:
+						var card: String = cm.inventories[bot][int(play["index"])]
+						var before: int = cm.inventories[bot].size()
+						cm._apply_play(bot, int(play["index"]), int(play["peer"]), String(play["province"]))
+						if cm.inventories.get(bot, []).size() < before:
+							played[card] = int(played.get(card, 0)) + 1
+			if cm.current_turn_peer_id() == bot and not cm.is_turn_blocked() and not cm.game_finished:
+				cm._apply_pass(bot, false)
 		var governing: bool = gm.phase == gm.Phase.GOVERNING
 		if governing and not was_governing:
 			governments += 1
 		was_governing = governing
 
-	print("  adim %d, tur %d, hukumet %d, oy %d, kartlar %s" % [steps, cm.round_number, governments, votes, str(played)])
+	print("  adim %d, tur %d, hukumet %d, oy %d, hamleler %s" % [steps, cm.round_number, governments, votes, str(played)])
 	check("oyun ilerledi (en az 10 tur)", cm.round_number >= 10 or cm.game_finished, "tur %d" % cm.round_number)
 	check("en az bir hukumet kuruldu", governments >= 1)
 	check("botlar oy verdi", votes > 0)
-	check("botlar farkli kart turleri oynadi", played.size() >= 3, str(played))
-	check("miting oynandi", int(played.get("miting", 0)) > 0)
+	check("botlar yasa sundu", int(played.get("law", 0)) > 0)
+	check("botlar il baskanligi kurdu", int(played.get("il_baskanligi", 0)) > 0)
+	check("botlar kart oynadi (miting)", int(played.get("miting", 0)) > 0)
+	check("botlar farkli hamle turleri yapti", played.size() >= 5, str(played))
+	var mana_ok := true
+	for peer_id in cm.mana.keys():
+		if cm.mana_of(peer_id) < 0:
+			mana_ok = false
+	check("mana hic eksiye dusmedi", mana_ok, str(cm.mana))
 
 	print("")
 	if fails == 0:

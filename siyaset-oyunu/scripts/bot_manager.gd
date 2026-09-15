@@ -61,6 +61,24 @@ func _handle_turn(now: float) -> void:
 	if now < _turn_due:
 		return
 	if not _turn_drawn:
+		# Ana hamle: yasa / il başkanlığı / pas ise hemen uygulanır; kart yolu
+		# seçildiyse kart çekilir, oynama biraz sonra.
+		var action := BotBrain.choose_action(bot)
+		match String(action["type"]):
+			"law":
+				_turn_due = INF
+				CardManager._apply_law(bot, String(action["law"]))
+				_pass_if_stuck(bot)
+				return
+			"organization":
+				_turn_due = INF
+				CardManager._apply_organization(bot, String(action["province"]))
+				_pass_if_stuck(bot)
+				return
+			"pass":
+				_turn_due = INF
+				CardManager._apply_pass(bot, true)
+				return
 		_turn_drawn = true
 		_turn_due = now + _delay(PLAY_SECONDS)
 		if CardManager.inventories.get(bot, []).size() < CardManager.MAX_HAND_SIZE:
@@ -69,14 +87,15 @@ func _handle_turn(now: float) -> void:
 	_turn_due = INF
 	var play := BotBrain.choose_play(bot)
 	if play.is_empty():
-		CardManager._apply_pass(bot)
+		CardManager._apply_pass(bot, false)
 		return
-	var hand_size: int = CardManager.inventories.get(bot, []).size()
 	CardManager._apply_play(bot, int(play["index"]), int(play["peer"]), String(play["province"]))
-	# Kart reddedildiyse (beklenmedik bir kural) sırayı tıkamamak için pas geç.
-	if CardManager.inventories.get(bot, []).size() == hand_size and CardManager.current_turn_peer_id() == bot \
-			and not CardManager.is_turn_blocked():
-		CardManager._apply_pass(bot)
+	_pass_if_stuck(bot)
+
+## Hamle reddedildiyse (beklenmedik bir kural) sırayı tıkamamak için turu bitir.
+func _pass_if_stuck(bot: int) -> void:
+	if CardManager.current_turn_peer_id() == bot and not CardManager.is_turn_blocked():
+		CardManager._apply_pass(bot, false)
 
 func _handle_votes(now: float) -> void:
 	var key := "%s:%d:%s:%d:%d:%d" % [GovernmentManager.proposal_kind, GovernmentManager.proposal_peer_id,

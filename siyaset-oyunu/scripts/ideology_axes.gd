@@ -6,16 +6,14 @@ extends Node
 ##   social         : -3 progressive           <-> +3 conservative
 ##   administrative : -3 federal/pluralist     <-> +3 unitary/nationalist
 ##
-## At party setup, a player may pick their own starting position per axis,
-## but NOT an extreme (-3/+3) and NOT neutral (0). Only ideology cards played
-## during the match can push a party to an extreme or bring it back to
-## neutral (bkz. design doc Bölüm 3.1).
+## Her parti NÖTR (0, 0, 0) başlar; parti kurulumunda ideoloji seçilmez.
+## Partinin görüşü sadece sunduğu yasalarla kayar. İllerin görüşü aynı
+## eksenlerde bkz. ProvinceIdeology.
 
 const AXES := ["economic", "social", "administrative"]
 const AXIS_MIN := -3
 const AXIS_MAX := 3
-# Değerler bu kümeden seçilmeli: uç (-3/+3) ve nötr (0) hariç.
-const ALLOWED_START_VALUES := [-2, -1, 1, 2]
+const ALLOWED_START_VALUES := [0]
 
 static func default_values() -> Dictionary:
 	var v := {}
@@ -32,13 +30,9 @@ static func is_valid_start_ideology(values: Dictionary) -> bool:
 			return false
 	return true
 
-## Oyuncunun kart oynamadan önceki ilk konumu için rastgele (fakat kurala
-## uygun: uç/nötr hariç) bir ideoloji üretir.
+## Başlangıç ideolojisi: her zaman nötr (eski çağrılarla uyum için korunur).
 static func random_start_ideology() -> Dictionary:
-	var v := {}
-	for axis in AXES:
-		v[axis] = ALLOWED_START_VALUES[randi_range(0, ALLOWED_START_VALUES.size() - 1)]
-	return v
+	return default_values()
 
 ## Kart oynanınca değer güncellenirken kullanılır: oyun ortası için uç/nötr
 ## yasağı YOKTUR, sadece [-3, 3] aralığına sıkıştırılır.

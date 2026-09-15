@@ -6,11 +6,6 @@ extends RefCounted
 
 const WIDTH := 330.0
 const DIM := Color(0.66, 0.7, 0.78)
-const AXIS_INFO := {
-	"economic": ["Ekonomi", "Devletçi", "Piyasacı"],
-	"social": ["Sosyal", "İlerici", "Muhafazakâr"],
-	"administrative": ["Yönetim", "Çoğulcu", "Merkeziyetçi"],
-}
 
 static func build(peer_id: int, my_id: int) -> PanelContainer:
 	var party: Dictionary = PartyManager.parties.get(peer_id, {})
@@ -99,7 +94,8 @@ static func role_text(peer_id: int) -> String:
 	return "Hükümet: " + ", ".join(PackedStringArray(posts))
 
 static func _axis_row(axis: String, value: int, color: Color) -> Control:
-	var info: Array = AXIS_INFO.get(axis, [axis, "-", "+"])
+	var titles: Dictionary = CardPresets.AXIS_TITLES.get(axis, {"title": axis, "neg": "-", "pos": "+"})
+	var info: Array = [titles["title"], titles["neg"], titles["pos"]]
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 2)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE

@@ -5,16 +5,28 @@ extends RefCounted
 ##
 ## DÖNGÜ
 ##   - Bir TUR: turn_order'daki herkesin sırayla bir kez oynaması.
-##   - İlk seçim 1. turun sonunda yapılır; sonra her ELECTION_INTERVAL turda
-##     bir (1, 4, 7, 10 ...). Arada kalan turlarda kurulu hükümet görevde
-##     kalır ve her tur sonunda makam puanlarını toplar — "iktidarda kalma"
-##     gerilimi ve gensoru kartı ancak böyle anlam kazanır.
+##   - İlk FIRST_ELECTION_ROUND tur KAMPANYA DÖNEMİDİR (meclis yok: il
+##     başkanlıkları, mitingler, gözcü, seçim vaatleri). İlk seçim o turun
+##     sonunda, sonra her ELECTION_INTERVAL turda bir (3, 6, 9 ...). Arada
+##     kalan turlarda kurulu hükümet görevde kalır ve makam puanlarını toplar.
+##   - MANA: herkes MANA_START ile başlar, her tur sonunda +MANA_PER_ROUND,
+##     kart çekmeden pas geçince +MANA_PASS_BONUS. Sınır yok. Yasa
+##     LAW_MANA_COST, il başkanlığı ORG_MANA_COST; kart çekmek ve elden kart
+##     oynamak bedava.
 ##   - Hükümet kurulamazsa (tüm görev hakları biterse) o turun sonunda ERKEN
 ##     SEÇİM yapılır.
 ##   - MAX_ROUNDS'uncu turun sonunda oyun biter; en çok puanı olan kazanır
 ##     (eşitlikte milletvekili sayısı).
 
 const ELECTION_INTERVAL := 3
+const FIRST_ELECTION_ROUND := 3
+
+const MANA_START := 1
+const MANA_PER_ROUND := 1
+const MANA_PASS_BONUS := 1
+const LAW_MANA_COST := 1
+const ORG_MANA_COST := 2
+const ORG_MAX_LEVEL := 3
 ## GEÇİCİ olarak iki katına çıkarıldı (12 -> 24) ki oyun geç bitsin.
 const MAX_ROUNDS := 24
 
@@ -34,9 +46,9 @@ const ELECTION_NIGHT_HOLD := 5.0
 const MIN_PLAYERS_TO_CONTINUE := 2
 
 static func is_election_round(round_number: int) -> bool:
-	if round_number == 1:
-		return true
-	return round_number > 1 and (round_number - 1) % ELECTION_INTERVAL == 0
+	# Son turun sonunda seçim yapılmaz: oyun biter.
+	return round_number >= FIRST_ELECTION_ROUND and round_number < MAX_ROUNDS \
+		and (round_number - FIRST_ELECTION_ROUND) % ELECTION_INTERVAL == 0
 
 ## round_number'dan (dahil) itibaren seçimin yapılacağı ilk tur; oyun
 ## bitmeden seçim kalmadıysa -1.

@@ -1,16 +1,17 @@
 class_name PublicOpinion
 extends RefCounted
-## KAMUOYU kuralları. Her partinin seçimler arasında birikip eriyen iki tür
-## desteği var (durum CardManager'da tutulur; buradaki fonksiyonlar saf):
+## GÜÇ kuralları — saf fonksiyonlar, durum CardManager'da.
 ##
-##   - ULUSAL kamuoyu  : yasalar, iktidar icraatı, provokasyonlar.
-##   - İL kamuoyu      : o ilde yapılan miting ve yatırımlar.
-##
-## Seçimde bir partinin bir ildeki ideolojik desteği şu çarpanla çarpılır:
-##   1 + EFFECT_PER_POINT * (ulusal + il)    (MIN_MULT..MAX_MULT arasında)
-## Yani +5 puan o ilde ~%30 daha fazla oy demek. Puanlar her tur sonunda
-## sıfıra doğru söner (erken kazanılan avantaj sonsuza kadar sürmez,
-## seçimden hemen önceki hamleler daha değerlidir).
+## Bir partinin bir ildeki seçim desteği iki YAKINLIKTAN oluşur:
+##   - İDEOLOJİK yakınlık: partinin görüşü ile ilin görüşü arasındaki mesafe
+##     (ElectionModel.support). İllerin görüşü oyun başında belirlenir ve
+##     değişmez (bkz. ProvinceIdeology); partiler NÖTR başlar, görüşleri
+##     sadece sundukları yasalarla kayar.
+##   - AKTİVİTE yakınlığı: o ilde yapılanlar — miting, yatırım, yasa etkileri,
+##     karalama (il puanı, tur sonunda söner) + İL BAŞKANLIĞI (seviye başına
+##     kalıcı puan).
+## Seçimde ideolojik destek şu çarpanla çarpılır:
+##   1 + EFFECT_PER_POINT * (ulusal + aktivite)    (MIN_MULT..MAX_MULT arasında)
 ##
 ## Dengeyi değiştirmek için sadece bu dosyadaki sabitleri düzenlemek yeterli.
 
@@ -30,14 +31,12 @@ const PROVOCATION_LOCAL := -2.5
 const PROVOCATION_NATIONAL := -1.0
 ## Provokasyon riski: partinin ideolojisi ile ilin MEVCUT siyasi dengesi
 ## arasındaki mesafe SAFE_DISTANCE'tan küçükse risk yok; FULL_DISTANCE'a
-## (her eksende uç sağ vs uç sol, ~10.4) yaklaştıkça MAX_RISK'e çıkar.
+## yaklaştıkça MAX_RISK'e çıkar. İl başkanlığı riski seviye başına azaltır.
 const PROVOCATION_MAX_RISK := 0.5
 const PROVOCATION_SAFE_DISTANCE := 1.5
 const PROVOCATION_FULL_DISTANCE := 9.0
-## İlin siyasi dengesinde: seçmen eğiliminin ağırlığı 1; bir partinin ağırlığı
-## = oy payı (0..1) * SHARE_WEIGHT + pozitif il kamuoyu * LOCAL_WEIGHT.
-## Böylece bir ilde güçlenen (oy alan, miting/yatırım yapan) parti o ilin
-## dengesini kendi ideolojisine doğru çeker.
+## İlin siyasi dengesinde: il görüşünün ağırlığı 1; bir partinin ağırlığı
+## = oy payı (0..1) * SHARE_WEIGHT + pozitif aktivite * LOCAL_WEIGHT.
 const BALANCE_SHARE_WEIGHT := 0.5
 const BALANCE_LOCAL_WEIGHT := 0.25
 
@@ -50,23 +49,49 @@ const INVEST_PARTNER_LOCAL := 1.5
 ## Seçim anında hükümette olan her parti bu kadar ulusal eksiyle seçime girer.
 const GOVERNMENT_FATIGUE := -1.5
 
+# --- İl başkanlığı ------------------------------------------------------------
+## Seviye başına KALICI aktivite (sönmez).
+const ORG_ACTIVITY_PER_LEVEL := 1.5
+## Seviye başına miting provokasyon riskinin azalma oranı.
+const ORG_RISK_REDUCTION_PER_LEVEL := 0.25
+
 # --- Yasalar ------------------------------------------------------------------
-## Tabanın beklediği yönde oy: küçük artı.
-const LAW_BASE_REWARD := 0.5
-## Tabana TERS oy: taban beklentisinin gücü (1..3) başına eksi.
-const LAW_BASE_PENALTY_PER_POINT := 0.8
-## Tabana ters oy veren parti, yasanın yönüne eğilimli illerde az da olsa
-## yeni seçmen çeker (il başına en fazla bu kadar).
-const LAW_NEW_VOTERS_LOCAL := 0.5
-## Yasa geçerse getiren partiye: hükümetten / muhalefetten (iktidara rağmen).
-const LAW_PASSED_GOVERNMENT := 1.5
-const LAW_PASSED_OPPOSITION := 3.5
-## Yasa reddedilirse getiren parti.
-const LAW_REJECTED := -1.0
-## Muhalefetin yasasına EVET diyen hükümet partisi ("gündemi muhalefete
-## kaptırdı"). Kendi tabanı da o yasayı destekliyorsa ceza daha küçük.
-const GOVERNMENT_YES_ON_OPPOSITION := -1.2
-const GOVERNMENT_YES_ON_OPPOSITION_ALIGNED := -0.4
+## UYUM: ilin yasa eksenindeki değeri × yasanın yönü / 3  (−1..+1).
+## Getiren parti, il başına: PROPOSER_POINTS × uyum; kabul edilirse × PASSED_MULT.
+## (Meclis yokken sunulan yasa = seçim vaadi: kabul edilmemiş gibi.)
+const LAW_PROPOSER_POINTS := 2.0
+const LAW_PASSED_MULT := 2.0
+## Oy veren parti (EVET +1 / HAYIR −1, çekimser etkisiz), il başına:
+##   VOTE_IDEOLOGY × uyum × oy  (+ aşağıdaki duruş etkisi, sadece EVET'te)
+const LAW_VOTE_IDEOLOGY := 1.5
+## İktidar partisi muhalefetin yasasına EVET: her ilde (gündemi kaptırdı).
+## Yasaya uyumlu illerde ideolojik artı bunu nötre/artıya çevirebilir.
+const LAW_GOV_YES_ON_OPPOSITION := -1.0
+## Muhalefet partisi iktidarın yasasına EVET: her ilde (istikrar). Yasaya zıt
+## illerde ideolojik eksi bunu nötre/eksiye çevirebilir.
+const LAW_OPPOSITION_YES_ON_GOV := 0.8
+
+# --- Karalama -----------------------------------------------------------------
+## Hedefin kaybı = DAMAGE / (1 + DEFENSE_FACTOR × hedefin il gücü)
+## Karalayanın kazancı = GAIN × (1 + ATTACK_FACTOR × karalayanın il gücü)
+const PROPAGANDA_DAMAGE := 3.0
+const PROPAGANDA_GAIN := 1.0
+const PROPAGANDA_DEFENSE_FACTOR := 0.5
+const PROPAGANDA_ATTACK_FACTOR := 0.3
+## Bir partinin bir ildeki GÜCÜ = IDEOLOGY_WEIGHT × ideolojik yakınlık (0..1)
+## + ACTIVITY_WEIGHT × pozitif aktivite.
+const STRENGTH_IDEOLOGY_WEIGHT := 3.0
+const STRENGTH_ACTIVITY_WEIGHT := 0.4
+
+# --- Anket --------------------------------------------------------------------
+## Anket sonucundaki her oy payı en fazla bu oranda sapar (%80 doğruluk).
+const POLL_ERROR := 0.2
+
+# --- Vekil momentumu ------------------------------------------------------------
+## Seçimden bu yana vekil payındaki değişim (yüzde puan) başına ulusal puan:
+## vekil çalarak büyüyen parti bir sonraki seçime artıyla girer.
+const SEAT_MOMENTUM_PER_POINT := 0.6
+const SEAT_MOMENTUM_LIMIT := 4.0
 
 const AXES := ["economic", "social", "administrative"]
 
@@ -77,9 +102,9 @@ static func multiplier(national: float, local: float) -> float:
 	return clampf(1.0 + EFFECT_PER_POINT * (national + local), MIN_MULT, MAX_MULT)
 
 ## İlin mevcut siyasi dengesi (3 eksenli bir nokta).
-##   voter_center : data/province_voters.json'daki seçmen eğilimi
+##   voter_center : ilin görüşü
 ##   shares       : peer_id -> o ildeki son seçim oy yüzdesi (0..100)
-##   local        : peer_id -> o ildeki kamuoyu puanı
+##   local        : peer_id -> o ildeki aktivite
 ##   ideologies   : peer_id -> parti ideolojisi
 static func balance_center(voter_center: Dictionary, shares: Dictionary, local: Dictionary, ideologies: Dictionary) -> Dictionary:
 	var sum := {}
@@ -101,27 +126,42 @@ static func balance_center(voter_center: Dictionary, shares: Dictionary, local: 
 	return center
 
 ## 0..PROVOCATION_MAX_RISK arası provokasyon olasılığı.
-static func provocation_risk(party_ideology: Dictionary, center: Dictionary) -> float:
+static func provocation_risk(party_ideology: Dictionary, center: Dictionary, org_level: int = 0) -> float:
 	var d := ElectionModel.distance(party_ideology, center)
 	var t: float = clampf((d - PROVOCATION_SAFE_DISTANCE) / (PROVOCATION_FULL_DISTANCE - PROVOCATION_SAFE_DISTANCE), 0.0, 1.0)
-	return PROVOCATION_MAX_RISK * t
+	return PROVOCATION_MAX_RISK * t * maxf(0.0, 1.0 - ORG_RISK_REDUCTION_PER_LEVEL * org_level)
 
-## Parti tabanının bir yasadan beklentisi: partinin yasa eksenindeki değeri ×
-## yasanın yönü. >0: EVET bekleniyor, <0: HAYIR bekleniyor, 0: taban kayıtsız.
-static func law_expectation(party_ideology: Dictionary, law: Dictionary) -> int:
-	return int(party_ideology.get(law["axis"], 0)) * int(law["dir"])
+## Yasanın bir ille uyumu: −1 (tam zıt) .. +1 (tam uyumlu).
+static func law_alignment(center: Dictionary, axis: String, dir: int) -> float:
+	return clampf(float(center.get(axis, 0.0)) * dir / 3.0, -1.0, 1.0)
 
-## Bir oyun sadece TABAN tepkisinden gelen ulusal kamuoyu değişimi.
-static func vote_base_delta(expectation: int, yes: bool) -> float:
-	if expectation == 0:
+## Yasayı getiren partinin bir ildeki güç değişimi.
+static func law_proposer_delta(alignment: float, passed: bool) -> float:
+	return LAW_PROPOSER_POINTS * alignment * (LAW_PASSED_MULT if passed else 1.0)
+
+## Oy veren partinin bir ildeki güç değişimi. choice: +1 EVET, 0 ÇEKİMSER, −1 HAYIR.
+static func law_vote_delta(alignment: float, choice: int, voter_in_gov: bool, proposer_in_gov: bool) -> float:
+	if choice == 0:
 		return 0.0
-	if (expectation > 0) == yes:
-		return LAW_BASE_REWARD
-	return -LAW_BASE_PENALTY_PER_POINT * absi(expectation)
+	var delta := LAW_VOTE_IDEOLOGY * alignment * float(choice)
+	if choice > 0:
+		if voter_in_gov and not proposer_in_gov:
+			delta += LAW_GOV_YES_ON_OPPOSITION
+		elif not voter_in_gov and proposer_in_gov:
+			delta += LAW_OPPOSITION_YES_ON_GOV
+	return delta
 
-## Tabana ters oy verince bir ilden çekilen yeni seçmen (0 ise etkisiz).
-static func law_new_voters_local(voter_center: Dictionary, law: Dictionary, yes: bool) -> float:
-	var lean: float = float(voter_center.get(law["axis"], 0.0)) * int(law["dir"]) * (1.0 if yes else -1.0)
-	if lean <= 0.5:
-		return 0.0
-	return LAW_NEW_VOTERS_LOCAL * minf(lean, 2.0) / 2.0
+## Bir partinin bir ildeki gücü (karalamada saldırı/savunma).
+static func party_strength(party_ideology: Dictionary, center: Dictionary, activity: float) -> float:
+	var closeness := clampf(ElectionModel.support(party_ideology, center) - ElectionModel.SUPPORT_FLOOR, 0.0, 1.0)
+	return STRENGTH_IDEOLOGY_WEIGHT * closeness + STRENGTH_ACTIVITY_WEIGHT * maxf(0.0, activity)
+
+static func propaganda_damage(defender_strength: float) -> float:
+	return PROPAGANDA_DAMAGE / (1.0 + PROPAGANDA_DEFENSE_FACTOR * maxf(0.0, defender_strength))
+
+static func propaganda_gain(attacker_strength: float) -> float:
+	return PROPAGANDA_GAIN * (1.0 + PROPAGANDA_ATTACK_FACTOR * maxf(0.0, attacker_strength))
+
+## Vekil payı değişimi (yüzde puan) -> ulusal puan.
+static func seat_momentum(share_change_points: float) -> float:
+	return clampf(share_change_points * SEAT_MOMENTUM_PER_POINT, -SEAT_MOMENTUM_LIMIT, SEAT_MOMENTUM_LIMIT)

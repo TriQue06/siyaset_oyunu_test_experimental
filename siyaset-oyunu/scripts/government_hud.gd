@@ -178,8 +178,8 @@ static func fill_score_panel(box: VBoxContainer, peer_ids: Array, my_id: int) ->
 		row.add_child(score_label)
 		box.add_child(row)
 
-## Yasa oylaması: 1. satır yasa ve oy durumu, 2. satır oyuncunun TABANININ
-## beklentisi ve EVET/HAYIR'ın kamuoyuna etkisi.
+## Yasa oylaması: 1. satır yasa ve oy durumu, 2. satır bu oyuncu için oyların
+## genel etkisi (il il değişir; illerin görüşü gizli olduğu için sayı verilmez).
 static func _law_status_text(my_id: int, time_text: String) -> String:
 	var law_type := GovernmentManager.proposal_law
 	var totals := GovernmentManager.vote_seat_totals()
@@ -191,21 +191,27 @@ static func _law_status_text(my_id: int, time_text: String) -> String:
 		return first + "\nOyun: %s · diğer partilerin oyu bekleniyor" % GovernmentManager.vote_text(GovernmentManager.my_vote())
 	if not GovernmentManager.voter_ids().has(my_id):
 		return first
-	return first + "\n" + law_expectation_text(my_id)
+	return first + "\n" + String(law_vote_hint(my_id)["short"])
 
-## "Tabanın EVET bekliyor · EVET +0.5 / HAYIR −1.6 kamuoyu"
-static func law_expectation_text(my_id: int) -> String:
-	var expectation := CardManager.law_expectation(my_id, GovernmentManager.proposal_law)
-	var base_text := "Tabanın kayıtsız"
-	if expectation > 0:
-		base_text = "Tabanın EVET bekliyor"
-	elif expectation < 0:
-		base_text = "Tabanın HAYIR bekliyor"
-	return "%s · EVET %+.1f / ÇEKİMSER %+.1f / HAYIR %+.1f kamuoyu" % [
-		base_text,
-		CardManager.preview_law_vote(my_id, GovernmentManager.VOTE_YES),
-		CardManager.preview_law_vote(my_id, GovernmentManager.VOTE_ABSTAIN),
-		CardManager.preview_law_vote(my_id, GovernmentManager.VOTE_NO)]
+## Bu oyuncunun oylamadaki yeri için EVET / HAYIR ipuçları.
+static func law_vote_hint(my_id: int) -> Dictionary:
+	var proposer := GovernmentManager.proposal_peer_id
+	var no_text := "HAYIR: yasaya yakın illerde güç kaybı, zıt illerde kazanç"
+	if my_id == proposer:
+		return {"yes": "EVET: kabul edilirse yasanın etkisi 2 katına çıkar", "no": no_text,
+			"short": "Senin yasan: kabul edilirse il etkileri 2 kat"}
+	var me_gov := GovernmentManager.proposal_gov_ids.has(my_id)
+	var proposer_gov := GovernmentManager.proposal_gov_ids.has(proposer)
+	if me_gov and not proposer_gov:
+		return {"yes": "EVET: muhalefete gündem kaptırırsın — her ilde eksi, yasaya yakın illerde nötr/artı",
+			"no": no_text,
+			"short": "İktidardasın: muhalefetin yasasına EVET her ilde eksi (yakın illerde az) · kabul edilirse getiren güçlenir"}
+	if not me_gov and proposer_gov:
+		return {"yes": "EVET: istikrar — çoğu ilde artı, yasaya zıt illerde nötr/eksi",
+			"no": no_text,
+			"short": "Muhalefettesin: iktidarın yasasına EVET istikrar sayılır, çoğu ilde artı"}
+	return {"yes": "EVET: yasaya yakın illerde artı, zıt illerde eksi", "no": no_text,
+		"short": "Etkisi il il değişir: yasaya yakın illerde EVET, zıt illerde HAYIR kazandırır"}
 
 ## Hükümet teklifi: 1/2 koalisyon görüşmesi ya da 2/2 meclis oylaması.
 static func _government_status_text(my_id: int, time_text: String) -> String:

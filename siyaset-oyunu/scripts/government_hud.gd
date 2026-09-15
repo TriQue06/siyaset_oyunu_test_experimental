@@ -61,7 +61,8 @@ static func _post_row(title: String, peer_id: int) -> Control:
 static func fill_government_panel(box: VBoxContainer) -> void:
 	_clear(box)
 	if GovernmentManager.is_voting() and GovernmentManager.proposal_kind == GovernmentManager.KIND_GOVERNMENT:
-		var title := section_title("%s — %s teklifi" % [
+		# İki satır: tek satırda sol paneli genişletip yandaki alanı itiyordu.
+		var title := section_title("%s\n%s teklifi" % [
 			"KOALİSYON GÖRÜŞMESİ" if GovernmentManager.is_coalition_stage() else "OYLANAN HÜKÜMET",
 			party_name_of(GovernmentManager.proposal_peer_id)])
 		title.modulate = Color(1.0, 0.85, 0.35)

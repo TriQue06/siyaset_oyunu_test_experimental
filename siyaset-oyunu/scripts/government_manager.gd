@@ -34,6 +34,8 @@ signal government_changed
 signal proposal_changed
 signal proposal_resolved(accepted: bool, kind: String, proposer_id: int)
 signal scores_changed
+## Koalisyondan çekilme gibi herkese duyurulacak olaylar.
+signal coalition_changed(text: String)
 
 enum Phase { IDLE, FORMING, VOTING, GOVERNING }
 
@@ -83,6 +85,8 @@ var last_resolution_reason: String = ""
 var government: Dictionary = {}            # post_id -> peer_id
 var main_gov_peer_id: int = -1             # başbakanlığı tutan parti
 var scores: Dictionary = {}                # peer_id -> int (biriken puan)
+## Bir ortak çekildi ve ana iktidar partisi yalnız kalabilir (bkz. ABANDONED_FALL_PENALTY).
+var abandoned: bool = false
 
 var state_version: int = 0
 
@@ -272,6 +276,7 @@ func start_formation() -> void:
 	attempts_used = 0
 	_clear_proposal()
 	last_resolution_reason = ""
+	abandoned = false
 	_set_phase(Phase.FORMING if not mandate_order.is_empty() else Phase.IDLE)
 	_push_state()
 
@@ -352,6 +357,50 @@ func submit_censure(peer_id: int) -> void:
 	votes = {}
 	_set_phase(Phase.VOTING)
 	_push_state()
+
+## Bu parti koalisyondan çekilebilir mi? (Hükümette, ana iktidar partisi
+## değil, oylama/kurma sürmüyor.)
+func can_withdraw(peer_id: int) -> bool:
+	return phase == Phase.GOVERNING and peer_id != main_gov_peer_id and government_party_ids().has(peer_id)
+
+## Küçük ortak koalisyondan çekilir: görevleri ana iktidar partisine geçer,
+## kendisi WITHDRAW_SCORE_PENALTY puan kaybeder. Hükümet salt çoğunluğu
+## kaybederse gensoru desteye girer; ana parti yalnız kalıp gensoruyla düşerse
+## ağır ceza alır (bkz. _resolve_proposal).
+func withdraw_from_coalition() -> void:
+	if _is_authority():
+		_apply_withdraw(multiplayer.get_unique_id())
+	else:
+		_request_withdraw.rpc_id(1)
+
+func _apply_withdraw(peer_id: int) -> void:
+	if not can_withdraw(peer_id):
+		return
+	for post_id in government.keys():
+		if int(government[post_id]) == peer_id:
+			government[post_id] = main_gov_peer_id
+	scores[peer_id] = score_of(peer_id) - GovernmentPresets.WITHDRAW_SCORE_PENALTY
+	abandoned = true
+	var alone := government_party_ids().size() == 1
+	var text := "%s koalisyondan çekildi (−%d puan).%s%s" % [
+		_party_name(peer_id), GovernmentPresets.WITHDRAW_SCORE_PENALTY,
+		(" %s hükümeti tek başına kaldı." % _party_name(main_gov_peer_id)) if alone else "",
+		" Hükümet salt çoğunluğu kaybetti!" if not has_majority() else ""]
+	last_resolution_reason = text
+	_push_state()
+	if not _is_local_only():
+		_notify_coalition.rpc(text)
+	coalition_changed.emit(text)
+
+@rpc("any_peer", "reliable")
+func _request_withdraw() -> void:
+	if not MultiplayerManager.is_host:
+		return
+	_apply_withdraw(multiplayer.get_remote_sender_id())
+
+@rpc("authority", "reliable")
+func _notify_coalition(text: String) -> void:
+	coalition_changed.emit(text)
 
 ## Yasa teklifi (yasa kartı oynanınca CardManager çağırır).
 func submit_law(peer_id: int, law_type: String) -> bool:
@@ -475,6 +524,7 @@ func _resolve_proposal() -> void:
 		if accepted:
 			government = proposal_assignments.duplicate(true)
 			main_gov_peer_id = int(government.get(GovernmentPresets.POST_PM, -1))
+			abandoned = false
 			_clear_proposal()
 			_set_phase(Phase.GOVERNING)
 			last_resolution_reason = "%s hükümeti güvenoyu aldı." % _party_name(main_gov_peer_id)
@@ -483,7 +533,13 @@ func _resolve_proposal() -> void:
 			_fail_attempt()
 	else: # KIND_CENSURE
 		if accepted:
-			# Hükümet düştü: kurma aşaması baştan başlar.
+			# Hükümet düştü: kurma aşaması baştan başlar. Ortağı çekildiği için
+			# tek başına kalıp düşen ana parti ağır puan kaybeder.
+			var fall_note := ""
+			if abandoned and government_party_ids().size() == 1 and main_gov_peer_id != -1:
+				scores[main_gov_peer_id] = score_of(main_gov_peer_id) - GovernmentPresets.ABANDONED_FALL_PENALTY
+				fall_note = " Yalnız kalan %s −%d puan." % [_party_name(main_gov_peer_id), GovernmentPresets.ABANDONED_FALL_PENALTY]
+			abandoned = false
 			government.clear()
 			main_gov_peer_id = -1
 			_build_mandate_order()
@@ -491,7 +547,7 @@ func _resolve_proposal() -> void:
 			attempts_used = 0
 			_clear_proposal()
 			_set_phase(Phase.FORMING if not mandate_order.is_empty() else Phase.IDLE)
-			last_resolution_reason = "Gensoru kabul edildi, hükümet düştü."
+			last_resolution_reason = "Gensoru kabul edildi, hükümet düştü." + fall_note
 		else:
 			_clear_proposal()
 			_set_phase(Phase.GOVERNING)
@@ -580,6 +636,7 @@ func _pack_state() -> Dictionary:
 		"scores": scores,
 		"phase_time_left": _phase_time_left,
 		"reason": last_resolution_reason,
+		"abandoned": abandoned,
 		"resolving": _resolving,
 	}
 
@@ -638,6 +695,7 @@ func _sync_state(state: Dictionary) -> void:
 	scores = state["scores"]
 	_phase_deadline_ms = Time.get_ticks_msec() + int(float(state["phase_time_left"]) * 1000.0)
 	last_resolution_reason = str(state["reason"])
+	abandoned = bool(state.get("abandoned", false))
 	_resolving = bool(state.get("resolving", false))
 	_emit_all()
 
@@ -657,6 +715,7 @@ func reset() -> void:
 	main_gov_peer_id = -1
 	scores = {}
 	last_resolution_reason = ""
+	abandoned = false
 	_last_blocked = false
 	_clear_proposal()
 	_push_state()

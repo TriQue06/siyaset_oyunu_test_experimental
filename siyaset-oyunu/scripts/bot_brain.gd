@@ -139,16 +139,25 @@ static func _eval_steal(bot: int, card_type: String) -> Dictionary:
 static func _eval_law(bot: int, card_type: String) -> Dictionary:
 	if not CardManager.can_play_card(bot, card_type):
 		return {}
-	var mine := CardManager.law_expectation(bot, card_type)
-	if mine < 0:
+	var law: Dictionary = CardPresets.law_data(card_type)
+	var factor: float = float(law["factor"])
+	# Yasa, getiren partinin görüşünü kaydırır: seçmene yaklaştırıyor mu?
+	var mine := _ideology(bot)
+	var moved := mine.duplicate()
+	moved[law["axis"]] = IdeologyAxes.clamp_value(int(mine[law["axis"]]) + int(law["dir"]) * int(law["shift"]))
+	var shift_gain := (_electoral_strength(moved) - _electoral_strength(mine)) * 40.0
+	if GovernmentManager.voter_ids().is_empty():
+		return {"score": shift_gain + PublicOpinion.LAW_BASE_REWARD * factor, "peer": -1, "province": ""}
+	var expectation := CardManager.law_expectation(bot, card_type)
+	if expectation < 0 and shift_gain <= 0.0:
 		return {}
 	var yes := 0
 	var no := 0
 	for peer_id in GovernmentManager.voter_ids():
-		var expectation := CardManager.law_expectation(peer_id, card_type)
-		if peer_id == bot or expectation > 0:
+		var other := CardManager.law_expectation(peer_id, card_type)
+		if peer_id == bot or other > 0:
 			yes += GovernmentManager.seats_of(peer_id)
-		elif expectation < 0:
+		elif other < 0:
 			no += GovernmentManager.seats_of(peer_id)
 	var in_gov := CardManager.is_government_party(bot)
 	var score: float
@@ -156,8 +165,7 @@ static func _eval_law(bot: int, card_type: String) -> Dictionary:
 		score = PublicOpinion.LAW_PASSED_GOVERNMENT if in_gov else PublicOpinion.LAW_PASSED_OPPOSITION
 	else:
 		score = PublicOpinion.LAW_REJECTED
-	if mine > 0:
-		score += PublicOpinion.LAW_BASE_REWARD
+	score = score * factor + PublicOpinion.vote_base_delta(expectation, true) * factor + shift_gain
 	return {"score": score, "peer": -1, "province": ""}
 
 # --- Oylama --------------------------------------------------------------------

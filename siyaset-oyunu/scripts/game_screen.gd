@@ -146,6 +146,7 @@ func _ready() -> void:
 	CardManager.seats_changed.connect(_on_seats_changed)
 	GovernmentManager.proposal_resolved.connect(_on_proposal_resolved)
 	CardManager.opinion_event.connect(_show_toast)
+	GovernmentManager.coalition_changed.connect(_show_toast)
 	CardManager.opinion_changed.connect(_on_opinion_changed)
 
 	UiSkin.skin_panel(left_panel, UiSkin.PANEL_DARK)

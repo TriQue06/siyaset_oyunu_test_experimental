@@ -34,6 +34,9 @@ func new_game(ideologies: Dictionary) -> void:
 	cm.turn_order = ideologies.keys()
 	cm.current_turn_index = 0
 
+func cp_law(card_type: String) -> bool:
+	return root.get_node("CardPresets").is_law_card(card_type)
+
 func pass_round() -> void:
 	for i in cm.turn_order.size():
 		cm._apply_pass(cm.current_turn_peer_id())
@@ -273,6 +276,41 @@ func _initialize() -> void:
 	gm._apply_vote(2, gm.VOTE_ABSTAIN)
 	gm._apply_vote(3, gm.VOTE_NO)
 	check("cekimser HAYIR sayilmaz -> hukumet kuruldu", gm.has_government(), gm.last_resolution_reason)
+
+	print("")
+	print("=== 14) KOALISYONDAN CEKILME ===")
+	new_game({1: ideology(1, 1, 2), 2: ideology(-1, -1, 1), 3: ideology(2, 2, -1)})
+	pass_round()
+	cm.last_seats = {1: 150, 2: 140, 3: 100}
+	gm.start_formation()
+	var c4 := all_posts_to(1)
+	c4[gp.POST_DEPUTY_PM] = 2
+	gm._apply_government_proposal(1, c4)
+	gm._apply_vote(1, gm.VOTE_YES)
+	gm._apply_vote(2, gm.VOTE_YES)
+	gm._apply_vote(3, gm.VOTE_NO)
+	gm.scores = {}
+	check("koalisyon kuruldu", gm.has_government() and gm.government_party_ids().size() == 2)
+	check("kucuk ortak cekilebilir, ana parti ve muhalefet cekilemez", gm.can_withdraw(2) and not gm.can_withdraw(1) and not gm.can_withdraw(3))
+	gm._apply_withdraw(2)
+	check("cekilen ortak puan kaybetti", gm.score_of(2) == -gp.WITHDRAW_SCORE_PENALTY, str(gm.score_of(2)))
+	check("gorevleri ana partiye gecti, hukumet tek basina", gm.government_party_ids() == [1], str(gm.government_party_ids()))
+	check("hukumet cogunlugu kaybetti -> gensoru destede", not gm.has_majority() and cm._draw_pool(3).has("gensoru"))
+	gm.submit_censure(3)
+	gm._apply_vote(1, gm.VOTE_NO)
+	gm._apply_vote(2, gm.VOTE_YES)
+	gm._apply_vote(3, gm.VOTE_YES)
+	check("gensoruyla dustu", not gm.has_government(), gm.last_resolution_reason)
+	check("yalniz kalan ana parti agir puan kaybetti", gm.score_of(1) == -gp.ABANDONED_FALL_PENALTY, str(gm.score_of(1)))
+
+	print("")
+	print("=== 15) YASA KUVVETI VE GORUS KAYMASI ===")
+	check("kuvvet varyantlari yasa sayilir", cp_law("law_privatization_strong") and cp_law("law_family_weak"))
+	new_game({1: ideology(1, 1, 2), 2: ideology(-1, -1, 1), 3: ideology(2, 2, -1)})
+	cm.inventories[1] = ["law_nationalization_strong"]
+	cm._apply_play(1, 0)
+	check("meclis yokken yasa = secim vaadi, gorus 2 kaydi (guclu)", int(pm.parties[1]["ideology"]["economic"]) == -1, str(pm.parties[1]["ideology"]))
+	check("ideoloji kartlari desteden gelmez", not cm._draw_pool(1).has("capitalist"))
 
 	print("")
 	if fails == 0:

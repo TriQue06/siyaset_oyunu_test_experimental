@@ -73,6 +73,22 @@ static func fill_government_panel(box: VBoxContainer) -> void:
 		return
 	_fill_cabinet(box, GovernmentManager.government)
 
+	var me := box.multiplayer.get_unique_id()
+	if GovernmentManager.can_withdraw(me):
+		var withdraw := Button.new()
+		UiSkin.skin_button(withdraw)
+		withdraw.text = "Koalisyondan Çekil (−%d puan)" % GovernmentPresets.WITHDRAW_SCORE_PENALTY
+		withdraw.add_theme_font_size_override("font_size", 12)
+		withdraw.tooltip_text = "Görevlerin ana iktidar partisine geçer. Ortağın yalnız kalıp gensoruyla düşerse o %d puan kaybeder." % GovernmentPresets.ABANDONED_FALL_PENALTY
+		withdraw.pressed.connect(func():
+			if bool(withdraw.get_meta("armed", false)):
+				GovernmentManager.withdraw_from_coalition()
+			else:
+				withdraw.set_meta("armed", true)
+				withdraw.text = "Emin misin? Çekilmek için tekrar bas"
+		)
+		box.add_child(withdraw)
+
 ## government: post_id -> peer_id
 static func _fill_cabinet(box: VBoxContainer, government: Dictionary) -> void:
 	var party_ids: Array = []

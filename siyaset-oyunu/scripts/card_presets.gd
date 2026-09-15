@@ -3,9 +3,11 @@ extends Node
 ## Godot'un kendi import sistemi export'a otomatik dahil eder.
 ##
 ## Kart grupları:
-##   - İDEOLOJİ : kartı oynayan partinin kendi eksenini ±1 kaydırır.
+##   - İDEOLOJİ : (artık desteden gelmez) partinin kendi eksenini ±1 kaydırır.
 ##   - MİTİNG   : seçilen ilde kamuoyu kazandırır; provokasyon riski var.
-##   - YASA     : meclise bir yasa teklifi getirir (ekseni ve yönü var).
+##   - YASA     : meclise bir yasa teklifi getirir (ekseni, yönü, kuvveti var).
+##                Oynayan partinin GÖRÜŞÜ yasanın yönünde kayar — partilerin
+##                ideolojisi artık sadece savundukları yasalarla değişir.
 ##   - YATIRIM  : sadece hükümet partilerine gelir; seçilen ile yatırım.
 ##   - VEKİL ÇALMA / GENSORU : koşullu özel kartlar.
 ## Hangi kartın ne olasılıkla çekileceği CardManager._draw_weights'te.
@@ -57,6 +59,15 @@ const LAW_CARD_TYPES: Array[String] = [
 	"law_centralization",
 	"law_local_government",
 ]
+
+## Yasa kuvvetleri. Kart türü = temel yasa (Orta) ya da "_weak"/"_strong" eki.
+##   factor: kamuoyu etkileri (taban tepkisi, geçme/red bonusu) çarpanı
+##   shift : oynayan partinin görüşünün yasa yönünde kayma miktarı
+const LAW_STRENGTHS := {
+	"weak": {"label": "Hafif", "factor": 0.6, "shift": 1, "suffix": "_weak"},
+	"medium": {"label": "Orta", "factor": 1.0, "shift": 1, "suffix": ""},
+	"strong": {"label": "Güçlü", "factor": 1.6, "shift": 2, "suffix": "_strong"},
+}
 
 const CARD_TYPES: Array[String] = [
 	"capitalist",
@@ -121,6 +132,10 @@ func _ready() -> void:
 			_card_textures[card_type] = load(path)
 		else:
 			push_warning("Kart görseli bulunamadı: %s" % path)
+	# Yasa kuvvet varyantları temel yasanın görselini kullanır.
+	for base in LAW_CARD_TYPES:
+		for strength in LAW_STRENGTHS.values():
+			_card_textures[base + String(strength["suffix"])] = _card_textures.get(base)
 	_closed_texture = load("res://assets/cards/closed_cards.png")
 
 func get_card_texture(card_type: String) -> Texture2D:
@@ -144,7 +159,28 @@ func is_censure_card(card_type: String) -> bool:
 	return card_type == CENSURE_CARD_TYPE
 
 func is_law_card(card_type: String) -> bool:
-	return LAWS.has(card_type)
+	return not law_data(card_type).is_empty()
+
+## Yasa kartının verisi (temel yasa + kuvvet: strength/factor/shift/label);
+## yasa değilse boş sözlük.
+func law_data(card_type: String) -> Dictionary:
+	for key in LAW_STRENGTHS.keys():
+		var suffix: String = LAW_STRENGTHS[key]["suffix"]
+		if suffix != "" and card_type.ends_with(suffix) and LAWS.has(card_type.trim_suffix(suffix)):
+			return _with_strength(card_type.trim_suffix(suffix), key)
+	if LAWS.has(card_type):
+		return _with_strength(card_type, "medium")
+	return {}
+
+func _with_strength(base: String, strength: String) -> Dictionary:
+	var law: Dictionary = LAWS[base].duplicate()
+	var info: Dictionary = LAW_STRENGTHS[strength]
+	law["base"] = base
+	law["strength"] = strength
+	law["factor"] = info["factor"]
+	law["shift"] = info["shift"]
+	law["label"] = info["label"]
+	return law
 
 func has_baked_title(card_type: String) -> bool:
 	return BAKED_TITLE_TYPES.has(card_type)
@@ -171,7 +207,8 @@ func weighted_pick(weights: Dictionary, rng: RandomNumberGenerator) -> String:
 ## Kartın üstüne basılacak kısa başlık (placeholder görselli kartlar için).
 func card_short_title(card_type: String) -> String:
 	if is_law_card(card_type):
-		return "YASA\n" + String(LAWS[card_type]["title"]).replace(" Yasası", "")
+		var law := law_data(card_type)
+		return "YASA\n%s\n%s" % [String(law["title"]).replace(" Yasası", ""), law["label"]]
 	match card_type:
 		MITING_CARD_TYPE:
 			return "MİTİNG"
@@ -181,7 +218,8 @@ func card_short_title(card_type: String) -> String:
 
 func card_title(card_type: String) -> String:
 	if is_law_card(card_type):
-		return LAWS[card_type]["title"]
+		var law := law_data(card_type)
+		return "%s (%s)" % [law["title"], law["label"]]
 	match card_type:
 		"capitalist":
 			return "Kapitalist"
@@ -212,7 +250,7 @@ func card_title(card_type: String) -> String:
 
 ## Yasanın yönünü okunur yazar: "Ekonomi → Piyasacı".
 func law_direction_text(card_type: String) -> String:
-	var law: Dictionary = LAWS.get(card_type, {})
+	var law := law_data(card_type)
 	if law.is_empty():
 		return ""
 	var info: Dictionary = AXIS_TITLES[law["axis"]]
@@ -221,9 +259,9 @@ func law_direction_text(card_type: String) -> String:
 ## Kart üstüne gelince gösterilen açıklama.
 func card_description(card_type: String) -> String:
 	if is_law_card(card_type):
-		var law: Dictionary = LAWS[card_type]
-		return "%s (%s)\nMeclise getirilir, herkes oylar. Geçerse getiren parti kamuoyu kazanır — muhalefetten geliyorsa çok daha fazla. Tabanına ters oy veren kamuoyu kaybeder." % [
-			law["desc"], law_direction_text(card_type)]
+		var law := law_data(card_type)
+		return "%s (%s, %s kuvvet)\nPartinin görüşü bu yönde %d birim kayar.\nParlamento diyagramına sürükle: meclise gelir, herkes oylar. Geçerse getiren parti kamuoyu kazanır — muhalefetten geliyorsa çok daha fazla. Tabanına ters oy veren kamuoyu kaybeder. Kamuoyu etkileri x%.1f.\nMeclis kurulmadan önce oynanırsa oylamasız SEÇİM VAADİ olur." % [
+			law["desc"], law_direction_text(card_type), law["label"], int(law["shift"]), float(law["factor"])]
 	if is_ideology_card(card_type):
 		var effect: Dictionary = CARD_EFFECTS[card_type]
 		var info: Dictionary = AXIS_TITLES[effect["axis"]]

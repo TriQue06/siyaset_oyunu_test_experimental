@@ -55,7 +55,10 @@ const PROVINCE_EVENT_LIMIT := 6
 const WEIGHT_IDEOLOGY := 1.0
 const WEIGHT_MITING := 2.5
 const WEIGHT_STEAL := 0.6
-const WEIGHT_LAW := 0.6
+## Yasa kuvvetlerine göre (her temel yasa için): hafif/orta sık, güçlü nadir.
+const WEIGHT_LAW_WEAK := 0.7
+const WEIGHT_LAW_MEDIUM := 0.7
+const WEIGHT_LAW_STRONG := 0.3
 const WEIGHT_INVEST := 2.5
 ## Azınlık hükümeti varken gensorunun ağırlığı, diğer TÜM kartların toplamının
 ## bu katı — yani ~%67 olasılıkla gensoru gelir.
@@ -251,7 +254,8 @@ func can_play_card(peer_id: int, card_type: String, target_peer_id: int = -1, ta
 			return is_government_party(peer_id)
 		return true
 	if CardPresets.is_law_card(card_type):
-		return GovernmentManager.can_submit_law()
+		# Meclis kurulmadan önce yasa kartı oylamasız bir seçim vaadi olarak oynanır.
+		return GovernmentManager.can_submit_law() or last_seats.is_empty()
 	if CardPresets.is_censure_card(card_type):
 		return GovernmentManager.phase == GovernmentManager.Phase.GOVERNING and not is_government_party(peer_id)
 	return true
@@ -285,7 +289,7 @@ func miting_risk(peer_id: int, province_id: String) -> float:
 	return PublicOpinion.provocation_risk(ideology, province_balance(province_id))
 
 func law_expectation(peer_id: int, law_type: String) -> int:
-	var law: Dictionary = CardPresets.LAWS.get(law_type, {})
+	var law := CardPresets.law_data(law_type)
 	if law.is_empty():
 		return 0
 	return PublicOpinion.law_expectation(PartyManager.parties.get(peer_id, {}).get("ideology", {}), law)
@@ -304,7 +308,7 @@ func _law_vote_delta(peer_id: int, law_type: String, choice: int, proposer: int,
 		return 0.0
 	var yes := choice == GovernmentManager.VOTE_YES
 	var expectation := law_expectation(peer_id, law_type)
-	var delta := PublicOpinion.vote_base_delta(expectation, yes)
+	var delta := PublicOpinion.vote_base_delta(expectation, yes) * float(CardPresets.law_data(law_type).get("factor", 1.0))
 	if yes and peer_id != proposer and gov_ids.has(peer_id) and not gov_ids.has(proposer):
 		delta += PublicOpinion.GOVERNMENT_YES_ON_OPPOSITION_ALIGNED if expectation > 0 \
 			else PublicOpinion.GOVERNMENT_YES_ON_OPPOSITION
@@ -395,15 +399,16 @@ func draw_card() -> void:
 ##   - gensoru SADECE azınlık hükümeti varken, hükümet dışı partilere ve
 ##     elinde zaten gensoru yoksa — o zaman da çok yüksek olasılıkla.
 func _draw_weights(peer_id: int = -1) -> Dictionary:
+	# İdeoloji kartları artık desteden gelmez: görüş yasalarla değişir.
 	var weights := {}
-	for card_type in CardPresets.IDEOLOGY_CARD_TYPES:
-		weights[card_type] = WEIGHT_IDEOLOGY
 	weights[CardPresets.MITING_CARD_TYPE] = WEIGHT_MITING
+	for base in CardPresets.LAW_CARD_TYPES:
+		weights[base + "_weak"] = WEIGHT_LAW_WEAK
+		weights[base] = WEIGHT_LAW_MEDIUM
+		weights[base + "_strong"] = WEIGHT_LAW_STRONG
 	if not last_seats.is_empty():
 		for card_type in CardPresets.STEAL_CARD_TYPES:
 			weights[card_type] = WEIGHT_STEAL
-		for card_type in CardPresets.LAW_CARD_TYPES:
-			weights[card_type] = WEIGHT_LAW
 	if is_government_party(peer_id):
 		weights[CardPresets.INVEST_CARD_TYPE] = WEIGHT_INVEST
 	var censure_possible: bool = GovernmentManager.has_government() and not GovernmentManager.has_majority() \
@@ -512,7 +517,10 @@ func _apply_card_effect(peer_id: int, card_type: String, target_peer_id: int = -
 		GovernmentManager.submit_censure(peer_id)
 		return false
 	if CardPresets.is_law_card(card_type):
-		GovernmentManager.submit_law(peer_id, card_type)
+		if last_seats.is_empty():
+			_declare_program(peer_id, card_type)
+		else:
+			GovernmentManager.submit_law(peer_id, card_type)
 		return false
 	if card_type == CardPresets.MITING_CARD_TYPE:
 		_apply_miting(peer_id, target_province)
@@ -525,6 +533,14 @@ func _apply_card_effect(peer_id: int, card_type: String, target_peer_id: int = -
 		return false
 	PartyManager.apply_ideology_delta(peer_id, effect["axis"], int(effect["delta"]))
 	return false
+
+## Meclis yokken yasa kartı: oylamasız SEÇİM VAADİ — görüş kayar, küçük ulusal kamuoyu.
+func _declare_program(peer_id: int, card_type: String) -> void:
+	var law := CardPresets.law_data(card_type)
+	PartyManager.apply_ideology_delta(peer_id, law["axis"], int(law["dir"]) * int(law["shift"]))
+	_add_national(peer_id, PublicOpinion.LAW_BASE_REWARD * float(law["factor"]))
+	_event_message = "%s seçim vaadi: %s — görüşü %s yönüne kaydı." % [
+		_party_name(peer_id), law["title"], CardPresets.law_direction_text(card_type)]
 
 func _party_name(peer_id: int) -> String:
 	return PartyManager.parties.get(peer_id, {}).get("name", "?")
@@ -565,9 +581,10 @@ func _apply_investment(peer_id: int, province_id: String) -> void:
 func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed: bool, gov_ids: Array) -> void:
 	if not _is_authority():
 		return
-	var law: Dictionary = CardPresets.LAWS.get(law_type, {})
+	var law := CardPresets.law_data(law_type)
 	if law.is_empty():
 		return
+	var factor: float = float(law["factor"])
 	var voters := ElectionModel.load_province_voters()
 	for peer_id in votes.keys():
 		var choice := GovernmentManager.normalize_vote(votes[peer_id])
@@ -580,7 +597,7 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 		var expectation := law_expectation(peer_id, law_type)
 		if expectation != 0 and (expectation > 0) != yes:
 			for province_id in _province_ids:
-				var gain := PublicOpinion.law_new_voters_local(voters.get(province_id, {}), law, yes)
+				var gain := PublicOpinion.law_new_voters_local(voters.get(province_id, {}), law, yes) * factor
 				if gain > 0.0:
 					_add_local(province_id, peer_id, gain)
 	var proposer_in_gov := gov_ids.has(proposer)
@@ -589,10 +606,14 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 		bonus = PublicOpinion.LAW_PASSED_GOVERNMENT if proposer_in_gov else PublicOpinion.LAW_PASSED_OPPOSITION
 	else:
 		bonus = PublicOpinion.LAW_REJECTED
+	bonus *= factor
 	_add_national(proposer, bonus)
-	_push_state({"type": "opinion", "message": "%s %s — %s %+.1f kamuoyu%s." % [
+	# Yasayı savunan partinin görüşü, oylamadan SONRA yasanın yönünde kayar
+	# (oylamadaki taban beklentisi yasayı getirmeden önceki görüşe göredir).
+	PartyManager.apply_ideology_delta(proposer, law["axis"], int(law["dir"]) * int(law["shift"]))
+	_push_state({"type": "opinion", "message": "%s %s — %s %+.1f kamuoyu%s · görüşü %s yönüne kaydı." % [
 		law["title"], "KABUL EDİLDİ" if passed else "reddedildi", _party_name(proposer), bonus,
-		" (iktidara rağmen!)" if passed and not proposer_in_gov else ""]})
+		" (iktidara rağmen!)" if passed and not proposer_in_gov else "", CardPresets.law_direction_text(law_type)]})
 
 func _add_national(peer_id: int, amount: float) -> void:
 	if amount == 0.0 or peer_id == -1:

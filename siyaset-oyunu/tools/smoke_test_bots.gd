@@ -98,6 +98,15 @@ func _initialize() -> void:
 	check("botlar yasa sundu", int(played.get("law", 0)) > 0)
 	check("botlar il baskanligi kurdu", int(played.get("il_baskanligi", 0)) > 0)
 	check("botlar kart oynadi (miting)", int(played.get("miting", 0)) > 0)
+	check("botlar gozcu gonderdi (il gorusunu bilmiyorlar)", int(played.get("gozcu", 0)) > 0)
+	# Bilgi kısıtı: gözcü gönderilmemiş il bot için nötrdür.
+	var bot0: int = cm.turn_order[0]
+	var known: Dictionary = brain._known_centers(bot0)
+	var unknown_ok := true
+	for province_id in known.keys():
+		if not cm.has_scouted(bot0, province_id) and not (known[province_id] as Dictionary).is_empty():
+			unknown_ok = false
+	check("bot gozcu gondermedigi ilin gorusunu bilmez", unknown_ok)
 	check("botlar farkli hamle turleri yapti", played.size() >= 5, str(played))
 	var mana_ok := true
 	for peer_id in cm.mana.keys():

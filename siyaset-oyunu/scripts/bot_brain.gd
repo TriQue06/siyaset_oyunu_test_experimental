@@ -3,20 +3,23 @@ extends RefCounted
 ## Botların KARARLARI (zamanlaması BotManager'da). Basit fayda puanı: her olası
 ## hamle oyunun kendi formülleriyle (seçim desteği, il gücü, miting riski,
 ## yasanın il etkileri...) kabaca puanlanır, en yükseği seçilir.
-## Not: botlar illerin görüşünü doğrudan bilir (gözcü/anket kullanmaz) —
-## basitlik için; bu kartları sadece el dolunca boşaltmak için oynarlar.
+##
+## BİLGİ KISITI: botlar da insanlar gibi illerin görüşünü BİLMEZ. Sadece gözcü
+## gönderdikleri illerde her eksenin hangi uçta ya da ortada olduğunu bilirler
+## (bkz. _known_centers); bilmedikleri illeri nötr (0) varsayarlar. Bu yüzden
+## gözcü kartı botlar için de değerlidir. Miting riski ise insanlara da
+## gösterilen bir ipucu olduğu için doğrudan kullanılır.
 
 ## En iyi kartın puanı bunun altındaysa bot kart oynamaz (el doluysa oynar).
 const PASS_THRESHOLD := 0.4
 ## Ana hamlelerin taban puanları.
 const PASS_ACTION_SCORE := 0.7
 const DRAW_ACTION_SCORE := 1.1
+## Gözcü bilgisinden tahmin edilen eksen değeri (uç biliniyor, büyüklük değil).
+const LEANING_ESTIMATE := 2.0
 
 static func _ideology(peer_id: int) -> Dictionary:
 	return PartyManager.parties.get(peer_id, {}).get("ideology", IdeologyAxes.default_values())
-
-static func _voters() -> Dictionary:
-	return CardManager.province_voters()
 
 static func _seats() -> Dictionary:
 	return CardManager._province_seat_counts
@@ -24,13 +27,27 @@ static func _seats() -> Dictionary:
 static func _total_seats() -> float:
 	return float(maxi(1, CardManager.TOTAL_SEATS))
 
-## İdeolojinin tüm ülkedeki seçmen desteği (milletvekili ağırlıklı, 0..~1).
-static func _electoral_strength(ideology: Dictionary) -> float:
-	var voters := _voters()
+## Botun bildiği il görüşleri: province_id -> tahmini merkez. Gözcü gönderilmemiş
+## iller boş sözlük (= nötr) döner.
+static func _known_centers(bot: int) -> Dictionary:
+	var result := {}
+	for province_id in _seats().keys():
+		if not CardManager.has_scouted(bot, province_id):
+			result[province_id] = {}
+			continue
+		var center := CardManager.province_center(province_id)
+		var estimate := {}
+		for axis in IdeologyAxes.AXES:
+			estimate[axis] = signf(float(center.get(axis, 0.0))) * LEANING_ESTIMATE
+		result[province_id] = estimate
+	return result
+
+## İdeolojinin tüm ülkedeki (bilinen) seçmen desteği (milletvekili ağırlıklı).
+static func _electoral_strength(ideology: Dictionary, known: Dictionary) -> float:
 	var seats := _seats()
 	var weighted := 0.0
 	for province_id in seats.keys():
-		weighted += ElectionModel.support(ideology, voters.get(province_id, {})) * float(seats[province_id])
+		weighted += ElectionModel.support(ideology, known.get(province_id, {})) * float(seats[province_id])
 	return weighted / _total_seats()
 
 static func _election_soon() -> bool:
@@ -42,6 +59,7 @@ static func _election_soon() -> bool:
 ## Dönüş: {"type": "card"} | {"type": "law", "law"} | {"type": "organization",
 ## "province"} | {"type": "pass"}
 static func choose_action(bot: int) -> Dictionary:
+	var known := _known_centers(bot)
 	var best := {"type": "pass"}
 	var best_score := PASS_ACTION_SCORE
 
@@ -57,76 +75,85 @@ static func choose_action(bot: int) -> Dictionary:
 		best_score = card_score
 
 	if CardManager.can_propose_law(bot):
-		var law := _best_law(bot)
+		var law := _best_law(bot, known)
 		if not law.is_empty() and float(law["score"]) > best_score:
 			best = {"type": "law", "law": law["law"]}
 			best_score = float(law["score"])
 
-	var org := _best_organization(bot)
+	var org := _best_organization(bot, known)
 	if not org.is_empty() and float(org["score"]) > best_score:
 		best = {"type": "organization", "province": org["province"]}
 	return best
 
-## Seçim desteğini en çok artıracak yasa: il etkileri (geçme ihtimaliyle) +
-## partinin görüş kaymasının seçmene yaklaştırması.
-static func _best_law(bot: int) -> Dictionary:
-	var voters := _voters()
+## Seçim desteğini en çok artıracak yasa: bilinen illerdeki etkiler (geçme
+## ihtimaliyle) + partinin görüş kaymasının seçmene yaklaştırması.
+static func _best_law(bot: int, known: Dictionary) -> Dictionary:
 	var seats := _seats()
 	var in_parliament := not CardManager.last_seats.is_empty()
 	var mine := _ideology(bot)
 	var best := {}
+	# Sadece gözcü gönderilmiş illerden çıkarım yapılır: ortalama etki × güven
+	# (bilinen vekil oranı arttıkça bot yasaya daha çok güvenir).
+	var known_seats := 0.0
+	for province_id in seats.keys():
+		if not (known.get(province_id, {}) as Dictionary).is_empty():
+			known_seats += float(seats[province_id])
+	if known_seats <= 0.0:
+		return {}
+	var confidence := clampf(known_seats / 60.0, 0.3, 1.0)
 	for axis in IdeologyAxes.AXES:
 		for dir in [-1, 1]:
 			var law_type := CardPresets.law_type(axis, dir)
 			var sum := 0.0
 			for province_id in seats.keys():
-				var alignment := PublicOpinion.law_alignment(voters.get(province_id, {}), axis, dir)
+				if (known.get(province_id, {}) as Dictionary).is_empty():
+					continue
+				var alignment := PublicOpinion.law_alignment(known[province_id], axis, dir)
 				sum += float(seats[province_id]) * PublicOpinion.law_proposer_delta(alignment, false)
-			var value := sum / _total_seats()
+			var value := sum / known_seats * confidence
 			if in_parliament:
-				value *= 1.0 + _law_pass_chance(bot, law_type) * (PublicOpinion.LAW_PASSED_MULT - 1.0)
+				value *= 1.0 + _law_pass_chance(bot, law_type, known) * (PublicOpinion.LAW_PASSED_MULT - 1.0)
 			var moved := mine.duplicate()
 			moved[axis] = IdeologyAxes.clamp_value(int(mine.get(axis, 0)) + dir)
-			value += (_electoral_strength(moved) - _electoral_strength(mine)) * 20.0
+			value += (_electoral_strength(moved, known) - _electoral_strength(mine, known)) * 20.0
 			var score := 1.1 + value * 4.0
 			if best.is_empty() or score > float(best["score"]):
 				best = {"law": law_type, "score": score}
 	return best
 
-## Kaba geçme ihtimali: diğer partilerin bu yasaya vereceği oy tahminiyle.
-static func _law_pass_chance(bot: int, law_type: String) -> float:
+## Kaba geçme ihtimali: diğer partilerin oyu, botun kendi bilgisiyle tahmin edilir.
+static func _law_pass_chance(bot: int, law_type: String, known: Dictionary) -> float:
 	var gov_ids := GovernmentManager.government_party_ids()
 	var yes := GovernmentManager.seats_of(bot)
 	var no := 0
 	for peer_id in GovernmentManager.voter_ids():
 		if peer_id == bot:
 			continue
-		match _best_law_vote(peer_id, law_type, bot, gov_ids):
+		match _best_law_vote(peer_id, law_type, bot, gov_ids, known):
 			GovernmentManager.VOTE_YES:
 				yes += GovernmentManager.seats_of(peer_id)
 			GovernmentManager.VOTE_NO:
 				no += GovernmentManager.seats_of(peer_id)
 	return 0.85 if yes > no else 0.15
 
-## Bir partinin bir yasaya EVET/ÇEKİMSER/HAYIR demesinin il etkilerinin
-## vekil ağırlıklı toplamı.
-static func _law_vote_value(voter: int, law_type: String, choice: int, proposer: int, gov_ids: Array) -> float:
+## Bir partinin bir yasaya EVET/HAYIR demesinin (bilinen) il etkilerinin vekil
+## ağırlıklı toplamı.
+static func _law_vote_value(voter: int, law_type: String, choice: int, proposer: int, gov_ids: Array, known: Dictionary) -> float:
 	var law := CardPresets.law_data(law_type)
 	if law.is_empty() or choice == GovernmentManager.VOTE_ABSTAIN:
 		return 0.0
-	var voters := _voters()
 	var seats := _seats()
 	var sum := 0.0
 	for province_id in seats.keys():
-		var alignment := PublicOpinion.law_alignment(voters.get(province_id, {}), law["axis"], int(law["dir"]))
+		var alignment := PublicOpinion.law_alignment(known.get(province_id, {}), law["axis"], int(law["dir"]))
 		sum += float(seats[province_id]) * PublicOpinion.law_vote_delta(alignment, choice, gov_ids.has(voter), gov_ids.has(proposer))
 	return sum / _total_seats()
 
-static func _best_law_vote(voter: int, law_type: String, proposer: int, gov_ids: Array) -> int:
+static func _best_law_vote(voter: int, law_type: String, proposer: int, gov_ids: Array, known: Dictionary) -> int:
 	var best := GovernmentManager.VOTE_ABSTAIN
 	var best_value := 0.0
 	for choice in [GovernmentManager.VOTE_YES, GovernmentManager.VOTE_NO]:
-		var value := _law_vote_value(voter, law_type, choice, proposer, gov_ids)
+		var value := _law_vote_value(voter, law_type, choice, proposer, gov_ids, known)
 		if value > best_value + 0.01:
 			best_value = value
 			best = choice
@@ -135,9 +162,8 @@ static func _best_law_vote(voter: int, law_type: String, proposer: int, gov_ids:
 		best = GovernmentManager.VOTE_NO
 	return best
 
-## Vekili çok, partiye yakın ve henüz teşkilatı zayıf il.
-static func _best_organization(bot: int) -> Dictionary:
-	var voters := _voters()
+## Vekili çok, partiye (bilindiği kadarıyla) yakın ve henüz teşkilatı zayıf il.
+static func _best_organization(bot: int, known: Dictionary) -> Dictionary:
 	var seats := _seats()
 	var mine := _ideology(bot)
 	var best := {}
@@ -146,8 +172,10 @@ static func _best_organization(bot: int) -> Dictionary:
 			continue
 		var level := CardManager.organization_level(province_id, bot)
 		# 2 mana: kalıcı ama pahalı — büyük illerde bile yasa/kartla yarışacak kadar.
-		var value := float(seats[province_id]) * (0.5 + ElectionModel.support(mine, voters.get(province_id, {}))) \
-			/ 30.0 * (1.0 - 0.3 * level)
+		var center: Dictionary = known.get(province_id, {})
+		# Bilinmeyen il: yakınlık orta varsayılır (nötr merkez parti için aldatıcı derecede yakın görünürdü).
+		var closeness := ElectionModel.support(mine, center) if not center.is_empty() else 0.5
+		var value := float(seats[province_id]) * (0.5 + closeness) / 30.0 * (1.0 - 0.3 * level)
 		var score := 0.25 + value * (1.3 if _election_soon() else 1.0)
 		if best.is_empty() or score > float(best["score"]):
 			best = {"province": province_id, "score": score}
@@ -157,13 +185,14 @@ static func _best_organization(bot: int) -> Dictionary:
 
 ## Dönüş: {"index", "peer", "province", "score"} ya da boş sözlük (= oynama).
 static func choose_play(bot: int) -> Dictionary:
+	var known := _known_centers(bot)
 	var hand: Array = CardManager.inventories.get(bot, [])
 	var best := {}
 	var best_score := PASS_THRESHOLD
 	if hand.size() >= CardManager.MAX_HAND_SIZE:
 		best_score = -INF  # el dolu: en iyisini oyna, desteyi tıkama
 	for i in hand.size():
-		var option := _evaluate(bot, String(hand[i]))
+		var option := _evaluate(bot, String(hand[i]), known)
 		if option.is_empty():
 			continue
 		if float(option["score"]) > best_score:
@@ -172,16 +201,18 @@ static func choose_play(bot: int) -> Dictionary:
 			best["index"] = i
 	return best
 
-static func _evaluate(bot: int, card_type: String) -> Dictionary:
+static func _evaluate(bot: int, card_type: String, known: Dictionary) -> Dictionary:
 	match card_type:
 		CardPresets.MITING_CARD_TYPE:
-			return _eval_miting(bot)
+			return _eval_miting(bot, known)
 		CardPresets.INVEST_CARD_TYPE:
-			return _eval_investment(bot)
+			return _eval_investment(bot, known)
 		CardPresets.PROPAGANDA_CARD_TYPE:
-			return _eval_propaganda(bot)
-		CardPresets.POLL_CARD_TYPE, CardPresets.SCOUT_CARD_TYPE:
-			return _eval_intel(bot, card_type)
+			return _eval_propaganda(bot, known)
+		CardPresets.SCOUT_CARD_TYPE:
+			return _eval_scout(bot)
+		CardPresets.POLL_CARD_TYPE:
+			return _eval_poll(bot)
 	if CardPresets.needs_target(card_type):
 		return _eval_steal(bot, card_type)
 	if CardPresets.is_censure_card(card_type):
@@ -191,16 +222,15 @@ static func _evaluate(bot: int, card_type: String) -> Dictionary:
 		return {"score": 6.0 if passes else 1.0, "peer": -1, "province": ""}
 	return {}
 
-## Beklenen il gücü kazancı × ilin vekil sayısı × partinin o ildeki şansı.
-static func _eval_miting(bot: int) -> Dictionary:
-	var voters := _voters()
+## Beklenen il gücü kazancı × ilin vekil sayısı × partinin o ildeki (bilinen) şansı.
+static func _eval_miting(bot: int, known: Dictionary) -> Dictionary:
 	var ideology := _ideology(bot)
 	var best_province := ""
 	var best_value := -INF
 	for province_id in _seats().keys():
 		var risk := CardManager.miting_risk(bot, province_id)
 		var seats := float(CardManager.province_seat_count(province_id))
-		var closeness := ElectionModel.support(ideology, voters.get(province_id, {}))
+		var closeness := ElectionModel.support(ideology, known.get(province_id, {}))
 		var expected := (1.0 - risk) * PublicOpinion.MITING_LOCAL + risk * PublicOpinion.PROVOCATION_LOCAL
 		var value := expected * seats / 6.0 * (0.5 + closeness) \
 			+ (1.0 - risk) * PublicOpinion.MITING_NATIONAL + risk * PublicOpinion.PROVOCATION_NATIONAL
@@ -212,32 +242,34 @@ static func _eval_miting(bot: int) -> Dictionary:
 	var score := best_value * 0.5 * (1.4 if _election_soon() else 1.0)
 	return {"score": score, "peer": -1, "province": best_province}
 
-static func _eval_investment(bot: int) -> Dictionary:
+static func _eval_investment(bot: int, known: Dictionary) -> Dictionary:
 	if not CardManager.is_government_party(bot):
 		return {}
-	var voters := _voters()
 	var ideology := _ideology(bot)
 	var best_province := ""
 	var best_value := -INF
 	for province_id in _seats().keys():
 		var value := float(CardManager.province_seat_count(province_id)) \
-			* (0.5 + ElectionModel.support(ideology, voters.get(province_id, {})))
+			* (0.5 + ElectionModel.support(ideology, known.get(province_id, {})))
 		if value > best_value:
 			best_value = value
 			best_province = province_id
 	return {"score": 1.5 + best_value / 12.0, "peer": -1, "province": best_province}
 
 ## En büyük rakibi, en çok vekilli ve onun zayıf, botun güçlü olduğu ilde karala.
-static func _eval_propaganda(bot: int) -> Dictionary:
+static func _eval_propaganda(bot: int, known: Dictionary) -> Dictionary:
 	var best := {}
 	var best_value := -INF
 	for province_id in _seats().keys():
 		var seats := float(CardManager.province_seat_count(province_id))
-		var gain := PublicOpinion.propaganda_gain(CardManager.party_strength(province_id, bot))
+		var center: Dictionary = known.get(province_id, {})
+		var gain := PublicOpinion.propaganda_gain(PublicOpinion.party_strength(
+			_ideology(bot), center, CardManager.activity_of(province_id, bot)))
 		for target in CardManager.turn_order:
 			if target == bot:
 				continue
-			var damage := PublicOpinion.propaganda_damage(CardManager.party_strength(province_id, target))
+			var damage := PublicOpinion.propaganda_damage(PublicOpinion.party_strength(
+				_ideology(target), center, CardManager.activity_of(province_id, target)))
 			var rival := 1.0 + float(GovernmentManager.seats_of(target)) / _total_seats() * 2.0
 			var value := (gain + damage * 0.6 * rival) * seats / 6.0
 			if value > best_value:
@@ -248,12 +280,23 @@ static func _eval_propaganda(bot: int) -> Dictionary:
 	best["score"] = best_value * 0.45
 	return best
 
-## Anket/gözcü botlara bilgi vermez: sadece el dolunca atılır.
-static func _eval_intel(bot: int, card_type: String) -> Dictionary:
+## Gözcü: vekili çok ve henüz bilinmeyen il değerlidir (yasa ve il başkanlığı
+## kararları bu bilgiye dayanır).
+static func _eval_scout(bot: int) -> Dictionary:
 	var best_province := ""
 	for province_id in _seats().keys():
-		if CardManager.can_play_card(bot, card_type, -1, province_id) \
+		if CardManager.can_play_card(bot, CardPresets.SCOUT_CARD_TYPE, -1, province_id) \
 				and (best_province == "" or CardManager.province_seat_count(province_id) > CardManager.province_seat_count(best_province)):
+			best_province = province_id
+	if best_province == "":
+		return {}
+	return {"score": 0.6 + float(CardManager.province_seat_count(best_province)) / 12.0, "peer": -1, "province": best_province}
+
+## Anket botların kararlarına girmez: sadece el dolunca atılır.
+static func _eval_poll(bot: int) -> Dictionary:
+	var best_province := ""
+	for province_id in _seats().keys():
+		if best_province == "" or CardManager.province_seat_count(province_id) > CardManager.province_seat_count(best_province):
 			best_province = province_id
 	if best_province == "":
 		return {}
@@ -311,7 +354,7 @@ static func choose_vote(bot: int) -> int:
 			if bot == GovernmentManager.proposal_peer_id:
 				return GovernmentManager.VOTE_YES
 			return _best_law_vote(bot, GovernmentManager.proposal_law, GovernmentManager.proposal_peer_id,
-				GovernmentManager.proposal_gov_ids)
+				GovernmentManager.proposal_gov_ids, _known_centers(bot))
 	return GovernmentManager.VOTE_ABSTAIN
 
 # --- Hükümet kurma -------------------------------------------------------------

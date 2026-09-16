@@ -91,7 +91,9 @@ func _initialize() -> void:
 	check("botlar oy verdi", votes > 0)
 	check("botlar yasa sundu", int(played.get("law", 0)) > 0)
 	check("botlar il baskanligi kurdu", int(played.get("il_baskanligi", 0)) > 0)
-	check("botlar kart oynadi (miting)", int(played.get("miting", 0)) > 0)
+	check("botlar miting yapti", int(played.get("miting", 0)) > 0)
+	check("botlar kart oynadi", int(played.get("karalama", 0)) + int(played.get("anket", 0)) + int(played.get("steal_weak", 0)) \
+		+ int(played.get("steal_medium", 0)) + int(played.get("steal_strong", 0)) > 0)
 	check("botlar gozcu gonderdi (il gorusunu bilmiyorlar)", int(played.get("scout", 0)) > 0)
 	check("botlar kart cekti (1 mana)", int(played.get("draw", 0)) > 0)
 	check("bir turda birden cok hamle yapildi", max_actions >= 2, str(max_actions))

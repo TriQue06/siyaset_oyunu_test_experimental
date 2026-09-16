@@ -86,6 +86,8 @@ static func do_action(bot: int) -> Dictionary:
 			CardManager._apply_organization(bot, String(action["province"]))
 		"scout":
 			CardManager._apply_scout_move(bot, String(action["province"]))
+		"miting":
+			CardManager._apply_miting_move(bot, String(action["province"]))
 		"draw":
 			CardManager._apply_draw(bot)
 		"card":

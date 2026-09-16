@@ -63,7 +63,6 @@ const PROVINCE_SEATS_PATH := "res://data/province_seats.json"
 const PROVINCE_EVENT_LIMIT := 6
 
 ## Deste ağırlıkları (bkz. _draw_weights).
-const WEIGHT_MITING := 2.5
 const WEIGHT_STEAL := 0.6
 const WEIGHT_INVEST := 2.5
 const WEIGHT_POLL := 1.2
@@ -269,6 +268,11 @@ func can_propose_law(peer_id: int, law_type: String = "") -> bool:
 func has_proposed_law_this_round(peer_id: int) -> bool:
 	return int(law_rounds.get(peer_id, 0)) == round_number
 
+## Miting hamlesi: seçilen ilde güç (provokasyon riskiyle).
+func can_miting(peer_id: int, province_id: String = "") -> bool:
+	return can_choose_main_action(peer_id) and mana_of(peer_id) >= GameRules.MITING_MANA_COST \
+		and (province_id == "" or has_province(province_id))
+
 ## Gözcü hamlesi: bu ilin görüşünü öğrenmek (bir kez).
 func can_scout(peer_id: int, province_id: String = "") -> bool:
 	if not can_choose_main_action(peer_id) or mana_of(peer_id) < GameRules.SCOUT_MANA_COST:
@@ -472,14 +476,13 @@ func draw_card() -> void:
 		_request_draw.rpc_id(1)
 
 ## Bu oyuncu için desteden çekilebilecek kartlar ve ağırlıkları.
-##   - miting, anket ve karalama her zaman,
+##   - anket ve karalama her zaman,
 ##   - vekil çalma ilk seçimden (meclis oluştuktan) sonra,
 ##   - yatırım SADECE hükümet partilerine,
 ##   - gensoru SADECE azınlık hükümeti varken, hükümet dışı partilere ve
 ##     elinde zaten gensoru yoksa — o zaman da çok yüksek olasılıkla.
 func _draw_weights(peer_id: int = -1) -> Dictionary:
 	var weights := {}
-	weights[CardPresets.MITING_CARD_TYPE] = WEIGHT_MITING
 	weights[CardPresets.POLL_CARD_TYPE] = WEIGHT_POLL
 	weights[CardPresets.PROPAGANDA_CARD_TYPE] = WEIGHT_PROPAGANDA
 	if not last_seats.is_empty():
@@ -541,6 +544,15 @@ func build_organization(province_id: String) -> void:
 		_apply_organization(multiplayer.get_unique_id(), province_id)
 	else:
 		_request_organization.rpc_id(1, province_id)
+
+## Miting hamlesi: seçilen ilde miting (MITING_MANA_COST).
+func miting(province_id: String) -> void:
+	if not can_miting(multiplayer.get_unique_id(), province_id):
+		return
+	if _is_authority():
+		_apply_miting_move(multiplayer.get_unique_id(), province_id)
+	else:
+		_request_miting.rpc_id(1, province_id)
 
 ## Gözcü hamlesi: seçilen ile gözcü gönder (SCOUT_MANA_COST).
 func scout(province_id: String) -> void:
@@ -647,6 +659,14 @@ func _apply_organization(peer_id: int, province_id: String) -> void:
 	_push_state({"type": "organization", "peer_id": peer_id, "province": province_id,
 		"message": "%s, %s'da il başkanlığı %s (seviye %d)." % [_party_name(peer_id), _province_name(province_id), verb, level]})
 
+func _apply_miting_move(peer_id: int, province_id: String) -> void:
+	if not can_miting(peer_id, province_id):
+		return
+	mana[peer_id] = mana_of(peer_id) - GameRules.MITING_MANA_COST
+	_event_message = ""
+	_apply_miting(peer_id, province_id)
+	_push_state({"type": "miting", "peer_id": peer_id, "province": province_id, "message": _event_message})
+
 func _apply_scout_move(peer_id: int, province_id: String) -> void:
 	if not can_scout(peer_id, province_id):
 		return
@@ -664,8 +684,6 @@ func _apply_card_effect(peer_id: int, card_type: String, target_peer_id: int = -
 		GovernmentManager.submit_censure(peer_id)
 		return false
 	match card_type:
-		CardPresets.MITING_CARD_TYPE:
-			_apply_miting(peer_id, target_province)
 		CardPresets.INVEST_CARD_TYPE:
 			_apply_investment(peer_id, target_province)
 		CardPresets.POLL_CARD_TYPE:
@@ -1195,6 +1213,12 @@ func _request_organization(province_id: String) -> void:
 	if not MultiplayerManager.is_host:
 		return
 	_apply_organization(multiplayer.get_remote_sender_id(), province_id)
+
+@rpc("any_peer", "reliable")
+func _request_miting(province_id: String) -> void:
+	if not MultiplayerManager.is_host:
+		return
+	_apply_miting_move(multiplayer.get_remote_sender_id(), province_id)
 
 @rpc("any_peer", "reliable")
 func _request_scout(province_id: String) -> void:

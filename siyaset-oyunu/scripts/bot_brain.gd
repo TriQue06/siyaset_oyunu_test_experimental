@@ -91,7 +91,8 @@ static func _mana_value(bot: int) -> float:
 	return MANA_VALUE * clampf(4.0 / maxf(1.0, float(CardManager.mana_of(bot))), 0.2, 1.5)
 
 ## Dönüş: {"type": "card"} | {"type": "law", "law"} | {"type": "organization",
-## "province"} | {"type": "scout", "province"} | {"type": "draw"} | {"type": "pass"}
+## "province"} | {"type": "miting", "province"} | {"type": "scout", "province"} |
+## {"type": "draw"} | {"type": "pass"}
 static func choose_action(bot: int) -> Dictionary:
 	var known := _known_centers(bot)
 	var best := {"type": "pass"}
@@ -117,6 +118,12 @@ static func choose_action(bot: int) -> Dictionary:
 	if not org.is_empty() and float(org["score"]) - GameRules.ORG_MANA_COST * mana_value > best_score:
 		best = {"type": "organization", "province": org["province"]}
 		best_score = float(org["score"]) - GameRules.ORG_MANA_COST * mana_value
+
+	if CardManager.can_miting(bot):
+		var miting := _eval_miting(bot, known)
+		if not miting.is_empty() and float(miting["score"]) - GameRules.MITING_MANA_COST * mana_value > best_score:
+			best = {"type": "miting", "province": miting["province"]}
+			best_score = float(miting["score"]) - GameRules.MITING_MANA_COST * mana_value
 
 	var scout := _best_scout(bot)
 	if not scout.is_empty() and float(scout["score"]) - GameRules.SCOUT_MANA_COST * mana_value > best_score:
@@ -278,8 +285,6 @@ static func _evaluate(bot: int, card_type: String, known: Dictionary) -> Diction
 	if CardManager.mana_of(bot) < CardPresets.card_cost(card_type):
 		return {}
 	match card_type:
-		CardPresets.MITING_CARD_TYPE:
-			return _eval_miting(bot, known)
 		CardPresets.INVEST_CARD_TYPE:
 			return _eval_investment(bot, known)
 		CardPresets.PROPAGANDA_CARD_TYPE:
@@ -306,14 +311,16 @@ static func _eval_miting(bot: int, known: Dictionary) -> Dictionary:
 		var seats := float(CardManager.province_seat_count(province_id))
 		var closeness := ElectionModel.support(ideology, known.get(province_id, {}))
 		var expected := (1.0 - risk) * PublicOpinion.MITING_LOCAL + risk * PublicOpinion.PROVOCATION_LOCAL
-		var value := expected * seats / 6.0 * (0.5 + closeness) \
+		# İl başkanlığıyla aynı ölçek (vekil/30). Zaten güçlü olduğu ilde getirisi azalır.
+		var diminish := 1.0 / (1.0 + maxf(0.0, CardManager.activity_of(province_id, bot)) / 3.0)
+		var value := expected / PublicOpinion.MITING_LOCAL * seats / 30.0 * (0.5 + closeness) * diminish \
 			+ (1.0 - risk) * PublicOpinion.MITING_NATIONAL + risk * PublicOpinion.PROVOCATION_NATIONAL
 		if value > best_value:
 			best_value = value
 			best_province = province_id
 	if best_province == "":
 		return {}
-	var score := best_value * 0.5 * (1.4 if _election_soon() else 1.0)
+	var score := best_value * 1.4 * (1.4 if _election_soon() else 1.0)
 	return {"score": score, "peer": -1, "province": best_province}
 
 static func _eval_investment(bot: int, known: Dictionary) -> Dictionary:

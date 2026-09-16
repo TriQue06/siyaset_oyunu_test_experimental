@@ -12,8 +12,9 @@ extends RefCounted
 ##   - HAMLE SINIRI YOK: sırası gelen oyuncu manası yettiğince hamle yapar,
 ##     "Turu Bitir" ile sırayı devreder. Mana birikir, üst sınır yok.
 ##   - MANA: herkes MANA_START ile başlar, her tur sonunda +MANA_PER_ROUND.
-##     Kart çekmek DRAW_MANA_COST, gözcü SCOUT_MANA_COST, il başkanlığı
-##     ORG_MANA_COST; yasa bedava ama oyuncu başına turda LAWS_PER_ROUND kez.
+##     HAMLELER: miting MITING_MANA_COST, il başkanlığı ORG_MANA_COST, gözcü
+##     SCOUT_MANA_COST; yasa bedava ama oyuncu başına turda LAWS_PER_ROUND kez.
+##     Kart çekmek DRAW_MANA_COST (kartlar bonus/joker niteliğinde).
 ##     Kartları oynamanın bedeli CardPresets.CARD_MANA_COSTS.
 ##   - Hükümet kurulamazsa (tüm görev hakları biterse) o turun sonunda ERKEN
 ##     SEÇİM yapılır.
@@ -29,6 +30,7 @@ const LAW_MANA_COST := 0
 const LAWS_PER_ROUND := 1
 const DRAW_MANA_COST := 1
 const SCOUT_MANA_COST := 1
+const MITING_MANA_COST := 3
 const ORG_MANA_COST := 2
 const ORG_MAX_LEVEL := 3
 ## GEÇİCİ olarak iki katına çıkarıldı (12 -> 24) ki oyun geç bitsin.

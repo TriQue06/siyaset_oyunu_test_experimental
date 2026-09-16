@@ -2,8 +2,8 @@ extends Node
 ## Autoload. Kart ve hamle katalogu. Görseller normal PNG'ler (assets/cards/).
 ##
 ## DESTE KARTLARI (çekmek GameRules.DRAW_MANA_COST; oynamanın bedeli CARD_MANA_COSTS).
-## GÖZCÜ artık kart değil hamle (bkz. CardManager.scout); SCOUT_CARD_TYPE eski
-## kayıtlar/görseller için duruyor, desteye girmez.
+## GÖZCÜ ve MİTİNG artık kart değil hamle (bkz. CardManager.scout / miting);
+## türleri eski kayıtlar/görseller için duruyor, desteye girmez.
 ##   - MİTİNG    : seçilen ilde güç kazandırır; provokasyon riski var.
 ##   - YATIRIM   : sadece hükümet partilerine gelir; seçilen ile yatırım.
 ##   - ANKET     : bir ilin güncel oy tahmini (±%20 hata); sonucu sadece oynayan görür.
@@ -66,7 +66,6 @@ const STEAL_RANGES := {
 
 ## Kartın elden oynanma bedeli (mana). Değerler henüz belirlenmedi: hepsi 0.
 const CARD_MANA_COSTS := {
-	"miting": 3,
 	"yatirim": 0,
 	"anket": 0,
 	"karalama": 2,

@@ -121,6 +121,8 @@ func _play_game(g: int, report: Dictionary) -> void:
 				_bump(actions, "il_baskanligi")
 			"scout":
 				_bump(actions, "gozcu")
+			"miting":
+				_bump(actions, "miting")
 			"draw":
 				_bump(actions, "kart_cek")
 			"card":

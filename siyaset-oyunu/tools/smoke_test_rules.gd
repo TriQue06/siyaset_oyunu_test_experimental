@@ -232,7 +232,8 @@ func _initialize() -> void:
 	cm._apply_pass(3)
 	check("tur sonu herkese +MANA_PER_ROUND", cm.mana_of(1) == GameRules.MANA_START + GameRules.MANA_PER_ROUND 		and cm.mana_of(3) == GameRules.MANA_PER_ROUND, str(cm.mana))
 	check("gozcu destede yok", not cm._draw_pool(1).has("gozcu"))
-	check("kart bedelleri: miting 3, karalama 2, vekil calma 2/3/4", cp.card_cost("miting") == 3 and cp.card_cost("karalama") == 2 		and cp.card_cost("steal_weak") == 2 and cp.card_cost("steal_medium") == 3 and cp.card_cost("steal_strong") == 4)
+	check("miting hamle, destede yok", not cm._draw_pool(1).has("miting") and GameRules.MITING_MANA_COST == 3)
+	check("kart bedelleri: karalama 2, vekil calma 2/3/4", cp.card_cost("karalama") == 2 		and cp.card_cost("steal_weak") == 2 and cp.card_cost("steal_medium") == 3 and cp.card_cost("steal_strong") == 4)
 
 	var law_type: String = cp.law_type("economic", 1)
 	check("yasa hamlesi turu okunur", cp.is_law_card(law_type) and int(cp.law_data(law_type)["dir"]) == 1 and not cp.is_law_card("miting"))
@@ -264,12 +265,13 @@ func _initialize() -> void:
 		cm._apply_organization(1, "izmir")
 	check("en fazla seviye 3", cm.organization_level("izmir", 1) == GameRules.ORG_MAX_LEVEL and cm.mana_of(1) == 20 - 3 * GameRules.ORG_MANA_COST,
 		"seviye %d, mana %d" % [cm.organization_level("izmir", 1), cm.mana_of(1)])
-	cm.inventories[1] = ["miting"]
 	cm.mana[1] = 2
-	check("mana yetmezse miting oynanamaz", not cm.can_play_card(1, "miting", -1, "izmir"))
+	check("mana yetmezse miting yapilamaz", not cm.can_miting(1, "izmir"))
 	cm.mana[1] = 3
-	cm._apply_play(1, 0, -1, "izmir")
-	check("miting 3 mana", cm.mana_of(1) == 0 and cm.inventories[1].is_empty())
+	var izmir_before: float = cm.local_of("izmir", 1) + cm.national_of(1)
+	cm._apply_miting_move(1, "izmir")
+	check("miting hamlesi 3 mana, etki yazildi, sira devretmedi", cm.mana_of(1) == 0 and cm.current_turn_peer_id() == 1 \
+		and not near(cm.local_of("izmir", 1) + cm.national_of(1), izmir_before))
 
 	print("")
 	print("=== 9b) OYLAR IDEOLOJIYI KAYDIRIR ===")

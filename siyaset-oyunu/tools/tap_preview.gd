@@ -42,7 +42,7 @@ func _initialize() -> void:
 	cm.init_game()
 	cm.turn_order = ids.duplicate()
 	cm.current_turn_index = 0
-	cm.inventories[me] = ["miting", "gozcu", "karalama"]
+	cm.inventories[me] = ["anket", "anket", "karalama"]
 	cm._push_state({"type": "full"}, true)
 
 	var scene: Node = (load("res://scenes/GameScreen.tscn") as PackedScene).instantiate()
@@ -63,7 +63,7 @@ func _initialize() -> void:
 
 	scene._on_province_clicked("ankara")
 	await _frames(10)
-	check("ayni ile ikinci dokunus: miting oynandi", cm.inventories[me].size() == 2 and cm.province_events.has("ankara"))
+	check("ayni ile ikinci dokunus: anket oynandi", cm.inventories[me].size() == 2 and not cm.poll_of(me, "ankara").is_empty())
 
 	cm.current_turn_index = 0
 	cm._push_state({"type": "timer"})

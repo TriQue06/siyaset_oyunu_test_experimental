@@ -279,9 +279,9 @@ func _initialize() -> void:
 	cm.local_support = {}
 	cm.turn_order = [3, 1, 2]
 	cm.current_turn_index = 0
-	cm.inventories[3] = ["anket", "karalama", "miting"]
-	cm._apply_play(3, 2, -1, "")
-	check("il secilmeden miting oynanamaz (kart elde)", cm.inventories[3].size() == 3 and cm.current_turn_peer_id() == 3)
+	cm.inventories[3] = ["anket", "karalama"]
+	cm._apply_play(3, 0, -1, "")
+	check("il secilmeden anket oynanamaz (kart elde)", cm.inventories[3].size() == 2 and cm.current_turn_peer_id() == 3)
 	cm._apply_play(3, 0, -1, "ankara")
 	var poll: Dictionary = cm.poll_of(3, "ankara")
 	var poll_sum := 0.0

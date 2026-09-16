@@ -146,6 +146,9 @@ var _mana_label: Label
 var _law_button: Button
 var _org_button: Button
 var _scout_button: Button
+var _miting_button: Button
+## Miting hamlesi için il seçme modu.
+var _pending_miting: bool = false
 ## Gözcü hamlesi için il seçme modu (harita gözcü katmanına geçer).
 var _pending_scout: bool = false
 ## Yasa tasarlama paneli (6 daire) ve karalama hedef menüsü.
@@ -988,6 +991,9 @@ func _begin_province_targeting(hand_index: int) -> void:
 func _cancel_targeting() -> void:
 	_pending_province_hand_index = -1
 	_pending_org = false
+	if _pending_miting:
+		_pending_miting = false
+		_refresh_action_buttons()
 	if _pending_scout:
 		_pending_scout = false
 		_end_scout_view()
@@ -1007,8 +1013,15 @@ func _cancel_targeting() -> void:
 func _on_province_clicked(province_id: String) -> void:
 	var me := multiplayer.get_unique_id()
 	# Hedef seçerken ilk dokunuş ili seçip ayrıntıyı gösterir, ikinci onaylar.
-	if (_pending_org or _pending_scout or _pending_province_hand_index != -1) and _selected_province != province_id:
+	if (_pending_org or _pending_scout or _pending_miting or _pending_province_hand_index != -1) and _selected_province != province_id:
 		_select_target_province(province_id)
+		return
+	if _pending_miting:
+		_cancel_targeting()
+		if CardManager.can_miting(me, province_id):
+			CardManager.miting(province_id)
+		else:
+			_show_toast(_action_block_reason(GameRules.MITING_MANA_COST))
 		return
 	if _pending_scout:
 		if CardManager.has_scouted(me, province_id) or not CardManager.can_scout(me, province_id):
@@ -1067,7 +1080,10 @@ func _select_target_province(province_id: String) -> void:
 	var me := multiplayer.get_unique_id()
 	var pname := ElectionNightSim.province_name(province_id)
 	var detail := ""
-	if _pending_scout:
+	if _pending_miting:
+		detail = "%s: miting (%d mana) · provokasyon riski %%%d · gücün %+.1f" % [pname, GameRules.MITING_MANA_COST,
+			int(round(CardManager.miting_risk(me, province_id) * 100.0)), CardManager.activity_of(province_id, me)]
+	elif _pending_scout:
 		detail = "%s: buraya zaten gözcü gönderdin" % pname if CardManager.has_scouted(me, province_id) \
 			else "%s: gözcü gönder (%d mana)" % [pname, GameRules.SCOUT_MANA_COST]
 	elif _pending_org:
@@ -1630,13 +1646,13 @@ const LAW_AXIS_COLORS := {
 func _place_right_column_controls() -> void:
 	deck_button.offset_left = -196.0
 	deck_button.offset_right = -114.0
-	deck_button.offset_top = -258.0
-	deck_button.offset_bottom = -148.0
+	deck_button.offset_top = -292.0
+	deck_button.offset_bottom = -182.0
 	pass_button.add_theme_font_size_override("font_size", 14)
 	var panel := player_panel_list.get_parent() as Control
 	if panel != null:
 		panel.offset_top = 72.0  # sağ üstte Menü butonu var
-		panel.offset_bottom = -268.0  # altında deste ve hamle butonları
+		panel.offset_bottom = -302.0  # altında deste ve hamle butonları
 	# Pas butonu daraldı: solunda mana göstergesi duruyor.
 	pass_button.offset_left = -128.0
 
@@ -1674,12 +1690,15 @@ func _build_action_buttons() -> void:
 	_mana_box.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_show_toast(_mana_rules))
-	_mana_rules = "Her tur +%d mana; manan yettikçe istediğin kadar hamle yap.\nKart çekmek %d, gözcü %d, il başkanlığı %d mana. Yasa bedava (turda 1).\nKartlar: miting 3, karalama 2, vekil çalma 2/3/4 mana." % [
-		GameRules.MANA_PER_ROUND, GameRules.DRAW_MANA_COST, GameRules.SCOUT_MANA_COST, GameRules.ORG_MANA_COST]
+	_mana_rules = "Her tur +%d mana; manan yettikçe istediğin kadar hamle yap.\nHamleler: yasa bedava (turda 1), miting %d, il başkanlığı %d, gözcü %d mana.\nKart çekmek %d mana; kartlar bonus: karalama 2, vekil çalma 2/3/4 mana." % [
+		GameRules.MANA_PER_ROUND, GameRules.MITING_MANA_COST, GameRules.ORG_MANA_COST, GameRules.SCOUT_MANA_COST, GameRules.DRAW_MANA_COST]
 	add_child(_mana_box)
-	_law_button = _action_button("YASA", "bedava", Color(0.42, 0.26, 0.62), -258.0)
+	# HAMLELER (sağ sütun, destenin yanında alt alta). Kartlar bonus niteliğinde.
+	_law_button = _action_button("YASA", "bedava", Color(0.42, 0.26, 0.62), -292.0)
 	_law_button.pressed.connect(_on_law_button_pressed)
-	_org_button = _action_button("İL BAŞKANLIĞI", "%d mana" % GameRules.ORG_MANA_COST, Color(0.1, 0.44, 0.48), -221.0)
+	_miting_button = _action_button("MİTİNG", "%d mana" % GameRules.MITING_MANA_COST, Color(0.72, 0.3, 0.14), -256.0)
+	_miting_button.pressed.connect(_on_miting_button_pressed)
+	_org_button = _action_button("İL BAŞKANLIĞI", "%d mana" % GameRules.ORG_MANA_COST, Color(0.1, 0.44, 0.48), -220.0)
 	_org_button.pressed.connect(_on_org_button_pressed)
 	_scout_button = _action_button("GÖZCÜ", "%d mana" % GameRules.SCOUT_MANA_COST, Color(0.55, 0.42, 0.12), -184.0)
 	_scout_button.pressed.connect(_on_scout_button_pressed)
@@ -1693,7 +1712,7 @@ func _action_button(title: String, cost_text: String, color: Color, top: float) 
 	button.offset_left = -106.0
 	button.offset_right = -16.0
 	button.offset_top = top
-	button.offset_bottom = top + 34.0
+	button.offset_bottom = top + 32.0
 	button.add_theme_font_size_override("font_size", 10)
 	button.add_theme_constant_override("line_spacing", -3)
 	button.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.35))
@@ -1734,6 +1753,8 @@ func _refresh_action_buttons() -> void:
 	var law_ok := CardManager.can_propose_law(me)
 	var org_ok := CardManager.can_choose_main_action(me) and mana_now >= GameRules.ORG_MANA_COST
 	var scout_ok := CardManager.can_scout(me)
+	var miting_ok := CardManager.can_miting(me)
+	_miting_button.modulate.a = 1.0 if miting_ok or _pending_miting else 0.45
 	# disabled kullanılmıyor: pasif butona dokununca neden olmadığı uyarı olarak çıksın.
 	_law_button.modulate.a = 1.0 if law_ok else 0.45
 	_org_button.modulate.a = 1.0 if org_ok else 0.45
@@ -1873,11 +1894,30 @@ func _on_law_button_pressed() -> void:
 		viewport_size.x - RIGHT_COLUMN_WIDTH - _law_designer.size.x - 12.0,
 		maxf(12.0, viewport_size.y * TOP_AREA_HEIGHT_RATIO - _law_designer.size.y))
 
+## Miting hamlesi: haritadan il seçilir (ilk dokunuş riski gösterir, ikincisi yapar).
+func _on_miting_button_pressed() -> void:
+	if _pending_miting:
+		_cancel_targeting()
+		return
+	var me := multiplayer.get_unique_id()
+	_deselect_hand_card()
+	_law_designer.hide()
+	if _pending_org or _pending_scout or _pending_province_hand_index != -1:
+		_cancel_targeting()
+	if not CardManager.can_miting(me):
+		_show_toast(_action_block_reason(GameRules.MITING_MANA_COST))
+		return
+	_pending_miting = true
+	if _province_panel != null:
+		_province_panel.hide()
+	_refresh_action_buttons()
+	_set_target_hint("Miting: haritada bir ile dokun (risk görünür), tekrar dokun: miting yap (%d mana)  ·  Butona tekrar dokun: iptal" % GameRules.MITING_MANA_COST)
+
 func _on_org_button_pressed() -> void:
 	if _pending_org:
 		_cancel_targeting()  # butona tekrar basmak il seçimini iptal eder
 		return
-	if _pending_scout:
+	if _pending_scout or _pending_miting:
 		_cancel_targeting()
 	_deselect_hand_card()
 	_law_designer.hide()
@@ -2147,7 +2187,7 @@ func _on_scout_button_pressed() -> void:
 	var me := multiplayer.get_unique_id()
 	_deselect_hand_card()
 	_law_designer.hide()
-	if _pending_org or _pending_province_hand_index != -1:
+	if _pending_org or _pending_miting or _pending_province_hand_index != -1:
 		_cancel_targeting()
 	if not CardManager.can_scout(me):
 		_show_toast(_action_block_reason(GameRules.SCOUT_MANA_COST))

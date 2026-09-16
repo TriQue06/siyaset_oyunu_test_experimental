@@ -114,6 +114,13 @@ func _initialize() -> void:
 	await create_timer(1.6).timeout
 	check("sonra onceki katmana doner", scene._map_layer == 2)
 	_shot("my_turn")
+	scene._on_miting_button_pressed()
+	scene._on_province_clicked("konya")
+	await _frames(3)
+	_shot("miting_pending")
+	check("miting: ilk dokunus riski gosterir", String(scene._target_hint.text).find("provokasyon") != -1)
+	scene._on_province_clicked("konya")
+	check("miting hamlesi yapildi (3 mana)", cm.mana_of(me) == 1)
 	print("=== CROWDED PREVIEW: %s ===" % ("PASS" if fails == 0 else "%d HATA" % fails))
 	quit()
 

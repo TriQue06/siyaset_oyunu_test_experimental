@@ -74,7 +74,10 @@ func _initialize() -> void:
 		if i % 4 == 0:
 			cm.intel[me] = cm.intel.get(me, {})
 			var scouts: Dictionary = cm.intel[me].get("scouts", {})
-			scouts[ids[i]] = true
+			scouts[ids[i]] = cm.round_number + 1 + (i / 4) % 5
+			var known: Dictionary = cm.intel[me].get("known", {})
+			known[ids[i]] = true
+			cm.intel[me]["known"] = known
 			cm.intel[me]["scouts"] = scouts
 	cm.current_turn_index = 2
 	cm._push_state({"type": "timer"})
@@ -86,6 +89,7 @@ func _initialize() -> void:
 			_shot("layer_sliding")
 		await create_timer(0.4).timeout
 		_shot("layer_%d" % layer)
+		print("layer istendi ", layer, " -> ", scene._map_layer, " switching ", scene._layer_switching, " queued ", scene._queued_layer)
 	check("vekil katmaninda vekil daireleri gorunur", scene.map_holder.get_node("SeatMarkers").visible)
 	scene._on_layer_button_pressed(2)
 	await create_timer(0.6).timeout
@@ -103,7 +107,7 @@ func _initialize() -> void:
 	scene._on_scout_button_pressed()
 	var target := ""
 	for id in ids:
-		if not cm.has_scouted(me, id):
+		if not cm.has_scouted(me, id) and not cm.knows_leaning(me, id):
 			target = id
 			break
 	scene._on_province_clicked(target)
@@ -121,6 +125,37 @@ func _initialize() -> void:
 	check("miting: ilk dokunus riski gosterir", String(scene._target_hint.text).find("provokasyon") != -1)
 	scene._on_province_clicked("konya")
 	check("miting hamlesi yapildi (3 mana)", cm.mana_of(me) == 1)
+	# İl paneli: gözcülü ve gözcüsüz il.
+	scene._cancel_targeting()
+	scene._on_layer_button_pressed(0)
+	await create_timer(0.6).timeout
+	var scouted := ""
+	var plain := ""
+	for id in ids:
+		if scouted == "" and cm.has_scouted(me, id) and cm.province_seat_count(id) >= 8:
+			scouted = id
+		if plain == "" and not cm.has_scouted(me, id) and not cm.knows_leaning(me, id):
+			plain = id
+	scene._on_province_clicked(scouted)
+	await _frames(5)
+	check("gozculu ilde rapor var", scene._province_panel.visible)
+	_shot("panel_scouted")
+	scene._on_province_clicked(scouted)
+	scene._on_province_clicked(plain)
+	await _frames(5)
+	_shot("panel_plain")
+	scene._province_panel.hide()
+	scene._on_layer_button_pressed(3)
+	await create_timer(0.6).timeout
+	_shot("layer_scout_rounds")
+	cm._end_game("32 tur tamamlandı. Son seçimle kurulan Partim3 hükümeti makam puanlarını aldı.")
+	await create_timer(0.4).timeout
+	_shot("game_over_fading")
+	await create_timer(3.0).timeout
+	var ov: Control = scene._game_over_overlay
+	print("overlay rect ", ov.get_global_rect(), " children ", ov.get_child_count(), " bd mod ", (ov.get_child(0) as CanvasItem).modulate, " bd rect ", (ov.get_child(0) as Control).get_global_rect(), " vp ", root.get_visible_rect())
+	await create_timer(4.0).timeout
+	_shot("game_over")
 	print("=== CROWDED PREVIEW: %s ===" % ("PASS" if fails == 0 else "%d HATA" % fails))
 	quit()
 

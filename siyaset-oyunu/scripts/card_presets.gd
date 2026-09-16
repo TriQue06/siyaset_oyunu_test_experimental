@@ -3,7 +3,8 @@ extends Node
 ##
 ## DESTE KARTLARI (çekmek GameRules.DRAW_MANA_COST; oynamanın bedeli CARD_MANA_COSTS).
 ## GÖZCÜ ve MİTİNG artık kart değil hamle (bkz. CardManager.scout / miting);
-## türleri eski kayıtlar/görseller için duruyor, desteye girmez.
+## ANKET kaldırıldı (gözcü raporu anlık vekil tahmini gösterir). Türleri eski
+## kayıtlar/görseller için duruyor, desteye girmez.
 ##   - MİTİNG    : seçilen ilde güç kazandırır; provokasyon riski var.
 ##   - YATIRIM   : sadece hükümet partilerine gelir; seçilen ile yatırım.
 ##   - ANKET     : bir ilin güncel oy tahmini (±%20 hata); sonucu sadece oynayan görür.
@@ -223,7 +224,7 @@ func _card_effect_text(card_type: String) -> String:
 		INVEST_CARD_TYPE:
 			return "Hükümet: seçtiğin ile yatırım.\nSen +%.0f, ortakların +%.1f güç kazanır." % [PublicOpinion.INVEST_LOCAL, PublicOpinion.INVEST_PARTNER_LOCAL]
 		POLL_CARD_TYPE:
-			return "Bir ilin güncel oy tahminini gör (±%%%d hata).\nSonucu sadece sen görürsün." % int(PublicOpinion.POLL_ERROR * 100)
+			return "Anket artık gözcü raporunun parçası."
 		SCOUT_CARD_TYPE:
 			return "Bir ilin görüşünü öğren: her eksende hangi uçta.\nSadece sen görürsün, kalıcıdır."
 		PROPAGANDA_CARD_TYPE:

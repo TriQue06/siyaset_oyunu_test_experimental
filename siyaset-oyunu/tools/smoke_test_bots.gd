@@ -97,22 +97,21 @@ func _initialize() -> void:
 	check("botlar gozcu gonderdi (il gorusunu bilmiyorlar)", int(played.get("scout", 0)) > 0)
 	check("botlar kart cekti (1 mana)", int(played.get("draw", 0)) > 0)
 	check("bir turda birden cok hamle yapildi", max_actions >= 2, str(max_actions))
-	var fractional := false
+	# Yarım adım kaymasının kendisi smoke_test_rules'ta; burada değerlerin geçerliliği.
+	var valid := true
 	for peer_id in pm.parties.keys():
 		for axis in pm.parties[peer_id]["ideology"].keys():
 			var v := float(pm.parties[peer_id]["ideology"][axis])
-			if not is_equal_approx(v, roundf(v)):
-				fractional = true
 			if absf(v) > 3.0 or not is_equal_approx(v * 2.0, roundf(v * 2.0)):
-				fractional = false
+				valid = false
 				print("  gecersiz ideoloji degeri: ", v)
-	check("ideolojiler 0.5 adimli (oylar yarim adim kaydirir)", fractional)
+	check("ideolojiler [-3, 3] ve 0.5 adimli", valid)
 	# Bilgi kısıtı: gözcü gönderilmemiş il bot için nötrdür.
 	var bot0: int = cm.turn_order[0]
 	var known: Dictionary = brain._known_centers(bot0)
 	var unknown_ok := true
 	for province_id in known.keys():
-		if not cm.has_scouted(bot0, province_id) and not (known[province_id] as Dictionary).is_empty():
+		if not cm.knows_leaning(bot0, province_id) and not (known[province_id] as Dictionary).is_empty():
 			unknown_ok = false
 	check("bot gozcu gondermedigi ilin gorusunu bilmez", unknown_ok)
 	check("botlar farkli hamle turleri yapti", played.size() >= 5, str(played))

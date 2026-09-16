@@ -271,27 +271,20 @@ func _initialize() -> void:
 	check("il baskanligi sonmedi", near(cm.activity_of("konya", 3), 2.0 * PublicOpinion.LOCAL_DECAY + PublicOpinion.ORG_ACTIVITY_PER_LEVEL))
 
 	print("")
-	print("=== 9) ANKET, GOZCU HAMLESI, KARALAMA ===")
+	print("=== 9) GOZCU RAPORU, KARALAMA ===")
 	var w: Dictionary = cm._draw_weights(3)
-	check("anket ve karalama destede, gozcu destede degil", w.has("anket") and not w.has("gozcu") and w.has("karalama"))
+	check("karalama destede; anket ve gozcu destede degil", not w.has("anket") and not w.has("gozcu") and w.has("karalama"))
 	cm.mana[3] = 50
 	cm.organizations = {}
 	cm.local_support = {}
 	cm.turn_order = [3, 1, 2]
 	cm.current_turn_index = 0
-	cm.inventories[3] = ["anket", "karalama"]
+	cm.inventories[3] = ["karalama"]
 	cm._apply_play(3, 0, -1, "")
-	check("il secilmeden anket oynanamaz (kart elde)", cm.inventories[3].size() == 2 and cm.current_turn_peer_id() == 3)
-	cm._apply_play(3, 0, -1, "ankara")
-	var poll: Dictionary = cm.poll_of(3, "ankara")
-	var poll_sum := 0.0
-	for id in poll.get("shares", {}).keys():
-		poll_sum += float(poll["shares"][id])
-	check("anket: sonuc kaydedildi, toplam 100", not poll.is_empty() and absf(poll_sum - 100.0) < 0.01, str(poll))
-	check("anket sonucu sadece oynayanda", cm.poll_of(1, "ankara").is_empty())
+	check("il secilmeden karalama oynanamaz (kart elde)", cm.inventories[3].size() == 1 and cm.current_turn_peer_id() == 3)
 	cm._apply_scout_move(3, "ankara")
 	check("gozcu: il ogrenildi (sadece gonderene)", cm.has_scouted(3, "ankara") and not cm.has_scouted(1, "ankara"))
-	check("ayni ile ikinci gozcu gonderilemez", not cm.can_scout(3, "ankara"))
+	check("ayni turda ikinci gozcu gonderilemez", not cm.can_scout(3, "ankara"))
 	check("karalama kendine oynanamaz", not cm.can_play_card(3, "karalama", 3, "ankara"))
 	check("karalama gecersiz partiye oynanamaz", not cm.can_play_card(3, "karalama", 99, "ankara"))
 	cm.current_turn_index = 0
@@ -319,8 +312,8 @@ func _initialize() -> void:
 	cm.mana[3] = 3
 	var law_soc: String = cp.law_type("social", 1)
 	cm._apply_law(3, law_soc)
-	check("yasa hamlesi meclise geldi, mana harcanmadi",
-		gm.phase == gm.Phase.VOTING and gm.proposal_law == law_soc and cm.mana_of(3) == 3, "mana %d" % cm.mana_of(3))
+	check("yasa hamlesi meclise geldi, 1 mana harcandi",
+		gm.phase == gm.Phase.VOTING and gm.proposal_law == law_soc and cm.mana_of(3) == 2, "mana %d" % cm.mana_of(3))
 	check("oylama sirasinda tur durur", cm.is_turn_blocked())
 
 	print("")

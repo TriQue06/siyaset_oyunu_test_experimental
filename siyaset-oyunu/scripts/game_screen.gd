@@ -921,8 +921,6 @@ func _drop_target(card_type: String) -> Dictionary:
 					pname, int(round(CardManager.miting_risk(me, province_id) * 100.0))]
 			elif card_type == CardPresets.INVEST_CARD_TYPE:
 				result["label"] = "Bırak: %s'a yatırım" % pname
-			elif card_type == CardPresets.POLL_CARD_TYPE:
-				result["label"] = "Bırak: %s'da anket yaptır (sonucu sadece sen görürsün)" % pname
 			else:
 				result["label"] = "Bırak: %s'da karalama — sonra hedef partiyi seç" % pname
 	elif CardPresets.is_law_card(card_type):
@@ -933,10 +931,10 @@ func _drop_target(card_type: String) -> Dictionary:
 			result["label"] = "%s: parlamento diyagramının üstüne bırak" % law["title"]
 		elif CardManager.can_propose_law(me, card_type):
 			result["valid"] = true
-			result["label"] = "Bırak: %s %s" % [law["title"],
-				"seçim vaadi olarak açıklanır" if CardManager.last_seats.is_empty() else "meclise sunulur"]
+			result["label"] = "Bırak: %s %s (%d mana)" % [law["title"],
+				"seçim vaadi olarak açıklanır" if CardManager.last_seats.is_empty() else "meclise sunulur", GameRules.LAW_MANA_COST]
 		else:
-			result["label"] = _action_block_reason(GameRules.LAW_MANA_COST)
+			result["label"] = _action_block_reason(GameRules.LAW_MANA_COST, true)
 			result["error"] = result["label"]
 	elif CardPresets.is_censure_card(card_type):
 		var over := parliament_diagram.get_global_rect().has_point(get_viewport().get_mouse_position())
@@ -1024,9 +1022,9 @@ func _on_province_clicked(province_id: String) -> void:
 			_show_toast(_action_block_reason(GameRules.MITING_MANA_COST))
 		return
 	if _pending_scout:
-		if CardManager.has_scouted(me, province_id) or not CardManager.can_scout(me, province_id):
+		if not CardManager.can_scout(me, province_id):
 			_cancel_targeting()
-			_show_toast("Bu ile zaten gözcü gönderdin." if CardManager.has_scouted(me, province_id) \
+			_show_toast("Bu ile bu tur zaten gözcü gönderdin." if CardManager.scout_rounds_left(me, province_id) >= GameRules.SCOUT_ROUNDS \
 				else _action_block_reason(GameRules.SCOUT_MANA_COST))
 			return
 		# Gönderildi: harita bir an gözcü katmanında kalır (il boyansın), sonra döner.
@@ -1035,7 +1033,7 @@ func _on_province_clicked(province_id: String) -> void:
 		_highlight_province("")
 		_set_target_hint("")
 		CardManager.scout(province_id)
-		_show_toast("Gözcü %s'a gitti: ilin görüşü il panelinde." % ElectionNightSim.province_name(province_id))
+		_show_toast("Gözcü %s'a gitti (%d tur): ile dokununca rapor açılır." % [ElectionNightSim.province_name(province_id), GameRules.SCOUT_ROUNDS])
 		_refresh_action_buttons()
 		var token := _scout_view_token
 		get_tree().create_timer(SCOUT_RESULT_HOLD).timeout.connect(func():
@@ -1084,8 +1082,13 @@ func _select_target_province(province_id: String) -> void:
 		detail = "%s: miting (%d mana) · provokasyon riski %%%d · gücün %+.1f" % [pname, GameRules.MITING_MANA_COST,
 			int(round(CardManager.miting_risk(me, province_id) * 100.0)), CardManager.activity_of(province_id, me)]
 	elif _pending_scout:
-		detail = "%s: buraya zaten gözcü gönderdin" % pname if CardManager.has_scouted(me, province_id) \
-			else "%s: gözcü gönder (%d mana)" % [pname, GameRules.SCOUT_MANA_COST]
+		var left := CardManager.scout_rounds_left(me, province_id)
+		if left >= GameRules.SCOUT_ROUNDS:
+			detail = "%s: bu tur zaten gözcü gönderdin" % pname
+		elif left > 0:
+			detail = "%s: gözcü %d tur daha burada · yenile: %d tura çıkar (%d mana)" % [pname, left, GameRules.SCOUT_ROUNDS, GameRules.SCOUT_MANA_COST]
+		else:
+			detail = "%s: gözcü gönder, %d tur kalır (%d mana)" % [pname, GameRules.SCOUT_ROUNDS, GameRules.SCOUT_MANA_COST]
 	elif _pending_org:
 		var level := CardManager.organization_level(province_id, me)
 		detail = "%s: il başkanlığı zaten en üst seviyede" % pname if level >= GameRules.ORG_MAX_LEVEL \
@@ -1690,11 +1693,12 @@ func _build_action_buttons() -> void:
 	_mana_box.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_show_toast(_mana_rules))
-	_mana_rules = "Her tur +%d mana; manan yettikçe istediğin kadar hamle yap.\nHamleler: yasa bedava (turda 1), miting %d, il başkanlığı %d, gözcü %d mana.\nKart çekmek %d mana; kartlar bonus: karalama 2, vekil çalma 2/3/4 mana." % [
-		GameRules.MANA_PER_ROUND, GameRules.MITING_MANA_COST, GameRules.ORG_MANA_COST, GameRules.SCOUT_MANA_COST, GameRules.DRAW_MANA_COST]
+	_mana_rules = "Her tur +%d mana; manan yettikçe istediğin kadar hamle yap.\nHamleler: yasa %d (turda 1), miting %d, il başkanlığı %d, gözcü %d mana (%d tur).\nKart çekmek %d mana; kartlar bonus: karalama 2, vekil çalma 2/3/4 mana." % [
+		GameRules.MANA_PER_ROUND, GameRules.LAW_MANA_COST, GameRules.MITING_MANA_COST, GameRules.ORG_MANA_COST,
+		GameRules.SCOUT_MANA_COST, GameRules.SCOUT_ROUNDS, GameRules.DRAW_MANA_COST]
 	add_child(_mana_box)
 	# HAMLELER (sağ sütun, destenin yanında alt alta). Kartlar bonus niteliğinde.
-	_law_button = _action_button("YASA", "bedava", Color(0.42, 0.26, 0.62), -292.0)
+	_law_button = _action_button("YASA", "%d mana" % GameRules.LAW_MANA_COST, Color(0.42, 0.26, 0.62), -292.0)
 	_law_button.pressed.connect(_on_law_button_pressed)
 	_miting_button = _action_button("MİTİNG", "%d mana" % GameRules.MITING_MANA_COST, Color(0.72, 0.3, 0.14), -256.0)
 	_miting_button.pressed.connect(_on_miting_button_pressed)
@@ -1734,11 +1738,11 @@ func _action_button(title: String, cost_text: String, color: Color, top: float) 
 	return button
 
 ## Neden şu an bu hamle yapılamıyor? (Buton ipucu ve uyarı yazısı.)
-func _action_block_reason(cost: int) -> String:
+func _action_block_reason(cost: int, is_law: bool = false) -> String:
 	var me := multiplayer.get_unique_id()
 	if not CardManager.can_act():
 		return "Sıran değil."
-	if cost == GameRules.LAW_MANA_COST and CardManager.has_proposed_law_this_round(me):
+	if is_law and CardManager.has_proposed_law_this_round(me):
 		return "Bu tur zaten bir yasa sundun (turda 1 yasa)."
 	if CardManager.mana_of(me) < cost:
 		return "Manan yetmiyor (%d gerekli)." % cost
@@ -1789,7 +1793,7 @@ func _build_law_designer() -> void:
 	close.pressed.connect(func(): _law_designer.hide())
 	header.add_child(close)
 	var hint := Label.new()
-	hint.text = "Bir daireyi meclis diyagramına sürükle · bedava, turda 1 yasa\nYakın illerde güç kazandırır, zıt illerde kaybettirir.\nPartin o yöne 1 adım, EVET diyenler yarım adım kayar; HAYIR diyenler ters yöne."
+	hint.text = "Bir daireyi meclis diyagramına sürükle · %d mana, turda 1 yasa\nYakın illerde güç kazandırır, zıt illerde kaybettirir.\nPartin o yöne 1 adım, EVET diyenler yarım adım kayar; HAYIR diyenler ters yöne." % GameRules.LAW_MANA_COST
 	hint.add_theme_font_size_override("font_size", 12)
 	hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.65))
 	box.add_child(hint)
@@ -1858,7 +1862,7 @@ func _law_circle(axis: String, dir: int) -> Control:
 
 func _start_law_drag(law_type: String) -> void:
 	if not CardManager.can_propose_law(multiplayer.get_unique_id(), law_type):
-		_show_toast(_action_block_reason(GameRules.LAW_MANA_COST))
+		_show_toast(_action_block_reason(GameRules.LAW_MANA_COST, true))
 		return
 	_start_drag(LAW_DRAG_INDEX, law_type, null)
 
@@ -1882,7 +1886,7 @@ func _circle_texture(color: Color) -> Texture2D:
 func _on_law_button_pressed() -> void:
 	_deselect_hand_card()
 	if not _law_designer.visible and not CardManager.can_propose_law(multiplayer.get_unique_id()):
-		_show_toast(_action_block_reason(GameRules.LAW_MANA_COST) + " (Panel yine de açılır: yasaları incele.)")
+		_show_toast(_action_block_reason(GameRules.LAW_MANA_COST, true) + " (Panel yine de açılır: yasaları incele.)")
 	if _law_designer.visible:
 		_law_designer.hide()
 		return
@@ -2026,9 +2030,10 @@ func _rebuild_layer_legend() -> void:
 			swatches.append([null, "güçlü"])
 		MapLayer.SCOUT:
 			swatches.append([MAP_BLANK_COLOR, ""])
-			swatches.append([null, "bilinmiyor"])
-			swatches.append([mine, ""])
-			swatches.append([null, "gözcü gönderildi"])
+			swatches.append([null, "yok"])
+			for left in range(GameRules.SCOUT_ROUNDS, 0, -1):
+				swatches.append([MAP_BLANK_COLOR.lerp(mine, float(left) / GameRules.SCOUT_ROUNDS), str(left)])
+			swatches.append([null, "tur kaldı"])
 	_layer_legend.visible = not swatches.is_empty()
 	for entry in swatches:
 		if entry[0] == null:
@@ -2095,7 +2100,9 @@ func _apply_map_layer_colors() -> void:
 					var t := clampf(CardManager.activity_of(province_id, me) / STRENGTH_COLOR_SCALE, -1.0, 1.0)
 					colors[province_id] = gradient.sample((t + 1.0) * 0.5)
 				MapLayer.SCOUT:
-					colors[province_id] = mine if CardManager.has_scouted(me, province_id) else MAP_BLANK_COLOR
+					# Yeni gözcü (5 tur) parti renginin aynısı, son turundaki açık ton.
+					var left := CardManager.scout_rounds_left(me, province_id)
+					colors[province_id] = MAP_BLANK_COLOR.lerp(mine, float(left) / GameRules.SCOUT_ROUNDS) if left > 0 else MAP_BLANK_COLOR
 	_province_base_colors = colors
 	map_holder.clear_overlay()
 	map_holder.set_province_colors(colors)
@@ -2125,7 +2132,9 @@ func _set_map_layer(layer: int, animate: bool = true) -> void:
 		if _map_snapshot.visible:
 			map_holder.position = Vector2.ZERO
 			_map_snapshot.hide()
-		await RenderingServer.frame_post_draw
+		# İki kare bekle: gizli butonlarla en az bir kare çizilmiş olsun.
+		await get_tree().process_frame
+		await get_tree().process_frame
 		_layer_bar.modulate.a = 1.0
 		_layer_legend.modulate.a = 1.0
 		_layer_switching = false
@@ -2197,7 +2206,7 @@ func _on_scout_button_pressed() -> void:
 		_province_panel.hide()
 	_begin_scout_view()
 	_refresh_action_buttons()
-	_set_target_hint("Gözcü: beyaz (bilinmeyen) bir ile dokun, tekrar dokun: gönder (%d mana)  ·  Butona tekrar dokun: iptal" % GameRules.SCOUT_MANA_COST)
+	_set_target_hint("Gözcü: bir ile dokun (beyaz = gözcün yok), tekrar dokun: gönder (%d mana)  ·  Butona tekrar dokun: iptal" % GameRules.SCOUT_MANA_COST)
 
 func _build_propaganda_menu() -> void:
 	_propaganda_menu = PanelContainer.new()

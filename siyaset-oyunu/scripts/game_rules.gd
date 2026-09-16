@@ -14,7 +14,7 @@ extends RefCounted
 ##   - MANA: herkes MANA_START ile başlar, her tur sonunda +MANA_PER_ROUND.
 ##     HAMLELER: miting MITING_MANA_COST, il başkanlığı ORG_MANA_COST, gözcü
 ##     SCOUT_MANA_COST; yasa bedava ama oyuncu başına turda LAWS_PER_ROUND kez.
-##     Kart çekmek DRAW_MANA_COST (kartlar bonus/joker niteliğinde).
+##     Kart çekmek DRAW_MANA_COST, turda en fazla bir kez (kartlar bonus/joker niteliğinde).
 ##     Kartları oynamanın bedeli CardPresets.CARD_MANA_COSTS.
 ##   - Hükümet kurulamazsa (tüm görev hakları biterse) o turun sonunda ERKEN
 ##     SEÇİM yapılır.

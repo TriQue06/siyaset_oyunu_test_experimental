@@ -221,9 +221,9 @@ func is_my_turn() -> bool:
 func can_draw() -> bool:
 	return can_draw_for(multiplayer.get_unique_id())
 
-## Kart çekmek bir hamle: mana ister, turda birden çok kez yapılabilir.
+## Kart çekmek bir hamle: mana ister, turda en fazla bir kez.
 func can_draw_for(peer_id: int) -> bool:
-	return can_choose_main_action(peer_id) and mana_of(peer_id) >= GameRules.DRAW_MANA_COST \
+	return can_choose_main_action(peer_id) and not has_drawn_this_turn and mana_of(peer_id) >= GameRules.DRAW_MANA_COST \
 		and inventories.get(peer_id, []).size() < MAX_HAND_SIZE
 
 ## Sıra bende VE tur akışı engellenmemiş mi? (UI bunu kullanmalı.)

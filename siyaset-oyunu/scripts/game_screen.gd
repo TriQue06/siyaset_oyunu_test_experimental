@@ -672,9 +672,7 @@ func _build_hand_card(card_type: String, hand_index: int) -> Control:
 
 	# Kartın ne olduğu her kartta görselin üstündeki bantta yazar.
 	holder.add_child(_card_title_banner(card_type))
-	var cost := CardPresets.card_cost(card_type)
-	if cost > 0:
-		holder.add_child(_card_cost_badge(cost))
+	holder.add_child(_card_cost_badge(CardPresets.card_cost(card_type)))
 
 	# TIK ve SÜRÜKLEME: basılı tutup TAP_MAX_MOVE_PX'ten fazla kaydırınca
 	# sürükleme başlar (kartın kopyası imleci izler, bırakınca hedefe göre
@@ -780,24 +778,40 @@ func _card_title_banner(card_type: String) -> Control:
 	return banner
 
 ## Kartın sağ alt köşesindeki mana bedeli rozeti.
+## Kartın üst kısmında mana bedeli: mana simgesi + sayı (bedava kartta 0).
 func _card_cost_badge(cost: int) -> Control:
 	var badge := PanelContainer.new()
-	badge.position = CARD_DISPLAY_SIZE - Vector2(40, 40)
-	badge.size = Vector2(32, 32)
 	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.12, 0.3, 0.55)
-	style.set_corner_radius_all(16)
-	style.set_border_width_all(2)
-	style.border_color = Color(0.55, 0.8, 1.0)
+	style.bg_color = Color(0.05, 0.07, 0.12, 0.85)
+	style.set_corner_radius_all(10)
+	style.content_margin_left = 4
+	style.content_margin_right = 7
 	badge.add_theme_stylebox_override("panel", style)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 2)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.add_child(row)
+	var icon := TextureRect.new()
+	icon.texture = MANA_ICON
+	icon.custom_minimum_size = Vector2(22, 22)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(icon)
 	var label := Label.new()
 	label.text = str(cost)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 16)
+	label.add_theme_font_size_override("font_size", 18)
+	label.add_theme_color_override("font_color", MANA_COLOR)
+	label.add_theme_color_override("font_outline_color", Color.BLACK)
+	label.add_theme_constant_override("outline_size", 4)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	badge.add_child(label)
+	row.add_child(label)
+	badge.reset_size()
+	# Başlık bandının hemen altında, sağda: el kartlarının yarısı ekran dışında kaldığı için üstte.
+	badge.position = Vector2(CARD_DISPLAY_SIZE.x - badge.get_combined_minimum_size().x - 8, 56)
 	return badge
 
 ## Oynanamayan bir karta tıklanınca neden oynanamadığı.
@@ -1693,7 +1707,7 @@ func _build_action_buttons() -> void:
 	_mana_box.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_show_toast(_mana_rules))
-	_mana_rules = "Her tur +%d mana; manan yettikçe istediğin kadar hamle yap.\nHamleler: yasa %d (turda 1), miting %d, il başkanlığı %d, gözcü %d mana (%d tur).\nKart çekmek %d mana; kartlar bonus: karalama 2, vekil çalma 2/3/4 mana." % [
+	_mana_rules = "Her tur +%d mana; manan yettikçe istediğin kadar hamle yap.\nHamleler: yasa %d (turda 1), miting %d, il başkanlığı %d, gözcü %d mana (%d tur).\nKart çekmek %d mana (turda 1); kartlar bonus: karalama 2, vekil çalma 2/3/4 mana." % [
 		GameRules.MANA_PER_ROUND, GameRules.LAW_MANA_COST, GameRules.MITING_MANA_COST, GameRules.ORG_MANA_COST,
 		GameRules.SCOUT_MANA_COST, GameRules.SCOUT_ROUNDS, GameRules.DRAW_MANA_COST]
 	add_child(_mana_box)

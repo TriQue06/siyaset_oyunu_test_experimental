@@ -226,7 +226,7 @@ func _initialize() -> void:
 	cm._apply_draw(3)
 	check("kart cekmek 1 mana, sira devretmez", cm.mana_of(3) == GameRules.MANA_START - GameRules.DRAW_MANA_COST 		and cm.inventories[3].size() == 1 and cm.current_turn_peer_id() == 3)
 	cm._apply_draw(3)
-	check("ayni turda tekrar kart cekilebilir", cm.inventories[3].size() == 2)
+	check("turda en fazla 1 kart cekilir", cm.inventories[3].size() == 1 and not cm.can_draw_for(3))
 	cm.mana[3] = 0
 	check("mana yoksa kart cekilemez", not cm.can_draw_for(3))
 	check("mana yoksa gozcu yok", not cm.can_scout(3, "ankara"))

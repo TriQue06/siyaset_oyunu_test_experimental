@@ -271,16 +271,17 @@ func _initialize() -> void:
 	check("il baskanligi sonmedi", near(cm.activity_of("konya", 3), 2.0 * PublicOpinion.LOCAL_DECAY + PublicOpinion.ORG_ACTIVITY_PER_LEVEL))
 
 	print("")
-	print("=== 9) YENI KARTLAR: ANKET, GOZCU, KARALAMA ===")
+	print("=== 9) ANKET, GOZCU HAMLESI, KARALAMA ===")
 	var w: Dictionary = cm._draw_weights(3)
-	check("anket, gozcu, karalama destede", w.has("anket") and w.has("gozcu") and w.has("karalama"))
+	check("anket ve karalama destede, gozcu destede degil", w.has("anket") and not w.has("gozcu") and w.has("karalama"))
+	cm.mana[3] = 50
 	cm.organizations = {}
 	cm.local_support = {}
 	cm.turn_order = [3, 1, 2]
 	cm.current_turn_index = 0
-	cm.inventories[3] = ["anket", "gozcu", "karalama", "miting"]
-	cm._apply_play(3, 3, -1, "")
-	check("il secilmeden miting oynanamaz (kart elde)", cm.inventories[3].size() == 4 and cm.current_turn_peer_id() == 3)
+	cm.inventories[3] = ["anket", "karalama", "miting"]
+	cm._apply_play(3, 2, -1, "")
+	check("il secilmeden miting oynanamaz (kart elde)", cm.inventories[3].size() == 3 and cm.current_turn_peer_id() == 3)
 	cm._apply_play(3, 0, -1, "ankara")
 	var poll: Dictionary = cm.poll_of(3, "ankara")
 	var poll_sum := 0.0
@@ -288,10 +289,9 @@ func _initialize() -> void:
 		poll_sum += float(poll["shares"][id])
 	check("anket: sonuc kaydedildi, toplam 100", not poll.is_empty() and absf(poll_sum - 100.0) < 0.01, str(poll))
 	check("anket sonucu sadece oynayanda", cm.poll_of(1, "ankara").is_empty())
-	cm.current_turn_index = 0
-	cm._apply_play(3, 0, -1, "ankara")
-	check("gozcu: il ogrenildi (sadece oynayana)", cm.has_scouted(3, "ankara") and not cm.has_scouted(1, "ankara"))
-	check("ayni ile ikinci gozcu oynanamaz", not cm.can_play_card(3, "gozcu", -1, "ankara"))
+	cm._apply_scout_move(3, "ankara")
+	check("gozcu: il ogrenildi (sadece gonderene)", cm.has_scouted(3, "ankara") and not cm.has_scouted(1, "ankara"))
+	check("ayni ile ikinci gozcu gonderilemez", not cm.can_scout(3, "ankara"))
 	check("karalama kendine oynanamaz", not cm.can_play_card(3, "karalama", 3, "ankara"))
 	check("karalama gecersiz partiye oynanamaz", not cm.can_play_card(3, "karalama", 99, "ankara"))
 	cm.current_turn_index = 0
@@ -319,8 +319,8 @@ func _initialize() -> void:
 	cm.mana[3] = 3
 	var law_soc: String = cp.law_type("social", 1)
 	cm._apply_law(3, law_soc)
-	check("yasa hamlesi meclise geldi, 1 mana harcandi",
-		gm.phase == gm.Phase.VOTING and gm.proposal_law == law_soc and cm.mana_of(3) == 2, "mana %d" % cm.mana_of(3))
+	check("yasa hamlesi meclise geldi, mana harcanmadi",
+		gm.phase == gm.Phase.VOTING and gm.proposal_law == law_soc and cm.mana_of(3) == 3, "mana %d" % cm.mana_of(3))
 	check("oylama sirasinda tur durur", cm.is_turn_blocked())
 
 	print("")

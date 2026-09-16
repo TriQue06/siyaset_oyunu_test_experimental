@@ -103,8 +103,8 @@ func _ready() -> void:
 	_party_order.sort_custom(func(a, b):
 		var ia: Dictionary = _party(a).get("ideology", {})
 		var ib: Dictionary = _party(b).get("ideology", {})
-		var ea := int(ia.get("economic", 0))
-		var eb := int(ib.get("economic", 0))
+		var ea := float(ia.get("economic", 0))
+		var eb := float(ib.get("economic", 0))
 		if ea != eb:
 			return ea < eb
 		return int(a) < int(b))

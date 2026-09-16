@@ -67,7 +67,6 @@ const WEIGHT_MITING := 2.5
 const WEIGHT_STEAL := 0.6
 const WEIGHT_INVEST := 2.5
 const WEIGHT_POLL := 1.2
-const WEIGHT_SCOUT := 1.2
 const WEIGHT_PROPAGANDA := 1.6
 ## Azınlık hükümeti varken gensorunun ağırlığı, diğer TÜM kartların toplamının
 ## bu katı — yani ~%67 olasılıkla gensoru gelir.
@@ -85,6 +84,8 @@ var turn_order: Array = []
 var current_turn_index: int = 0
 # Sırası gelen oyuncu bu turda kart çekti mi (turda en fazla bir çekiş).
 var has_drawn_this_turn: bool = false
+## Oyuncunun en son yasa sunduğu tur: peer_id -> round_number (turda 1 yasa).
+var law_rounds: Dictionary = {}
 ## Eksen keskinliği: il bazlı seçim sonuçlarının ne kadar keskin çıkacağını
 ## belirleyen üs (bkz. ElectionModel). HER TUR SONUNDA artar.
 var current_axis_sharpness: float = 0.5
@@ -216,11 +217,12 @@ func is_my_turn() -> bool:
 	return current_turn_peer_id() == multiplayer.get_unique_id()
 
 func can_draw() -> bool:
-	if is_turn_blocked():
-		return false
-	if not is_my_turn() or has_drawn_this_turn:
-		return false
-	return my_inventory().size() < MAX_HAND_SIZE
+	return can_draw_for(multiplayer.get_unique_id())
+
+## Kart çekmek bir hamle: mana ister, turda birden çok kez yapılabilir.
+func can_draw_for(peer_id: int) -> bool:
+	return can_choose_main_action(peer_id) and mana_of(peer_id) >= GameRules.DRAW_MANA_COST \
+		and inventories.get(peer_id, []).size() < MAX_HAND_SIZE
 
 ## Sıra bende VE tur akışı engellenmemiş mi? (UI bunu kullanmalı.)
 func can_act() -> bool:
@@ -249,7 +251,8 @@ func province_seat_count(province_id: String) -> int:
 func is_government_party(peer_id: int) -> bool:
 	return GovernmentManager.government_party_ids().has(peer_id)
 
-## Bu oyuncu şu an bir ANA HAMLE (yasa / il başkanlığı) seçebilir mi?
+## Sıra bu oyuncuda ve tur akışı engellenmemiş mi? (Her hamlenin ön şartı;
+## hamle sayısı sınırsız, mana belirler.)
 func can_choose_main_action(peer_id: int) -> bool:
 	return peer_id == current_turn_peer_id() and not is_turn_blocked()
 
@@ -257,9 +260,20 @@ func can_choose_main_action(peer_id: int) -> bool:
 func can_propose_law(peer_id: int, law_type: String = "") -> bool:
 	if not can_choose_main_action(peer_id) or mana_of(peer_id) < GameRules.LAW_MANA_COST:
 		return false
+	if has_proposed_law_this_round(peer_id):
+		return false
 	if law_type != "" and not CardPresets.is_law_card(law_type):
 		return false
 	return GovernmentManager.can_submit_law() or last_seats.is_empty()
+
+func has_proposed_law_this_round(peer_id: int) -> bool:
+	return int(law_rounds.get(peer_id, 0)) == round_number
+
+## Gözcü hamlesi: bu ilin görüşünü öğrenmek (bir kez).
+func can_scout(peer_id: int, province_id: String = "") -> bool:
+	if not can_choose_main_action(peer_id) or mana_of(peer_id) < GameRules.SCOUT_MANA_COST:
+		return false
+	return province_id == "" or (has_province(province_id) and not has_scouted(peer_id, province_id))
 
 func can_build_organization(peer_id: int, province_id: String) -> bool:
 	return can_choose_main_action(peer_id) and mana_of(peer_id) >= GameRules.ORG_MANA_COST \
@@ -283,7 +297,7 @@ func can_play_card(peer_id: int, card_type: String, target_peer_id: int = -1, ta
 	if card_type == CardPresets.PROPAGANDA_CARD_TYPE:
 		return has_province(target_province) and turn_order.has(target_peer_id) and target_peer_id != peer_id
 	if card_type == CardPresets.SCOUT_CARD_TYPE:
-		return has_province(target_province) and not has_scouted(peer_id, target_province)
+		return false  # gözcü artık hamle (bkz. scout)
 	if CardPresets.needs_province_target(card_type):
 		if not has_province(target_province):
 			return false
@@ -384,6 +398,7 @@ func init_game() -> void:
 	turn_order.shuffle()
 	current_turn_index = 0
 	has_drawn_this_turn = false
+	law_rounds = {}
 	current_axis_sharpness = MultiplayerManager.axis_sharpness_start
 	round_number = 1
 	last_election_round = 0
@@ -457,7 +472,7 @@ func draw_card() -> void:
 		_request_draw.rpc_id(1)
 
 ## Bu oyuncu için desteden çekilebilecek kartlar ve ağırlıkları.
-##   - miting, anket, gözcü ve karalama her zaman,
+##   - miting, anket ve karalama her zaman,
 ##   - vekil çalma ilk seçimden (meclis oluştuktan) sonra,
 ##   - yatırım SADECE hükümet partilerine,
 ##   - gensoru SADECE azınlık hükümeti varken, hükümet dışı partilere ve
@@ -466,7 +481,6 @@ func _draw_weights(peer_id: int = -1) -> Dictionary:
 	var weights := {}
 	weights[CardPresets.MITING_CARD_TYPE] = WEIGHT_MITING
 	weights[CardPresets.POLL_CARD_TYPE] = WEIGHT_POLL
-	weights[CardPresets.SCOUT_CARD_TYPE] = WEIGHT_SCOUT
 	weights[CardPresets.PROPAGANDA_CARD_TYPE] = WEIGHT_PROPAGANDA
 	if not last_seats.is_empty():
 		for card_type in CardPresets.STEAL_CARD_TYPES:
@@ -528,7 +542,16 @@ func build_organization(province_id: String) -> void:
 	else:
 		_request_organization.rpc_id(1, province_id)
 
-## Turu bir sonraki oyuncuya devreder. Kart çekmeden geçilirse +mana.
+## Gözcü hamlesi: seçilen ile gözcü gönder (SCOUT_MANA_COST).
+func scout(province_id: String) -> void:
+	if not can_scout(multiplayer.get_unique_id(), province_id):
+		return
+	if _is_authority():
+		_apply_scout_move(multiplayer.get_unique_id(), province_id)
+	else:
+		_request_scout.rpc_id(1, province_id)
+
+## "Turu Bitir": sırayı bir sonraki oyuncuya devreder.
 func pass_turn() -> void:
 	if turn_order.is_empty() or not can_act():
 		return
@@ -546,12 +569,11 @@ func request_full_sync() -> void:
 # --- Host tarafı: uygulama --------------------------------------------------
 
 func _apply_draw(peer_id: int) -> void:
-	if is_turn_blocked() or peer_id != current_turn_peer_id() or has_drawn_this_turn:
+	if not can_draw_for(peer_id):
 		return
 	if not inventories.has(peer_id):
 		inventories[peer_id] = []
-	if inventories[peer_id].size() >= MAX_HAND_SIZE:
-		return
+	mana[peer_id] = mana_of(peer_id) - GameRules.DRAW_MANA_COST
 	var card_type := CardPresets.weighted_pick(_draw_weights(peer_id), _rng)
 	card_drawn.emit(peer_id, card_type)
 	# Yeni kart elin ORTASINA yerleşir.
@@ -574,20 +596,16 @@ func _apply_play(peer_id: int, hand_index: int, target_peer_id: int = -1, target
 	mana[peer_id] = mana_of(peer_id) - CardPresets.card_cost(card_type)
 	_event_message = ""
 	var seats_changed_now := _apply_card_effect(peer_id, card_type, target_peer_id, target_province)
-	var wrapped := _advance_turn()
 	var event := {"type": "played", "peer_id": peer_id, "card": card_type,
 		"target": target_peer_id, "province": target_province, "seats_changed": seats_changed_now}
 	if _event_message != "":
 		event["message"] = _event_message
 	_push_state(event, seats_changed_now)
-	_finish_round_if_needed(wrapped)
 
-## voluntary=false: süre doldu (mana bonusu yok — boş bekleyerek mana biriktirilmesin).
-func _apply_pass(peer_id: int, voluntary: bool = true) -> void:
+## Turu bitir (voluntary=false: süre doldu). Mana bonusu yok.
+func _apply_pass(peer_id: int, _voluntary: bool = true) -> void:
 	if is_turn_blocked() or peer_id != current_turn_peer_id():
 		return
-	if voluntary:
-		mana[peer_id] = mana_of(peer_id) + GameRules.MANA_PASS_BONUS
 	var wrapped := _advance_turn()
 	_push_state({"type": "passed", "peer_id": peer_id})
 	_finish_round_if_needed(wrapped)
@@ -601,12 +619,11 @@ func _apply_law(peer_id: int, law_type: String) -> void:
 	elif not GovernmentManager.submit_law(peer_id, law_type):
 		return
 	mana[peer_id] = mana_of(peer_id) - GameRules.LAW_MANA_COST
-	var wrapped := _advance_turn()
+	law_rounds[peer_id] = round_number
 	var event := {"type": "law", "peer_id": peer_id, "law": law_type}
 	if _event_message != "":
 		event["message"] = _event_message
 	_push_state(event)
-	_finish_round_if_needed(wrapped)
 
 ## Meclis yokken yasa: oylamasız SEÇİM VAADİ — reddedilmiş bir yasa kadar etki.
 func _apply_law_promise(peer_id: int, law_type: String) -> void:
@@ -614,7 +631,7 @@ func _apply_law_promise(peer_id: int, law_type: String) -> void:
 	for province_id in _province_ids:
 		var alignment := PublicOpinion.law_alignment(province_center(province_id), law["axis"], int(law["dir"]))
 		_add_local(province_id, peer_id, PublicOpinion.law_proposer_delta(alignment, false))
-	PartyManager.apply_ideology_delta(peer_id, law["axis"], int(law["dir"]))
+	PartyManager.apply_ideology_delta(peer_id, law["axis"], IdeologyAxes.LAW_PROPOSE_SHIFT * int(law["dir"]))
 	_event_message = "%s seçim vaadi: %s. Partisi %s yönüne kaydı." % [_party_name(peer_id), law["title"], law["side"]]
 
 func _apply_organization(peer_id: int, province_id: String) -> void:
@@ -627,10 +644,16 @@ func _apply_organization(peer_id: int, province_id: String) -> void:
 	organizations[province_id] = entry
 	var verb := "kurdu" if level == 1 else "geliştirdi"
 	_log_province(province_id, "%s il başkanlığı %s (seviye %d)" % [_party_name(peer_id), verb, level])
-	var wrapped := _advance_turn()
 	_push_state({"type": "organization", "peer_id": peer_id, "province": province_id,
 		"message": "%s, %s'da il başkanlığı %s (seviye %d)." % [_party_name(peer_id), _province_name(province_id), verb, level]})
-	_finish_round_if_needed(wrapped)
+
+func _apply_scout_move(peer_id: int, province_id: String) -> void:
+	if not can_scout(peer_id, province_id):
+		return
+	mana[peer_id] = mana_of(peer_id) - GameRules.SCOUT_MANA_COST
+	_event_message = ""
+	_apply_scout(peer_id, province_id)
+	_push_state({"type": "scout", "peer_id": peer_id, "province": province_id, "message": _event_message})
 
 ## Kartın etkisini uygular. Milletvekili dağılımı değiştiyse true döner.
 ## Herkese duyurulacak bir sonuç varsa _event_message'a yazar.
@@ -647,8 +670,6 @@ func _apply_card_effect(peer_id: int, card_type: String, target_peer_id: int = -
 			_apply_investment(peer_id, target_province)
 		CardPresets.POLL_CARD_TYPE:
 			_apply_poll(peer_id, target_province)
-		CardPresets.SCOUT_CARD_TYPE:
-			_apply_scout(peer_id, target_province)
 		CardPresets.PROPAGANDA_CARD_TYPE:
 			_apply_propaganda(peer_id, target_peer_id, target_province)
 	return false
@@ -752,8 +773,16 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 				continue
 			var choice := GovernmentManager.normalize_vote(votes[voter])
 			_add_local(province_id, int(voter), PublicOpinion.law_vote_delta(alignment, choice, gov_ids.has(voter), proposer_in_gov))
-	# Yasayı savunan partinin görüşü yasanın yönünde kayar.
-	PartyManager.apply_ideology_delta(proposer, axis, dir)
+	# Görüş kayması: sunan yasanın yönünde 1 adım, EVET yasanın yönünde,
+	# HAYIR ters yönde yarım adım; çekimser kaymaz.
+	var shifts: Array = [{"peer": proposer, "axis": axis, "delta": IdeologyAxes.LAW_PROPOSE_SHIFT * dir}]
+	for voter in votes.keys():
+		if int(voter) == proposer:
+			continue
+		var choice := GovernmentManager.normalize_vote(votes[voter])
+		if choice != GovernmentManager.VOTE_ABSTAIN:
+			shifts.append({"peer": int(voter), "axis": axis, "delta": IdeologyAxes.LAW_VOTE_SHIFT * dir * choice})
+	PartyManager.apply_ideology_deltas(shifts)
 	_push_state({"type": "opinion", "message": "%s %s — %s bu görüşe yakın illerde güçlendi%s. Partisi %s yönüne kaydı." % [
 		law["title"], "KABUL EDİLDİ" if passed else "reddedildi", _party_name(proposer),
 		" (2 kat)" if passed else "", law["side"]]})
@@ -1032,6 +1061,7 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"turn_order": turn_order,
 		"turn_index": current_turn_index,
 		"has_drawn": has_drawn_this_turn,
+		"law_rounds": law_rounds,
 		"sharpness": current_axis_sharpness,
 		"round": round_number,
 		"turn_time_left": _turn_time_left,
@@ -1062,6 +1092,7 @@ func _apply_state(state: Dictionary) -> void:
 	turn_order = state["turn_order"]
 	current_turn_index = int(state["turn_index"])
 	has_drawn_this_turn = bool(state["has_drawn"])
+	law_rounds = state.get("law_rounds", {})
 	current_axis_sharpness = float(state["sharpness"])
 	round_number = int(state["round"])
 	_turn_deadline_ms = Time.get_ticks_msec() + int(float(state["turn_time_left"]) * 1000.0)
@@ -1164,6 +1195,12 @@ func _request_organization(province_id: String) -> void:
 	if not MultiplayerManager.is_host:
 		return
 	_apply_organization(multiplayer.get_remote_sender_id(), province_id)
+
+@rpc("any_peer", "reliable")
+func _request_scout(province_id: String) -> void:
+	if not MultiplayerManager.is_host:
+		return
+	_apply_scout_move(multiplayer.get_remote_sender_id(), province_id)
 
 @rpc("any_peer", "reliable")
 func _request_pass() -> void:

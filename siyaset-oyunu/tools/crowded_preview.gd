@@ -66,6 +66,54 @@ func _initialize() -> void:
 		z.resize(r.size.x * 3, r.size.y * 3, Image.INTERPOLATE_NEAREST)
 		z.save_png("%s/zoom_parliament_after.png" % OS.get_user_data_dir())
 	_shot("crowded_after")
+	# Harita katmanları: örnek teşkilat, güç ve gözcü verisi.
+	cm.organizations = {"istanbul": {me: 3}, "ankara": {me: 2}, "izmir": {me: 1}, "konya": {me: 1}, "bursa": {me: 2}}
+	var ids: Array = scene.map_holder.get_all_province_ids()
+	for i in ids.size():
+		cm.local_support[ids[i]] = {me: sin(i * 0.7) * 5.0}
+		if i % 4 == 0:
+			cm.intel[me] = cm.intel.get(me, {})
+			var scouts: Dictionary = cm.intel[me].get("scouts", {})
+			scouts[ids[i]] = true
+			cm.intel[me]["scouts"] = scouts
+	cm.current_turn_index = 2
+	cm._push_state({"type": "timer"})
+	await _frames(10)
+	for layer in [1, 2, 3, 0]:
+		scene._on_layer_button_pressed(layer)
+		await create_timer(0.2).timeout
+		if layer == 1:
+			_shot("layer_sliding")
+		await create_timer(0.4).timeout
+		_shot("layer_%d" % layer)
+	check("vekil katmaninda vekil daireleri gorunur", scene.map_holder.get_node("SeatMarkers").visible)
+	scene._on_layer_button_pressed(2)
+	await create_timer(0.6).timeout
+	cm.current_turn_index = cm.turn_order.find(me)
+	cm.mana[me] = 5
+	cm._push_state({"type": "timer"})
+	await _frames(5)
+	scene._on_scout_button_pressed()
+	await create_timer(0.6).timeout
+	check("gozcu butonu haritayi gozcu katmanina alir", scene._map_layer == 3)
+	_shot("scout_pending")
+	scene._on_scout_button_pressed()
+	await create_timer(0.6).timeout
+	check("iptal: onceki katmana (guc) doner, mana harcanmaz", scene._map_layer == 2 and cm.mana_of(me) == 5)
+	scene._on_scout_button_pressed()
+	var target := ""
+	for id in ids:
+		if not cm.has_scouted(me, id):
+			target = id
+			break
+	scene._on_province_clicked(target)
+	scene._on_province_clicked(target)
+	check("gozcu gonderildi, 1 mana", cm.has_scouted(me, target) and cm.mana_of(me) == 4)
+	await create_timer(0.3).timeout
+	check("gonderince bir an gozcu katmaninda kalir", scene._map_layer == 3)
+	await create_timer(1.6).timeout
+	check("sonra onceki katmana doner", scene._map_layer == 2)
+	_shot("my_turn")
 	print("=== CROWDED PREVIEW: %s ===" % ("PASS" if fails == 0 else "%d HATA" % fails))
 	quit()
 

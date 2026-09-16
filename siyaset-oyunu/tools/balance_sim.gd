@@ -17,6 +17,7 @@ var pm
 var cm
 var gm
 var brain
+var bm
 
 func _initialize() -> void:
 	var games := 20
@@ -33,7 +34,8 @@ func _initialize() -> void:
 	cm = root.get_node("CardManager")
 	gm = root.get_node("GovernmentManager")
 	brain = load("res://scripts/bot_brain.gd")
-	root.get_node("BotManager").set_process(false)
+	bm = root.get_node("BotManager")
+	bm.set_process(false)
 	mm.room_code = ""
 	gm.result_hold_seconds = 0.0
 
@@ -76,6 +78,7 @@ func _play_game(g: int, report: Dictionary) -> void:
 	var prev_election_seats := {}
 	var marks := {}  # province_id -> {hedef: true} (son seçimden beri karalananlar)
 	var steps := 0
+	var turn_actions := 0
 	while not cm.game_finished and steps < 30000:
 		steps += 1
 		if cm.last_election_round != prev_election_round:
@@ -104,39 +107,32 @@ func _play_game(g: int, report: Dictionary) -> void:
 
 		var bot: int = cm.current_turn_peer_id()
 		var actions: Dictionary = stats[bot]["actions"]
-		if cm.inventories.get(bot, []).size() < cm.MAX_HAND_SIZE:
-			cm._apply_draw(bot)
-		var action: Dictionary = brain.choose_action(bot)
-		match String(action["type"]):
+		var done: Dictionary = bm.do_action(bot) if turn_actions < 12 else {}
+		turn_actions += 1
+		if done.is_empty():
+			cm._apply_pass(bot, true)
+			_bump(actions, "turu_bitir")
+			turn_actions = 0
+			continue
+		match String(done["type"]):
 			"law":
-				cm._apply_law(bot, String(action["law"]))
 				_bump(actions, "yasa")
 			"organization":
-				cm._apply_organization(bot, String(action["province"]))
 				_bump(actions, "il_baskanligi")
-			"pass":
-				cm._apply_pass(bot, true)
-				_bump(actions, "pas")
-			_:
-				var play: Dictionary = brain.choose_play(bot)
-				if play.is_empty():
-					cm._apply_pass(bot, true)
-					_bump(actions, "pas")
-				else:
-					var card: String = cm.inventories[bot][int(play["index"])]
-					var before: int = cm.inventories[bot].size()
-					cm._apply_play(bot, int(play["index"]), int(play["peer"]), String(play["province"]))
-					if cm.inventories.get(bot, []).size() < before:
-						_bump(actions, card.trim_prefix("steal_").trim_suffix("") if not card.begins_with("steal_") else "vekil_calma")
-						if card == "karalama":
-							var target := int(play["peer"])
-							var province_id := String(play["province"])
-							stats[target]["propaganda_received"] = int(stats[target]["propaganda_received"]) + 1
-							var entry: Dictionary = marks.get(province_id, {})
-							entry[target] = true
-							marks[province_id] = entry
-		if not cm.game_finished and cm.current_turn_peer_id() == bot and not cm.is_turn_blocked():
-			cm._apply_pass(bot, false)
+			"scout":
+				_bump(actions, "gozcu")
+			"draw":
+				_bump(actions, "kart_cek")
+			"card":
+				var card := String(done["card"])
+				_bump(actions, card if not card.begins_with("steal_") else "vekil_calma")
+				if card == "karalama":
+					var target := int(done["peer"])
+					var province_id := String(done["province"])
+					stats[target]["propaganda_received"] = int(stats[target]["propaganda_received"]) + 1
+					var entry: Dictionary = marks.get(province_id, {})
+					entry[target] = true
+					marks[province_id] = entry
 
 	var parties := []
 	for rank in cm.final_ranking.size():

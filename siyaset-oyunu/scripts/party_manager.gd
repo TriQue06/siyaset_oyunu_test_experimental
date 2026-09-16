@@ -182,18 +182,29 @@ func add_bot_party(peer_id: int) -> void:
 
 ## Oyun sırasında (kart oynanınca vb.) bir partinin ideoloji eksenini kaydırır.
 ## Sadece host çağırır (bkz. CardManager._apply_play). Oyun ortasında uç/nötr
-## yasağı YOKTUR, sadece [-3, 3] aralığına sıkıştırılır.
-func apply_ideology_delta(peer_id: int, axis: String, delta: int) -> void:
+## yasağı YOKTUR, 0.5 adıma yuvarlanıp [-3, 3] aralığına sıkıştırılır.
+func apply_ideology_delta(peer_id: int, axis: String, delta: float) -> void:
+	apply_ideology_deltas([{"peer": peer_id, "axis": axis, "delta": delta}])
+
+## Birden çok kaydırmayı tek yayınla uygular (yasa oylamasında herkes kayar).
+## changes: [{"peer": int, "axis": String, "delta": float}]
+func apply_ideology_deltas(changes: Array) -> void:
 	# room_code == "" : aktif oda yok (örn. sahne editörde tek başına test) —
 	# yerel önizleme için host kontrolünü atla.
 	if MultiplayerManager.room_code != "" and not MultiplayerManager.is_host:
 		return
-	if not parties.has(peer_id):
+	var changed := false
+	for change in changes:
+		var peer_id := int(change["peer"])
+		if not parties.has(peer_id) or is_zero_approx(float(change["delta"])):
+			continue
+		var axis := String(change["axis"])
+		var ideology: Dictionary = parties[peer_id].get("ideology", IdeologyAxes.default_values())
+		ideology[axis] = IdeologyAxes.clamp_value(float(ideology.get(axis, 0)) + float(change["delta"]))
+		parties[peer_id]["ideology"] = ideology
+		changed = true
+	if not changed:
 		return
-	var ideology: Dictionary = parties[peer_id].get("ideology", IdeologyAxes.default_values())
-	var new_value: int = IdeologyAxes.clamp_value(int(ideology.get(axis, 0)) + delta)
-	ideology[axis] = new_value
-	parties[peer_id]["ideology"] = ideology
 	if MultiplayerManager.room_code == "":
 		parties_updated.emit()
 		return

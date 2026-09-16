@@ -1,17 +1,20 @@
 extends Node
 ## Autoload. Botları (MultiplayerManager.is_bot) İNSAN HIZINDA oynatır: sıra
-## gelince biraz düşünür, kart çeker, biraz daha bekler, sonra oynar; oyları
+## gelince biraz düşünür, hamle hamle oynar, yapacak değerli bir şey kalmayınca
+## turu bitirir; oyları
 ## ve hükümet tekliflerini de rastgele birkaç saniye içinde verir. Kararlar
 ## BotBrain'de. Sadece yetkili tarafta (host ya da ağsız yerel oyun) çalışır.
 
-const THINK_SECONDS := Vector2(1.5, 3.0)   # sıra gelince -> kart çekme
-const PLAY_SECONDS := Vector2(1.0, 2.2)    # kart çekme -> oynama/pas
+const THINK_SECONDS := Vector2(1.5, 3.0)   # sıra gelince -> ilk hamle
+const PLAY_SECONDS := Vector2(1.0, 2.2)    # hamleler arası
+## Güvenlik sınırı: bir turda en çok bu kadar bot hamlesi.
+const MAX_ACTIONS_PER_TURN := 12
 const VOTE_SECONDS := Vector2(1.5, 4.5)    # oylama açılınca -> oy
 const FORM_SECONDS := Vector2(3.0, 6.0)    # görev gelince -> teklif
 
 var _rng := RandomNumberGenerator.new()
 var _turn_key := ""
-var _turn_drawn := false
+var _turn_actions := 0
 var _turn_due := 0.0
 var _vote_key := ""
 var _vote_due: Dictionary = {}
@@ -55,40 +58,52 @@ func _handle_turn(now: float) -> void:
 	var key := "%d:%d:%d" % [CardManager.round_number, CardManager.current_turn_index, bot]
 	if key != _turn_key:
 		_turn_key = key
-		_turn_drawn = false
+		_turn_actions = 0
 		_turn_due = now + _delay(THINK_SECONDS)
 		return
 	if now < _turn_due:
 		return
-	if not _turn_drawn:
-		# Kart çekmek hamle değil: önce (bedava) çek, biraz düşün, sonra hamle.
-		_turn_drawn = true
-		_turn_due = now + _delay(PLAY_SECONDS)
-		if CardManager.inventories.get(bot, []).size() < CardManager.MAX_HAND_SIZE:
-			CardManager._apply_draw(bot)
-			return
-	_turn_due = INF
+	# Hamle sınırı yok: bot her hamleden sonra biraz düşünüp devam eder,
+	# yapacak değerli bir şey kalmayınca turu bitirir.
+	_turn_due = now + _delay(PLAY_SECONDS)
+	_turn_actions += 1
+	if _turn_actions > MAX_ACTIONS_PER_TURN or do_action(bot).is_empty():
+		CardManager._apply_pass(bot, true)
+
+## Botun bir hamlesini uygular (testler ve simülasyon da kullanır). Uygulanan
+## hamle {"type", "card"?, "peer"?, "province"?} döner; bot turu bitirmek
+## istiyorsa ya da hamle reddedildiyse boş sözlük.
+static func do_action(bot: int) -> Dictionary:
 	var action := BotBrain.choose_action(bot)
+	var mana_before := CardManager.mana_of(bot)
+	var hand_before: int = CardManager.inventories.get(bot, []).size()
+	var laws_before := CardManager.has_proposed_law_this_round(bot)
+	var blocked_before := CardManager.is_turn_blocked()
 	match String(action["type"]):
 		"law":
 			CardManager._apply_law(bot, String(action["law"]))
 		"organization":
 			CardManager._apply_organization(bot, String(action["province"]))
+		"scout":
+			CardManager._apply_scout_move(bot, String(action["province"]))
+		"draw":
+			CardManager._apply_draw(bot)
 		"card":
 			var play := BotBrain.choose_play(bot)
 			if play.is_empty():
-				CardManager._apply_pass(bot, true)
-				return
+				return {}
+			action["card"] = String(CardManager.inventories[bot][int(play["index"])])
+			action["peer"] = int(play["peer"])
+			action["province"] = String(play["province"])
 			CardManager._apply_play(bot, int(play["index"]), int(play["peer"]), String(play["province"]))
 		_:
-			CardManager._apply_pass(bot, true)
-			return
-	_pass_if_stuck(bot)
-
-## Hamle reddedildiyse (beklenmedik bir kural) sırayı tıkamamak için turu bitir.
-func _pass_if_stuck(bot: int) -> void:
-	if CardManager.current_turn_peer_id() == bot and not CardManager.is_turn_blocked():
-		CardManager._apply_pass(bot, false)
+			return {}
+	# Hamle gerçekten uygulandı mı? (Reddedilen hamlede döngüye girmesin.)
+	var applied: bool = CardManager.mana_of(bot) != mana_before \
+		or CardManager.inventories.get(bot, []).size() != hand_before \
+		or CardManager.has_proposed_law_this_round(bot) != laws_before \
+		or CardManager.is_turn_blocked() != blocked_before
+	return action if applied else {}
 
 func _handle_votes(now: float) -> void:
 	var key := "%s:%d:%s:%d:%d:%d" % [GovernmentManager.proposal_kind, GovernmentManager.proposal_peer_id,

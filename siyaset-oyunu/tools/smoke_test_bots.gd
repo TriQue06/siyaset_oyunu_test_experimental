@@ -46,6 +46,8 @@ func _initialize() -> void:
 	var votes := 0
 	var steps := 0
 	var was_governing := false
+	var turn_actions := 0
+	var max_actions := 0
 	while steps < 4000 and not cm.game_finished and cm.round_number <= 14:
 		steps += 1
 		if gm.phase == gm.Phase.VOTING:
@@ -60,32 +62,24 @@ func _initialize() -> void:
 			if gm.phase == gm.Phase.FORMING:
 				gm.tick(GameRules.FORMATION_TIMEOUT + 100.0)  # geçersiz teklif: süre dolsun
 		else:
+			# Hamle sınırı yok: bot turu bitirene kadar (en çok 12) hamle yapar.
 			var bot: int = cm.current_turn_peer_id()
-			if cm.inventories.get(bot, []).size() < cm.MAX_HAND_SIZE:
-				cm._apply_draw(bot)
-			var action: Dictionary = brain.choose_action(bot)
-			match String(action["type"]):
-				"law":
-					cm._apply_law(bot, String(action["law"]))
-					played["law"] = int(played.get("law", 0)) + 1
-				"organization":
-					cm._apply_organization(bot, String(action["province"]))
-					played["il_baskanligi"] = int(played.get("il_baskanligi", 0)) + 1
-				"pass":
-					cm._apply_pass(bot, true)
-					played["pas"] = int(played.get("pas", 0)) + 1
-				_:
-					var play: Dictionary = brain.choose_play(bot)
-					if play.is_empty():
-						cm._apply_pass(bot, true)
-					else:
-						var card: String = cm.inventories[bot][int(play["index"])]
-						var before: int = cm.inventories[bot].size()
-						cm._apply_play(bot, int(play["index"]), int(play["peer"]), String(play["province"]))
-						if cm.inventories.get(bot, []).size() < before:
-							played[card] = int(played.get(card, 0)) + 1
-			if cm.current_turn_peer_id() == bot and not cm.is_turn_blocked() and not cm.game_finished:
-				cm._apply_pass(bot, false)
+			var done: Dictionary = bm.do_action(bot) if turn_actions < 12 else {}
+			turn_actions += 1
+			if done.is_empty():
+				cm._apply_pass(bot, true)
+				played["turu_bitir"] = int(played.get("turu_bitir", 0)) + 1
+				max_actions = maxi(max_actions, turn_actions - 1)
+				turn_actions = 0
+			else:
+				var kind := String(done["type"])
+				if kind == "card":
+					kind = String(done["card"])
+				elif kind == "law":
+					kind = "law"
+				elif kind == "organization":
+					kind = "il_baskanligi"
+				played[kind] = int(played.get(kind, 0)) + 1
 		var governing: bool = gm.phase == gm.Phase.GOVERNING
 		if governing and not was_governing:
 			governments += 1
@@ -98,7 +92,19 @@ func _initialize() -> void:
 	check("botlar yasa sundu", int(played.get("law", 0)) > 0)
 	check("botlar il baskanligi kurdu", int(played.get("il_baskanligi", 0)) > 0)
 	check("botlar kart oynadi (miting)", int(played.get("miting", 0)) > 0)
-	check("botlar gozcu gonderdi (il gorusunu bilmiyorlar)", int(played.get("gozcu", 0)) > 0)
+	check("botlar gozcu gonderdi (il gorusunu bilmiyorlar)", int(played.get("scout", 0)) > 0)
+	check("botlar kart cekti (1 mana)", int(played.get("draw", 0)) > 0)
+	check("bir turda birden cok hamle yapildi", max_actions >= 2, str(max_actions))
+	var fractional := false
+	for peer_id in pm.parties.keys():
+		for axis in pm.parties[peer_id]["ideology"].keys():
+			var v := float(pm.parties[peer_id]["ideology"][axis])
+			if not is_equal_approx(v, roundf(v)):
+				fractional = true
+			if absf(v) > 3.0 or not is_equal_approx(v * 2.0, roundf(v * 2.0)):
+				fractional = false
+				print("  gecersiz ideoloji degeri: ", v)
+	check("ideolojiler 0.5 adimli (oylar yarim adim kaydirir)", fractional)
 	# Bilgi kısıtı: gözcü gönderilmemiş il bot için nötrdür.
 	var bot0: int = cm.turn_order[0]
 	var known: Dictionary = brain._known_centers(bot0)

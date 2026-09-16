@@ -103,6 +103,7 @@ func run_host() -> void:
 	mm.finish_party_setup()
 	cm.turn_order = [client_id, 1]
 	cm.current_turn_index = 0
+	cm.mana[client_id] = 10  # kart çek (1) + her kart (en çok 4) + gözcü (1)
 	cm._push_state({"type": "full"}, true)
 	log_line("oyun başladı, sıra client'ta (id %d)" % client_id)
 
@@ -152,13 +153,16 @@ func run_client() -> void:
 	var card: String = cm.my_inventory()[0]
 	# İlk seçimden önce deste il kartları verir (miting, anket, gözcü, karalama).
 	cm.play_card(0, 1, "ankara")
-	# Sadece elin boşalmasını bekle: host sırasını anında geçip turu (ve seçimi)
-	# bitirebilir, o zaman sıra çoktan tekrar bize dönmüş olur.
 	if not await wait_until(func(): return cm.my_inventory().is_empty(), "kart oynama RPC'si (%s)" % card):
 		return
 	if not await wait_until(func(): return cm.province_events.has("ankara") or cm.intel.has(me),
 			"kart sonucu (il olayı / istihbarat) senkronlandı"):
 		return
+	# Hamle sınırı yok: aynı turda gözcü hamlesi, sonra turu bitir.
+	cm.scout("izmir")
+	if not await wait_until(func(): return cm.has_scouted(me, "izmir"), "gözcü hamlesi RPC'si"):
+		return
+	cm.pass_turn()
 	if not await wait_until(func(): return cm.province_ideology.size() == 67, "illerin görüşü senkronlandı"):
 		return
 	if not await wait_until(func(): return cm.last_election_round == 1 and cm.last_province_results.size() == 67,

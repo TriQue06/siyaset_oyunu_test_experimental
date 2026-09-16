@@ -7,13 +7,18 @@ extends Node
 ##   administrative : -3 federal/pluralist     <-> +3 unitary/nationalist
 ##
 ## Her parti NÖTR (0, 0, 0) başlar; parti kurulumunda ideoloji seçilmez.
-## Partinin görüşü sadece sunduğu yasalarla kayar. İllerin görüşü aynı
+## Değerler STEP (0.5) adımlıdır. Yasa sunmak partiyi yasanın yönünde
+## LAW_PROPOSE_SHIFT, yasaya EVET yasanın yönünde / HAYIR ters yönde
+## LAW_VOTE_SHIFT kaydırır; çekimser kaydırmaz. İllerin görüşü aynı
 ## eksenlerde bkz. ProvinceIdeology.
 
 const AXES := ["economic", "social", "administrative"]
 const AXIS_MIN := -3
 const AXIS_MAX := 3
 const ALLOWED_START_VALUES := [0]
+const STEP := 0.5
+const LAW_PROPOSE_SHIFT := 1.0
+const LAW_VOTE_SHIFT := 0.5
 
 static func default_values() -> Dictionary:
 	var v := {}
@@ -34,10 +39,16 @@ static func is_valid_start_ideology(values: Dictionary) -> bool:
 static func random_start_ideology() -> Dictionary:
 	return default_values()
 
-## Kart oynanınca değer güncellenirken kullanılır: oyun ortası için uç/nötr
-## yasağı YOKTUR, sadece [-3, 3] aralığına sıkıştırılır.
-static func clamp_value(value: int) -> int:
-	return clampi(value, AXIS_MIN, AXIS_MAX)
+## Oyun ortası güncelleme: STEP'e yuvarlanır ve [-3, 3] aralığına sıkıştırılır.
+static func clamp_value(value: float) -> float:
+	return clampf(snappedf(value, STEP), AXIS_MIN, AXIS_MAX)
+
+## "+1.5", "−2", "0" gibi kısa gösterim.
+static func format_value(value: float) -> String:
+	if is_zero_approx(value):
+		return "0"
+	var text := ("%+.1f" % value) if not is_equal_approx(value, roundf(value)) else ("%+d" % int(roundf(value)))
+	return text
 
 ## İki ideoloji vektörü arasındaki Öklid mesafesi (eksen sayısına göre genel).
 static func distance(a: Dictionary, b: Dictionary) -> float:

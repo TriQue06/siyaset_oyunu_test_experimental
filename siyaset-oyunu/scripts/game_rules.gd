@@ -9,10 +9,12 @@ extends RefCounted
 ##     başkanlıkları, mitingler, gözcü, seçim vaatleri). İlk seçim o turun
 ##     sonunda, sonra her ELECTION_INTERVAL turda bir (3, 6, 9 ...). Arada
 ##     kalan turlarda kurulu hükümet görevde kalır ve makam puanlarını toplar.
-##   - MANA: herkes MANA_START ile başlar, her tur sonunda +MANA_PER_ROUND,
-##     pas geçince +MANA_PASS_BONUS. Sınır yok. Yasa LAW_MANA_COST, il
-##     başkanlığı ORG_MANA_COST, kartların bedeli CardPresets.CARD_MANA_COSTS.
-##     Kart çekmek bedavadır ve hamle sayılmaz.
+##   - HAMLE SINIRI YOK: sırası gelen oyuncu manası yettiğince hamle yapar,
+##     "Turu Bitir" ile sırayı devreder. Mana birikir, üst sınır yok.
+##   - MANA: herkes MANA_START ile başlar, her tur sonunda +MANA_PER_ROUND.
+##     Kart çekmek DRAW_MANA_COST, gözcü SCOUT_MANA_COST, il başkanlığı
+##     ORG_MANA_COST; yasa bedava ama oyuncu başına turda LAWS_PER_ROUND kez.
+##     Kartları oynamanın bedeli CardPresets.CARD_MANA_COSTS.
 ##   - Hükümet kurulamazsa (tüm görev hakları biterse) o turun sonunda ERKEN
 ##     SEÇİM yapılır.
 ##   - MAX_ROUNDS'uncu turun sonunda oyun biter; en çok puanı olan kazanır
@@ -21,19 +23,21 @@ extends RefCounted
 const ELECTION_INTERVAL := 3
 const FIRST_ELECTION_ROUND := 3
 
-const MANA_START := 1
-const MANA_PER_ROUND := 1
-const MANA_PASS_BONUS := 1
-const LAW_MANA_COST := 1
+const MANA_START := 3
+const MANA_PER_ROUND := 3
+const LAW_MANA_COST := 0
+const LAWS_PER_ROUND := 1
+const DRAW_MANA_COST := 1
+const SCOUT_MANA_COST := 1
 const ORG_MANA_COST := 2
 const ORG_MAX_LEVEL := 3
 ## GEÇİCİ olarak iki katına çıkarıldı (12 -> 24) ki oyun geç bitsin.
 const MAX_ROUNDS := 24
 
 ## Süre sınırları (saniye). AFK kalan tek bir oyuncu oyunu kilitleyemesin diye.
-## Tur süresi dolarsa otomatik pas; hükümet kurma süresi dolarsa o teklif
+## Tur süresi dolarsa sıra otomatik devredilir; hükümet kurma süresi dolarsa o teklif
 ## hakkı yanar; oylama süresi dolarsa oy vermeyenler ÇEKİMSER sayılır.
-const TURN_TIMEOUT := 60.0
+const TURN_TIMEOUT := 90.0
 const FORMATION_TIMEOUT := 120.0
 const VOTE_TIMEOUT := 45.0
 ## Seçim gecesi canlı sayım yayınının süresi ve bittikten sonra kesin sonucun

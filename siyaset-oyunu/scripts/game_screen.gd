@@ -39,6 +39,21 @@ const TAP_MAX_MOVE_PX := 10.0
 ## Oylamada parlamento koltuklarının ve profil etiketlerinin rengi.
 const VOTE_COLORS := {1: Color(0.32, 0.82, 0.38), 0: Color(0.92, 0.78, 0.3), -1: Color(0.92, 0.3, 0.3)}
 
+## HARİTA KATMANLARI: aynı Türkiye haritasının dört ayrı görünümü; butonlarla
+## geçilir, harita yan yana dizilmiş sayfalar gibi yana kayar.
+##   SEATS        : son seçim (il kazananları + vekil daireleri)
+##   ORGANIZATION : il başkanlığı seviyem (0 beyaz → 3 parti rengi)
+##   STRENGTH     : ildeki gücüm (koyu kırmızı çok kötü, sarı nötr, koyu yeşil çok iyi)
+##   SCOUT        : gözcü gönderdiğim iller parti rengimde, diğerleri beyaz
+enum MapLayer { SEATS, ORGANIZATION, STRENGTH, SCOUT }
+const MAP_LAYER_TITLES := ["Vekiller", "Teşkilat", "Güç", "Gözcü"]
+const MAP_SLIDE_DURATION := 0.38
+## Güç haritasında bu kadar il puanı en koyu renge denk gelir.
+const STRENGTH_COLOR_SCALE := 5.0
+const STRENGTH_STOPS := [Color(0.42, 0.04, 0.05), Color(0.88, 0.2, 0.14), Color(0.96, 0.84, 0.24), Color(0.36, 0.76, 0.3), Color(0.04, 0.36, 0.13)]
+const MAP_BLANK_COLOR := Color(0.97, 0.97, 0.95)
+## Gözcü hamlesinden sonra haritanın gözcü katmanında kaldığı süre.
+const SCOUT_RESULT_HOLD := 1.2
 const SHADOW_OFFSET := Vector2(4, 5)
 const SHADOW_COLOR := Color(0, 0, 0, 0.38)
 
@@ -88,6 +103,20 @@ var _hand_holders: Array = [] # Array[Control], hover-kaldirma animasyonu icin (
 var _hovered_province_id: String = ""
 # province_id -> Color (kazanan partinin rengi) — hover'dan çıkınca buna dönülür.
 var _province_base_colors: Dictionary = {}
+## Son seçimde illeri kazanan partilerin renkleri (Vekiller katmanı).
+var _seat_layer_colors: Dictionary = {}
+## Harita katmanı (bkz. MapLayer) ve katman geçişi.
+var _map_layer: int = MapLayer.SEATS
+var _layer_before_scout: int = -1
+var _scout_view_token: int = 0
+var _map_clip: Control
+var _map_snapshot: TextureRect
+var _map_slide_tween: Tween
+var _layer_switching: bool = false
+var _queued_layer: int = -1
+var _layer_bar: HBoxContainer
+var _layer_buttons: Array = []
+var _layer_legend: Control
 var _game_over_overlay: Control
 ## Ekranın üstünde kısa süre görünen bilgi yazısı (teklif sonucu, yeni tur…).
 var _toast: Label
@@ -116,6 +145,9 @@ var _mana_box: HBoxContainer
 var _mana_label: Label
 var _law_button: Button
 var _org_button: Button
+var _scout_button: Button
+## Gözcü hamlesi için il seçme modu (harita gözcü katmanına geçer).
+var _pending_scout: bool = false
 ## Yasa tasarlama paneli (6 daire) ve karalama hedef menüsü.
 var _law_designer: PanelContainer
 var _propaganda_menu: PanelContainer
@@ -216,10 +248,17 @@ func _apply_layout() -> void:
 	var map_native_size: Vector2 = Vector2(map_holder.grid_width, map_holder.grid_height) * map_holder.MAP_UNIT_SCALE
 	var fit_scale: float = minf(available_width / map_native_size.x, available_height / map_native_size.y) * MAP_FILL_RATIO
 	map_holder.scale = Vector2(fit_scale, fit_scale)
-	map_holder.position = Vector2(
+	var map_position := Vector2(
 		LEFT_PANEL_WIDTH + available_width * 0.5 - map_native_size.x * 0.5 * fit_scale,
 		available_height * 0.5 - map_native_size.y * 0.5 * fit_scale
 	)
+	# Harita, katman geçişinde yana kayabilsin diye kırpan bir kutunun içinde.
+	_ensure_map_clip()
+	_map_clip.position = map_position
+	_map_clip.size = map_native_size * fit_scale
+	if _map_slide_tween == null or not _map_slide_tween.is_running():
+		map_holder.position = Vector2.ZERO
+	_place_layer_bar()
 
 	# Alt hazne, sol panel ile sağ sütun arasındaki TÜM genişliği kullanır:
 	# solda meclis diyagramı + oylama (PARLIAMENT_WIDTH_RATIO), sağında el
@@ -366,7 +405,7 @@ func _on_proposal_changed() -> void:
 ## 0.8), sadece "çoğunluk" (yarıdan az ama en yüksek) ise daha soluk (alfa
 ## 0.6) boyanır.
 func _refresh_province_winner_colors() -> void:
-	_province_base_colors.clear()
+	_seat_layer_colors.clear()
 	for province_id in CardManager.last_province_results.keys():
 		var entry: Dictionary = CardManager.last_province_results[province_id]
 		if entry.is_empty():
@@ -393,8 +432,8 @@ func _refresh_province_winner_colors() -> void:
 		# ilin pikselleri artık TAMAMEN parti rengi oluyor, karışım yok.
 		var party_color: Color = PartyManager.parties.get(winner_id, {}).get("bg_color", Color(0.5, 0.5, 0.5))
 		party_color.a = 1.0
-		_province_base_colors[province_id] = party_color
-		map_holder.set_province_color(province_id, party_color)
+		_seat_layer_colors[province_id] = party_color
+	_apply_map_layer_colors()
 
 ## Harita üzerindeki il başına milletvekili noktalarını (SeatMarkers, bkz.
 ## Map.tscn/seat_markers.gd) son il bazlı sonuçlara göre günceller.
@@ -445,12 +484,13 @@ func _highlight_province(province_id: String) -> void:
 		var base: Color = _province_base_colors.get(province_id, Color(0, 0, 0, 0))
 		# Dokunmatikte imleç yok: seçili il açıkça belli olsun.
 		if base.a > 0.0:
-			map_holder.set_province_color(province_id, base.darkened(0.45))
+			map_holder.set_province_color(province_id, base.darkened(0.45 if base.get_luminance() < 0.85 else 0.3))
 		else:
 			map_holder.set_province_color(province_id, Color(0.08, 0.08, 0.1, 0.6))
 
 func _on_parties_updated() -> void:
 	_rebuild_player_panel()
+	_apply_map_layer_colors()
 	_update_turn_indicator()
 	if _profile_peer_id != -1:
 		_show_tooltip_for(_profile_peer_id)
@@ -522,7 +562,7 @@ func _refresh_deck_button() -> void:
 
 func _refresh_pass_button() -> void:
 	pass_button.disabled = not CardManager.can_act()
-	pass_button.text = "Pas Geç (+%d)" % GameRules.MANA_PASS_BONUS
+	pass_button.text = "Turu Bitir"
 	pass_button.modulate.a = 1.0 if not pass_button.disabled else 0.5
 
 ## Sıra sende değilken eldeki kartlar tıklanamaz + soluk görünür — kullanıcı
@@ -871,9 +911,6 @@ func _drop_target(card_type: String) -> Dictionary:
 		elif card_type == CardPresets.INVEST_CARD_TYPE and not CardManager.is_government_party(me):
 			result["label"] = "Yatırımı sadece hükümet partileri yapabilir"
 			result["error"] = result["label"]
-		elif card_type == CardPresets.SCOUT_CARD_TYPE and CardManager.has_scouted(me, province_id):
-			result["label"] = "%s'a zaten gözcü gönderdin" % pname
-			result["error"] = result["label"]
 		else:
 			result["valid"] = true
 			if card_type == CardPresets.MITING_CARD_TYPE:
@@ -883,8 +920,6 @@ func _drop_target(card_type: String) -> Dictionary:
 				result["label"] = "Bırak: %s'a yatırım" % pname
 			elif card_type == CardPresets.POLL_CARD_TYPE:
 				result["label"] = "Bırak: %s'da anket yaptır (sonucu sadece sen görürsün)" % pname
-			elif card_type == CardPresets.SCOUT_CARD_TYPE:
-				result["label"] = "Bırak: %s'a gözcü gönder" % pname
 			else:
 				result["label"] = "Bırak: %s'da karalama — sonra hedef partiyi seç" % pname
 	elif CardPresets.is_law_card(card_type):
@@ -895,8 +930,8 @@ func _drop_target(card_type: String) -> Dictionary:
 			result["label"] = "%s: parlamento diyagramının üstüne bırak" % law["title"]
 		elif CardManager.can_propose_law(me, card_type):
 			result["valid"] = true
-			result["label"] = "Bırak: %s %s (%d mana)" % [law["title"],
-				"seçim vaadi olarak açıklanır" if CardManager.last_seats.is_empty() else "meclise sunulur", GameRules.LAW_MANA_COST]
+			result["label"] = "Bırak: %s %s" % [law["title"],
+				"seçim vaadi olarak açıklanır" if CardManager.last_seats.is_empty() else "meclise sunulur"]
 		else:
 			result["label"] = _action_block_reason(GameRules.LAW_MANA_COST)
 			result["error"] = result["label"]
@@ -953,6 +988,10 @@ func _begin_province_targeting(hand_index: int) -> void:
 func _cancel_targeting() -> void:
 	_pending_province_hand_index = -1
 	_pending_org = false
+	if _pending_scout:
+		_pending_scout = false
+		_end_scout_view()
+		_refresh_action_buttons()
 	if _selected_province != "":
 		_selected_province = ""
 		if _drag_hand_index == -1:
@@ -968,8 +1007,27 @@ func _cancel_targeting() -> void:
 func _on_province_clicked(province_id: String) -> void:
 	var me := multiplayer.get_unique_id()
 	# Hedef seçerken ilk dokunuş ili seçip ayrıntıyı gösterir, ikinci onaylar.
-	if (_pending_org or _pending_province_hand_index != -1) and _selected_province != province_id:
+	if (_pending_org or _pending_scout or _pending_province_hand_index != -1) and _selected_province != province_id:
 		_select_target_province(province_id)
+		return
+	if _pending_scout:
+		if CardManager.has_scouted(me, province_id) or not CardManager.can_scout(me, province_id):
+			_cancel_targeting()
+			_show_toast("Bu ile zaten gözcü gönderdin." if CardManager.has_scouted(me, province_id) \
+				else _action_block_reason(GameRules.SCOUT_MANA_COST))
+			return
+		# Gönderildi: harita bir an gözcü katmanında kalır (il boyansın), sonra döner.
+		_pending_scout = false
+		_selected_province = ""
+		_highlight_province("")
+		_set_target_hint("")
+		CardManager.scout(province_id)
+		_show_toast("Gözcü %s'a gitti: ilin görüşü il panelinde." % ElectionNightSim.province_name(province_id))
+		_refresh_action_buttons()
+		var token := _scout_view_token
+		get_tree().create_timer(SCOUT_RESULT_HOLD).timeout.connect(func():
+			if is_instance_valid(self) and token == _scout_view_token and not _pending_scout:
+				_end_scout_view())
 		return
 	if _pending_org:
 		_cancel_targeting()
@@ -990,8 +1048,6 @@ func _on_province_clicked(province_id: String) -> void:
 		var card_type: String = hand[hand_index]
 		if card_type == CardPresets.PROPAGANDA_CARD_TYPE:
 			_ask_propaganda_target(hand_index, province_id)
-		elif card_type == CardPresets.SCOUT_CARD_TYPE and CardManager.has_scouted(me, province_id):
-			_show_toast("Bu ile zaten gözcü gönderdin.")
 		else:
 			CardManager.play_card(hand_index, -1, province_id)
 		return
@@ -1011,7 +1067,10 @@ func _select_target_province(province_id: String) -> void:
 	var me := multiplayer.get_unique_id()
 	var pname := ElectionNightSim.province_name(province_id)
 	var detail := ""
-	if _pending_org:
+	if _pending_scout:
+		detail = "%s: buraya zaten gözcü gönderdin" % pname if CardManager.has_scouted(me, province_id) \
+			else "%s: gözcü gönder (%d mana)" % [pname, GameRules.SCOUT_MANA_COST]
+	elif _pending_org:
 		var level := CardManager.organization_level(province_id, me)
 		detail = "%s: il başkanlığı zaten en üst seviyede" % pname if level >= GameRules.ORG_MAX_LEVEL \
 			else "%s: il başkanlığı seviye %d → %d (%d mana)" % [pname, level, level + 1, GameRules.ORG_MANA_COST]
@@ -1020,14 +1079,14 @@ func _select_target_province(province_id: String) -> void:
 		if card_type == CardPresets.MITING_CARD_TYPE:
 			detail = "%s: miting · provokasyon riski %%%d · gücün %+.1f" % [pname,
 				int(round(CardManager.miting_risk(me, province_id) * 100.0)), CardManager.activity_of(province_id, me)]
-		elif card_type == CardPresets.SCOUT_CARD_TYPE and CardManager.has_scouted(me, province_id):
-			detail = "%s: buraya zaten gözcü gönderdin" % pname
 		else:
 			detail = "%s: %s" % [pname, CardPresets.card_title(card_type)]
 	_set_target_hint("%s  ·  Onaylamak için tekrar dokun" % detail)
 
 func _on_opinion_changed() -> void:
 	_refresh_score_panel()
+	if _map_layer != MapLayer.SEATS:
+		_apply_map_layer_colors()
 	if _province_panel != null and _province_panel.visible:
 		_province_panel.refresh()
 
@@ -1266,12 +1325,15 @@ func _add_shadow_behind(control: Control, texture: Texture2D) -> void:
 ## rengi parıltıyla ayrışır.
 func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 	var is_self := peer_id == multiplayer.get_unique_id()
+	var is_turn := not CardManager.turn_order.is_empty() and peer_id == CardManager.current_turn_peer_id()
 	var color: Color = party.get("bg_color", Color(0.5, 0.5, 0.5))
 	var card := PanelContainer.new()
 	card.custom_minimum_size = Vector2(RIGHT_COLUMN_WIDTH - 16.0, _avatar_height)
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.09, 0.1, 0.14, 0.94)
+	# SIRA KİMDE: açık zemin + beyaz çerçeve + "SIRADA" etiketi (nabız gibi atar).
+	# BEN: altın rengi isim + altın parıltı + "SEN" etiketi. İkisi birlikte olabilir.
+	style.bg_color = Color(0.2, 0.22, 0.3, 0.98) if is_turn else Color(0.09, 0.1, 0.14, 0.94)
 	style.set_corner_radius_all(8)
 	style.border_width_left = 6
 	style.border_color = color
@@ -1309,6 +1371,16 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 		var seats_text := ("%d vekil · " % int(CardManager.last_seats[peer_id])) if CardManager.last_seats.has(peer_id) else ""
 		info.add_child(_avatar_label("%s%d mana" % [seats_text, CardManager.mana_of(peer_id)], 11, Color(0.6, 0.65, 0.75)))
 
+	if is_self or is_turn:
+		var tags := VBoxContainer.new()
+		tags.add_theme_constant_override("separation", 2)
+		tags.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		tags.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if is_turn:
+			tags.add_child(_avatar_tag("SIRADA", Color(1, 1, 1), Color(0.1, 0.1, 0.12)))
+		if is_self and not (is_turn and compact):
+			tags.add_child(_avatar_tag("SEN", Color(1.0, 0.82, 0.2), Color(0.15, 0.1, 0.0)))
+		row.add_child(tags)
 	# Hangi oyuncuya ait olduğu düğümün ÜSTÜNDE saklanıyor: hover tespiti ve
 	# tooltip konumu panelin çocuk SIRASINA güvenmez (bkz. _party_under_mouse).
 	card.set_meta("peer_id", peer_id)
@@ -1332,6 +1404,20 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 	halo.add_theme_stylebox_override("panel", halo_style)
 	halo.visible = false
 	card.add_child(halo)
+	if is_turn:
+		var frame := Panel.new()
+		frame.name = "TurnFrame"
+		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var frame_style := StyleBoxFlat.new()
+		frame_style.draw_center = false
+		frame_style.set_border_width_all(2)
+		frame_style.border_color = Color(1, 1, 1, 0.95)
+		frame_style.set_corner_radius_all(8)
+		frame.add_theme_stylebox_override("panel", frame_style)
+		card.add_child(frame)
+		var pulse := frame.create_tween().set_loops()
+		pulse.tween_property(frame, "modulate:a", 0.35, 0.7).set_trans(Tween.TRANS_SINE)
+		pulse.tween_property(frame, "modulate:a", 1.0, 0.7).set_trans(Tween.TRANS_SINE)
 	var wrap := card
 	# Hedef seçme modunda (vekil çalma kartı) bu partiye tıklanabilir.
 	wrap.gui_input.connect(func(event: InputEvent):
@@ -1363,6 +1449,21 @@ func _hide_profile() -> void:
 	_profile_peer_id = -1
 	if hover_tooltip != null:
 		hover_tooltip.hide()
+
+func _avatar_tag(text: String, bg: Color, fg: Color) -> Control:
+	var tag := Label.new()
+	tag.text = text
+	tag.add_theme_font_size_override("font_size", 9)
+	tag.add_theme_color_override("font_color", fg)
+	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := StyleBoxFlat.new()
+	style.bg_color = bg
+	style.set_corner_radius_all(4)
+	style.content_margin_left = 4
+	style.content_margin_right = 4
+	tag.add_theme_stylebox_override("normal", style)
+	return tag
 
 func _avatar_label(text: String, font_size: int, color: Color) -> Label:
 	var label := Label.new()
@@ -1573,25 +1674,28 @@ func _build_action_buttons() -> void:
 	_mana_box.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_show_toast(_mana_rules))
-	_mana_rules = "Her tur +%d mana. Kart çekmeden pas geçersen +%d.\nYasa %d, il başkanlığı %d mana. Kart çekmek ve oynamak bedava." % [
-		GameRules.MANA_PER_ROUND, GameRules.MANA_PASS_BONUS, GameRules.LAW_MANA_COST, GameRules.ORG_MANA_COST]
+	_mana_rules = "Her tur +%d mana; manan yettikçe istediğin kadar hamle yap.\nKart çekmek %d, gözcü %d, il başkanlığı %d mana. Yasa bedava (turda 1).\nKartlar: miting 3, karalama 2, vekil çalma 2/3/4 mana." % [
+		GameRules.MANA_PER_ROUND, GameRules.DRAW_MANA_COST, GameRules.SCOUT_MANA_COST, GameRules.ORG_MANA_COST]
 	add_child(_mana_box)
-	_law_button = _action_button("YASA\nTASARLA", GameRules.LAW_MANA_COST, Color(0.42, 0.26, 0.62), -258.0)
+	_law_button = _action_button("YASA", "bedava", Color(0.42, 0.26, 0.62), -258.0)
 	_law_button.pressed.connect(_on_law_button_pressed)
-	_org_button = _action_button("İL\nBAŞKANLIĞI", GameRules.ORG_MANA_COST, Color(0.1, 0.44, 0.48), -202.0)
+	_org_button = _action_button("İL BAŞKANLIĞI", "%d mana" % GameRules.ORG_MANA_COST, Color(0.1, 0.44, 0.48), -221.0)
 	_org_button.pressed.connect(_on_org_button_pressed)
+	_scout_button = _action_button("GÖZCÜ", "%d mana" % GameRules.SCOUT_MANA_COST, Color(0.55, 0.42, 0.12), -184.0)
+	_scout_button.pressed.connect(_on_scout_button_pressed)
 
-func _action_button(title: String, cost: int, color: Color, top: float) -> Button:
+func _action_button(title: String, cost_text: String, color: Color, top: float) -> Button:
 	var button := Button.new()
-	button.text = "%s\n%d mana" % [title, cost]
+	button.text = "%s\n%s" % [title, cost_text]
 	button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	button.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	button.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	button.offset_left = -106.0
 	button.offset_right = -16.0
 	button.offset_top = top
-	button.offset_bottom = top + 54.0
-	button.add_theme_font_size_override("font_size", 11)
+	button.offset_bottom = top + 34.0
+	button.add_theme_font_size_override("font_size", 10)
+	button.add_theme_constant_override("line_spacing", -3)
 	button.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.35))
 	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
 		var style := StyleBoxFlat.new()
@@ -1615,6 +1719,8 @@ func _action_block_reason(cost: int) -> String:
 	var me := multiplayer.get_unique_id()
 	if not CardManager.can_act():
 		return "Sıran değil."
+	if cost == GameRules.LAW_MANA_COST and CardManager.has_proposed_law_this_round(me):
+		return "Bu tur zaten bir yasa sundun (turda 1 yasa)."
 	if CardManager.mana_of(me) < cost:
 		return "Manan yetmiyor (%d gerekli)." % cost
 	return "Şu an yapılamaz."
@@ -1627,9 +1733,11 @@ func _refresh_action_buttons() -> void:
 	_mana_label.text = str(mana_now)
 	var law_ok := CardManager.can_propose_law(me)
 	var org_ok := CardManager.can_choose_main_action(me) and mana_now >= GameRules.ORG_MANA_COST
+	var scout_ok := CardManager.can_scout(me)
 	# disabled kullanılmıyor: pasif butona dokununca neden olmadığı uyarı olarak çıksın.
 	_law_button.modulate.a = 1.0 if law_ok else 0.45
 	_org_button.modulate.a = 1.0 if org_ok else 0.45
+	_scout_button.modulate.a = 1.0 if scout_ok or _pending_scout else 0.45
 
 func _build_law_designer() -> void:
 	_law_designer = PanelContainer.new()
@@ -1660,7 +1768,7 @@ func _build_law_designer() -> void:
 	close.pressed.connect(func(): _law_designer.hide())
 	header.add_child(close)
 	var hint := Label.new()
-	hint.text = "Bir daireyi meclis diyagramına sürükle · %d mana\nYakın illerde güç kazandırır, zıt illerde kaybettirir." % GameRules.LAW_MANA_COST
+	hint.text = "Bir daireyi meclis diyagramına sürükle · bedava, turda 1 yasa\nYakın illerde güç kazandırır, zıt illerde kaybettirir.\nPartin o yöne 1 adım, EVET diyenler yarım adım kayar; HAYIR diyenler ters yöne."
 	hint.add_theme_font_size_override("font_size", 12)
 	hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.65))
 	box.add_child(hint)
@@ -1769,6 +1877,8 @@ func _on_org_button_pressed() -> void:
 	if _pending_org:
 		_cancel_targeting()  # butona tekrar basmak il seçimini iptal eder
 		return
+	if _pending_scout:
+		_cancel_targeting()
 	_deselect_hand_card()
 	_law_designer.hide()
 	if not CardManager.can_choose_main_action(multiplayer.get_unique_id()) \
@@ -1779,6 +1889,275 @@ func _on_org_button_pressed() -> void:
 	if _province_panel != null:
 		_province_panel.hide()
 	_set_target_hint("İl başkanlığı: haritada bir ile dokun, tekrar dokun: kur (%d mana)  ·  Butona tekrar dokun: iptal" % GameRules.ORG_MANA_COST)
+
+# --- Harita katmanları ---------------------------------------------------------
+
+func _ensure_map_clip() -> void:
+	if _map_clip != null:
+		return
+	_map_clip = Control.new()
+	_map_clip.name = "MapClip"
+	_map_clip.clip_contents = true
+	_map_clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_map_clip)
+	move_child(_map_clip, map_holder.get_index())
+	map_holder.reparent(_map_clip, false)
+	_map_snapshot = TextureRect.new()
+	_map_snapshot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_map_snapshot.stretch_mode = TextureRect.STRETCH_SCALE
+	_map_snapshot.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_map_snapshot.hide()
+	_map_clip.add_child(_map_snapshot)
+	_build_layer_bar()
+
+func _build_layer_bar() -> void:
+	_layer_bar = HBoxContainer.new()
+	_layer_bar.add_theme_constant_override("separation", 0)
+	_layer_bar.z_index = 5
+	add_child(_layer_bar)
+	for i in MAP_LAYER_TITLES.size():
+		var button := Button.new()
+		button.text = MAP_LAYER_TITLES[i]
+		button.custom_minimum_size = Vector2(84, 34)
+		button.focus_mode = Control.FOCUS_NONE
+		button.add_theme_font_size_override("font_size", 13)
+		button.pressed.connect(_on_layer_button_pressed.bind(i))
+		_layer_bar.add_child(button)
+		_layer_buttons.append(button)
+	_layer_legend = HBoxContainer.new()
+	_layer_legend.z_index = 5
+	(_layer_legend as HBoxContainer).add_theme_constant_override("separation", 4)
+	_layer_legend.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_layer_legend)
+	_refresh_layer_bar()
+
+func _place_layer_bar() -> void:
+	if _layer_bar == null:
+		return
+	_layer_bar.reset_size()
+	var rect := Rect2(_map_clip.position, _map_clip.size)
+	_layer_bar.position = Vector2(rect.position.x + 18.0, rect.end.y - _layer_bar.size.y - 16.0)
+	_layer_legend.reset_size()
+	_layer_legend.position = Vector2(_layer_bar.position.x + 4.0, _layer_bar.position.y - _layer_legend.size.y - 6.0)
+
+func _layer_button_style(color: Color, left: bool, right: bool) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = color
+	style.set_border_width_all(1)
+	style.border_color = Color(0, 0, 0, 0.55)
+	style.corner_radius_top_left = 9 if left else 0
+	style.corner_radius_bottom_left = 9 if left else 0
+	style.corner_radius_top_right = 9 if right else 0
+	style.corner_radius_bottom_right = 9 if right else 0
+	style.content_margin_left = 8
+	style.content_margin_right = 8
+	return style
+
+func _refresh_layer_bar() -> void:
+	for i in _layer_buttons.size():
+		var button: Button = _layer_buttons[i]
+		var active := i == _map_layer
+		var color := Color(0.95, 0.8, 0.3) if active else Color(0.1, 0.11, 0.15, 0.9)
+		var first := i == 0
+		var last := i == _layer_buttons.size() - 1
+		for state in ["normal", "hover", "pressed", "focus"]:
+			var c := color.lightened(0.08) if state == "hover" and not active else color
+			button.add_theme_stylebox_override(state, _layer_button_style(c, first, last))
+		button.add_theme_color_override("font_color", Color(0.1, 0.08, 0.02) if active else Color(1, 1, 1, 0.85))
+		button.add_theme_color_override("font_hover_color", Color(0.1, 0.08, 0.02) if active else Color.WHITE)
+		button.add_theme_color_override("font_pressed_color", Color(0.1, 0.08, 0.02))
+	_rebuild_layer_legend()
+
+## Katmanın küçük açıklaması (renk anahtarı), butonların hemen üstünde.
+func _rebuild_layer_legend() -> void:
+	for child in _layer_legend.get_children():
+		child.queue_free()
+	var mine: Color = PartyManager.parties.get(multiplayer.get_unique_id(), {}).get("bg_color", Color(0.5, 0.5, 0.5))
+	var swatches: Array = []
+	match _map_layer:
+		MapLayer.ORGANIZATION:
+			for level in GameRules.ORG_MAX_LEVEL + 1:
+				swatches.append([MAP_BLANK_COLOR.lerp(mine, float(level) / GameRules.ORG_MAX_LEVEL), str(level)])
+			swatches.append([null, "il başkanlığı seviyem"])
+		MapLayer.STRENGTH:
+			swatches.append([null, "zayıf"])
+			for i in STRENGTH_STOPS.size():
+				swatches.append([STRENGTH_STOPS[i], ""])
+			swatches.append([null, "güçlü"])
+		MapLayer.SCOUT:
+			swatches.append([MAP_BLANK_COLOR, ""])
+			swatches.append([null, "bilinmiyor"])
+			swatches.append([mine, ""])
+			swatches.append([null, "gözcü gönderildi"])
+	_layer_legend.visible = not swatches.is_empty()
+	for entry in swatches:
+		if entry[0] == null:
+			var label := Label.new()
+			label.text = String(entry[1])
+			label.add_theme_font_size_override("font_size", 12)
+			label.add_theme_color_override("font_outline_color", Color.BLACK)
+			label.add_theme_constant_override("outline_size", 4)
+			_layer_legend.add_child(label)
+			continue
+		var swatch := Panel.new()
+		swatch.custom_minimum_size = Vector2(22, 16)
+		var style := StyleBoxFlat.new()
+		style.bg_color = entry[0]
+		style.set_corner_radius_all(3)
+		style.set_border_width_all(1)
+		style.border_color = Color(0, 0, 0, 0.6)
+		swatch.add_theme_stylebox_override("panel", style)
+		if String(entry[1]) != "":
+			var num := Label.new()
+			num.text = String(entry[1])
+			num.set_anchors_preset(Control.PRESET_FULL_RECT)
+			num.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			num.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			num.add_theme_font_size_override("font_size", 11)
+			num.add_theme_color_override("font_color", Color.BLACK if (entry[0] as Color).get_luminance() > 0.5 else Color.WHITE)
+			swatch.add_child(num)
+		_layer_legend.add_child(swatch)
+	if _map_clip != null:
+		_place_layer_bar.call_deferred()
+
+func _on_layer_button_pressed(layer: int) -> void:
+	if _pending_scout:
+		# Gözcü seçimi sürerken başka katmana geçmek gözcüyü iptal eder.
+		_pending_scout = false
+		_layer_before_scout = -1
+		_selected_province = ""
+		_highlight_province("")
+		_set_target_hint("")
+		_refresh_action_buttons()
+	_scout_view_token += 1
+	_layer_before_scout = -1
+	_set_map_layer(layer)
+
+## Katmana göre il renkleri. Vurgulu il (seçim modu) koyulaştırılmış kalır.
+func _apply_map_layer_colors() -> void:
+	if map_holder == null:
+		return
+	var me := multiplayer.get_unique_id()
+	var mine: Color = PartyManager.parties.get(me, {}).get("bg_color", Color(0.5, 0.5, 0.5))
+	mine.a = 1.0
+	var colors := {}
+	if _map_layer == MapLayer.SEATS:
+		colors = _seat_layer_colors.duplicate()
+	else:
+		var gradient := Gradient.new()
+		gradient.offsets = PackedFloat32Array([0.0, 0.25, 0.5, 0.75, 1.0])
+		gradient.colors = PackedColorArray(STRENGTH_STOPS)
+		for province_id in map_holder.get_all_province_ids():
+			match _map_layer:
+				MapLayer.ORGANIZATION:
+					colors[province_id] = MAP_BLANK_COLOR.lerp(mine, float(CardManager.organization_level(province_id, me)) / GameRules.ORG_MAX_LEVEL)
+				MapLayer.STRENGTH:
+					var t := clampf(CardManager.activity_of(province_id, me) / STRENGTH_COLOR_SCALE, -1.0, 1.0)
+					colors[province_id] = gradient.sample((t + 1.0) * 0.5)
+				MapLayer.SCOUT:
+					colors[province_id] = mine if CardManager.has_scouted(me, province_id) else MAP_BLANK_COLOR
+	_province_base_colors = colors
+	map_holder.clear_overlay()
+	map_holder.set_province_colors(colors)
+	var seat_markers := map_holder.get_node_or_null("SeatMarkers")
+	if seat_markers != null:
+		seat_markers.visible = _map_layer == MapLayer.SEATS
+	if _hovered_province_id != "":
+		var selected := _hovered_province_id
+		_hovered_province_id = ""
+		_highlight_province(selected)
+
+## Katmanı değiştirir: eski görünümün anlık görüntüsü bir yana, yeni katman
+## öbür yandan kayarak gelir (sağdaki katman sağdan, soldaki soldan).
+func _set_map_layer(layer: int, animate: bool = true) -> void:
+	if layer == _map_layer or _layer_switching:
+		if _layer_switching:
+			_queued_layer = layer
+		return
+	var direction := 1.0 if layer > _map_layer else -1.0
+	var snapshot: Image = null
+	if animate and _map_clip != null and DisplayServer.get_name() != "headless":
+		# Anlık görüntüde katman butonları ve açıklama olmasın (onlar kaymaz):
+		# bir kare gizlenip çizim bitince yakalanır.
+		_layer_switching = true
+		_layer_bar.modulate.a = 0.0
+		_layer_legend.modulate.a = 0.0
+		if _map_snapshot.visible:
+			map_holder.position = Vector2.ZERO
+			_map_snapshot.hide()
+		await RenderingServer.frame_post_draw
+		_layer_bar.modulate.a = 1.0
+		_layer_legend.modulate.a = 1.0
+		_layer_switching = false
+		if not is_inside_tree():
+			return
+		var full := get_viewport().get_texture().get_image()
+		if full != null:
+			var to_pixels := get_viewport().get_final_transform()
+			var pixel_rect := Rect2i((to_pixels * Rect2(_map_clip.global_position, _map_clip.size)).abs())
+			pixel_rect = pixel_rect.intersection(Rect2i(Vector2i.ZERO, full.get_size()))
+			if pixel_rect.has_area():
+				snapshot = full.get_region(pixel_rect)
+	_map_layer = layer
+	_apply_map_layer_colors()
+	_refresh_layer_bar()
+	if snapshot == null:
+		return
+	if _map_slide_tween != null and _map_slide_tween.is_running():
+		_map_slide_tween.kill()
+	var width := _map_clip.size.x
+	_map_snapshot.texture = ImageTexture.create_from_image(snapshot)
+	_map_snapshot.position = Vector2.ZERO
+	_map_snapshot.size = _map_clip.size
+	_map_snapshot.show()
+	_map_clip.move_child(_map_snapshot, _map_clip.get_child_count() - 1)
+	map_holder.position = Vector2(width * direction, 0.0)
+	_map_slide_tween = create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	_map_slide_tween.tween_property(_map_snapshot, "position:x", -width * direction, MAP_SLIDE_DURATION)
+	_map_slide_tween.tween_property(map_holder, "position:x", 0.0, MAP_SLIDE_DURATION)
+	_map_slide_tween.chain().tween_callback(func():
+		_map_snapshot.hide()
+		_map_snapshot.texture = null
+		map_holder.position = Vector2.ZERO)
+	if _queued_layer != -1:
+		var queued := _queued_layer
+		_queued_layer = -1
+		_set_map_layer(queued)
+
+func _begin_scout_view() -> void:
+	_scout_view_token += 1
+	if _layer_before_scout == -1:
+		_layer_before_scout = _map_layer
+	_set_map_layer(MapLayer.SCOUT)
+
+func _end_scout_view() -> void:
+	if _layer_before_scout == -1:
+		return
+	var previous := _layer_before_scout
+	_layer_before_scout = -1
+	_set_map_layer(previous)
+
+## Gözcü hamlesi: harita anında gözcü katmanına geçer, il seçilir. Butona
+## tekrar basmak iptal eder (mana harcanmaz); her iki durumda da harita önceki
+## katmanına döner.
+func _on_scout_button_pressed() -> void:
+	if _pending_scout:
+		_cancel_targeting()
+		return
+	var me := multiplayer.get_unique_id()
+	_deselect_hand_card()
+	_law_designer.hide()
+	if _pending_org or _pending_province_hand_index != -1:
+		_cancel_targeting()
+	if not CardManager.can_scout(me):
+		_show_toast(_action_block_reason(GameRules.SCOUT_MANA_COST))
+		return
+	_pending_scout = true
+	if _province_panel != null:
+		_province_panel.hide()
+	_begin_scout_view()
+	_refresh_action_buttons()
+	_set_target_hint("Gözcü: beyaz (bilinmeyen) bir ile dokun, tekrar dokun: gönder (%d mana)  ·  Butona tekrar dokun: iptal" % GameRules.SCOUT_MANA_COST)
 
 func _build_propaganda_menu() -> void:
 	_propaganda_menu = PanelContainer.new()

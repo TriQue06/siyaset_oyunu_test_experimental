@@ -69,7 +69,7 @@ static func build(peer_id: int, my_id: int) -> PanelContainer:
 	box.add_child(_label("İDEOLOJİ", 11, DIM))
 	var ideology: Dictionary = party.get("ideology", IdeologyAxes.default_values())
 	for axis in IdeologyAxes.AXES:
-		box.add_child(_axis_row(axis, int(ideology.get(axis, 0)), color))
+		box.add_child(_axis_row(axis, float(ideology.get(axis, 0)), color))
 	return card
 
 ## "Hükümet: Başbakanlık, 3 bakanlık" / "Muhalefet" / "Hükümet yok".
@@ -93,7 +93,8 @@ static func role_text(peer_id: int) -> String:
 		return "Muhalefet"
 	return "Hükümet: " + ", ".join(PackedStringArray(posts))
 
-static func _axis_row(axis: String, value: int, color: Color) -> Control:
+## value: 0.5 adımlı; ölçekte her yarım adım bir hücre (−3 … +3 = 13 hücre).
+static func _axis_row(axis: String, value: float, color: Color) -> Control:
 	var titles: Dictionary = CardPresets.AXIS_TITLES.get(axis, {"title": axis, "neg": "-", "pos": "+"})
 	var info: Array = [titles["title"], titles["neg"], titles["pos"]]
 	var box := VBoxContainer.new()
@@ -106,7 +107,7 @@ static func _axis_row(axis: String, value: int, color: Color) -> Control:
 	var title := _label(String(info[0]), 13, Color.WHITE)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(title)
-	top.add_child(_label("%+d" % value if value != 0 else "0", 13, color.lightened(0.25)))
+	top.add_child(_label(IdeologyAxes.format_value(value), 13, color.lightened(0.25)))
 
 	var scale := HBoxContainer.new()
 	scale.add_theme_constant_override("separation", 6)
@@ -117,22 +118,26 @@ static func _axis_row(axis: String, value: int, color: Color) -> Control:
 	left.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	scale.add_child(left)
 	var cells := HBoxContainer.new()
-	cells.add_theme_constant_override("separation", 3)
+	cells.add_theme_constant_override("separation", 2)
 	cells.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	cells.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	scale.add_child(cells)
-	for v in range(IdeologyAxes.AXIS_MIN, IdeologyAxes.AXIS_MAX + 1):
+	var steps := int(roundf((IdeologyAxes.AXIS_MAX - IdeologyAxes.AXIS_MIN) / IdeologyAxes.STEP))
+	for i in steps + 1:
+		var v: float = IdeologyAxes.AXIS_MIN + i * IdeologyAxes.STEP
+		var whole := is_equal_approx(v, roundf(v))
 		var cell := Panel.new()
-		cell.custom_minimum_size = Vector2(16, 12)
+		cell.custom_minimum_size = Vector2(9, 12 if whole else 8)
+		cell.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var cell_style := StyleBoxFlat.new()
 		cell_style.set_corner_radius_all(2)
-		if v == value:
+		if is_equal_approx(v, value):
 			cell_style.bg_color = color
 			cell_style.set_border_width_all(1)
 			cell_style.border_color = Color(1, 1, 1, 0.85)
 		else:
-			cell_style.bg_color = Color(1, 1, 1, 0.2 if v == 0 else 0.08)
+			cell_style.bg_color = Color(1, 1, 1, 0.2 if is_zero_approx(v) else (0.1 if whole else 0.05))
 		cell.add_theme_stylebox_override("panel", cell_style)
 		cells.add_child(cell)
 	var right := _label(String(info[2]), 11, DIM)

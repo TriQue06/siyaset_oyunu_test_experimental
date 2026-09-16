@@ -182,7 +182,7 @@ func _initialize() -> void:
 	check("secim oncesi puan yazildi", gm.score_of(1) == pts1 * 3)
 
 	print("")
-	print("=== 7) TUR SONU GENSORUYA DENK GELIRSE ERTELENIR ===")
+	print("=== 7) GENSORU OYLAMASI SIRAYI DEVRETMEZ ===")
 	form_government({1: 200, 2: 100, 3: 90}, all_posts_to(1))
 	check("hukumet kuruldu", gm.has_government())
 	cm.current_turn_index = cm.turn_order.size() - 1
@@ -191,12 +191,13 @@ func _initialize() -> void:
 	var round_before: int = cm.round_number
 	cm._apply_play(last_peer, 0)
 	check("gensoru oylamasi acildi", gm.phase == gm.Phase.VOTING)
-	check("tur sonu ERTELENDI", cm.round_number == round_before)
+	check("oylamada turu bitiremez", (func(): cm._apply_pass(last_peer); return cm.round_number == round_before).call())
 	gm._apply_vote(1, false)
 	gm._apply_vote(2, false)
 	gm._apply_vote(3, false)
-	check("gensoru reddedildi, tur simdi kapandi", gm.phase == gm.Phase.GOVERNING and cm.round_number == round_before + 1,
-		"faz %d, tur %d" % [gm.phase, cm.round_number])
+	check("gensoru reddedildi, sira hala ayni oyuncuda", gm.phase == gm.Phase.GOVERNING and cm.current_turn_peer_id() == last_peer 		and cm.round_number == round_before, "faz %d, tur %d" % [gm.phase, cm.round_number])
+	cm._apply_pass(last_peer)
+	check("turu bitirince tur kapandi", cm.round_number == round_before + 1)
 
 	print("")
 	print("=== 8) SURE SINIRLARI ===")
@@ -214,45 +215,77 @@ func _initialize() -> void:
 
 	print("")
 	print("=== 9) MANA VE HAMLELER ===")
-	new_game({1: ideology(1, 1, 2), 2: ideology(-1, -1, 1), 3: ideology(2, 2, -1)})
-	check("herkes 1 mana ile baslar", cm.mana_of(1) == 1 and cm.mana_of(2) == 1 and cm.mana_of(3) == 1, str(cm.mana))
+	new_game({1: ideology(0, 0, 0), 2: ideology(0, 0, 0), 3: ideology(0, 0, 0)})
+	check("herkes MANA_START ile baslar", cm.mana_of(1) == GameRules.MANA_START and cm.mana_of(3) == GameRules.MANA_START, str(cm.mana))
 	cm._apply_pass(1)
-	check("kart cekmeden pas: +1 mana", cm.mana_of(1) == 2)
+	check("turu bitirmek mana vermez", cm.mana_of(1) == GameRules.MANA_START)
 	cm.tick(GameRules.TURN_TIMEOUT + 1.0)
-	check("sure dolunca pas: mana bonusu yok", cm.mana_of(2) == 1 and cm.current_turn_peer_id() == 3)
+	check("sure dolunca sira devreder", cm.current_turn_peer_id() == 3)
 	cm._apply_draw(3)
-	check("kart cekmek hamle degil: sonra yasa sunulabilir", cm.can_propose_law(3))
-	check("kart cektikten sonra ana hamle secilebilir", cm.can_choose_main_action(3))
+	check("kart cekmek 1 mana, sira devretmez", cm.mana_of(3) == GameRules.MANA_START - GameRules.DRAW_MANA_COST 		and cm.inventories[3].size() == 1 and cm.current_turn_peer_id() == 3)
+	cm._apply_draw(3)
+	check("ayni turda tekrar kart cekilebilir", cm.inventories[3].size() == 2)
+	cm.mana[3] = 0
+	check("mana yoksa kart cekilemez", not cm.can_draw_for(3))
+	check("mana yoksa gozcu yok", not cm.can_scout(3, "ankara"))
+	check("yasa bedava: mana yokken de sunulabilir", cm.can_propose_law(3))
 	cm._apply_pass(3)
-	check("kart cekip pas: +1 mana, tur sonu herkese +1",
-		cm.mana_of(1) == 3 and cm.mana_of(2) == 2 and cm.mana_of(3) == 3, str(cm.mana))
-	check("tum deste kartlarinin mana bedeli tanimli", cp.CARD_MANA_COSTS.size() == cp.CARD_TYPES.size())
+	check("tur sonu herkese +MANA_PER_ROUND", cm.mana_of(1) == GameRules.MANA_START + GameRules.MANA_PER_ROUND 		and cm.mana_of(3) == GameRules.MANA_PER_ROUND, str(cm.mana))
+	check("gozcu destede yok", not cm._draw_pool(1).has("gozcu"))
+	check("kart bedelleri: miting 3, karalama 2, vekil calma 2/3/4", cp.card_cost("miting") == 3 and cp.card_cost("karalama") == 2 		and cp.card_cost("steal_weak") == 2 and cp.card_cost("steal_medium") == 3 and cp.card_cost("steal_strong") == 4)
 
 	var law_type: String = cp.law_type("economic", 1)
 	check("yasa hamlesi turu okunur", cp.is_law_card(law_type) and int(cp.law_data(law_type)["dir"]) == 1 and not cp.is_law_card("miting"))
 	var pos := extreme(cm.province_ideology, "economic", true)
 	var neg := extreme(cm.province_ideology, "economic", false)
+	var mana1: int = cm.mana_of(1)
 	cm._apply_law(1, law_type)
-	check("meclis yokken yasa = secim vaadi, 1 mana harcandi", cm.mana_of(1) == 2 and gm.phase == gm.Phase.IDLE)
+	check("meclis yokken yasa = secim vaadi, mana harcanmaz", cm.mana_of(1) == mana1 and gm.phase == gm.Phase.IDLE)
 	check("vaat: gorusune yakin ilde guc kazandi, zit ilde kaybetti",
 		cm.local_of(pos, 1) > 0.0 and cm.local_of(neg, 1) < 0.0, "%s %.2f / %s %.2f" % [pos, cm.local_of(pos, 1), neg, cm.local_of(neg, 1)])
 	check("vaat: ulusal puana yazilmaz", cm.national_of(1) == 0.0)
-	check("vaat: partinin gorusu yasa yonune 1 kaydi", int(pm.parties[1]["ideology"]["economic"]) == 2)
-	check("sira gecti", cm.current_turn_peer_id() == 2)
+	check("vaat: partinin gorusu yasa yonune 1 kaydi", near(float(pm.parties[1]["ideology"]["economic"]), 1.0))
+	check("sira devretmedi", cm.current_turn_peer_id() == 1)
+	check("turda ikinci yasa yok", not cm.can_propose_law(1))
+	cm._apply_law(1, cp.law_type("social", 1))
+	check("ikinci yasa reddedildi", near(float(pm.parties[1]["ideology"]["social"]), 0.0))
 
-	check("2 mana ile il baskanligi kurulabilir", cm.can_build_organization(2, "ankara"))
-	cm._apply_organization(2, "ankara")
-	check("il baskanligi kuruldu, 2 mana harcandi", cm.organization_level("ankara", 2) == 1 and cm.mana_of(2) == 0)
-	check("il baskanligi aktiviteye kalici katki", near(cm.activity_of("ankara", 2), PublicOpinion.ORG_ACTIVITY_PER_LEVEL))
-	cm.mana[3] = 1
-	check("mana yetmezse kurulamaz", not cm.can_build_organization(3, "ankara"))
-	cm.mana[3] = 20
-	cm.turn_order = [3, 1, 2]
+	cm._apply_scout_move(1, "ankara")
+	check("gozcu hamlesi: 1 mana, il ogrenildi", cm.has_scouted(1, "ankara") and cm.mana_of(1) == mana1 - GameRules.SCOUT_MANA_COST)
+	check("ayni ile ikinci gozcu yok", not cm.can_scout(1, "ankara"))
+	cm.mana[1] = 2
+	check("2 mana ile il baskanligi kurulabilir", cm.can_build_organization(1, "ankara"))
+	cm._apply_organization(1, "ankara")
+	check("il baskanligi kuruldu, 2 mana harcandi, sira devretmedi", cm.organization_level("ankara", 1) == 1 and cm.mana_of(1) == 0 		and cm.current_turn_peer_id() == 1)
+	check("il baskanligi aktiviteye kalici katki", near(cm.activity_of("ankara", 1) - cm.local_of("ankara", 1), PublicOpinion.ORG_ACTIVITY_PER_LEVEL))
+	check("mana yetmezse kurulamaz", not cm.can_build_organization(1, "izmir"))
+	cm.mana[1] = 20
 	for i in 5:
-		cm.current_turn_index = 0
-		cm._apply_organization(3, "izmir")
-	check("en fazla seviye 3", cm.organization_level("izmir", 3) == GameRules.ORG_MAX_LEVEL and cm.mana_of(3) == 20 - 3 * GameRules.ORG_MANA_COST,
-		"seviye %d, mana %d" % [cm.organization_level("izmir", 3), cm.mana_of(3)])
+		cm._apply_organization(1, "izmir")
+	check("en fazla seviye 3", cm.organization_level("izmir", 1) == GameRules.ORG_MAX_LEVEL and cm.mana_of(1) == 20 - 3 * GameRules.ORG_MANA_COST,
+		"seviye %d, mana %d" % [cm.organization_level("izmir", 1), cm.mana_of(1)])
+	cm.inventories[1] = ["miting"]
+	cm.mana[1] = 2
+	check("mana yetmezse miting oynanamaz", not cm.can_play_card(1, "miting", -1, "izmir"))
+	cm.mana[1] = 3
+	cm._apply_play(1, 0, -1, "izmir")
+	check("miting 3 mana", cm.mana_of(1) == 0 and cm.inventories[1].is_empty())
+
+	print("")
+	print("=== 9b) OYLAR IDEOLOJIYI KAYDIRIR ===")
+	cm.last_seats = {1: 150, 2: 140, 3: 100}
+	var before2 := float(pm.parties[2]["ideology"]["social"])
+	var before3 := float(pm.parties[3]["ideology"]["social"])
+	var before1 := float(pm.parties[1]["ideology"]["social"])
+	cm.apply_law_result(1, cp.law_type("social", -1), {1: 1, 2: 1, 3: -1}, true, [])
+	check("sunan 1 adim kaydi", near(float(pm.parties[1]["ideology"]["social"]), before1 - 1.0))
+	check("EVET yasa yonune yarim adim", near(float(pm.parties[2]["ideology"]["social"]), before2 - 0.5))
+	check("HAYIR ters yone yarim adim", near(float(pm.parties[3]["ideology"]["social"]), before3 + 0.5))
+	cm.apply_law_result(1, cp.law_type("social", -1), {2: 0}, false, [])
+	check("cekimser kaymaz", near(float(pm.parties[2]["ideology"]["social"]), before2 - 0.5))
+	pm.parties[3]["ideology"]["economic"] = 3.0
+	pm.apply_ideology_delta(3, "economic", 0.5)
+	check("uc sinir 3", near(float(pm.parties[3]["ideology"]["economic"]), 3.0))
 	check("il baskanligi miting riskini azaltir",
 		PublicOpinion.provocation_risk(ideology(-3, -3, -3), ideology(3, 3, 3), 2) < PublicOpinion.provocation_risk(ideology(-3, -3, -3), ideology(3, 3, 3), 0))
 

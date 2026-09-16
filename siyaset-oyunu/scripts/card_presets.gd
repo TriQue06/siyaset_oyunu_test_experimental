@@ -1,11 +1,12 @@
 extends Node
 ## Autoload. Kart ve hamle katalogu. Görseller normal PNG'ler (assets/cards/).
 ##
-## DESTE KARTLARI (desteden bedava çekilir; elden oynamanın mana bedeli CARD_MANA_COSTS):
+## DESTE KARTLARI (çekmek GameRules.DRAW_MANA_COST; oynamanın bedeli CARD_MANA_COSTS).
+## GÖZCÜ artık kart değil hamle (bkz. CardManager.scout); SCOUT_CARD_TYPE eski
+## kayıtlar/görseller için duruyor, desteye girmez.
 ##   - MİTİNG    : seçilen ilde güç kazandırır; provokasyon riski var.
 ##   - YATIRIM   : sadece hükümet partilerine gelir; seçilen ile yatırım.
 ##   - ANKET     : bir ilin güncel oy tahmini (±%20 hata); sonucu sadece oynayan görür.
-##   - GÖZCÜ     : bir ilin görüşünü eksen başına uç/orta olarak gösterir (oynayana, kalıcı).
 ##   - KARALAMA  : bir ilde bir partiyi karalar: ona eksi, oynayana artı.
 ##   - VEKİL ÇALMA / GENSORU : koşullu özel kartlar.
 ## YASA bir kart DEĞİL, bir hamle türüdür (bkz. CardManager.propose_law): eksen
@@ -65,14 +66,13 @@ const STEAL_RANGES := {
 
 ## Kartın elden oynanma bedeli (mana). Değerler henüz belirlenmedi: hepsi 0.
 const CARD_MANA_COSTS := {
-	"miting": 0,
+	"miting": 3,
 	"yatirim": 0,
 	"anket": 0,
-	"gozcu": 0,
-	"karalama": 0,
-	"steal_weak": 0,
-	"steal_medium": 0,
-	"steal_strong": 0,
+	"karalama": 2,
+	"steal_weak": 2,
+	"steal_medium": 3,
+	"steal_strong": 4,
 	"gensoru": 0,
 }
 
@@ -199,7 +199,8 @@ func law_description(card_type: String) -> String:
 	var law := law_data(card_type)
 	if law.is_empty():
 		return ""
-	return "Bu görüşe yakın illerde güç kazanırsın, zıt illerde kaybedersin.\nKabul edilirse etkisi 2 katı. Partin %s yönüne kayar." % law["side"]
+	return "Bu görüşe yakın illerde güç kazanırsın, zıt illerde kaybedersin.\nKabul edilirse etkisi 2 katı. Partin %s yönüne 1 adım kayar;
+EVET diyenler bu yöne, HAYIR diyenler ters yöne yarım adım kayar." % law["side"]
 
 ## Karta dokununca gösterilen açıklama (kısa ve somut) + mana bedeli.
 func card_description(card_type: String) -> String:

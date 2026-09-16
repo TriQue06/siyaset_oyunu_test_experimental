@@ -5,7 +5,11 @@ const SLIDE_DURATION := 0.2
 
 @onready var code_label: Label = %CodeLabel
 @onready var copy_code_button: Button = %CopyCodeButton
-@onready var player_list_box: VBoxContainer = %PlayerListBox
+@onready var player_list_box: GridContainer = %PlayerListBox
+
+## 8 sabit oyuncu kartı, 2 sütun. Robot butonu kartın sağ üst köşesine taşar.
+const SLOT_SIZE := Vector2(412, 74)
+const BOT_BUTTON_SIZE := 34.0
 @onready var settings_button: Button = %SettingsButton
 @onready var start_button: Button = %StartButton
 @onready var leave_button: Button = %LeaveButton
@@ -88,20 +92,16 @@ func _refresh() -> void:
 	var am_owner := MultiplayerManager.is_local_owner()
 	var local_id := multiplayer.get_unique_id()
 
-	var index := 0
-	for peer_id in MultiplayerManager.players.keys():
-		player_list_box.add_child(_build_player_card(peer_id, index, am_owner, local_id))
-		index += 1
+	# Kartlar sırayla dolar: önce insanlar, sonra botlar, sonra boş kartlar. Bot
+	# sadece İLK boş karta eklenebilir (sonraki boş kartların butonu pasif).
+	var order := MultiplayerManager.lobby_order()
+	for i in MultiplayerManager.MAX_PLAYERS:
+		if i < order.size():
+			player_list_box.add_child(_build_slot(_build_player_card(order[i], i, am_owner, local_id), false, false))
+		else:
+			player_list_box.add_child(_build_slot(_build_empty_card(i), am_owner, i == order.size()))
 
 	var count := MultiplayerManager.players.size()
-	if am_owner and count < MultiplayerManager.MAX_PLAYERS:
-		var add_bot := Button.new()
-		add_bot.text = "+  Bot Ekle"
-		add_bot.custom_minimum_size = Vector2(0, 44)
-		UiSkin.skin_button(add_bot)
-		add_bot.modulate = Color(1, 1, 1, 0.8)
-		add_bot.pressed.connect(MultiplayerManager.add_bot)
-		player_list_box.add_child(add_bot)
 	info_label.text = "Oyuncular: %d / %d  (başlamak için en az %d gerekir)" % [
 		count, MultiplayerManager.MAX_PLAYERS, MultiplayerManager.MIN_PLAYERS_TO_START
 	]
@@ -150,12 +150,17 @@ func _build_player_card(peer_id: int, index: int, am_owner: bool, local_id: int)
 	avatar_style.bg_color = color.darkened(0.2) if not is_bot else Color(0.35, 0.37, 0.42)
 	avatar_style.set_corner_radius_all(22)
 	avatar.add_theme_stylebox_override("panel", avatar_style)
-	var initial := Label.new()
-	initial.text = "🤖" if is_bot else player_name.substr(0, 1).to_upper()
-	initial.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	initial.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	initial.add_theme_font_size_override("font_size", 20)
-	avatar.add_child(initial)
+	if is_bot:
+		var robot := RobotIcon.new()
+		robot.custom_minimum_size = Vector2(44, 44)
+		avatar.add_child(robot)
+	else:
+		var initial := Label.new()
+		initial.text = player_name.substr(0, 1).to_upper()
+		initial.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		initial.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		initial.add_theme_font_size_override("font_size", 20)
+		avatar.add_child(initial)
 	row.add_child(avatar)
 
 	var info := VBoxContainer.new()
@@ -193,6 +198,80 @@ func _build_player_card(peer_id: int, index: int, am_owner: bool, local_id: int)
 			action.pressed.connect(func(): MultiplayerManager.transfer_ownership(peer_id))
 		row.add_child(action)
 	return card
+
+## Kartı sabit boyutlu bir slota yerleştirir; istenirse sağ üst köşesine
+## yuvarlak robot butonu oturtur (enabled=false ise soluk ve basılamaz).
+func _build_slot(card: Control, show_bot_button: bool, enabled: bool) -> Control:
+	var slot := Control.new()
+	slot.custom_minimum_size = SLOT_SIZE
+	card.custom_minimum_size = Vector2.ZERO
+	card.set_anchors_preset(Control.PRESET_FULL_RECT)
+	card.offset_top = BOT_BUTTON_SIZE * 0.45
+	card.offset_right = -BOT_BUTTON_SIZE * 0.45
+	slot.add_child(card)
+	if not show_bot_button:
+		return slot
+	var button := Button.new()
+	button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	button.offset_left = -BOT_BUTTON_SIZE
+	button.offset_right = 0.0
+	button.offset_top = 0.0
+	button.offset_bottom = BOT_BUTTON_SIZE
+	button.disabled = not enabled
+	button.focus_mode = Control.FOCUS_NONE
+	for state in ["normal", "hover", "pressed", "disabled"]:
+		var style := StyleBoxFlat.new()
+		style.set_corner_radius_all(int(BOT_BUTTON_SIZE / 2.0))
+		style.set_border_width_all(2)
+		style.border_color = Color(1, 1, 1, 0.85 if enabled else 0.25)
+		style.bg_color = Color(0.16, 0.55, 0.5) if enabled else Color(0.22, 0.24, 0.28)
+		if state == "hover":
+			style.bg_color = style.bg_color.lightened(0.15)
+		elif state == "pressed":
+			style.bg_color = style.bg_color.darkened(0.2)
+		button.add_theme_stylebox_override(state, style)
+	var robot := RobotIcon.new()
+	robot.set_anchors_preset(Control.PRESET_FULL_RECT)
+	robot.color = Color.WHITE if enabled else Color(1, 1, 1, 0.35)
+	button.add_child(robot)
+	if enabled:
+		button.pressed.connect(MultiplayerManager.add_bot)
+	slot.add_child(button)
+	return slot
+
+func _build_empty_card(index: int) -> Control:
+	var card := PanelContainer.new()
+	UiSkin.skin_panel(card, UiSkin.PANEL)
+	card.modulate = Color(1, 1, 1, 0.4)
+	var label := Label.new()
+	label.text = "%d · Boş" % (index + 1)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 15)
+	card.add_child(label)
+	return card
+
+## Emoji fontu her cihazda yok (Android): robot simgesi çizilerek üretilir.
+class RobotIcon extends Control:
+	var color: Color = Color.WHITE
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var s: float = minf(size.x, size.y)
+		var c: Vector2 = size * 0.5 + Vector2(0, s * 0.04)
+		var line: float = maxf(1.5, s * 0.07)
+		# anten
+		draw_line(c + Vector2(0, -0.2) * s, c + Vector2(0, -0.32) * s, color, line)
+		draw_circle(c + Vector2(0, -0.35) * s, s * 0.055, color)
+		# kafa, gözler, ağız, kulaklar
+		draw_rect(Rect2(c + Vector2(-0.27, -0.2) * s, Vector2(0.54, 0.42) * s), color, false, line)
+		draw_rect(Rect2(c + Vector2(-0.16, -0.08) * s, Vector2(0.1, 0.1) * s), color)
+		draw_rect(Rect2(c + Vector2(0.06, -0.08) * s, Vector2(0.1, 0.1) * s), color)
+		draw_line(c + Vector2(-0.11, 0.1) * s, c + Vector2(0.11, 0.1) * s, color, maxf(1.5, s * 0.05))
+		draw_rect(Rect2(c + Vector2(-0.36, -0.06) * s, Vector2(0.07, 0.14) * s), color)
+		draw_rect(Rect2(c + Vector2(0.29, -0.06) * s, Vector2(0.07, 0.14) * s), color)
 
 func _refresh_settings_display() -> void:
 	var t := MultiplayerManager.election_threshold

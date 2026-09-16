@@ -287,6 +287,19 @@ func bot_ids() -> Array:
 			ids.append(peer_id)
 	return ids
 
+## Lobi kartlarının sırası: önce insanlar (katılma sırasıyla), sonra botlar.
+## Botlar varken bir oyuncu katılırsa botlar otomatik olarak bir sonraki
+## karta kayar.
+func lobby_order() -> Array:
+	var humans: Array = []
+	var bots: Array = []
+	for peer_id in players.keys():
+		if is_bot(peer_id):
+			bots.append(peer_id)
+		else:
+			humans.append(peer_id)
+	return humans + bots
+
 func add_bot() -> void:
 	if not is_local_owner():
 		return
@@ -548,7 +561,7 @@ func _request_join(code: String, player_name: String) -> void:
 		_join_rejected.rpc_id(sender_id, "Kod hatalı.")
 		multiplayer.multiplayer_peer.disconnect_peer(sender_id)
 		return
-	if players.size() >= MAX_PLAYERS:
+	if players.size() >= MAX_PLAYERS and (bot_ids().is_empty() or stage != Stage.LOBBY):
 		_join_rejected.rpc_id(sender_id, "Oda dolu.")
 		multiplayer.multiplayer_peer.disconnect_peer(sender_id)
 		return
@@ -556,6 +569,9 @@ func _request_join(code: String, player_name: String) -> void:
 		_join_rejected.rpc_id(sender_id, "Bu odada oyun zaten başladı.")
 		multiplayer.multiplayer_peer.disconnect_peer(sender_id)
 		return
+	# Oda botlarla doluysa en son eklenen bot insan oyuncuya yer açar.
+	if players.size() >= MAX_PLAYERS:
+		players.erase(bot_ids().back())
 	players[sender_id] = {"name": player_name}
 	_sync_player_list.rpc(players, owner_id, election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
 	player_list_updated.emit()

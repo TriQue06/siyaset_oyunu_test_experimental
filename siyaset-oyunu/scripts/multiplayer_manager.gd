@@ -473,22 +473,17 @@ func _reset_state() -> void:
 func _on_connected_to_server() -> void:
 	_request_join.rpc_id(1, _pending_code, local_player_name, network_signature())
 
-## Ağ sürüm imzası: senkronlanan autoload'ların RPC listeleri ve ana kural
-## sabitleri. Godot RPC'leri SIRA NUMARASIYLA eşler; iki cihazda farklı sürüm
-## varsa istemcinin istekleri sunucuda yanlış fonksiyona gider ya da sessizce
-## düşer ("tabletten basıyor ama hiçbir şey olmuyor"). Katılırken karşılaştırılır.
+## Ağ sürüm imzası = oyun sürümü. Godot RPC'leri SIRA NUMARASIYLA eşler; iki
+## cihazda farklı sürüm varsa istemcinin istekleri sunucuda yanlış fonksiyona
+## gider ya da sessizce düşer. Katılırken karşılaştırılır; her derlemede sürüm
+## artırıldığı için farklı derlemeler asla eşleşmez.
 func network_signature() -> String:
-	var parts: Array = []
-	for node_name in ["MultiplayerManager", "PartyManager", "CardManager", "GovernmentManager"]:
-		var node := get_node_or_null("/root/" + node_name)
-		if node == null:
-			continue
-		var script: Script = node.get_script()
-		var methods: Array = script.get_rpc_config().keys() if script != null else []
-		methods.sort()
-		parts.append("%s:%s" % [node_name, ",".join(PackedStringArray(methods))])
-	parts.append("rules:%d,%d,%d,%d" % [GameRules.MAX_ROUNDS, GameRules.ELECTION_INTERVAL, GameRules.MANA_PER_ROUND, GameRules.MITING_MANA_COST])
-	return "%08x" % ("|".join(PackedStringArray(parts)).hash())
+	return game_version()
+
+## Oyun sürümü (project.godot: application/config/version). Her yeni derlemede
+## son rakam 1 artırılır (0.0.1, 0.0.2, ...); Android version/name ile aynı tutulur.
+static func game_version() -> String:
+	return str(ProjectSettings.get_setting("application/config/version", "0.0.0"))
 
 ## Röle peer'ı aynı hatayı room_error ile de bildirebilir; kullanıcıya tek
 ## mesaj gitsin, ve oda KURARKEN düşen bağlantı "katılma" hatası sanılmasın.
@@ -575,7 +570,8 @@ func _request_join(code: String, player_name: String, signature: String) -> void
 		return
 	var sender_id := multiplayer.get_remote_sender_id()
 	if signature != network_signature():
-		_join_rejected.rpc_id(sender_id, "Oyun sürümleri farklı (sen %s, oda %s). İki cihazda da aynı güncel sürümü kullanın." % [signature, network_signature()])
+		_join_rejected.rpc_id(sender_id, "Oyun sürümleri farklı (sen %s, oda %s). İki cihazda da aynı güncel sürümü kullanın." % [
+			signature, game_version()])
 		multiplayer.multiplayer_peer.disconnect_peer(sender_id)
 		return
 	if code != room_code:

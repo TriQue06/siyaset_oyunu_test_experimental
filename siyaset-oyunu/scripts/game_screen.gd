@@ -1587,7 +1587,7 @@ func _place_right_column_controls() -> void:
 	pass_button.add_theme_font_size_override("font_size", 14)
 	var panel := player_panel_list.get_parent() as Control
 	if panel != null:
-		panel.offset_top = 16.0
+		panel.offset_top = 70.0  # sağ üstte Menü butonu var
 		panel.offset_bottom = -300.0
 
 func _build_action_buttons() -> void:

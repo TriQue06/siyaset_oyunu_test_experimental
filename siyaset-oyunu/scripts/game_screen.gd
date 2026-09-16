@@ -112,6 +112,7 @@ var _drag_ghost: TextureRect
 ## Sürükleme sırasında el yeniden kurulmak istendi mi (bırakınca kurulur).
 var _hand_dirty: bool = false
 ## Hamle butonları ve mana göstergesi (sağ sütun, destenin yanında).
+var _mana_box: HBoxContainer
 var _mana_label: Label
 var _law_button: Button
 var _org_button: Button
@@ -346,6 +347,9 @@ func _refresh_parliament_diagram() -> void:
 		if voting and GovernmentManager.votes.has(peer_id):
 			color = VOTE_COLORS[int(GovernmentManager.votes[peer_id])]
 		entries.append({"seats": int(CardManager.last_seats[peer_id]), "color": color})
+	if entries.is_empty():
+		# İlk seçimden önce: bembeyaz, boş bir meclis (yasa dairesi buraya sürüklenir).
+		entries.append({"seats": CardManager.TOTAL_SEATS, "color": EMPTY_SEAT_COLOR})
 	parliament_diagram.set_results(entries)
 
 ## Oylar değişti: diyagram renkleri, profillerdeki oy etiketleri ve (oylanan
@@ -464,8 +468,10 @@ func _rebuild_player_panel() -> void:
 		player_panel_list.remove_child(child)
 		child.queue_free()
 	var count: int = maxi(1, _ordered_peer_ids().size())
-	var available: float = player_panel_list.get_parent().size.y
-	_avatar_height = clampf((available - AVATAR_SEPARATION * (count - 1)) / count, 40.0, 72.0) if available > 0.0 else 64.0
+	# Panel boyutu ilk karede henüz hesaplanmamış olabilir: pencereden hesaplanır.
+	var panel := player_panel_list.get_parent() as Control
+	var available: float = get_viewport_rect().size.y - panel.offset_top + panel.offset_bottom
+	_avatar_height = clampf((available - AVATAR_SEPARATION * (count - 1)) / count, 26.0, 72.0) if available > 0.0 else 64.0
 	player_panel_list.columns = 1
 
 	for peer_id in _ordered_peer_ids():
@@ -516,7 +522,7 @@ func _refresh_deck_button() -> void:
 
 func _refresh_pass_button() -> void:
 	pass_button.disabled = not CardManager.can_act()
-	pass_button.text = "Pas Geç (+%d mana)" % GameRules.MANA_PASS_BONUS
+	pass_button.text = "Pas Geç (+%d)" % GameRules.MANA_PASS_BONUS
 	pass_button.modulate.a = 1.0 if not pass_button.disabled else 0.5
 
 ## Sıra sende değilken eldeki kartlar tıklanamaz + soluk görünür — kullanıcı
@@ -1271,8 +1277,10 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 	style.border_color = color
 	style.content_margin_left = 12
 	style.content_margin_right = 8
-	style.content_margin_top = 4
-	style.content_margin_bottom = 4
+	# Çok oyunculu ve alçak ekranda kart sıkışır: tek satır (sadece parti adı).
+	var compact := _avatar_height < 42.0
+	style.content_margin_top = 1 if compact else 4
+	style.content_margin_bottom = 1 if compact else 4
 	if is_self:
 		style.shadow_color = Color(1.0, 0.82, 0.15, 0.55)
 		style.shadow_size = 5
@@ -1282,7 +1290,7 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 	row.add_theme_constant_override("separation", 8)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(row)
-	var badge_size: float = clampf(_avatar_height - 16.0, 24.0, 44.0)
+	var badge_size: float = clampf(_avatar_height - (6.0 if compact else 16.0), 18.0, 44.0)
 	var badge := PartyBadge.build(party, Vector2(badge_size, badge_size), BADGE_ICON_PIXEL_SIZE)
 	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -1295,7 +1303,8 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(info)
 	info.add_child(_avatar_label(String(party.get("name", "?")), 14, Color(1.0, 0.85, 0.35) if is_self else Color.WHITE))
-	info.add_child(_avatar_label(_leader_name_of(peer_id) + ("  (Sen)" if is_self else ""), 11, Color(0.68, 0.72, 0.8)))
+	if not compact:
+		info.add_child(_avatar_label(_leader_name_of(peer_id) + ("  (Sen)" if is_self else ""), 11, Color(0.68, 0.72, 0.8)))
 	if _avatar_height >= 58.0:
 		var seats_text := ("%d vekil · " % int(CardManager.last_seats[peer_id])) if CardManager.last_seats.has(peer_id) else ""
 		info.add_child(_avatar_label("%s%d mana" % [seats_text, CardManager.mana_of(peer_id)], 11, Color(0.6, 0.65, 0.75)))
@@ -1506,6 +1515,8 @@ func _refresh_score_panel() -> void:
 ## Yasa dairesi sürüklenirken _drag_hand_index bu değeri alır (elde kart yok).
 const LAW_DRAG_INDEX := -2
 const MANA_COLOR := Color(0.55, 0.8, 1.0)
+const MANA_ICON := preload("res://assets/icons/mana_icon.png")
+const EMPTY_SEAT_COLOR := Color(0.95, 0.95, 0.95)
 const LAW_AXIS_COLORS := {
 	"economic": Color(0.85, 0.58, 0.14),
 	"social": Color(0.6, 0.32, 0.78),
@@ -1523,31 +1534,48 @@ func _place_right_column_controls() -> void:
 	pass_button.add_theme_font_size_override("font_size", 14)
 	var panel := player_panel_list.get_parent() as Control
 	if panel != null:
-		panel.offset_top = 70.0  # sağ üstte Menü butonu var
-		panel.offset_bottom = -300.0
+		panel.offset_top = 72.0  # sağ üstte Menü butonu var
+		panel.offset_bottom = -268.0  # altında deste ve hamle butonları
+	# Pas butonu daraldı: solunda mana göstergesi duruyor.
+	pass_button.offset_left = -128.0
 
 func _build_action_buttons() -> void:
+	# Mana göstergesi: pas butonunun solunda simge + sayı. Dokununca kurallar.
+	_mana_box = HBoxContainer.new()
+	_mana_box.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	_mana_box.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_mana_box.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_mana_box.offset_left = -196.0
+	_mana_box.offset_right = -134.0
+	_mana_box.offset_top = -140.0
+	_mana_box.offset_bottom = -106.0
+	_mana_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	_mana_box.add_theme_constant_override("separation", 4)
+	_mana_box.mouse_filter = Control.MOUSE_FILTER_STOP
+	_mana_box.tooltip_text = "Mana"
+	var mana_icon := TextureRect.new()
+	mana_icon.texture = MANA_ICON
+	mana_icon.custom_minimum_size = Vector2(28, 28)
+	mana_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	mana_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	mana_icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	mana_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	mana_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_mana_box.add_child(mana_icon)
 	_mana_label = Label.new()
-	_mana_label.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	_mana_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	_mana_label.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	_mana_label.offset_left = -196.0
-	_mana_label.offset_right = -16.0
-	_mana_label.offset_top = -292.0
-	_mana_label.offset_bottom = -264.0
-	_mana_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_mana_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_mana_label.add_theme_font_size_override("font_size", 17)
+	_mana_label.add_theme_font_size_override("font_size", 22)
 	_mana_label.add_theme_color_override("font_color", MANA_COLOR)
 	_mana_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	_mana_label.add_theme_constant_override("outline_size", 5)
-	_mana_label.mouse_filter = Control.MOUSE_FILTER_STOP
-	_mana_label.gui_input.connect(func(event: InputEvent):
+	_mana_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_mana_box.add_child(_mana_label)
+	_mana_box.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_show_toast(_mana_rules))
 	_mana_rules = "Her tur +%d mana. Kart çekmeden pas geçersen +%d.\nYasa %d, il başkanlığı %d mana. Kart çekmek ve oynamak bedava." % [
 		GameRules.MANA_PER_ROUND, GameRules.MANA_PASS_BONUS, GameRules.LAW_MANA_COST, GameRules.ORG_MANA_COST]
-	add_child(_mana_label)
+	add_child(_mana_box)
 	_law_button = _action_button("YASA\nTASARLA", GameRules.LAW_MANA_COST, Color(0.42, 0.26, 0.62), -258.0)
 	_law_button.pressed.connect(_on_law_button_pressed)
 	_org_button = _action_button("İL\nBAŞKANLIĞI", GameRules.ORG_MANA_COST, Color(0.1, 0.44, 0.48), -202.0)
@@ -1596,7 +1624,7 @@ func _refresh_action_buttons() -> void:
 		return
 	var me := multiplayer.get_unique_id()
 	var mana_now := CardManager.mana_of(me)
-	_mana_label.text = "MANA  %d" % mana_now
+	_mana_label.text = str(mana_now)
 	var law_ok := CardManager.can_propose_law(me)
 	var org_ok := CardManager.can_choose_main_action(me) and mana_now >= GameRules.ORG_MANA_COST
 	# disabled kullanılmıyor: pasif butona dokununca neden olmadığı uyarı olarak çıksın.

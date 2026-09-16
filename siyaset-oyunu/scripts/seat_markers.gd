@@ -205,9 +205,8 @@ func _centroid_anchor(center: Vector2, layout: Array, cell: float) -> Vector2:
 		return center
 	return center - sum / float(total)
 
-## Pixel-art haritayla tutarlı olsun diye YUVARLAK değil, keskin kenarlı KARE
-## noktalar çiziliyor: önce biraz daha büyük koyu bir kare (kontur), üstüne
-## parti renginde asıl kare (eksen_projeksiyon'daki stroke="#1c1e21" karşılığı).
+## Vekiller DAİRE olarak çiziliyor: önce biraz daha büyük koyu bir daire (kontur),
+## üstüne parti renginde asıl daire (eksen_projeksiyon'daki stroke="#1c1e21" karşılığı).
 ##
 ## PİKSEL IZGARASI (bu fonksiyonun asıl işi): harita kesirli bir ölçekle
 ## (fit_scale, ör. 0.678) büyütülüyor. Nokta konumları harita biriminde
@@ -260,13 +259,12 @@ func _draw() -> void:
 						break
 					var color: Color = dot_outline_color if pass_index == 0 else colors[idx]
 					var center_px := Vector2(x0_px + col * step_px, y_px)
-					_draw_rect_at_screen_px(inv, center_px, half_px, color)
+					_draw_circle_at_screen_px(inv, scale, center_px, half_px, color)
 					idx += 1
 
-## Ekran (global) piksel uzayında verilen kare, local uzaya geri çevrilerek
-## çiziliyor — böylece Node2D ölçeği ne olursa olsun kenarlar tam piksele
-## oturur, yarım piksel bulanıklığı olmaz.
-func _draw_rect_at_screen_px(inv: Transform2D, center_px: Vector2, half_px: int, color: Color) -> void:
-	var top_left: Vector2 = inv * (center_px - Vector2(half_px, half_px))
-	var bottom_right: Vector2 = inv * (center_px + Vector2(half_px, half_px))
-	draw_rect(Rect2(top_left, bottom_right - top_left), color, true)
+## Ekran piksel uzayında (tam sayı merkez, tam sayı yarıçap) antialiased daire;
+## yerel uzaya geri çevrilerek çizilir. Bütün dairelerin merkezi ve yarıçapı
+## ekranda aynı tam sayılara oturduğu için kenar yumuşatması her birinde birebir
+## aynı görünür; adım konturlu çapın üstünde olduğundan daireler değmez.
+func _draw_circle_at_screen_px(inv: Transform2D, screen_scale: float, center_px: Vector2, half_px: int, color: Color) -> void:
+	draw_circle(inv * center_px, float(half_px) / screen_scale, color, true, -1.0, true)

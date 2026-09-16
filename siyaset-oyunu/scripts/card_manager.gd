@@ -18,7 +18,7 @@ extends Node
 ##   Hükümet kurulurken / meclis oylarken tur DURUR (is_turn_blocked).
 ##
 ## TUR SONU (herkes birer kez oynayınca) — bkz. GameRules
-##   - herkes +MANA_PER_ROUND mana alır,
+##   - (mana geliri tur sonunda değil, her oyuncunun sırası geldiğinde verilir),
 ##   - görevdeki hükümet makam puanlarını alır, eksen keskinliği artar,
 ##   - il/ulusal puanlar sıfıra doğru söner (il başkanlığı sönmez),
 ##   - son tursa oyun biter; seçim turuysa (ya da hükümet kurulamadıysa
@@ -269,7 +269,8 @@ func can_propose_law(peer_id: int, law_type: String = "") -> bool:
 		return false
 	if law_type != "" and not CardPresets.is_law_card(law_type):
 		return false
-	return GovernmentManager.can_submit_law() or last_seats.is_empty()
+	# İlk seçime kadar meclis yok: yasa yapılamaz (saf propaganda dönemi).
+	return not last_seats.is_empty() and GovernmentManager.can_submit_law()
 
 func has_proposed_law_this_round(peer_id: int) -> bool:
 	return int(law_rounds.get(peer_id, 0)) == round_number
@@ -441,6 +442,7 @@ func init_game() -> void:
 	turn_order = MultiplayerManager.players.keys().duplicate()
 	turn_order.shuffle()
 	current_turn_index = 0
+	_grant_turn_income()
 	has_drawn_this_turn = false
 	law_rounds = {}
 	populism = {}
@@ -681,9 +683,7 @@ func _apply_law(peer_id: int, law_type: String) -> void:
 	if not can_propose_law(peer_id, law_type):
 		return
 	_event_message = ""
-	if last_seats.is_empty():
-		_apply_law_promise(peer_id, law_type)
-	elif not GovernmentManager.submit_law(peer_id, law_type):
+	if not GovernmentManager.submit_law(peer_id, law_type):
 		return
 	mana[peer_id] = mana_of(peer_id) - GameRules.LAW_MANA_COST
 	law_rounds[peer_id] = round_number
@@ -691,15 +691,6 @@ func _apply_law(peer_id: int, law_type: String) -> void:
 	if _event_message != "":
 		event["message"] = _event_message
 	_push_state(event)
-
-## Meclis yokken yasa: oylamasız SEÇİM VAADİ — reddedilmiş bir yasa kadar etki.
-func _apply_law_promise(peer_id: int, law_type: String) -> void:
-	var law := CardPresets.law_data(law_type)
-	for province_id in _province_ids:
-		var alignment := PublicOpinion.law_alignment(province_center(province_id), law["axis"], int(law["dir"]))
-		_add_local(province_id, peer_id, PublicOpinion.law_proposer_delta(alignment, false), true)
-	PartyManager.apply_ideology_delta(peer_id, law["axis"], IdeologyAxes.LAW_PROPOSE_SHIFT * int(law["dir"]))
-	_event_message = "%s seçim vaadi: %s. Partisi %s yönüne kaydı." % [_party_name(peer_id), law["title"], law["side"]]
 
 func _apply_organization(peer_id: int, province_id: String) -> void:
 	if not can_build_organization(peer_id, province_id):
@@ -965,7 +956,14 @@ func _advance_turn() -> bool:
 	current_turn_index = (current_turn_index + 1) % size
 	has_drawn_this_turn = false
 	_turn_time_left = GameRules.TURN_TIMEOUT
+	_grant_turn_income()
 	return wrapped
+
+## Sırası gelen oyuncu mana gelirini alır.
+func _grant_turn_income() -> void:
+	var peer_id := current_turn_peer_id()
+	if peer_id != -1:
+		mana[peer_id] = mana_of(peer_id) + GameRules.MANA_PER_ROUND
 
 # --- Tur sonu / seçim / oyun sonu -------------------------------------------
 
@@ -982,8 +980,6 @@ func _finish_round() -> void:
 	_round_end_pending = false
 	# Biten turda görevde olan hükümet görev puanlarını KAZANIR (birikimli).
 	GovernmentManager.award_round_scores()
-	for peer_id in turn_order:
-		mana[peer_id] = mana_of(peer_id) + GameRules.MANA_PER_ROUND
 	var finished_round := round_number
 	round_number += 1
 	current_axis_sharpness += MultiplayerManager.axis_sharpness_increment

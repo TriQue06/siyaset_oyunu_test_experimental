@@ -471,7 +471,24 @@ func _reset_state() -> void:
 # --- Bağlantı olayları -------------------------------------------------
 
 func _on_connected_to_server() -> void:
-	_request_join.rpc_id(1, _pending_code, local_player_name)
+	_request_join.rpc_id(1, _pending_code, local_player_name, network_signature())
+
+## Ağ sürüm imzası: senkronlanan autoload'ların RPC listeleri ve ana kural
+## sabitleri. Godot RPC'leri SIRA NUMARASIYLA eşler; iki cihazda farklı sürüm
+## varsa istemcinin istekleri sunucuda yanlış fonksiyona gider ya da sessizce
+## düşer ("tabletten basıyor ama hiçbir şey olmuyor"). Katılırken karşılaştırılır.
+func network_signature() -> String:
+	var parts: Array = []
+	for node_name in ["MultiplayerManager", "PartyManager", "CardManager", "GovernmentManager"]:
+		var node := get_node_or_null("/root/" + node_name)
+		if node == null:
+			continue
+		var script: Script = node.get_script()
+		var methods: Array = script.get_rpc_config().keys() if script != null else []
+		methods.sort()
+		parts.append("%s:%s" % [node_name, ",".join(PackedStringArray(methods))])
+	parts.append("rules:%d,%d,%d,%d" % [GameRules.MAX_ROUNDS, GameRules.ELECTION_INTERVAL, GameRules.MANA_PER_ROUND, GameRules.MITING_MANA_COST])
+	return "%08x" % ("|".join(PackedStringArray(parts)).hash())
 
 ## Röle peer'ı aynı hatayı room_error ile de bildirebilir; kullanıcıya tek
 ## mesaj gitsin, ve oda KURARKEN düşen bağlantı "katılma" hatası sanılmasın.
@@ -553,10 +570,14 @@ func _notify_party_setup_finished() -> void:
 # --- RPC'ler -------------------------------------------------------------
 
 @rpc("any_peer", "reliable")
-func _request_join(code: String, player_name: String) -> void:
+func _request_join(code: String, player_name: String, signature: String) -> void:
 	if not is_host:
 		return
 	var sender_id := multiplayer.get_remote_sender_id()
+	if signature != network_signature():
+		_join_rejected.rpc_id(sender_id, "Oyun sürümleri farklı (sen %s, oda %s). İki cihazda da aynı güncel sürümü kullanın." % [signature, network_signature()])
+		multiplayer.multiplayer_peer.disconnect_peer(sender_id)
+		return
 	if code != room_code:
 		_join_rejected.rpc_id(sender_id, "Kod hatalı.")
 		multiplayer.multiplayer_peer.disconnect_peer(sender_id)

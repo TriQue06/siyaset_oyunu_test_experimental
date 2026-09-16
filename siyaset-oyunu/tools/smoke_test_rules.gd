@@ -220,41 +220,43 @@ func _initialize() -> void:
 	print("")
 	print("=== 9) MANA VE HAMLELER ===")
 	new_game({1: ideology(0, 0, 0), 2: ideology(0, 0, 0), 3: ideology(0, 0, 0)})
-	check("herkes MANA_START ile baslar", cm.mana_of(1) == GameRules.MANA_START and cm.mana_of(3) == GameRules.MANA_START, str(cm.mana))
+	cm.mana = {1: GameRules.MANA_START, 2: GameRules.MANA_START, 3: GameRules.MANA_START}
+	cm._grant_turn_income()
+	check("sirasi gelen +MANA_PER_ROUND alir, digerleri almaz", cm.mana_of(1) == GameRules.MANA_START + GameRules.MANA_PER_ROUND 		and cm.mana_of(2) == GameRules.MANA_START, str(cm.mana))
+	cm.mana[1] = 1
 	cm._apply_pass(1)
-	check("turu bitirmek mana vermez", cm.mana_of(1) == GameRules.MANA_START)
+	check("turu bitirmek mana vermez: harcanan mana geri dolmaz", cm.mana_of(1) == 1, str(cm.mana))
+	check("sirasi gelen 2 gelirini aldi", cm.mana_of(2) == GameRules.MANA_START + GameRules.MANA_PER_ROUND)
 	cm.tick(GameRules.TURN_TIMEOUT + 1.0)
 	check("sure dolunca sira devreder", cm.current_turn_peer_id() == 3)
+	var mana3: int = cm.mana_of(3)
 	cm._apply_draw(3)
-	check("kart cekmek 1 mana, sira devretmez", cm.mana_of(3) == GameRules.MANA_START - GameRules.DRAW_MANA_COST 		and cm.inventories[3].size() == 1 and cm.current_turn_peer_id() == 3)
+	check("kart cekmek 1 mana, sira devretmez", cm.mana_of(3) == mana3 - GameRules.DRAW_MANA_COST 		and cm.inventories[3].size() == 1 and cm.current_turn_peer_id() == 3)
 	cm._apply_draw(3)
 	check("turda en fazla 1 kart cekilir", cm.inventories[3].size() == 1 and not cm.can_draw_for(3))
 	cm.mana[3] = 0
-	check("mana yoksa kart cekilemez", not cm.can_draw_for(3))
 	check("mana yoksa gozcu yok", not cm.can_scout(3, "ankara"))
-	check("yasa 1 mana: mana yokken sunulamaz", not cm.can_propose_law(3))
 	cm._apply_pass(3)
-	check("tur sonu herkese +MANA_PER_ROUND", cm.mana_of(1) == GameRules.MANA_START + GameRules.MANA_PER_ROUND 		and cm.mana_of(3) == GameRules.MANA_PER_ROUND, str(cm.mana))
+	check("tur bitti: 1 birikmis manasina gelir ekledi (1 + gelir)", cm.round_number == 2 and cm.mana_of(1) == 1 + GameRules.MANA_PER_ROUND 		and cm.mana_of(3) == 0, str(cm.mana))
 	check("gozcu destede yok", not cm._draw_pool(1).has("gozcu"))
 	check("miting hamle, destede yok", not cm._draw_pool(1).has("miting") and GameRules.MITING_MANA_COST == 3)
 	check("kart bedelleri: karalama 2, vekil calma 2/3/4", cp.card_cost("karalama") == 2 		and cp.card_cost("steal_weak") == 2 and cp.card_cost("steal_medium") == 3 and cp.card_cost("steal_strong") == 4)
 
 	var law_type: String = cp.law_type("economic", 1)
 	check("yasa hamlesi turu okunur", cp.is_law_card(law_type) and int(cp.law_data(law_type)["dir"]) == 1 and not cp.is_law_card("miting"))
-	var pos := extreme(cm.province_ideology, "economic", true)
-	var neg := extreme(cm.province_ideology, "economic", false)
-	var mana1: int = cm.mana_of(1)
+	cm.mana[1] = 10
+	check("ilk secimden once yasa yapilamaz (meclis yok)", not cm.can_propose_law(1))
 	cm._apply_law(1, law_type)
-	check("meclis yokken yasa = secim vaadi, 1 mana", cm.mana_of(1) == mana1 - GameRules.LAW_MANA_COST and gm.phase == gm.Phase.IDLE)
-	mana1 = cm.mana_of(1)
-	check("vaat: gorusune yakin ilde guc kazandi, zit ilde kaybetti",
-		cm.local_of(pos, 1) > 0.0 and cm.local_of(neg, 1) < 0.0, "%s %.2f / %s %.2f" % [pos, cm.local_of(pos, 1), neg, cm.local_of(neg, 1)])
-	check("vaat: ulusal puana yazilmaz", cm.national_of(1) == 0.0)
-	check("vaat: partinin gorusu yasa yonune 1 kaydi", near(float(pm.parties[1]["ideology"]["economic"]), 1.0))
-	check("sira devretmedi", cm.current_turn_peer_id() == 1)
+	check("secim oncesi yasa reddedildi: mana ve gorus degismedi", cm.mana_of(1) == 10 and near(float(pm.parties[1]["ideology"]["economic"]), 0.0))
+	cm.last_seats = {1: 150, 2: 140, 3: 100}
+	check("meclis varken yasa sunulabilir", cm.can_propose_law(1))
+	cm._apply_law(1, law_type)
+	check("yasa 1 mana, meclis oylamasi acildi, sira devretmedi", cm.mana_of(1) == 10 - GameRules.LAW_MANA_COST and gm.phase == gm.Phase.VOTING 		and cm.current_turn_peer_id() == 1)
+	for id in [1, 2, 3]:
+		gm._apply_vote(id, gm.VOTE_ABSTAIN)
 	check("turda ikinci yasa yok", not cm.can_propose_law(1))
-	cm._apply_law(1, cp.law_type("social", 1))
-	check("ikinci yasa reddedildi", near(float(pm.parties[1]["ideology"]["social"]), 0.0))
+	cm.last_seats = {}
+	var mana1: int = cm.mana_of(1)
 
 	cm._apply_scout_move(1, "ankara")
 	check("gozcu hamlesi: 1 mana, 5 tur, il ogrenildi", cm.has_scouted(1, "ankara") and cm.mana_of(1) == mana1 - GameRules.SCOUT_MANA_COST \

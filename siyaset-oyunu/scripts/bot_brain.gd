@@ -166,11 +166,13 @@ static func _best_law(bot: int, known: Dictionary) -> Dictionary:
 			var score := 1.7 + value * 5.0
 			if best.is_empty() or score > float(best["score"]):
 				best = {"law": law_type, "score": score}
-	# Az il biliniyorken tahmin gürültülü: kimlik yasası daha iyiyse o sunulur.
-	if known_seats < 60.0:
-		var exploration := _exploration_law(bot, mine)
-		if float(exploration["score"]) > float(best["score"]):
-			return exploration
+	# Tahmin gürültülü ya da bütün yasalar zararlı görünüyorsa kimlik yasası
+	# (partinin belirgin ekseni) yedek seçenektir: meclis oyunu durmasın.
+	var exploration := _exploration_law(bot, mine)
+	if known_seats >= 60.0:
+		exploration["score"] = 1.2
+	if float(exploration["score"]) > float(best["score"]):
+		return exploration
 	return best
 
 ## Hiç il bilinmiyorken: parti kimliğini güçlendiren (en belirgin ekseninde)

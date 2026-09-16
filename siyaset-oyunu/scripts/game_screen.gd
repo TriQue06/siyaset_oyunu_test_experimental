@@ -155,6 +155,7 @@ var _censure_button: Button
 var _pending_invest: bool = false
 ## Gensoru: ilk dokunuş onay ister, ikincisi verir.
 var _pending_censure: bool = false
+var _last_turn_peer: int = -2
 ## Gözcü hamlesi için il seçme modu (harita gözcü katmanına geçer).
 var _pending_scout: bool = false
 ## Yasa tasarlama paneli (6 daire) ve karalama hedef menüsü.
@@ -534,6 +535,11 @@ func _rebuild_player_panel() -> void:
 # --- Tur göstergesi (geçici; kalıcı görseli kullanıcı sonra ekleyecek) -----
 
 func _on_turn_changed(_peer_id: int) -> void:
+	var current := CardManager.current_turn_peer_id()
+	if current != _last_turn_peer:
+		_last_turn_peer = current
+		if current == multiplayer.get_unique_id() and not CardManager.game_finished:
+			_show_toast("Sıra sende: +%d mana (toplam %d)" % [GameRules.MANA_PER_ROUND, CardManager.mana_of(current)])
 	_update_turn_indicator()
 	_refresh_deck_button()
 	_refresh_pass_button()
@@ -1749,7 +1755,7 @@ func _build_action_buttons() -> void:
 	_mana_box.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_show_toast(_mana_rules))
-	_mana_rules = "Her tur +%d mana; manan yettikçe istediğin kadar hamle yap.\nHamleler: yasa %d (turda 1), miting %d, il başkanlığı %d, gözcü %d (%d tur), yatırım %d, gensoru %d mana.\nKart çekmek %d mana (turda 1). Kartlar bonus: karalama 2, vekil çalma 2/3/4, popülizm 2, mana bonusu 0." % [
+	_mana_rules = "Sıran gelince +%d mana; manan yettikçe istediğin kadar hamle yap, biriken mana kalır.\nHamleler: yasa %d (turda 1), miting %d, il başkanlığı %d, gözcü %d (%d tur), yatırım %d, gensoru %d mana.\nKart çekmek %d mana (turda 1). Kartlar bonus: karalama 2, vekil çalma 2/3/4, popülizm 2, mana bonusu 0." % [
 		GameRules.MANA_PER_ROUND, GameRules.LAW_MANA_COST, GameRules.MITING_MANA_COST, GameRules.ORG_MANA_COST,
 		GameRules.SCOUT_MANA_COST, GameRules.SCOUT_ROUNDS, GameRules.INVEST_MANA_COST, GameRules.CENSURE_MANA_COST, GameRules.DRAW_MANA_COST]
 	add_child(_mana_box)
@@ -1801,6 +1807,8 @@ func _action_button(title: String, cost_text: String, color: Color, top: float, 
 ## Neden şu an bu hamle yapılamıyor? (Buton ipucu ve uyarı yazısı.)
 func _action_block_reason(cost: int, is_law: bool = false) -> String:
 	var me := multiplayer.get_unique_id()
+	if is_law and CardManager.last_seats.is_empty():
+		return "İlk seçime kadar meclis yok: yasa yapılamaz."
 	if not CardManager.can_act():
 		return "Sıran değil."
 	if is_law and CardManager.has_proposed_law_this_round(me):

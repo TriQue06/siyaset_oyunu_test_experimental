@@ -10,6 +10,15 @@ func _ready() -> void:
 	start_button.pressed.connect(_on_start_pressed)
 	quit_button.pressed.connect(_on_quit_pressed)
 	$Background.gui_input.connect(_on_background_gui_input)
+	# Sürüm imzası: çok oyunculu oynarken iki cihazda aynı olmalı.
+	var version := Label.new()
+	version.text = "sürüm %s" % MultiplayerManager.network_signature()
+	version.add_theme_font_size_override("font_size", 12)
+	version.modulate = Color(1, 1, 1, 0.45)
+	version.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	version.position += Vector2(12, -28)
+	version.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(version)
 
 ## Boş bir yere (kutunun dışına) tıklanınca yazı imleci kutuda takılı kalmasın.
 func _on_background_gui_input(event: InputEvent) -> void:

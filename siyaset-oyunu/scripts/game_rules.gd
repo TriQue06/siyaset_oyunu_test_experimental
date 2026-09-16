@@ -11,7 +11,9 @@ extends RefCounted
 ##     kalan turlarda kurulu hükümet görevde kalır ve makam puanlarını toplar.
 ##   - HAMLE SINIRI YOK: sırası gelen oyuncu manası yettiğince hamle yapar,
 ##     "Turu Bitir" ile sırayı devreder. Mana birikir, üst sınır yok.
-##   - MANA: herkes MANA_START ile başlar, her tur sonunda +MANA_PER_ROUND.
+##   - MANA: herkes MANA_START ile başlar; SIRASI GELDİĞİNDE +MANA_PER_ROUND alır
+##     (tur sonunda değil: harcadığın mana turu bitirince geri dolmuş görünmez).
+##   - YASA ilk seçimden önce yapılamaz: meclis yok, saf propaganda dönemi.
 ##     HAMLELER: miting MITING_MANA_COST, il başkanlığı ORG_MANA_COST, gözcü
 ##     SCOUT_MANA_COST; yasa bedava ama oyuncu başına turda LAWS_PER_ROUND kez.
 ##     Kart çekmek DRAW_MANA_COST, turda en fazla bir kez (kartlar bonus/joker niteliğinde).
@@ -27,7 +29,7 @@ extends RefCounted
 const ELECTION_INTERVAL := 4
 const FIRST_ELECTION_ROUND := 4
 
-const MANA_START := 3
+const MANA_START := 0
 const MANA_PER_ROUND := 3
 const LAW_MANA_COST := 1
 const LAWS_PER_ROUND := 1

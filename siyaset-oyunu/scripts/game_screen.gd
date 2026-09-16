@@ -757,11 +757,7 @@ func _build_hand_card(card_type: String, hand_index: int) -> Control:
 	card.set_meta("pressed", false)
 	card.set_meta("press_pos", Vector2.ZERO)
 	card.gui_input.connect(func(event: InputEvent):
-		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-			if _drag_hand_index != -1:
-				card.set_meta("pressed", false)
-				_end_drag()
-		elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
 				card.set_meta("pressed", true)
 				card.set_meta("press_pos", event.position)
@@ -791,6 +787,10 @@ func _on_hand_card_clicked(hand_index: int) -> void:
 	if hand_index < 0 or hand_index >= hand.size():
 		return
 	var card_type: String = hand[hand_index]
+	# Hedef seçmeyi bekleyen karta tekrar tıklamak seçimi iptal eder (sağ tık yok).
+	if _pending_target_hand_index == hand_index or _pending_province_hand_index == hand_index:
+		_cancel_targeting()
+		return
 	_cancel_targeting()
 	var me := multiplayer.get_unique_id()
 	if CardPresets.needs_target(card_type):
@@ -854,7 +854,7 @@ func _update_drag() -> void:
 	var mouse := get_viewport().get_mouse_position()
 	_drag_ghost.position = mouse - _drag_ghost.size * 0.5
 	var target := _drop_target(_drag_card_type)
-	_set_target_hint(String(target["label"]) + "  ·  Sağ tık: iptal")
+	_set_target_hint(String(target["label"]) + "  ·  Geçersiz yere bırak: iptal")
 	var valid: bool = target["valid"]
 	_drag_ghost.modulate = Color(1, 1, 1, 0.95) if valid else Color(1, 0.75, 0.75, 0.8)
 	parliament_diagram.modulate = Color(1.3, 1.3, 1.05) if bool(target["parliament"]) else Color.WHITE
@@ -990,7 +990,7 @@ func _party_under_mouse() -> int:
 func _begin_targeting(hand_index: int) -> void:
 	_pending_target_hand_index = hand_index
 	_refresh_target_highlights()
-	_set_target_hint("Vekil çalmak için sağdan bir parti seç  ·  Sağ tık: iptal")
+	_set_target_hint("Vekil çalmak için sağdan bir parti seç  ·  Karta tekrar tıkla: iptal")
 
 ## Miting / yatırım: haritadan il seçilmesi beklenir (bkz. _on_province_clicked).
 func _begin_province_targeting(hand_index: int) -> void:
@@ -999,7 +999,7 @@ func _begin_province_targeting(hand_index: int) -> void:
 	if _province_panel != null:
 		_province_panel.hide()
 	var card_type: String = CardManager.my_inventory()[hand_index]
-	_set_target_hint("%s için haritadan bir il seç (risk il üstünde yazar)  ·  Sağ tık: iptal" % CardPresets.card_title(card_type))
+	_set_target_hint("%s için haritadan bir il seç (risk il üstünde yazar)  ·  Karta tekrar tıkla: iptal" % CardPresets.card_title(card_type))
 
 func _cancel_targeting() -> void:
 	_pending_province_hand_index = -1
@@ -1009,12 +1009,6 @@ func _cancel_targeting() -> void:
 		return
 	_pending_target_hand_index = -1
 	_refresh_target_highlights()
-
-func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
-		if _pending_target_hand_index != -1 or _pending_province_hand_index != -1 or _pending_org:
-			_cancel_targeting()
-			get_viewport().set_input_as_handled()
 
 ## Haritada bir ile tıklandı: il seçme modundaysa kart o ilde oynanır, değilse
 ## il detay paneli açılır/kapanır.
@@ -1763,9 +1757,6 @@ func _law_circle(axis: String, dir: int) -> Control:
 				_start_law_drag(law_type)
 			elif _drag_hand_index == LAW_DRAG_INDEX:
 				_finish_drag()
-		elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-			if _drag_hand_index == LAW_DRAG_INDEX:
-				_end_drag()
 	)
 	return circle
 
@@ -1806,6 +1797,9 @@ func _on_law_button_pressed() -> void:
 		maxf(12.0, viewport_size.y * TOP_AREA_HEIGHT_RATIO - _law_designer.size.y))
 
 func _on_org_button_pressed() -> void:
+	if _pending_org:
+		_cancel_targeting()  # butona tekrar basmak il seçimini iptal eder
+		return
 	_cancel_targeting()
 	_law_designer.hide()
 	if not CardManager.can_choose_main_action(multiplayer.get_unique_id()):
@@ -1814,7 +1808,7 @@ func _on_org_button_pressed() -> void:
 	_pending_org = true
 	if _province_panel != null:
 		_province_panel.hide()
-	_set_target_hint("İl başkanlığı kurmak ya da geliştirmek için haritadan bir il seç (%d mana)  ·  Sağ tık: iptal" % GameRules.ORG_MANA_COST)
+	_set_target_hint("İl başkanlığı kurmak ya da geliştirmek için haritadan bir il seç (%d mana)  ·  Butona tekrar bas: iptal" % GameRules.ORG_MANA_COST)
 
 func _build_propaganda_menu() -> void:
 	_propaganda_menu = PanelContainer.new()

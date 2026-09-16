@@ -104,6 +104,8 @@ func _play_game(g: int, report: Dictionary) -> void:
 
 		var bot: int = cm.current_turn_peer_id()
 		var actions: Dictionary = stats[bot]["actions"]
+		if cm.inventories.get(bot, []).size() < cm.MAX_HAND_SIZE:
+			cm._apply_draw(bot)
 		var action: Dictionary = brain.choose_action(bot)
 		match String(action["type"]):
 			"law":
@@ -116,12 +118,10 @@ func _play_game(g: int, report: Dictionary) -> void:
 				cm._apply_pass(bot, true)
 				_bump(actions, "pas")
 			_:
-				if cm.inventories.get(bot, []).size() < cm.MAX_HAND_SIZE:
-					cm._apply_draw(bot)
 				var play: Dictionary = brain.choose_play(bot)
 				if play.is_empty():
-					cm._apply_pass(bot, false)
-					_bump(actions, "kart_cek_bitir")
+					cm._apply_pass(bot, true)
+					_bump(actions, "pas")
 				else:
 					var card: String = cm.inventories[bot][int(play["index"])]
 					var before: int = cm.inventories[bot].size()

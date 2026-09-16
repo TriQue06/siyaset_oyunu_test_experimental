@@ -10,9 +10,9 @@ extends RefCounted
 ##     sonunda, sonra her ELECTION_INTERVAL turda bir (3, 6, 9 ...). Arada
 ##     kalan turlarda kurulu hükümet görevde kalır ve makam puanlarını toplar.
 ##   - MANA: herkes MANA_START ile başlar, her tur sonunda +MANA_PER_ROUND,
-##     kart çekmeden pas geçince +MANA_PASS_BONUS. Sınır yok. Yasa
-##     LAW_MANA_COST, il başkanlığı ORG_MANA_COST; kart çekmek ve elden kart
-##     oynamak bedava.
+##     pas geçince +MANA_PASS_BONUS. Sınır yok. Yasa LAW_MANA_COST, il
+##     başkanlığı ORG_MANA_COST, kartların bedeli CardPresets.CARD_MANA_COSTS.
+##     Kart çekmek bedavadır ve hamle sayılmaz.
 ##   - Hükümet kurulamazsa (tüm görev hakları biterse) o turun sonunda ERKEN
 ##     SEÇİM yapılır.
 ##   - MAX_ROUNDS'uncu turun sonunda oyun biter; en çok puanı olan kazanır

@@ -1,7 +1,7 @@
 extends Node
 ## Autoload. Kart ve hamle katalogu. Görseller normal PNG'ler (assets/cards/).
 ##
-## DESTE KARTLARI (desteden çekilir; elden oynamak mana istemez):
+## DESTE KARTLARI (desteden bedava çekilir; elden oynamanın mana bedeli CARD_MANA_COSTS):
 ##   - MİTİNG    : seçilen ilde güç kazandırır; provokasyon riski var.
 ##   - YATIRIM   : sadece hükümet partilerine gelir; seçilen ile yatırım.
 ##   - ANKET     : bir ilin güncel oy tahmini (±%20 hata); sonucu sadece oynayan görür.
@@ -63,11 +63,18 @@ const STEAL_RANGES := {
 	"steal_strong": {"min": 9, "max": 12},
 }
 
-## Görseli yazısıyla birlikte çizilmiş kartlar. Diğerlerinin (placeholder
-## görselli kartlar) adı oyunda kartın üstüne yazılır.
-const BAKED_TITLE_TYPES: Array[String] = [
-	"steal_weak", "steal_medium", "steal_strong", "gensoru",
-]
+## Kartın elden oynanma bedeli (mana). Değerler henüz belirlenmedi: hepsi 0.
+const CARD_MANA_COSTS := {
+	"miting": 0,
+	"yatirim": 0,
+	"anket": 0,
+	"gozcu": 0,
+	"karalama": 0,
+	"steal_weak": 0,
+	"steal_medium": 0,
+	"steal_strong": 0,
+	"gensoru": 0,
+}
 
 var _card_textures: Dictionary = {}
 var _closed_texture: Texture2D
@@ -118,8 +125,8 @@ func law_data(card_type: String) -> Dictionary:
 	var info: Dictionary = AXIS_TITLES[axis]
 	return {"axis": axis, "dir": dir, "title": LAW_TITLES[axis][dir], "side": info["pos"] if dir > 0 else info["neg"]}
 
-func has_baked_title(card_type: String) -> bool:
-	return BAKED_TITLE_TYPES.has(card_type)
+func card_cost(card_type: String) -> int:
+	return int(CARD_MANA_COSTS.get(card_type, 0))
 
 ## weights: card_type -> ağırlık (>0). Ağırlıkla orantılı rastgele seçim.
 func weighted_pick(weights: Dictionary, rng: RandomNumberGenerator) -> String:
@@ -135,8 +142,15 @@ func weighted_pick(weights: Dictionary, rng: RandomNumberGenerator) -> String:
 			return card_type
 	return weights.keys().back()
 
-## Kartın üstüne basılacak kısa başlık (placeholder görselli kartlar için).
+## Kartın görselinin üstüne yazılan kısa başlık (her kartta).
 func card_short_title(card_type: String) -> String:
+	match card_type:
+		"steal_weak":
+			return "VEKİL ÇALMA\nZAYIF"
+		"steal_medium":
+			return "VEKİL ÇALMA\nORTA"
+		"steal_strong":
+			return "VEKİL ÇALMA\nGÜÇLÜ"
 	return card_title(card_type).to_upper()
 
 func card_title(card_type: String) -> String:
@@ -187,8 +201,15 @@ func law_description(card_type: String) -> String:
 		return ""
 	return "Bu görüşe yakın illerde güç kazanırsın, zıt illerde kaybedersin.\nKabul edilirse etkisi 2 katı. Partin %s yönüne kayar." % law["side"]
 
-## Kart üstüne gelince gösterilen açıklama (kısa ve somut).
+## Karta dokununca gösterilen açıklama (kısa ve somut) + mana bedeli.
 func card_description(card_type: String) -> String:
+	var text := _card_effect_text(card_type)
+	var cost := card_cost(card_type)
+	if cost > 0 and not is_law_card(card_type):
+		text += "\nBedel: %d mana" % cost
+	return text
+
+func _card_effect_text(card_type: String) -> String:
 	if is_law_card(card_type):
 		return law_description(card_type)
 	if needs_target(card_type):

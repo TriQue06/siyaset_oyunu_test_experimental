@@ -6,17 +6,20 @@ extends RefCounted
 ##
 ## BİLGİ KISITI: botlar da insanlar gibi illerin görüşünü BİLMEZ. Sadece gözcü
 ## gönderdikleri illerde her eksenin hangi uçta ya da ortada olduğunu bilirler
-## (bkz. _known_centers); bilmedikleri illeri nötr (0) varsayarlar. Bu yüzden
-## gözcü kartı botlar için de değerlidir. Miting riski ise insanlara da
+## (bkz. _known_centers); anketlerden de önde olan partilerin görüşüne bakıp
+## kaba bir tahmin çıkarırlar, bilmedikleri illeri nötr (0) sayarlar. Önce
+## kimliklerini güçlendiren yasalar sunar, öğrendikçe yasalarını illere göre
+## seçerler. Bu yüzden gözcü kartı botlar için de değerlidir. Miting riski ise insanlara da
 ## gösterilen bir ipucu olduğu için doğrudan kullanılır.
 
 ## En iyi kartın puanı bunun altındaysa bot kart oynamaz (el doluysa oynar).
 const PASS_THRESHOLD := 0.4
 ## Ana hamlelerin taban puanları.
 const PASS_ACTION_SCORE := 0.7
-const DRAW_ACTION_SCORE := 1.1
 ## Gözcü bilgisinden tahmin edilen eksen değeri (uç biliniyor, büyüklük değil).
 const LEANING_ESTIMATE := 2.0
+## Anketteki pay-ağırlıklı parti görüşünü il görüşü tahminine çeviren çarpan.
+const POLL_INFERENCE_SCALE := 2.0
 
 static func _ideology(peer_id: int) -> Dictionary:
 	return PartyManager.parties.get(peer_id, {}).get("ideology", IdeologyAxes.default_values())
@@ -33,7 +36,7 @@ static func _known_centers(bot: int) -> Dictionary:
 	var result := {}
 	for province_id in _seats().keys():
 		if not CardManager.has_scouted(bot, province_id):
-			result[province_id] = {}
+			result[province_id] = _infer_from_poll(bot, province_id)
 			continue
 		var center := CardManager.province_center(province_id)
 		var estimate := {}
@@ -41,6 +44,25 @@ static func _known_centers(bot: int) -> Dictionary:
 			estimate[axis] = signf(float(center.get(axis, 0.0))) * LEANING_ESTIMATE
 		result[province_id] = estimate
 	return result
+
+## Anketten kaba çıkarım: ilde önde olan partilerin görüşü ilin görüşüne
+## yakındır. Oy payıyla ağırlıklı parti görüşlerinin ortalaması; partiler hâlâ
+## nötrse bilgi vermez (boş sözlük).
+static func _infer_from_poll(bot: int, province_id: String) -> Dictionary:
+	var poll := CardManager.poll_of(bot, province_id)
+	if poll.is_empty():
+		return {}
+	var shares: Dictionary = poll.get("shares", {})
+	var estimate := {}
+	var informative := false
+	for axis in IdeologyAxes.AXES:
+		var sum := 0.0
+		for peer_id in shares.keys():
+			sum += float(shares[peer_id]) / 100.0 * float(_ideology(int(peer_id)).get(axis, 0))
+		estimate[axis] = sum * POLL_INFERENCE_SCALE
+		if absf(sum) > 0.05:
+			informative = true
+	return estimate if informative else {}
 
 ## İdeolojinin tüm ülkedeki (bilinen) seçmen desteği (milletvekili ağırlıklı).
 static func _electoral_strength(ideology: Dictionary, known: Dictionary) -> float:
@@ -63,13 +85,15 @@ static func choose_action(bot: int) -> Dictionary:
 	var best := {"type": "pass"}
 	var best_score := PASS_ACTION_SCORE
 
+	# Kart çekmek hamle değil (BotManager hamleden önce çeker): burada sadece
+	# elden kart OYNAMAK diğer hamlelerle yarışır.
 	var hand: Array = CardManager.inventories.get(bot, [])
-	var card_score := DRAW_ACTION_SCORE if hand.size() < CardManager.MAX_HAND_SIZE else -INF
+	var card_score := -INF
 	var play := choose_play(bot)
 	if not play.is_empty():
-		card_score = maxf(card_score, float(play["score"]))
-	if hand.size() >= CardManager.MAX_HAND_SIZE:
-		card_score = maxf(card_score, 3.0)  # el dolu: boşalt
+		card_score = float(play["score"])
+		if hand.size() >= CardManager.MAX_HAND_SIZE:
+			card_score = maxf(card_score, 3.0)  # el dolu: boşalt
 	if card_score > best_score:
 		best = {"type": "card"}
 		best_score = card_score
@@ -99,7 +123,7 @@ static func _best_law(bot: int, known: Dictionary) -> Dictionary:
 		if not (known.get(province_id, {}) as Dictionary).is_empty():
 			known_seats += float(seats[province_id])
 	if known_seats <= 0.0:
-		return {}
+		return _exploration_law(bot, mine)
 	var confidence := clampf(known_seats / 60.0, 0.3, 1.0)
 	for axis in IdeologyAxes.AXES:
 		for dir in [-1, 1]:
@@ -116,10 +140,29 @@ static func _best_law(bot: int, known: Dictionary) -> Dictionary:
 			var moved := mine.duplicate()
 			moved[axis] = IdeologyAxes.clamp_value(int(mine.get(axis, 0)) + dir)
 			value += (_electoral_strength(moved, known) - _electoral_strength(mine, known)) * 20.0
-			var score := 1.1 + value * 4.0
+			var score := 1.7 + value * 5.0
 			if best.is_empty() or score > float(best["score"]):
 				best = {"law": law_type, "score": score}
 	return best
+
+## Hiç il bilinmiyorken: parti kimliğini güçlendiren (en belirgin ekseninde)
+## yasa; kimlik yoksa bota ve tura göre bir eksen. Çok iyi bir kart (ör. büyük
+## ilde gözcü) varsa o önce gelir. Yasa partiyi kaydırdıkça kimlik oluşur.
+static func _exploration_law(bot: int, mine: Dictionary) -> Dictionary:
+	var best_axis := ""
+	var best_dir := 1
+	var strength := 0
+	for axis in IdeologyAxes.AXES:
+		var v := int(mine.get(axis, 0))
+		if absi(v) > strength:
+			strength = absi(v)
+			best_axis = axis
+			best_dir = 1 if v > 0 else -1
+	if best_axis == "":
+		var seed_value := absi(bot) + CardManager.round_number
+		best_axis = IdeologyAxes.AXES[seed_value % IdeologyAxes.AXES.size()]
+		best_dir = 1 if (absi(bot) / 7) % 2 == 0 else -1
+	return {"law": CardPresets.law_type(best_axis, best_dir), "score": 1.5}
 
 ## Kaba geçme ihtimali: diğer partilerin oyu, botun kendi bilgisiyle tahmin edilir.
 static func _law_pass_chance(bot: int, law_type: String, known: Dictionary) -> float:
@@ -202,6 +245,8 @@ static func choose_play(bot: int) -> Dictionary:
 	return best
 
 static func _evaluate(bot: int, card_type: String, known: Dictionary) -> Dictionary:
+	if CardManager.mana_of(bot) < CardPresets.card_cost(card_type):
+		return {}
 	match card_type:
 		CardPresets.MITING_CARD_TYPE:
 			return _eval_miting(bot, known)

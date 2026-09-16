@@ -6,13 +6,14 @@ extends Node
 ## uygular ve herkese yayınlar.
 ##
 ## TUR AKIŞI (bir oyuncunun sırası) — TEK ANA HAMLE:
-##   a) KART: desteden kart çek (bedava), sonra elden bir kart oyna ya da turu bitir.
-##      Elden kart oynamak mana istemez; çekmeden de elden kart oynanabilir.
+##   a) KART OYNA: elden bir kart oyna; kartın mana bedeli düşer
+##      (CardPresets.card_cost).
 ##   b) YASA TASARLA (GameRules.LAW_MANA_COST): meclise yasa sun; meclis yoksa
 ##      oylamasız SEÇİM VAADİ olur.
 ##   c) İL BAŞKANLIĞI (GameRules.ORG_MANA_COST): bir ilde teşkilat kur / geliştir.
-##   d) PAS: hiçbir şey yapmadan geç, +GameRules.MANA_PASS_BONUS mana.
-##   Kart çektikten sonra yasa ve il başkanlığı yapılamaz (tek hamle).
+##   d) PAS: hamle yapmadan geç, +GameRules.MANA_PASS_BONUS mana.
+##   KART ÇEKMEK HAMLE DEĞİLDİR: turda bir kez, bedava, hamleden önce çekilir.
+##   Çektiği kartı beğenmeyen oyuncu yine yasa / il başkanlığı / pas seçebilir.
 ##   GameRules.TURN_TIMEOUT dolarsa otomatik pas geçilir (mana bonusu yok).
 ##   Hükümet kurulurken / meclis oylarken tur DURUR (is_turn_blocked).
 ##
@@ -82,7 +83,7 @@ var inventories: Dictionary = {}
 var turn_order: Array = []
 # turn_order içindeki index; sırası gelen oyuncu turn_order[current_turn_index].
 var current_turn_index: int = 0
-# Sırası gelen oyuncu bu turda kart çekti mi (çektiyse yasa/il başkanlığı yapamaz).
+# Sırası gelen oyuncu bu turda kart çekti mi (turda en fazla bir çekiş).
 var has_drawn_this_turn: bool = false
 ## Eksen keskinliği: il bazlı seçim sonuçlarının ne kadar keskin çıkacağını
 ## belirleyen üs (bkz. ElectionModel). HER TUR SONUNDA artar.
@@ -250,7 +251,7 @@ func is_government_party(peer_id: int) -> bool:
 
 ## Bu oyuncu şu an bir ANA HAMLE (yasa / il başkanlığı) seçebilir mi?
 func can_choose_main_action(peer_id: int) -> bool:
-	return peer_id == current_turn_peer_id() and not is_turn_blocked() and not has_drawn_this_turn
+	return peer_id == current_turn_peer_id() and not is_turn_blocked()
 
 ## Bu oyuncu şu an bir yasa sunabilir mi? (law_type verilirse o yasa geçerli mi.)
 func can_propose_law(peer_id: int, law_type: String = "") -> bool:
@@ -275,6 +276,8 @@ func is_valid_steal_target(peer_id: int, target_peer_id: int) -> bool:
 
 ## Bu kart şu an bu hedeflerle oynanabilir mi? (Host doğrulaması ve UI.)
 func can_play_card(peer_id: int, card_type: String, target_peer_id: int = -1, target_province: String = "") -> bool:
+	if mana_of(peer_id) < CardPresets.card_cost(card_type):
+		return false
 	if CardPresets.needs_target(card_type):
 		return is_valid_steal_target(peer_id, target_peer_id)
 	if card_type == CardPresets.PROPAGANDA_CARD_TYPE:
@@ -568,6 +571,7 @@ func _apply_play(peer_id: int, hand_index: int, target_peer_id: int = -1, target
 		return
 	card_played.emit(peer_id, card_type)
 	hand.remove_at(hand_index)
+	mana[peer_id] = mana_of(peer_id) - CardPresets.card_cost(card_type)
 	_event_message = ""
 	var seats_changed_now := _apply_card_effect(peer_id, card_type, target_peer_id, target_province)
 	var wrapped := _advance_turn()
@@ -582,7 +586,7 @@ func _apply_play(peer_id: int, hand_index: int, target_peer_id: int = -1, target
 func _apply_pass(peer_id: int, voluntary: bool = true) -> void:
 	if is_turn_blocked() or peer_id != current_turn_peer_id():
 		return
-	if voluntary and not has_drawn_this_turn:
+	if voluntary:
 		mana[peer_id] = mana_of(peer_id) + GameRules.MANA_PASS_BONUS
 	var wrapped := _advance_turn()
 	_push_state({"type": "passed", "peer_id": peer_id})

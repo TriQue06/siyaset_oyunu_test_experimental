@@ -516,8 +516,7 @@ func _refresh_deck_button() -> void:
 
 func _refresh_pass_button() -> void:
 	pass_button.disabled = not CardManager.can_act()
-	pass_button.text = "Turu Bitir" if CardManager.can_act() and CardManager.has_drawn_this_turn \
-		else "Pas Geç (+%d mana)" % GameRules.MANA_PASS_BONUS
+	pass_button.text = "Pas Geç (+%d mana)" % GameRules.MANA_PASS_BONUS
 	pass_button.modulate.a = 1.0 if not pass_button.disabled else 0.5
 
 ## Sıra sende değilken eldeki kartlar tıklanamaz + soluk görünür — kullanıcı
@@ -622,19 +621,11 @@ func _build_hand_card(card_type: String, hand_index: int) -> Control:
 	card.set_meta("is_click_target", true)
 	holder.add_child(card)
 
-	# Görseli henüz çizilmemiş (placeholder) kartlarda adı kartın gövdesine yaz.
-	if not CardPresets.has_baked_title(card_type):
-		var title := Label.new()
-		title.text = CardPresets.card_short_title(card_type)
-		title.position = Vector2(10, CARD_DISPLAY_SIZE.y * 0.36)
-		title.size = Vector2(CARD_DISPLAY_SIZE.x - 20, CARD_DISPLAY_SIZE.y * 0.55)
-		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		title.add_theme_font_size_override("font_size", 15)
-		title.add_theme_color_override("font_color", Color(0.16, 0.13, 0.11))
-		title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		holder.add_child(title)
+	# Kartın ne olduğu her kartta görselin üstündeki bantta yazar.
+	holder.add_child(_card_title_banner(card_type))
+	var cost := CardPresets.card_cost(card_type)
+	if cost > 0:
+		holder.add_child(_card_cost_badge(cost))
 
 	# TIK ve SÜRÜKLEME: basılı tutup TAP_MAX_MOVE_PX'ten fazla kaydırınca
 	# sürükleme başlar (kartın kopyası imleci izler, bırakınca hedefe göre
@@ -717,8 +708,53 @@ func _deselect_hand_card() -> void:
 			holder.set_meta("lift_target", 0.0)
 			holder.z_index = 0
 
+## Kart görselinin üstündeki isim bandı.
+func _card_title_banner(card_type: String) -> Control:
+	var banner := PanelContainer.new()
+	banner.position = Vector2(6, 8)
+	banner.size = Vector2(CARD_DISPLAY_SIZE.x - 12, 44)
+	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.07, 0.08, 0.11, 0.86)
+	style.set_corner_radius_all(6)
+	style.set_content_margin_all(3)
+	banner.add_theme_stylebox_override("panel", style)
+	var title := Label.new()
+	title.text = CardPresets.card_short_title(card_type)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.add_theme_font_size_override("font_size", 14)
+	title.add_theme_color_override("font_color", Color.WHITE)
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	banner.add_child(title)
+	return banner
+
+## Kartın sağ alt köşesindeki mana bedeli rozeti.
+func _card_cost_badge(cost: int) -> Control:
+	var badge := PanelContainer.new()
+	badge.position = CARD_DISPLAY_SIZE - Vector2(40, 40)
+	badge.size = Vector2(32, 32)
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.12, 0.3, 0.55)
+	style.set_corner_radius_all(16)
+	style.set_border_width_all(2)
+	style.border_color = Color(0.55, 0.8, 1.0)
+	badge.add_theme_stylebox_override("panel", style)
+	var label := Label.new()
+	label.text = str(cost)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 16)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.add_child(label)
+	return badge
+
 ## Oynanamayan bir karta tıklanınca neden oynanamadığı.
 func _unplayable_reason(card_type: String) -> String:
+	if CardManager.mana_of(multiplayer.get_unique_id()) < CardPresets.card_cost(card_type):
+		return "Manan yetmiyor (%d gerekli)." % CardPresets.card_cost(card_type)
 	if CardPresets.is_law_card(card_type):
 		return "Yasa şu an meclise getirilemez (meclis yok ya da hükümet kuruluyor)."
 	if CardPresets.is_censure_card(card_type):
@@ -1551,8 +1587,6 @@ func _action_block_reason(cost: int) -> String:
 	var me := multiplayer.get_unique_id()
 	if not CardManager.can_act():
 		return "Sıran değil."
-	if CardManager.has_drawn_this_turn:
-		return "Kart çektin: bu tur ancak kart oynayabilir ya da turu bitirebilirsin."
 	if CardManager.mana_of(me) < cost:
 		return "Manan yetmiyor (%d gerekli)." % cost
 	return "Şu an yapılamaz."

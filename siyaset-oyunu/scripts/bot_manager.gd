@@ -61,35 +61,28 @@ func _handle_turn(now: float) -> void:
 	if now < _turn_due:
 		return
 	if not _turn_drawn:
-		# Ana hamle: yasa / il başkanlığı / pas ise hemen uygulanır; kart yolu
-		# seçildiyse kart çekilir, oynama biraz sonra.
-		var action := BotBrain.choose_action(bot)
-		match String(action["type"]):
-			"law":
-				_turn_due = INF
-				CardManager._apply_law(bot, String(action["law"]))
-				_pass_if_stuck(bot)
-				return
-			"organization":
-				_turn_due = INF
-				CardManager._apply_organization(bot, String(action["province"]))
-				_pass_if_stuck(bot)
-				return
-			"pass":
-				_turn_due = INF
-				CardManager._apply_pass(bot, true)
-				return
+		# Kart çekmek hamle değil: önce (bedava) çek, biraz düşün, sonra hamle.
 		_turn_drawn = true
 		_turn_due = now + _delay(PLAY_SECONDS)
 		if CardManager.inventories.get(bot, []).size() < CardManager.MAX_HAND_SIZE:
 			CardManager._apply_draw(bot)
 			return
 	_turn_due = INF
-	var play := BotBrain.choose_play(bot)
-	if play.is_empty():
-		CardManager._apply_pass(bot, false)
-		return
-	CardManager._apply_play(bot, int(play["index"]), int(play["peer"]), String(play["province"]))
+	var action := BotBrain.choose_action(bot)
+	match String(action["type"]):
+		"law":
+			CardManager._apply_law(bot, String(action["law"]))
+		"organization":
+			CardManager._apply_organization(bot, String(action["province"]))
+		"card":
+			var play := BotBrain.choose_play(bot)
+			if play.is_empty():
+				CardManager._apply_pass(bot, true)
+				return
+			CardManager._apply_play(bot, int(play["index"]), int(play["peer"]), String(play["province"]))
+		_:
+			CardManager._apply_pass(bot, true)
+			return
 	_pass_if_stuck(bot)
 
 ## Hamle reddedildiyse (beklenmedik bir kural) sırayı tıkamamak için turu bitir.

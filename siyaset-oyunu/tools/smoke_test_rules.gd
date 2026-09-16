@@ -221,11 +221,12 @@ func _initialize() -> void:
 	cm.tick(GameRules.TURN_TIMEOUT + 1.0)
 	check("sure dolunca pas: mana bonusu yok", cm.mana_of(2) == 1 and cm.current_turn_peer_id() == 3)
 	cm._apply_draw(3)
-	check("kart cektikten sonra yasa sunulamaz", not cm.can_propose_law(3))
-	check("kart cektikten sonra il baskanligi kurulamaz", not cm.can_build_organization(3, "ankara"))
+	check("kart cekmek hamle degil: sonra yasa sunulabilir", cm.can_propose_law(3))
+	check("kart cektikten sonra ana hamle secilebilir", cm.can_choose_main_action(3))
 	cm._apply_pass(3)
-	check("kart cekip turu bitirmek mana vermez, tur sonu herkese +1",
-		cm.mana_of(1) == 3 and cm.mana_of(2) == 2 and cm.mana_of(3) == 2, str(cm.mana))
+	check("kart cekip pas: +1 mana, tur sonu herkese +1",
+		cm.mana_of(1) == 3 and cm.mana_of(2) == 2 and cm.mana_of(3) == 3, str(cm.mana))
+	check("tum deste kartlarinin mana bedeli tanimli", cp.CARD_MANA_COSTS.size() == cp.CARD_TYPES.size())
 
 	var law_type: String = cp.law_type("economic", 1)
 	check("yasa hamlesi turu okunur", cp.is_law_card(law_type) and int(cp.law_data(law_type)["dir"]) == 1 and not cp.is_law_card("miting"))

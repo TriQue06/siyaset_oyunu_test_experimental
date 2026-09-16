@@ -61,6 +61,8 @@ func _initialize() -> void:
 				gm.tick(GameRules.FORMATION_TIMEOUT + 100.0)  # geçersiz teklif: süre dolsun
 		else:
 			var bot: int = cm.current_turn_peer_id()
+			if cm.inventories.get(bot, []).size() < cm.MAX_HAND_SIZE:
+				cm._apply_draw(bot)
 			var action: Dictionary = brain.choose_action(bot)
 			match String(action["type"]):
 				"law":
@@ -73,11 +75,9 @@ func _initialize() -> void:
 					cm._apply_pass(bot, true)
 					played["pas"] = int(played.get("pas", 0)) + 1
 				_:
-					if cm.inventories.get(bot, []).size() < cm.MAX_HAND_SIZE:
-						cm._apply_draw(bot)
 					var play: Dictionary = brain.choose_play(bot)
 					if play.is_empty():
-						cm._apply_pass(bot, false)
+						cm._apply_pass(bot, true)
 					else:
 						var card: String = cm.inventories[bot][int(play["index"])]
 						var before: int = cm.inventories[bot].size()

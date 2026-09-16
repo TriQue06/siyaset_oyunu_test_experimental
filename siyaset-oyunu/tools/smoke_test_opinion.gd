@@ -213,8 +213,8 @@ func _initialize() -> void:
 	print("=== 6) IKTIDAR YORGUNLUGU, VEKIL MOMENTUMU, IL BASKANLIGI ===")
 	cm.national_support = {1: 2.0, 3: 1.0}
 	var mods: Dictionary = cm.election_modifiers()
-	check("hukumet partisi secime -1.5 ile girer", near(float(mods["national"][1]), 2.0 + PublicOpinion.GOVERNMENT_FATIGUE))
-	check("ortak da yorulur", near(float(mods["national"].get(2, 0.0)), PublicOpinion.GOVERNMENT_FATIGUE))
+	check("hukumet partisi secime iktidar dengesiyle girer", near(float(mods["national"][1]), 2.0 + PublicOpinion.GOVERNMENT_FATIGUE))
+	check("ortak da ayni dengeyi alir", near(float(mods["national"].get(2, 0.0)), PublicOpinion.GOVERNMENT_FATIGUE))
 	check("muhalefet yorulmaz", near(float(mods["national"][3]), 1.0))
 	check("gercek puan degismedi", near(cm.national_of(1), 2.0))
 	cm.election_seats = {1: 200, 2: 100, 3: 90}

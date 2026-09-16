@@ -47,9 +47,13 @@ const INVEST_LOCAL := 3.0
 const INVEST_NATIONAL := 0.5
 const INVEST_PARTNER_LOCAL := 1.5
 
-# --- İktidar yorgunluğu -------------------------------------------------------
-## Seçim anında hükümette olan her parti bu kadar ulusal eksiyle seçime girer.
-const GOVERNMENT_FATIGUE := -1.6
+# --- İktidar dengesi ----------------------------------------------------------
+## Seçim anında hükümette olan her partiye eklenen ulusal puan. İktidar zaten
+## yapısal olarak kaybeder (en büyük parti olmak, saldırıların hedefi olmak):
+## bu değer yokken iktidar bir sonraki seçimde ortalama 44 vekil, eski −1.6 ile
+## 67 vekil kaybediyordu. +1.1 bu dezavantajı yarıya indirir (bot simülasyonu,
+## 40 oyun: iktidar −32, muhalefet +25). İktidar yine dezavantajlıdır.
+const GOVERNMENT_FATIGUE := 1.1
 
 # --- Gensoru ------------------------------------------------------------------
 ## Reddedilen gensoruyu getiren parti bu kadar ulusal destek kaybeder.

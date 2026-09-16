@@ -23,8 +23,9 @@ extends Node
 ##      hepsi biterse görev bir sonraki en büyük partiye geçer. Kimse kuramazsa
 ##      faz IDLE olur ve tur sonunda ERKEN SEÇİM yapılır (bkz. CardManager).
 ##
-## GENSORU: Hükümetin toplam milletvekili salt çoğunluğun altına düşerse
-## gensoru kartı desteye girer. Kabul edilirse hükümet düşer ve kurma aşaması
+## GENSORU: Hükümetin toplam milletvekili salt çoğunluğun altına düşerse muhalefet
+## gensoru hamlesi yapabilir. EVET vekilleri HAYIR'dan fazlaysa kabul edilir (çekimserler
+## sayılmaz), hükümet düşer ve kurma aşaması
 ## baştan başlar.
 ##
 ## YASA: Yasa kartı oynanınca meclise gelir (hükümet olsun olmasın, kurma
@@ -549,9 +550,9 @@ func _resolve_proposal() -> void:
 	var rejected: bool = totals.y * 2 > total_seats()
 	var reason := "Meclis çoğunluğu HAYIR dedi." if rejected else ""
 	if kind == KIND_CENSURE:
-		# Gensoru hükümeti düşürmek demektir: salt çoğunluk (%50 + 1) EVET demedikçe
-		# reddedilir. Çekimser ve oy vermeyenler hükümeti korur.
-		rejected = not (totals.x * 2 > total_seats())
+		# Gensoru, EVET veren vekiller HAYIR verenlerden fazlaysa geçer (yasalardaki
+		# gibi). Çekimser ve oy vermeyenler sayılmaz; eşitlikte hükümet görevde kalır.
+		rejected = not (totals.x > totals.y)
 	# Hükümete HAYIR ülkeyi istikrarsızlaştırır: küçük bir puan kaybı.
 	var no_note := ""
 	if kind == KIND_GOVERNMENT:

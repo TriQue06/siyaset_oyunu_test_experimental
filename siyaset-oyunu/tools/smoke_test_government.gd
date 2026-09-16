@@ -133,10 +133,10 @@ func _initialize() -> void:
 	print("")
 	print("=== 7) GENSORU ===")
 	gm.submit_censure(3)
-	gm._apply_vote(1, gm.VOTE_ABSTAIN)  # 300 cekimser
-	gm._apply_vote(2, gm.VOTE_NO)
-	gm._apply_vote(3, gm.VOTE_YES)      # 90 evet: salt cogunluk yok
-	check("salt cogunluk EVET yoksa gensoru REDDEDILIR", gm.has_government() and gm.phase == gm.Phase.GOVERNING, gm.last_resolution_reason)
+	gm._apply_vote(1, gm.VOTE_NO)       # 300 hayir
+	gm._apply_vote(2, gm.VOTE_ABSTAIN)
+	gm._apply_vote(3, gm.VOTE_YES)      # 90 evet: HAYIR fazla
+	check("HAYIR EVET'ten fazlaysa gensoru REDDEDILIR", gm.has_government() and gm.phase == gm.Phase.GOVERNING, gm.last_resolution_reason)
 	gm.submit_censure(1)
 	check("faz VOTING", gm.phase == gm.Phase.VOTING)
 	check("teklif turu censure", gm.proposal_kind == gm.KIND_CENSURE)

@@ -548,6 +548,10 @@ func _resolve_proposal() -> void:
 	# vermeyenler çekimser sayılır.
 	var rejected: bool = totals.y * 2 > total_seats()
 	var reason := "Meclis çoğunluğu HAYIR dedi." if rejected else ""
+	if kind == KIND_CENSURE:
+		# Gensoru hükümeti düşürmek demektir: salt çoğunluk (%50 + 1) EVET demedikçe
+		# reddedilir. Çekimser ve oy vermeyenler hükümeti korur.
+		rejected = not (totals.x * 2 > total_seats())
 	# Hükümete HAYIR ülkeyi istikrarsızlaştırır: küçük bir puan kaybı.
 	var no_note := ""
 	if kind == KIND_GOVERNMENT:

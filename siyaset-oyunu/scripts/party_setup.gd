@@ -23,6 +23,8 @@ const PREVIEW_ICON_PIXEL_SIZE := 480   # kocaman önizleme için raster boyutu
 ## Parti ikonları her zaman beyaz. Beyaz arka plan bu yüzden seçilemez
 ## (ikon görünmez olurdu).
 const ICON_COLOR := Color.WHITE
+## Soldaki oyuncu listesi paneli (herkesin adı ve kurduğu parti, anlık).
+const PLAYERS_PANEL_WIDTH := 270.0
 
 # Eksen başına görünen başlık + uç etiketleri (- ve + yönü).
 const AXIS_LABELS := {
@@ -53,6 +55,7 @@ var _ideology_value_labels: Dictionary = {}  # axis -> Label
 var _time_left: float = 60.0
 var _unlimited_time: bool = false
 var _is_locked: bool = false
+var _players_list: VBoxContainer
 
 func _ready() -> void:
 	_unlimited_time = MultiplayerManager.party_setup_duration == MultiplayerManager.PARTY_DURATION_UNLIMITED
@@ -64,6 +67,8 @@ func _ready() -> void:
 	name_edit.max_length = PartyManager.NAME_MAX_LENGTH
 	name_edit.text_changed.connect(_on_name_changed)
 
+	_selected_bg_color = _first_free_color(_selected_bg_color)
+	_build_players_panel()
 	_build_icon_grid()
 	_build_color_row()
 	# İdeoloji seçimi yok: sahnedeki başlık, kaydırıcı kutusu ve ayırıcı gizlenir.
@@ -76,6 +81,7 @@ func _ready() -> void:
 	ready_button.pressed.connect(_on_ready_pressed)
 	MultiplayerManager.party_setup_finished.connect(_on_party_setup_finished)
 	PartyManager.parties_updated.connect(_refresh_ready_count)
+	PartyManager.parties_updated.connect(_on_parties_updated)
 
 	_update_preview()
 	_update_name_hint()
@@ -141,6 +147,126 @@ func _refresh_icon_grid_selection() -> void:
 		var btn: TextureButton = icon_grid.get_child(i)
 		btn.self_modulate = Color(1, 1, 0.4) if i == _selected_icon_index else Color.WHITE
 
+## Renk başka bir OYUNCUDA mı? (Botun rengi alınabilir, bot başka renge geçer.)
+func _is_taken_by_player(color: Color) -> bool:
+	var owner := PartyManager.color_owner(color, multiplayer.get_unique_id())
+	return owner != -1 and not MultiplayerManager.is_bot(owner)
+
+func _first_free_color(preferred: Color) -> Color:
+	if _is_allowed_bg_color(preferred) and not _is_taken_by_player(preferred):
+		return preferred
+	for color in PartyPresets.COLORS:
+		if _is_allowed_bg_color(color) and not _is_taken_by_player(color):
+			return color
+	return preferred
+
+## Parti verisi değişti: renkler güncellenir. Seçtiğim renk bu arada başka bir
+## oyuncuya geçtiyse (aynı anda seçildi, host ilkini kabul etti) boş bir renge geçerim.
+func _on_parties_updated() -> void:
+	_refresh_players_panel()
+	if _is_taken_by_player(_selected_bg_color):
+		_selected_bg_color = _first_free_color(_selected_bg_color)
+		_update_preview()
+		if not _is_locked:
+			_push_party()
+	_build_color_row()
+
+# --- Soldaki oyuncu paneli ---------------------------------------------------
+
+func _build_players_panel() -> void:
+	var left_preview := get_node_or_null("LeftPreview") as Control
+	if left_preview != null:
+		left_preview.offset_left = PLAYERS_PANEL_WIDTH
+		preview_bg.custom_minimum_size = Vector2(280, 280)
+		preview_bg.offset_left = -140
+		preview_bg.offset_top = -140
+		preview_bg.offset_right = 140
+		preview_bg.offset_bottom = 140
+		preview_icon.offset_left = -95
+		preview_icon.offset_top = -95
+		preview_icon.offset_right = 95
+		preview_icon.offset_bottom = 95
+	var panel := PanelContainer.new()
+	panel.name = "PlayersPanel"
+	panel.anchor_bottom = 1.0
+	panel.offset_left = 12
+	panel.offset_top = 86
+	panel.offset_right = PLAYERS_PANEL_WIDTH - 6
+	panel.offset_bottom = -12
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.08, 0.09, 0.12, 0.92)
+	style.set_corner_radius_all(10)
+	style.set_content_margin_all(12)
+	panel.add_theme_stylebox_override("panel", style)
+	add_child(panel)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	panel.add_child(box)
+	var title := Label.new()
+	title.text = "OYUNCULAR"
+	title.add_theme_font_size_override("font_size", 18)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(title)
+	box.add_child(HSeparator.new())
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	box.add_child(scroll)
+	_players_list = VBoxContainer.new()
+	_players_list.size_flags_horizontal = SIZE_EXPAND_FILL
+	_players_list.add_theme_constant_override("separation", 6)
+	scroll.add_child(_players_list)
+	_refresh_players_panel()
+
+func _refresh_players_panel() -> void:
+	if _players_list == null:
+		return
+	for child in _players_list.get_children():
+		child.queue_free()
+	var my_id := multiplayer.get_unique_id()
+	var order: Array = MultiplayerManager.lobby_order() if not MultiplayerManager.players.is_empty() else [my_id]
+	for peer_id in order:
+		var party: Dictionary = PartyManager.parties.get(peer_id, {})
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		var swatch := ColorRect.new()
+		swatch.custom_minimum_size = Vector2(40, 40)
+		swatch.color = Color(party.get("bg_color", Color(0.3, 0.3, 0.3)))
+		if party.has("icon_index"):
+			var icon := TextureRect.new()
+			icon.texture = PartyPresets.get_icon_texture(int(party["icon_index"]), GRID_ICON_PIXEL_SIZE)
+			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			icon.set_anchors_preset(Control.PRESET_FULL_RECT)
+			icon.offset_left = 5
+			icon.offset_top = 5
+			icon.offset_right = -5
+			icon.offset_bottom = -5
+			swatch.add_child(icon)
+		row.add_child(swatch)
+		var texts := VBoxContainer.new()
+		texts.size_flags_horizontal = SIZE_EXPAND_FILL
+		texts.add_theme_constant_override("separation", 0)
+		var player_label := Label.new()
+		var player_name := String(MultiplayerManager.players.get(peer_id, {}).get("name", "Sen"))
+		player_label.text = player_name + (" (sen)" if int(peer_id) == my_id else "") + ("  🤖" if MultiplayerManager.is_bot(peer_id) else "")
+		player_label.add_theme_font_size_override("font_size", 13)
+		player_label.modulate = Color(1, 1, 1, 0.65)
+		player_label.clip_text = true
+		texts.add_child(player_label)
+		var party_label := Label.new()
+		party_label.text = String(party.get("name", "parti kuruyor…"))
+		party_label.add_theme_font_size_override("font_size", 17)
+		party_label.clip_text = true
+		texts.add_child(party_label)
+		row.add_child(texts)
+		var ready_label := Label.new()
+		ready_label.text = "✔" if PartyManager.is_ready(peer_id) else "…"
+		ready_label.modulate = Color(0.45, 1, 0.5) if PartyManager.is_ready(peer_id) else Color(1, 1, 1, 0.4)
+		ready_label.add_theme_font_size_override("font_size", 18)
+		row.add_child(ready_label)
+		_players_list.add_child(row)
+
 ## Arka plan rengi seçilebilir mi? İkonla aynı renk (beyaz) olamaz.
 static func _is_allowed_bg_color(color: Color) -> bool:
 	return not color.is_equal_approx(ICON_COLOR)
@@ -150,11 +276,15 @@ func _build_color_row() -> void:
 		child.queue_free()
 	for i in PartyPresets.COLORS.size():
 		var color: Color = PartyPresets.COLORS[i]
-		var allowed := _is_allowed_bg_color(color)
+		var taken := _is_taken_by_player(color)
+		var allowed := _is_allowed_bg_color(color) and not taken
 		var btn := Button.new()
 		btn.custom_minimum_size = Vector2(SWATCH_SIZE, SWATCH_SIZE)
 		btn.disabled = not allowed or _is_locked
 		btn.modulate = Color(1, 1, 1, 1) if allowed else Color(1, 1, 1, 0.35)
+		if taken:
+			btn.text = "✕"
+			btn.tooltip_text = "Bu renk başka bir oyuncuda"
 		var style := StyleBoxFlat.new()
 		style.bg_color = color
 		style.set_corner_radius_all(4)
@@ -240,9 +370,12 @@ func _on_ideology_slider_changed(index: float, axis: String) -> void:
 ## kasıtlı olarak buraya dahil edilmedi.
 func _on_random_pressed() -> void:
 	_selected_icon_index = PartyPresets.random_icon_index()
-	_selected_bg_color = PartyPresets.random_color()
-	while not _is_allowed_bg_color(_selected_bg_color):
-		_selected_bg_color = PartyPresets.random_color()
+	var free: Array = []
+	for color in PartyPresets.COLORS:
+		if _is_allowed_bg_color(color) and not _is_taken_by_player(color):
+			free.append(color)
+	if not free.is_empty():
+		_selected_bg_color = free[randi_range(0, free.size() - 1)]
 	_refresh_icon_grid_selection()
 	_build_color_row()
 	_update_preview()

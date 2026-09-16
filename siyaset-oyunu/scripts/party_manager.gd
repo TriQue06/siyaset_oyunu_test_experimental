@@ -27,6 +27,34 @@ var parties: Dictionary = {}
 ## (bkz. CardManager._heartbeat).
 var state_version: int = 0
 
+## Bu renk (arka plan) başka bir partide mi? Varsa sahibinin peer_id'si, yoksa -1.
+func color_owner(color: Color, except_peer: int = 0) -> int:
+	for peer_id in parties.keys():
+		if int(peer_id) == except_peer:
+			continue
+		if Color(parties[peer_id].get("bg_color", Color.TRANSPARENT)).is_equal_approx(color):
+			return int(peer_id)
+	return -1
+
+## Renk başkasındaysa kullanılamaz. İstisna: sahibi bot ise bot başka boş bir
+## renge geçer (botlar oyuncularla aynı rengi alamaz, oyuncu önceliklidir).
+func _claim_color(peer_id: int, color: Color) -> bool:
+	var owner := color_owner(color, peer_id)
+	if owner == -1:
+		return true
+	if not MultiplayerManager.is_bot(owner) or MultiplayerManager.is_bot(peer_id):
+		return false
+	parties[owner]["bg_color"] = _free_color(color)
+	return true
+
+func _free_color(also_avoid: Color) -> Color:
+	var colors: Array = []
+	for color in PartyPresets.COLORS:
+		if color.is_equal_approx(Color.WHITE) or color.is_equal_approx(also_avoid) or color_owner(color) != -1:
+			continue
+		colors.append(color)
+	return colors[randi_range(0, colors.size() - 1)] if not colors.is_empty() else PartyPresets.COLORS[0]
+
 func my_party() -> Dictionary:
 	return parties.get(multiplayer.get_unique_id(), {})
 
@@ -91,7 +119,8 @@ func set_party_and_ready(party_name: String, icon_index: int, icon_color: Color,
 	if MultiplayerManager.room_code == "":
 		_apply_party_local_only(party_name, icon_index, icon_color, bg_color, ideology)
 		var id := multiplayer.get_unique_id()
-		parties[id]["ready"] = is_ready_value
+		if parties.has(id):
+			parties[id]["ready"] = is_ready_value
 		parties_updated.emit()
 		return
 	var my_id := multiplayer.get_unique_id()
@@ -129,10 +158,8 @@ func add_bot_party(peer_id: int) -> void:
 	if MultiplayerManager.room_code != "" and not MultiplayerManager.is_host:
 		return
 	var used_names: Array = []
-	var used_colors: Array = []
 	for party in parties.values():
 		used_names.append(party.get("name", ""))
-		used_colors.append(party.get("bg_color", Color.TRANSPARENT))
 	var party_name := "Parti%d" % randi_range(10, 99)
 	var names := BOT_PARTY_NAMES.duplicate()
 	names.shuffle()
@@ -140,11 +167,7 @@ func add_bot_party(peer_id: int) -> void:
 		if not used_names.has(candidate):
 			party_name = candidate
 			break
-	var colors: Array = []
-	for color in PartyPresets.COLORS:
-		if not color.is_equal_approx(Color.WHITE) and not used_colors.has(color):
-			colors.append(color)
-	var bg: Color = colors[randi_range(0, colors.size() - 1)] if not colors.is_empty() else PartyPresets.COLORS[0]
+	var bg := _free_color(Color.TRANSPARENT)
 	parties[peer_id] = {
 		"name": party_name,
 		"icon_index": PartyPresets.random_icon_index(),
@@ -179,6 +202,9 @@ func apply_ideology_delta(peer_id: int, axis: String, delta: int) -> void:
 
 func _apply_party_local_only(party_name: String, icon_index: int, icon_color: Color, bg_color: Color, ideology: Dictionary) -> void:
 	var id := multiplayer.get_unique_id()
+	if not _claim_color(id, bg_color):
+		parties_updated.emit()
+		return
 	var was_ready: bool = parties.get(id, {}).get("ready", false)
 	parties[id] = {
 		"name": party_name,
@@ -191,6 +217,10 @@ func _apply_party_local_only(party_name: String, icon_index: int, icon_color: Co
 	parties_updated.emit()
 
 func _apply_party(peer_id: int, party_name: String, icon_index: int, icon_color: Color, bg_color: Color, ideology: Dictionary) -> void:
+	if not _claim_color(peer_id, bg_color):
+		_broadcast_parties()  # reddedildi: istemci güncel renkleri görsün
+		parties_updated.emit()
+		return
 	var was_ready: bool = parties.get(peer_id, {}).get("ready", false)
 	parties[peer_id] = {
 		"name": party_name,
@@ -204,6 +234,10 @@ func _apply_party(peer_id: int, party_name: String, icon_index: int, icon_color:
 	parties_updated.emit()
 
 func _apply_party_and_ready(peer_id: int, party_name: String, icon_index: int, icon_color: Color, bg_color: Color, ideology: Dictionary, is_ready_value: bool) -> void:
+	if not _claim_color(peer_id, bg_color):
+		_broadcast_parties()
+		parties_updated.emit()
+		return
 	parties[peer_id] = {
 		"name": party_name,
 		"icon_index": icon_index,

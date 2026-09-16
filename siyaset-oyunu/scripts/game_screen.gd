@@ -149,6 +149,12 @@ var _scout_button: Button
 var _miting_button: Button
 ## Miting hamlesi için il seçme modu.
 var _pending_miting: bool = false
+var _invest_button: Button
+var _censure_button: Button
+## Yatırım hamlesi için il seçme modu.
+var _pending_invest: bool = false
+## Gensoru: ilk dokunuş onay ister, ikincisi verir.
+var _pending_censure: bool = false
 ## Gözcü hamlesi için il seçme modu (harita gözcü katmanına geçer).
 var _pending_scout: bool = false
 ## Yasa tasarlama paneli (6 daire) ve karalama hedef menüsü.
@@ -713,6 +719,15 @@ func _on_hand_card_clicked(hand_index: int) -> void:
 	if hand_index < 0 or hand_index >= hand.size():
 		return
 	if _selected_hand_index == hand_index:
+		var selected_type: String = hand[hand_index]
+		# Bonus kart (hedefsiz): seçiliyken tekrar dokunmak kullanır.
+		if CardPresets.is_self_card(selected_type) and CardManager.can_act():
+			_deselect_hand_card()
+			if CardManager.can_play_card(multiplayer.get_unique_id(), selected_type):
+				CardManager.play_card(hand_index)
+			else:
+				_show_toast(_unplayable_reason(selected_type))
+			return
 		_deselect_hand_card()
 		return
 	_cancel_targeting()
@@ -730,9 +745,8 @@ func _on_hand_card_clicked(hand_index: int) -> void:
 			return
 		_begin_province_targeting(hand_index)
 		return
-	if CardPresets.is_censure_card(card_type):
-		_show_toast("Kartı parlamento diyagramının üstüne sürükle." if CardManager.can_play_card(me, card_type) \
-			else _unplayable_reason(card_type))
+	if CardPresets.is_self_card(card_type):
+		_set_target_hint("%s: kullanmak için karta tekrar dokun  ·  Başka yere dokun: vazgeç" % CardPresets.card_title(card_type))
 
 func _select_hand_card(hand_index: int) -> void:
 	_selected_hand_index = hand_index
@@ -950,6 +964,16 @@ func _drop_target(card_type: String) -> Dictionary:
 		else:
 			result["label"] = _action_block_reason(GameRules.LAW_MANA_COST, true)
 			result["error"] = result["label"]
+	elif CardPresets.is_self_card(card_type):
+		var above_hand := get_viewport().get_mouse_position().y < hand_area.get_global_rect().position.y
+		if not above_hand:
+			result["label"] = "%s: kullanmak için yukarı sürükle" % CardPresets.card_title(card_type)
+		elif CardManager.can_play_card(me, card_type):
+			result["valid"] = true
+			result["label"] = "Bırak: %s kullan" % CardPresets.card_title(card_type)
+		else:
+			result["label"] = _unplayable_reason(card_type)
+			result["error"] = result["label"]
 	elif CardPresets.is_censure_card(card_type):
 		var over := parliament_diagram.get_global_rect().has_point(get_viewport().get_mouse_position())
 		result["parliament"] = over
@@ -1003,8 +1027,10 @@ func _begin_province_targeting(hand_index: int) -> void:
 func _cancel_targeting() -> void:
 	_pending_province_hand_index = -1
 	_pending_org = false
-	if _pending_miting:
+	if _pending_miting or _pending_invest or _pending_censure:
 		_pending_miting = false
+		_pending_invest = false
+		_pending_censure = false
 		_refresh_action_buttons()
 	if _pending_scout:
 		_pending_scout = false
@@ -1025,8 +1051,15 @@ func _cancel_targeting() -> void:
 func _on_province_clicked(province_id: String) -> void:
 	var me := multiplayer.get_unique_id()
 	# Hedef seçerken ilk dokunuş ili seçip ayrıntıyı gösterir, ikinci onaylar.
-	if (_pending_org or _pending_scout or _pending_miting or _pending_province_hand_index != -1) and _selected_province != province_id:
+	if (_pending_org or _pending_scout or _pending_miting or _pending_invest or _pending_province_hand_index != -1) and _selected_province != province_id:
 		_select_target_province(province_id)
+		return
+	if _pending_invest:
+		_cancel_targeting()
+		if CardManager.can_invest(me, province_id):
+			CardManager.invest(province_id)
+		else:
+			_show_toast(_invest_block_reason())
 		return
 	if _pending_miting:
 		_cancel_targeting()
@@ -1092,7 +1125,10 @@ func _select_target_province(province_id: String) -> void:
 	var me := multiplayer.get_unique_id()
 	var pname := ElectionNightSim.province_name(province_id)
 	var detail := ""
-	if _pending_miting:
+	if _pending_invest:
+		detail = "%s: hükümet yatırımı (%d mana) · sen +%.0f, ortakların +%.1f güç" % [pname, GameRules.INVEST_MANA_COST,
+			PublicOpinion.INVEST_LOCAL, PublicOpinion.INVEST_PARTNER_LOCAL]
+	elif _pending_miting:
 		detail = "%s: miting (%d mana) · provokasyon riski %%%d · gücün %+.1f" % [pname, GameRules.MITING_MANA_COST,
 			int(round(CardManager.miting_risk(me, province_id) * 100.0)), CardManager.activity_of(province_id, me)]
 	elif _pending_scout:
@@ -1404,7 +1440,8 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 		var seats_text := ("%d vekil · " % int(CardManager.last_seats[peer_id])) if CardManager.last_seats.has(peer_id) else ""
 		info.add_child(_avatar_label("%s%d mana" % [seats_text, CardManager.mana_of(peer_id)], 11, Color(0.6, 0.65, 0.75)))
 
-	if is_self or is_turn:
+	var populism_left := CardManager.populism_rounds_left(peer_id)
+	if is_self or is_turn or populism_left > 0:
 		var tags := VBoxContainer.new()
 		tags.add_theme_constant_override("separation", 2)
 		tags.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -1413,6 +1450,8 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 			tags.add_child(_avatar_tag("SIRADA", Color(1, 1, 1), Color(0.1, 0.1, 0.12)))
 		if is_self and not (is_turn and compact):
 			tags.add_child(_avatar_tag("SEN", Color(1.0, 0.82, 0.2), Color(0.15, 0.1, 0.0)))
+		if populism_left > 0 and not (compact and tags.get_child_count() >= 2):
+			tags.add_child(_avatar_tag("POPÜLİZM %d" % populism_left, Color(0.85, 0.35, 0.75), Color.WHITE))
 		row.add_child(tags)
 	# Hangi oyuncuya ait olduğu düğümün ÜSTÜNDE saklanıyor: hover tespiti ve
 	# tooltip konumu panelin çocuk SIRASINA güvenmez (bkz. _party_under_mouse).
@@ -1661,17 +1700,20 @@ const LAW_AXIS_COLORS := {
 ## yanında YASA TASARLA / İL BAŞKANLIĞI butonları, mana. Parti kartları üstte
 ## kalan alana sığar.
 func _place_right_column_controls() -> void:
+	# Alt sağ: 6 hamle butonu (2 sütun x 3 satır), altında küçük deste + mana + Turu Bitir.
+	deck_button.ignore_texture_size = true
+	deck_button.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 	deck_button.offset_left = -196.0
-	deck_button.offset_right = -114.0
-	deck_button.offset_top = -292.0
-	deck_button.offset_bottom = -182.0
+	deck_button.offset_right = -140.0
+	deck_button.offset_top = -182.0
+	deck_button.offset_bottom = -106.0
 	pass_button.add_theme_font_size_override("font_size", 14)
 	var panel := player_panel_list.get_parent() as Control
 	if panel != null:
 		panel.offset_top = 72.0  # sağ üstte Menü butonu var
 		panel.offset_bottom = -302.0  # altında deste ve hamle butonları
-	# Pas butonu daraldı: solunda mana göstergesi duruyor.
-	pass_button.offset_left = -128.0
+	pass_button.offset_left = -134.0
+	pass_button.offset_top = -140.0
 
 func _build_action_buttons() -> void:
 	# Mana göstergesi: pas butonunun solunda simge + sayı. Dokununca kurallar.
@@ -1679,10 +1721,10 @@ func _build_action_buttons() -> void:
 	_mana_box.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	_mana_box.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	_mana_box.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	_mana_box.offset_left = -196.0
-	_mana_box.offset_right = -134.0
-	_mana_box.offset_top = -140.0
-	_mana_box.offset_bottom = -106.0
+	_mana_box.offset_left = -134.0
+	_mana_box.offset_right = -16.0
+	_mana_box.offset_top = -182.0
+	_mana_box.offset_bottom = -146.0
 	_mana_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	_mana_box.add_theme_constant_override("separation", 4)
 	_mana_box.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -1707,28 +1749,33 @@ func _build_action_buttons() -> void:
 	_mana_box.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_show_toast(_mana_rules))
-	_mana_rules = "Her tur +%d mana; manan yettikçe istediğin kadar hamle yap.\nHamleler: yasa %d (turda 1), miting %d, il başkanlığı %d, gözcü %d mana (%d tur).\nKart çekmek %d mana (turda 1); kartlar bonus: karalama 2, vekil çalma 2/3/4 mana." % [
+	_mana_rules = "Her tur +%d mana; manan yettikçe istediğin kadar hamle yap.\nHamleler: yasa %d (turda 1), miting %d, il başkanlığı %d, gözcü %d (%d tur), yatırım %d, gensoru %d mana.\nKart çekmek %d mana (turda 1). Kartlar bonus: karalama 2, vekil çalma 2/3/4, popülizm 2, mana bonusu 0." % [
 		GameRules.MANA_PER_ROUND, GameRules.LAW_MANA_COST, GameRules.MITING_MANA_COST, GameRules.ORG_MANA_COST,
-		GameRules.SCOUT_MANA_COST, GameRules.SCOUT_ROUNDS, GameRules.DRAW_MANA_COST]
+		GameRules.SCOUT_MANA_COST, GameRules.SCOUT_ROUNDS, GameRules.INVEST_MANA_COST, GameRules.CENSURE_MANA_COST, GameRules.DRAW_MANA_COST]
 	add_child(_mana_box)
 	# HAMLELER (sağ sütun, destenin yanında alt alta). Kartlar bonus niteliğinde.
-	_law_button = _action_button("YASA", "%d mana" % GameRules.LAW_MANA_COST, Color(0.42, 0.26, 0.62), -292.0)
+	_law_button = _action_button("YASA", "%d mana" % GameRules.LAW_MANA_COST, Color(0.42, 0.26, 0.62), -292.0, 0)
 	_law_button.pressed.connect(_on_law_button_pressed)
-	_miting_button = _action_button("MİTİNG", "%d mana" % GameRules.MITING_MANA_COST, Color(0.72, 0.3, 0.14), -256.0)
+	_miting_button = _action_button("MİTİNG", "%d mana" % GameRules.MITING_MANA_COST, Color(0.72, 0.3, 0.14), -292.0, 1)
 	_miting_button.pressed.connect(_on_miting_button_pressed)
-	_org_button = _action_button("İL BAŞKANLIĞI", "%d mana" % GameRules.ORG_MANA_COST, Color(0.1, 0.44, 0.48), -220.0)
+	_org_button = _action_button("İL BAŞKANLIĞI", "%d mana" % GameRules.ORG_MANA_COST, Color(0.1, 0.44, 0.48), -256.0, 0)
 	_org_button.pressed.connect(_on_org_button_pressed)
-	_scout_button = _action_button("GÖZCÜ", "%d mana" % GameRules.SCOUT_MANA_COST, Color(0.55, 0.42, 0.12), -184.0)
+	_scout_button = _action_button("GÖZCÜ", "%d mana" % GameRules.SCOUT_MANA_COST, Color(0.55, 0.42, 0.12), -256.0, 1)
 	_scout_button.pressed.connect(_on_scout_button_pressed)
+	_invest_button = _action_button("YATIRIM", "%d mana" % GameRules.INVEST_MANA_COST, Color(0.2, 0.5, 0.22), -220.0, 0)
+	_invest_button.pressed.connect(_on_invest_button_pressed)
+	_censure_button = _action_button("GENSORU", "%d mana" % GameRules.CENSURE_MANA_COST, Color(0.6, 0.16, 0.2), -220.0, 1)
+	_censure_button.pressed.connect(_on_censure_button_pressed)
 
-func _action_button(title: String, cost_text: String, color: Color, top: float) -> Button:
+## column: 0 sol, 1 sağ (sağ sütunda iki sütunlu ızgara).
+func _action_button(title: String, cost_text: String, color: Color, top: float, column: int) -> Button:
 	var button := Button.new()
 	button.text = "%s\n%s" % [title, cost_text]
 	button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	button.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	button.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	button.offset_left = -106.0
-	button.offset_right = -16.0
+	button.offset_left = -196.0 if column == 0 else -104.0
+	button.offset_right = -108.0 if column == 0 else -16.0
 	button.offset_top = top
 	button.offset_bottom = top + 32.0
 	button.add_theme_font_size_override("font_size", 10)
@@ -1773,6 +1820,8 @@ func _refresh_action_buttons() -> void:
 	var scout_ok := CardManager.can_scout(me)
 	var miting_ok := CardManager.can_miting(me)
 	_miting_button.modulate.a = 1.0 if miting_ok or _pending_miting else 0.45
+	_invest_button.modulate.a = 1.0 if CardManager.can_invest(me) or _pending_invest else 0.45
+	_censure_button.modulate.a = 1.0 if CardManager.can_censure(me) or _pending_censure else 0.45
 	# disabled kullanılmıyor: pasif butona dokununca neden olmadığı uyarı olarak çıksın.
 	_law_button.modulate.a = 1.0 if law_ok else 0.45
 	_org_button.modulate.a = 1.0 if org_ok else 0.45
@@ -1912,6 +1961,57 @@ func _on_law_button_pressed() -> void:
 		viewport_size.x - RIGHT_COLUMN_WIDTH - _law_designer.size.x - 12.0,
 		maxf(12.0, viewport_size.y * TOP_AREA_HEIGHT_RATIO - _law_designer.size.y))
 
+func _invest_block_reason() -> String:
+	if CardManager.can_act() and not CardManager.is_government_party(multiplayer.get_unique_id()):
+		return "Yatırımı sadece hükümet partileri yapabilir."
+	return _action_block_reason(GameRules.INVEST_MANA_COST)
+
+## Yatırım hamlesi: haritadan il seçilir (ilk dokunuş ayrıntı, ikincisi yapar).
+func _on_invest_button_pressed() -> void:
+	if _pending_invest:
+		_cancel_targeting()
+		return
+	var me := multiplayer.get_unique_id()
+	_deselect_hand_card()
+	_law_designer.hide()
+	_cancel_targeting()
+	if not CardManager.can_invest(me):
+		_show_toast(_invest_block_reason())
+		return
+	_pending_invest = true
+	if _province_panel != null:
+		_province_panel.hide()
+	_refresh_action_buttons()
+	_set_target_hint("Yatırım: haritada bir ile dokun, tekrar dokun: yatırım yap (%d mana)  ·  Butona tekrar dokun: iptal" % GameRules.INVEST_MANA_COST)
+
+## Gensoru hamlesi: sadece hükümet azınlıktayken muhalefete açık. İlk dokunuş
+## onay ister, ikinci dokunuş meclis oylamasını başlatır.
+func _on_censure_button_pressed() -> void:
+	var me := multiplayer.get_unique_id()
+	if _pending_censure:
+		_cancel_targeting()
+		if CardManager.can_censure(me):
+			CardManager.censure()
+		return
+	_deselect_hand_card()
+	_law_designer.hide()
+	_cancel_targeting()
+	if not CardManager.can_censure(me):
+		if not CardManager.can_act():
+			_show_toast("Sıran değil.")
+		elif not GovernmentManager.has_government():
+			_show_toast("Görevde bir hükümet yok.")
+		elif CardManager.is_government_party(me):
+			_show_toast("Hükümetteki parti gensoru veremez.")
+		elif GovernmentManager.has_majority():
+			_show_toast("Gensoru sadece hükümet azınlıktayken verilebilir (salt çoğunluğu yok).")
+		else:
+			_show_toast(_action_block_reason(GameRules.CENSURE_MANA_COST))
+		return
+	_pending_censure = true
+	_refresh_action_buttons()
+	_set_target_hint("Gensoru: hükümeti düşürmek için meclis oylaması (%d mana). Reddedilirse ulusal destek kaybedersin. Onay: butona tekrar dokun" % GameRules.CENSURE_MANA_COST)
+
 ## Miting hamlesi: haritadan il seçilir (ilk dokunuş riski gösterir, ikincisi yapar).
 func _on_miting_button_pressed() -> void:
 	if _pending_miting:
@@ -1920,7 +2020,7 @@ func _on_miting_button_pressed() -> void:
 	var me := multiplayer.get_unique_id()
 	_deselect_hand_card()
 	_law_designer.hide()
-	if _pending_org or _pending_scout or _pending_province_hand_index != -1:
+	if _pending_org or _pending_scout or _pending_invest or _pending_censure or _pending_province_hand_index != -1:
 		_cancel_targeting()
 	if not CardManager.can_miting(me):
 		_show_toast(_action_block_reason(GameRules.MITING_MANA_COST))
@@ -1935,7 +2035,7 @@ func _on_org_button_pressed() -> void:
 	if _pending_org:
 		_cancel_targeting()  # butona tekrar basmak il seçimini iptal eder
 		return
-	if _pending_scout or _pending_miting:
+	if _pending_scout or _pending_miting or _pending_invest or _pending_censure:
 		_cancel_targeting()
 	_deselect_hand_card()
 	_law_designer.hide()
@@ -2210,7 +2310,7 @@ func _on_scout_button_pressed() -> void:
 	var me := multiplayer.get_unique_id()
 	_deselect_hand_card()
 	_law_designer.hide()
-	if _pending_org or _pending_miting or _pending_province_hand_index != -1:
+	if _pending_org or _pending_miting or _pending_invest or _pending_censure or _pending_province_hand_index != -1:
 		_cancel_targeting()
 	if not CardManager.can_scout(me):
 		_show_toast(_action_block_reason(GameRules.SCOUT_MANA_COST))

@@ -189,9 +189,11 @@ func _initialize() -> void:
 	check("hukumet kuruldu", gm.has_government())
 	cm.current_turn_index = cm.turn_order.size() - 1
 	var last_peer: int = cm.current_turn_peer_id()
-	cm.inventories[last_peer] = ["gensoru"]
 	var round_before: int = cm.round_number
-	cm._apply_play(last_peer, 0)
+	# Hükümet azınlıkta olmalı ve gensoruyu muhalefet verir.
+	cm.last_seats = {1: 150, 2: 140, 3: 100}
+	cm.mana[last_peer] = 10
+	cm._apply_censure_move(last_peer)
 	check("gensoru oylamasi acildi", gm.phase == gm.Phase.VOTING)
 	check("oylamada turu bitiremez", (func(): cm._apply_pass(last_peer); return cm.round_number == round_before).call())
 	gm._apply_vote(1, false)
@@ -393,7 +395,7 @@ func _initialize() -> void:
 	gm._apply_withdraw(2)
 	check("cekilen ortak puan kaybetti", gm.score_of(2) == -gp.WITHDRAW_SCORE_PENALTY, str(gm.score_of(2)))
 	check("gorevleri ana partiye gecti, hukumet tek basina", gm.government_party_ids() == [1], str(gm.government_party_ids()))
-	check("hukumet cogunlugu kaybetti -> gensoru destede", not gm.has_majority() and cm._draw_pool(3).has("gensoru"))
+	check("hukumet cogunlugu kaybetti -> gensoru verilebilir", not gm.has_majority())
 	gm.submit_censure(3)
 	gm._apply_vote(1, gm.VOTE_NO)
 	gm._apply_vote(2, gm.VOTE_YES)

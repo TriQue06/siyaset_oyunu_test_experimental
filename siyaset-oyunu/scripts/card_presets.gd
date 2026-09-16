@@ -2,6 +2,9 @@ extends Node
 ## Autoload. Kart ve hamle katalogu. Görseller normal PNG'ler (assets/cards/).
 ##
 ## DESTE KARTLARI (çekmek GameRules.DRAW_MANA_COST; oynamanın bedeli CARD_MANA_COSTS).
+## YATIRIM ve GENSORU da artık hamle (bkz. CardManager.invest / censure).
+##   - POPÜLİZM BONUSU : POPULISM_ROUNDS tur kendi hamlelerinin iyi etkisi artar, kötüsü azalır.
+##   - MANA BONUSU     : +MANA_BONUS_AMOUNT mana; kullanınca sıra devreder.
 ## GÖZCÜ ve MİTİNG artık kart değil hamle (bkz. CardManager.scout / miting);
 ## ANKET kaldırıldı (gözcü raporu anlık vekil tahmini gösterir). Türleri eski
 ## kayıtlar/görseller için duruyor, desteye girmez.
@@ -29,6 +32,9 @@ const INVEST_CARD_TYPE := "yatirim"
 const POLL_CARD_TYPE := "anket"
 const SCOUT_CARD_TYPE := "gozcu"
 const PROPAGANDA_CARD_TYPE := "karalama"
+## Hedefsiz bonus kartlar: seçip tekrar dokununca (ya da yukarı sürükleyince) oynanır.
+const POPULISM_CARD_TYPE := "populizm"
+const MANA_BONUS_CARD_TYPE := "mana_bonusu"
 
 const CARD_TYPES: Array[String] = [
 	"steal_weak",
@@ -40,6 +46,8 @@ const CARD_TYPES: Array[String] = [
 	"anket",
 	"gozcu",
 	"karalama",
+	"populizm",
+	"mana_bonusu",
 ]
 
 const AXIS_TITLES := {
@@ -65,15 +73,14 @@ const STEAL_RANGES := {
 	"steal_strong": {"min": 9, "max": 12},
 }
 
-## Kartın elden oynanma bedeli (mana). Değerler henüz belirlenmedi: hepsi 0.
+## Kartın elden oynanma bedeli (mana).
 const CARD_MANA_COSTS := {
-	"yatirim": 0,
-	"anket": 0,
 	"karalama": 2,
+	"populizm": 2,
+	"mana_bonusu": 0,
 	"steal_weak": 2,
 	"steal_medium": 3,
 	"steal_strong": 4,
-	"gensoru": 0,
 }
 
 var _card_textures: Dictionary = {}
@@ -102,6 +109,10 @@ func needs_target(card_type: String) -> bool:
 ## sonra hedef parti de seçilir.)
 func needs_province_target(card_type: String) -> bool:
 	return card_type in [MITING_CARD_TYPE, INVEST_CARD_TYPE, POLL_CARD_TYPE, SCOUT_CARD_TYPE, PROPAGANDA_CARD_TYPE]
+
+## Hedef gerektirmeyen bonus kart mı? (popülizm, mana bonusu)
+func is_self_card(card_type: String) -> bool:
+	return card_type in [POPULISM_CARD_TYPE, MANA_BONUS_CARD_TYPE]
 
 func is_censure_card(card_type: String) -> bool:
 	return card_type == CENSURE_CARD_TYPE
@@ -145,6 +156,10 @@ func weighted_pick(weights: Dictionary, rng: RandomNumberGenerator) -> String:
 ## Kartın görselinin üstüne yazılan kısa başlık (her kartta).
 func card_short_title(card_type: String) -> String:
 	match card_type:
+		"populizm":
+			return "POPÜLİZM\nBONUSU"
+		"mana_bonusu":
+			return "MANA\nBONUSU"
 		"steal_weak":
 			return "VEKİL ÇALMA\nZAYIF"
 		"steal_medium":
@@ -175,6 +190,10 @@ func card_title(card_type: String) -> String:
 			return "Gözcü"
 		"karalama":
 			return "Karalama"
+		"populizm":
+			return "Popülizm Bonusu"
+		"mana_bonusu":
+			return "Mana Bonusu"
 	return card_type
 
 ## Yasanın yönünü okunur yazar: "Ekonomi → Piyasacı".
@@ -229,4 +248,9 @@ func _card_effect_text(card_type: String) -> String:
 			return "Bir ilin görüşünü öğren: her eksende hangi uçta.\nSadece sen görürsün, kalıcıdır."
 		PROPAGANDA_CARD_TYPE:
 			return "Bir ilde bir partiyi karala: ona eksi, sana artı.\nİlde güçlü olan partiye az işler."
+		POPULISM_CARD_TYPE:
+			return "%d tur boyunca hamlelerinin iyi sonuçları %%%d artar,\nkötü sonuçları %%%d azalır. Seçmek için dokun, tekrar dokun: kullan." % [
+				GameRules.POPULISM_ROUNDS, int(round((PublicOpinion.POPULISM_GOOD_MULT - 1.0) * 100)), int(round((1.0 - PublicOpinion.POPULISM_BAD_MULT) * 100))]
+		MANA_BONUS_CARD_TYPE:
+			return "+%d mana kazan. Kullanınca sıra sonraki oyuncuya geçer.\nSeçmek için dokun, tekrar dokun: kullan." % GameRules.MANA_BONUS_AMOUNT
 	return ""

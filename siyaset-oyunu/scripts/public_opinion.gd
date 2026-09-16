@@ -47,6 +47,13 @@ const INVEST_LOCAL := 3.0
 const INVEST_NATIONAL := 0.5
 const INVEST_PARTNER_LOCAL := 1.5
 
+# --- Popülizm bonusu -----------------------------------------------------------
+## Popülizm süren partinin KENDİ hamlelerinin (miting, yatırım, yasa, oy,
+## karalama kazancı, gensoru) iyi sonuçları bu çarpanla büyür, kötü sonuçları
+## küçülür. Başkalarının ona yaptığı karalama etkilenmez.
+const POPULISM_GOOD_MULT := 1.5
+const POPULISM_BAD_MULT := 0.5
+
 # --- İktidar dengesi ----------------------------------------------------------
 ## Seçim anında hükümette olan her partiye eklenen ulusal puan. İktidar zaten
 ## yapısal olarak kaybeder (en büyük parti olmak, saldırıların hedefi olmak):

@@ -125,6 +125,19 @@ func _initialize() -> void:
 	check("miting: ilk dokunus riski gosterir", String(scene._target_hint.text).find("provokasyon") != -1)
 	scene._on_province_clicked("konya")
 	check("miting hamlesi yapildi (3 mana)", cm.mana_of(me) == 1)
+	cm.mana[me] = 10
+	cm.inventories[me] = ["populizm", "mana_bonusu", "karalama"]
+	cm._push_state({"type": "timer"})
+	await _frames(5)
+	scene._on_hand_card_clicked(0)
+	await _frames(3)
+	scene._on_hand_card_clicked(0)
+	await _frames(5)
+	check("populizm karti iki dokunusla kullanildi", cm.populism_rounds_left(me) == GameRules.POPULISM_ROUNDS and cm.mana_of(me) == 8)
+	scene._on_censure_button_pressed()
+	await _frames(3)
+	check("cogunluk yokken bile hukumet yoksa gensoru acilmaz", not scene._pending_censure)
+	_shot("bonus_cards")
 	# İl paneli: gözcülü ve gözcüsüz il.
 	scene._cancel_targeting()
 	scene._on_layer_button_pressed(0)

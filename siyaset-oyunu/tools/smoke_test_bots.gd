@@ -48,6 +48,7 @@ func _initialize() -> void:
 	var was_governing := false
 	var turn_actions := 0
 	var max_actions := 0
+	var last_bot := -1
 	while steps < 4000 and not cm.game_finished and cm.round_number <= 14:
 		steps += 1
 		if gm.phase == gm.Phase.VOTING:
@@ -64,6 +65,9 @@ func _initialize() -> void:
 		else:
 			# Hamle sınırı yok: bot turu bitirene kadar (en çok 12) hamle yapar.
 			var bot: int = cm.current_turn_peer_id()
+			if bot != last_bot:
+				last_bot = bot
+				turn_actions = 0
 			var done: Dictionary = bm.do_action(bot) if turn_actions < 12 else {}
 			turn_actions += 1
 			if done.is_empty():

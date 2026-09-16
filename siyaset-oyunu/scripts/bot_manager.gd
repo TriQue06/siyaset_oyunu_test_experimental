@@ -88,6 +88,10 @@ static func do_action(bot: int) -> Dictionary:
 			CardManager._apply_scout_move(bot, String(action["province"]))
 		"miting":
 			CardManager._apply_miting_move(bot, String(action["province"]))
+		"invest":
+			CardManager._apply_invest_move(bot, String(action["province"]))
+		"censure":
+			CardManager._apply_censure_move(bot)
 		"draw":
 			CardManager._apply_draw(bot)
 		"card":
@@ -101,7 +105,7 @@ static func do_action(bot: int) -> Dictionary:
 		_:
 			return {}
 	# Hamle gerçekten uygulandı mı? (Reddedilen hamlede döngüye girmesin.)
-	var applied: bool = CardManager.mana_of(bot) != mana_before \
+	var applied: bool = CardManager.mana_of(bot) != mana_before or CardManager.current_turn_peer_id() != bot \
 		or CardManager.inventories.get(bot, []).size() != hand_before \
 		or CardManager.has_proposed_law_this_round(bot) != laws_before \
 		or CardManager.is_turn_blocked() != blocked_before

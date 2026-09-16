@@ -124,13 +124,11 @@ func _initialize() -> void:
 	print("=== 6) DESTE HAVUZU (kosullu kartlar) ===")
 	var pool: Array = cm._draw_pool()
 	check("vekil calma kartlari destede (meclis var)", pool.has("steal_strong"))
-	check("gensoru DESTEDE DEGIL (hukumet cogunlukta)", not pool.has("gensoru"),
-		"hukumet %d/%d" % [gm.government_seats(), gm.total_seats()])
+	check("gensoru destede yok (hamle)", not pool.has("gensoru"))
 	# Hukumeti azinliga dusur
 	cm.last_seats = {1: 300, 2: 50, 3: 40}
 	check("hukumet artik AZINLIK", not gm.has_majority(), "%d/%d" % [gm.government_seats(), gm.total_seats()])
-	pool = cm._draw_pool()
-	check("gensoru DESTEYE GIRDI", pool.has("gensoru"))
+
 
 	print("")
 	print("=== 7) GENSORU ===")

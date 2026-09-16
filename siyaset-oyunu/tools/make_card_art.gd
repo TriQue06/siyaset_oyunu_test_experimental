@@ -16,6 +16,8 @@ const CARDS := {
 	"anket": Color("2F7FD1"),
 	"gozcu": Color("5A6B7D"),
 	"karalama": Color("A12B3A"),
+	"populizm": Color("C0409A"),
+	"mana_bonusu": Color("2A8FE0"),
 }
 
 func _initialize() -> void:

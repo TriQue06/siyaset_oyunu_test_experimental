@@ -79,6 +79,7 @@ func _play_game(g: int, report: Dictionary) -> void:
 	var marks := {}  # province_id -> {hedef: true} (son seçimden beri karalananlar)
 	var steps := 0
 	var turn_actions := 0
+	var last_bot := -1
 	while not cm.game_finished and steps < 30000:
 		steps += 1
 		if cm.last_election_round != prev_election_round:
@@ -107,6 +108,9 @@ func _play_game(g: int, report: Dictionary) -> void:
 
 		var bot: int = cm.current_turn_peer_id()
 		var actions: Dictionary = stats[bot]["actions"]
+		if bot != last_bot:
+			last_bot = bot
+			turn_actions = 0
 		var done: Dictionary = bm.do_action(bot) if turn_actions < 12 else {}
 		turn_actions += 1
 		if done.is_empty():
@@ -123,6 +127,10 @@ func _play_game(g: int, report: Dictionary) -> void:
 				_bump(actions, "gozcu")
 			"miting":
 				_bump(actions, "miting")
+			"invest":
+				_bump(actions, "yatirim")
+			"censure":
+				_bump(actions, "gensoru")
 			"draw":
 				_bump(actions, "kart_cek")
 			"card":

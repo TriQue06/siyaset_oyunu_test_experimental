@@ -151,18 +151,23 @@ func run_client() -> void:
 	if not await wait_until(func(): return cm.my_inventory().size() == 1, "kart çekme RPC'si"):
 		return
 	var card: String = cm.my_inventory()[0]
-	# İlk seçimden önce deste il kartları verir (miting, anket, gözcü, karalama).
-	cm.play_card(0, 1, "ankara")
-	if not await wait_until(func(): return cm.my_inventory().is_empty(), "kart oynama RPC'si (%s)" % card):
-		return
-	if not await wait_until(func(): return cm.province_events.has("ankara") or cm.intel.has(me),
-			"kart sonucu (il olayı / istihbarat) senkronlandı"):
-		return
-	# Hamle sınırı yok: aynı turda gözcü hamlesi, sonra turu bitir.
+	# Hamle sınırı yok: önce gözcü hamlesi, sonra çekilen kart.
 	cm.scout("izmir")
 	if not await wait_until(func(): return cm.has_scouted(me, "izmir"), "gözcü hamlesi RPC'si"):
 		return
-	cm.pass_turn()
+	# Deste ilk seçimden önce karalama, popülizm ya da mana bonusu verir.
+	cm.play_card(0, 1, "ankara")
+	if not await wait_until(func(): return cm.my_inventory().is_empty(), "kart oynama RPC'si (%s)" % card):
+		return
+	if card == "karalama":
+		if not await wait_until(func(): return cm.province_events.has("ankara"), "karalama sonucu (il olayı) senkronlandı"):
+			return
+	elif card == "populizm":
+		if not await wait_until(func(): return cm.populism_rounds_left(me) > 0, "popülizm senkronlandı"):
+			return
+	# Mana bonusu sırayı kendisi devreder; diğerlerinde turu bitir.
+	if card != "mana_bonusu":
+		cm.pass_turn()
 	if not await wait_until(func(): return cm.province_ideology.size() == 67, "illerin görüşü senkronlandı"):
 		return
 	if not await wait_until(func(): return cm.last_election_round == 1 and cm.last_province_results.size() == 67,

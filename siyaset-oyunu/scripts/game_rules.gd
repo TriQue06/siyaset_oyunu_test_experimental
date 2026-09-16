@@ -35,6 +35,13 @@ const DRAW_MANA_COST := 1
 const SCOUT_MANA_COST := 1
 const SCOUT_ROUNDS := 5
 const MITING_MANA_COST := 3
+## Yatırım (sadece hükümet partileri) ve gensoru (sadece muhalefet, hükümet
+## azınlıktayken) hamleleri.
+const INVEST_MANA_COST := 3
+const CENSURE_MANA_COST := 2
+## Popülizm bonusu kartı bu kadar tur sürer; mana bonusu kartı bu kadar mana verir.
+const POPULISM_ROUNDS := 5
+const MANA_BONUS_AMOUNT := 3
 const ORG_MANA_COST := 2
 const ORG_MAX_LEVEL := 3
 const MAX_ROUNDS := 32

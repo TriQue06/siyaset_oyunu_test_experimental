@@ -64,8 +64,9 @@ const PROVINCE_EVENT_LIMIT := 6
 
 ## Deste ağırlıkları (bkz. _draw_weights).
 const WEIGHT_STEAL := 0.6
-const WEIGHT_INVEST := 2.5
 const WEIGHT_PROPAGANDA := 1.6
+const WEIGHT_POPULISM := 1.0
+const WEIGHT_MANA_BONUS := 1.2
 ## Azınlık hükümeti varken gensorunun ağırlığı, diğer TÜM kartların toplamının
 ## bu katı — yani ~%67 olasılıkla gensoru gelir.
 const CENSURE_WEIGHT_FACTOR := 2.0
@@ -84,6 +85,8 @@ var current_turn_index: int = 0
 var has_drawn_this_turn: bool = false
 ## Oyuncunun en son yasa sunduğu tur: peer_id -> round_number (turda 1 yasa).
 var law_rounds: Dictionary = {}
+## Popülizm bonusu: peer_id -> bittiği tur (o turdan önceki son tura kadar sürer).
+var populism: Dictionary = {}
 ## Eksen keskinliği: il bazlı seçim sonuçlarının ne kadar keskin çıkacağını
 ## belirleyen üs (bkz. ElectionModel). HER TUR SONUNDA artar.
 var current_axis_sharpness: float = 0.5
@@ -271,6 +274,21 @@ func can_propose_law(peer_id: int, law_type: String = "") -> bool:
 func has_proposed_law_this_round(peer_id: int) -> bool:
 	return int(law_rounds.get(peer_id, 0)) == round_number
 
+## Yatırım hamlesi: sadece hükümet partileri.
+func can_invest(peer_id: int, province_id: String = "") -> bool:
+	return can_choose_main_action(peer_id) and is_government_party(peer_id) \
+		and mana_of(peer_id) >= GameRules.INVEST_MANA_COST and (province_id == "" or has_province(province_id))
+
+## Gensoru hamlesi: muhalefet, hükümet görevde ve salt çoğunluğu yokken.
+func can_censure(peer_id: int) -> bool:
+	return can_choose_main_action(peer_id) and mana_of(peer_id) >= GameRules.CENSURE_MANA_COST \
+		and GovernmentManager.phase == GovernmentManager.Phase.GOVERNING and GovernmentManager.has_government() \
+		and not GovernmentManager.has_majority() and not is_government_party(peer_id)
+
+## Popülizm bonusunun kalan turu (kullanıldığı turda POPULISM_ROUNDS, yoksa 0).
+func populism_rounds_left(peer_id: int) -> int:
+	return maxi(0, int(populism.get(peer_id, 0)) - round_number)
+
 ## Miting hamlesi: seçilen ilde güç (provokasyon riskiyle).
 func can_miting(peer_id: int, province_id: String = "") -> bool:
 	return can_choose_main_action(peer_id) and mana_of(peer_id) >= GameRules.MITING_MANA_COST \
@@ -309,11 +327,9 @@ func can_play_card(peer_id: int, card_type: String, target_peer_id: int = -1, ta
 	if CardPresets.needs_province_target(card_type):
 		if not has_province(target_province):
 			return false
-		if card_type == CardPresets.INVEST_CARD_TYPE:
-			return is_government_party(peer_id)
 		return true
-	if CardPresets.is_censure_card(card_type):
-		return GovernmentManager.phase == GovernmentManager.Phase.GOVERNING and not is_government_party(peer_id)
+	if card_type == CardPresets.INVEST_CARD_TYPE or CardPresets.is_censure_card(card_type):
+		return false  # artık hamle (bkz. invest / censure)
 	return true
 
 # --- Güç sorguları ------------------------------------------------------------
@@ -427,6 +443,7 @@ func init_game() -> void:
 	current_turn_index = 0
 	has_drawn_this_turn = false
 	law_rounds = {}
+	populism = {}
 	current_axis_sharpness = MultiplayerManager.axis_sharpness_start
 	round_number = 1
 	last_election_round = 0
@@ -502,26 +519,16 @@ func draw_card() -> void:
 
 ## Bu oyuncu için desteden çekilebilecek kartlar ve ağırlıkları.
 ##   - karalama her zaman,
-##   - vekil çalma ilk seçimden (meclis oluştuktan) sonra,
-##   - yatırım SADECE hükümet partilerine,
-##   - gensoru SADECE azınlık hükümeti varken, hükümet dışı partilere ve
-##     elinde zaten gensoru yoksa — o zaman da çok yüksek olasılıkla.
+##   - popülizm ve mana bonusu her zaman,
+##   - vekil çalma ilk seçimden (meclis oluştuktan) sonra.
 func _draw_weights(peer_id: int = -1) -> Dictionary:
 	var weights := {}
 	weights[CardPresets.PROPAGANDA_CARD_TYPE] = WEIGHT_PROPAGANDA
 	if not last_seats.is_empty():
 		for card_type in CardPresets.STEAL_CARD_TYPES:
 			weights[card_type] = WEIGHT_STEAL
-	if is_government_party(peer_id):
-		weights[CardPresets.INVEST_CARD_TYPE] = WEIGHT_INVEST
-	var censure_possible: bool = GovernmentManager.has_government() and not GovernmentManager.has_majority() \
-		and not is_government_party(peer_id) \
-		and not inventories.get(peer_id, []).has(CardPresets.CENSURE_CARD_TYPE)
-	if censure_possible:
-		var others := 0.0
-		for card_type in weights.keys():
-			others += float(weights[card_type])
-		weights[CardPresets.CENSURE_CARD_TYPE] = others * CENSURE_WEIGHT_FACTOR
+	weights[CardPresets.POPULISM_CARD_TYPE] = WEIGHT_POPULISM
+	weights[CardPresets.MANA_BONUS_CARD_TYPE] = WEIGHT_MANA_BONUS
 	return weights
 
 ## Geriye uyumluluk / testler: desteye girebilecek kart türleri.
@@ -568,6 +575,24 @@ func build_organization(province_id: String) -> void:
 		_apply_organization(multiplayer.get_unique_id(), province_id)
 	else:
 		_request_organization.rpc_id(1, province_id)
+
+## Yatırım hamlesi: seçilen ile hükümet yatırımı (INVEST_MANA_COST).
+func invest(province_id: String) -> void:
+	if not can_invest(multiplayer.get_unique_id(), province_id):
+		return
+	if _is_authority():
+		_apply_invest_move(multiplayer.get_unique_id(), province_id)
+	else:
+		_request_invest.rpc_id(1, province_id)
+
+## Gensoru hamlesi (CENSURE_MANA_COST): meclis oylaması açılır.
+func censure() -> void:
+	if not can_censure(multiplayer.get_unique_id()):
+		return
+	if _is_authority():
+		_apply_censure_move(multiplayer.get_unique_id())
+	else:
+		_request_censure.rpc_id(1)
 
 ## Miting hamlesi: seçilen ilde miting (MITING_MANA_COST).
 func miting(province_id: String) -> void:
@@ -636,7 +661,13 @@ func _apply_play(peer_id: int, hand_index: int, target_peer_id: int = -1, target
 		"target": target_peer_id, "province": target_province, "seats_changed": seats_changed_now}
 	if _event_message != "":
 		event["message"] = _event_message
+	# Mana bonusu bir hamle sayılır: kullanınca sıra sonraki oyuncuya geçer.
+	var wrapped := false
+	if card_type == CardPresets.MANA_BONUS_CARD_TYPE:
+		wrapped = _advance_turn()
 	_push_state(event, seats_changed_now)
+	if card_type == CardPresets.MANA_BONUS_CARD_TYPE:
+		_finish_round_if_needed(wrapped)
 
 ## Turu bitir (voluntary=false: süre doldu). Mana bonusu yok.
 func _apply_pass(peer_id: int, _voluntary: bool = true) -> void:
@@ -666,7 +697,7 @@ func _apply_law_promise(peer_id: int, law_type: String) -> void:
 	var law := CardPresets.law_data(law_type)
 	for province_id in _province_ids:
 		var alignment := PublicOpinion.law_alignment(province_center(province_id), law["axis"], int(law["dir"]))
-		_add_local(province_id, peer_id, PublicOpinion.law_proposer_delta(alignment, false))
+		_add_local(province_id, peer_id, PublicOpinion.law_proposer_delta(alignment, false), true)
 	PartyManager.apply_ideology_delta(peer_id, law["axis"], IdeologyAxes.LAW_PROPOSE_SHIFT * int(law["dir"]))
 	_event_message = "%s seçim vaadi: %s. Partisi %s yönüne kaydı." % [_party_name(peer_id), law["title"], law["side"]]
 
@@ -682,6 +713,22 @@ func _apply_organization(peer_id: int, province_id: String) -> void:
 	_log_province(province_id, "%s il başkanlığı %s (seviye %d)" % [_party_name(peer_id), verb, level])
 	_push_state({"type": "organization", "peer_id": peer_id, "province": province_id,
 		"message": "%s, %s'da il başkanlığı %s (seviye %d)." % [_party_name(peer_id), _province_name(province_id), verb, level]})
+
+func _apply_invest_move(peer_id: int, province_id: String) -> void:
+	if not can_invest(peer_id, province_id):
+		return
+	mana[peer_id] = mana_of(peer_id) - GameRules.INVEST_MANA_COST
+	_event_message = ""
+	_apply_investment(peer_id, province_id)
+	_push_state({"type": "invest", "peer_id": peer_id, "province": province_id, "message": _event_message})
+
+func _apply_censure_move(peer_id: int) -> void:
+	if not can_censure(peer_id):
+		return
+	mana[peer_id] = mana_of(peer_id) - GameRules.CENSURE_MANA_COST
+	_push_state({"type": "censure", "peer_id": peer_id,
+		"message": "%s hükümete gensoru verdi: meclis oylaması başladı." % _party_name(peer_id)})
+	GovernmentManager.submit_censure(peer_id)
 
 func _apply_miting_move(peer_id: int, province_id: String) -> void:
 	if not can_miting(peer_id, province_id):
@@ -704,12 +751,13 @@ func _apply_scout_move(peer_id: int, province_id: String) -> void:
 func _apply_card_effect(peer_id: int, card_type: String, target_peer_id: int = -1, target_province: String = "") -> bool:
 	if CardPresets.needs_target(card_type):
 		return _apply_steal(peer_id, target_peer_id, card_type)
-	if CardPresets.is_censure_card(card_type):
-		GovernmentManager.submit_censure(peer_id)
-		return false
 	match card_type:
-		CardPresets.INVEST_CARD_TYPE:
-			_apply_investment(peer_id, target_province)
+		CardPresets.POPULISM_CARD_TYPE:
+			populism[peer_id] = round_number + GameRules.POPULISM_ROUNDS
+			_event_message = "%s popülizme başladı: %d tur boyunca hamleleri daha etkili." % [_party_name(peer_id), GameRules.POPULISM_ROUNDS]
+		CardPresets.MANA_BONUS_CARD_TYPE:
+			mana[peer_id] = mana_of(peer_id) + GameRules.MANA_BONUS_AMOUNT
+			_event_message = "%s mana bonusu kullandı (+%d mana)." % [_party_name(peer_id), GameRules.MANA_BONUS_AMOUNT]
 		CardPresets.PROPAGANDA_CARD_TYPE:
 			_apply_propaganda(peer_id, target_peer_id, target_province)
 	return false
@@ -724,22 +772,22 @@ func _province_name(province_id: String) -> String:
 func _apply_miting(peer_id: int, province_id: String) -> void:
 	var risk := miting_risk(peer_id, province_id)
 	if _rng.randf() < risk:
-		_add_local(province_id, peer_id, PublicOpinion.PROVOCATION_LOCAL)
-		_add_national(peer_id, PublicOpinion.PROVOCATION_NATIONAL)
+		_add_local(province_id, peer_id, PublicOpinion.PROVOCATION_LOCAL, true)
+		_add_national(peer_id, PublicOpinion.PROVOCATION_NATIONAL, true)
 		_log_province(province_id, "%s mitinginde PROVOKASYON (il %.1f, ulusal %.1f)" % [
 			_party_name(peer_id), PublicOpinion.PROVOCATION_LOCAL, PublicOpinion.PROVOCATION_NATIONAL])
 		_event_message = "%s'da %s mitinginde provokasyon çıktı! (risk %%%d)" % [
 			_province_name(province_id), _party_name(peer_id), int(round(risk * 100.0))]
 	else:
-		_add_local(province_id, peer_id, PublicOpinion.MITING_LOCAL)
-		_add_national(peer_id, PublicOpinion.MITING_NATIONAL)
+		_add_local(province_id, peer_id, PublicOpinion.MITING_LOCAL, true)
+		_add_national(peer_id, PublicOpinion.MITING_NATIONAL, true)
 		_log_province(province_id, "%s miting yaptı (+%.1f)" % [_party_name(peer_id), PublicOpinion.MITING_LOCAL])
 		_event_message = "%s, %s'da miting yaptı." % [_party_name(peer_id), _province_name(province_id)]
 
 ## Yatırım: getiren parti daha çok, hükümet ortakları daha az kazanır.
 func _apply_investment(peer_id: int, province_id: String) -> void:
-	_add_local(province_id, peer_id, PublicOpinion.INVEST_LOCAL)
-	_add_national(peer_id, PublicOpinion.INVEST_NATIONAL)
+	_add_local(province_id, peer_id, PublicOpinion.INVEST_LOCAL, true)
+	_add_national(peer_id, PublicOpinion.INVEST_NATIONAL, true)
 	for partner in GovernmentManager.government_party_ids():
 		if partner != peer_id:
 			_add_local(province_id, partner, PublicOpinion.INVEST_PARTNER_LOCAL)
@@ -768,7 +816,7 @@ func _apply_propaganda(peer_id: int, target_peer_id: int, province_id: String) -
 	var current := local_of(province_id, target_peer_id)
 	damage = clampf(damage, 0.0, maxf(0.0, current - PublicOpinion.PROPAGANDA_FLOOR))
 	_add_local(province_id, target_peer_id, -damage)
-	_add_local(province_id, peer_id, gain)
+	_add_local(province_id, peer_id, gain, true)
 	_log_province(province_id, "%s, %s karşıtı kampanya yaptı (%s −%.1f, %s +%.1f)" % [
 		_party_name(peer_id), _party_name(target_peer_id), _party_name(target_peer_id), damage, _party_name(peer_id), gain])
 	_event_message = "%s, %s'da %s karşıtı karalama kampanyası yaptı." % [
@@ -789,12 +837,12 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 	var proposer_in_gov := gov_ids.has(proposer)
 	for province_id in _province_ids:
 		var alignment := PublicOpinion.law_alignment(province_center(province_id), axis, dir)
-		_add_local(province_id, proposer, PublicOpinion.law_proposer_delta(alignment, passed))
+		_add_local(province_id, proposer, PublicOpinion.law_proposer_delta(alignment, passed), true)
 		for voter in votes.keys():
 			if int(voter) == proposer:
 				continue
 			var choice := GovernmentManager.normalize_vote(votes[voter])
-			_add_local(province_id, int(voter), PublicOpinion.law_vote_delta(alignment, choice, gov_ids.has(voter), proposer_in_gov))
+			_add_local(province_id, int(voter), PublicOpinion.law_vote_delta(alignment, choice, gov_ids.has(voter), proposer_in_gov), true)
 	# Görüş kayması: sunan yasanın yönünde 1 adım, EVET yasanın yönünde,
 	# HAYIR ters yönde yarım adım; çekimser kaymaz.
 	var shifts: Array = [{"peer": proposer, "axis": axis, "delta": IdeologyAxes.LAW_PROPOSE_SHIFT * dir}]
@@ -814,15 +862,26 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 func apply_censure_rejected(peer_id: int) -> void:
 	if not _is_authority():
 		return
-	_add_national(peer_id, PublicOpinion.CENSURE_REJECTED_NATIONAL)
+	_add_national(peer_id, PublicOpinion.CENSURE_REJECTED_NATIONAL, true)
 	_push_state({"type": "opinion"})
 
-func _add_national(peer_id: int, amount: float) -> void:
+## Popülizm süren partinin kendi hamlesinin etkisi: iyisi büyür, kötüsü küçülür.
+func _own_effect(peer_id: int, amount: float) -> float:
+	if populism_rounds_left(peer_id) <= 0:
+		return amount
+	return amount * (PublicOpinion.POPULISM_GOOD_MULT if amount > 0.0 else PublicOpinion.POPULISM_BAD_MULT)
+
+## own=true: parti bu etkiyi KENDİ hamlesiyle aldı (popülizm uygulanır).
+func _add_national(peer_id: int, amount: float, own: bool = false) -> void:
+	if own:
+		amount = _own_effect(peer_id, amount)
 	if amount == 0.0 or peer_id == -1:
 		return
 	national_support[peer_id] = PublicOpinion.clamp_points(national_of(peer_id) + amount)
 
-func _add_local(province_id: String, peer_id: int, amount: float) -> void:
+func _add_local(province_id: String, peer_id: int, amount: float, own: bool = false) -> void:
+	if own:
+		amount = _own_effect(peer_id, amount)
 	if amount == 0.0 or peer_id == -1:
 		return
 	var entry: Dictionary = local_support.get(province_id, {})
@@ -1100,6 +1159,7 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"turn_index": current_turn_index,
 		"has_drawn": has_drawn_this_turn,
 		"law_rounds": law_rounds,
+		"populism": populism,
 		"sharpness": current_axis_sharpness,
 		"round": round_number,
 		"turn_time_left": _turn_time_left,
@@ -1131,6 +1191,7 @@ func _apply_state(state: Dictionary) -> void:
 	current_turn_index = int(state["turn_index"])
 	has_drawn_this_turn = bool(state["has_drawn"])
 	law_rounds = state.get("law_rounds", {})
+	populism = state.get("populism", {})
 	current_axis_sharpness = float(state["sharpness"])
 	round_number = int(state["round"])
 	_turn_deadline_ms = Time.get_ticks_msec() + int(float(state["turn_time_left"]) * 1000.0)
@@ -1233,6 +1294,18 @@ func _request_organization(province_id: String) -> void:
 	if not MultiplayerManager.is_host:
 		return
 	_apply_organization(multiplayer.get_remote_sender_id(), province_id)
+
+@rpc("any_peer", "reliable")
+func _request_invest(province_id: String) -> void:
+	if not MultiplayerManager.is_host:
+		return
+	_apply_invest_move(multiplayer.get_remote_sender_id(), province_id)
+
+@rpc("any_peer", "reliable")
+func _request_censure() -> void:
+	if not MultiplayerManager.is_host:
+		return
+	_apply_censure_move(multiplayer.get_remote_sender_id())
 
 @rpc("any_peer", "reliable")
 func _request_miting(province_id: String) -> void:

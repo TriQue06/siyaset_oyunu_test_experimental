@@ -98,6 +98,18 @@ static func choose_action(bot: int) -> Dictionary:
 		best = {"type": "organization", "province": org["province"]}
 		best_score = float(org["score"]) - GameRules.ORG_MANA_COST * mana_value
 
+	if CardManager.can_invest(bot):
+		var invest := _eval_investment(bot, known)
+		if not invest.is_empty() and float(invest["score"]) - GameRules.INVEST_MANA_COST * mana_value > best_score:
+			best = {"type": "invest", "province": invest["province"]}
+			best_score = float(invest["score"]) - GameRules.INVEST_MANA_COST * mana_value
+
+	if CardManager.can_censure(bot) and GovernmentManager.government_seats() * 2 <= GovernmentManager.total_seats():
+		# Hükümetin salt çoğunluğu yok: geçme ihtimali yüksek, reddedilirse ulusal eksi.
+		if 6.0 - GameRules.CENSURE_MANA_COST * mana_value > best_score:
+			best = {"type": "censure"}
+			best_score = 6.0 - GameRules.CENSURE_MANA_COST * mana_value
+
 	if CardManager.can_miting(bot):
 		var miting := _eval_miting(bot, known)
 		if not miting.is_empty() and float(miting["score"]) - GameRules.MITING_MANA_COST * mana_value > best_score:
@@ -264,18 +276,18 @@ static func _evaluate(bot: int, card_type: String, known: Dictionary) -> Diction
 	if CardManager.mana_of(bot) < CardPresets.card_cost(card_type):
 		return {}
 	match card_type:
-		CardPresets.INVEST_CARD_TYPE:
-			return _eval_investment(bot, known)
+		CardPresets.POPULISM_CARD_TYPE:
+			# Seçime az kala ya da hiç popülizm yokken değerli.
+			if CardManager.populism_rounds_left(bot) > 0:
+				return {}
+			return {"score": 2.2 if _election_soon() else 1.4, "peer": -1, "province": ""}
+		CardPresets.MANA_BONUS_CARD_TYPE:
+			# Turu bitirir: manası azken, yapacak başka şey yokken kullanılır.
+			return {"score": 0.9 if CardManager.mana_of(bot) < GameRules.MITING_MANA_COST else 0.3, "peer": -1, "province": ""}
 		CardPresets.PROPAGANDA_CARD_TYPE:
 			return _eval_propaganda(bot, known)
 	if CardPresets.needs_target(card_type):
 		return _eval_steal(bot, card_type)
-	if CardPresets.is_censure_card(card_type):
-		if not CardManager.can_play_card(bot, card_type):
-			return {}
-		var passes: bool = GovernmentManager.government_seats() * 2 <= GovernmentManager.total_seats()
-		# Reddedilen gensoru getirene ulusal eksi yazar: geçmeyecekse elde tut.
-		return {"score": 6.0 if passes else 0.05, "peer": -1, "province": ""}
 	return {}
 
 ## Beklenen il gücü kazancı × ilin vekil sayısı × partinin o ildeki (bilinen) şansı.
@@ -312,7 +324,8 @@ static func _eval_investment(bot: int, known: Dictionary) -> Dictionary:
 		if value > best_value:
 			best_value = value
 			best_province = province_id
-	return {"score": 1.5 + best_value / 12.0, "peer": -1, "province": best_province}
+	# İl başkanlığı ve mitingle aynı ölçek (vekil/30).
+	return {"score": 0.8 + best_value / 30.0 * 1.2 * (1.3 if _election_soon() else 1.0), "peer": -1, "province": best_province}
 
 ## En büyük rakibi, en çok vekilli ve onun zayıf, botun güçlü olduğu ilde karala.
 static func _eval_propaganda(bot: int, known: Dictionary) -> Dictionary:

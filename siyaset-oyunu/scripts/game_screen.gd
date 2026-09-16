@@ -78,12 +78,16 @@ var _leaving_for_results: bool = false
 var _waiting_overlay: Control
 var _waiting_label: Label
 
-var _hovered_peer_id: int = -1
+## Profil kartı açık olan parti (-1 = kapalı). Dokununca açılır/kapanır.
+var _profile_peer_id: int = -1
+## Seçili (kalkmış, açıklaması görünen) el kartı; -1 = yok.
+var _selected_hand_index: int = -1
+## Hedef seçerken ilk dokunuşla seçilen il (ikinci dokunuş onaylar).
+var _selected_province: String = ""
 var _hand_holders: Array = [] # Array[Control], hover-kaldirma animasyonu icin (her biri bir kartin "holder"i)
 var _hovered_province_id: String = ""
 # province_id -> Color (kazanan partinin rengi) — hover'dan çıkınca buna dönülür.
 var _province_base_colors: Dictionary = {}
-var _province_tooltip: PanelContainer
 var _game_over_overlay: Control
 ## Ekranın üstünde kısa süre görünen bilgi yazısı (teklif sonucu, yeni tur…).
 var _toast: Label
@@ -117,11 +121,13 @@ var _propaganda_menu: PanelContainer
 ## İl başkanlığı için il seçme modu.
 var _pending_org: bool = false
 var _circle_textures: Dictionary = {}
+## Mana göstergesine dokununca gösterilen kural özeti.
+var _mana_rules: String = ""
+## Yasa panelinde seçilen dairenin açıklaması (dokununca güncellenir).
+var _law_info: Label
 
 func _ready() -> void:
-	map_holder.province_hovered.connect(_on_province_hovered)
 	map_holder.province_clicked.connect(_on_province_clicked)
-	_build_province_tooltip()
 	_refresh_game_settings_label()
 	MultiplayerManager.settings_updated.connect(_refresh_game_settings_label)
 
@@ -425,133 +431,25 @@ func _on_deck_pressed() -> void:
 func _on_pass_pressed() -> void:
 	CardManager.pass_turn()
 
-## Haritada mouse ile gezinirken hover edilen ili hafifçe koyulaştırır ve
-## o ildeki son seçim sonuçlarını (varsa) küçük bir kutuda gösterir.
-## _province_base_colors'taki (kazanan parti rengi) ile ÇAKIŞMASIN diye,
-## hover'dan çıkınca rastgele siyah yerine o ilin GERÇEK taban rengini
-## geri yüklüyoruz.
-func _on_province_hovered(province_id: String) -> void:
+## Seçilen (ya da sürüklenen kartın altındaki) ili koyulaştırır; "" önceki
+## vurguyu kaldırır. İlin taban rengi (_province_base_colors) geri yüklenir.
+func _highlight_province(province_id: String) -> void:
 	if _hovered_province_id != "":
 		map_holder.set_province_color(_hovered_province_id, _province_base_colors.get(_hovered_province_id, Color(0, 0, 0, 0)))
 	_hovered_province_id = province_id
 	if province_id != "":
 		var base: Color = _province_base_colors.get(province_id, Color(0, 0, 0, 0))
+		# Dokunmatikte imleç yok: seçili il açıkça belli olsun.
 		if base.a > 0.0:
-			map_holder.set_province_color(province_id, base.darkened(0.25))
+			map_holder.set_province_color(province_id, base.darkened(0.45))
 		else:
-			map_holder.set_province_color(province_id, Color(0, 0, 0, 0.22))
-	_show_province_tooltip(province_id)
-
-func _build_province_tooltip() -> void:
-	_province_tooltip = PanelContainer.new()
-	_province_tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_province_tooltip.z_index = 90
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.08, 0.08, 0.11, 0.95)
-	style.set_corner_radius_all(6)
-	style.set_content_margin_all(10)
-	style.shadow_size = 6
-	style.shadow_color = SHADOW_COLOR
-	_province_tooltip.add_theme_stylebox_override("panel", style)
-	_province_tooltip.hide()
-	add_child(_province_tooltip)
-
-func _show_province_tooltip(province_id: String) -> void:
-	if province_id == "":
-		_province_tooltip.hide()
-		return
-
-	for child in _province_tooltip.get_children():
-		child.queue_free()
-
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 4)
-
-	var title := Label.new()
-	title.text = ElectionNightSim.province_name(province_id)
-	title.add_theme_font_size_override("font_size", 14)
-	vbox.add_child(title)
-
-	var results: Dictionary = CardManager.last_province_results.get(province_id, {})
-	if results.is_empty():
-		var empty_label := Label.new()
-		empty_label.text = "Henüz sonuç yok"
-		empty_label.modulate.a = 0.6
-		empty_label.add_theme_font_size_override("font_size", 12)
-		vbox.add_child(empty_label)
-	else:
-		var ids: Array = results.keys()
-		ids.sort_custom(func(a, b): return results[a]["percent"] > results[b]["percent"])
-		for peer_id in ids:
-			var party: Dictionary = PartyManager.parties.get(peer_id, {})
-			var pname: String = party.get("name", "?")
-			var row := Label.new()
-			row.text = "%s: %%%.1f (%d mv)" % [pname, results[peer_id]["percent"], results[peer_id]["seats"]]
-			row.add_theme_font_size_override("font_size", 12)
-			row.modulate = party.get("bg_color", Color.WHITE)
-			vbox.add_child(row)
-
-	var me := multiplayer.get_unique_id()
-	var orgs: Array = []
-	for peer_id in _ordered_peer_ids():
-		var level := CardManager.organization_level(province_id, peer_id)
-		if level > 0:
-			orgs.append("%s %d" % [_party_name_of(peer_id), level])
-	if not orgs.is_empty():
-		var org_label := Label.new()
-		org_label.text = "İl başkanlıkları: " + ", ".join(PackedStringArray(orgs))
-		org_label.add_theme_font_size_override("font_size", 12)
-		vbox.add_child(org_label)
-	if PartyManager.parties.has(me):
-		var mine := Label.new()
-		mine.text = "Senin gücün: %+.1f  ·  Miting riski: %%%d" % [
-			CardManager.activity_of(province_id, me), int(round(CardManager.miting_risk(me, province_id) * 100.0))]
-		mine.add_theme_font_size_override("font_size", 12)
-		vbox.add_child(mine)
-		# İstihbarat: sadece bu oyuncunun gözcü ve anket bilgisi.
-		if CardManager.has_scouted(me, province_id):
-			var center := CardManager.province_center(province_id)
-			var parts: Array = []
-			for axis in IdeologyAxes.AXES:
-				parts.append(CardPresets.leaning_text(axis, int(center.get(axis, 0))))
-			var scout := Label.new()
-			scout.text = "Gözcü: " + " · ".join(PackedStringArray(parts))
-			scout.add_theme_font_size_override("font_size", 12)
-			scout.add_theme_color_override("font_color", Color(0.6, 0.85, 1.0))
-			vbox.add_child(scout)
-		var poll := CardManager.poll_of(me, province_id)
-		if not poll.is_empty():
-			var shares: Dictionary = poll.get("shares", {})
-			var poll_ids: Array = shares.keys()
-			poll_ids.sort_custom(func(a, b): return float(shares[a]) > float(shares[b]))
-			var poll_parts: Array = []
-			for peer_id in poll_ids:
-				poll_parts.append("%s %%%.0f" % [_party_name_of(int(peer_id)), float(shares[peer_id])])
-			var poll_label := Label.new()
-			poll_label.text = "Anket (%d. tur): %s" % [int(poll.get("round", 0)), ", ".join(PackedStringArray(poll_parts))]
-			poll_label.add_theme_font_size_override("font_size", 12)
-			poll_label.add_theme_color_override("font_color", Color(0.6, 0.85, 1.0))
-			vbox.add_child(poll_label)
-	var hint := Label.new()
-	if _pending_org:
-		hint.text = "Tıkla: il başkanlığı kur / geliştir"
-	else:
-		hint.text = "Tıkla: kartı bu ilde oyna" if _pending_province_hand_index != -1 else "Tıkla: il detayları"
-	hint.modulate.a = 0.6
-	hint.add_theme_font_size_override("font_size", 11)
-	vbox.add_child(hint)
-
-	_province_tooltip.add_child(vbox)
-	_province_tooltip.show()
-	await get_tree().process_frame
-	var mouse_pos := get_viewport().get_mouse_position()
-	_province_tooltip.global_position = mouse_pos + Vector2(18, 18)
+			map_holder.set_province_color(province_id, Color(0.08, 0.08, 0.1, 0.6))
 
 func _on_parties_updated() -> void:
 	_rebuild_player_panel()
 	_update_turn_indicator()
-	if _hovered_peer_id != -1:
-		_show_tooltip_for(_hovered_peer_id)
+	if _profile_peer_id != -1:
+		_show_tooltip_for(_profile_peer_id)
 
 func _ordered_peer_ids() -> Array:
 	# Oynama sırası CardManager.turn_order'da (oyun başında host tarafından
@@ -632,7 +530,7 @@ func _refresh_hand_interactivity() -> void:
 		holder.modulate.a = 1.0 if interactive else 0.55
 		for child in holder.get_children():
 			if child is TextureRect and child.get_meta("is_click_target", false):
-				child.mouse_filter = Control.MOUSE_FILTER_STOP if interactive else Control.MOUSE_FILTER_IGNORE
+				child.mouse_filter = Control.MOUSE_FILTER_STOP
 
 # --- El (envanter) ----------------------------------------------------------
 
@@ -644,6 +542,7 @@ func _rebuild_hand() -> void:
 		return
 	# El değişti: bekleyen hedef seçimi artık yanlış karta işaret edebilir.
 	_cancel_targeting()
+	_selected_hand_index = -1
 	if _card_info != null:
 		_card_info.hide()
 	for child in hand_container.get_children():
@@ -668,7 +567,6 @@ func _fit_hand_width(count: int) -> void:
 	hand_container.add_theme_constant_override("separation", separation)
 
 func _process(delta: float) -> void:
-	_update_avatar_hover()
 	_refresh_countdowns()
 	if _drag_ghost != null:
 		_update_drag()
@@ -705,6 +603,7 @@ func _build_hand_card(card_type: String, hand_index: int) -> Control:
 	holder.mouse_filter = Control.MOUSE_FILTER_PASS
 	holder.set_meta("lift_target", 0.0)
 	holder.set_meta("lift_current", 0.0)
+	holder.set_meta("hand_index", hand_index)
 
 	var shadow := TextureRect.new()
 	shadow.texture = CardPresets.get_card_texture(card_type)
@@ -737,18 +636,6 @@ func _build_hand_card(card_type: String, hand_index: int) -> Control:
 		title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		holder.add_child(title)
 
-	# Kartlar üst üste binmiş olabilir (bkz. _fit_hand_width): hover edilen
-	# kart komşularının ÖNÜNE çıksın ve ne işe yaradığı gösterilsin.
-	card.mouse_entered.connect(func():
-		holder.set_meta("lift_target", -CARD_DISPLAY_SIZE.y * 0.5)
-		holder.z_index = 5
-		_show_card_info(card_type, holder)
-	)
-	card.mouse_exited.connect(func():
-		holder.set_meta("lift_target", 0.0)
-		holder.z_index = 0
-		_card_info.hide()
-	)
 	# TIK ve SÜRÜKLEME: basılı tutup TAP_MAX_MOVE_PX'ten fazla kaydırınca
 	# sürükleme başlar (kartın kopyası imleci izler, bırakınca hedefe göre
 	# oynanır — bkz. _drop_target). Kaydırmadan bırakmak TIK sayılır.
@@ -777,21 +664,24 @@ func _build_hand_card(card_type: String, hand_index: int) -> Control:
 	_hand_holders.append(holder)
 	return wrapper
 
-## TEK TIK. İdeoloji kartları doğrudan kendi partine oynanır. Meclis kartları
-## (yasa, gensoru) parlamento diyagramına sürüklenmeli. Vekil çalma ve
-## miting/yatırımda sürüklemenin yanında tık + hedef seçme de çalışır.
+## TEK DOKUNUŞ (hover yok, tablette de çalışır):
+##   - karta dokunmak onu SEÇER: kalkar (üst üste binen kartların önüne çıkar),
+##     açıklaması görünür; sıra sendeyse ve kart hedef istiyorsa hedef seçme
+##     başlar (il / parti),
+##   - seçili karta tekrar dokunmak seçimi kaldırır (iptal),
+##   - sürüklemek her zaman doğrudan oynar.
 func _on_hand_card_clicked(hand_index: int) -> void:
-	if not CardManager.can_act():
-		return
 	var hand := CardManager.my_inventory()
 	if hand_index < 0 or hand_index >= hand.size():
 		return
-	var card_type: String = hand[hand_index]
-	# Hedef seçmeyi bekleyen karta tekrar tıklamak seçimi iptal eder (sağ tık yok).
-	if _pending_target_hand_index == hand_index or _pending_province_hand_index == hand_index:
-		_cancel_targeting()
+	if _selected_hand_index == hand_index:
+		_deselect_hand_card()
 		return
 	_cancel_targeting()
+	_select_hand_card(hand_index)
+	if not CardManager.can_act():
+		return  # sıra değil: sadece açıklama
+	var card_type: String = hand[hand_index]
 	var me := multiplayer.get_unique_id()
 	if CardPresets.needs_target(card_type):
 		_begin_targeting(hand_index)
@@ -805,11 +695,27 @@ func _on_hand_card_clicked(hand_index: int) -> void:
 	if CardPresets.is_censure_card(card_type):
 		_show_toast("Kartı parlamento diyagramının üstüne sürükle." if CardManager.can_play_card(me, card_type) \
 			else _unplayable_reason(card_type))
-		return
-	if not CardManager.can_play_card(me, card_type):
-		_show_toast(_unplayable_reason(card_type))
-		return
-	CardManager.play_card(hand_index)
+
+func _select_hand_card(hand_index: int) -> void:
+	_selected_hand_index = hand_index
+	for holder in _hand_holders:
+		if not is_instance_valid(holder):
+			continue
+		var selected: bool = int(holder.get_meta("hand_index", -1)) == hand_index
+		holder.set_meta("lift_target", -CARD_DISPLAY_SIZE.y * 0.5 if selected else 0.0)
+		holder.z_index = 5 if selected else 0
+		if selected:
+			_show_card_info(String(CardManager.my_inventory()[hand_index]), holder)
+
+func _deselect_hand_card() -> void:
+	_selected_hand_index = -1
+	_cancel_targeting()
+	if _card_info != null:
+		_card_info.hide()
+	for holder in _hand_holders:
+		if is_instance_valid(holder):
+			holder.set_meta("lift_target", 0.0)
+			holder.z_index = 0
 
 ## Oynanamayan bir karta tıklanınca neden oynanamadığı.
 func _unplayable_reason(card_type: String) -> String:
@@ -824,7 +730,7 @@ func _unplayable_reason(card_type: String) -> String:
 func _start_drag(hand_index: int, card_type: String, holder: Control) -> void:
 	if not CardManager.can_act():
 		return
-	_cancel_targeting()
+	_deselect_hand_card()
 	_drag_hand_index = hand_index
 	_drag_card_type = card_type
 	_card_info.hide()
@@ -861,7 +767,7 @@ func _update_drag() -> void:
 	if CardPresets.needs_province_target(_drag_card_type):
 		var province_id: String = target["province"]
 		if province_id != _hovered_province_id:
-			_on_province_hovered(province_id)
+			_highlight_province(province_id)
 
 func _finish_drag() -> void:
 	var hand_index := _drag_hand_index
@@ -888,7 +794,7 @@ func _end_drag() -> void:
 	_drag_card_type = ""
 	parliament_diagram.modulate = Color.WHITE
 	if _hovered_province_id != "":
-		_on_province_hovered("")
+		_highlight_province("")
 	_cancel_targeting()
 	if _hand_dirty:
 		_hand_dirty = false
@@ -990,7 +896,8 @@ func _party_under_mouse() -> int:
 func _begin_targeting(hand_index: int) -> void:
 	_pending_target_hand_index = hand_index
 	_refresh_target_highlights()
-	_set_target_hint("Vekil çalmak için sağdan bir parti seç  ·  Karta tekrar tıkla: iptal")
+	_hide_profile()
+	_set_target_hint("Vekil çalmak için sağdan bir partiye dokun  ·  Karta tekrar dokun: iptal")
 
 ## Miting / yatırım: haritadan il seçilmesi beklenir (bkz. _on_province_clicked).
 func _begin_province_targeting(hand_index: int) -> void:
@@ -999,11 +906,15 @@ func _begin_province_targeting(hand_index: int) -> void:
 	if _province_panel != null:
 		_province_panel.hide()
 	var card_type: String = CardManager.my_inventory()[hand_index]
-	_set_target_hint("%s için haritadan bir il seç (risk il üstünde yazar)  ·  Karta tekrar tıkla: iptal" % CardPresets.card_title(card_type))
+	_set_target_hint("%s: haritada bir ile dokun (ayrıntı görünür), tekrar dokun: oyna  ·  Karta tekrar dokun: iptal" % CardPresets.card_title(card_type))
 
 func _cancel_targeting() -> void:
 	_pending_province_hand_index = -1
 	_pending_org = false
+	if _selected_province != "":
+		_selected_province = ""
+		if _drag_hand_index == -1:
+			_highlight_province("")
 	_set_target_hint("")
 	if _pending_target_hand_index == -1:
 		return
@@ -1014,6 +925,10 @@ func _cancel_targeting() -> void:
 ## il detay paneli açılır/kapanır.
 func _on_province_clicked(province_id: String) -> void:
 	var me := multiplayer.get_unique_id()
+	# Hedef seçerken ilk dokunuş ili seçip ayrıntıyı gösterir, ikinci onaylar.
+	if (_pending_org or _pending_province_hand_index != -1) and _selected_province != province_id:
+		_select_target_province(province_id)
+		return
 	if _pending_org:
 		_cancel_targeting()
 		if CardManager.can_build_organization(me, province_id):
@@ -1027,6 +942,7 @@ func _on_province_clicked(province_id: String) -> void:
 		var hand_index := _pending_province_hand_index
 		_cancel_targeting()
 		var hand := CardManager.my_inventory()
+		_deselect_hand_card()
 		if hand_index >= hand.size():
 			return
 		var card_type: String = hand[hand_index]
@@ -1045,6 +961,28 @@ func _on_province_clicked(province_id: String) -> void:
 		return
 	_province_panel.position = Vector2(LEFT_PANEL_WIDTH + 12, 12)
 	_province_panel.show_province(province_id)
+
+## Hedef seçme modunda dokunulan il: vurgulanır, üstte ne olacağı yazar.
+func _select_target_province(province_id: String) -> void:
+	_selected_province = province_id
+	_highlight_province(province_id)
+	var me := multiplayer.get_unique_id()
+	var pname := ElectionNightSim.province_name(province_id)
+	var detail := ""
+	if _pending_org:
+		var level := CardManager.organization_level(province_id, me)
+		detail = "%s: il başkanlığı zaten en üst seviyede" % pname if level >= GameRules.ORG_MAX_LEVEL \
+			else "%s: il başkanlığı seviye %d → %d (%d mana)" % [pname, level, level + 1, GameRules.ORG_MANA_COST]
+	else:
+		var card_type: String = CardManager.my_inventory()[_pending_province_hand_index]
+		if card_type == CardPresets.MITING_CARD_TYPE:
+			detail = "%s: miting · provokasyon riski %%%d · gücün %+.1f" % [pname,
+				int(round(CardManager.miting_risk(me, province_id) * 100.0)), CardManager.activity_of(province_id, me)]
+		elif card_type == CardPresets.SCOUT_CARD_TYPE and CardManager.has_scouted(me, province_id):
+			detail = "%s: buraya zaten gözcü gönderdin" % pname
+		else:
+			detail = "%s: %s" % [pname, CardPresets.card_title(card_type)]
+	_set_target_hint("%s  ·  Onaylamak için tekrar dokun" % detail)
 
 func _on_opinion_changed() -> void:
 	_refresh_score_panel()
@@ -1131,11 +1069,12 @@ func _refresh_target_highlights() -> void:
 ## Hedef seçme modundayken sağdaki panelden bir partiye tıklanması.
 func _on_target_party_clicked(peer_id: int) -> void:
 	if _pending_target_hand_index == -1:
+		_toggle_profile(peer_id)
 		return
 	if not CardManager.is_valid_steal_target(multiplayer.get_unique_id(), peer_id):
 		return
 	var hand_index := _pending_target_hand_index
-	_cancel_targeting()
+	_deselect_hand_card()
 	CardManager.play_card(hand_index, peer_id)
 
 # --- Kart çekme animasyonu (sadece çeken oyuncunun kendi ekranında) --------
@@ -1326,7 +1265,7 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 		info.add_child(_avatar_label("%s%d mana" % [seats_text, CardManager.mana_of(peer_id)], 11, Color(0.6, 0.65, 0.75)))
 
 	# Hangi oyuncuya ait olduğu düğümün ÜSTÜNDE saklanıyor: hover tespiti ve
-	# tooltip konumu panelin çocuk SIRASINA güvenmez (bkz. _update_avatar_hover).
+	# tooltip konumu panelin çocuk SIRASINA güvenmez (bkz. _party_under_mouse).
 	card.set_meta("peer_id", peer_id)
 	# Oylama sırasında kartın sağında partinin oyu (ya da beklendiği) yazar.
 	if GovernmentManager.is_voting() and GovernmentManager.eligible_voter_ids().has(peer_id):
@@ -1367,37 +1306,18 @@ func _find_avatar_node(peer_id: int) -> Control:
 			return control
 	return null
 
-## Avatar hover'ı, Control'ün mouse_entered/mouse_exited sinyalleriyle DEĞİL,
-## her karede gerçek fare konumuna bakarak belirleniyor. Sinyal yaklaşımı iki
-## ayrı nedenle güvenilmezdi:
-##   1) Rozetin içindeki renkli daire (Panel) varsayılan olarak STOP filtreli
-##      ve tüm alanı kaplıyor; fare daire ile ikon arasında geçerken hover
-##      hedefi değişip dıştaki kapsayıcıya mouse_exited attırıyordu — yani
-##      imleç logonun üstünden hiç çıkmadığı hâlde profil kartı kayboluyordu.
-##   2) Parti verisi güncellenince panel komple yeniden kuruluyor; silinen
-##      eski avatarlar da mouse_exited yayınlayıp kartı kapatıyordu.
-## Konumdan hesaplayınca ikisi de tamamen ortadan kalkıyor.
-func _update_avatar_hover() -> void:
-	if hover_tooltip == null:
+## Parti kartına dokununca profil açılır; aynı karta tekrar dokununca kapanır.
+func _toggle_profile(peer_id: int) -> void:
+	if _profile_peer_id == peer_id:
+		_hide_profile()
 		return
-	var mouse_pos := get_viewport().get_mouse_position()
-	var found := -1
-	for child in player_panel_list.get_children():
-		if not is_instance_valid(child) or child.is_queued_for_deletion():
-			continue
-		var avatar := child as Control
-		if avatar == null:
-			continue
-		if Rect2(avatar.global_position, avatar.size).has_point(mouse_pos):
-			found = avatar.get_meta("peer_id", -1)
-			break
-	if found == _hovered_peer_id:
-		return
-	_hovered_peer_id = found
-	if found == -1:
+	_profile_peer_id = peer_id
+	_show_tooltip_for(peer_id)
+
+func _hide_profile() -> void:
+	_profile_peer_id = -1
+	if hover_tooltip != null:
 		hover_tooltip.hide()
-	else:
-		_show_tooltip_for(found)
 
 func _avatar_label(text: String, font_size: int, color: Color) -> Label:
 	var label := Label.new()
@@ -1408,7 +1328,7 @@ func _avatar_label(text: String, font_size: int, color: Color) -> Label:
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return label
 
-## Parti profili (bkz. PartyInfoCard): hover edilen oyuncu kartının soluna.
+## Parti profili (bkz. PartyInfoCard): dokunulan oyuncu kartının soluna.
 func _show_tooltip_for(peer_id: int) -> void:
 	hover_tooltip_image.hide()
 	for child in hover_tooltip.get_children():
@@ -1420,13 +1340,13 @@ func _show_tooltip_for(peer_id: int) -> void:
 	hover_tooltip.show()
 	# Kapsayıcıların boyutu bir kare sonra kesinleşir; o zamana kadar görünmez.
 	await get_tree().process_frame
-	if _hovered_peer_id != peer_id or not is_instance_valid(card):
+	if _profile_peer_id != peer_id or not is_instance_valid(card):
 		return
 	card.reset_size()
 	hover_tooltip.size = card.size
 	card.modulate.a = 1.0
 
-	# Tooltip'i, hover edilen avatarın hemen soluna yerleştir.
+	# Profili, dokunulan kartın hemen soluna yerleştir.
 	var avatar := _find_avatar_node(peer_id)
 	if avatar != null:
 		# Dikeyde avatarla ORTALA, yatayda avatarın soluna koy. Ekranın
@@ -1531,26 +1451,6 @@ func _refresh_vote_ui() -> void:
 		vote_no_button.texture_hover = null
 		vote_no_button.texture_pressed = null
 
-	# Yasa oylamasında butonların üstüne gelince kamuoyu etkisi görünsün.
-	var me := multiplayer.get_unique_id()
-	if can_vote and GovernmentManager.proposal_kind == GovernmentManager.KIND_LAW:
-		var hint := GovernmentHud.law_vote_hint(me)
-		vote_yes_button.tooltip_text = String(hint["yes"])
-		_abstain_button.tooltip_text = "ÇEKİMSER: bu yasadan etkilenmezsin"
-		vote_no_button.tooltip_text = String(hint["no"])
-	elif can_vote and GovernmentManager.is_coalition_stage():
-		vote_yes_button.tooltip_text = "EVET: koalisyona gir, teklif meclis oylamasına geçer"
-		_abstain_button.tooltip_text = "ÇEKİMSER: ret sayılır, teklif düşer"
-		vote_no_button.tooltip_text = "HAYIR: koalisyonu reddet, teklif düşer"
-	elif can_vote and GovernmentManager.proposal_kind == GovernmentManager.KIND_GOVERNMENT:
-		vote_yes_button.tooltip_text = ""
-		_abstain_button.tooltip_text = ""
-		vote_no_button.tooltip_text = "HAYIR: −%d puan (ülkeyi istikrarsızlaştırır)" % GovernmentPresets.GOVERNMENT_NO_PENALTY
-	else:
-		vote_yes_button.tooltip_text = ""
-		_abstain_button.tooltip_text = ""
-		vote_no_button.tooltip_text = ""
-
 	proposal_label.text = GovernmentHud.proposal_status_text(multiplayer.get_unique_id())
 
 func _party_name_of(peer_id: int) -> String:
@@ -1605,8 +1505,11 @@ func _build_action_buttons() -> void:
 	_mana_label.add_theme_color_override("font_color", MANA_COLOR)
 	_mana_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	_mana_label.add_theme_constant_override("outline_size", 5)
-	_mana_label.mouse_filter = Control.MOUSE_FILTER_PASS
-	_mana_label.tooltip_text = "Her tur +%d mana. Kart çekmeden pas geçersen +%d.\nYasa %d, il başkanlığı %d mana. Kart çekmek ve oynamak bedava." % [
+	_mana_label.mouse_filter = Control.MOUSE_FILTER_STOP
+	_mana_label.gui_input.connect(func(event: InputEvent):
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			_show_toast(_mana_rules))
+	_mana_rules = "Her tur +%d mana. Kart çekmeden pas geçersen +%d.\nYasa %d, il başkanlığı %d mana. Kart çekmek ve oynamak bedava." % [
 		GameRules.MANA_PER_ROUND, GameRules.MANA_PASS_BONUS, GameRules.LAW_MANA_COST, GameRules.ORG_MANA_COST]
 	add_child(_mana_label)
 	_law_button = _action_button("YASA\nTASARLA", GameRules.LAW_MANA_COST, Color(0.42, 0.26, 0.62), -258.0)
@@ -1660,16 +1563,11 @@ func _refresh_action_buttons() -> void:
 	var me := multiplayer.get_unique_id()
 	var mana_now := CardManager.mana_of(me)
 	_mana_label.text = "MANA  %d" % mana_now
-	_law_button.disabled = not CardManager.can_propose_law(me)
-	_org_button.disabled = not CardManager.can_choose_main_action(me) or mana_now < GameRules.ORG_MANA_COST
-	_law_button.tooltip_text = _action_block_reason(GameRules.LAW_MANA_COST) if _law_button.disabled \
-		else "Yasa tasarla (%d mana): bir görüş seç, meclis diyagramına sürükle.%s" % [
-			GameRules.LAW_MANA_COST, "\nMeclis yokken seçim vaadi olur." if CardManager.last_seats.is_empty() else ""]
-	_org_button.tooltip_text = _action_block_reason(GameRules.ORG_MANA_COST) if _org_button.disabled \
-		else "Bir ilde il başkanlığı kur ya da geliştir (%d mana, en fazla seviye %d).\nKalıcı güç verir, miting riskini azaltır." % [
-			GameRules.ORG_MANA_COST, GameRules.ORG_MAX_LEVEL]
-	if _law_button.disabled and _law_designer != null and _law_designer.visible and _drag_hand_index != LAW_DRAG_INDEX:
-		_law_designer.hide()
+	var law_ok := CardManager.can_propose_law(me)
+	var org_ok := CardManager.can_choose_main_action(me) and mana_now >= GameRules.ORG_MANA_COST
+	# disabled kullanılmıyor: pasif butona dokununca neden olmadığı uyarı olarak çıksın.
+	_law_button.modulate.a = 1.0 if law_ok else 0.45
+	_org_button.modulate.a = 1.0 if org_ok else 0.45
 
 func _build_law_designer() -> void:
 	_law_designer = PanelContainer.new()
@@ -1704,6 +1602,13 @@ func _build_law_designer() -> void:
 	hint.add_theme_font_size_override("font_size", 12)
 	hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.65))
 	box.add_child(hint)
+	_law_info = Label.new()
+	_law_info.text = "Bir daireye dokun: ne yaptığı burada yazar."
+	_law_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_law_info.custom_minimum_size = Vector2(300, 0)
+	_law_info.add_theme_font_size_override("font_size", 12)
+	_law_info.add_theme_color_override("font_color", Color(1.0, 0.85, 0.45))
+	box.add_child(_law_info)
 	for axis in IdeologyAxes.AXES:
 		var info: Dictionary = CardPresets.AXIS_TITLES[axis]
 		var row := HBoxContainer.new()
@@ -1740,7 +1645,6 @@ func _law_circle(axis: String, dir: int) -> Control:
 	circle.add_theme_stylebox_override("panel", style)
 	circle.mouse_filter = Control.MOUSE_FILTER_STOP
 	circle.mouse_default_cursor_shape = Control.CURSOR_DRAG
-	circle.tooltip_text = "%s\n%s" % [law["title"], CardPresets.law_description(law_type)]
 	var label := Label.new()
 	label.text = String(law["side"])
 	label.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -1754,6 +1658,7 @@ func _law_circle(axis: String, dir: int) -> Control:
 	circle.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
+				_law_info.text = "%s: %s" % [law["title"], CardPresets.law_description(law_type).replace("\n", " ")]
 				_start_law_drag(law_type)
 			elif _drag_hand_index == LAW_DRAG_INDEX:
 				_finish_drag()
@@ -1784,7 +1689,9 @@ func _circle_texture(color: Color) -> Texture2D:
 	return texture
 
 func _on_law_button_pressed() -> void:
-	_cancel_targeting()
+	_deselect_hand_card()
+	if not _law_designer.visible and not CardManager.can_propose_law(multiplayer.get_unique_id()):
+		_show_toast(_action_block_reason(GameRules.LAW_MANA_COST) + " (Panel yine de açılır: yasaları incele.)")
 	if _law_designer.visible:
 		_law_designer.hide()
 		return
@@ -1800,15 +1707,16 @@ func _on_org_button_pressed() -> void:
 	if _pending_org:
 		_cancel_targeting()  # butona tekrar basmak il seçimini iptal eder
 		return
-	_cancel_targeting()
+	_deselect_hand_card()
 	_law_designer.hide()
-	if not CardManager.can_choose_main_action(multiplayer.get_unique_id()):
+	if not CardManager.can_choose_main_action(multiplayer.get_unique_id()) \
+			or CardManager.mana_of(multiplayer.get_unique_id()) < GameRules.ORG_MANA_COST:
 		_show_toast(_action_block_reason(GameRules.ORG_MANA_COST))
 		return
 	_pending_org = true
 	if _province_panel != null:
 		_province_panel.hide()
-	_set_target_hint("İl başkanlığı kurmak ya da geliştirmek için haritadan bir il seç (%d mana)  ·  Butona tekrar bas: iptal" % GameRules.ORG_MANA_COST)
+	_set_target_hint("İl başkanlığı: haritada bir ile dokun, tekrar dokun: kur (%d mana)  ·  Butona tekrar dokun: iptal" % GameRules.ORG_MANA_COST)
 
 func _build_propaganda_menu() -> void:
 	_propaganda_menu = PanelContainer.new()

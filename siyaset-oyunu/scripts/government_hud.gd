@@ -88,7 +88,7 @@ static func fill_government_panel(box: VBoxContainer) -> void:
 				GovernmentManager.withdraw_from_coalition()
 			else:
 				withdraw.set_meta("armed", true)
-				withdraw.text = "Emin misin? Çekilmek için tekrar bas"
+				withdraw.text = "Emin misin? Tekrar dokun (ortağın yalnız düşerse −%d)" % GovernmentPresets.ABANDONED_FALL_PENALTY
 		)
 		box.add_child(withdraw)
 
@@ -143,7 +143,7 @@ static func _fill_cabinet(box: VBoxContainer, government: Dictionary) -> void:
 ## satır yüksekliğinde — 8 oyuncuda da sol panele sığsın.
 static func fill_score_panel(box: VBoxContainer, peer_ids: Array, my_id: int) -> void:
 	_clear(box)
-	box.add_child(section_title("PUAN TABLOSU"))
+	box.add_child(section_title("PUAN TABLOSU   (kamuoyu · puan)"))
 	var ids: Array = peer_ids.duplicate()
 	ids.sort_custom(func(a, b):
 		var sa := GovernmentManager.score_of(a)

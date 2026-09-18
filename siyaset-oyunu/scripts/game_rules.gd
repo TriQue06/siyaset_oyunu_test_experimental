@@ -19,8 +19,12 @@ extends RefCounted
 ##     (tur sonunda değil: harcadığın mana turu bitirince geri dolmuş görünmez).
 ##   - YASA ilk seçimden önce yapılamaz: meclis yok, saf propaganda dönemi.
 ##     HAMLELER: miting MITING_MANA_COST, il başkanlığı ORG_MANA_COST, gözcü
-##     SCOUT_MANA_COST; yasa bedava ama oyuncu başına turda LAWS_PER_ROUND kez.
-##     Kart çekmek DRAW_MANA_COST, sınırsız (kartlar bonus/joker niteliğinde).
+##     yasa oyuncu başına turda LAWS_PER_ROUND kez.
+##   - TEŞKİLATLANMA (eski il başkanlığı + gözcü) il başına 3 seviye; her
+##     seviye ORG_MANA_COST. 1: az oy bonusu + ilin görüşü (her eksende hangi uç),
+##     2: orta bonus + orta isabetli anket, 3: yüksek bonus + yüksek isabetli anket.
+##     Kart çekmek bedava, turda DRAWS_PER_TURN kez; kart OYNAMAK sınırsız
+##     (kartların kendi bedeli var).
 ##     Kartları oynamanın bedeli CardPresets.CARD_MANA_COSTS.
 ##   - Hükümet kurulamazsa (tüm görev hakları biterse) o turun sonunda ERKEN
 ##     SEÇİM yapılır.
@@ -28,7 +32,6 @@ extends RefCounted
 ##     makam puanlarını bir kez daha alır ve puan tablosu kesinleşir. Hükümet
 ##     kurulamazsa bu puan yazılmaz. En çok puanı olan kazanır (eşitlikte
 ##     milletvekili sayısı).
-##   - GÖZCÜ bir ilde SCOUT_ROUNDS tur sürer (gönderildiği tur dahil).
 
 const ELECTION_INTERVAL := 5
 const FIRST_ELECTION_ROUND := 5
@@ -37,9 +40,12 @@ const MANA_START := 0
 const MANA_PER_ROUND := 3
 const LAW_MANA_COST := 1
 const LAWS_PER_ROUND := 1
-const DRAW_MANA_COST := 1
-const SCOUT_MANA_COST := 1
-const SCOUT_ROUNDS := 5
+const DRAW_MANA_COST := 0
+const DRAWS_PER_TURN := 1
+## Teşkilat anketinin sapması (her partinin oyu en fazla bu oranda sapar):
+## 2. seviye orta isabet, 3. seviye yüksek isabet.
+const POLL_ERROR_MEDIUM := 0.3
+const POLL_ERROR_HIGH := 0.08
 const MITING_MANA_COST := 2
 ## Yatırım (sadece hükümet partileri) ve gensoru (sadece muhalefet, hükümet
 ## azınlıktayken) hamleleri.

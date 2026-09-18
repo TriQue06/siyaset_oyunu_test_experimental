@@ -4,8 +4,8 @@ extends RefCounted
 ## hamle oyunun kendi formülleriyle (seçim desteği, il gücü, miting riski,
 ## yasanın il etkileri...) kabaca puanlanır, en yükseği seçilir.
 ##
-## BİLGİ KISITI: botlar da insanlar gibi illerin görüşünü BİLMEZ. Sadece gözcü
-## gönderdikleri illerde her eksenin hangi uçta ya da ortada olduğunu bilirler
+## BİLGİ KISITI: botlar da insanlar gibi illerin görüşünü BİLMEZ. Sadece
+## teşkilat kurdukları illerde her eksenin hangi uçta ya da ortada olduğunu bilirler
 ## (bkz. _known_centers; gözcünün süresi bitse de görüş hatırlanır), bilmedikleri
 ## illeri nötr (0) sayarlar. Önce
 ## kimliklerini güçlendiren yasalar sunar, öğrendikçe yasalarını illere göre
@@ -22,8 +22,6 @@ const PASS_THRESHOLD := 0.4
 const PASS_ACTION_SCORE := 0.7
 ## Bir mananın puan karşılığı (hamle puanından bedel × bu değer düşülür).
 const MANA_VALUE := 0.3
-## Elde bu kadar kart yoksa kart çekmek cazip.
-const DRAW_HAND_TARGET := 3
 ## Gözcü bilgisinden tahmin edilen eksen değeri (uç biliniyor, büyüklük değil).
 const LEANING_ESTIMATE := 2.0
 ## Yasanın taban puanı: yasa her tur meclisi durdurur, bot onu sadece gerçekten
@@ -57,11 +55,16 @@ static func _known_centers(bot: int) -> Dictionary:
 	return result
 
 ## İdeolojinin tüm ülkedeki (bilinen) seçmen desteği (milletvekili ağırlıklı).
+## Görüşü bilinmeyen iller sayılmaz: onları nötr saymak her yasayı (nötrden
+## uzaklaştırdığı için) zararlı gösterir, botlar hep aynı yedek yasaya düşerdi.
 static func _electoral_strength(ideology: Dictionary, known: Dictionary) -> float:
 	var seats := _seats()
 	var weighted := 0.0
 	for province_id in seats.keys():
-		weighted += ElectionModel.support(ideology, known.get(province_id, {})) * float(seats[province_id])
+		var center: Dictionary = known.get(province_id, {})
+		if center.is_empty():
+			continue
+		weighted += ElectionModel.support(ideology, center) * float(seats[province_id])
 	return weighted / _total_seats()
 
 static func _election_soon() -> bool:
@@ -75,7 +78,7 @@ static func _mana_value(bot: int) -> float:
 	return MANA_VALUE * clampf(4.0 / maxf(1.0, float(CardManager.mana_of(bot))), 0.2, 1.5)
 
 ## Dönüş: {"type": "card"} | {"type": "law", "law"} | {"type": "organization",
-## "province"} | {"type": "miting", "province"} | {"type": "scout", "province"} |
+## "province"} | {"type": "miting", "province"} | |
 ## {"type": "draw"} | {"type": "pass"}
 static func choose_action(bot: int) -> Dictionary:
 	var known := _known_centers(bot)
@@ -121,19 +124,10 @@ static func choose_action(bot: int) -> Dictionary:
 			best = {"type": "miting", "province": miting["province"]}
 			best_score = float(miting["score"]) - GameRules.MITING_MANA_COST * mana_value
 
-	var scout := _best_scout(bot)
-	if not scout.is_empty() and float(scout["score"]) - GameRules.SCOUT_MANA_COST * mana_value > best_score:
-		best = {"type": "scout", "province": scout["province"]}
-		best_score = float(scout["score"]) - GameRules.SCOUT_MANA_COST * mana_value
 
 	if CardManager.can_draw_for(bot):
-		# Elde kart azsa çek; kalan mana bir kart oynamaya yetmeli.
-		var draw_score := 0.0
-		if hand.size() < DRAW_HAND_TARGET:
-			draw_score = 1.7 - 0.35 * hand.size()
-		if CardManager.mana_of(bot) - GameRules.DRAW_MANA_COST < 1:
-			draw_score *= 0.5
-		if draw_score - GameRules.DRAW_MANA_COST * mana_value > best_score:
+		# Kart çekmek bedava (turda bir): el dolu değilse her zaman çek.
+		if hand.size() < CardManager.MAX_HAND_SIZE - 1:
 			best = {"type": "draw"}
 	return best
 
@@ -168,7 +162,7 @@ static func _best_law(bot: int, known: Dictionary) -> Dictionary:
 			var moved := mine.duplicate()
 			moved[axis] = IdeologyAxes.clamp_value(float(mine.get(axis, 0)) + IdeologyAxes.LAW_PROPOSE_SHIFT * dir)
 			value += (_electoral_strength(moved, known) - _electoral_strength(mine, known)) * 20.0
-			var score := LAW_BASE_SCORE + value * 5.0
+			var score := LAW_BASE_SCORE + value * 5.0 - _repeat_penalty(bot, law_type)
 			if best.is_empty() or score > float(best["score"]):
 				best = {"law": law_type, "score": score}
 	# Tahmin gürültülü ya da bütün yasalar zararlı görünüyorsa kimlik yasası
@@ -184,20 +178,41 @@ static func _best_law(bot: int, known: Dictionary) -> Dictionary:
 ## yasa; kimlik yoksa bota ve tura göre bir eksen. Çok iyi bir kart (ör. büyük
 ## ilde gözcü) varsa o önce gelir. Yasa partiyi kaydırdıkça kimlik oluşur.
 static func _exploration_law(bot: int, mine: Dictionary) -> Dictionary:
-	var best_axis := ""
-	var best_dir := 1
-	var strength := 0.0
-	for axis in IdeologyAxes.AXES:
+	# En az kullandığı eksen; yön partinin o eksendeki eğilimi (yoksa bota göre).
+	var best_law := ""
+	var best_penalty := INF
+	var offset := absi(bot) + CardManager.round_number
+	for i in IdeologyAxes.AXES.size():
+		var axis: String = IdeologyAxes.AXES[(i + offset) % IdeologyAxes.AXES.size()]
 		var v := float(mine.get(axis, 0))
-		if absf(v) > strength:
-			strength = absf(v)
-			best_axis = axis
-			best_dir = 1 if v > 0 else -1
-	if best_axis == "":
-		var seed_value := absi(bot) + CardManager.round_number
-		best_axis = IdeologyAxes.AXES[seed_value % IdeologyAxes.AXES.size()]
-		best_dir = 1 if (absi(bot) / 7) % 2 == 0 else -1
-	return {"law": CardPresets.law_type(best_axis, best_dir), "score": 1.0}
+		var dir := 1 if v > 0 else (-1 if v < 0 else (1 if (absi(bot) / 7 + i) % 2 == 0 else -1))
+		var law_type := CardPresets.law_type(axis, dir)
+		var penalty := _repeat_penalty(bot, law_type)
+		if penalty < best_penalty:
+			best_penalty = penalty
+			best_law = law_type
+	return {"law": best_law, "score": 1.0}
+
+## Botun son sunduğu yasalar: aynı yasayı (ve aynı ekseni) üst üste sunmasın.
+static var _recent_laws: Dictionary = {}
+const RECENT_LAW_MEMORY := 4
+
+static func note_law(bot: int, law_type: String) -> void:
+	var recent: Array = _recent_laws.get(bot, [])
+	recent.append(law_type)
+	while recent.size() > RECENT_LAW_MEMORY:
+		recent.pop_front()
+	_recent_laws[bot] = recent
+
+static func _repeat_penalty(bot: int, law_type: String) -> float:
+	var law := CardPresets.law_data(law_type)
+	var penalty := 0.0
+	for previous in _recent_laws.get(bot, []):
+		if previous == law_type:
+			penalty += 0.9
+		elif not law.is_empty() and CardPresets.law_data(previous).get("axis", "") == law["axis"]:
+			penalty += 0.35
+	return penalty
 
 ## Kaba geçme ihtimali: diğer partilerin oyu, botun kendi bilgisiyle tahmin edilir.
 static func _law_pass_chance(bot: int, law_type: String, known: Dictionary) -> float:
@@ -253,9 +268,11 @@ static func _best_organization(bot: int, known: Dictionary) -> Dictionary:
 		var center: Dictionary = known.get(province_id, {})
 		# Bilinmeyen il: yakınlık orta varsayılır (nötr merkez parti için aldatıcı derecede yakın görünürdü).
 		var closeness := ElectionModel.support(mine, center) if not center.is_empty() else 0.5
-		# Seviye başına kalıcı aktivite (ORG_ACTIVITY_PER_LEVEL) mitingden daha değerli.
-		var value := float(seats[province_id]) * (0.5 + closeness) / 30.0 * (1.0 - 0.3 * level) \
-			* PublicOpinion.ORG_ACTIVITY_PER_LEVEL / 1.2
+		# Kalıcı oy bonusu (seviye farkı) + bilgi: 1. seviye ilin görüşünü, 2-3 anketi açar.
+		var gain := PublicOpinion.org_activity(level + 1) - PublicOpinion.org_activity(level)
+		var value := float(seats[province_id]) * (0.5 + closeness) / 30.0 * gain / 1.2 * 0.8
+		if level == 0:
+			value += 0.25 + float(seats[province_id]) / 40.0
 		var score := 1.0 + value * (1.3 if _election_soon() else 1.0)
 		if best.is_empty() or score > float(best["score"]):
 			best = {"province": province_id, "score": score}
@@ -359,23 +376,6 @@ static func _eval_propaganda(bot: int, known: Dictionary) -> Dictionary:
 		return {}
 	best["score"] = best_value * 0.45
 	return best
-
-## Gözcü hamlesi: vekili çok ve henüz bilinmeyen il değerlidir (yasa ve il
-## başkanlığı kararları bu bilgiye dayanır). Bilinen il arttıkça değeri düşer.
-static func _best_scout(bot: int) -> Dictionary:
-	if not CardManager.can_scout(bot):
-		return {}
-	var best_province := ""
-	var known := 0
-	for province_id in _seats().keys():
-		if CardManager.knows_leaning(bot, province_id):
-			known += 1
-		elif best_province == "" or CardManager.province_seat_count(province_id) > CardManager.province_seat_count(best_province):
-			best_province = province_id
-	if best_province == "":
-		return {}
-	var score := (0.6 + float(CardManager.province_seat_count(best_province)) / 12.0) / (1.0 + known * 0.15)
-	return {"score": score, "province": best_province}
 
 ## İktidardaysa en büyük muhalefetten, muhalefetteyse hükümetten çal.
 static func _eval_steal(bot: int, card_type: String) -> Dictionary:

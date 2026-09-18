@@ -2,14 +2,13 @@ class_name ProvincePanel
 extends PanelContainer
 ## Haritada bir ile TIKLAYINCA açılan il detay paneli:
 ##   - milletvekili sayısı,
-##   - GÖZCÜ RAPORU (sadece bu oyuncu, gözcü sürerken): ilin görüşü, "şimdi seçim
-##     olsa" vekil tahmini (daireler) ve partilerin buradaki GÜCÜ ile il başkanlığı.
-##     Gözcü yoksa başka partilerin gücü görünmez; ilin görüşü bir kez öğrenildiyse
-##     hatırlanır.
+##   - TEŞKİLAT RAPORU (sadece bu oyuncu): 1. seviyede ilin görüşü (her eksende
+##     hangi uç), 2. seviyede orta, 3. seviyede yüksek isabetli ANKET ("şimdi
+##     seçim olsa" oy ve vekil tahmini, daireler). Teşkilat yoksa bilgi yok.
 ##   - son seçimin il sonucu (herkese açık),
 ##   - kendi partinin burada gücü, miting riski ve il başkanlığı durumu,
 ##   - ildeki son olaylar.
-## İlin gerçek görüşü burada ASLA doğrudan gösterilmez — gözcü hamlesiyle öğrenilir.
+## İlin gerçek görüşü burada ASLA doğrudan gösterilmez — teşkilatla öğrenilir.
 ## Durum değiştikçe GameScreen refresh() çağırır.
 
 signal closed
@@ -81,41 +80,39 @@ func _section(text: String) -> void:
 
 func _build_intel() -> void:
 	var me := multiplayer.get_unique_id()
-	var left := CardManager.scout_rounds_left(me, province_id)
-	if left > 0:
-		_section("GÖZCÜ RAPORU  ·  %d tur kaldı  (sadece sen görürsün)" % left)
-	else:
-		_section("GÖZCÜ  (sadece sen görürsün)")
-	if CardManager.knows_leaning(me, province_id):
-		var center := CardManager.province_center(province_id)
-		for axis in IdeologyAxes.AXES:
-			_body.add_child(_label(CardPresets.leaning_text(axis, int(center.get(axis, 0))), 12, INTEL_COLOR))
-		if left <= 0:
-			_body.add_child(_label("Görüş eski gözcü bilgisinden hatırlanıyor.", 11, DIM))
-	if left <= 0:
-		_body.add_child(_label("Bu ilde gözcün yok: partilerin buradaki gücünü ve anlık vekil tahminini görmek için gözcü gönder (%d mana, %d tur)." % [
-			GameRules.SCOUT_MANA_COST, GameRules.SCOUT_ROUNDS], 12, DIM))
+	var level := CardManager.organization_level(province_id, me)
+	_section("TEŞKİLAT RAPORU  ·  seviye %d/%d  (sadece sen görürsün)" % [level, GameRules.ORG_MAX_LEVEL])
+	if level == 0:
+		_body.add_child(_label("Bu ilde teşkilatın yok. Teşkilatlanma (%d mana): 1. seviye ilin görüşünü, 2. seviye orta, 3. seviye yüksek isabetli anketi açar; her seviye oy bonusu da verir." % GameRules.ORG_MANA_COST, 12, DIM))
 		return
-	_body.add_child(_label("Şimdi seçim olsa  (oy · mv · güç · il başkanlığı):", 12, INTEL_COLOR))
-	var projection := CardManager.province_projection(province_id)
-	var ids: Array = projection.keys()
-	ids.sort_custom(func(a, b):
-		var sa := int(projection[a]["seats"])
-		var sb := int(projection[b]["seats"])
+	var center := CardManager.province_center(province_id)
+	for axis in IdeologyAxes.AXES:
+		_body.add_child(_label(CardPresets.leaning_text(axis, int(center.get(axis, 0))), 12, INTEL_COLOR))
+	var poll := CardManager.province_poll(me, province_id)
+	if poll.is_empty():
+		_body.add_child(_label("Anket için teşkilatı 2. seviyeye çıkar (%d mana)." % GameRules.ORG_MANA_COST, 12, DIM))
+		return
+	var accuracy := "yüksek isabetli" if level >= 3 else "orta isabetli"
+	_body.add_child(_label("Anket (%s, ±%%%d)  ·  şimdi seçim olsa (oy · mv):" % [accuracy,
+		int(round(CardManager.poll_error(me, province_id) * 100.0))], 12, INTEL_COLOR))
+	var ids: Array = poll.keys()
+	ids.sort_custom(func(x, y):
+		var sa := int(poll[x]["seats"])
+		var sb := int(poll[y]["seats"])
 		if sa != sb:
 			return sa > sb
-		return float(projection[a]["percent"]) > float(projection[b]["percent"]))
+		return float(poll[x]["percent"]) > float(poll[y]["percent"]))
 	var colors: Array = []
 	for peer_id in ids:
 		var color: Color = PartyManager.parties.get(peer_id, {}).get("bg_color", Color(0.5, 0.5, 0.5))
-		for i in int(projection[peer_id]["seats"]):
+		for i in int(poll[peer_id]["seats"]):
 			colors.append(color)
 	var dots := SeatDots.new()
 	dots.colors = colors
 	_body.add_child(dots)
 	for peer_id in ids:
-		var entry: Dictionary = projection[peer_id]
-		_body.add_child(_party_row(int(peer_id), "%%%.0f · %d" % [float(entry["percent"]), int(entry["seats"])], true))
+		var entry: Dictionary = poll[peer_id]
+		_body.add_child(_party_row(int(peer_id), "%%%.0f · %d" % [float(entry["percent"]), int(entry["seats"])], false))
 
 ## Bir parti satırı: rozet, ad, istatistik; show_strength ise ildeki gücü ve il başkanlığı.
 func _party_row(peer_id: int, stats_text: String, show_strength: bool) -> Control:
@@ -149,7 +146,7 @@ func _party_row(peer_id: int, stats_text: String, show_strength: bool) -> Contro
 		row.add_child(org_label)
 	return row
 
-## Son seçim sonucu herkese açık bilgi; güç ve il başkanlığı sadece gözcüyle.
+## Son seçim sonucu herkese açık bilgi.
 func _build_parties() -> void:
 	var results: Dictionary = CardManager.last_province_results.get(province_id, {})
 	if results.is_empty():
@@ -172,7 +169,8 @@ func _build_own() -> void:
 	var power := CardManager.activity_of(province_id, me)
 	_body.add_child(_label("Buradaki gücün: %+.1f" % power, 12, _opinion_color(power)))
 	var level := CardManager.organization_level(province_id, me)
-	var org_text := "İl başkanlığı yok" if level == 0 else "İl başkanlığı: seviye %d/%d" % [level, GameRules.ORG_MAX_LEVEL]
+	var org_text := "Teşkilat yok" if level == 0 else "Teşkilat: seviye %d/%d (oy bonusu %+.1f)" % [level, GameRules.ORG_MAX_LEVEL,
+		CardManager.org_bonus(province_id, me)]
 	if level < GameRules.ORG_MAX_LEVEL:
 		org_text += "  ·  %s: %d mana" % ["kurmak" if level == 0 else "geliştirmek", GameRules.ORG_MANA_COST]
 	_body.add_child(_label(org_text, 12))

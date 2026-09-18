@@ -43,18 +43,22 @@ const BALANCE_SHARE_WEIGHT := 0.5
 const BALANCE_LOCAL_WEIGHT := 0.25
 
 # --- Yatırım (sadece hükümet partileri) ---------------------------------------
-const INVEST_LOCAL := 3.0
-const INVEST_NATIONAL := 0.5
-const INVEST_PARTNER_LOCAL := 1.5
+## Yatırım mitingden etkilidir (miting il +5, ulusal +0.8; üstelik risksiz).
+const INVEST_LOCAL := 7.0
+const INVEST_NATIONAL := 1.2
+const INVEST_PARTNER_LOCAL := 2.5
 
 # --- Popülizm bonusu -----------------------------------------------------------
 ## Popülizm süren partinin KENDİ hamlelerinin (miting, yatırım, yasa, oy,
 ## karalama kazancı, gensoru) iyi sonuçları bu çarpanla büyür, kötü sonuçları
-## küçülür. Başkalarının ona yaptığı karalama etkilenmez.
+## küçülür. Ayrıca karalamanın hasarı ve teşkilatın oy bonusu da bu çarpanla
+## büyür, vekil çalma POPULISM_STEAL_MULT kat vekil getirir. Başkalarının ona
+## yaptığı karalama etkilenmez.
 const POPULISM_GOOD_MULT := 2.0
 const POPULISM_BAD_MULT := 0.25
 ## Popülizm sürerken seçim yapılırsa partinin ulusal puanına eklenir.
 const POPULISM_ELECTION_NATIONAL := 1.5
+const POPULISM_STEAL_MULT := 1.5
 
 # --- İktidar dengesi ----------------------------------------------------------
 ## Seçim anında hükümette olan her partiye eklenen ulusal puan. İktidar zaten
@@ -68,9 +72,9 @@ const GOVERNMENT_FATIGUE := 1.1
 ## Reddedilen gensoruyu getiren parti bu kadar ulusal destek kaybeder.
 const CENSURE_REJECTED_NATIONAL := -2.0
 
-# --- İl başkanlığı ------------------------------------------------------------
-## Seviye başına KALICI aktivite (sönmez).
-const ORG_ACTIVITY_PER_LEVEL := 2.0
+# --- Teşkilat ------------------------------------------------------------------
+## Seviyeye göre KALICI aktivite (sönmez): 1 az, 2 orta, 3 yüksek oy bonusu.
+const ORG_ACTIVITY_BY_LEVEL := [0.0, 1.5, 3.5, 6.0]
 ## Seviye başına miting provokasyon riskinin azalma oranı.
 const ORG_RISK_REDUCTION_PER_LEVEL := 0.25
 
@@ -113,6 +117,9 @@ const SEAT_MOMENTUM_PER_POINT := 0.6
 const SEAT_MOMENTUM_LIMIT := 4.0
 
 const AXES := ["economic", "social", "administrative"]
+
+static func org_activity(level: int) -> float:
+	return float(ORG_ACTIVITY_BY_LEVEL[clampi(level, 0, ORG_ACTIVITY_BY_LEVEL.size() - 1)])
 
 static func clamp_points(value: float) -> float:
 	return clampf(value, -LIMIT, LIMIT)

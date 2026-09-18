@@ -67,22 +67,16 @@ func _initialize() -> void:
 		z.save_png("%s/zoom_parliament_after.png" % OS.get_user_data_dir())
 	_shot("crowded_after")
 	# Harita katmanları: örnek teşkilat, güç ve gözcü verisi.
-	cm.organizations = {"istanbul": {me: 3}, "ankara": {me: 2}, "izmir": {me: 1}, "konya": {me: 1}, "bursa": {me: 2}}
+	cm.organizations = {}
 	var ids: Array = scene.map_holder.get_all_province_ids()
 	for i in ids.size():
 		cm.local_support[ids[i]] = {me: sin(i * 0.7) * 5.0}
-		if i % 4 == 0:
-			cm.intel[me] = cm.intel.get(me, {})
-			var scouts: Dictionary = cm.intel[me].get("scouts", {})
-			scouts[ids[i]] = cm.round_number + 1 + (i / 4) % 5
-			var known: Dictionary = cm.intel[me].get("known", {})
-			known[ids[i]] = true
-			cm.intel[me]["known"] = known
-			cm.intel[me]["scouts"] = scouts
+		if i % 3 != 2:
+			cm.organizations[ids[i]] = {me: 1 + i % 3, 102: 1}
 	cm.current_turn_index = 2
 	cm._push_state({"type": "timer"})
 	await _frames(10)
-	for layer in [1, 2, 3, 0]:
+	for layer in [1, 2, 0]:
 		scene._on_layer_button_pressed(layer)
 		await create_timer(0.2).timeout
 		if layer == 1:
@@ -94,6 +88,12 @@ func _initialize() -> void:
 	# Güç katmanı herkesin gücüyle hesaplanır: vekil çıkaramayan yeşil göremez,
 	# bir ilde en fazla iki parti koyu yeşil (vekillerin yarısı) olabilir.
 	var projection: Dictionary = cm.projection_all()
+	var mine_projection: Dictionary = cm.projection_all(me)
+	var poll_only_ok := true
+	for province_id in ids:
+		if mine_projection.has(province_id) != (cm.organization_level(province_id, me) >= 2):
+			poll_only_ok = false
+	check("guc haritasi sadece anketli (teskilat 2+) illeri boyar", poll_only_ok)
 	var green_without_seat := 0
 	var crowded_dark_green := 0
 	for province_id in projection.keys():
@@ -114,24 +114,24 @@ func _initialize() -> void:
 	cm.mana[me] = 5
 	cm._push_state({"type": "timer"})
 	await _frames(5)
-	scene._on_scout_button_pressed()
+	scene._on_org_button_pressed()
 	await create_timer(0.6).timeout
-	check("gozcu butonu haritayi gozcu katmanina alir", scene._map_layer == 3)
-	_shot("scout_pending")
-	scene._on_scout_button_pressed()
+	check("teskilat butonu haritayi teskilat katmanina alir", scene._map_layer == 1)
+	_shot("org_pending")
+	scene._on_org_button_pressed()
 	await create_timer(0.6).timeout
 	check("iptal: onceki katmana (guc) doner, mana harcanmaz", scene._map_layer == 2 and cm.mana_of(me) == 5)
-	scene._on_scout_button_pressed()
+	scene._on_org_button_pressed()
 	var target := ""
 	for id in ids:
-		if not cm.has_scouted(me, id) and not cm.knows_leaning(me, id):
+		if cm.organization_level(id, me) == 0:
 			target = id
 			break
 	scene._on_province_clicked(target)
 	scene._on_province_clicked(target)
-	check("gozcu gonderildi, 1 mana", cm.has_scouted(me, target) and cm.mana_of(me) == 4)
+	check("teskilat kuruldu, 2 mana, il gorusu acildi", cm.organization_level(target, me) == 1 and cm.mana_of(me) == 3 and cm.knows_leaning(me, target))
 	await create_timer(0.3).timeout
-	check("gonderince bir an gozcu katmaninda kalir", scene._map_layer == 3)
+	check("kurunca bir an teskilat katmaninda kalir", scene._map_layer == 1)
 	await create_timer(1.6).timeout
 	check("sonra onceki katmana doner", scene._map_layer == 2)
 	_shot("my_turn")
@@ -141,7 +141,7 @@ func _initialize() -> void:
 	_shot("miting_pending")
 	check("miting: ilk dokunus riski gosterir", String(scene._target_hint.text).find("provokasyon") != -1)
 	scene._on_province_clicked("konya")
-	check("miting hamlesi yapildi (2 mana)", cm.mana_of(me) == 4 - GameRules.MITING_MANA_COST)
+	check("miting hamlesi yapildi (2 mana)", cm.mana_of(me) == 3 - GameRules.MITING_MANA_COST)
 	cm.mana[me] = 10
 	cm.inventories[me] = ["populizm", "mana_bonusu", "karalama"]
 	cm._push_state({"type": "timer"})
@@ -162,22 +162,19 @@ func _initialize() -> void:
 	var scouted := ""
 	var plain := ""
 	for id in ids:
-		if scouted == "" and cm.has_scouted(me, id) and cm.province_seat_count(id) >= 8:
+		if scouted == "" and cm.organization_level(id, me) >= 2 and cm.province_seat_count(id) >= 8:
 			scouted = id
-		if plain == "" and not cm.has_scouted(me, id) and not cm.knows_leaning(me, id):
+		if plain == "" and not cm.knows_leaning(me, id):
 			plain = id
 	scene._on_province_clicked(scouted)
 	await _frames(5)
-	check("gozculu ilde rapor var", scene._province_panel.visible)
+	check("anketli ilde rapor var", scene._province_panel.visible)
 	_shot("panel_scouted")
 	scene._on_province_clicked(scouted)
 	scene._on_province_clicked(plain)
 	await _frames(5)
 	_shot("panel_plain")
 	scene._province_panel.hide()
-	scene._on_layer_button_pressed(3)
-	await create_timer(0.6).timeout
-	_shot("layer_scout_rounds")
 	cm._end_game("32 tur tamamlandı. Son seçimle kurulan Partim3 hükümeti makam puanlarını aldı.")
 	await create_timer(0.4).timeout
 	_shot("game_over_fading")

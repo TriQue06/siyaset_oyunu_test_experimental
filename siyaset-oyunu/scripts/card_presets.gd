@@ -5,7 +5,7 @@ extends Node
 ## YATIRIM ve GENSORU da artık hamle (bkz. CardManager.invest / censure).
 ##   - POPÜLİZM BONUSU : POPULISM_ROUNDS tur kendi hamlelerinin iyi etkisi artar, kötüsü azalır.
 ##   - MANA BONUSU     : +MANA_BONUS_AMOUNT mana; kullanınca sıra devreder.
-## GÖZCÜ ve MİTİNG artık kart değil hamle (bkz. CardManager.scout / miting);
+## GÖZCÜ (artık teşkilatın parçası) ve MİTİNG kart değil (bkz. CardManager);
 ## ANKET kaldırıldı (gözcü raporu anlık vekil tahmini gösterir). Türleri eski
 ## kayıtlar/görseller için duruyor, desteye girmez.
 ##   - MİTİNG    : seçilen ilde güç kazandırır; provokasyon riski var.
@@ -249,9 +249,9 @@ func _card_effect_text(card_type: String) -> String:
 		PROPAGANDA_CARD_TYPE:
 			return "Bir ilde bir partiyi karala: ona eksi, sana artı.\nİlde güçlü olan partiye az işler."
 		POPULISM_CARD_TYPE:
-			return "%d tur boyunca hamlelerinin iyi sonuçları %d katına çıkar,\nkötü sonuçları %%%d azalır; bu sürede seçim olursa ulusal +%.1f.\nSeçmek için dokun, tekrar dokun: kullan." % [
-				GameRules.POPULISM_ROUNDS, int(PublicOpinion.POPULISM_GOOD_MULT), int(round((1.0 - PublicOpinion.POPULISM_BAD_MULT) * 100)),
-				PublicOpinion.POPULISM_ELECTION_NATIONAL]
+			return "%d tur boyunca her şey güçlenir: miting, yatırım, yasa, karalama\nhasarı ve teşkilat bonusu %d kat, vekil çalma %.1f kat; kötü sonuçlar\n%%%d azalır; bu sürede seçim olursa ulusal +%.1f. Dokun, tekrar dokun: kullan." % [
+				GameRules.POPULISM_ROUNDS, int(PublicOpinion.POPULISM_GOOD_MULT), PublicOpinion.POPULISM_STEAL_MULT,
+				int(round((1.0 - PublicOpinion.POPULISM_BAD_MULT) * 100)), PublicOpinion.POPULISM_ELECTION_NATIONAL]
 		MANA_BONUS_CARD_TYPE:
 			return "+%d mana kazan. Kullanınca sıra sonraki oyuncuya geçer.\nSeçmek için dokun, tekrar dokun: kullan." % GameRules.MANA_BONUS_AMOUNT
 	return ""

@@ -10,9 +10,10 @@ extends Node
 ##      (CardPresets.card_cost).
 ##   b) YASA TASARLA (GameRules.LAW_MANA_COST): meclise yasa sun; meclis yoksa
 ##      oylamasız SEÇİM VAADİ olur.
-##   c) İL BAŞKANLIĞI (GameRules.ORG_MANA_COST): bir ilde teşkilat kur / geliştir.
+##   c) TEŞKİLATLANMA (GameRules.ORG_MANA_COST): bir ilde teşkilat kur / geliştir
+##      (oy bonusu + ilin görüşü + 2. seviyeden itibaren anket).
 ##   d) PAS: hamle yapmadan geç, +GameRules.MANA_PASS_BONUS mana.
-##   KART ÇEKMEK: GameRules.DRAW_MANA_COST, sınırsız (el dolana kadar).
+##   KART ÇEKMEK: bedava, turda GameRules.DRAWS_PER_TURN kez; kart oynamak sınırsız.
 ##   Manası biten oyuncunun sırası kendiliğinden devreder (_auto_end_if_broke).
 ##   GameRules.TURN_TIMEOUT dolarsa otomatik pas geçilir (mana bonusu yok).
 ##   Hükümet kurulurken / meclis oylarken tur DURUR (is_turn_blocked).
@@ -81,7 +82,7 @@ var inventories: Dictionary = {}
 var turn_order: Array = []
 # turn_order içindeki index; sırası gelen oyuncu turn_order[current_turn_index].
 var current_turn_index: int = 0
-# Sırası gelen oyuncu bu turda kart çekti mi (bilgi amaçlı; çekiş sınırı yok).
+# Sırası gelen oyuncu bu turda kart çekti mi (turda bir çekiş).
 var has_drawn_this_turn: bool = false
 ## Oyuncunun en son yasa sunduğu tur: peer_id -> round_number (turda 1 yasa).
 var law_rounds: Dictionary = {}
@@ -122,10 +123,6 @@ var province_ideology: Dictionary = {}
 var organizations: Dictionary = {}
 ## peer_id -> int
 var mana: Dictionary = {}
-## peer_id -> {"scouts": {province_id: bitiş turu}, "known": {province_id: true}}
-##   scouts: gözcü o turdan ÖNCEKİ son tura kadar ilde (SCOUT_ROUNDS tur).
-##   known : gözcü gönderilmiş iller; ilin görüşü değişmediği için hatırlanır.
-var intel: Dictionary = {}
 
 var game_finished: bool = false
 ## [{peer_id, name, leader, color, score, seats}], kazanan başta.
@@ -224,9 +221,9 @@ func is_my_turn() -> bool:
 func can_draw() -> bool:
 	return can_draw_for(multiplayer.get_unique_id())
 
-## Kart çekmek bir hamle: mana ister, sayı sınırı yok (el dolana kadar).
+## Kart çekmek bedava, turda bir kez.
 func can_draw_for(peer_id: int) -> bool:
-	return can_choose_main_action(peer_id) and mana_of(peer_id) >= GameRules.DRAW_MANA_COST \
+	return can_choose_main_action(peer_id) and not has_drawn_this_turn and mana_of(peer_id) >= GameRules.DRAW_MANA_COST \
 		and inventories.get(peer_id, []).size() < MAX_HAND_SIZE
 
 ## Sıra bende VE tur akışı engellenmemiş mi? (UI bunu kullanmalı.)
@@ -295,13 +292,6 @@ func can_miting(peer_id: int, province_id: String = "") -> bool:
 	return can_choose_main_action(peer_id) and mana_of(peer_id) >= GameRules.MITING_MANA_COST \
 		and (province_id == "" or has_province(province_id))
 
-## Gözcü hamlesi: bu ilin görüşünü öğrenmek (bir kez).
-func can_scout(peer_id: int, province_id: String = "") -> bool:
-	if not can_choose_main_action(peer_id) or mana_of(peer_id) < GameRules.SCOUT_MANA_COST:
-		return false
-	# Süren gözcü yenilenebilir (süre baştan başlar), ama aynı tur içinde değil.
-	return province_id == "" or (has_province(province_id) and scout_rounds_left(peer_id, province_id) < GameRules.SCOUT_ROUNDS)
-
 func can_build_organization(peer_id: int, province_id: String) -> bool:
 	return can_choose_main_action(peer_id) and mana_of(peer_id) >= GameRules.ORG_MANA_COST \
 		and has_province(province_id) and organization_level(province_id, peer_id) < GameRules.ORG_MAX_LEVEL
@@ -324,7 +314,7 @@ func can_play_card(peer_id: int, card_type: String, target_peer_id: int = -1, ta
 	if card_type == CardPresets.PROPAGANDA_CARD_TYPE:
 		return has_province(target_province) and turn_order.has(target_peer_id) and target_peer_id != peer_id
 	if card_type == CardPresets.SCOUT_CARD_TYPE:
-		return false  # gözcü artık hamle (bkz. scout)
+		return false  # gözcü artık teşkilatın parçası
 	if CardPresets.needs_province_target(card_type):
 		if not has_province(target_province):
 			return false
@@ -354,16 +344,23 @@ func province_center(province_id: String) -> Dictionary:
 func organization_level(province_id: String, peer_id: int) -> int:
 	return int(organizations.get(province_id, {}).get(peer_id, 0))
 
-## AKTİVİTE yakınlığı: sönen il puanı + il başkanlığının kalıcı katkısı.
+## AKTİVİTE yakınlığı: sönen il puanı + teşkilatın kalıcı katkısı.
 func activity_of(province_id: String, peer_id: int) -> float:
-	return local_of(province_id, peer_id) + organization_level(province_id, peer_id) * PublicOpinion.ORG_ACTIVITY_PER_LEVEL
+	return local_of(province_id, peer_id) + org_bonus(province_id, peer_id)
+
+## Teşkilatın oy bonusu (popülizm sürerken büyür).
+func org_bonus(province_id: String, peer_id: int) -> float:
+	var bonus := PublicOpinion.org_activity(organization_level(province_id, peer_id))
+	if populism_rounds_left(peer_id) > 0:
+		bonus *= PublicOpinion.POPULISM_GOOD_MULT
+	return bonus
 
 ## Bir ilde partilerin aktivitesi: peer_id -> puan.
 func activity_entry(province_id: String) -> Dictionary:
 	var entry: Dictionary = local_support.get(province_id, {}).duplicate()
 	var orgs: Dictionary = organizations.get(province_id, {})
 	for peer_id in orgs.keys():
-		entry[peer_id] = float(entry.get(peer_id, 0.0)) + int(orgs[peer_id]) * PublicOpinion.ORG_ACTIVITY_PER_LEVEL
+		entry[peer_id] = float(entry.get(peer_id, 0.0)) + org_bonus(province_id, int(peer_id))
 	return entry
 
 ## Tüm iller: province_id -> {peer_id -> aktivite}.
@@ -380,19 +377,49 @@ func party_strength(province_id: String, peer_id: int) -> float:
 	var ideology: Dictionary = PartyManager.parties.get(peer_id, {}).get("ideology", IdeologyAxes.default_values())
 	return PublicOpinion.party_strength(ideology, province_center(province_id), activity_of(province_id, peer_id))
 
-## Bu ilde şu an bu oyuncunun gözcüsü var mı? (Partilerin gücü ve anlık vekil
-## tahmini sadece o sürece görünür.)
-func has_scouted(peer_id: int, province_id: String) -> bool:
-	return scout_rounds_left(peer_id, province_id) > 0
-
-## Gözcünün kalan tur sayısı (gönderildiği turda SCOUT_ROUNDS, son turunda 1, yoksa 0).
-func scout_rounds_left(peer_id: int, province_id: String) -> int:
-	var expires := int(intel.get(peer_id, {}).get("scouts", {}).get(province_id, 0))
-	return maxi(0, expires - round_number)
-
-## İlin görüşünü biliyor mu? (Bir kez gözcü gönderilmişse süresi bitse de.)
+## Teşkilat bilgisi (sadece o partinin arayüzü gösterir):
+##   1. seviye: ilin görüşü (her eksende hangi uç), 2: + orta isabetli anket,
+##   3: + yüksek isabetli anket.
 func knows_leaning(peer_id: int, province_id: String) -> bool:
-	return bool(intel.get(peer_id, {}).get("known", {}).get(province_id, false))
+	return organization_level(province_id, peer_id) >= 1
+
+## Anket sapması (−1: anket yok).
+func poll_error(peer_id: int, province_id: String) -> float:
+	match organization_level(province_id, peer_id):
+		2:
+			return GameRules.POLL_ERROR_MEDIUM
+		3:
+			return GameRules.POLL_ERROR_HIGH
+	return -1.0
+
+## Teşkilat anketi: gerçek tahmin, seviyeye göre gürültülü. Aynı turda aynı
+## sonucu verir (her bakışta değişmez). Anket yoksa boş sözlük.
+func province_poll(peer_id: int, province_id: String) -> Dictionary:
+	var error := poll_error(peer_id, province_id)
+	if error < 0.0:
+		return {}
+	var projection := province_projection(province_id)
+	return _noisy_poll(projection, error, "%s:%d:%d" % [province_id, peer_id, round_number], province_seat_count(province_id))
+
+func _noisy_poll(projection: Dictionary, error: float, seed_text: String, seat_count: int) -> Dictionary:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(seed_text)
+	var shares := {}
+	var total := 0.0
+	var ids: Array = projection.keys()
+	ids.sort()
+	for peer_id in ids:
+		var value: float = float(projection[peer_id]["percent"]) * (1.0 + rng.randf_range(-error, error))
+		shares[peer_id] = value
+		total += value
+	if total > 0.0:
+		for peer_id in ids:
+			shares[peer_id] = float(shares[peer_id]) / total * 100.0
+	var alloc := ElectionModel.dhondt(shares, ids, seat_count)
+	var result := {}
+	for peer_id in ids:
+		result[peer_id] = {"percent": float(shares[peer_id]), "seats": int(alloc.get(peer_id, 0))}
+	return result
 
 ## Şimdi seçim olsa bu ilde: peer_id -> {"percent", "seats"} (gürültüsüz beklenen
 ## oylar, ildeki vekiller D'Hondt ile; baraj yok sayılır). Gözcü raporu için.
@@ -407,18 +434,29 @@ func province_projection(province_id: String) -> Dictionary:
 		result[peer_id] = {"percent": float(shares.get(peer_id, 0.0)), "seats": int(alloc.get(peer_id, 0))}
 	return result
 
-## Tüm iller için anlık seçim tahmini: province_id -> {peer_id -> {"percent",
-## "seats", "quotient"}}. quotient: ildeki son kazanan D'Hondt bölümü (bir
-## vekile ne kadar yakın olunduğunu ölçmek için). Güç haritası kullanır.
-func projection_all() -> Dictionary:
+## Güç haritası: bu partinin ANKETİ olan illerde (teşkilat 2+) anlık seçim
+## tahmini: province_id -> {peer_id -> {"percent", "seats", "quotient"},
+## "seat_count"}. quotient: ildeki son kazanan D'Hondt bölümü (bir vekile ne
+## kadar yakın olunduğunu ölçmek için). peer_id = -1: tüm iller, gürültüsüz.
+func projection_all(viewer: int = -1) -> Dictionary:
 	var mods := election_modifiers()
 	var local_mods: Dictionary = mods["local"]
 	var ideologies := _ideologies()
 	var result := {}
 	for province_id in _province_ids:
+		var error := poll_error(viewer, province_id) if viewer != -1 else 0.0
+		if error < 0.0:
+			continue
 		var seat_count := province_seat_count(province_id)
 		var shares := ElectionModel.expected_shares(ideologies, province_center(province_id), current_axis_sharpness,
 			mods["national"], local_mods.get(province_id, {}))
+		if viewer != -1:
+			var noisy := {}
+			for peer_id in shares.keys():
+				noisy[peer_id] = {"percent": float(shares[peer_id])}
+			noisy = _noisy_poll(noisy, error, "%s:%d:%d" % [province_id, viewer, round_number], seat_count)
+			for peer_id in noisy.keys():
+				shares[peer_id] = float(noisy[peer_id]["percent"])
 		var alloc := ElectionModel.dhondt(shares, turn_order, seat_count)
 		var last_quotient := INF
 		for peer_id in turn_order:
@@ -486,7 +524,6 @@ func init_game() -> void:
 	province_events = {}
 	province_ideology = ProvinceIdeology.generate(_rng, _province_ids)
 	organizations = {}
-	intel = {}
 	game_finished = false
 	final_ranking = []
 	game_end_reason = ""
@@ -516,7 +553,6 @@ func abandon_game() -> void:
 	province_ideology = {}
 	organizations = {}
 	mana = {}
-	intel = {}
 	game_finished = false
 	final_ranking = []
 	game_end_reason = ""
@@ -631,15 +667,6 @@ func miting(province_id: String) -> void:
 	else:
 		_request_miting.rpc_id(1, province_id)
 
-## Gözcü hamlesi: seçilen ile gözcü gönder (SCOUT_MANA_COST).
-func scout(province_id: String) -> void:
-	if not can_scout(multiplayer.get_unique_id(), province_id):
-		return
-	if _is_authority():
-		_apply_scout_move(multiplayer.get_unique_id(), province_id)
-	else:
-		_request_scout.rpc_id(1, province_id)
-
 ## "Turu Bitir": sırayı bir sonraki oyuncuya devreder.
 func pass_turn() -> void:
 	if turn_order.is_empty() or not can_act():
@@ -730,9 +757,9 @@ func _apply_organization(peer_id: int, province_id: String) -> void:
 	entry[peer_id] = level
 	organizations[province_id] = entry
 	var verb := "kurdu" if level == 1 else "geliştirdi"
-	_log_province(province_id, "%s il başkanlığı %s (seviye %d)" % [_party_name(peer_id), verb, level])
+	_log_province(province_id, "%s teşkilat %s (seviye %d)" % [_party_name(peer_id), verb, level])
 	_push_state({"type": "organization", "peer_id": peer_id, "province": province_id,
-		"message": "%s, %s'da il başkanlığı %s (seviye %d)." % [_party_name(peer_id), _province_name(province_id), verb, level]})
+		"message": "%s, %s'da teşkilat %s (seviye %d)." % [_party_name(peer_id), _province_name(province_id), verb, level]})
 	_auto_end_if_broke()
 
 func _apply_invest_move(peer_id: int, province_id: String) -> void:
@@ -759,15 +786,6 @@ func _apply_miting_move(peer_id: int, province_id: String) -> void:
 	_event_message = ""
 	_apply_miting(peer_id, province_id)
 	_push_state({"type": "miting", "peer_id": peer_id, "province": province_id, "message": _event_message})
-	_auto_end_if_broke()
-
-func _apply_scout_move(peer_id: int, province_id: String) -> void:
-	if not can_scout(peer_id, province_id):
-		return
-	mana[peer_id] = mana_of(peer_id) - GameRules.SCOUT_MANA_COST
-	_event_message = ""
-	_apply_scout(peer_id, province_id)
-	_push_state({"type": "scout", "peer_id": peer_id, "province": province_id, "message": _event_message})
 	_auto_end_if_broke()
 
 ## Kartın etkisini uygular. Milletvekili dağılımı değiştiyse true döner.
@@ -819,22 +837,11 @@ func _apply_investment(peer_id: int, province_id: String) -> void:
 		_party_name(peer_id), PublicOpinion.INVEST_LOCAL, PublicOpinion.INVEST_PARTNER_LOCAL])
 	_event_message = "%s, %s'a hükümet yatırımı getirdi." % [_party_name(peer_id), _province_name(province_id)]
 
-## Gözcü: SCOUT_ROUNDS tur boyunca ilin görüşü, partilerin gücü ve anlık vekil
-## tahmini bu oyuncuya açılır; ilin görüşü sonra da hatırlanır.
-func _apply_scout(peer_id: int, province_id: String) -> void:
-	var info: Dictionary = intel.get(peer_id, {})
-	var scouts: Dictionary = info.get("scouts", {})
-	scouts[province_id] = round_number + GameRules.SCOUT_ROUNDS
-	info["scouts"] = scouts
-	var known: Dictionary = info.get("known", {})
-	known[province_id] = true
-	info["known"] = known
-	intel[peer_id] = info
-	_event_message = "%s, %s'a gözcü gönderdi." % [_party_name(peer_id), _province_name(province_id)]
-
 ## Karalama: hedefe eksi, karalayana artı; ikisi de o ildeki güçleriyle ölçeklenir.
 func _apply_propaganda(peer_id: int, target_peer_id: int, province_id: String) -> void:
 	var damage := PublicOpinion.propaganda_damage(party_strength(province_id, target_peer_id))
+	if populism_rounds_left(peer_id) > 0:
+		damage *= PublicOpinion.POPULISM_GOOD_MULT
 	var gain := PublicOpinion.propaganda_gain(party_strength(province_id, peer_id))
 	# Taban: karalama il puanını PROPAGANDA_FLOOR'un altına itemez.
 	var current := local_of(province_id, target_peer_id)
@@ -949,6 +956,8 @@ func _apply_steal(peer_id: int, target_peer_id: int, card_type: String) -> bool:
 	if range_info.is_empty():
 		return false
 	var wanted: int = _rng.randi_range(int(range_info["min"]), int(range_info["max"]))
+	if populism_rounds_left(peer_id) > 0:
+		wanted = int(round(wanted * PublicOpinion.POPULISM_STEAL_MULT))
 	var amount: int = mini(wanted, maxi(0, int(last_seats[target_peer_id]) - 1))
 	if amount <= 0:
 		return false
@@ -990,6 +999,8 @@ func _auto_end_if_broke() -> void:
 	var peer_id := current_turn_peer_id()
 	if mana_of(peer_id) > 0:
 		return
+	if can_draw_for(peer_id):
+		return  # bedava kart hakkı duruyor
 	for card_type in inventories.get(peer_id, []):
 		if CardPresets.card_cost(String(card_type)) <= 0:
 			return
@@ -1176,7 +1187,6 @@ func remove_player(peer_id: int) -> void:
 	turn_order.remove_at(idx)
 	inventories.erase(peer_id)
 	mana.erase(peer_id)
-	intel.erase(peer_id)
 	last_seats.erase(peer_id)
 	election_seats.erase(peer_id)
 	last_vote_shares.erase(peer_id)
@@ -1234,7 +1244,6 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"events": province_events,
 		"organizations": organizations,
 		"mana": mana,
-		"intel": intel,
 		"game_finished": game_finished,
 		"final_ranking": final_ranking,
 		"end_reason": game_end_reason,
@@ -1266,7 +1275,6 @@ func _apply_state(state: Dictionary) -> void:
 	province_events = state["events"]
 	organizations = state.get("organizations", {})
 	mana = state.get("mana", {})
-	intel = state.get("intel", {})
 	game_finished = bool(state["game_finished"])
 	final_ranking = state["final_ranking"]
 	game_end_reason = str(state["end_reason"])
@@ -1372,12 +1380,6 @@ func _request_miting(province_id: String) -> void:
 	if not MultiplayerManager.is_host:
 		return
 	_apply_miting_move(multiplayer.get_remote_sender_id(), province_id)
-
-@rpc("any_peer", "reliable")
-func _request_scout(province_id: String) -> void:
-	if not MultiplayerManager.is_host:
-		return
-	_apply_scout_move(multiplayer.get_remote_sender_id(), province_id)
 
 @rpc("any_peer", "reliable")
 func _request_pass() -> void:

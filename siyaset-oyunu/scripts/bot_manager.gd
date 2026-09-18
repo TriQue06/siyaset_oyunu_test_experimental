@@ -82,10 +82,10 @@ static func do_action(bot: int) -> Dictionary:
 	match String(action["type"]):
 		"law":
 			CardManager._apply_law(bot, String(action["law"]))
+			if CardManager.has_proposed_law_this_round(bot):
+				BotBrain.note_law(bot, String(action["law"]))
 		"organization":
 			CardManager._apply_organization(bot, String(action["province"]))
-		"scout":
-			CardManager._apply_scout_move(bot, String(action["province"]))
 		"miting":
 			CardManager._apply_miting_move(bot, String(action["province"]))
 		"invest":

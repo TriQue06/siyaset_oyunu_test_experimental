@@ -228,7 +228,7 @@ func _initialize() -> void:
 	check("vekil calan parti momentumla girer", near(float(mods["national"][3]), 1.0 + PublicOpinion.seat_momentum(10.0 / 390.0 * 100.0)),
 		"%.2f" % float(mods["national"][3]))
 	check("vekil kaybeden parti eksi momentum", float(mods["national"][1]) < 2.0 + PublicOpinion.GOVERNMENT_FATIGUE)
-	check("il baskanligi il carpanina girer", near(float(mods["local"]["konya"][3]), 2.0 * PublicOpinion.ORG_ACTIVITY_PER_LEVEL))
+	check("il baskanligi il carpanina girer", near(float(mods["local"]["konya"][3]), PublicOpinion.org_activity(2)))
 	cm.last_seats = {1: 200, 2: 100, 3: 90}
 	cm.election_seats = {}
 	cm.organizations = {}
@@ -270,10 +270,10 @@ func _initialize() -> void:
 	check("secimsiz tur gecti", cm.round_number == round_before + 1 and gm.has_government(), "tur %d" % cm.round_number)
 	check("ulusal puan %10 sondu", near(cm.national_of(3), 4.0 * PublicOpinion.NATIONAL_DECAY), "%.3f" % cm.national_of(3))
 	check("il puani %15 sondu", near(cm.local_of("konya", 3), 2.0 * PublicOpinion.LOCAL_DECAY), "%.3f" % cm.local_of("konya", 3))
-	check("il baskanligi sonmedi", near(cm.activity_of("konya", 3), 2.0 * PublicOpinion.LOCAL_DECAY + PublicOpinion.ORG_ACTIVITY_PER_LEVEL))
+	check("teskilat sonmedi", near(cm.activity_of("konya", 3), 2.0 * PublicOpinion.LOCAL_DECAY + PublicOpinion.org_activity(1)))
 
 	print("")
-	print("=== 9) GOZCU RAPORU, KARALAMA ===")
+	print("=== 9) TESKILAT BILGISI, KARALAMA ===")
 	var w: Dictionary = cm._draw_weights(3)
 	check("karalama destede; anket ve gozcu destede degil", not w.has("anket") and not w.has("gozcu") and w.has("karalama"))
 	cm.mana[3] = 50
@@ -284,9 +284,9 @@ func _initialize() -> void:
 	cm.inventories[3] = ["karalama"]
 	cm._apply_play(3, 0, -1, "")
 	check("il secilmeden karalama oynanamaz (kart elde)", cm.inventories[3].size() == 1 and cm.current_turn_peer_id() == 3)
-	cm._apply_scout_move(3, "ankara")
-	check("gozcu: il ogrenildi (sadece gonderene)", cm.has_scouted(3, "ankara") and not cm.has_scouted(1, "ankara"))
-	check("ayni turda ikinci gozcu gonderilemez", not cm.can_scout(3, "ankara"))
+	cm._apply_organization(3, "ankara")
+	check("teskilat: il gorusu (sadece kurana)", cm.knows_leaning(3, "ankara") and not cm.knows_leaning(1, "ankara"))
+	cm.organizations = {}
 	check("karalama kendine oynanamaz", not cm.can_play_card(3, "karalama", 3, "ankara"))
 	check("karalama gecersiz partiye oynanamaz", not cm.can_play_card(3, "karalama", 99, "ankara"))
 	cm.current_turn_index = 0

@@ -82,7 +82,7 @@ func _initialize() -> void:
 				elif kind == "law":
 					kind = "law"
 				elif kind == "organization":
-					kind = "il_baskanligi"
+					kind = "teskilat"
 				played[kind] = int(played.get(kind, 0)) + 1
 		var governing: bool = gm.phase == gm.Phase.GOVERNING
 		if governing and not was_governing:
@@ -94,12 +94,11 @@ func _initialize() -> void:
 	check("en az bir hukumet kuruldu", governments >= 1)
 	check("botlar oy verdi", votes > 0)
 	check("botlar yasa sundu", int(played.get("law", 0)) > 0)
-	check("botlar il baskanligi kurdu", int(played.get("il_baskanligi", 0)) > 0)
+	check("botlar teskilat kurdu", int(played.get("teskilat", 0)) > 0)
 	check("botlar miting yapti", int(played.get("miting", 0)) > 0)
 	check("botlar kart oynadi", int(played.get("karalama", 0)) + int(played.get("anket", 0)) + int(played.get("steal_weak", 0)) \
 		+ int(played.get("steal_medium", 0)) + int(played.get("steal_strong", 0)) > 0)
-	check("botlar gozcu gonderdi (il gorusunu bilmiyorlar)", int(played.get("scout", 0)) > 0)
-	check("botlar kart cekti (1 mana)", int(played.get("draw", 0)) > 0)
+	check("botlar kart cekti (bedava)", int(played.get("draw", 0)) > 0)
 	check("bir turda birden cok hamle yapildi", max_actions >= 2, str(max_actions))
 	# Yarım adım kaymasının kendisi smoke_test_rules'ta; burada değerlerin geçerliliği.
 	var valid := true
@@ -117,7 +116,7 @@ func _initialize() -> void:
 	for province_id in known.keys():
 		if not cm.knows_leaning(bot0, province_id) and not (known[province_id] as Dictionary).is_empty():
 			unknown_ok = false
-	check("bot gozcu gondermedigi ilin gorusunu bilmez", unknown_ok)
+	check("bot teskilati olmayan ilin gorusunu bilmez", unknown_ok)
 	check("botlar farkli hamle turleri yapti", played.size() >= 5, str(played))
 	var mana_ok := true
 	for peer_id in cm.mana.keys():

@@ -70,6 +70,7 @@ func _play_game(g: int, report: Dictionary) -> void:
 	cm.init_game()
 
 	var stats := {}
+	var law_types := {}
 	for peer_id in cm.turn_order:
 		stats[peer_id] = {"actions": {}, "propaganda_received": 0, "gov_rounds": 0}
 	var last_round := 0
@@ -121,10 +122,9 @@ func _play_game(g: int, report: Dictionary) -> void:
 		match String(done["type"]):
 			"law":
 				_bump(actions, "yasa")
+				_bump(law_types, String(done["law"]))
 			"organization":
-				_bump(actions, "il_baskanligi")
-			"scout":
-				_bump(actions, "gozcu")
+				_bump(actions, "teskilat")
 			"miting":
 				_bump(actions, "miting")
 			"invest":
@@ -153,7 +153,7 @@ func _play_game(g: int, report: Dictionary) -> void:
 			"actions": stats[peer_id]["actions"], "gov_rounds": stats[peer_id]["gov_rounds"],
 			"propaganda_received": stats[peer_id]["propaganda_received"],
 		})
-	report["games"].append({"game": g, "steps": steps, "parties": parties})
+	report["games"].append({"game": g, "steps": steps, "parties": parties, "law_types": law_types})
 
 func _top_party(seats: Dictionary) -> int:
 	var best := -1
@@ -177,7 +177,7 @@ func _record_election(g: int, round_snapshot: Dictionary, prev_seats: Dictionary
 		var here: Dictionary = local_mods.get(province_id, {})
 		var snap: Dictionary = round_snapshot.get(province_id, {})
 		for peer_id in cm.turn_order:
-			var org_part := int(orgs.get(province_id, {}).get(peer_id, 0)) * PublicOpinion.ORG_ACTIVITY_PER_LEVEL
+			var org_part := PublicOpinion.org_activity(int(orgs.get(province_id, {}).get(peer_id, 0)))
 			var local_now := float(here.get(peer_id, 0.0)) - org_part
 			var earlier := float(snap.get(peer_id, 0.0))
 			contrib["il_baskanligi"] += absf(org_part) * n

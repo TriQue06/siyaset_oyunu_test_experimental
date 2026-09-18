@@ -39,20 +39,21 @@ const TAP_MAX_MOVE_PX := 10.0
 ## Oylamada parlamento koltuklarının ve profil etiketlerinin rengi.
 const VOTE_COLORS := {1: Color(0.32, 0.82, 0.38), 0: Color(0.92, 0.78, 0.3), -1: Color(0.92, 0.3, 0.3)}
 
-## HARİTA KATMANLARI: aynı Türkiye haritasının dört ayrı görünümü; butonlarla
+## HARİTA KATMANLARI: aynı Türkiye haritasının üç ayrı görünümü; butonlarla
 ## geçilir, harita yan yana dizilmiş sayfalar gibi yana kayar.
 ##   SEATS        : son seçim (il kazananları + vekil daireleri)
-##   ORGANIZATION : il başkanlığı seviyem (0 beyaz → 3 parti rengi)
-##   STRENGTH     : ildeki gücüm (koyu kırmızı çok kötü, sarı nötr, koyu yeşil çok iyi)
-##   SCOUT        : gözcü gönderdiğim iller parti rengimde, diğerleri beyaz
-enum MapLayer { SEATS, ORGANIZATION, STRENGTH, SCOUT }
-const MAP_LAYER_TITLES := ["Vekiller", "Teşkilat", "Güç", "Gözcü"]
+##   ORGANIZATION : teşkilat seviyem (0 beyaz → 3 parti rengi)
+##   STRENGTH     : anketim olan illerde (teşkilat 2+) şimdi seçim olsa durumum;
+##                  anketsiz iller gri
+enum MapLayer { SEATS, ORGANIZATION, STRENGTH }
+const MAP_LAYER_TITLES := ["Vekiller", "Teşkilat", "Güç"]
+const MAP_UNKNOWN_COLOR := Color(0.62, 0.62, 0.64)
 const MAP_SLIDE_DURATION := 0.38
 ## Güç haritasında bu kadar il puanı en koyu renge denk gelir.
 const STRENGTH_STOPS := [Color(0.42, 0.04, 0.05), Color(0.88, 0.2, 0.14), Color(0.96, 0.84, 0.24), Color(0.36, 0.76, 0.3), Color(0.04, 0.36, 0.13)]
 const MAP_BLANK_COLOR := Color(0.97, 0.97, 0.95)
-## Gözcü hamlesinden sonra haritanın gözcü katmanında kaldığı süre.
-const SCOUT_RESULT_HOLD := 1.2
+## Teşkilat hamlesinden sonra haritanın teşkilat katmanında kaldığı süre.
+const ORG_RESULT_HOLD := 1.2
 const SHADOW_OFFSET := Vector2(4, 5)
 const SHADOW_COLOR := Color(0, 0, 0, 0.38)
 
@@ -106,8 +107,8 @@ var _province_base_colors: Dictionary = {}
 var _seat_layer_colors: Dictionary = {}
 ## Harita katmanı (bkz. MapLayer) ve katman geçişi.
 var _map_layer: int = MapLayer.SEATS
-var _layer_before_scout: int = -1
-var _scout_view_token: int = 0
+var _layer_before_org: int = -1
+var _org_view_token: int = 0
 var _map_clip: Control
 var _map_snapshot: TextureRect
 var _map_slide_tween: Tween
@@ -144,7 +145,6 @@ var _mana_box: HBoxContainer
 var _mana_label: Label
 var _law_button: Button
 var _org_button: Button
-var _scout_button: Button
 var _miting_button: Button
 ## Miting hamlesi için il seçme modu.
 var _pending_miting: bool = false
@@ -155,12 +155,10 @@ var _pending_invest: bool = false
 ## Gensoru: ilk dokunuş onay ister, ikincisi verir.
 var _pending_censure: bool = false
 var _last_turn_peer: int = -2
-## Gözcü hamlesi için il seçme modu (harita gözcü katmanına geçer).
-var _pending_scout: bool = false
 ## Yasa tasarlama paneli (6 daire) ve karalama hedef menüsü.
 var _law_designer: PanelContainer
 var _propaganda_menu: PanelContainer
-## İl başkanlığı için il seçme modu.
+## Teşkilatlanma için il seçme modu (harita teşkilat katmanına geçer).
 var _pending_org: bool = false
 var _circle_textures: Dictionary = {}
 ## Mana göstergesine dokununca gösterilen kural özeti.
@@ -1031,15 +1029,14 @@ func _begin_province_targeting(hand_index: int) -> void:
 
 func _cancel_targeting() -> void:
 	_pending_province_hand_index = -1
-	_pending_org = false
+	if _pending_org:
+		_pending_org = false
+		_end_org_view()
+		_refresh_action_buttons()
 	if _pending_miting or _pending_invest or _pending_censure:
 		_pending_miting = false
 		_pending_invest = false
 		_pending_censure = false
-		_refresh_action_buttons()
-	if _pending_scout:
-		_pending_scout = false
-		_end_scout_view()
 		_refresh_action_buttons()
 	if _selected_province != "":
 		_selected_province = ""
@@ -1056,7 +1053,7 @@ func _cancel_targeting() -> void:
 func _on_province_clicked(province_id: String) -> void:
 	var me := multiplayer.get_unique_id()
 	# Hedef seçerken ilk dokunuş ili seçip ayrıntıyı gösterir, ikinci onaylar.
-	if (_pending_org or _pending_scout or _pending_miting or _pending_invest or _pending_province_hand_index != -1) and _selected_province != province_id:
+	if (_pending_org or _pending_miting or _pending_invest or _pending_province_hand_index != -1) and _selected_province != province_id:
 		_select_target_province(province_id)
 		return
 	if _pending_invest:
@@ -1073,33 +1070,27 @@ func _on_province_clicked(province_id: String) -> void:
 		else:
 			_show_toast(_action_block_reason(GameRules.MITING_MANA_COST))
 		return
-	if _pending_scout:
-		if not CardManager.can_scout(me, province_id):
+	if _pending_org:
+		if not CardManager.can_build_organization(me, province_id):
 			_cancel_targeting()
-			_show_toast("Bu ile bu tur zaten gözcü gönderdin." if CardManager.scout_rounds_left(me, province_id) >= GameRules.SCOUT_ROUNDS \
-				else _action_block_reason(GameRules.SCOUT_MANA_COST))
+			if CardManager.organization_level(province_id, me) >= GameRules.ORG_MAX_LEVEL:
+				_show_toast("Bu ildeki teşkilatın zaten en üst seviyede.")
+			else:
+				_show_toast(_action_block_reason(GameRules.ORG_MANA_COST))
 			return
-		# Gönderildi: harita bir an gözcü katmanında kalır (il boyansın), sonra döner.
-		_pending_scout = false
+		# Kuruldu: harita bir an teşkilat katmanında kalır (il boyansın), sonra döner.
+		_pending_org = false
 		_selected_province = ""
 		_highlight_province("")
 		_set_target_hint("")
-		CardManager.scout(province_id)
-		_show_toast("Gözcü %s'a gitti (%d tur): ile dokununca rapor açılır." % [ElectionNightSim.province_name(province_id), GameRules.SCOUT_ROUNDS])
+		var level := CardManager.organization_level(province_id, me) + 1
+		CardManager.build_organization(province_id)
+		_show_toast("%s teşkilatı seviye %d: %s" % [ElectionNightSim.province_name(province_id), level, _org_level_text(level)])
 		_refresh_action_buttons()
-		var token := _scout_view_token
-		get_tree().create_timer(SCOUT_RESULT_HOLD).timeout.connect(func():
-			if is_instance_valid(self) and token == _scout_view_token and not _pending_scout:
-				_end_scout_view())
-		return
-	if _pending_org:
-		_cancel_targeting()
-		if CardManager.can_build_organization(me, province_id):
-			CardManager.build_organization(province_id)
-		elif CardManager.organization_level(province_id, me) >= GameRules.ORG_MAX_LEVEL:
-			_show_toast("Bu ildeki il başkanlığın zaten en üst seviyede.")
-		else:
-			_show_toast(_action_block_reason(GameRules.ORG_MANA_COST))
+		var token := _org_view_token
+		get_tree().create_timer(ORG_RESULT_HOLD).timeout.connect(func():
+			if is_instance_valid(self) and token == _org_view_token and not _pending_org:
+				_end_org_view())
 		return
 	if _pending_province_hand_index != -1:
 		var hand_index := _pending_province_hand_index
@@ -1136,18 +1127,10 @@ func _select_target_province(province_id: String) -> void:
 	elif _pending_miting:
 		detail = "%s: miting (%d mana) · provokasyon riski %%%d · gücün %+.1f" % [pname, GameRules.MITING_MANA_COST,
 			int(round(CardManager.miting_risk(me, province_id) * 100.0)), CardManager.activity_of(province_id, me)]
-	elif _pending_scout:
-		var left := CardManager.scout_rounds_left(me, province_id)
-		if left >= GameRules.SCOUT_ROUNDS:
-			detail = "%s: bu tur zaten gözcü gönderdin" % pname
-		elif left > 0:
-			detail = "%s: gözcü %d tur daha burada · yenile: %d tura çıkar (%d mana)" % [pname, left, GameRules.SCOUT_ROUNDS, GameRules.SCOUT_MANA_COST]
-		else:
-			detail = "%s: gözcü gönder, %d tur kalır (%d mana)" % [pname, GameRules.SCOUT_ROUNDS, GameRules.SCOUT_MANA_COST]
 	elif _pending_org:
 		var level := CardManager.organization_level(province_id, me)
-		detail = "%s: il başkanlığı zaten en üst seviyede" % pname if level >= GameRules.ORG_MAX_LEVEL \
-			else "%s: il başkanlığı seviye %d → %d (%d mana)" % [pname, level, level + 1, GameRules.ORG_MANA_COST]
+		detail = "%s: teşkilat zaten en üst seviyede" % pname if level >= GameRules.ORG_MAX_LEVEL \
+			else "%s: teşkilat seviye %d → %d (%d mana) · %s" % [pname, level, level + 1, GameRules.ORG_MANA_COST, _org_level_text(level + 1)]
 	else:
 		var card_type: String = CardManager.my_inventory()[_pending_province_hand_index]
 		if card_type == CardPresets.MITING_CARD_TYPE:
@@ -1688,7 +1671,7 @@ func _refresh_government_panel() -> void:
 func _refresh_score_panel() -> void:
 	GovernmentHud.fill_score_panel(score_vbox, _ordered_peer_ids(), multiplayer.get_unique_id())
 
-# --- Hamleler: yasa tasarla, il başkanlığı, karalama hedefi -------------------
+# --- Hamleler: yasa tasarla, teşkilat, karalama hedefi -------------------
 
 ## Yasa dairesi sürüklenirken _drag_hand_index bu değeri alır (elde kart yok).
 const LAW_DRAG_INDEX := -2
@@ -1754,9 +1737,9 @@ func _build_action_buttons() -> void:
 	_mana_box.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_show_toast(_mana_rules))
-	_mana_rules = "Sıran gelince +%d mana; manan yettikçe istediğin kadar hamle yap, biriken mana kalır.\nHamleler: yasa %d (turda 1), miting %d, il başkanlığı %d, gözcü %d (%d tur), yatırım %d, gensoru %d mana.\nKart çekmek %d mana (sınırsız). Kartlar bonus: karalama %d, vekil çalma %d/%d/%d, popülizm %d, mana bonusu %d.\nManan bitince sıra kendiliğinden geçer. Seçimden sonra herkese +%d, yeni hükümete +%d mana." % [
+	_mana_rules = "Sıran gelince +%d mana; manan yettikçe istediğin kadar hamle yap, biriken mana kalır.\nHamleler: yasa %d (turda 1), miting %d, teşkilat %d (seviye başına), yatırım %d, gensoru %d mana.\nKart çekmek bedava (turda 1), kart oynamak sınırsız. Kartlar bonus: karalama %d, vekil çalma %d/%d/%d, popülizm %d, mana bonusu %d.\nManan bitince sıra kendiliğinden geçer. Seçimden sonra herkese +%d, yeni hükümete +%d mana." % [
 		GameRules.MANA_PER_ROUND, GameRules.LAW_MANA_COST, GameRules.MITING_MANA_COST, GameRules.ORG_MANA_COST,
-		GameRules.SCOUT_MANA_COST, GameRules.SCOUT_ROUNDS, GameRules.INVEST_MANA_COST, GameRules.CENSURE_MANA_COST, GameRules.DRAW_MANA_COST,
+		GameRules.INVEST_MANA_COST, GameRules.CENSURE_MANA_COST,
 		CardPresets.card_cost("karalama"), CardPresets.card_cost("steal_weak"), CardPresets.card_cost("steal_medium"),
 		CardPresets.card_cost("steal_strong"), CardPresets.card_cost("populizm"), CardPresets.card_cost("mana_bonusu"),
 		GameRules.ELECTION_MANA_BONUS, GameRules.GOVERNMENT_MANA_BONUS]
@@ -1766,13 +1749,11 @@ func _build_action_buttons() -> void:
 	_law_button.pressed.connect(_on_law_button_pressed)
 	_miting_button = _action_button("MİTİNG", "%d mana" % GameRules.MITING_MANA_COST, Color(0.72, 0.3, 0.14), -292.0, 1)
 	_miting_button.pressed.connect(_on_miting_button_pressed)
-	_org_button = _action_button("İL BAŞKANLIĞI", "%d mana" % GameRules.ORG_MANA_COST, Color(0.1, 0.44, 0.48), -256.0, 0)
+	_org_button = _action_button("TEŞKİLATLANMA", "%d mana" % GameRules.ORG_MANA_COST, Color(0.1, 0.44, 0.48), -256.0, 0)
 	_org_button.pressed.connect(_on_org_button_pressed)
-	_scout_button = _action_button("GÖZCÜ", "%d mana" % GameRules.SCOUT_MANA_COST, Color(0.55, 0.42, 0.12), -256.0, 1)
-	_scout_button.pressed.connect(_on_scout_button_pressed)
-	_invest_button = _action_button("YATIRIM", "%d mana" % GameRules.INVEST_MANA_COST, Color(0.2, 0.5, 0.22), -220.0, 0)
+	_invest_button = _action_button("YATIRIM", "%d mana" % GameRules.INVEST_MANA_COST, Color(0.2, 0.5, 0.22), -256.0, 1)
 	_invest_button.pressed.connect(_on_invest_button_pressed)
-	_censure_button = _action_button("GENSORU", "%d mana" % GameRules.CENSURE_MANA_COST, Color(0.6, 0.16, 0.2), -220.0, 1)
+	_censure_button = _action_button("GENSORU", "%d mana" % GameRules.CENSURE_MANA_COST, Color(0.6, 0.16, 0.2), -220.0, 0)
 	_censure_button.pressed.connect(_on_censure_button_pressed)
 
 ## column: 0 sol, 1 sağ (sağ sütunda iki sütunlu ızgara).
@@ -1827,15 +1808,13 @@ func _refresh_action_buttons() -> void:
 	_mana_label.text = str(mana_now)
 	var law_ok := CardManager.can_propose_law(me)
 	var org_ok := CardManager.can_choose_main_action(me) and mana_now >= GameRules.ORG_MANA_COST
-	var scout_ok := CardManager.can_scout(me)
 	var miting_ok := CardManager.can_miting(me)
 	_miting_button.modulate.a = 1.0 if miting_ok or _pending_miting else 0.45
 	_invest_button.modulate.a = 1.0 if CardManager.can_invest(me) or _pending_invest else 0.45
 	_censure_button.modulate.a = 1.0 if CardManager.can_censure(me) or _pending_censure else 0.45
 	# disabled kullanılmıyor: pasif butona dokununca neden olmadığı uyarı olarak çıksın.
 	_law_button.modulate.a = 1.0 if law_ok else 0.45
-	_org_button.modulate.a = 1.0 if org_ok else 0.45
-	_scout_button.modulate.a = 1.0 if scout_ok or _pending_scout else 0.45
+	_org_button.modulate.a = 1.0 if org_ok or _pending_org else 0.45
 
 func _build_law_designer() -> void:
 	_law_designer = PanelContainer.new()
@@ -2030,7 +2009,7 @@ func _on_miting_button_pressed() -> void:
 	var me := multiplayer.get_unique_id()
 	_deselect_hand_card()
 	_law_designer.hide()
-	if _pending_org or _pending_scout or _pending_invest or _pending_censure or _pending_province_hand_index != -1:
+	if _pending_org or _pending_invest or _pending_censure or _pending_province_hand_index != -1:
 		_cancel_targeting()
 	if not CardManager.can_miting(me):
 		_show_toast(_action_block_reason(GameRules.MITING_MANA_COST))
@@ -2040,23 +2019,6 @@ func _on_miting_button_pressed() -> void:
 		_province_panel.hide()
 	_refresh_action_buttons()
 	_set_target_hint("Miting: haritada bir ile dokun (risk görünür), tekrar dokun: miting yap (%d mana)  ·  Butona tekrar dokun: iptal" % GameRules.MITING_MANA_COST)
-
-func _on_org_button_pressed() -> void:
-	if _pending_org:
-		_cancel_targeting()  # butona tekrar basmak il seçimini iptal eder
-		return
-	if _pending_scout or _pending_miting or _pending_invest or _pending_censure:
-		_cancel_targeting()
-	_deselect_hand_card()
-	_law_designer.hide()
-	if not CardManager.can_choose_main_action(multiplayer.get_unique_id()) \
-			or CardManager.mana_of(multiplayer.get_unique_id()) < GameRules.ORG_MANA_COST:
-		_show_toast(_action_block_reason(GameRules.ORG_MANA_COST))
-		return
-	_pending_org = true
-	if _province_panel != null:
-		_province_panel.hide()
-	_set_target_hint("İl başkanlığı: haritada bir ile dokun, tekrar dokun: kur (%d mana)  ·  Butona tekrar dokun: iptal" % GameRules.ORG_MANA_COST)
 
 # --- Harita katmanları ---------------------------------------------------------
 
@@ -2146,18 +2108,13 @@ func _rebuild_layer_legend() -> void:
 		MapLayer.ORGANIZATION:
 			for level in GameRules.ORG_MAX_LEVEL + 1:
 				swatches.append([MAP_BLANK_COLOR.lerp(mine, float(level) / GameRules.ORG_MAX_LEVEL), str(level)])
-			swatches.append([null, "il başkanlığı seviyem"])
+			swatches.append([null, "teşkilat seviyem"])
 		MapLayer.STRENGTH:
-			swatches.append([null, "vekil yok"])
+			swatches.append([MAP_UNKNOWN_COLOR, ""])
+			swatches.append([null, "anket yok (teşkilat 2+)  ·  vekil yok"])
 			for i in STRENGTH_STOPS.size():
 				swatches.append([STRENGTH_STOPS[i], ""])
-			swatches.append([null, "ilin yarısı (şimdi seçim olsa)"])
-		MapLayer.SCOUT:
-			swatches.append([MAP_BLANK_COLOR, ""])
-			swatches.append([null, "yok"])
-			for left in range(GameRules.SCOUT_ROUNDS, 0, -1):
-				swatches.append([MAP_BLANK_COLOR.lerp(mine, float(left) / GameRules.SCOUT_ROUNDS), str(left)])
-			swatches.append([null, "tur kaldı"])
+			swatches.append([null, "ilin yarısı"])
 	_layer_legend.visible = not swatches.is_empty()
 	for entry in swatches:
 		if entry[0] == null:
@@ -2190,16 +2147,16 @@ func _rebuild_layer_legend() -> void:
 		_place_layer_bar.call_deferred()
 
 func _on_layer_button_pressed(layer: int) -> void:
-	if _pending_scout:
-		# Gözcü seçimi sürerken başka katmana geçmek gözcüyü iptal eder.
-		_pending_scout = false
-		_layer_before_scout = -1
+	if _pending_org:
+		# Teşkilat seçimi sürerken başka katmana geçmek seçimi iptal eder.
+		_pending_org = false
+		_layer_before_org = -1
 		_selected_province = ""
 		_highlight_province("")
 		_set_target_hint("")
 		_refresh_action_buttons()
-	_scout_view_token += 1
-	_layer_before_scout = -1
+	_org_view_token += 1
+	_layer_before_org = -1
 	_set_map_layer(layer)
 
 ## Katmana göre il renkleri. Vurgulu il (seçim modu) koyulaştırılmış kalır.
@@ -2216,17 +2173,16 @@ func _apply_map_layer_colors() -> void:
 		var gradient := Gradient.new()
 		gradient.offsets = PackedFloat32Array([0.0, 0.25, 0.5, 0.75, 1.0])
 		gradient.colors = PackedColorArray(STRENGTH_STOPS)
-		var projection: Dictionary = CardManager.projection_all() if _map_layer == MapLayer.STRENGTH else {}
+		var projection: Dictionary = CardManager.projection_all(me) if _map_layer == MapLayer.STRENGTH else {}
 		for province_id in map_holder.get_all_province_ids():
 			match _map_layer:
 				MapLayer.ORGANIZATION:
 					colors[province_id] = MAP_BLANK_COLOR.lerp(mine, float(CardManager.organization_level(province_id, me)) / GameRules.ORG_MAX_LEVEL)
 				MapLayer.STRENGTH:
-					colors[province_id] = gradient.sample((_strength_t(projection.get(province_id, {}), me) + 1.0) * 0.5)
-				MapLayer.SCOUT:
-					# Yeni gözcü (5 tur) parti renginin aynısı, son turundaki açık ton.
-					var left := CardManager.scout_rounds_left(me, province_id)
-					colors[province_id] = MAP_BLANK_COLOR.lerp(mine, float(left) / GameRules.SCOUT_ROUNDS) if left > 0 else MAP_BLANK_COLOR
+					if projection.has(province_id):
+						colors[province_id] = gradient.sample((_strength_t(projection[province_id], me) + 1.0) * 0.5)
+					else:
+						colors[province_id] = MAP_UNKNOWN_COLOR
 	_province_base_colors = colors
 	map_holder.clear_overlay()
 	map_holder.set_province_colors(colors)
@@ -2313,40 +2269,51 @@ func _set_map_layer(layer: int, animate: bool = true) -> void:
 		_queued_layer = -1
 		_set_map_layer(queued)
 
-func _begin_scout_view() -> void:
-	_scout_view_token += 1
-	if _layer_before_scout == -1:
-		_layer_before_scout = _map_layer
-	_set_map_layer(MapLayer.SCOUT)
+func _begin_org_view() -> void:
+	_org_view_token += 1
+	if _layer_before_org == -1:
+		_layer_before_org = _map_layer
+	_set_map_layer(MapLayer.ORGANIZATION)
 
-func _end_scout_view() -> void:
-	if _layer_before_scout == -1:
+func _end_org_view() -> void:
+	if _layer_before_org == -1:
 		return
-	var previous := _layer_before_scout
-	_layer_before_scout = -1
+	var previous := _layer_before_org
+	_layer_before_org = -1
 	_set_map_layer(previous)
 
-## Gözcü hamlesi: harita anında gözcü katmanına geçer, il seçilir. Butona
+## Teşkilatlanma: harita anında teşkilat katmanına geçer, il seçilir. Butona
 ## tekrar basmak iptal eder (mana harcanmaz); her iki durumda da harita önceki
 ## katmanına döner.
-func _on_scout_button_pressed() -> void:
-	if _pending_scout:
+func _on_org_button_pressed() -> void:
+	if _pending_org:
 		_cancel_targeting()
 		return
 	var me := multiplayer.get_unique_id()
 	_deselect_hand_card()
 	_law_designer.hide()
-	if _pending_org or _pending_miting or _pending_invest or _pending_censure or _pending_province_hand_index != -1:
+	if _pending_miting or _pending_invest or _pending_censure or _pending_province_hand_index != -1:
 		_cancel_targeting()
-	if not CardManager.can_scout(me):
-		_show_toast(_action_block_reason(GameRules.SCOUT_MANA_COST))
+	if not CardManager.can_choose_main_action(me) or CardManager.mana_of(me) < GameRules.ORG_MANA_COST:
+		_show_toast(_action_block_reason(GameRules.ORG_MANA_COST))
 		return
-	_pending_scout = true
+	_pending_org = true
 	if _province_panel != null:
 		_province_panel.hide()
-	_begin_scout_view()
+	_begin_org_view()
 	_refresh_action_buttons()
-	_set_target_hint("Gözcü: bir ile dokun (beyaz = gözcün yok), tekrar dokun: gönder (%d mana)  ·  Butona tekrar dokun: iptal" % GameRules.SCOUT_MANA_COST)
+	_set_target_hint("Teşkilatlanma: bir ile dokun, tekrar dokun: kur / geliştir (%d mana)  ·  Butona tekrar dokun: iptal" % GameRules.ORG_MANA_COST)
+
+## Teşkilat seviyesinin getirdikleri (kısa).
+static func _org_level_text(level: int) -> String:
+	match level:
+		1:
+			return "az oy bonusu, ilin görüşü"
+		2:
+			return "orta oy bonusu, orta isabetli anket"
+		3:
+			return "yüksek oy bonusu, yüksek isabetli anket"
+	return ""
 
 func _build_propaganda_menu() -> void:
 	_propaganda_menu = PanelContainer.new()

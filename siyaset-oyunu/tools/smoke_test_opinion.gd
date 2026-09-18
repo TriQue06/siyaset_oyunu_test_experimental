@@ -192,9 +192,9 @@ func _initialize() -> void:
 	gm.submit_law(1, cp.law_type("social", -1))
 	gm._apply_vote(1, gm.VOTE_YES)
 	gm._apply_vote(2, gm.VOTE_ABSTAIN)
-	gm._apply_vote(3, gm.VOTE_YES)   # muhalefet iktidarın yasasına EVET: istikrar
-	check("muhalefet iktidara EVET: istikrar arti", near(cm.local_of(soc_mid, 3), PublicOpinion.law_vote_delta(a_mid, 1, false, true)) \
-		and cm.local_of(soc_mid, 3) > 0.0, "%.2f" % cm.local_of(soc_mid, 3))
+	gm._apply_vote(3, gm.VOTE_YES)   # muhalefet iktidarın yasasına EVET: istikrar bonusu yok
+	check("muhalefet iktidara EVET: sadece ideolojik etki", near(cm.local_of(soc_mid, 3), PublicOpinion.LAW_VOTE_IDEOLOGY * a_mid),
+		"%.2f" % cm.local_of(soc_mid, 3))
 	var abstain_untouched := true
 	for province_id in cm.local_support.keys():
 		if cm.local_of(province_id, 2) != 0.0:
@@ -255,7 +255,7 @@ func _initialize() -> void:
 	check("reddedilen gensoru: hukumet gorevde", gm.has_government() and gm.phase == gm.Phase.GOVERNING, gm.last_resolution_reason)
 	check("reddedilen gensoruyu veren ulusal destek kaybeder", near(cm.national_of(3), PublicOpinion.CENSURE_REJECTED_NATIONAL),
 		"%.2f" % cm.national_of(3))
-	check("puan tablosu etkilenmez", gm.score_of(3) == 0 or gm.score_of(3) == -gp.GOVERNMENT_NO_PENALTY, str(gm.score_of(3)))
+	check("puan tablosu etkilenmez", gm.score_of(3) == 0, str(gm.score_of(3)))
 
 	print("")
 	print("=== 8) SONME (IL BASKANLIGI SONMEZ) ===")

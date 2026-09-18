@@ -27,8 +27,8 @@ const NATIONAL_DECAY := 0.75
 const LOCAL_DECAY := 0.62
 
 # --- Miting -----------------------------------------------------------------
-const MITING_LOCAL := 3.5
-const MITING_NATIONAL := 0.5
+const MITING_LOCAL := 5.0
+const MITING_NATIONAL := 0.8
 const PROVOCATION_LOCAL := -2.5
 const PROVOCATION_NATIONAL := -1.0
 ## Provokasyon riski: partinin ideolojisi ile ilin MEVCUT siyasi dengesi
@@ -51,8 +51,10 @@ const INVEST_PARTNER_LOCAL := 1.5
 ## Popülizm süren partinin KENDİ hamlelerinin (miting, yatırım, yasa, oy,
 ## karalama kazancı, gensoru) iyi sonuçları bu çarpanla büyür, kötü sonuçları
 ## küçülür. Başkalarının ona yaptığı karalama etkilenmez.
-const POPULISM_GOOD_MULT := 1.5
-const POPULISM_BAD_MULT := 0.5
+const POPULISM_GOOD_MULT := 2.0
+const POPULISM_BAD_MULT := 0.25
+## Popülizm sürerken seçim yapılırsa partinin ulusal puanına eklenir.
+const POPULISM_ELECTION_NATIONAL := 1.5
 
 # --- İktidar dengesi ----------------------------------------------------------
 ## Seçim anında hükümette olan her partiye eklenen ulusal puan. İktidar zaten
@@ -68,7 +70,7 @@ const CENSURE_REJECTED_NATIONAL := -2.0
 
 # --- İl başkanlığı ------------------------------------------------------------
 ## Seviye başına KALICI aktivite (sönmez).
-const ORG_ACTIVITY_PER_LEVEL := 1.2
+const ORG_ACTIVITY_PER_LEVEL := 2.0
 ## Seviye başına miting provokasyon riskinin azalma oranı.
 const ORG_RISK_REDUCTION_PER_LEVEL := 0.25
 
@@ -84,18 +86,15 @@ const LAW_VOTE_IDEOLOGY := 1.5
 ## İktidar partisi muhalefetin yasasına EVET: her ilde (gündemi kaptırdı).
 ## Yasaya uyumlu illerde ideolojik artı bunu nötre/artıya çevirebilir.
 const LAW_GOV_YES_ON_OPPOSITION := -1.0
-## Muhalefet partisi iktidarın yasasına EVET: her ilde (istikrar). Yasaya zıt
-## illerde ideolojik eksi bunu nötre/eksiye çevirebilir.
-const LAW_OPPOSITION_YES_ON_GOV := 0.8
 
 # --- Karalama -----------------------------------------------------------------
 ## Hedefin kaybı = DAMAGE / (1 + DEFENSE_FACTOR × hedefin il gücü)
 ## Karalayanın kazancı = GAIN × (1 + ATTACK_FACTOR × karalayanın il gücü)
-const PROPAGANDA_DAMAGE := 3.5
+const PROPAGANDA_DAMAGE := 5.0
 ## Karalama bir partinin il puanını bunun altına İTEMEZ: parti sarsılır ama o
 ## ilden silinmez, karşı kampanyayla toparlanabilir.
 const PROPAGANDA_FLOOR := -3.0
-const PROPAGANDA_GAIN := 1.0
+const PROPAGANDA_GAIN := 1.5
 const PROPAGANDA_DEFENSE_FACTOR := 0.5
 const PROPAGANDA_ATTACK_FACTOR := 0.3
 ## Bir partinin bir ildeki GÜCÜ = IDEOLOGY_WEIGHT × ideolojik yakınlık (0..1)
@@ -167,8 +166,6 @@ static func law_vote_delta(alignment: float, choice: int, voter_in_gov: bool, pr
 	if choice > 0:
 		if voter_in_gov and not proposer_in_gov:
 			delta += LAW_GOV_YES_ON_OPPOSITION
-		elif not voter_in_gov and proposer_in_gov:
-			delta += LAW_OPPOSITION_YES_ON_GOV
 	return delta
 
 ## Bir partinin bir ildeki gücü (karalamada saldırı/savunma).

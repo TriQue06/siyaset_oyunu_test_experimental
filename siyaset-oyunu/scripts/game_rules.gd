@@ -7,16 +7,20 @@ extends RefCounted
 ##   - Bir TUR: turn_order'daki herkesin sırayla bir kez oynaması.
 ##   - İlk FIRST_ELECTION_ROUND tur KAMPANYA DÖNEMİDİR (meclis yok: il
 ##     başkanlıkları, mitingler, gözcü, seçim vaatleri). İlk seçim o turun
-##     sonunda, sonra her ELECTION_INTERVAL turda bir (4, 8, 12 ... 32). Arada
+##     sonunda, sonra her ELECTION_INTERVAL turda bir (5, 10, 15 ... 30). Arada
 ##     kalan turlarda kurulu hükümet görevde kalır ve makam puanlarını toplar.
 ##   - HAMLE SINIRI YOK: sırası gelen oyuncu manası yettiğince hamle yapar,
-##     "Turu Bitir" ile sırayı devreder. Mana birikir, üst sınır yok.
+##     "Turu Bitir" ile sırayı devreder. Mana birikir, üst sınır yok. Manası
+##     biten (ve elinde bedava kart olmayan) oyuncunun sırası kendiliğinden devreder.
+##   - Her seçimden sonra herkes +ELECTION_MANA_BONUS, göreve başlayan hükümetin
+##     partileri +GOVERNMENT_MANA_BONUS mana alır (gensoruyla düşen hükümetin
+##     yerine kurulan hükümet dahil).
 ##   - MANA: herkes MANA_START ile başlar; SIRASI GELDİĞİNDE +MANA_PER_ROUND alır
 ##     (tur sonunda değil: harcadığın mana turu bitirince geri dolmuş görünmez).
 ##   - YASA ilk seçimden önce yapılamaz: meclis yok, saf propaganda dönemi.
 ##     HAMLELER: miting MITING_MANA_COST, il başkanlığı ORG_MANA_COST, gözcü
 ##     SCOUT_MANA_COST; yasa bedava ama oyuncu başına turda LAWS_PER_ROUND kez.
-##     Kart çekmek DRAW_MANA_COST, turda en fazla bir kez (kartlar bonus/joker niteliğinde).
+##     Kart çekmek DRAW_MANA_COST, sınırsız (kartlar bonus/joker niteliğinde).
 ##     Kartları oynamanın bedeli CardPresets.CARD_MANA_COSTS.
 ##   - Hükümet kurulamazsa (tüm görev hakları biterse) o turun sonunda ERKEN
 ##     SEÇİM yapılır.
@@ -26,8 +30,8 @@ extends RefCounted
 ##     milletvekili sayısı).
 ##   - GÖZCÜ bir ilde SCOUT_ROUNDS tur sürer (gönderildiği tur dahil).
 
-const ELECTION_INTERVAL := 4
-const FIRST_ELECTION_ROUND := 4
+const ELECTION_INTERVAL := 5
+const FIRST_ELECTION_ROUND := 5
 
 const MANA_START := 0
 const MANA_PER_ROUND := 3
@@ -36,17 +40,20 @@ const LAWS_PER_ROUND := 1
 const DRAW_MANA_COST := 1
 const SCOUT_MANA_COST := 1
 const SCOUT_ROUNDS := 5
-const MITING_MANA_COST := 3
+const MITING_MANA_COST := 2
 ## Yatırım (sadece hükümet partileri) ve gensoru (sadece muhalefet, hükümet
 ## azınlıktayken) hamleleri.
-const INVEST_MANA_COST := 3
-const CENSURE_MANA_COST := 2
+const INVEST_MANA_COST := 2
+const CENSURE_MANA_COST := 1
 ## Popülizm bonusu kartı bu kadar tur sürer; mana bonusu kartı bu kadar mana verir.
-const POPULISM_ROUNDS := 5
-const MANA_BONUS_AMOUNT := 3
+const POPULISM_ROUNDS := 4
+const MANA_BONUS_AMOUNT := 7
+const ELECTION_MANA_BONUS := 1
+const GOVERNMENT_MANA_BONUS := 1
 const ORG_MANA_COST := 2
 const ORG_MAX_LEVEL := 3
-const MAX_ROUNDS := 32
+## Seçimler 5 turda bir: son seçim de takvime denk gelsin diye 30 tur.
+const MAX_ROUNDS := 30
 
 ## Süre sınırları (saniye). AFK kalan tek bir oyuncu oyunu kilitleyemesin diye.
 ## Tur süresi dolarsa sıra otomatik devredilir; hükümet kurma süresi dolarsa o teklif

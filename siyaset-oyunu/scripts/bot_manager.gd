@@ -5,8 +5,8 @@ extends Node
 ## ve hükümet tekliflerini de rastgele birkaç saniye içinde verir. Kararlar
 ## BotBrain'de. Sadece yetkili tarafta (host ya da ağsız yerel oyun) çalışır.
 
-const THINK_SECONDS := Vector2(1.5, 3.0)   # sıra gelince -> ilk hamle
-const PLAY_SECONDS := Vector2(1.0, 2.2)    # hamleler arası
+const THINK_SECONDS := Vector2(1.0, 1.5)   # sıra gelince -> ilk hamle
+const PLAY_SECONDS := Vector2(1.0, 1.5)    # hamleler arası
 ## Güvenlik sınırı: bir turda en çok bu kadar bot hamlesi.
 const MAX_ACTIONS_PER_TURN := 12
 const VOTE_SECONDS := Vector2(1.5, 4.5)    # oylama açılınca -> oy

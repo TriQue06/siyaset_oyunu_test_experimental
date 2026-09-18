@@ -206,10 +206,6 @@ static func law_vote_hint(my_id: int) -> Dictionary:
 		return {"yes": "EVET: muhalefete gündem kaptırırsın — her ilde eksi, yasaya yakın illerde nötr/artı",
 			"no": no_text,
 			"short": "İktidardasın: muhalefetin yasasına EVET her ilde eksi (yakın illerde az) · kabul edilirse getiren güçlenir"}
-	if not me_gov and proposer_gov:
-		return {"yes": "EVET: istikrar — çoğu ilde artı, yasaya zıt illerde nötr/eksi",
-			"no": no_text,
-			"short": "Muhalefettesin: iktidarın yasasına EVET istikrar sayılır, çoğu ilde artı"}
 	return {"yes": "EVET: yasaya yakın illerde artı, zıt illerde eksi", "no": no_text,
 		"short": "Etkisi il il değişir: yasaya yakın illerde EVET, zıt illerde HAYIR kazandırır"}
 
@@ -234,8 +230,6 @@ static func _government_status_text(my_id: int, time_text: String) -> String:
 		proposer, totals.x, GovernmentManager.abstain_seats(), totals.y, voted, eligible.size(), time_text]
 	if GovernmentManager.has_voted(my_id):
 		text2 += "\nOyun: %s" % GovernmentManager.vote_text(GovernmentManager.my_vote())
-	elif eligible.has(my_id):
-		text2 += "\nHükümete HAYIR ülkeyi istikrarsızlaştırır: −%d puan" % GovernmentPresets.GOVERNMENT_NO_PENALTY
 	return text2
 
 ## Meclis butonlarının altındaki durum metni (kalan süre dahil).

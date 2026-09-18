@@ -84,7 +84,7 @@ func _initialize() -> void:
 	check("2. asamada herkes oy verebilir", gm.eligible_voter_ids().size() == 3)
 	gm._apply_vote(1, false)   # 100 hayir  => 100 < 195, gecmeli
 	check("hukumet KURULDU", gm.has_government())
-	check("hukumete HAYIR diyen -%d puan" % gp.GOVERNMENT_NO_PENALTY, gm.score_of(1) == -gp.GOVERNMENT_NO_PENALTY, str(gm.score_of(1)))
+	check("hukumete HAYIR diyene puan cezasi yok (istikrar kaldirildi)", gm.score_of(1) == 0, str(gm.score_of(1)))
 	check("EVET diyenlere ceza yok", gm.score_of(2) == 0 and gm.score_of(3) == 0)
 	check("ana iktidar partisi = basbakanligi tutan", gm.main_gov_peer_id == 2, str(gm.main_gov_peer_id))
 	check("faz GOVERNING", gm.phase == gm.Phase.GOVERNING)

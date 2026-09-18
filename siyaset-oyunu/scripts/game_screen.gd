@@ -49,7 +49,6 @@ enum MapLayer { SEATS, ORGANIZATION, STRENGTH, SCOUT }
 const MAP_LAYER_TITLES := ["Vekiller", "Teşkilat", "Güç", "Gözcü"]
 const MAP_SLIDE_DURATION := 0.38
 ## Güç haritasında bu kadar il puanı en koyu renge denk gelir.
-const STRENGTH_COLOR_SCALE := 5.0
 const STRENGTH_STOPS := [Color(0.42, 0.04, 0.05), Color(0.88, 0.2, 0.14), Color(0.96, 0.84, 0.24), Color(0.36, 0.76, 0.3), Color(0.04, 0.36, 0.13)]
 const MAP_BLANK_COLOR := Color(0.97, 0.97, 0.95)
 ## Gözcü hamlesinden sonra haritanın gözcü katmanında kaldığı süre.
@@ -1755,9 +1754,12 @@ func _build_action_buttons() -> void:
 	_mana_box.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_show_toast(_mana_rules))
-	_mana_rules = "Sıran gelince +%d mana; manan yettikçe istediğin kadar hamle yap, biriken mana kalır.\nHamleler: yasa %d (turda 1), miting %d, il başkanlığı %d, gözcü %d (%d tur), yatırım %d, gensoru %d mana.\nKart çekmek %d mana (turda 1). Kartlar bonus: karalama 2, vekil çalma 2/3/4, popülizm 2, mana bonusu 0." % [
+	_mana_rules = "Sıran gelince +%d mana; manan yettikçe istediğin kadar hamle yap, biriken mana kalır.\nHamleler: yasa %d (turda 1), miting %d, il başkanlığı %d, gözcü %d (%d tur), yatırım %d, gensoru %d mana.\nKart çekmek %d mana (sınırsız). Kartlar bonus: karalama %d, vekil çalma %d/%d/%d, popülizm %d, mana bonusu %d.\nManan bitince sıra kendiliğinden geçer. Seçimden sonra herkese +%d, yeni hükümete +%d mana." % [
 		GameRules.MANA_PER_ROUND, GameRules.LAW_MANA_COST, GameRules.MITING_MANA_COST, GameRules.ORG_MANA_COST,
-		GameRules.SCOUT_MANA_COST, GameRules.SCOUT_ROUNDS, GameRules.INVEST_MANA_COST, GameRules.CENSURE_MANA_COST, GameRules.DRAW_MANA_COST]
+		GameRules.SCOUT_MANA_COST, GameRules.SCOUT_ROUNDS, GameRules.INVEST_MANA_COST, GameRules.CENSURE_MANA_COST, GameRules.DRAW_MANA_COST,
+		CardPresets.card_cost("karalama"), CardPresets.card_cost("steal_weak"), CardPresets.card_cost("steal_medium"),
+		CardPresets.card_cost("steal_strong"), CardPresets.card_cost("populizm"), CardPresets.card_cost("mana_bonusu"),
+		GameRules.ELECTION_MANA_BONUS, GameRules.GOVERNMENT_MANA_BONUS]
 	add_child(_mana_box)
 	# HAMLELER (sağ sütun, destenin yanında alt alta). Kartlar bonus niteliğinde.
 	_law_button = _action_button("YASA", "%d mana" % GameRules.LAW_MANA_COST, Color(0.42, 0.26, 0.62), -292.0, 0)
@@ -2146,10 +2148,10 @@ func _rebuild_layer_legend() -> void:
 				swatches.append([MAP_BLANK_COLOR.lerp(mine, float(level) / GameRules.ORG_MAX_LEVEL), str(level)])
 			swatches.append([null, "il başkanlığı seviyem"])
 		MapLayer.STRENGTH:
-			swatches.append([null, "zayıf"])
+			swatches.append([null, "vekil yok"])
 			for i in STRENGTH_STOPS.size():
 				swatches.append([STRENGTH_STOPS[i], ""])
-			swatches.append([null, "güçlü"])
+			swatches.append([null, "ilin yarısı (şimdi seçim olsa)"])
 		MapLayer.SCOUT:
 			swatches.append([MAP_BLANK_COLOR, ""])
 			swatches.append([null, "yok"])
@@ -2214,13 +2216,13 @@ func _apply_map_layer_colors() -> void:
 		var gradient := Gradient.new()
 		gradient.offsets = PackedFloat32Array([0.0, 0.25, 0.5, 0.75, 1.0])
 		gradient.colors = PackedColorArray(STRENGTH_STOPS)
+		var projection: Dictionary = CardManager.projection_all() if _map_layer == MapLayer.STRENGTH else {}
 		for province_id in map_holder.get_all_province_ids():
 			match _map_layer:
 				MapLayer.ORGANIZATION:
 					colors[province_id] = MAP_BLANK_COLOR.lerp(mine, float(CardManager.organization_level(province_id, me)) / GameRules.ORG_MAX_LEVEL)
 				MapLayer.STRENGTH:
-					var t := clampf(CardManager.activity_of(province_id, me) / STRENGTH_COLOR_SCALE, -1.0, 1.0)
-					colors[province_id] = gradient.sample((t + 1.0) * 0.5)
+					colors[province_id] = gradient.sample((_strength_t(projection.get(province_id, {}), me) + 1.0) * 0.5)
 				MapLayer.SCOUT:
 					# Yeni gözcü (5 tur) parti renginin aynısı, son turundaki açık ton.
 					var left := CardManager.scout_rounds_left(me, province_id)
@@ -2235,6 +2237,22 @@ func _apply_map_layer_colors() -> void:
 		var selected := _hovered_province_id
 		_hovered_province_id = ""
 		_highlight_province(selected)
+
+## Güç katmanı: TÜM partilerin gücüyle, şimdi seçim olsa bu ilde durumum.
+## −1 (kırmızı) .. +1 (koyu yeşil). Vekil çıkaramıyorsam en fazla sarıya yakın
+## turuncu (bir vekile ne kadar yakın olduğuma göre); vekil çıkarıyorsam sarı
+## yeşilden, ilin vekillerinin yarısını alıyorsam koyu yeşile.
+func _strength_t(entry: Dictionary, me: int) -> float:
+	if entry.is_empty() or not entry.has(me):
+		return -1.0
+	var mine: Dictionary = entry[me]
+	var seat_count := maxi(1, int(entry.get("seat_count", 1)))
+	var won := int(mine["seats"])
+	if won <= 0:
+		var quotient := float(mine["quotient"])
+		var closeness := clampf(float(mine["percent"]) / quotient, 0.0, 1.0) if quotient > 0.0 and quotient < INF else 0.0
+		return -1.0 + 0.85 * closeness
+	return 0.2 + 0.8 * clampf(float(won) / float(seat_count) / 0.5, 0.0, 1.0)
 
 ## Katmanı değiştirir: eski görünümün anlık görüntüsü bir yana, yeni katman
 ## öbür yandan kayarak gelir (sağdaki katman sağdan, soldaki soldan).

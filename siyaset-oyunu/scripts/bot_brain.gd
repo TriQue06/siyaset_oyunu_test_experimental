@@ -26,6 +26,11 @@ const MANA_VALUE := 0.3
 const DRAW_HAND_TARGET := 3
 ## Gözcü bilgisinden tahmin edilen eksen değeri (uç biliniyor, büyüklük değil).
 const LEANING_ESTIMATE := 2.0
+## Yasanın taban puanı: yasa her tur meclisi durdurur, bot onu sadece gerçekten
+## işe yarayacaksa sunsun (miting / il başkanlığı / kartlar öne geçebilsin).
+const LAW_BASE_SCORE := 1.0
+## Bot bir yasayı en fazla bu kadar turda bir sunar.
+const LAW_EVERY_ROUNDS := 3
 
 static func _ideology(peer_id: int) -> Dictionary:
 	return PartyManager.parties.get(peer_id, {}).get("ideology", IdeologyAxes.default_values())
@@ -87,7 +92,7 @@ static func choose_action(bot: int) -> Dictionary:
 			best = {"type": "card"}
 			best_score = card_score
 
-	if CardManager.can_propose_law(bot):
+	if CardManager.can_propose_law(bot) and CardManager.round_number - int(CardManager.law_rounds.get(bot, -99)) >= LAW_EVERY_ROUNDS:
 		var law := _best_law(bot, known)
 		if not law.is_empty() and float(law["score"]) - GameRules.LAW_MANA_COST * mana_value > best_score:
 			best = {"type": "law", "law": law["law"]}
@@ -104,11 +109,11 @@ static func choose_action(bot: int) -> Dictionary:
 			best = {"type": "invest", "province": invest["province"]}
 			best_score = float(invest["score"]) - GameRules.INVEST_MANA_COST * mana_value
 
-	if CardManager.can_censure(bot) and GovernmentManager.government_seats() * 2 <= GovernmentManager.total_seats():
-		# Hükümetin salt çoğunluğu yok: geçme ihtimali yüksek, reddedilirse ulusal eksi.
-		if 6.0 - GameRules.CENSURE_MANA_COST * mana_value > best_score:
+	if CardManager.can_censure(bot) and _censure_worth_it(bot):
+		# Geçeceği hesaplanan gensoru: hükümet düşer, yeni kurma turu başlar.
+		if 4.0 - GameRules.CENSURE_MANA_COST * mana_value > best_score:
 			best = {"type": "censure"}
-			best_score = 6.0 - GameRules.CENSURE_MANA_COST * mana_value
+			best_score = 4.0 - GameRules.CENSURE_MANA_COST * mana_value
 
 	if CardManager.can_miting(bot):
 		var miting := _eval_miting(bot, known)
@@ -122,11 +127,11 @@ static func choose_action(bot: int) -> Dictionary:
 		best_score = float(scout["score"]) - GameRules.SCOUT_MANA_COST * mana_value
 
 	if CardManager.can_draw_for(bot):
-		# Elde oynanabilir kart azsa çek; kalan mana bir kart oynamaya yetmeli.
+		# Elde kart azsa çek; kalan mana bir kart oynamaya yetmeli.
 		var draw_score := 0.0
 		if hand.size() < DRAW_HAND_TARGET:
-			draw_score = 1.1 - 0.3 * hand.size()
-		if CardManager.mana_of(bot) - GameRules.DRAW_MANA_COST < 2:
+			draw_score = 1.7 - 0.35 * hand.size()
+		if CardManager.mana_of(bot) - GameRules.DRAW_MANA_COST < 1:
 			draw_score *= 0.5
 		if draw_score - GameRules.DRAW_MANA_COST * mana_value > best_score:
 			best = {"type": "draw"}
@@ -163,14 +168,14 @@ static func _best_law(bot: int, known: Dictionary) -> Dictionary:
 			var moved := mine.duplicate()
 			moved[axis] = IdeologyAxes.clamp_value(float(mine.get(axis, 0)) + IdeologyAxes.LAW_PROPOSE_SHIFT * dir)
 			value += (_electoral_strength(moved, known) - _electoral_strength(mine, known)) * 20.0
-			var score := 1.7 + value * 5.0
+			var score := LAW_BASE_SCORE + value * 5.0
 			if best.is_empty() or score > float(best["score"]):
 				best = {"law": law_type, "score": score}
 	# Tahmin gürültülü ya da bütün yasalar zararlı görünüyorsa kimlik yasası
 	# (partinin belirgin ekseni) yedek seçenektir: meclis oyunu durmasın.
 	var exploration := _exploration_law(bot, mine)
 	if known_seats >= 60.0:
-		exploration["score"] = 1.2
+		exploration["score"] = 0.8
 	if float(exploration["score"]) > float(best["score"]):
 		return exploration
 	return best
@@ -192,7 +197,7 @@ static func _exploration_law(bot: int, mine: Dictionary) -> Dictionary:
 		var seed_value := absi(bot) + CardManager.round_number
 		best_axis = IdeologyAxes.AXES[seed_value % IdeologyAxes.AXES.size()]
 		best_dir = 1 if (absi(bot) / 7) % 2 == 0 else -1
-	return {"law": CardPresets.law_type(best_axis, best_dir), "score": 1.5}
+	return {"law": CardPresets.law_type(best_axis, best_dir), "score": 1.0}
 
 ## Kaba geçme ihtimali: diğer partilerin oyu, botun kendi bilgisiyle tahmin edilir.
 static func _law_pass_chance(bot: int, law_type: String, known: Dictionary) -> float:
@@ -248,7 +253,9 @@ static func _best_organization(bot: int, known: Dictionary) -> Dictionary:
 		var center: Dictionary = known.get(province_id, {})
 		# Bilinmeyen il: yakınlık orta varsayılır (nötr merkez parti için aldatıcı derecede yakın görünürdü).
 		var closeness := ElectionModel.support(mine, center) if not center.is_empty() else 0.5
-		var value := float(seats[province_id]) * (0.5 + closeness) / 30.0 * (1.0 - 0.3 * level)
+		# Seviye başına kalıcı aktivite (ORG_ACTIVITY_PER_LEVEL) mitingden daha değerli.
+		var value := float(seats[province_id]) * (0.5 + closeness) / 30.0 * (1.0 - 0.3 * level) \
+			* PublicOpinion.ORG_ACTIVITY_PER_LEVEL / 1.2
 		var score := 1.0 + value * (1.3 if _election_soon() else 1.0)
 		if best.is_empty() or score > float(best["score"]):
 			best = {"province": province_id, "score": score}
@@ -303,7 +310,7 @@ static func _eval_miting(bot: int, known: Dictionary) -> Dictionary:
 		var closeness := ElectionModel.support(ideology, known.get(province_id, {}))
 		var expected := (1.0 - risk) * PublicOpinion.MITING_LOCAL + risk * PublicOpinion.PROVOCATION_LOCAL
 		# İl başkanlığıyla aynı ölçek (vekil/30). Zaten güçlü olduğu ilde getirisi azalır.
-		var diminish := 1.0 / (1.0 + maxf(0.0, CardManager.activity_of(province_id, bot)) / 3.0)
+		var diminish := 1.0 / (1.0 + maxf(0.0, CardManager.activity_of(province_id, bot)) / 2.0)
 		var value := expected / PublicOpinion.MITING_LOCAL * seats / 30.0 * (0.5 + closeness) * diminish \
 			+ (1.0 - risk) * PublicOpinion.MITING_NATIONAL + risk * PublicOpinion.PROVOCATION_NATIONAL
 		if value > best_value:
@@ -398,6 +405,29 @@ static func _eval_steal(bot: int, card_type: String) -> Dictionary:
 			score += 3.0
 	return {"score": score, "peer": target, "province": ""}
 
+## Gensoru ancak geçeceği hesaplanıyorsa ve hükümet yeni kurulmamışsa verilir;
+## aynı tur içinde ikinci gensoru yok (her tur meclisi kilitlemesin).
+static func _censure_worth_it(bot: int) -> bool:
+	if CardManager.round_number - GovernmentManager.formed_round < 2:
+		return false
+	if GovernmentManager.censure_round == CardManager.round_number:
+		return false
+	var yes := GovernmentManager.seats_of(bot)
+	var no := 0
+	var main_gov := GovernmentManager.main_gov_peer_id
+	for peer_id in GovernmentManager.voter_ids():
+		if peer_id == bot:
+			continue
+		if CardManager.is_government_party(peer_id):
+			no += GovernmentManager.seats_of(peer_id)
+		elif not MultiplayerManager.is_bot(peer_id):
+			continue  # insanın oyu bilinmez: hesaba katılmaz
+		elif ElectionModel.distance(_ideology(peer_id), _ideology(main_gov)) < 2.0:
+			continue  # çekimser
+		else:
+			yes += GovernmentManager.seats_of(peer_id)
+	return yes > no
+
 # --- Oylama --------------------------------------------------------------------
 
 static func choose_vote(bot: int) -> int:
@@ -409,10 +439,12 @@ static func choose_vote(bot: int) -> int:
 			var d := ElectionModel.distance(_ideology(bot), _ideology(pm))
 			if d < 2.5:
 				return GovernmentManager.VOTE_YES
-			if d < 5.0:  # HAYIR puan kaybettirir: sadece çok uzak hükümete
+			if d < 4.0:
 				return GovernmentManager.VOTE_ABSTAIN
 			return GovernmentManager.VOTE_NO
 		GovernmentManager.KIND_CENSURE:
+			if bot == GovernmentManager.proposal_peer_id:
+				return GovernmentManager.VOTE_YES
 			if CardManager.is_government_party(bot):
 				return GovernmentManager.VOTE_NO
 			if ElectionModel.distance(_ideology(bot), _ideology(GovernmentManager.main_gov_peer_id)) < 2.0:

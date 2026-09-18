@@ -15,8 +15,7 @@ extends Node
 ##      2. MECLİS OYLAMASI: tüm partiler EVET / ÇEKİMSER / HAYIR oylar (ortakların
 ##         oyu 1. aşamadan EVET gelir). HAYIR oylarının milletvekili toplamı
 ##         salt çoğunluğu (%50 + 1) geçerse reddedilir — hükümet salt çoğunluğu
-##         OLMADAN da güvenoyu alabilir. Hükümete HAYIR diyen her parti
-##         GovernmentPresets.GOVERNMENT_NO_PENALTY puan kaybeder (istikrarsızlık).
+##         OLMADAN da güvenoyu alabilir.
 ##      Her aşama HERKES oy verene kadar (ya da GameRules.VOTE_TIMEOUT dolana
 ##      kadar; oy vermeyen ÇEKİMSER sayılır) sürer, erken bitmez.
 ##   5) Reddedilirse ya da süre dolarsa aynı partinin MAX_ATTEMPTS hakkı vardır;
@@ -24,7 +23,7 @@ extends Node
 ##      faz IDLE olur ve tur sonunda ERKEN SEÇİM yapılır (bkz. CardManager).
 ##
 ## GENSORU: Hükümetin toplam milletvekili salt çoğunluğun altına düşerse muhalefet
-## gensoru hamlesi yapabilir. EVET vekilleri HAYIR'dan fazlaysa kabul edilir (çekimserler
+## gensoru hamlesi yapabilir. Gensoruyu verenin oyu baştan EVET'tir. EVET vekilleri HAYIR'dan fazlaysa kabul edilir (çekimserler
 ## sayılmaz), hükümet düşer ve kurma aşaması
 ## baştan başlar.
 ##
@@ -95,6 +94,10 @@ var main_gov_peer_id: int = -1             # başbakanlığı tutan parti
 var scores: Dictionary = {}                # peer_id -> int (biriken puan)
 ## Bir ortak çekildi ve ana iktidar partisi yalnız kalabilir (bkz. ABANDONED_FALL_PENALTY).
 var abandoned: bool = false
+## Sadece host (botların kararı için): mevcut hükümetin kurulduğu ve son
+## gensorunun verildiği tur.
+var formed_round: int = 0
+var censure_round: int = 0
 
 var state_version: int = 0
 
@@ -377,9 +380,14 @@ func submit_censure(peer_id: int) -> void:
 	proposal_kind = KIND_CENSURE
 	proposal_peer_id = peer_id
 	proposal_assignments = {}
-	votes = {}
+	# Gensoruyu veren kendi önergesine EVET demiş sayılır.
+	votes = {peer_id: VOTE_YES}
+	censure_round = CardManager.round_number
 	_set_phase(Phase.VOTING)
-	_push_state()
+	if _all_voted():
+		_begin_resolution()
+	else:
+		_push_state()
 
 ## Bu parti koalisyondan çekilebilir mi? (Hükümette, ana iktidar partisi
 ## değil, oylama/kurma sürmüyor.)
@@ -553,17 +561,6 @@ func _resolve_proposal() -> void:
 		# Gensoru, EVET veren vekiller HAYIR verenlerden fazlaysa geçer (yasalardaki
 		# gibi). Çekimser ve oy vermeyenler sayılmaz; eşitlikte hükümet görevde kalır.
 		rejected = not (totals.x > totals.y)
-	# Hükümete HAYIR ülkeyi istikrarsızlaştırır: küçük bir puan kaybı.
-	var no_note := ""
-	if kind == KIND_GOVERNMENT:
-		var no_names: Array = []
-		for peer_id in votes.keys():
-			if int(votes[peer_id]) == VOTE_NO:
-				scores[peer_id] = score_of(peer_id) - GovernmentPresets.GOVERNMENT_NO_PENALTY
-				no_names.append(_party_name(peer_id))
-		if not no_names.is_empty():
-			no_note = " HAYIR diyenler −%d puan: %s." % [GovernmentPresets.GOVERNMENT_NO_PENALTY,
-				", ".join(PackedStringArray(no_names))]
 	var accepted := not rejected
 
 	if kind == KIND_GOVERNMENT:
@@ -573,9 +570,12 @@ func _resolve_proposal() -> void:
 			abandoned = false
 			_clear_proposal()
 			_set_phase(Phase.GOVERNING)
-			last_resolution_reason = "%s hükümeti güvenoyu aldı.%s" % [_party_name(main_gov_peer_id), no_note]
+			formed_round = CardManager.round_number
+			last_resolution_reason = "%s hükümeti güvenoyu aldı. Hükümet partileri +%d mana." % [
+				_party_name(main_gov_peer_id), GameRules.GOVERNMENT_MANA_BONUS]
+			CardManager.grant_government_mana(government_party_ids())
 		else:
-			last_resolution_reason = "Hükümet teklifi reddedildi: " + reason + no_note
+			last_resolution_reason = "Hükümet teklifi reddedildi: " + reason
 			_fail_attempt()
 	else: # KIND_CENSURE
 		if accepted:
@@ -781,6 +781,8 @@ func _notify_resolved(accepted: bool, kind: String, proposer_id: int) -> void:
 
 ## Yeni oyun başlarken host çağırır.
 func reset() -> void:
+	formed_round = 0
+	censure_round = 0
 	if not _is_authority():
 		return
 	_set_phase(Phase.IDLE)

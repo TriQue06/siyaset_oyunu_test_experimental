@@ -12,8 +12,8 @@ extends Node
 ##      oylamasız SEÇİM VAADİ olur.
 ##   c) İL BAŞKANLIĞI (GameRules.ORG_MANA_COST): bir ilde teşkilat kur / geliştir.
 ##   d) PAS: hamle yapmadan geç, +GameRules.MANA_PASS_BONUS mana.
-##   KART ÇEKMEK HAMLE DEĞİLDİR: turda bir kez, bedava, hamleden önce çekilir.
-##   Çektiği kartı beğenmeyen oyuncu yine yasa / il başkanlığı / pas seçebilir.
+##   KART ÇEKMEK: GameRules.DRAW_MANA_COST, sınırsız (el dolana kadar).
+##   Manası biten oyuncunun sırası kendiliğinden devreder (_auto_end_if_broke).
 ##   GameRules.TURN_TIMEOUT dolarsa otomatik pas geçilir (mana bonusu yok).
 ##   Hükümet kurulurken / meclis oylarken tur DURUR (is_turn_blocked).
 ##
@@ -81,7 +81,7 @@ var inventories: Dictionary = {}
 var turn_order: Array = []
 # turn_order içindeki index; sırası gelen oyuncu turn_order[current_turn_index].
 var current_turn_index: int = 0
-# Sırası gelen oyuncu bu turda kart çekti mi (turda en fazla bir çekiş).
+# Sırası gelen oyuncu bu turda kart çekti mi (bilgi amaçlı; çekiş sınırı yok).
 var has_drawn_this_turn: bool = false
 ## Oyuncunun en son yasa sunduğu tur: peer_id -> round_number (turda 1 yasa).
 var law_rounds: Dictionary = {}
@@ -224,9 +224,9 @@ func is_my_turn() -> bool:
 func can_draw() -> bool:
 	return can_draw_for(multiplayer.get_unique_id())
 
-## Kart çekmek bir hamle: mana ister, turda en fazla bir kez.
+## Kart çekmek bir hamle: mana ister, sayı sınırı yok (el dolana kadar).
 func can_draw_for(peer_id: int) -> bool:
-	return can_choose_main_action(peer_id) and not has_drawn_this_turn and mana_of(peer_id) >= GameRules.DRAW_MANA_COST \
+	return can_choose_main_action(peer_id) and mana_of(peer_id) >= GameRules.DRAW_MANA_COST \
 		and inventories.get(peer_id, []).size() < MAX_HAND_SIZE
 
 ## Sıra bende VE tur akışı engellenmemiş mi? (UI bunu kullanmalı.)
@@ -405,6 +405,32 @@ func province_projection(province_id: String) -> Dictionary:
 	var result := {}
 	for peer_id in turn_order:
 		result[peer_id] = {"percent": float(shares.get(peer_id, 0.0)), "seats": int(alloc.get(peer_id, 0))}
+	return result
+
+## Tüm iller için anlık seçim tahmini: province_id -> {peer_id -> {"percent",
+## "seats", "quotient"}}. quotient: ildeki son kazanan D'Hondt bölümü (bir
+## vekile ne kadar yakın olunduğunu ölçmek için). Güç haritası kullanır.
+func projection_all() -> Dictionary:
+	var mods := election_modifiers()
+	var local_mods: Dictionary = mods["local"]
+	var ideologies := _ideologies()
+	var result := {}
+	for province_id in _province_ids:
+		var seat_count := province_seat_count(province_id)
+		var shares := ElectionModel.expected_shares(ideologies, province_center(province_id), current_axis_sharpness,
+			mods["national"], local_mods.get(province_id, {}))
+		var alloc := ElectionModel.dhondt(shares, turn_order, seat_count)
+		var last_quotient := INF
+		for peer_id in turn_order:
+			var won := int(alloc.get(peer_id, 0))
+			if won > 0:
+				last_quotient = minf(last_quotient, float(shares.get(peer_id, 0.0)) / float(won))
+		var entry := {}
+		for peer_id in turn_order:
+			entry[peer_id] = {"percent": float(shares.get(peer_id, 0.0)), "seats": int(alloc.get(peer_id, 0)),
+				"quotient": last_quotient}
+		entry["seat_count"] = seat_count
+		result[province_id] = entry
 	return result
 
 func _ideologies() -> Dictionary:
@@ -643,6 +669,7 @@ func _apply_draw(peer_id: int) -> void:
 	inventories[peer_id].insert(inventories[peer_id].size() / 2, card_type)
 	has_drawn_this_turn = true
 	_push_state({"type": "drawn", "peer_id": peer_id, "card": card_type})
+	_auto_end_if_broke()
 
 func _apply_play(peer_id: int, hand_index: int, target_peer_id: int = -1, target_province: String = "") -> void:
 	if is_turn_blocked() or peer_id != current_turn_peer_id():
@@ -670,6 +697,8 @@ func _apply_play(peer_id: int, hand_index: int, target_peer_id: int = -1, target
 	_push_state(event, seats_changed_now)
 	if card_type == CardPresets.MANA_BONUS_CARD_TYPE:
 		_finish_round_if_needed(wrapped)
+	else:
+		_auto_end_if_broke()
 
 ## Turu bitir (voluntary=false: süre doldu). Mana bonusu yok.
 func _apply_pass(peer_id: int, _voluntary: bool = true) -> void:
@@ -704,6 +733,7 @@ func _apply_organization(peer_id: int, province_id: String) -> void:
 	_log_province(province_id, "%s il başkanlığı %s (seviye %d)" % [_party_name(peer_id), verb, level])
 	_push_state({"type": "organization", "peer_id": peer_id, "province": province_id,
 		"message": "%s, %s'da il başkanlığı %s (seviye %d)." % [_party_name(peer_id), _province_name(province_id), verb, level]})
+	_auto_end_if_broke()
 
 func _apply_invest_move(peer_id: int, province_id: String) -> void:
 	if not can_invest(peer_id, province_id):
@@ -712,6 +742,7 @@ func _apply_invest_move(peer_id: int, province_id: String) -> void:
 	_event_message = ""
 	_apply_investment(peer_id, province_id)
 	_push_state({"type": "invest", "peer_id": peer_id, "province": province_id, "message": _event_message})
+	_auto_end_if_broke()
 
 func _apply_censure_move(peer_id: int) -> void:
 	if not can_censure(peer_id):
@@ -728,6 +759,7 @@ func _apply_miting_move(peer_id: int, province_id: String) -> void:
 	_event_message = ""
 	_apply_miting(peer_id, province_id)
 	_push_state({"type": "miting", "peer_id": peer_id, "province": province_id, "message": _event_message})
+	_auto_end_if_broke()
 
 func _apply_scout_move(peer_id: int, province_id: String) -> void:
 	if not can_scout(peer_id, province_id):
@@ -736,6 +768,7 @@ func _apply_scout_move(peer_id: int, province_id: String) -> void:
 	_event_message = ""
 	_apply_scout(peer_id, province_id)
 	_push_state({"type": "scout", "peer_id": peer_id, "province": province_id, "message": _event_message})
+	_auto_end_if_broke()
 
 ## Kartın etkisini uygular. Milletvekili dağılımı değiştiyse true döner.
 ## Herkese duyurulacak bir sonuç varsa _event_message'a yazar.
@@ -949,6 +982,28 @@ func _apply_steal(peer_id: int, target_peer_id: int, card_type: String) -> bool:
 	_event_message = "%s, %s'dan %d milletvekili transfer etti." % [_party_name(peer_id), _party_name(target_peer_id), moved]
 	return true
 
+## Sırası gelen oyuncunun manası bittiyse (ve elinde bedava oynanabilecek kart
+## yoksa) sıra kendiliğinden sonraki oyuncuya geçer.
+func _auto_end_if_broke() -> void:
+	if not _is_authority() or game_finished or turn_order.is_empty() or is_turn_blocked():
+		return
+	var peer_id := current_turn_peer_id()
+	if mana_of(peer_id) > 0:
+		return
+	for card_type in inventories.get(peer_id, []):
+		if CardPresets.card_cost(String(card_type)) <= 0:
+			return
+	_apply_pass(peer_id, false)
+
+## GovernmentManager, hükümet güvenoyu alınca çağırır: hükümet partilerine mana.
+func grant_government_mana(peer_ids: Array) -> void:
+	if not _is_authority():
+		return
+	for peer_id in peer_ids:
+		if mana.has(peer_id):
+			mana[peer_id] = mana_of(peer_id) + GameRules.GOVERNMENT_MANA_BONUS
+	_push_state({"type": "mana"})
+
 ## Sırayı bir sonrakine devreder; index başa sardıysa (tur bitti) true döner.
 func _advance_turn() -> bool:
 	var size: int = maxi(1, turn_order.size())
@@ -1003,13 +1058,17 @@ func _finish_round() -> void:
 		_push_state({"type": "round"})
 
 ## Seçimde kullanılacak güç çarpanları:
-##   ulusal : ulusal puan + İKTİDAR YORGUNLUĞU + VEKİL MOMENTUMU (seçimden bu
+##   ulusal : ulusal puan + İKTİDAR DENGESİ + POPÜLİZM + VEKİL MOMENTUMU (seçimden bu
 ##            yana vekil çalarak büyüyen parti artıyla girer)
 ##   il     : aktivite (il puanı + il başkanlığı)
 func election_modifiers() -> Dictionary:
 	var national := national_support.duplicate()
 	for peer_id in GovernmentManager.government_party_ids():
 		national[peer_id] = float(national.get(peer_id, 0.0)) + PublicOpinion.GOVERNMENT_FATIGUE
+	# Popülizm sürerken seçim: seçmen vaatleri hatırlar.
+	for peer_id in turn_order:
+		if populism_rounds_left(peer_id) > 0:
+			national[peer_id] = float(national.get(peer_id, 0.0)) + PublicOpinion.POPULISM_ELECTION_NATIONAL
 	if not election_seats.is_empty():
 		var total := float(maxi(1, TOTAL_SEATS))
 		for peer_id in last_seats.keys():
@@ -1038,6 +1097,9 @@ func _hold_election(finished_round: int, early: bool) -> void:
 	election_seats = last_seats.duplicate()
 	last_election_round = finished_round
 	last_election_was_early = early
+	# Seçim sonrası herkese mana.
+	for peer_id in turn_order:
+		mana[peer_id] = mana_of(peer_id) + GameRules.ELECTION_MANA_BONUS
 	# Seçimde kullanıldıktan SONRA söner: seçimden hemen önceki hamleler tam etkili.
 	_decay_opinion()
 	_push_state({"type": "election"}, true)
@@ -1099,6 +1161,8 @@ func on_block_state_changed() -> void:
 		_finish_round()
 	else:
 		_push_state({"type": "timer"})
+	# Yasa/gensoru son manayla verildiyse oylama bitince sıra devreder.
+	_auto_end_if_broke()
 
 ## Host: oyun sırasında ayrılan oyuncuyu sıradan, envanterden, meclisten ve
 ## hükümet süreçlerinden çıkarır. Onsuz sırası gelen/oy bekleyen oyun kilitlenirdi.

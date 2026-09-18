@@ -91,6 +91,23 @@ func _initialize() -> void:
 		_shot("layer_%d" % layer)
 		print("layer istendi ", layer, " -> ", scene._map_layer, " switching ", scene._layer_switching, " queued ", scene._queued_layer)
 	check("vekil katmaninda vekil daireleri gorunur", scene.map_holder.get_node("SeatMarkers").visible)
+	# Güç katmanı herkesin gücüyle hesaplanır: vekil çıkaramayan yeşil göremez,
+	# bir ilde en fazla iki parti koyu yeşil (vekillerin yarısı) olabilir.
+	var projection: Dictionary = cm.projection_all()
+	var green_without_seat := 0
+	var crowded_dark_green := 0
+	for province_id in projection.keys():
+		var dark := 0
+		for id in cm.turn_order:
+			var t: float = scene._strength_t(projection[province_id], id)
+			if t > 0.0 and int(projection[province_id][id]["seats"]) == 0:
+				green_without_seat += 1
+			if t >= 0.99:
+				dark += 1
+		if dark > 2:
+			crowded_dark_green += 1
+	check("guc haritasi: vekil cikaramayan ilde yesil yok", green_without_seat == 0, str(green_without_seat))
+	check("guc haritasi: bir ilde en fazla iki parti koyu yesil", crowded_dark_green == 0, str(crowded_dark_green))
 	scene._on_layer_button_pressed(2)
 	await create_timer(0.6).timeout
 	cm.current_turn_index = cm.turn_order.find(me)
@@ -124,7 +141,7 @@ func _initialize() -> void:
 	_shot("miting_pending")
 	check("miting: ilk dokunus riski gosterir", String(scene._target_hint.text).find("provokasyon") != -1)
 	scene._on_province_clicked("konya")
-	check("miting hamlesi yapildi (3 mana)", cm.mana_of(me) == 1)
+	check("miting hamlesi yapildi (2 mana)", cm.mana_of(me) == 4 - GameRules.MITING_MANA_COST)
 	cm.mana[me] = 10
 	cm.inventories[me] = ["populizm", "mana_bonusu", "karalama"]
 	cm._push_state({"type": "timer"})

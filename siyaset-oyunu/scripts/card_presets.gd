@@ -68,9 +68,9 @@ const CARD_NATIVE_SIZE := Vector2(72, 96)
 
 ## Vekil çalma kartlarının çaldığı milletvekili aralığı (her değer eşit olası).
 const STEAL_RANGES := {
-	"steal_weak": {"min": 1, "max": 4},
-	"steal_medium": {"min": 5, "max": 8},
-	"steal_strong": {"min": 9, "max": 12},
+	"steal_weak": {"min": 2, "max": 5},
+	"steal_medium": {"min": 6, "max": 10},
+	"steal_strong": {"min": 11, "max": 15},
 }
 
 ## Kartın elden oynanma bedeli (mana).
@@ -78,9 +78,9 @@ const CARD_MANA_COSTS := {
 	"karalama": 2,
 	"populizm": 2,
 	"mana_bonusu": 0,
-	"steal_weak": 2,
-	"steal_medium": 3,
-	"steal_strong": 4,
+	"steal_weak": 1,
+	"steal_medium": 2,
+	"steal_strong": 3,
 }
 
 var _card_textures: Dictionary = {}
@@ -249,8 +249,9 @@ func _card_effect_text(card_type: String) -> String:
 		PROPAGANDA_CARD_TYPE:
 			return "Bir ilde bir partiyi karala: ona eksi, sana artı.\nİlde güçlü olan partiye az işler."
 		POPULISM_CARD_TYPE:
-			return "%d tur boyunca hamlelerinin iyi sonuçları %%%d artar,\nkötü sonuçları %%%d azalır. Seçmek için dokun, tekrar dokun: kullan." % [
-				GameRules.POPULISM_ROUNDS, int(round((PublicOpinion.POPULISM_GOOD_MULT - 1.0) * 100)), int(round((1.0 - PublicOpinion.POPULISM_BAD_MULT) * 100))]
+			return "%d tur boyunca hamlelerinin iyi sonuçları %d katına çıkar,\nkötü sonuçları %%%d azalır; bu sürede seçim olursa ulusal +%.1f.\nSeçmek için dokun, tekrar dokun: kullan." % [
+				GameRules.POPULISM_ROUNDS, int(PublicOpinion.POPULISM_GOOD_MULT), int(round((1.0 - PublicOpinion.POPULISM_BAD_MULT) * 100)),
+				PublicOpinion.POPULISM_ELECTION_NATIONAL]
 		MANA_BONUS_CARD_TYPE:
 			return "+%d mana kazan. Kullanınca sıra sonraki oyuncuya geçer.\nSeçmek için dokun, tekrar dokun: kullan." % GameRules.MANA_BONUS_AMOUNT
 	return ""

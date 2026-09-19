@@ -40,6 +40,8 @@ const AXIS_LABELS := {
 @onready var name_edit: LineEdit = %NameEdit
 @onready var name_hint_label: Label = %NameHintLabel
 @onready var icon_grid: GridContainer = %IconGrid
+var _icon_tabs: HBoxContainer
+var _icon_category: int = PartyPresets.CATEGORY_FICTIONAL
 @onready var bg_color_row: HFlowContainer = %BgColorRow
 @onready var ideology_container: VBoxContainer = %IdeologyContainer
 @onready var random_button: Button = %RandomButton
@@ -126,7 +128,29 @@ func _update_name_hint() -> void:
 	name_hint_label.text = "%d-%d karakter" % [PartyManager.NAME_MIN_LENGTH, PartyManager.NAME_MAX_LENGTH]
 	name_hint_label.modulate = Color(1, 1, 1, 0.6) if valid else Color(1, 0.4, 0.4, 1)
 
+## İkon kategorisi sekmeleri (Kurgusal / Türkiye) ızgaranın üstünde.
+func _build_icon_tabs() -> void:
+	_icon_tabs = HBoxContainer.new()
+	_icon_tabs.alignment = BoxContainer.ALIGNMENT_CENTER
+	_icon_tabs.add_theme_constant_override("separation", 6)
+	var parent := icon_grid.get_parent()
+	parent.add_child(_icon_tabs)
+	parent.move_child(_icon_tabs, icon_grid.get_index())
+	for category in PartyPresets.CATEGORY_TITLES.size():
+		var tab := Button.new()
+		tab.text = PartyPresets.CATEGORY_TITLES[category]
+		tab.toggle_mode = true
+		tab.custom_minimum_size = Vector2(110, 30)
+		tab.pressed.connect(_on_icon_tab_pressed.bind(category))
+		_icon_tabs.add_child(tab)
+
+func _on_icon_tab_pressed(category: int) -> void:
+	_icon_category = category
+	_refresh_icon_grid_selection()
+
 func _build_icon_grid() -> void:
+	_icon_category = PartyPresets.icon_category(_selected_icon_index)
+	_build_icon_tabs()
 	for i in PartyPresets.icon_count():
 		var btn := TextureButton.new()
 		btn.texture_normal = PartyPresets.get_icon_texture(i, GRID_ICON_PIXEL_SIZE)
@@ -147,6 +171,12 @@ func _refresh_icon_grid_selection() -> void:
 	for i in icon_grid.get_child_count():
 		var btn: TextureButton = icon_grid.get_child(i)
 		btn.self_modulate = Color(1, 1, 0.4) if i == _selected_icon_index else Color.WHITE
+		btn.visible = PartyPresets.icon_category(i) == _icon_category
+	if _icon_tabs != null:
+		for category in _icon_tabs.get_child_count():
+			var tab := _icon_tabs.get_child(category) as Button
+			tab.button_pressed = category == _icon_category
+			tab.modulate = Color.WHITE if category == _icon_category else Color(1, 1, 1, 0.5)
 
 ## Renk başka bir OYUNCUDA mı? (Botun rengi alınabilir, bot başka renge geçer.)
 func _is_taken_by_player(color: Color) -> bool:

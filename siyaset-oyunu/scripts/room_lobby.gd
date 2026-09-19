@@ -137,7 +137,7 @@ func _build_player_card(peer_id: int, index: int, am_owner: bool, local_id: int)
 	var pdata: Dictionary = MultiplayerManager.players[peer_id]
 	var is_bot := MultiplayerManager.is_bot(peer_id)
 	var player_name: String = pdata.get("name", "?")
-	var color: Color = PartyPresets.COLORS[(index * 7) % 20]
+	var color: Color = PartyPresets.COLORS[(index * 7) % PartyPresets.COLORS.size()]
 
 	var card := PanelContainer.new()
 	UiSkin.skin_panel(card, UiSkin.PANEL)

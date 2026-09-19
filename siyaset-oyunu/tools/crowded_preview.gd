@@ -88,12 +88,7 @@ func _initialize() -> void:
 	# Güç katmanı herkesin gücüyle hesaplanır: vekil çıkaramayan yeşil göremez,
 	# bir ilde en fazla iki parti koyu yeşil (vekillerin yarısı) olabilir.
 	var projection: Dictionary = cm.projection_all()
-	var mine_projection: Dictionary = cm.projection_all(me)
-	var poll_only_ok := true
-	for province_id in ids:
-		if mine_projection.has(province_id) != (cm.organization_level(province_id, me) >= 2):
-			poll_only_ok = false
-	check("guc haritasi sadece anketli (teskilat 2+) illeri boyar", poll_only_ok)
+	check("guc haritasi her ili boyar (anket gerekmez)", projection.size() == ids.size(), "%d/%d" % [projection.size(), ids.size()])
 	var green_without_seat := 0
 	var crowded_dark_green := 0
 	for province_id in projection.keys():

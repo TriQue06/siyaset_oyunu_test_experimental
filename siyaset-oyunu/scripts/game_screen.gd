@@ -43,8 +43,8 @@ const VOTE_COLORS := {1: Color(0.32, 0.82, 0.38), 0: Color(0.92, 0.78, 0.3), -1:
 ## geçilir, harita yan yana dizilmiş sayfalar gibi yana kayar.
 ##   SEATS        : son seçim (il kazananları + vekil daireleri)
 ##   ORGANIZATION : teşkilat seviyem (0 beyaz → 3 parti rengi)
-##   STRENGTH     : anketim olan illerde (teşkilat 2+) şimdi seçim olsa durumum;
-##                  anketsiz iller gri
+##   STRENGTH     : tüm faktörlerle (ilin görüşü, bütün partilerin gücü) şimdi
+##                  seçim olsa bu ilde durumum; her ilde, ilk turdan itibaren
 enum MapLayer { SEATS, ORGANIZATION, STRENGTH }
 const MAP_LAYER_TITLES := ["Vekiller", "Teşkilat", "Güç"]
 const MAP_UNKNOWN_COLOR := Color(0.62, 0.62, 0.64)
@@ -2125,8 +2125,7 @@ func _rebuild_layer_legend() -> void:
 				swatches.append([MAP_BLANK_COLOR.lerp(mine, float(level) / GameRules.ORG_MAX_LEVEL), str(level)])
 			swatches.append([null, "teşkilat seviyem"])
 		MapLayer.STRENGTH:
-			swatches.append([MAP_UNKNOWN_COLOR, ""])
-			swatches.append([null, "anket yok (teşkilat 2+)  ·  vekil yok"])
+			swatches.append([null, "vekil yok"])
 			for i in STRENGTH_STOPS.size():
 				swatches.append([STRENGTH_STOPS[i], ""])
 			swatches.append([null, "ilin yarısı"])
@@ -2188,7 +2187,7 @@ func _apply_map_layer_colors() -> void:
 		var gradient := Gradient.new()
 		gradient.offsets = PackedFloat32Array([0.0, 0.25, 0.5, 0.75, 1.0])
 		gradient.colors = PackedColorArray(STRENGTH_STOPS)
-		var projection: Dictionary = CardManager.projection_all(me) if _map_layer == MapLayer.STRENGTH else {}
+		var projection: Dictionary = CardManager.projection_all() if _map_layer == MapLayer.STRENGTH else {}
 		for province_id in map_holder.get_all_province_ids():
 			match _map_layer:
 				MapLayer.ORGANIZATION:

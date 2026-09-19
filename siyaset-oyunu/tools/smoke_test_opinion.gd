@@ -319,6 +319,7 @@ func _initialize() -> void:
 	check("yasa hamlesi meclise geldi, 1 mana harcandi",
 		gm.phase == gm.Phase.VOTING and gm.proposal_law == law_soc and cm.mana_of(3) == 2, "mana %d" % cm.mana_of(3))
 	check("oylama sirasinda tur durur", cm.is_turn_blocked())
+	check("yasayi getirenin oyu bastan EVET", int(gm.votes.get(3, 99)) == gm.VOTE_YES and gm.has_voted(3))
 
 	print("")
 	print("=== 10) BONUS KARTLAR: POPULIZM, MANA BONUSU ===")

@@ -442,8 +442,13 @@ func submit_law(peer_id: int, law_type: String) -> bool:
 	proposal_peer_id = peer_id
 	proposal_law = law_type
 	proposal_gov_ids = government_party_ids()
+	# Yasayı getiren kendi yasasına EVET demiş sayılır.
+	votes = {peer_id: VOTE_YES}
 	_set_phase(Phase.VOTING)
-	_push_state()
+	if _all_voted():
+		_begin_resolution()
+	else:
+		_push_state()
 	return true
 
 ## choice: VOTE_YES / VOTE_ABSTAIN / VOTE_NO (bool da kabul edilir).

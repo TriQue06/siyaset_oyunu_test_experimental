@@ -165,7 +165,10 @@ func run_client() -> void:
 	else:
 		# Deste ilk seçimden önce karalama, popülizm ya da mana bonusu verir.
 		cm.play_card(0, 1, "ankara")
-	if card != "atlandi" and not await wait_until(func(): return cm.my_inventory().is_empty(), "kart oynama RPC'si (%s)" % card):
+	# Mana bonusu sırayı devreder; sıra geri dönünce yeni kart gelebilir.
+	var round_before: int = cm.round_number
+	if card != "atlandi" and not await wait_until(func(): return cm.my_inventory().is_empty() or not cm.is_my_turn() 			or cm.round_number != round_before or cm.last_election_round > 0,
+			"kart oynama RPC'si (%s)" % card):
 		return
 	if card == "karalama":
 		if not await wait_until(func(): return cm.province_events.has("ankara"), "karalama sonucu (il olayı) senkronlandı"):

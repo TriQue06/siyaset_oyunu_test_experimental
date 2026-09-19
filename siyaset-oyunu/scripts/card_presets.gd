@@ -36,6 +36,23 @@ const PROPAGANDA_CARD_TYPE := "karalama"
 const POPULISM_CARD_TYPE := "populizm"
 const MANA_BONUS_CARD_TYPE := "mana_bonusu"
 
+## GÜNDEM KARTLARI: her eksenin her ucu için bir sıcak konu. Oynayan gündemi
+## GameRules.AGENDA_ROUNDS tur boyunca bu konuya çeker.
+const AGENDAS := {
+	"gundem_economic_n": {"axis": "economic", "dir": -1, "title": "Hayat Pahalılığı",
+		"text": "Fiyatlar uçtu, seçmen devletten koruma bekliyor."},
+	"gundem_economic_p": {"axis": "economic", "dir": 1, "title": "Vergi ve Bürokrasi Yükü",
+		"text": "Esnaf ve sanayici vergi ve kırtasiyeden bunaldı."},
+	"gundem_social_n": {"axis": "social", "dir": -1, "title": "Özgürlükler Tartışması",
+		"text": "İfade ve yaşam tarzı özgürlüğü ülkenin gündeminde."},
+	"gundem_social_p": {"axis": "social", "dir": 1, "title": "Aile ve Değerler",
+		"text": "Aile ve gelenekler ülkenin en çok konuşulan konusu."},
+	"gundem_administrative_n": {"axis": "administrative", "dir": -1, "title": "Yerelden Yönetim Talebi",
+		"text": "Şehirler kendi kararlarını kendileri vermek istiyor."},
+	"gundem_administrative_p": {"axis": "administrative", "dir": 1, "title": "Güvenlik ve Birlik",
+		"text": "Güvenlik kaygısı güçlü bir merkez talebini büyüttü."},
+}
+
 const CARD_TYPES: Array[String] = [
 	"steal_weak",
 	"steal_medium",
@@ -48,6 +65,12 @@ const CARD_TYPES: Array[String] = [
 	"karalama",
 	"populizm",
 	"mana_bonusu",
+	"gundem_economic_n",
+	"gundem_economic_p",
+	"gundem_social_n",
+	"gundem_social_p",
+	"gundem_administrative_n",
+	"gundem_administrative_p",
 ]
 
 const AXIS_TITLES := {
@@ -68,9 +91,9 @@ const CARD_NATIVE_SIZE := Vector2(72, 96)
 
 ## Vekil çalma kartlarının çaldığı milletvekili aralığı (her değer eşit olası).
 const STEAL_RANGES := {
-	"steal_weak": {"min": 2, "max": 5},
-	"steal_medium": {"min": 6, "max": 10},
-	"steal_strong": {"min": 11, "max": 15},
+	"steal_weak": {"min": 3, "max": 7},
+	"steal_medium": {"min": 8, "max": 13},
+	"steal_strong": {"min": 14, "max": 20},
 }
 
 ## Kartın elden oynanma bedeli (mana).
@@ -78,6 +101,12 @@ const CARD_MANA_COSTS := {
 	"karalama": 1,
 	"populizm": 1,
 	"mana_bonusu": 0,
+	"gundem_economic_n": 1,
+	"gundem_economic_p": 1,
+	"gundem_social_n": 1,
+	"gundem_social_p": 1,
+	"gundem_administrative_n": 1,
+	"gundem_administrative_p": 1,
 	"steal_weak": 1,
 	"steal_medium": 2,
 	"steal_strong": 3,
@@ -112,7 +141,28 @@ func needs_province_target(card_type: String) -> bool:
 
 ## Hedef gerektirmeyen bonus kart mı? (popülizm, mana bonusu)
 func is_self_card(card_type: String) -> bool:
-	return card_type in [POPULISM_CARD_TYPE, MANA_BONUS_CARD_TYPE]
+	return card_type in [POPULISM_CARD_TYPE, MANA_BONUS_CARD_TYPE] or is_agenda_card(card_type)
+
+func is_agenda_card(card_type: String) -> bool:
+	return AGENDAS.has(card_type)
+
+## {"axis", "dir", "title", "text", "side"} ya da boş sözlük.
+func agenda_data(card_type: String) -> Dictionary:
+	if not AGENDAS.has(card_type):
+		return {}
+	var data: Dictionary = AGENDAS[card_type].duplicate()
+	var info: Dictionary = AXIS_TITLES[data["axis"]]
+	data["side"] = info["pos"] if int(data["dir"]) > 0 else info["neg"]
+	data["axis_title"] = info["title"]
+	return data
+
+## Gündemin yasalar üzerindeki etkisini anlatan kısa metin.
+func agenda_effect_text(card_type: String) -> String:
+	var data := agenda_data(card_type)
+	if data.is_empty():
+		return ""
+	return "%s yasaları %d kat, %s yasaları %d kat etkili" % [data["side"], int(PublicOpinion.AGENDA_MATCH_MULT),
+		String(AXIS_TITLES[data["axis"]]["pos" if int(data["dir"]) < 0 else "neg"]), int(PublicOpinion.AGENDA_AXIS_MULT)]
 
 func is_censure_card(card_type: String) -> bool:
 	return card_type == CENSURE_CARD_TYPE
@@ -166,11 +216,15 @@ func card_short_title(card_type: String) -> String:
 			return "VEKİL ÇALMA\nORTA"
 		"steal_strong":
 			return "VEKİL ÇALMA\nGÜÇLÜ"
+	if is_agenda_card(card_type):
+		return "GÜNDEM\n" + String(agenda_data(card_type)["title"]).to_upper()
 	return card_title(card_type).to_upper()
 
 func card_title(card_type: String) -> String:
 	if is_law_card(card_type):
 		return String(law_data(card_type)["title"])
+	if is_agenda_card(card_type):
+		return "Gündem: " + String(agenda_data(card_type)["title"])
 	match card_type:
 		"steal_weak":
 			return "Vekil Çalma (Zayıf)"
@@ -234,7 +288,11 @@ func _card_effect_text(card_type: String) -> String:
 		return law_description(card_type)
 	if needs_target(card_type):
 		var r: Dictionary = STEAL_RANGES[card_type]
-		return "Seçtiğin partiden %d-%d vekil çal.\nSağdaki bir parti kartına sürükle." % [int(r["min"]), int(r["max"])]
+		return "Seçtiğin partiden %d-%d vekil çal (vekili azsa hepsi gidebilir).\nSağdaki bir parti kartına sürükle." % [int(r["min"]), int(r["max"])]
+	if is_agenda_card(card_type):
+		var agenda := agenda_data(card_type)
+		return "%s\n%d tur boyunca gündem bu: %s.\nDokun, tekrar dokun: kullan." % [agenda["text"], GameRules.AGENDA_ROUNDS,
+			agenda_effect_text(card_type)]
 	match card_type:
 		CENSURE_CARD_TYPE:
 			return "Hükümeti düşürmek için gensoru ver.\nMeclis diyagramına sürükle."
@@ -249,7 +307,7 @@ func _card_effect_text(card_type: String) -> String:
 		PROPAGANDA_CARD_TYPE:
 			return "Bir ilde bir partiyi karala: ona eksi, sana artı.\nİlde güçlü olan partiye az işler."
 		POPULISM_CARD_TYPE:
-			return "%d tur boyunca her şey güçlenir: miting, yatırım, yasa, karalama\nhasarı ve teşkilat bonusu %d kat, vekil çalma %.1f kat; kötü sonuçlar\n%%%d azalır; bu sürede seçim olursa ulusal +%.1f. Dokun, tekrar dokun: kullan." % [
+			return "%d tur boyunca her şey güçlenir: miting, yasa, karalama\nhasarı ve teşkilat bonusu %d kat, vekil çalma %.1f kat; kötü sonuçlar\n%%%d azalır; bu sürede seçim olursa ulusal +%.1f. Dokun, tekrar dokun: kullan." % [
 				GameRules.POPULISM_ROUNDS, int(PublicOpinion.POPULISM_GOOD_MULT), PublicOpinion.POPULISM_STEAL_MULT,
 				int(round((1.0 - PublicOpinion.POPULISM_BAD_MULT) * 100)), PublicOpinion.POPULISM_ELECTION_NATIONAL]
 		MANA_BONUS_CARD_TYPE:

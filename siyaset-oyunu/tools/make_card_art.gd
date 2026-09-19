@@ -18,6 +18,12 @@ const CARDS := {
 	"karalama": Color("A12B3A"),
 	"populizm": Color("C0409A"),
 	"mana_bonusu": Color("2A8FE0"),
+	"gundem_economic_n": Color("B8862B"),
+	"gundem_economic_p": Color("D9A93A"),
+	"gundem_social_n": Color("7A4FC4"),
+	"gundem_social_p": Color("9A6FDF"),
+	"gundem_administrative_n": Color("1F8F8A"),
+	"gundem_administrative_p": Color("35B3AD"),
 }
 
 func _initialize() -> void:

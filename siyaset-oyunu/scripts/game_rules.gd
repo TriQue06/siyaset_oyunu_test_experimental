@@ -55,6 +55,15 @@ const CENSURE_MANA_COST := 1
 const POPULISM_ROUNDS := 4
 const MANA_BONUS_AMOUNT := 5
 const ELECTION_MANA_BONUS := 1
+## GÜNDEM: bir eksenin bir ucuyla ilgili sıcak konu AGENDA_ROUNDS tur sürer
+## (başladığı tur dahil). Gündem yokken her tur sonunda AGENDA_RANDOM_CHANCE
+## olasılıkla rastgele bir gündem başlar; gündem kartıyla da başlatılabilir.
+const AGENDA_ROUNDS := 2
+const AGENDA_RANDOM_CHANCE := 0.3
+## Kabul edilen yasa, getiren partiye puan tablosunda bu kadar puan yazar
+## (hükümet partisinin yasası daha çok).
+const LAW_PASS_SCORE := 4
+const LAW_PASS_SCORE_GOV := 6
 const GOVERNMENT_MANA_BONUS := 1
 const ORG_MANA_COST := 2
 const ORG_MAX_LEVEL := 3

@@ -377,8 +377,8 @@ func _on_game_started() -> void:
 
 func _on_leave_pressed() -> void:
 	MultiplayerManager.leave_room()
-	get_tree().change_scene_to_file("res://scenes/RoomSetup.tscn")
+	get_tree().change_scene_to_file("res://scenes/Lobby.tscn")
 
 func _on_room_closed(reason: String) -> void:
 	info_label.text = reason
-	get_tree().change_scene_to_file("res://scenes/RoomSetup.tscn")
+	get_tree().change_scene_to_file("res://scenes/Lobby.tscn")

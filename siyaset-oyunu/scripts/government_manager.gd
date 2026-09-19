@@ -543,6 +543,11 @@ func _resolve_proposal() -> void:
 		_set_phase(Phase.GOVERNING if has_government() else Phase.IDLE)
 		last_resolution_reason = "%s %s (EVET %d – HAYIR %d)." % [
 			CardPresets.card_title(law_type), "kabul edildi" if passed else "reddedildi", totals.x, totals.y]
+		if passed:
+			# Kabul edilen yasa getirene ciddi puan yazar; hükümetinki daha çok.
+			var points: int = CardManager.law_pass_score(gov_ids.has(proposer))
+			scores[proposer] = score_of(proposer) + points
+			last_resolution_reason += " %s +%d puan." % [_party_name(proposer), points]
 		# Kamuoyu sonuçları ÖNCE: fazın açılması ertelenmiş bir tur sonunu (ve
 		# seçimi) tetikleyebilir, seçim bu sonuçları görmeli.
 		CardManager.apply_law_result(proposer, law_type, votes_copy, passed, gov_ids)

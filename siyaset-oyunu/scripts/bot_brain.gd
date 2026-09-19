@@ -95,8 +95,12 @@ static func choose_action(bot: int) -> Dictionary:
 			best = {"type": "card"}
 			best_score = card_score
 
-	if CardManager.can_propose_law(bot) and CardManager.round_number - int(CardManager.law_rounds.get(bot, -99)) >= LAW_EVERY_ROUNDS:
+	if CardManager.can_propose_law(bot):
 		var law := _best_law(bot, known)
+		# Yasa sıklığı sınırı: gündemdeki eksenin yasası bu sınıra takılmaz.
+		var rested: bool = CardManager.round_number - int(CardManager.law_rounds.get(bot, -99)) >= LAW_EVERY_ROUNDS
+		if not law.is_empty() and not rested and CardManager.agenda_law_mult(String(law["law"])) <= 1.0:
+			law = {}
 		if not law.is_empty() and float(law["score"]) - GameRules.LAW_MANA_COST * mana_value > best_score:
 			best = {"type": "law", "law": law["law"]}
 			best_score = float(law["score"]) - GameRules.LAW_MANA_COST * mana_value
@@ -156,9 +160,12 @@ static func _best_law(bot: int, known: Dictionary) -> Dictionary:
 					continue
 				var alignment := PublicOpinion.law_alignment(known[province_id], axis, dir)
 				sum += float(seats[province_id]) * PublicOpinion.law_proposer_delta(alignment, false)
-			var value := sum / known_seats * confidence
+			var value := sum / known_seats * confidence * CardManager.agenda_law_mult(law_type)
 			if in_parliament:
-				value *= 1.0 + _law_pass_chance(bot, law_type, known) * (PublicOpinion.LAW_PASSED_MULT - 1.0)
+				var pass_chance := _law_pass_chance(bot, law_type, known)
+				value *= 1.0 + pass_chance * (PublicOpinion.LAW_PASSED_MULT - 1.0)
+				# Kabul edilen yasa puan tablosuna ciddi puan yazar.
+				value += pass_chance * CardManager.law_pass_score(CardManager.is_government_party(bot)) * 0.12
 			var moved := mine.duplicate()
 			moved[axis] = IdeologyAxes.clamp_value(float(mine.get(axis, 0)) + IdeologyAxes.LAW_PROPOSE_SHIFT * dir)
 			value += (_electoral_strength(moved, known) - _electoral_strength(mine, known)) * 20.0
@@ -312,9 +319,25 @@ static func _evaluate(bot: int, card_type: String, known: Dictionary) -> Diction
 			return {"score": 0.9 if CardManager.mana_of(bot) < GameRules.MITING_MANA_COST else 0.3, "peer": -1, "province": ""}
 		CardPresets.PROPAGANDA_CARD_TYPE:
 			return _eval_propaganda(bot, known)
+	if CardPresets.is_agenda_card(card_type):
+		return _eval_agenda(bot, card_type)
 	if CardPresets.needs_target(card_type):
 		return _eval_steal(bot, card_type)
 	return {}
+
+## Gündem kartı: gündem boşken ve konu partinin görüşüne uyuyorsa (ya da nötrse)
+## oynanır; ardından o eksende yasa sunmak çok daha etkili olur.
+static func _eval_agenda(bot: int, card_type: String) -> Dictionary:
+	if CardManager.agenda_type() != "":
+		return {}
+	var data := CardPresets.agenda_data(card_type)
+	var lean := float(_ideology(bot).get(data["axis"], 0))
+	if lean * float(data["dir"]) < 0.0:
+		return {}  # rakiplerin konusunu gündeme taşıma
+	var score := 1.3 if lean == 0.0 else 1.9
+	if CardManager.can_propose_law(bot) or CardManager.has_seats(bot):
+		score += 0.5
+	return {"score": score, "peer": -1, "province": ""}
 
 ## Beklenen il gücü kazancı × ilin vekil sayısı × partinin o ildeki (bilinen) şansı.
 static func _eval_miting(bot: int, known: Dictionary) -> Dictionary:

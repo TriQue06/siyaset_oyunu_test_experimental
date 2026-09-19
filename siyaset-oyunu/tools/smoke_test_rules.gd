@@ -100,7 +100,7 @@ func _initialize() -> void:
 	rng.seed = 42
 	var parties := {1: ideology(1, 1, 2), 2: ideology(0, -1, 1), 3: ideology(-2, -2, -2)}
 	var r := ElectionModel.compute(parties, seat_file, voters, 0.0, 1.0, rng)
-	check("toplam 390 vekil", int(sum_values(r["seats"])) == 390, str(r["seats"]))
+	check("toplam 400 vekil (390 il + 10 ulusal liste)", int(sum_values(r["seats"])) == 400, str(r["seats"]))
 	check("oy oranlari toplami 100", absf(sum_values(r["vote_shares"]) - 100.0) < 0.01, str(sum_values(r["vote_shares"])))
 	check("secmene yakin parti daha cok oy aldi", float(r["vote_shares"][1]) > float(r["vote_shares"][3]), str(r["vote_shares"]))
 	var per_province_ok := true
@@ -116,9 +116,9 @@ func _initialize() -> void:
 	var share3: float = float(r["vote_shares"][3])
 	var rt := ElectionModel.compute(parties, seat_file, voters, share3 + 0.5, 1.0, rng)
 	check("baraj alti parti 0 vekil", int(rt["seats"][3]) == 0 and not rt["passed_threshold"].has(3), str(rt["seats"]))
-	check("baraj sonrasi yine 390", int(sum_values(rt["seats"])) == 390)
+	check("baraj sonrasi yine 400", int(sum_values(rt["seats"])) == 400)
 	var r100 := ElectionModel.compute(parties, seat_file, voters, 100.0, 1.0, rng)
-	check("kimse gecemezse baraj uygulanmaz", int(sum_values(r100["seats"])) == 390 and r100["passed_threshold"].size() == 3)
+	check("kimse gecemezse baraj uygulanmaz", int(sum_values(r100["seats"])) == 400 and r100["passed_threshold"].size() == 3)
 	var expected := ElectionModel.expected_shares(parties, voters["konya"], 1.0)
 	check("beklenen paylar (anket) toplami 100", absf(sum_values(expected) - 100.0) < 0.01, str(expected))
 
@@ -141,7 +141,7 @@ func _initialize() -> void:
 	check("4 tur sonunda henuz secim yok", cm.last_seats.is_empty() and cm.round_number == 5)
 	mana_before_election = cm.mana.duplicate()
 	pass_round()
-	check("5. tur sonunda ilk secim yapildi", cm.last_election_round == 5 and int(sum_values(cm.last_seats)) == 390, str(cm.last_seats))
+	check("5. tur sonunda ilk secim yapildi", cm.last_election_round == 5 and int(sum_values(cm.last_seats)) == 400, str(cm.last_seats))
 	check("tur 6'ya gecildi", cm.round_number == 6)
 	var election_bonus_ok := true
 	for id in cm.turn_order:

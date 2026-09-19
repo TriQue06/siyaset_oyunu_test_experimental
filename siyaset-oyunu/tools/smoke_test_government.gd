@@ -108,21 +108,29 @@ func _initialize() -> void:
 	check("kendinden calamaz", not cm.is_valid_steal_target(1, 1))
 	check("meclis disindan calamaz", not cm.is_valid_steal_target(1, 99))
 	cm.last_seats[3] = 1
-	check("tek vekilliden calamaz", not cm.is_valid_steal_target(1, 3))
+	check("tek vekilliden de calinabilir", cm.is_valid_steal_target(1, 3))
 	cm.last_seats[3] = 110
-	cm.passed_threshold = [1, 2, 3]
 	check("gecerli hedef", cm.is_valid_steal_target(1, 3))
-	cm.passed_threshold = [2, 3]
-	check("baraj alti (meclis disi) parti vekil calamaz", not cm.is_valid_steal_target(1, 3))
-	cm.passed_threshold = [1, 2, 3]
+	var seats1: int = cm.last_seats[1]
+	cm.last_seats[1] = 0
+	check("vekilsiz (meclis disi) parti vekil calamaz", not cm.is_valid_steal_target(1, 3))
+	cm.last_seats[1] = seats1
 	cm._apply_steal(1, 2, "steal_strong")
 	check("toplam sandalye DEGISMEDI (sifir toplamli)", gm.total_seats() == before_total,
 		"%d -> %d" % [before_total, gm.total_seats()])
-	# 1'in altina dusurememe
-	cm.last_seats[3] = 1
+	# Vekili az olan parti sıfıra inebilir; sonra meclis dışı sayılır.
 	cm.last_seats[1] = 100
+	var three_total: int = int(cm.last_seats[3])
+	cm.last_seats[3] = 2
+	# 2 vekilin ikisi de ulusal listeden (il sonuçları dokunulmadan).
+	var saved_results: Dictionary = cm.last_province_results
+	cm.last_province_results = {}
+	cm.national_list[3] = 2
 	cm._apply_steal(1, 3, "steal_strong")
-	check("hedef 1'in ALTINA dusmedi", int(cm.last_seats[3]) >= 1, str(cm.last_seats[3]))
+	check("vekili az olan parti 0'a inebilir", int(cm.last_seats[3]) == 0, str(cm.last_seats[3]))
+	check("vekilsiz parti oy veremez", not gm.voter_ids().has(3))
+	cm.last_province_results = saved_results
+	cm.last_seats[3] = three_total
 
 	print("")
 	print("=== 6) DESTE HAVUZU (kosullu kartlar) ===")

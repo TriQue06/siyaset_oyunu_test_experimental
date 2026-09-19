@@ -150,6 +150,17 @@ func _initialize() -> void:
 	await _frames(3)
 	check("cogunluk yokken bile hukumet yoksa gensoru acilmaz", not scene._pending_censure)
 	_shot("bonus_cards")
+	# Gündem bandı ve yasa paneli.
+	cm.agenda = {"type": "gundem_economic_n", "until": cm.round_number + 2}
+	cm._push_state({"type": "timer"})
+	await _frames(3)
+	check("gundem bandi gorunur", scene._agenda_banner.visible)
+	check("gundem carpani: devletci 3, piyasaci 2, diger 1", is_equal_approx(cm.agenda_law_mult("law:economic:-1"), 3.0) 		and is_equal_approx(cm.agenda_law_mult("law:economic:1"), 2.0) and is_equal_approx(cm.agenda_law_mult("law:social:1"), 1.0))
+	scene._on_law_button_pressed()
+	await create_timer(0.3).timeout
+	_shot("law_designer")
+	check("yasa paneli acildi", scene._law_designer.visible)
+	scene._law_designer.hide()
 	# İl paneli: gözcülü ve gözcüsüz il.
 	scene._cancel_targeting()
 	scene._on_layer_button_pressed(0)

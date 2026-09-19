@@ -50,6 +50,10 @@ var peer_ids: Array = []
 var province_ids: Array = []
 var province_seats: Dictionary = {}
 var total_seats: int = 0
+## İllerden gelen vekil toplamı (ulusal liste hariç; sayım yüzdesi buna göre).
+var _province_total: int = 0
+## peer_id -> ulusal listeden kazanılan vekil (bütün iller sayılınca eklenir).
+var _list_seats: Dictionary = {}
 
 var _results: Dictionary = {}
 var _final_shares: Dictionary = {}
@@ -86,6 +90,17 @@ func setup(province_results: Dictionary, vote_shares: Dictionary, seats: Diction
 			n += int(entry[peer_id]["seats"])
 		province_seats[province_id] = n
 		total_seats += n
+	_province_total = total_seats
+	# Ulusal liste = kesin vekil − illerden gelen vekil.
+	_list_seats.clear()
+	for peer_id in ids.keys():
+		var from_provinces := 0
+		for province_id in province_results.keys():
+			from_provinces += int(province_results[province_id].get(peer_id, {}).get("seats", 0))
+		_list_seats[peer_id] = maxi(0, int(seats.get(peer_id, 0)) - from_provinces)
+	# Ulusal liste sayımın sonunda dağıtılır (kesin sonuçta görünür).
+	if not province_results.is_empty():
+		total_seats += ElectionModel.NATIONAL_LIST_SEATS
 	peer_ids = ids.keys()
 	peer_ids.sort()
 
@@ -195,8 +210,11 @@ func sample(t: float) -> Dictionary:
 		p["seats"] = alloc
 		for peer_id in alloc.keys():
 			seats[peer_id] = int(seats[peer_id]) + int(alloc[peer_id])
+	if weight >= float(_province_total) - 0.001:
+		for peer_id in _list_seats.keys():
+			seats[peer_id] = int(seats.get(peer_id, 0)) + int(_list_seats[peer_id])
 	return {
-		"counted": weight / float(maxi(1, total_seats)) * 100.0,
+		"counted": weight / float(maxi(1, _province_total)) * 100.0,
 		"national": national, "eligible": eligible, "seats": seats, "provinces": provinces,
 	}
 

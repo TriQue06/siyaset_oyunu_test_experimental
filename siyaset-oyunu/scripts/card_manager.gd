@@ -64,7 +64,9 @@ const PROVINCE_SEATS_PATH := "res://data/province_seats.json"
 const PROVINCE_EVENT_LIMIT := 6
 
 ## Deste ağırlıkları (bkz. _draw_weights).
-const WEIGHT_STEAL := 0.6
+const WEIGHT_STEAL := 1.0
+## Her gündem kartının ağırlığı (6 kart; toplamda ~1.8).
+const WEIGHT_AGENDA := 0.3
 const WEIGHT_PROPAGANDA := 1.6
 const WEIGHT_POPULISM := 1.0
 const WEIGHT_MANA_BONUS := 1.2
@@ -88,6 +90,10 @@ var has_drawn_this_turn: bool = false
 var law_rounds: Dictionary = {}
 ## Popülizm bonusu: peer_id -> bittiği tur (o turdan önceki son tura kadar sürer).
 var populism: Dictionary = {}
+## GÜNDEM: {"type": gündem kartı türü, "until": bittiği tur} (boş = gündem yok).
+var agenda: Dictionary = {}
+## peer_id -> int: son seçimde ulusal listeden kazanılan vekil.
+var national_list: Dictionary = {}
 ## Eksen keskinliği: il bazlı seçim sonuçlarının ne kadar keskin çıkacağını
 ## belirleyen üs (bkz. ElectionModel). HER TUR SONUNDA artar.
 var current_axis_sharpness: float = 0.5
@@ -199,7 +205,7 @@ func _load_province_seat_counts() -> void:
 		_province_ids.append(province_id)
 		sum += seats
 	if sum > 0:
-		TOTAL_SEATS = sum
+		TOTAL_SEATS = sum + ElectionModel.NATIONAL_LIST_SEATS
 
 # --- Sorgular ---------------------------------------------------------------
 
@@ -262,6 +268,8 @@ func can_choose_main_action(peer_id: int) -> bool:
 func can_propose_law(peer_id: int, law_type: String = "") -> bool:
 	if not can_choose_main_action(peer_id) or mana_of(peer_id) < GameRules.LAW_MANA_COST:
 		return false
+	if not has_seats(peer_id):
+		return false  # meclis dışı parti yasa teklif edemez
 	if has_proposed_law_this_round(peer_id):
 		return false
 	if law_type != "" and not CardPresets.is_law_card(law_type):
@@ -277,9 +285,14 @@ func can_invest(peer_id: int, province_id: String = "") -> bool:
 	return can_choose_main_action(peer_id) and is_government_party(peer_id) \
 		and mana_of(peer_id) >= GameRules.INVEST_MANA_COST and (province_id == "" or has_province(province_id))
 
+## Mecliste en az bir vekili var mı? (Vekilsiz parti oy veremez, yasa ve
+## gensoru veremez, vekil çalamaz.)
+func has_seats(peer_id: int) -> bool:
+	return int(last_seats.get(peer_id, 0)) > 0
+
 ## Gensoru hamlesi: muhalefet, hükümet görevde ve salt çoğunluğu yokken.
 func can_censure(peer_id: int) -> bool:
-	return can_choose_main_action(peer_id) and mana_of(peer_id) >= GameRules.CENSURE_MANA_COST \
+	return can_choose_main_action(peer_id) and mana_of(peer_id) >= GameRules.CENSURE_MANA_COST and has_seats(peer_id) \
 		and GovernmentManager.phase == GovernmentManager.Phase.GOVERNING and GovernmentManager.has_government() \
 		and not GovernmentManager.has_majority() and not is_government_party(peer_id)
 
@@ -301,12 +314,11 @@ func can_build_organization(peer_id: int, province_id: String) -> bool:
 func is_valid_steal_target(peer_id: int, target_peer_id: int) -> bool:
 	if target_peer_id == -1 or target_peer_id == peer_id:
 		return false
-	# Barajı geçemeyen (meclis dışı) parti vekil çalamaz: yoksa baraj delinir.
-	if not passed_threshold.has(peer_id):
+	# Vekilsiz (meclis dışı / barajı geçemeyen) parti vekil çalamaz: yoksa baraj delinir.
+	if not has_seats(peer_id):
 		return false
-	if not last_seats.has(target_peer_id):
-		return false
-	return int(last_seats[target_peer_id]) > 1
+	# Hedefin vekili çalınacak sayıdan azsa hepsi gidebilir (0'a iner).
+	return has_seats(target_peer_id)
 
 ## Bu kart şu an bu hedeflerle oynanabilir mi? (Host doğrulaması ve UI.)
 func can_play_card(peer_id: int, card_type: String, target_peer_id: int = -1, target_province: String = "") -> bool:
@@ -540,6 +552,8 @@ func init_game() -> void:
 	has_drawn_this_turn = false
 	law_rounds = {}
 	populism = {}
+	agenda = {}
+	national_list = {}
 	current_axis_sharpness = MultiplayerManager.axis_sharpness_start
 	round_number = 1
 	last_election_round = 0
@@ -618,6 +632,8 @@ func draw_card() -> void:
 func _draw_weights(peer_id: int = -1) -> Dictionary:
 	var weights := {}
 	weights[CardPresets.PROPAGANDA_CARD_TYPE] = WEIGHT_PROPAGANDA
+	for card_type in CardPresets.AGENDAS.keys():
+		weights[card_type] = WEIGHT_AGENDA
 	if not last_seats.is_empty():
 		for card_type in CardPresets.STEAL_CARD_TYPES:
 			weights[card_type] = WEIGHT_STEAL
@@ -823,6 +839,9 @@ func _apply_miting_move(peer_id: int, province_id: String) -> void:
 func _apply_card_effect(peer_id: int, card_type: String, target_peer_id: int = -1, target_province: String = "") -> bool:
 	if CardPresets.needs_target(card_type):
 		return _apply_steal(peer_id, target_peer_id, card_type)
+	if CardPresets.is_agenda_card(card_type):
+		_start_agenda(card_type, peer_id)
+		return false
 	match card_type:
 		CardPresets.POPULISM_CARD_TYPE:
 			populism[peer_id] = round_number + GameRules.POPULISM_ROUNDS
@@ -857,9 +876,10 @@ func _apply_miting(peer_id: int, province_id: String) -> void:
 		_event_message = "%s, %s'da miting yaptı." % [_party_name(peer_id), _province_name(province_id)]
 
 ## Yatırım: getiren parti daha çok, hükümet ortakları daha az kazanır.
+## Popülizm yatırımı büyütmez (popülist iktidar için miting daha etkili).
 func _apply_investment(peer_id: int, province_id: String) -> void:
-	_add_local(province_id, peer_id, PublicOpinion.INVEST_LOCAL, true)
-	_add_national(peer_id, PublicOpinion.INVEST_NATIONAL, true)
+	_add_local(province_id, peer_id, PublicOpinion.INVEST_LOCAL)
+	_add_national(peer_id, PublicOpinion.INVEST_NATIONAL)
 	for partner in GovernmentManager.government_party_ids():
 		if partner != peer_id:
 			_add_local(province_id, partner, PublicOpinion.INVEST_PARTNER_LOCAL)
@@ -896,14 +916,15 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 	var axis: String = law["axis"]
 	var dir: int = int(law["dir"])
 	var proposer_in_gov := gov_ids.has(proposer)
+	var agenda_mult := agenda_law_mult(law_type)
 	for province_id in _province_ids:
 		var alignment := PublicOpinion.law_alignment(province_center(province_id), axis, dir)
-		_add_local(province_id, proposer, PublicOpinion.law_proposer_delta(alignment, passed), true)
+		_add_local(province_id, proposer, PublicOpinion.law_proposer_delta(alignment, passed) * agenda_mult, true)
 		for voter in votes.keys():
 			if int(voter) == proposer:
 				continue
 			var choice := GovernmentManager.normalize_vote(votes[voter])
-			_add_local(province_id, int(voter), PublicOpinion.law_vote_delta(alignment, choice, gov_ids.has(voter), proposer_in_gov), true)
+			_add_local(province_id, int(voter), PublicOpinion.law_vote_delta(alignment, choice, gov_ids.has(voter), proposer_in_gov) * agenda_mult, true)
 	# Görüş kayması: sunan yasanın yönünde 1 adım, EVET yasanın yönünde,
 	# HAYIR ters yönde yarım adım; çekimser kaymaz.
 	var shifts: Array = [{"peer": proposer, "axis": axis, "delta": IdeologyAxes.LAW_PROPOSE_SHIFT * dir}]
@@ -914,9 +935,58 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 		if choice != GovernmentManager.VOTE_ABSTAIN:
 			shifts.append({"peer": int(voter), "axis": axis, "delta": IdeologyAxes.LAW_VOTE_SHIFT * dir * choice})
 	PartyManager.apply_ideology_deltas(shifts)
-	_push_state({"type": "opinion", "message": "%s %s — %s bu görüşe yakın illerde güçlendi%s. Partisi %s yönüne kaydı." % [
+	var notes := ""
+	if agenda_mult > 1.0:
+		notes += " Gündemde: etkiler %d kat." % int(agenda_mult)
+	if passed:
+		notes += " %s +%d puan." % [_party_name(proposer), law_pass_score(proposer_in_gov)]
+	_push_state({"type": "opinion", "message": "%s %s — %s bu görüşe yakın illerde güçlendi%s. Partisi %s yönüne kaydı.%s" % [
 		law["title"], "KABUL EDİLDİ" if passed else "reddedildi", _party_name(proposer),
-		" (2 kat)" if passed else "", law["side"]]})
+		" (2 kat)" if passed else "", law["side"], notes]})
+
+## Kabul edilen yasanın getiren partiye yazdığı puan.
+static func law_pass_score(proposer_in_gov: bool) -> int:
+	return GameRules.LAW_PASS_SCORE_GOV if proposer_in_gov else GameRules.LAW_PASS_SCORE
+
+# --- Gündem ------------------------------------------------------------------------
+
+## Şu an gündemdeki konu (gündem kartı türü) ya da "".
+func agenda_type() -> String:
+	if agenda.is_empty() or round_number >= int(agenda.get("until", 0)):
+		return ""
+	return String(agenda.get("type", ""))
+
+func agenda_rounds_left() -> int:
+	return maxi(0, int(agenda.get("until", 0)) - round_number) if agenda_type() != "" else 0
+
+## Bu yasanın gündem çarpanı: gündemdeki eksendeyse AGENDA_AXIS_MULT, gündemin
+## ucuyla aynı yöndeyse AGENDA_MATCH_MULT, değilse 1.
+func agenda_law_mult(law_type: String) -> float:
+	var current := agenda_type()
+	if current == "":
+		return 1.0
+	var law := CardPresets.law_data(law_type)
+	var data := CardPresets.agenda_data(current)
+	if law.is_empty() or data.is_empty() or law["axis"] != data["axis"]:
+		return 1.0
+	return PublicOpinion.AGENDA_MATCH_MULT if int(law["dir"]) == int(data["dir"]) else PublicOpinion.AGENDA_AXIS_MULT
+
+## Gündemi başlatır (kartla peer_id, rastgele -1). Mesajı _event_message'a yazar.
+func _start_agenda(card_type: String, peer_id: int = -1) -> void:
+	agenda = {"type": card_type, "until": round_number + GameRules.AGENDA_ROUNDS}
+	var data := CardPresets.agenda_data(card_type)
+	_event_message = "GÜNDEM%s: %s — %d tur boyunca %s." % [
+		(" (%s)" % _party_name(peer_id)) if peer_id != -1 else "", data["title"], GameRules.AGENDA_ROUNDS,
+		CardPresets.agenda_effect_text(card_type)]
+
+## Tur sonunda gündem yoksa rastgele bir gündem başlayabilir.
+func _maybe_random_agenda() -> void:
+	if agenda_type() != "" or _rng.randf() >= GameRules.AGENDA_RANDOM_CHANCE:
+		return
+	var types: Array = CardPresets.AGENDAS.keys()
+	_event_message = ""
+	_start_agenda(String(types[_rng.randi_range(0, types.size() - 1)]))
+	_push_state({"type": "agenda", "message": _event_message})
 
 ## GovernmentManager, reddedilen gensorudan sonra (host) çağırır: getiren parti
 ## ulusal destek kaybeder. Durum GovernmentManager'ın yayınıyla birlikte gider.
@@ -988,7 +1058,7 @@ func _apply_steal(peer_id: int, target_peer_id: int, card_type: String) -> bool:
 	var wanted: int = _rng.randi_range(int(range_info["min"]), int(range_info["max"]))
 	if populism_rounds_left(peer_id) > 0:
 		wanted = int(round(wanted * PublicOpinion.POPULISM_STEAL_MULT))
-	var amount: int = mini(wanted, maxi(0, int(last_seats[target_peer_id]) - 1))
+	var amount: int = mini(wanted, int(last_seats[target_peer_id]))
 	if amount <= 0:
 		return false
 
@@ -997,12 +1067,22 @@ func _apply_steal(peer_id: int, target_peer_id: int, card_type: String) -> bool:
 		var here: int = int(last_province_results[province_id].get(target_peer_id, {}).get("seats", 0))
 		for i in here:
 			bag.append(province_id)
+	# Ulusal listeden de vekil çalınabilir ("" = ulusal liste).
+	for i in int(national_list.get(target_peer_id, 0)):
+		bag.append("")
 	bag.shuffle()
 
 	var moved := 0
 	for province_id in bag:
 		if moved >= amount:
 			break
+		if province_id == "":
+			if int(national_list.get(target_peer_id, 0)) <= 0:
+				continue
+			national_list[target_peer_id] = int(national_list[target_peer_id]) - 1
+			national_list[peer_id] = int(national_list.get(peer_id, 0)) + 1
+			moved += 1
+			continue
 		var entry: Dictionary = last_province_results[province_id]
 		var target_entry: Dictionary = entry.get(target_peer_id, {})
 		if int(target_entry.get("seats", 0)) <= 0:
@@ -1097,6 +1177,7 @@ func _finish_round() -> void:
 	else:
 		_decay_opinion()
 		_push_state({"type": "round"})
+	_maybe_random_agenda()
 
 ## Seçimde kullanılacak güç çarpanları:
 ##   ulusal : ulusal puan + İKTİDAR DENGESİ + POPÜLİZM + VEKİL MOMENTUMU (seçimden bu
@@ -1135,6 +1216,7 @@ func _hold_election(finished_round: int, early: bool) -> void:
 	last_seats = result["seats"]
 	last_province_results = result["province_results"]
 	passed_threshold = result["passed_threshold"]
+	national_list = result.get("national_list", {})
 	election_seats = last_seats.duplicate()
 	last_election_round = finished_round
 	last_election_was_early = early
@@ -1219,6 +1301,7 @@ func remove_player(peer_id: int) -> void:
 	mana.erase(peer_id)
 	last_seats.erase(peer_id)
 	election_seats.erase(peer_id)
+	national_list.erase(peer_id)
 	last_vote_shares.erase(peer_id)
 	passed_threshold.erase(peer_id)
 	national_support.erase(peer_id)
@@ -1260,6 +1343,8 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"has_drawn": has_drawn_this_turn,
 		"law_rounds": law_rounds,
 		"populism": populism,
+		"agenda": agenda,
+		"national_list": national_list,
 		"sharpness": current_axis_sharpness,
 		"round": round_number,
 		"turn_time_left": _turn_time_left,
@@ -1291,6 +1376,8 @@ func _apply_state(state: Dictionary) -> void:
 	has_drawn_this_turn = bool(state["has_drawn"])
 	law_rounds = state.get("law_rounds", {})
 	populism = state.get("populism", {})
+	agenda = state.get("agenda", {})
+	national_list = state.get("national_list", {})
 	current_axis_sharpness = float(state["sharpness"])
 	round_number = int(state["round"])
 	_turn_deadline_ms = Time.get_ticks_msec() + int(float(state["turn_time_left"]) * 1000.0)

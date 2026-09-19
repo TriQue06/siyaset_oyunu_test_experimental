@@ -93,6 +93,10 @@ static func expected_shares(parties: Dictionary, center: Dictionary, sharpness: 
 ##   "passed_threshold": barajı geçen peer_id'ler
 ##   modifiers: {"national": {peer_id -> puan}, "local": {province_id -> {peer_id -> puan}}}
 ##              — KAMUOYU (bkz. PublicOpinion.multiplier). Boşsa etkisiz.
+## ULUSAL LİSTE: bu kadar milletvekili illerden değil, barajı geçen partiler
+## arasında ULUSAL oy oranına göre (D'Hondt) dağıtılır.
+const NATIONAL_LIST_SEATS := 10
+
 static func compute(parties: Dictionary, province_seats: Dictionary, voters: Dictionary,
 		threshold_percent: float, sharpness: float, rng: RandomNumberGenerator,
 		modifiers: Dictionary = {}) -> Dictionary:
@@ -103,7 +107,7 @@ static func compute(parties: Dictionary, province_seats: Dictionary, voters: Dic
 	var province_results: Dictionary = {}
 	var result := {
 		"vote_shares": vote_shares, "seats": seats,
-		"province_results": province_results, "passed_threshold": [],
+		"province_results": province_results, "passed_threshold": [], "national_list": {},
 	}
 	var peer_ids: Array = parties.keys()
 	peer_ids.sort()
@@ -173,6 +177,12 @@ static func compute(parties: Dictionary, province_seats: Dictionary, voters: Dic
 			entry[peer_id] = {"percent": float(shares[peer_id]) * 100.0, "seats": won}
 			seats[peer_id] = int(seats[peer_id]) + won
 		province_results[province_id] = entry
+	var list_alloc := dhondt(vote_shares, eligible, NATIONAL_LIST_SEATS)
+	var national_list := {}
+	for peer_id in peer_ids:
+		national_list[peer_id] = int(list_alloc.get(peer_id, 0))
+		seats[peer_id] = int(seats[peer_id]) + int(national_list[peer_id])
+	result["national_list"] = national_list
 	return result
 
 ## D'Hondt: her koltuk, oy / (aldığı koltuk + 1) oranı en yüksek partiye gider.

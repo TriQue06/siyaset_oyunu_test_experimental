@@ -148,9 +148,9 @@ func _on_room_closed_any(reason: String) -> void:
 	last_close_reason = reason
 	var scene := get_tree().current_scene
 	var path: String = scene.scene_file_path if scene != null else ""
-	if path in ["res://scenes/RoomLobby.tscn", "res://scenes/RoomSetup.tscn", "res://scenes/Lobby.tscn"]:
+	if path in ["res://scenes/RoomLobby.tscn", "res://scenes/Lobby.tscn"]:
 		return
-	get_tree().change_scene_to_file.call_deferred("res://scenes/RoomSetup.tscn")
+	get_tree().change_scene_to_file.call_deferred("res://scenes/Lobby.tscn")
 
 func _on_relay_connecting_slow() -> void:
 	connection_status.emit("Sunucu uyanıyor olabilir (ücretsiz sunucu uykudan kalkarken ~1 dk sürebilir)…")

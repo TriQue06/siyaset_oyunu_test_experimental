@@ -225,7 +225,7 @@ func _initialize() -> void:
 	cm.organizations = {"konya": {3: 2}}
 	cm.local_support = {}
 	mods = cm.election_modifiers()
-	check("vekil calan parti momentumla girer", near(float(mods["national"][3]), 1.0 + PublicOpinion.seat_momentum(10.0 / 390.0 * 100.0)),
+	check("vekil calan parti momentumla girer", near(float(mods["national"][3]), 1.0 + PublicOpinion.seat_momentum(10.0 / float(cm.TOTAL_SEATS) * 100.0)),
 		"%.2f" % float(mods["national"][3]))
 	check("vekil kaybeden parti eksi momentum", float(mods["national"][1]) < 2.0 + PublicOpinion.GOVERNMENT_FATIGUE)
 	check("il baskanligi il carpanina girer", near(float(mods["local"]["konya"][3]), PublicOpinion.org_activity(2)))
@@ -249,13 +249,14 @@ func _initialize() -> void:
 	cm._apply_censure_move(3)
 	check("gensoru hamlesi 2 mana, oylama acildi", cm.mana_of(3) == 10 - GameRules.CENSURE_MANA_COST and gm.phase == gm.Phase.VOTING)
 	cm.last_seats = {1: 200, 2: 100, 3: 90}
+	var score3_before: int = gm.score_of(3)
 	gm._apply_vote(3, gm.VOTE_YES)
 	gm._apply_vote(1, gm.VOTE_NO)
 	gm._apply_vote(2, gm.VOTE_NO)
 	check("reddedilen gensoru: hukumet gorevde", gm.has_government() and gm.phase == gm.Phase.GOVERNING, gm.last_resolution_reason)
 	check("reddedilen gensoruyu veren ulusal destek kaybeder", near(cm.national_of(3), PublicOpinion.CENSURE_REJECTED_NATIONAL),
 		"%.2f" % cm.national_of(3))
-	check("puan tablosu etkilenmez", gm.score_of(3) == 0, str(gm.score_of(3)))
+	check("puan tablosu etkilenmez", gm.score_of(3) == score3_before, str(gm.score_of(3)))
 
 	print("")
 	print("=== 8) SONME (IL BASKANLIGI SONMEZ) ===")

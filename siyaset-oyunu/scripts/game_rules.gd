@@ -33,8 +33,24 @@ extends RefCounted
 ##     kurulamazsa bu puan yazılmaz. En çok puanı olan kazanır (eşitlikte
 ##     milletvekili sayısı).
 
-const ELECTION_INTERVAL := 5
-const FIRST_ELECTION_ROUND := 5
+## Oyun süresi LOBİ AYARIDIR (bkz. MultiplayerManager.election_interval /
+## election_count): seçimler ELECTION_INTERVAL turda bir, toplam ELECTION_COUNT
+## seçim; oyun MAX_ROUNDS = aralık × sayı tur sürer. Değerler configure() ile
+## (her cihazda, ayar senkronlanınca) güncellenir.
+const DEFAULT_ELECTION_INTERVAL := 4
+const DEFAULT_ELECTION_COUNT := 7
+const ELECTION_INTERVAL_MIN := 2
+const ELECTION_INTERVAL_MAX := 8
+const ELECTION_COUNT_MIN := 2
+const ELECTION_COUNT_MAX := 12
+static var ELECTION_INTERVAL: int = DEFAULT_ELECTION_INTERVAL
+static var FIRST_ELECTION_ROUND: int = DEFAULT_ELECTION_INTERVAL
+static var MAX_ROUNDS: int = DEFAULT_ELECTION_INTERVAL * DEFAULT_ELECTION_COUNT
+
+static func configure(interval: int, count: int) -> void:
+	ELECTION_INTERVAL = clampi(interval, ELECTION_INTERVAL_MIN, ELECTION_INTERVAL_MAX)
+	FIRST_ELECTION_ROUND = ELECTION_INTERVAL
+	MAX_ROUNDS = ELECTION_INTERVAL * clampi(count, ELECTION_COUNT_MIN, ELECTION_COUNT_MAX)
 
 const MANA_START := 0
 const MANA_PER_ROUND := 3
@@ -67,8 +83,6 @@ const LAW_PASS_SCORE_GOV := 6
 const GOVERNMENT_MANA_BONUS := 1
 const ORG_MANA_COST := 2
 const ORG_MAX_LEVEL := 3
-## Seçimler 5 turda bir: son seçim de takvime denk gelsin diye 30 tur.
-const MAX_ROUNDS := 30
 
 ## Süre sınırları (saniye). AFK kalan tek bir oyuncu oyunu kilitleyemesin diye.
 ## Tur süresi dolarsa sıra otomatik devredilir; hükümet kurma süresi dolarsa o teklif

@@ -18,25 +18,34 @@ const BOT_BUTTON_SIZE := 34.0
 @onready var center_box: VBoxContainer = %CenterBox
 
 @onready var settings_side_panel: Control = %SettingsSidePanel
-@onready var threshold_slider: HSlider = %ThresholdSlider
-@onready var threshold_value_label: Label = %ThresholdValueLabel
-@onready var party_duration_slider: HSlider = %PartyDurationSlider
-@onready var party_duration_value_label: Label = %PartyDurationValueLabel
 @onready var side_close_button: Button = %SideCloseButton
+@onready var settings_vbox: VBoxContainer = $SettingsSidePanel/Margin/VBox
 
-@onready var axis_start_slider: HSlider = %AxisStartSlider
-@onready var axis_start_value_label: Label = %AxisStartValueLabel
-@onready var axis_increment_slider: HSlider = %AxisIncrementSlider
-@onready var axis_increment_value_label: Label = %AxisIncrementValueLabel
-@onready var axis_max_enabled_check: CheckButton = %AxisMaxEnabledCheck
-@onready var axis_max_value_row: HBoxContainer = %AxisMaxValueRow
-@onready var axis_max_value_slider: HSlider = %AxisMaxValueSlider
-@onready var axis_max_value_value_label: Label = %AxisMaxValueValueLabel
+## Ayar paneli kodla kurulur (bkz. _build_settings_panel).
+const SECTION_COLOR := Color(0.93, 0.66, 0.22)
+var interval_value_label: Label
+var interval_minus: Button
+var interval_plus: Button
+var count_value_label: Label
+var count_minus: Button
+var count_plus: Button
+var game_length_summary: Label
+var threshold_slider: HSlider
+var threshold_value_label: Label
+var axis_start_slider: HSlider
+var axis_start_value_label: Label
+var axis_increment_slider: HSlider
+var axis_increment_value_label: Label
+var axis_max_enabled_check: CheckButton
+var axis_max_value_row: HBoxContainer
+var axis_max_value_slider: HSlider
+var axis_max_value_value_label: Label
 
 var _settings_open: bool = false
 var _center_base_x: float = 0.0
 
 func _ready() -> void:
+	_build_settings_panel()
 	_refresh_code_display()
 	GameSettings.streamer_mode_changed.connect(_on_streamer_mode_changed)
 	copy_code_button.pressed.connect(_on_copy_code_pressed)
@@ -50,10 +59,10 @@ func _ready() -> void:
 	threshold_slider.step = MultiplayerManager.THRESHOLD_STEP
 	threshold_slider.value_changed.connect(_on_threshold_slider_changed)
 
-	party_duration_slider.min_value = 0
-	party_duration_slider.max_value = MultiplayerManager.PARTY_DURATION_OPTIONS.size() - 1
-	party_duration_slider.step = 1
-	party_duration_slider.value_changed.connect(_on_party_duration_slider_changed)
+	interval_minus.pressed.connect(func(): _change_game_length(-1, 0))
+	interval_plus.pressed.connect(func(): _change_game_length(1, 0))
+	count_minus.pressed.connect(func(): _change_game_length(0, -1))
+	count_plus.pressed.connect(func(): _change_game_length(0, 1))
 
 	axis_start_slider.min_value = MultiplayerManager.AXIS_SHARPNESS_START_MIN
 	axis_start_slider.max_value = MultiplayerManager.AXIS_SHARPNESS_START_MAX
@@ -114,7 +123,8 @@ func _refresh() -> void:
 		_close_settings_panel()
 
 	threshold_slider.editable = am_owner
-	party_duration_slider.editable = am_owner
+	for button in [interval_minus, interval_plus, count_minus, count_plus]:
+		button.disabled = not am_owner
 	axis_start_slider.editable = am_owner
 	axis_increment_slider.editable = am_owner
 	axis_max_enabled_check.disabled = not am_owner
@@ -275,16 +285,25 @@ class RobotIcon extends Control:
 
 func _refresh_settings_display() -> void:
 	var t := MultiplayerManager.election_threshold
-	threshold_label.text = "Seçim Barajı: %%%s" % _format_threshold(t)
+	var interval := MultiplayerManager.election_interval
+	var count := MultiplayerManager.election_count
+	threshold_label.text = "Baraj %%%s  ·  %d seçim, %d turda bir (%d tur)" % [_format_threshold(t), count, interval, interval * count]
+	interval_value_label.text = str(interval)
+	count_value_label.text = str(count)
+	var rounds: Array = []
+	for i in range(1, count + 1):
+		rounds.append(str(interval * i))
+	if rounds.size() > 5:
+		rounds = rounds.slice(0, 3) + ["…"] + rounds.slice(rounds.size() - 1)
+	game_length_summary.text = "Toplam %d tur. Seçimler: %s. turlarda." % [interval * count, ", ".join(PackedStringArray(rounds))]
+	if MultiplayerManager.is_local_owner():
+		interval_minus.disabled = interval <= GameRules.ELECTION_INTERVAL_MIN
+		interval_plus.disabled = interval >= GameRules.ELECTION_INTERVAL_MAX
+		count_minus.disabled = count <= GameRules.ELECTION_COUNT_MIN
+		count_plus.disabled = count >= GameRules.ELECTION_COUNT_MAX
 	threshold_value_label.text = "%%%s" % _format_threshold(t)
 	if not threshold_slider.has_focus():
 		threshold_slider.value = t
-
-	var duration := MultiplayerManager.party_setup_duration
-	party_duration_value_label.text = _format_party_duration(duration)
-	if not party_duration_slider.has_focus():
-		var idx := MultiplayerManager.PARTY_DURATION_OPTIONS.find(duration)
-		party_duration_slider.value = idx if idx != -1 else 0
 
 	axis_start_value_label.text = "%.1f" % MultiplayerManager.axis_sharpness_start
 	if not axis_start_slider.has_focus():
@@ -296,15 +315,11 @@ func _refresh_settings_display() -> void:
 
 	axis_max_enabled_check.button_pressed = MultiplayerManager.axis_sharpness_max_enabled
 	axis_max_value_row.visible = MultiplayerManager.axis_sharpness_max_enabled
+	axis_max_value_slider.visible = MultiplayerManager.axis_sharpness_max_enabled
 	axis_max_value_value_label.text = "%.0f" % MultiplayerManager.axis_sharpness_max_value
 	if not axis_max_value_slider.has_focus():
 		var cap_idx := MultiplayerManager.AXIS_SHARPNESS_CAP_OPTIONS.find(MultiplayerManager.axis_sharpness_max_value)
 		axis_max_value_slider.value = cap_idx if cap_idx != -1 else 0
-
-func _format_party_duration(seconds: int) -> String:
-	if seconds == MultiplayerManager.PARTY_DURATION_UNLIMITED:
-		return "Sınırsız"
-	return "%d sn" % seconds
 
 func _format_threshold(value: float) -> String:
 	if is_equal_approx(value, round(value)):
@@ -314,9 +329,9 @@ func _format_threshold(value: float) -> String:
 func _on_threshold_slider_changed(value: float) -> void:
 	MultiplayerManager.set_election_threshold(value)
 
-func _on_party_duration_slider_changed(index: float) -> void:
-	var seconds: int = MultiplayerManager.PARTY_DURATION_OPTIONS[int(index)]
-	MultiplayerManager.set_party_setup_duration(seconds)
+func _change_game_length(interval_delta: int, count_delta: int) -> void:
+	MultiplayerManager.set_game_length(MultiplayerManager.election_interval + interval_delta,
+		MultiplayerManager.election_count + count_delta)
 
 func _on_axis_start_slider_changed(value: float) -> void:
 	MultiplayerManager.set_axis_sharpness_start(value)
@@ -326,11 +341,134 @@ func _on_axis_increment_slider_changed(value: float) -> void:
 
 func _on_axis_max_enabled_toggled(enabled: bool) -> void:
 	axis_max_value_row.visible = enabled
+	axis_max_value_slider.visible = enabled
 	MultiplayerManager.set_axis_sharpness_max_enabled(enabled)
 
 func _on_axis_max_value_slider_changed(index: float) -> void:
 	var value: float = MultiplayerManager.AXIS_SHARPNESS_CAP_OPTIONS[int(index)]
 	MultiplayerManager.set_axis_sharpness_max_value(value)
+
+# --- Ayar paneli ------------------------------------------------------------------
+
+func _build_settings_panel() -> void:
+	settings_vbox.add_theme_constant_override("separation", 8)
+	var title := settings_vbox.get_node("HeaderRow/TitleLabel") as Label
+	title.add_theme_font_size_override("font_size", 20)
+
+	var length := _section("OYUN SÜRESİ", "")
+	var interval_row := _stepper_row(length, "Seçimler kaç turda bir")
+	interval_minus = interval_row[0]
+	interval_value_label = interval_row[1]
+	interval_plus = interval_row[2]
+	var count_row := _stepper_row(length, "Kaç seçim olacak")
+	count_minus = count_row[0]
+	count_value_label = count_row[1]
+	count_plus = count_row[2]
+	game_length_summary = _note(length, "")
+	game_length_summary.add_theme_color_override("font_color", Color(SECTION_COLOR, 0.9))
+
+	var election := _section("SEÇİM", "")
+	var threshold_row := _value_row(election, "Seçim barajı")
+	threshold_value_label = threshold_row
+	threshold_slider = HSlider.new()
+	election.add_child(threshold_slider)
+
+	var axis := _section("GELİŞMİŞ · EKSEN KESKİNLİĞİ", "İller görüşüne en yakın partiye ne kadar yönelir.")
+	axis_start_value_label = _value_row(axis, "Başlangıç")
+	axis_start_slider = HSlider.new()
+	axis.add_child(axis_start_slider)
+	axis_increment_value_label = _value_row(axis, "Tur başına artış")
+	axis_increment_slider = HSlider.new()
+	axis.add_child(axis_increment_slider)
+	var cap_row := HBoxContainer.new()
+	var cap_label := _row_label("Üst sınır")
+	cap_row.add_child(cap_label)
+	axis_max_enabled_check = CheckButton.new()
+	cap_row.add_child(axis_max_enabled_check)
+	axis.add_child(cap_row)
+	axis_max_value_row = HBoxContainer.new()
+	axis_max_value_row.add_child(_row_label("Sınır değeri"))
+	axis_max_value_value_label = _value_label()
+	axis_max_value_row.add_child(axis_max_value_value_label)
+	axis.add_child(axis_max_value_row)
+	axis_max_value_slider = HSlider.new()
+	axis.add_child(axis_max_value_slider)
+
+## Başlıklı, çerçeveli bir ayar bölümü; içeriğin ekleneceği kutuyu döner.
+func _section(title_text: String, note_text: String) -> VBoxContainer:
+	var panel := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(1, 1, 1, 0.04)
+	style.border_color = Color(1, 1, 1, 0.1)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(10)
+	style.set_content_margin_all(10)
+	panel.add_theme_stylebox_override("panel", style)
+	settings_vbox.add_child(panel)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 4)
+	panel.add_child(box)
+	var title := Label.new()
+	title.text = title_text
+	title.add_theme_font_size_override("font_size", 13)
+	title.add_theme_color_override("font_color", SECTION_COLOR)
+	box.add_child(title)
+	if note_text != "":
+		_note(box, note_text)
+	return box
+
+func _note(parent: Control, text: String) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.add_theme_font_size_override("font_size", 11)
+	label.add_theme_color_override("font_color", Color(1, 1, 1, 0.5))
+	parent.add_child(label)
+	return label
+
+func _row_label(text: String) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.add_theme_font_size_override("font_size", 14)
+	return label
+
+func _value_label() -> Label:
+	var label := Label.new()
+	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
+	return label
+
+## "Etiket ........ değer" satırı; değer etiketini döner.
+func _value_row(parent: Control, text: String) -> Label:
+	var row := HBoxContainer.new()
+	row.add_child(_row_label(text))
+	var value := _value_label()
+	row.add_child(value)
+	parent.add_child(row)
+	return value
+
+## "Etiket   [−] değer [+]" satırı: [eksi, değer, artı].
+func _stepper_row(parent: Control, text: String) -> Array:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	row.add_child(_row_label(text))
+	var minus := Button.new()
+	minus.text = "−"
+	minus.custom_minimum_size = Vector2(32, 30)
+	var value := _value_label()
+	value.custom_minimum_size = Vector2(28, 0)
+	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	value.add_theme_font_size_override("font_size", 18)
+	value.add_theme_color_override("font_color", SECTION_COLOR)
+	var plus := Button.new()
+	plus.text = "+"
+	plus.custom_minimum_size = Vector2(32, 30)
+	row.add_child(minus)
+	row.add_child(value)
+	row.add_child(plus)
+	parent.add_child(row)
+	return [minus, value, plus]
 
 func _refresh_code_display() -> void:
 	var shown := "•••••" if GameSettings.streamer_mode else MultiplayerManager.room_code

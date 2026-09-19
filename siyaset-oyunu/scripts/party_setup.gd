@@ -6,7 +6,7 @@ extends Control
 ## İDEOLOJİ SEÇİLMEZ: her parti nötr başlar, görüşü oyunda sunduğu yasalarla
 ## oluşur (bkz. IdeologyAxes). Sahnedeki ideoloji düğümleri gizlenir.
 ##
-## Süre (lobi ayarından gelen party_setup_duration; 0 = SINIRSIZ) dolunca
+## Süre sınırsızdır (eski süre ayarı kaldırıldı); herkes hazır olunca
 ## HOST otomatik olarak herkesi Oyun Ekranı'na geçirir. Bir oyuncu
 ## "Kilitle ve Hazır Ver"e basarsa seçimleri kilitlenir ve hazır olarak
 ## işaretlenir; HERKES hazır olursa süre dolmamış olsa bile oyun hemen
@@ -58,8 +58,9 @@ var _is_locked: bool = false
 var _players_list: VBoxContainer
 
 func _ready() -> void:
-	_unlimited_time = MultiplayerManager.party_setup_duration == MultiplayerManager.PARTY_DURATION_UNLIMITED
-	_time_left = float(MultiplayerManager.party_setup_duration)
+	# Parti kurma süresi her zaman sınırsız (lobi ayarı kaldırıldı).
+	_unlimited_time = true
+	_time_left = 0.0
 	_party_name = "Parti%d" % randi_range(1, 99)
 	_ideology = IdeologyAxes.default_values()
 

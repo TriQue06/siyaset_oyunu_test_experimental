@@ -75,10 +75,12 @@ const ELECTION_MANA_BONUS := 1
 ## gündem, AGENDA_GAP tur ara, yine AGENDA_ROUNDS tur gündem... Gündemli her tur
 ## tek bir eksenin bir ucudur; bir gündem dönemindeki turlar farklı eksenlerdir
 ## (eksenler her dönemde rastgele). YASA sadece gündemdeki eksende sunulabilir.
-const AGENDA_ROUNDS := 2
-const AGENDA_GAP := 3
+const AGENDA_ROUNDS := 1
+const AGENDA_GAP := 2
 ## Kabul edilen yasa, getiren partiye puan tablosunda bu kadar puan yazar
 ## (hükümet partisinin yasası daha çok).
+## Kabul edilen gensoru, getiren partiye puan tablosunda bu kadar puan yazar.
+const CENSURE_PASS_SCORE := 5
 const LAW_PASS_SCORE := 4
 const LAW_PASS_SCORE_GOV := 6
 const GOVERNMENT_MANA_BONUS := 1

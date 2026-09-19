@@ -66,6 +66,8 @@ const PROVINCE_EVENT_LIMIT := 6
 ## Deste ağırlıkları (bkz. _draw_weights).
 const WEIGHT_STEAL := 1.0
 const WEIGHT_PROPAGANDA := 1.6
+const WEIGHT_REPUTATION := 1.2
+const WEIGHT_REBELLION := 1.0
 const WEIGHT_POPULISM := 1.0
 const WEIGHT_MANA_BONUS := 1.2
 ## Azınlık hükümeti varken gensorunun ağırlığı, diğer TÜM kartların toplamının
@@ -88,10 +90,13 @@ var has_drawn_this_turn: bool = false
 var law_rounds: Dictionary = {}
 ## Popülizm bonusu: peer_id -> bittiği tur (o turdan önceki son tura kadar sürer).
 var populism: Dictionary = {}
+## peer_id -> true: partide isyan var, sıradaki ilk yasa oylamasında çekimser.
+var rebellion: Dictionary = {}
 ## GÜNDEM: {"type": gündem türü, "until": bittiği tur} (boş = gündem yok).
 var agenda: Dictionary = {}
 ## Sadece host: bu üçlemenin eksen sırası (her üçlemede karıştırılır).
 var _agenda_axes: Array = []
+var _last_agenda_axis: String = ""
 ## peer_id -> int: son seçimde ulusal listeden kazanılan vekil.
 var national_list: Dictionary = {}
 ## Eksen keskinliği: il bazlı seçim sonuçlarının ne kadar keskin çıkacağını
@@ -332,6 +337,10 @@ func can_play_card(peer_id: int, card_type: String, target_peer_id: int = -1, ta
 		return false
 	if CardPresets.needs_target(card_type):
 		return is_valid_steal_target(peer_id, target_peer_id)
+	if card_type == CardPresets.REPUTATION_CARD_TYPE:
+		return turn_order.has(target_peer_id) and target_peer_id != peer_id
+	if card_type == CardPresets.REBELLION_CARD_TYPE:
+		return turn_order.has(target_peer_id) and target_peer_id != peer_id and has_seats(target_peer_id)
 	if card_type == CardPresets.PROPAGANDA_CARD_TYPE:
 		return has_province(target_province) and turn_order.has(target_peer_id) and target_peer_id != peer_id
 	if card_type == CardPresets.SCOUT_CARD_TYPE:
@@ -575,6 +584,7 @@ func init_game() -> void:
 	has_drawn_this_turn = false
 	law_rounds = {}
 	populism = {}
+	rebellion = {}
 	agenda = {}
 	_agenda_axes = []
 	national_list = {}
@@ -656,6 +666,10 @@ func draw_card() -> void:
 func _draw_weights(peer_id: int = -1) -> Dictionary:
 	var weights := {}
 	weights[CardPresets.PROPAGANDA_CARD_TYPE] = WEIGHT_PROPAGANDA
+	weights[CardPresets.REPUTATION_CARD_TYPE] = WEIGHT_REPUTATION
+	# İsyan kartı ancak meclis (ve yasa oylaması) varken anlamlı.
+	if not last_seats.is_empty():
+		weights[CardPresets.REBELLION_CARD_TYPE] = WEIGHT_REBELLION
 	if not last_seats.is_empty():
 		for card_type in CardPresets.STEAL_CARD_TYPES:
 			weights[card_type] = WEIGHT_STEAL
@@ -851,6 +865,11 @@ func _apply_card_effect(peer_id: int, card_type: String, target_peer_id: int = -
 	if CardPresets.needs_target(card_type):
 		return _apply_steal(peer_id, target_peer_id, card_type)
 	match card_type:
+		CardPresets.REPUTATION_CARD_TYPE:
+			_apply_reputation(peer_id, target_peer_id)
+		CardPresets.REBELLION_CARD_TYPE:
+			rebellion[target_peer_id] = true
+			_event_message = "%s'da parti içi isyan çıktı: sıradaki yasa oylamasında çekimser kalacak." % _party_name(target_peer_id)
 		CardPresets.POPULISM_CARD_TYPE:
 			populism[peer_id] = round_number + GameRules.POPULISM_ROUNDS
 			_event_message = "%s popülizme başladı: %d tur boyunca hamleleri daha etkili." % [_party_name(peer_id), GameRules.POPULISM_ROUNDS]
@@ -933,6 +952,20 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 				continue
 			var choice := GovernmentManager.normalize_vote(votes[voter])
 			_add_local(province_id, int(voter), PublicOpinion.law_vote_delta(alignment, choice, gov_ids.has(voter), proposer_in_gov) * agenda_mult, true)
+	# KOALİSYON UYUMU: başbakanın partisinin yasasına hükümet ortağının oyu
+	# ulusal puana yansır (kısmi).
+	var pm_party := GovernmentManager.main_gov_peer_id
+	if proposer == pm_party and pm_party != -1:
+		for voter in votes.keys():
+			var partner := int(voter)
+			if partner == proposer or not gov_ids.has(partner):
+				continue
+			var partner_choice := GovernmentManager.normalize_vote(votes[voter])
+			if partner_choice == GovernmentManager.VOTE_YES:
+				_add_national(partner, PublicOpinion.LAW_PARTNER_YES_NATIONAL)
+			elif partner_choice == GovernmentManager.VOTE_NO:
+				_add_national(partner, PublicOpinion.LAW_PARTNER_NO_NATIONAL)
+				_add_national(pm_party, PublicOpinion.LAW_PM_PARTNER_NO_NATIONAL)
 	# Görüş kayması: sunan yasanın yönünde 1 adım, EVET yasanın yönünde,
 	# HAYIR ters yönde yarım adım; çekimser kaymaz.
 	var shifts: Array = [{"peer": proposer, "axis": axis, "delta": IdeologyAxes.LAW_PROPOSE_SHIFT * dir}]
@@ -993,14 +1026,19 @@ func _schedule_agenda() -> void:
 		if was_active and pos == GameRules.AGENDA_ROUNDS:
 			_push_state({"type": "agenda", "message": "Gündem arası: %d tur yasa yok, sonra yeni gündemler." % GameRules.AGENDA_GAP})
 		return
-	if pos == 0 or _agenda_axes.size() != IdeologyAxes.AXES.size():
+	# Eksenler karıştırılmış bir sıradan tüketilir: arka arkaya gelen iki gündem
+	# (aynı dönemde ya da iki dönem arasında) hep farklı eksenden olur.
+	if _agenda_axes.is_empty():
 		_agenda_axes = IdeologyAxes.AXES.duplicate()
 		for i in range(_agenda_axes.size() - 1, 0, -1):
 			var j := _rng.randi_range(0, i)
 			var tmp = _agenda_axes[i]
 			_agenda_axes[i] = _agenda_axes[j]
 			_agenda_axes[j] = tmp
-	var axis: String = _agenda_axes[pos % _agenda_axes.size()]  # dönemde her tur farklı eksen
+		if _agenda_axes.size() > 1 and String(_agenda_axes[0]) == _last_agenda_axis:
+			_agenda_axes.push_back(_agenda_axes.pop_front())
+	var axis: String = String(_agenda_axes.pop_front())
+	_last_agenda_axis = axis
 	var type := "gundem_%s_%s" % [axis, "p" if _rng.randf() < 0.5 else "n"]
 	agenda = {"type": type, "until": round_number + 1, "index": pos + 1}
 	var data := CardPresets.agenda_data(type)
@@ -1117,7 +1155,32 @@ func _apply_steal(peer_id: int, target_peer_id: int, card_type: String) -> bool:
 		return false
 	last_seats[target_peer_id] = int(last_seats[target_peer_id]) - moved
 	last_seats[peer_id] = int(last_seats.get(peer_id, 0)) + moved
+	# Transfer meşru görünmez: çalan küçük bir ulusal destek kaybeder, çalınan
+	# parti mağduriyetten küçük bir destek kazanır (ikisi de kısmi).
+	_add_national(peer_id, PublicOpinion.steal_thief_national(moved))
+	_add_national(target_peer_id, PublicOpinion.steal_victim_national(moved))
 	_event_message = "%s, %s'dan %d milletvekili transfer etti." % [_party_name(peer_id), _party_name(target_peer_id), moved]
+	return true
+
+## Kaset / itibar suikastı: hedefin ULUSAL desteği doğrudan düşer. Popülizm
+## süren saldırgan için hasar daha büyüktür (kendi hamlesinin iyi sonucu).
+func _apply_reputation(peer_id: int, target_peer_id: int) -> void:
+	var damage := PublicOpinion.REPUTATION_NATIONAL_DAMAGE
+	if populism_rounds_left(peer_id) > 0:
+		damage *= PublicOpinion.POPULISM_GOOD_MULT
+	_add_national(target_peer_id, -damage)
+	_event_message = "%s hakkında kaset sızdı: ulusal desteği %.1f puan düştü. (%s)" % [
+		_party_name(target_peer_id), damage, _party_name(peer_id)]
+
+## Parti içi isyan sürüyor mu? (sıradaki ilk yasa oylamasında çekimser)
+func has_rebellion(peer_id: int) -> bool:
+	return bool(rebellion.get(peer_id, false))
+
+## İsyan kullanıldı: bayrak düşer (host yetkili; yasa oylaması başlarken).
+func consume_rebellion(peer_id: int) -> bool:
+	if not has_rebellion(peer_id):
+		return false
+	rebellion.erase(peer_id)
 	return true
 
 ## GovernmentManager, hükümet güvenoyu alınca çağırır: hükümet partilerine mana.
@@ -1215,13 +1278,6 @@ func election_modifiers() -> Dictionary:
 	for peer_id in turn_order:
 		if populism_rounds_left(peer_id) > 0:
 			national[peer_id] = float(national.get(peer_id, 0.0)) + PublicOpinion.POPULISM_ELECTION_NATIONAL
-	if not election_seats.is_empty():
-		var total := float(maxi(1, TOTAL_SEATS))
-		for peer_id in last_seats.keys():
-			var change := (float(last_seats[peer_id]) - float(election_seats.get(peer_id, 0))) / total * 100.0
-			var momentum := PublicOpinion.seat_momentum(change)
-			if momentum != 0.0:
-				national[peer_id] = float(national.get(peer_id, 0.0)) + momentum
 	return {"national": national, "local": activity_map()}
 
 func _hold_election(finished_round: int, early: bool) -> void:
@@ -1367,6 +1423,7 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"has_drawn": has_drawn_this_turn,
 		"law_rounds": law_rounds,
 		"populism": populism,
+		"rebellion": rebellion,
 		"agenda": agenda,
 		"national_list": national_list,
 		"sharpness": current_axis_sharpness,
@@ -1400,6 +1457,7 @@ func _apply_state(state: Dictionary) -> void:
 	has_drawn_this_turn = bool(state["has_drawn"])
 	law_rounds = state.get("law_rounds", {})
 	populism = state.get("populism", {})
+	rebellion = state.get("rebellion", {})
 	agenda = state.get("agenda", {})
 	national_list = state.get("national_list", {})
 	current_axis_sharpness = float(state["sharpness"])

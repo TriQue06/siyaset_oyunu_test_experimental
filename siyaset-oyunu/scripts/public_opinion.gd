@@ -94,7 +94,16 @@ const LAW_VOTE_IDEOLOGY := 1.5
 ## İktidar partisi muhalefetin yasasına EVET: her ilde (gündemi kaptırdı).
 ## Yasaya uyumlu illerde ideolojik artı bunu nötre/artıya çevirebilir.
 const LAW_GOV_YES_ON_OPPOSITION := -1.0
+## KOALİSYON UYUMU (ulusal puan, kısmi): başbakanın partisinin yasasına ortak
+## EVET derse uyumlu görünür ve kazanır; HAYIR derse kendisi küçük, başbakanın
+## partisi (ortağına yasa geçirtemedi) biraz daha fazla kaybeder.
+const LAW_PARTNER_YES_NATIONAL := 0.5
+const LAW_PARTNER_NO_NATIONAL := -0.4
+const LAW_PM_PARTNER_NO_NATIONAL := -0.8
 
+# --- Kaset / itibar suikastı ------------------------------------------------------
+## Hedefin ULUSAL desteğinden doğrudan düşer (il puanlarına dokunmaz).
+const REPUTATION_NATIONAL_DAMAGE := 4.0
 # --- Karalama -----------------------------------------------------------------
 ## Hedefin kaybı = DAMAGE / (1 + DEFENSE_FACTOR × hedefin il gücü)
 ## Karalayanın kazancı = GAIN × (1 + ATTACK_FACTOR × karalayanın il gücü)
@@ -114,11 +123,14 @@ const STRENGTH_ACTIVITY_WEIGHT := 0.4
 ## Anket sonucundaki her oy payı en fazla bu oranda sapar (%80 doğruluk).
 const POLL_ERROR := 0.2
 
-# --- Vekil momentumu ------------------------------------------------------------
-## Seçimden bu yana vekil payındaki değişim (yüzde puan) başına ulusal puan:
-## vekil çalarak büyüyen parti bir sonraki seçime artıyla girer.
-const SEAT_MOMENTUM_PER_POINT := 0.6
-const SEAT_MOMENTUM_LIMIT := 4.0
+# --- Vekil çalmanın bedeli -------------------------------------------------------
+## Vekil transferi seçmene meşru görünmez: ÇALAN parti çalınan vekil başına
+## küçük bir ulusal destek kaybeder, ÇALINAN parti "mağduriyet" olarak küçük bir
+## destek kazanır. İkisi de kısmidir: hamleyi caydırmaz, bedava da bırakmaz.
+const STEAL_THIEF_NATIONAL_PER_SEAT := -0.03
+const STEAL_THIEF_NATIONAL_LIMIT := -1.0
+const STEAL_VICTIM_NATIONAL_PER_SEAT := 0.025
+const STEAL_VICTIM_NATIONAL_LIMIT := 0.8
 
 const AXES := ["economic", "social", "administrative"]
 
@@ -191,5 +203,9 @@ static func propaganda_gain(attacker_strength: float) -> float:
 	return PROPAGANDA_GAIN * (1.0 + PROPAGANDA_ATTACK_FACTOR * maxf(0.0, attacker_strength))
 
 ## Vekil payı değişimi (yüzde puan) -> ulusal puan.
-static func seat_momentum(share_change_points: float) -> float:
-	return clampf(share_change_points * SEAT_MOMENTUM_PER_POINT, -SEAT_MOMENTUM_LIMIT, SEAT_MOMENTUM_LIMIT)
+## Çalınan vekil sayısına göre ulusal puan (çalan için eksi, çalınan için artı).
+static func steal_thief_national(seats: int) -> float:
+	return maxf(float(seats) * STEAL_THIEF_NATIONAL_PER_SEAT, STEAL_THIEF_NATIONAL_LIMIT)
+
+static func steal_victim_national(seats: int) -> float:
+	return minf(float(seats) * STEAL_VICTIM_NATIONAL_PER_SEAT, STEAL_VICTIM_NATIONAL_LIMIT)

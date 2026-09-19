@@ -21,9 +21,14 @@ extends Node
 ## Bir başka partiden milletvekili çalar. Kullanılırken HEDEF parti seçilir.
 const STEAL_CARD_TYPES: Array[String] = [
 	"steal_weak",
-	"steal_medium",
 	"steal_strong",
 ]
+
+## Hedef PARTİ seçilen diğer saldırı kartları.
+## Kaset: hedefin ulusal desteğini doğrudan düşürür.
+## Parti içi isyan: hedef, sıradaki İLK yasa oylamasında çekimser kalmak zorunda.
+const REPUTATION_CARD_TYPE := "kaset"
+const REBELLION_CARD_TYPE := "isyan"
 
 ## Hükümeti düşürmek için meclise getirilen teklif.
 const CENSURE_CARD_TYPE := "gensoru"
@@ -55,8 +60,9 @@ const AGENDAS := {
 
 const CARD_TYPES: Array[String] = [
 	"steal_weak",
-	"steal_medium",
 	"steal_strong",
+	"kaset",
+	"isyan",
 	"gensoru",
 	"miting",
 	"yatirim",
@@ -86,7 +92,6 @@ const CARD_NATIVE_SIZE := Vector2(72, 96)
 ## Vekil çalma kartlarının çaldığı milletvekili aralığı (her değer eşit olası).
 const STEAL_RANGES := {
 	"steal_weak": {"min": 2, "max": 4},
-	"steal_medium": {"min": 5, "max": 9},
 	"steal_strong": {"min": 10, "max": 16},
 }
 
@@ -95,12 +100,10 @@ const STEAL_RANGES := {
 ## zıt radikal uçlardaysa STEAL_RANGES_FAR. Arası doğrusal (bkz. steal_range).
 const STEAL_RANGES_CLOSE := {
 	"steal_weak": {"min": 4, "max": 8},
-	"steal_medium": {"min": 10, "max": 18},
 	"steal_strong": {"min": 20, "max": 32},
 }
 const STEAL_RANGES_FAR := {
 	"steal_weak": {"min": 1, "max": 2},
-	"steal_medium": {"min": 3, "max": 5},
 	"steal_strong": {"min": 6, "max": 9},
 }
 
@@ -126,8 +129,15 @@ const CARD_MANA_COSTS := {
 	"gundem_administrative_n": 1,
 	"gundem_administrative_p": 1,
 	"steal_weak": 1,
-	"steal_medium": 2,
 	"steal_strong": 3,
+	"kaset": 2,
+	"isyan": 2,
+}
+
+## Kendi görseli olmayan kartlar geçici olarak başka bir kartın görselini kullanır.
+const CARD_ART_ALIAS := {
+	"kaset": "steal_medium",
+	"isyan": "gensoru",
 }
 
 var _card_textures: Dictionary = {}
@@ -135,7 +145,7 @@ var _closed_texture: Texture2D
 
 func _ready() -> void:
 	for card_type in CARD_TYPES:
-		var path := "res://assets/cards/politic_card_%s.png" % card_type
+		var path := "res://assets/cards/politic_card_%s.png" % String(CARD_ART_ALIAS.get(card_type, card_type))
 		if ResourceLoader.exists(path):
 			_card_textures[card_type] = load(path)
 		else:
@@ -151,6 +161,10 @@ func get_closed_texture() -> Texture2D:
 ## Bu kart oynanırken hedef PARTİ seçilmesi gerekiyor mu? (vekil çalma)
 func needs_target(card_type: String) -> bool:
 	return STEAL_CARD_TYPES.has(card_type)
+
+## Hedef parti seçilen TÜM kartlar: vekil çalma + kaset + parti içi isyan.
+func needs_party_target(card_type: String) -> bool:
+	return needs_target(card_type) or card_type in [REPUTATION_CARD_TYPE, REBELLION_CARD_TYPE]
 
 ## Bu kart oynanırken haritadan İL seçilmesi gerekiyor mu? (Karalamada ilden
 ## sonra hedef parti de seçilir.)
@@ -245,11 +259,13 @@ func card_title(card_type: String) -> String:
 		return "Gündem: " + String(agenda_data(card_type)["title"])
 	match card_type:
 		"steal_weak":
-			return "Vekil Çalma (Zayıf)"
-		"steal_medium":
-			return "Vekil Çalma (Orta)"
+			return "Vekil Çalma"
 		"steal_strong":
 			return "Vekil Çalma (Güçlü)"
+		"kaset":
+			return "Kaset / İtibar Suikastı"
+		"isyan":
+			return "Parti İçi İsyan"
 		"gensoru":
 			return "Gensoru"
 		"miting":
@@ -308,13 +324,21 @@ func _card_effect_text(card_type: String) -> String:
 		var r: Dictionary = STEAL_RANGES[card_type]
 		var close: Dictionary = STEAL_RANGES_CLOSE[card_type]
 		var far: Dictionary = STEAL_RANGES_FAR[card_type]
-		return "Seçtiğin partiden vekil çal: %d-%d; görüşü sana yakınsa %d-%d'e kadar, zıt uçtaysa %d-%d.\nSağdaki bir parti kartına sürükle." % [
+		return "Seçtiğin partiden vekil çal: %d-%d; görüşü sana yakınsa %d-%d'e kadar, zıt uçtaysa %d-%d.\nMeşru görünmez: ulusal desteğin biraz düşer, çalınan partininki artar.\nSağdaki bir parti kartına sürükle." % [
 			int(r["min"]), int(r["max"]), int(close["min"]), int(close["max"]), int(far["min"]), int(far["max"])]
 	if is_agenda_card(card_type):
 		var agenda := agenda_data(card_type)
 		return "%s\n%d tur boyunca gündem bu: %s.\nDokun, tekrar dokun: kullan." % [agenda["text"], GameRules.AGENDA_ROUNDS,
 			agenda_effect_text(card_type)]
 	match card_type:
+		REPUTATION_CARD_TYPE:
+			return ("Seçtiğin partinin itibarını sarsan bir kaset sızar:" + "\n"
+				+ "ulusal desteği %.1f puan düşer." + "\n"
+				+ "Sağdaki bir parti kartına sürükle.") % PublicOpinion.REPUTATION_NATIONAL_DAMAGE
+		REBELLION_CARD_TYPE:
+			return ("Seçtiğin partide isyan çıkar: sıradaki İLK yasa" + "\n"
+				+ "oylamasında çekimser kalmak zorunda kalır." + "\n"
+				+ "Sağdaki bir parti kartına sürükle.")
 		CENSURE_CARD_TYPE:
 			return "Hükümeti düşürmek için gensoru ver.\nMeclis diyagramına sürükle."
 		MITING_CARD_TYPE:

@@ -768,7 +768,7 @@ func _on_hand_card_clicked(hand_index: int) -> void:
 		return  # sıra değil: sadece açıklama
 	var card_type: String = hand[hand_index]
 	var me := multiplayer.get_unique_id()
-	if CardPresets.needs_target(card_type):
+	if CardPresets.needs_party_target(card_type):
 		_begin_targeting(hand_index)
 		return
 	if CardPresets.needs_province_target(card_type):
@@ -893,8 +893,8 @@ func _start_drag(hand_index: int, card_type: String, holder: Control) -> void:
 	_drag_ghost.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_drag_ghost.z_index = 150
 	add_child(_drag_ghost)
-	# Vekil çalmada geçerli hedef partiler vurgulanır.
-	if CardPresets.needs_target(card_type):
+	# Hedef parti seçilen kartlarda geçerli partiler vurgulanır.
+	if CardPresets.needs_party_target(card_type):
 		_pending_target_hand_index = hand_index
 		_refresh_target_highlights()
 	_update_drag()
@@ -954,7 +954,27 @@ func _end_drag() -> void:
 func _drop_target(card_type: String) -> Dictionary:
 	var me := multiplayer.get_unique_id()
 	var result := {"valid": false, "peer": -1, "province": "", "label": "", "error": "", "parliament": false}
-	if CardPresets.needs_target(card_type):
+	if CardPresets.needs_party_target(card_type) and not CardPresets.needs_target(card_type):
+		# Kaset / parti içi isyan: hedef, kendisi dışında herhangi bir parti.
+		var other := _party_under_mouse()
+		result["peer"] = other
+		var title := CardPresets.card_title(card_type)
+		if other == -1:
+			result["label"] = "%s için sağdaki bir partinin logosuna bırak" % title
+		elif other == me:
+			result["label"] = "Bu kartı kendi partine oynayamazsın"
+			result["error"] = result["label"]
+		elif card_type == CardPresets.REBELLION_CARD_TYPE and not CardManager.has_seats(other):
+			result["label"] = "Meclis dışı partide isyan çıkmaz"
+			result["error"] = result["label"]
+		else:
+			result["valid"] = true
+			if card_type == CardPresets.REPUTATION_CARD_TYPE:
+				result["label"] = "Bırak: %s hakkında kaset sızdır (ulusal −%.1f)" % [_party_name_of(other),
+					PublicOpinion.REPUTATION_NATIONAL_DAMAGE]
+			else:
+				result["label"] = "Bırak: %s'da isyan çıkar (ilk yasa oylamasında çekimser)" % _party_name_of(other)
+	elif CardPresets.needs_target(card_type):
 		var peer := _party_under_mouse()
 		result["peer"] = peer
 		if peer == -1:

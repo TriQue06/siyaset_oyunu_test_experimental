@@ -444,6 +444,11 @@ func submit_law(peer_id: int, law_type: String) -> bool:
 	proposal_gov_ids = government_party_ids()
 	# Yasayı getiren kendi yasasına EVET demiş sayılır.
 	votes = {peer_id: VOTE_YES}
+	# PARTİ İÇİ İSYAN: isyan çıkan parti bu oylamada çekimser kalmak zorunda
+	# (yasayı getiren parti dahil); bayrak burada tükenir.
+	for voter in eligible_voter_ids():
+		if CardManager.consume_rebellion(int(voter)):
+			votes[int(voter)] = VOTE_ABSTAIN
 	_set_phase(Phase.VOTING)
 	if _all_voted():
 		_begin_resolution()
@@ -594,7 +599,8 @@ func _resolve_proposal() -> void:
 		if accepted:
 			# Hükümet düştü: kurma aşaması baştan başlar. Ortağı çekildiği için
 			# tek başına kalıp düşen ana parti ağır puan kaybeder.
-			var fall_note := ""
+			var fall_note := " %s +%d puan." % [_party_name(proposer), GameRules.CENSURE_PASS_SCORE]
+			scores[proposer] = score_of(proposer) + GameRules.CENSURE_PASS_SCORE
 			if abandoned and government_party_ids().size() == 1 and main_gov_peer_id != -1:
 				scores[main_gov_peer_id] = score_of(main_gov_peer_id) - GovernmentPresets.ABANDONED_FALL_PENALTY
 				fall_note = " Yalnız kalan %s −%d puan." % [_party_name(main_gov_peer_id), GovernmentPresets.ABANDONED_FALL_PENALTY]

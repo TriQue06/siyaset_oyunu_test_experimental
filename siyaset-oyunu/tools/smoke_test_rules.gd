@@ -259,7 +259,7 @@ func _initialize() -> void:
 	check("tur bitti: 1 birikmis manasina gelir ekledi (1 + gelir)", cm.round_number == 2 and cm.mana_of(1) == 1 + GameRules.MANA_PER_ROUND 		and cm.mana_of(3) == 0, str(cm.mana))
 	check("gozcu destede yok", not cm._draw_pool(1).has("gozcu"))
 	check("miting hamle, destede yok, 2 mana", not cm._draw_pool(1).has("miting") and GameRules.MITING_MANA_COST == 2)
-	check("kart bedelleri: karalama 1, vekil calma 1/2/3", cp.card_cost("karalama") == 1 		and cp.card_cost("steal_weak") == 1 and cp.card_cost("steal_medium") == 2 and cp.card_cost("steal_strong") == 3)
+	check("kart bedelleri: karalama 1, calma 1/3, kaset 2, isyan 2", cp.card_cost("karalama") == 1 		and cp.card_cost("steal_weak") == 1 and cp.card_cost("steal_strong") == 3 and cp.card_cost("kaset") == 2 and cp.card_cost("isyan") == 2)
 
 	var law_type: String = cp.law_type("economic", 1)
 	check("yasa hamlesi turu okunur", cp.is_law_card(law_type) and int(cp.law_data(law_type)["dir"]) == 1 and not cp.is_law_card("miting"))
@@ -509,18 +509,19 @@ func _initialize() -> void:
 		if calendar[rr] != "":
 			no_early = false
 	check("ilk secimden once gundem yok", no_early, str(calendar))
-	var pattern_ok: bool = calendar[5] != "" and calendar[6] != "" and calendar[7] == "" and calendar[8] == "" and calendar[9] == "" \
-		and calendar[10] != "" and calendar[11] != "" and calendar[12] == "" and calendar[13] == "" and calendar[14] == "" and calendar[15] != ""
-	check("2 tur gundem, 3 tur ara", pattern_ok, str(calendar))
-	check("donemdeki iki gundem farkli eksen", cp.agenda_data(calendar[5])["axis"] != cp.agenda_data(calendar[6])["axis"] \
-		and cp.agenda_data(calendar[10])["axis"] != cp.agenda_data(calendar[11])["axis"])
+	var pattern_ok: bool = calendar[5] != "" and calendar[6] == "" and calendar[7] == "" and calendar[8] != "" \
+		and calendar[9] == "" and calendar[10] == "" and calendar[11] != "" and calendar[12] == "" and calendar[13] == "" and calendar[14] != ""
+	check("1 tur gundem, 2 tur ara", pattern_ok, str(calendar))
+	check("arka arkaya gelen gundemler farkli eksen", cp.agenda_data(calendar[5])["axis"] != cp.agenda_data(calendar[8])["axis"] \
+		and cp.agenda_data(calendar[8])["axis"] != cp.agenda_data(calendar[11])["axis"])
 
 	print("")
 	print("=== 14) IDEOLOJIYE BAGLI VEKIL CALMA, IL TAVANI, SECIM HEDIYESI ===")
 	check("notr (orta yakinlik) guclu: 10-16", str(cp.steal_range("steal_strong", 0.5)) == str({"min": 10, "max": 16}))
 	check("ayni ideoloji guclu: 20-32", str(cp.steal_range("steal_strong", 1.0)) == str({"min": 20, "max": 32}))
-	check("zit uclar: zayif 1-2, orta 3-5, guclu 6-9", str(cp.steal_range("steal_weak", 0.0)) == str({"min": 1, "max": 2}) \
-		and str(cp.steal_range("steal_medium", 0.0)) == str({"min": 3, "max": 5}) and str(cp.steal_range("steal_strong", 0.0)) == str({"min": 6, "max": 9}))
+	check("zit uclar: normal 1-2, guclu 6-9", str(cp.steal_range("steal_weak", 0.0)) == str({"min": 1, "max": 2}) \
+		and str(cp.steal_range("steal_strong", 0.0)) == str({"min": 6, "max": 9}))
+	check("vekil calmanin iki varyanti var", cp.STEAL_CARD_TYPES.size() == 2 and not cp.STEAL_CARD_TYPES.has("steal_medium"))
 	pm.parties[1]["ideology"] = ideology(3, 3, 3)
 	pm.parties[2]["ideology"] = ideology(-3, -3, -3)
 	pm.parties[3]["ideology"] = ideology(3, 3, 3)
@@ -538,6 +539,36 @@ func _initialize() -> void:
 			gift_ok = false
 	check("secimden sonra herkese 1 kart hediye", gift_ok)
 	check("gundem karti destede yok", not cm._draw_pool(1).has("gundem_economic_n"))
+
+	print("")
+	print("=== 15) YENI KARTLAR, CALMA BEDELI, GENSORU PUANI ===")
+	var kaset_target: int = cm.turn_order[1]
+	var kaset_player: int = cm.turn_order[0]
+	cm.current_turn_index = 0
+	cm.mana[kaset_player] = 9
+	cm.last_seats[kaset_target] = maxi(20, int(cm.last_seats.get(kaset_target, 0)))
+	cm.last_seats[kaset_player] = maxi(20, int(cm.last_seats.get(kaset_player, 0)))
+	var nat_before: float = cm.national_of(kaset_target)
+	cm._apply_card_effect(kaset_player, "kaset", kaset_target)
+	check("kaset: hedefin ulusal destegi dustu", near(cm.national_of(kaset_target), nat_before - PublicOpinion.REPUTATION_NATIONAL_DAMAGE),
+		"%.2f -> %.2f" % [nat_before, cm.national_of(kaset_target)])
+	cm._apply_card_effect(kaset_player, "isyan", kaset_target)
+	check("isyan: hedef partide isyan var", cm.has_rebellion(kaset_target))
+	check("isyan tuketilir", cm.consume_rebellion(kaset_target) and not cm.has_rebellion(kaset_target))
+	check("kaset kendine oynanamaz", not cm.can_play_card(kaset_player, "kaset", kaset_player))
+
+	var thief: int = cm.turn_order[0]
+	var victim: int = cm.turn_order[1]
+	var thief_nat: float = cm.national_of(thief)
+	var victim_nat: float = cm.national_of(victim)
+	var seats_before: int = int(cm.last_seats[victim])
+	cm._apply_steal(thief, victim, "steal_weak")
+	var moved: int = seats_before - int(cm.last_seats[victim])
+	check("calmada calan ulusal kaybeder, calinan kazanir", moved > 0 \
+		and cm.national_of(thief) < thief_nat and cm.national_of(victim) > victim_nat,
+		"%d vekil, %.2f / %.2f" % [moved, cm.national_of(thief) - thief_nat, cm.national_of(victim) - victim_nat])
+	check("bedeller kucuk (en fazla 1 puan)", absf(cm.national_of(thief) - thief_nat) <= 1.0 \
+		and absf(cm.national_of(victim) - victim_nat) <= 0.8)
 
 	print("")
 	if fails == 0:

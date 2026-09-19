@@ -225,9 +225,9 @@ func _initialize() -> void:
 	cm.organizations = {"konya": {3: 2}}
 	cm.local_support = {}
 	mods = cm.election_modifiers()
-	check("vekil calan parti momentumla girer", near(float(mods["national"][3]), 1.0 + PublicOpinion.seat_momentum(10.0 / float(cm.TOTAL_SEATS) * 100.0)),
+	check("vekil calmanin secim momentumu kaldirildi", near(float(mods["national"][3]), 1.0),
 		"%.2f" % float(mods["national"][3]))
-	check("vekil kaybeden parti eksi momentum", float(mods["national"][1]) < 2.0 + PublicOpinion.GOVERNMENT_FATIGUE)
+	check("calma bedeli ulusal puana anlik yazilir", near(PublicOpinion.steal_thief_national(10), -0.3) and near(PublicOpinion.steal_victim_national(10), 0.25))
 	check("il baskanligi il carpanina girer", near(float(mods["local"]["konya"][3]), PublicOpinion.org_activity(2)))
 	cm.last_seats = {1: 200, 2: 100, 3: 90}
 	cm.election_seats = {}

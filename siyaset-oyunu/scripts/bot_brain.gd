@@ -375,7 +375,44 @@ static func _evaluate(bot: int, card_type: String, known: Dictionary) -> Diction
 			return _eval_propaganda(bot, known)
 	if CardPresets.needs_target(card_type):
 		return _eval_steal(bot, card_type)
+	if card_type == CardPresets.REPUTATION_CARD_TYPE:
+		return _eval_reputation(bot)
+	if card_type == CardPresets.REBELLION_CARD_TYPE:
+		return _eval_rebellion(bot)
 	return {}
+
+## Kaset: en büyük rakibin (blok varsa insan hükümetinin) ulusal desteğini vurur.
+static func _eval_reputation(bot: int) -> Dictionary:
+	var target := _attack_target(bot)
+	if target == -1:
+		return {}
+	var score := 1.9 + PublicOpinion.REPUTATION_NATIONAL_DAMAGE / 4.0
+	if bloc_active() and bloc_members().has(bot) and target == GovernmentManager.main_gov_peer_id:
+		score += BLOC_STEAL_BONUS * 0.6
+	return {"score": score, "peer": target, "province": ""}
+
+## Parti içi isyan: yasa oylaması yakınken büyük bir rakibi çekimsere zorlar.
+static func _eval_rebellion(bot: int) -> Dictionary:
+	var target := _attack_target(bot)
+	if target == -1 or not CardManager.has_seats(target):
+		return {}
+	var score := 1.2 + float(GovernmentManager.seats_of(target)) / float(maxi(1, GovernmentManager.total_seats())) * 3.0
+	if CardManager.is_government_party(target) and not CardManager.is_government_party(bot):
+		score += 0.5  # hükümetin yasasını zora sokar
+	return {"score": score, "peer": target, "province": ""}
+
+## Saldırı kartlarının hedefi: blok varsa hükümetin ana partisi, yoksa
+## kendisi dışındaki en çok vekilli parti.
+static func _attack_target(bot: int) -> int:
+	if bloc_active() and bloc_members().has(bot):
+		return GovernmentManager.main_gov_peer_id
+	var target := -1
+	for peer_id in CardManager.turn_order:
+		if peer_id == bot:
+			continue
+		if target == -1 or GovernmentManager.seats_of(peer_id) > GovernmentManager.seats_of(target):
+			target = peer_id
+	return target
 
 ## Beklenen il gücü kazancı × ilin vekil sayısı × partinin o ildeki (bilinen) şansı.
 static func _eval_miting(bot: int, known: Dictionary) -> Dictionary:

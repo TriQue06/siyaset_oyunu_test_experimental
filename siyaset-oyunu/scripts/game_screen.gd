@@ -65,6 +65,7 @@ const PLAY_POP_DURATION := 0.18   # ortada küçülüp "puf" kaybolma
 
 @onready var map_holder: Node2D = %MapHolder
 @onready var deck_button: TextureButton = %DeckButton
+var _deck_shadow: TextureRect
 @onready var pass_button: Button = %PassButton
 @onready var player_panel_list: GridContainer = %PlayerPanelList
 @onready var hand_container: HBoxContainer = %HandContainer
@@ -174,7 +175,7 @@ func _ready() -> void:
 	_place_right_column_controls()
 	deck_button.texture_normal = CardPresets.get_closed_texture()
 	deck_button.pressed.connect(_on_deck_pressed)
-	_add_shadow_behind(deck_button, CardPresets.get_closed_texture())
+	_deck_shadow = _add_shadow_behind(deck_button, CardPresets.get_closed_texture())
 	pass_button.pressed.connect(_on_pass_pressed)
 
 	await get_tree().process_frame
@@ -1353,9 +1354,11 @@ func _spawn_puf_particles(center_pos: Vector2) -> void:
 
 # --- Gölge yardımcıları (hafif estetik derinlik) ---------------------------
 
-func _add_shadow_behind(control: Control, texture: Texture2D) -> void:
+func _add_shadow_behind(control: Control, texture: Texture2D) -> TextureRect:
 	var shadow := TextureRect.new()
 	shadow.texture = texture
+	# Dokunun kendi boyutu kontrolü büyütmesin: gölge tam control kadar olsun.
+	shadow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	shadow.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	shadow.modulate = SHADOW_COLOR
@@ -1375,6 +1378,17 @@ func _add_shadow_behind(control: Control, texture: Texture2D) -> void:
 	var parent := control.get_parent()
 	parent.add_child(shadow)
 	parent.move_child(shadow, control.get_index())
+	return shadow
+
+## Gölgeyi control'ün güncel yerine taşır (control sonradan yeniden
+## konumlandırılınca gölge eski, büyük yerinde kalmasın).
+func _sync_shadow(shadow: Control, control: Control) -> void:
+	if shadow == null:
+		return
+	shadow.offset_left = control.offset_left + SHADOW_OFFSET.x
+	shadow.offset_top = control.offset_top + SHADOW_OFFSET.y
+	shadow.offset_right = control.offset_right + SHADOW_OFFSET.x
+	shadow.offset_bottom = control.offset_bottom + SHADOW_OFFSET.y
 
 
 ## Sağ sütundaki oyuncu kartı: parti rengi şeridi, logo, parti ve oyuncu adı,
@@ -1695,6 +1709,7 @@ func _place_right_column_controls() -> void:
 	deck_button.offset_right = -140.0
 	deck_button.offset_top = -182.0
 	deck_button.offset_bottom = -106.0
+	_sync_shadow(_deck_shadow, deck_button)
 	pass_button.add_theme_font_size_override("font_size", 14)
 	var panel := player_panel_list.get_parent() as Control
 	if panel != null:

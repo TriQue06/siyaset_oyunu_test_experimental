@@ -112,6 +112,7 @@ func _refresh_seat_view() -> void:
 		var seats := GovernmentManager.seats_of(peer_id)
 		seat_entries.append({"seats": seats, "color": color if _partners.has(peer_id) else color.darkened(0.6)})
 		rows.append({
+			"party": party,
 			"name": party.get("name", "?"),
 			"leader": MultiplayerManager.players.get(peer_id, {}).get("name", ""),
 			"color": color,

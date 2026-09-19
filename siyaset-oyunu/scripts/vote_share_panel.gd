@@ -31,7 +31,8 @@ const BAR_BG_COLOR := Color(1, 1, 1, 0.07)      # eksen_projeksiyon: var(--surfa
 func _ready() -> void:
 	add_theme_constant_override("separation", ROW_SEPARATION)
 
-## entries: Array of {"name": String, "color": Color, "percent": float, "seats": int} —
+## entries: Array of {"name": String, "color": Color, "percent": float, "seats": int,
+##   "party": parti sözlüğü (varsa logo rozeti çizilir)} —
 ## BÜYÜKTEN KÜÇÜĞE sıralı olmalı.
 func set_data(entries: Array) -> void:
 	for child in get_children():
@@ -67,7 +68,10 @@ func set_data(entries: Array) -> void:
 		if compact:
 			add_child(_build_compact_row(e, max_percent))
 		else:
-			add_child(_build_row(e["name"], e["color"], e["percent"], int(e.get("seats", 0)), max_percent, String(e.get("leader", ""))))
+			var row := _build_row(e["name"], e["color"], e["percent"], int(e.get("seats", 0)), max_percent, String(e.get("leader", "")))
+			row.add_child(_badge_or_dot(e, e["color"], 24.0))
+			row.move_child(row.get_child(row.get_child_count() - 1), 0)
+			add_child(row)
 
 	call_deferred("_apply_vertical_centering", top_spacer, entries.size())
 
@@ -104,12 +108,7 @@ func _build_compact_row(e: Dictionary, max_percent: float) -> Control:
 	top.add_theme_constant_override("separation", 7)
 	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(top)
-	var dot := Panel.new()
-	dot.custom_minimum_size = Vector2(10, 10)
-	dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	dot.add_theme_stylebox_override("panel", _rounded(color, 5))
-	top.add_child(dot)
+	top.add_child(_badge_or_dot(e, color, 20.0))
 	var name_label := _plain_label(String(e["name"]), 13, Color(0.93, 0.94, 0.97))
 	name_label.clip_text = true
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -132,6 +131,21 @@ func _build_compact_row(e: Dictionary, max_percent: float) -> Control:
 	fill.add_theme_stylebox_override("panel", _rounded(color, 3))
 	track.add_child(fill)
 	return margin
+
+## Parti verisi varsa logo + renk rozeti, yoksa renk noktası.
+func _badge_or_dot(e: Dictionary, color: Color, badge_size: float) -> Control:
+	var party: Dictionary = e.get("party", {})
+	if not party.is_empty():
+		var badge := PartyBadge.build(party, Vector2(badge_size, badge_size), 40)
+		badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		return badge
+	var dot := Panel.new()
+	dot.custom_minimum_size = Vector2(10, 10)
+	dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dot.add_theme_stylebox_override("panel", _rounded(color, 5))
+	return dot
 
 func _rounded(color: Color, radius: int) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()

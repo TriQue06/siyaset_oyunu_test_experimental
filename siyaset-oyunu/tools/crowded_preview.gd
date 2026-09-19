@@ -150,6 +150,19 @@ func _initialize() -> void:
 	await _frames(3)
 	check("cogunluk yokken bile hukumet yoksa gensoru acilmaz", not scene._pending_censure)
 	_shot("bonus_cards")
+	# Karalama hedef menüsü: her partide logo ve renk.
+	cm.inventories[me] = ["karalama"]
+	cm._push_state({"type": "timer"})
+	await _frames(3)
+	scene._ask_propaganda_target(0, "ankara")
+	await _frames(5)
+	_shot("propaganda_menu")
+	var badges := 0
+	for row in scene._propaganda_menu.find_children("*", "HBoxContainer", true, false):
+		if row.get_child_count() >= 2 and row.get_child(1) is Button:
+			badges += 1
+	check("karalama menusunde her rakip partinin rozeti var", badges == cm.turn_order.size() - 1, str(badges))
+	scene._propaganda_menu.hide()
 	# Gündem bandı ve yasa paneli.
 	cm.agenda = {"type": "gundem_economic_n", "until": cm.round_number + 2}
 	cm._push_state({"type": "timer"})

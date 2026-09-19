@@ -260,6 +260,7 @@ func _animate(delta: float) -> void:
 		d["rank"] = lerpf(float(d["rank"]), float(target["rank"]), k * 0.7)
 		rows.append({
 			"name": _party_name(peer_id), "leader": _leader_name(peer_id), "color": _party_color(peer_id),
+			"icon": _party_icon(peer_id),
 			"percent": d["percent"], "rank": d["rank"], "seats": target["seats"], "below": target["below"],
 		})
 	_bars.rows = rows
@@ -390,6 +391,13 @@ func _party_name(peer_id) -> String:
 
 func _leader_name(peer_id) -> String:
 	return String(MultiplayerManager.players.get(peer_id, {}).get("name", ""))
+
+## Parti logosu (seçim gecesi çubuklarında rengin üstüne çizilir).
+func _party_icon(peer_id) -> Texture2D:
+	var party := _party(peer_id)
+	if not party.has("icon_index"):
+		return null
+	return PartyPresets.get_icon_texture(int(party["icon_index"]), 64)
 
 func _party_color(peer_id) -> Color:
 	var color: Color = _party(peer_id).get("bg_color", Color(0.5, 0.5, 0.5))
@@ -603,7 +611,7 @@ class LiveBars extends Control:
 		var n := rows.size()
 		var row_h: float = minf(60.0, size.y / float(n))
 		var h: float = row_h - 8.0
-		var name_w: float = minf(200.0, size.x * 0.32)
+		var name_w: float = minf(250.0, size.x * 0.36)
 		var value_w := 104.0
 		var bar_x := name_w + 10.0
 		var bar_w: float = maxf(40.0, size.x - bar_x - value_w - 10.0)
@@ -617,11 +625,18 @@ class LiveBars extends Control:
 			var color: Color = r["color"]
 			var below: bool = bool(r["below"])
 			var alpha := 0.45 if below else 1.0
-			draw_rect(Rect2(0, y + 2, 6, h), Color(color, alpha))
-			draw_string(font, Vector2(14, y + h * 0.5 + 2), String(r["name"]), HORIZONTAL_ALIGNMENT_LEFT,
-				name_w - 14, name_size, Color(1, 1, 1, alpha))
-			draw_string(font, Vector2(14, y + h * 0.5 + 4 + name_size * 0.8), String(r["leader"]), HORIZONTAL_ALIGNMENT_LEFT,
-				name_w - 14, maxi(9, name_size - 6), Color(0.65, 0.7, 0.8, alpha))
+			# Parti rozeti: renkli kare + logo.
+			var badge: float = minf(h, 44.0)
+			var badge_rect := Rect2(0, y + 2 + (h - badge) * 0.5, badge, badge)
+			draw_rect(badge_rect, Color(color, alpha))
+			var icon: Texture2D = r.get("icon")
+			if icon != null:
+				draw_texture_rect(icon, badge_rect.grow(-badge * 0.14), false, Color(1, 1, 1, alpha))
+			var text_x := badge + 8.0
+			draw_string(font, Vector2(text_x, y + h * 0.5 + 2), String(r["name"]), HORIZONTAL_ALIGNMENT_LEFT,
+				name_w - text_x, name_size, Color(1, 1, 1, alpha))
+			draw_string(font, Vector2(text_x, y + h * 0.5 + 4 + name_size * 0.8), String(r["leader"]), HORIZONTAL_ALIGNMENT_LEFT,
+				name_w - text_x, maxi(9, name_size - 6), Color(0.65, 0.7, 0.8, alpha))
 			draw_rect(Rect2(bar_x, y + 2, bar_w, h), Color(1, 1, 1, 0.05))
 			var fill: float = bar_w * clampf(float(r["percent"]) / scale, 0.0, 1.0)
 			draw_rect(Rect2(bar_x, y + 2, fill, h), Color(color, alpha))

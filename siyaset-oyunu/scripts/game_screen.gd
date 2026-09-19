@@ -93,6 +93,8 @@ var _pending_target_hand_index: int = -1
 var _leaving_for_results: bool = false
 var _waiting_overlay: Control
 var _waiting_label: Label
+var _waiting_badge_slot: CenterContainer
+var _waiting_badge_holder: int = -2
 
 ## Profil kartı açık olan parti (-1 = kapalı). Dokununca açılır/kapanır.
 var _profile_peer_id: int = -1
@@ -375,6 +377,7 @@ func _refresh_results_panels() -> void:
 		var pname: String = party.get("name", MultiplayerManager.players.get(peer_id, {}).get("name", "?"))
 		var color: Color = party.get("bg_color", Color(0.5, 0.5, 0.5))
 		vote_entries.append({
+			"party": party,
 			"name": pname,
 			"leader": _leader_name_of(peer_id),
 			"color": color,
@@ -1627,6 +1630,14 @@ func _refresh_waiting_overlay() -> void:
 	if not _waiting_overlay.visible:
 		return
 	var holder: int = GovernmentManager.mandate_peer_id()
+	if holder != _waiting_badge_holder:
+		_waiting_badge_holder = holder
+		for child in _waiting_badge_slot.get_children():
+			child.queue_free()
+		var badge := PartyBadge.build(PartyManager.parties.get(holder, {}), Vector2(96, 96), 192)
+		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_waiting_badge_slot.add_child(badge)
+		_waiting_badge_slot.position = Vector2(get_viewport_rect().size.x * 0.5 - 48.0, get_viewport_rect().size.y * 0.5 - 190.0)
 	_waiting_label.text = "HÜKÜMET KURULUYOR\n\n%s (%s)\ngörev dağılımını hazırlıyor…\n\n%d. teklif hakkı  ·  Süre: %s" % [
 		_party_name_of(holder),
 		_leader_name_of(holder),
@@ -1645,6 +1656,11 @@ func _build_waiting_overlay() -> void:
 	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
 	backdrop.modulate = Color(1, 1, 1, 0.93)
 	_waiting_overlay.add_child(backdrop)
+
+	_waiting_badge_slot = CenterContainer.new()
+	_waiting_badge_slot.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	_waiting_badge_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_waiting_overlay.add_child(_waiting_badge_slot)
 
 	_waiting_label = Label.new()
 	_waiting_label.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -2494,13 +2510,22 @@ func _ask_propaganda_target(hand_index: int, province_id: String) -> void:
 	for peer_id in _ordered_peer_ids():
 		if peer_id == me:
 			continue
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		var badge := PartyBadge.build(PartyManager.parties.get(peer_id, {}), Vector2(34, 34), BADGE_ICON_PIXEL_SIZE)
+		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(badge)
 		var button := Button.new()
 		UiSkin.skin_button(button)
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		button.text = "%s  (%s)" % [_party_name_of(peer_id), _leader_name_of(peer_id)]
 		button.pressed.connect(func():
 			_propaganda_menu.hide()
 			CardManager.play_card(hand_index, peer_id, province_id))
-		box.add_child(button)
+		row.add_child(button)
+		box.add_child(row)
 	var cancel := Button.new()
 	UiSkin.skin_button(cancel)
 	cancel.text = "İptal"

@@ -221,7 +221,7 @@ static func _government_status_text(my_id: int, time_text: String) -> String:
 		var text := "1/2 KOALİSYON GÖRÜŞMESİ — %s teklifi · ortak onayı %d/%d · %s" % [
 			proposer, voted, eligible.size(), time_text]
 		if eligible.has(my_id) and not GovernmentManager.has_voted(my_id):
-			text += "\nORTAK önerildin: EVET kabul, diğerleri ret"
+			text += "\nORTAK önerildin: EVET kabul, HAYIR ret (çekimser yok)"
 		elif my_id == GovernmentManager.proposal_peer_id:
 			text += "\nOrtaklarının cevabı bekleniyor"
 		return text

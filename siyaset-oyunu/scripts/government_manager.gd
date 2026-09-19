@@ -500,6 +500,9 @@ func _apply_vote(peer_id: int, choice) -> void:
 		return
 	if votes.has(peer_id):
 		return  # oy değiştirilemez
+	# Koalisyon görüşmesinde ortak ya EVET ya HAYIR der; çekimser olamaz.
+	if is_coalition_stage() and normalize_vote(choice) == VOTE_ABSTAIN:
+		return
 	votes[peer_id] = normalize_vote(choice)
 	if not _all_voted():
 		_push_state()

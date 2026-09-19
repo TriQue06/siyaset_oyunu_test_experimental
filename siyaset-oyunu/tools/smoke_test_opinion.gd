@@ -330,7 +330,7 @@ func _initialize() -> void:
 	check("populizm ve mana bonusu destede", cm._draw_weights(3).has("populizm") and cm._draw_weights(3).has("mana_bonusu"))
 	cm.inventories[3] = ["populizm", "mana_bonusu"]
 	cm._apply_play(3, 0)
-	check("populizm 2 mana, 5 tur", cm.mana_of(3) == 8 and cm.populism_rounds_left(3) == GameRules.POPULISM_ROUNDS)
+	check("populizm 1 mana, 4 tur", cm.mana_of(3) == 9 and cm.populism_rounds_left(3) == GameRules.POPULISM_ROUNDS)
 	check("populizmde sira devretmez", cm.current_turn_peer_id() == 3)
 	cm._apply_miting(3, "konya")
 	var pop_gain: float = cm.local_of("konya", 3)
@@ -342,7 +342,7 @@ func _initialize() -> void:
 	cm._add_local("konya", 3, -2.0)
 	check("populizm: baskasinin karalamasi etkilenmez", near(cm.local_of("konya", 3), -2.0 * PublicOpinion.POPULISM_BAD_MULT - 2.0))
 	cm._apply_play(3, 0)
-	check("mana bonusu +3 mana", cm.mana_of(3) == 8 + GameRules.MANA_BONUS_AMOUNT)
+	check("mana bonusu +5 mana", cm.mana_of(3) == 9 + GameRules.MANA_BONUS_AMOUNT and GameRules.MANA_BONUS_AMOUNT == 5)
 	check("mana bonusu hamle sayilir: sira devretti", cm.current_turn_peer_id() == 1)
 	cm.round_number += GameRules.POPULISM_ROUNDS
 	check("populizm 5 tur sonra biter", cm.populism_rounds_left(3) == 0)

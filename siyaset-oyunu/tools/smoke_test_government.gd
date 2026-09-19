@@ -110,7 +110,11 @@ func _initialize() -> void:
 	cm.last_seats[3] = 1
 	check("tek vekilliden calamaz", not cm.is_valid_steal_target(1, 3))
 	cm.last_seats[3] = 110
+	cm.passed_threshold = [1, 2, 3]
 	check("gecerli hedef", cm.is_valid_steal_target(1, 3))
+	cm.passed_threshold = [2, 3]
+	check("baraj alti (meclis disi) parti vekil calamaz", not cm.is_valid_steal_target(1, 3))
+	cm.passed_threshold = [1, 2, 3]
 	cm._apply_steal(1, 2, "steal_strong")
 	check("toplam sandalye DEGISMEDI (sifir toplamli)", gm.total_seats() == before_total,
 		"%d -> %d" % [before_total, gm.total_seats()])

@@ -53,7 +53,7 @@ const INVEST_MANA_COST := 2
 const CENSURE_MANA_COST := 1
 ## Popülizm bonusu kartı bu kadar tur sürer; mana bonusu kartı bu kadar mana verir.
 const POPULISM_ROUNDS := 4
-const MANA_BONUS_AMOUNT := 7
+const MANA_BONUS_AMOUNT := 5
 const ELECTION_MANA_BONUS := 1
 const GOVERNMENT_MANA_BONUS := 1
 const ORG_MANA_COST := 2

@@ -75,8 +75,8 @@ const STEAL_RANGES := {
 
 ## Kartın elden oynanma bedeli (mana).
 const CARD_MANA_COSTS := {
-	"karalama": 2,
-	"populizm": 2,
+	"karalama": 1,
+	"populizm": 1,
 	"mana_bonusu": 0,
 	"steal_weak": 1,
 	"steal_medium": 2,

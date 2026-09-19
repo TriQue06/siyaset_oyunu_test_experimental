@@ -145,7 +145,7 @@ func _initialize() -> void:
 	await _frames(3)
 	scene._on_hand_card_clicked(0)
 	await _frames(5)
-	check("populizm karti iki dokunusla kullanildi", cm.populism_rounds_left(me) == GameRules.POPULISM_ROUNDS and cm.mana_of(me) == 8)
+	check("populizm karti iki dokunusla kullanildi", cm.populism_rounds_left(me) == GameRules.POPULISM_ROUNDS and cm.mana_of(me) == 9)
 	scene._on_censure_button_pressed()
 	await _frames(3)
 	check("cogunluk yokken bile hukumet yoksa gensoru acilmaz", not scene._pending_censure)

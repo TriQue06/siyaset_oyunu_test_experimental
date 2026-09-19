@@ -1654,7 +1654,8 @@ func _refresh_vote_ui() -> void:
 
 	vote_yes_button.disabled = not can_vote
 	vote_no_button.disabled = not can_vote
-	_abstain_button.disabled = not can_vote
+	# Koalisyon teklifinde ortak çekimser kalamaz: ya EVET ya HAYIR.
+	_abstain_button.disabled = not can_vote or GovernmentManager.is_coalition_stage()
 
 	if can_vote:
 		vote_yes_button.texture_normal = load("res://assets/ui/vote_yes_normal.png")

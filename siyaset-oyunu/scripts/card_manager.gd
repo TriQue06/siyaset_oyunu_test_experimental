@@ -301,6 +301,9 @@ func can_build_organization(peer_id: int, province_id: String) -> bool:
 func is_valid_steal_target(peer_id: int, target_peer_id: int) -> bool:
 	if target_peer_id == -1 or target_peer_id == peer_id:
 		return false
+	# Barajı geçemeyen (meclis dışı) parti vekil çalamaz: yoksa baraj delinir.
+	if not passed_threshold.has(peer_id):
+		return false
 	if not last_seats.has(target_peer_id):
 		return false
 	return int(last_seats[target_peer_id]) > 1
@@ -399,9 +402,10 @@ func province_poll(peer_id: int, province_id: String) -> Dictionary:
 	if error < 0.0:
 		return {}
 	var projection := province_projection(province_id)
-	return _noisy_poll(projection, error, "%s:%d:%d" % [province_id, peer_id, round_number], province_seat_count(province_id))
+	return _noisy_poll(projection, error, "%s:%d:%d" % [province_id, peer_id, round_number], province_seat_count(province_id),
+		projected_eligible())
 
-func _noisy_poll(projection: Dictionary, error: float, seed_text: String, seat_count: int) -> Dictionary:
+func _noisy_poll(projection: Dictionary, error: float, seed_text: String, seat_count: int, eligible: Array) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(seed_text)
 	var shares := {}
@@ -415,11 +419,36 @@ func _noisy_poll(projection: Dictionary, error: float, seed_text: String, seat_c
 	if total > 0.0:
 		for peer_id in ids:
 			shares[peer_id] = float(shares[peer_id]) / total * 100.0
-	var alloc := ElectionModel.dhondt(shares, ids, seat_count)
+	var alloc := ElectionModel.dhondt(shares, eligible, seat_count)
 	var result := {}
 	for peer_id in ids:
 		result[peer_id] = {"percent": float(shares[peer_id]), "seats": int(alloc.get(peer_id, 0))}
 	return result
+
+## Tahminlerde (güç haritası, anket) barajı geçmesi beklenen partiler: gürültüsüz
+## beklenen ulusal oyu baraj ve üstü olanlar (seçimle aynı kural; kimse
+## geçemezse herkes).
+func projected_eligible(mods: Dictionary = {}) -> Array:
+	if mods.is_empty():
+		mods = election_modifiers()
+	var local_mods: Dictionary = mods["local"]
+	var ideologies := _ideologies()
+	var national := {}
+	var total := 0.0
+	for province_id in _province_ids:
+		var seats := float(province_seat_count(province_id))
+		var shares := ElectionModel.expected_shares(ideologies, province_center(province_id), current_axis_sharpness,
+			mods["national"], local_mods.get(province_id, {}))
+		for peer_id in shares.keys():
+			national[peer_id] = float(national.get(peer_id, 0.0)) + float(shares[peer_id]) * seats
+		total += seats
+	var eligible: Array = []
+	for peer_id in turn_order:
+		if total > 0.0 and float(national.get(peer_id, 0.0)) / total >= MultiplayerManager.election_threshold:
+			eligible.append(peer_id)
+	if eligible.is_empty():
+		eligible = turn_order.duplicate()
+	return eligible
 
 ## Şimdi seçim olsa bu ilde: peer_id -> {"percent", "seats"} (gürültüsüz beklenen
 ## oylar, ildeki vekiller D'Hondt ile; baraj yok sayılır). Gözcü raporu için.
@@ -428,7 +457,7 @@ func province_projection(province_id: String) -> Dictionary:
 	var local_mods: Dictionary = mods["local"]
 	var shares := ElectionModel.expected_shares(_ideologies(), province_center(province_id), current_axis_sharpness,
 		mods["national"], local_mods.get(province_id, {}))
-	var alloc := ElectionModel.dhondt(shares, turn_order, province_seat_count(province_id))
+	var alloc := ElectionModel.dhondt(shares, projected_eligible(mods), province_seat_count(province_id))
 	var result := {}
 	for peer_id in turn_order:
 		result[peer_id] = {"percent": float(shares.get(peer_id, 0.0)), "seats": int(alloc.get(peer_id, 0))}
@@ -442,6 +471,7 @@ func projection_all(viewer: int = -1) -> Dictionary:
 	var mods := election_modifiers()
 	var local_mods: Dictionary = mods["local"]
 	var ideologies := _ideologies()
+	var eligible := projected_eligible(mods)
 	var result := {}
 	for province_id in _province_ids:
 		var error := poll_error(viewer, province_id) if viewer != -1 else 0.0
@@ -454,10 +484,10 @@ func projection_all(viewer: int = -1) -> Dictionary:
 			var noisy := {}
 			for peer_id in shares.keys():
 				noisy[peer_id] = {"percent": float(shares[peer_id])}
-			noisy = _noisy_poll(noisy, error, "%s:%d:%d" % [province_id, viewer, round_number], seat_count)
+			noisy = _noisy_poll(noisy, error, "%s:%d:%d" % [province_id, viewer, round_number], seat_count, eligible)
 			for peer_id in noisy.keys():
 				shares[peer_id] = float(noisy[peer_id]["percent"])
-		var alloc := ElectionModel.dhondt(shares, turn_order, seat_count)
+		var alloc := ElectionModel.dhondt(shares, eligible, seat_count)
 		var last_quotient := INF
 		for peer_id in turn_order:
 			var won := int(alloc.get(peer_id, 0))

@@ -10,6 +10,10 @@ func check(label: String, ok: bool, detail: String = "") -> void:
 		fails += 1
 	print("  %s %s%s" % ["[OK] " if ok else "[HATA]", label, ("  -> " + detail) if detail != "" else ""])
 
+func _frames(n: int) -> void:
+	for i in n:
+		await process_frame
+
 func _initialize() -> void:
 	await process_frame
 	var mm = root.get_node("MultiplayerManager")
@@ -66,5 +70,35 @@ func _initialize() -> void:
 		await process_frame
 	if DisplayServer.get_name() != "headless":
 		root.get_texture().get_image().save_png("%s/party_setup_turkiye.png" % OS.get_user_data_dir())
+	# Oda sahibi bot partisini düzenler.
+	mm.owner_id = me
+	var my_before: Dictionary = pm.parties[me].duplicate()
+	var edited_bot: int = mm.BOT_ID_BASE - 1
+	scene._start_editing(edited_bot)
+	await _frames(3)
+	scene.name_edit.text = "Robotlar"
+	scene._on_name_changed("Robotlar")
+	scene._on_icon_selected(presets.icon_indices(1)[3])
+	var free_index := -1
+	for i in colors.size():
+		if pm.color_owner(colors[i], edited_bot) == -1:
+			free_index = i
+			break
+	scene._on_bg_color_selected(free_index)
+	await _frames(3)
+	var bot_party: Dictionary = pm.parties[edited_bot]
+	check("oda sahibi botun adini, logosunu, rengini degistirdi", bot_party["name"] == "Robotlar" 		and int(bot_party["icon_index"]) == presets.icon_indices(1)[3] and Color(bot_party["bg_color"]).is_equal_approx(colors[free_index]), str(bot_party))
+	check("kendi partim degismedi", pm.parties[me]["name"] == my_before["name"] and int(pm.parties[me]["icon_index"]) == int(my_before["icon_index"]))
+	var taken_by_me: Color = pm.parties[me]["bg_color"]
+	pm.set_bot_party(edited_bot, "Robotlar", 0, taken_by_me)
+	check("bot baskasinin rengini alamaz", not Color(pm.parties[edited_bot]["bg_color"]).is_equal_approx(taken_by_me))
+	if DisplayServer.get_name() != "headless":
+		root.get_texture().get_image().save_png("%s/party_setup_bot_edit.png" % OS.get_user_data_dir())
+	scene._start_editing(-1)
+	await _frames(3)
+	check("kendi partime donunce ad geri geldi", scene.name_edit.text == String(my_before["name"]), scene.name_edit.text)
+	mm.owner_id = 77
+	check("oda sahibi olmayan bot partisini degistiremez", (func():
+		pm.set_bot_party(edited_bot, "Hacker", 0, colors[free_index]); return pm.parties[edited_bot]["name"] == "Robotlar").call())
 	print("=== PARTY SETUP PREVIEW: %s ===" % ("PASS" if fails == 0 else "%d HATA" % fails))
 	quit()

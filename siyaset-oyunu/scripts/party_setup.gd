@@ -58,6 +58,11 @@ var _time_left: float = 60.0
 var _unlimited_time: bool = false
 var _is_locked: bool = false
 var _players_list: VBoxContainer
+## Sağ paneldeki kontrollerin düzenlediği parti: kendi partim ya da (oda
+## sahibiysem) bir bot. Bot düzenlenirken kendi seçimlerim burada saklanır.
+var _edit_target: int = -1
+var _own_backup: Dictionary = {}
+@onready var title_label: Label = $RightPanel/Margin/Scroll/VBox/TitleLabel
 
 func _ready() -> void:
 	# Parti kurma süresi her zaman sınırsız (lobi ayarı kaldırıldı).
@@ -180,8 +185,14 @@ func _refresh_icon_grid_selection() -> void:
 
 ## Renk başka bir OYUNCUDA mı? (Botun rengi alınabilir, bot başka renge geçer.)
 func _is_taken_by_player(color: Color) -> bool:
+	if _editing_bot():
+		# Bot, başka hiçbir partinin rengini alamaz.
+		return PartyManager.color_owner(color, _edit_target) != -1
 	var owner := PartyManager.color_owner(color, multiplayer.get_unique_id())
 	return owner != -1 and not MultiplayerManager.is_bot(owner)
+
+func _editing_bot() -> bool:
+	return _edit_target != -1 and _edit_target != multiplayer.get_unique_id()
 
 func _first_free_color(preferred: Color) -> Color:
 	if _is_allowed_bg_color(preferred) and not _is_taken_by_player(preferred):
@@ -195,6 +206,14 @@ func _first_free_color(preferred: Color) -> Color:
 ## oyuncuya geçtiyse (aynı anda seçildi, host ilkini kabul etti) boş bir renge geçerim.
 func _on_parties_updated() -> void:
 	_refresh_players_panel()
+	if _editing_bot():
+		# Düzenlenen botun gerçek (host'un kabul ettiği) hâli gösterilir.
+		var party: Dictionary = PartyManager.parties.get(_edit_target, {})
+		if not party.is_empty() and not Color(party.get("bg_color")).is_equal_approx(_selected_bg_color):
+			_selected_bg_color = party["bg_color"]
+			_update_preview()
+		_build_color_row()
+		return
 	if _is_taken_by_player(_selected_bg_color):
 		_selected_bg_color = _first_free_color(_selected_bg_color)
 		_update_preview()
@@ -291,6 +310,17 @@ func _refresh_players_panel() -> void:
 		party_label.clip_text = true
 		texts.add_child(party_label)
 		row.add_child(texts)
+		# Oda sahibi botların partisini düzenleyebilir; düzenlenen satır vurgulu.
+		if MultiplayerManager.is_local_owner() and (MultiplayerManager.is_bot(peer_id) or int(peer_id) == my_id) \
+				and MultiplayerManager.players.size() > 0:
+			var editing: bool = (int(peer_id) == _edit_target) or (int(peer_id) == my_id and not _editing_bot())
+			var edit_button := Button.new()
+			edit_button.text = "✎" if int(peer_id) != my_id else "Ben"
+			edit_button.tooltip_text = "Bu botun adını, logosunu ve rengini düzenle" if int(peer_id) != my_id else "Kendi partine dön"
+			edit_button.custom_minimum_size = Vector2(34, 30)
+			edit_button.modulate = Color(1, 0.85, 0.35) if editing else Color.WHITE
+			edit_button.pressed.connect(_start_editing.bind(-1 if int(peer_id) == my_id else int(peer_id)))
+			row.add_child(edit_button)
 		var ready_label := Label.new()
 		ready_label.text = "✔" if PartyManager.is_ready(peer_id) else "…"
 		ready_label.modulate = Color(0.45, 1, 0.5) if PartyManager.is_ready(peer_id) else Color(1, 1, 1, 0.4)
@@ -311,7 +341,7 @@ func _build_color_row() -> void:
 		var allowed := _is_allowed_bg_color(color) and not taken
 		var btn := Button.new()
 		btn.custom_minimum_size = Vector2(SWATCH_SIZE, SWATCH_SIZE)
-		btn.disabled = not allowed or _is_locked
+		btn.disabled = not allowed or (_is_locked and not _editing_bot())
 		btn.modulate = Color(1, 1, 1, 1) if allowed else Color(1, 1, 1, 0.35)
 		if taken:
 			btn.text = "✕"
@@ -419,8 +449,45 @@ func _update_preview() -> void:
 	preview_icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 
 func _push_party() -> void:
-	if PartyManager.is_valid_name(_party_name):
-		PartyManager.set_my_party(_party_name, _selected_icon_index, ICON_COLOR, _selected_bg_color, _ideology)
+	if not PartyManager.is_valid_name(_party_name):
+		return
+	if _editing_bot():
+		PartyManager.set_bot_party(_edit_target, _party_name, _selected_icon_index, _selected_bg_color)
+		return
+	PartyManager.set_my_party(_party_name, _selected_icon_index, ICON_COLOR, _selected_bg_color, _ideology)
+
+## Oda sahibi: bir botun partisini düzenlemeye başla ya da kendi partine dön
+## (bot_id = -1). Kendi seçimlerin saklanır, geri dönünce yerine konur.
+func _start_editing(bot_id: int) -> void:
+	var me := multiplayer.get_unique_id()
+	if bot_id != -1 and (not MultiplayerManager.is_local_owner() or not MultiplayerManager.is_bot(bot_id)):
+		return
+	if not _editing_bot():
+		_own_backup = {"name": _party_name, "icon": _selected_icon_index, "color": _selected_bg_color}
+	if bot_id == -1 or bot_id == me:
+		_edit_target = -1
+		_party_name = String(_own_backup.get("name", _party_name))
+		_selected_icon_index = int(_own_backup.get("icon", _selected_icon_index))
+		_selected_bg_color = _own_backup.get("color", _selected_bg_color)
+		title_label.text = "PARTİNİ KUR"
+		_set_controls_disabled(_is_locked)
+		ready_button.disabled = false
+	else:
+		_edit_target = bot_id
+		var party: Dictionary = PartyManager.parties.get(bot_id, {})
+		_party_name = String(party.get("name", ""))
+		_selected_icon_index = int(party.get("icon_index", 0))
+		_selected_bg_color = party.get("bg_color", _selected_bg_color)
+		title_label.text = "BOT PARTİSİ: %s" % MultiplayerManager.players.get(bot_id, {}).get("name", "Bot")
+		_set_controls_disabled(false)
+		ready_button.disabled = true  # hazır butonu sadece kendi partin için
+	name_edit.text = _party_name
+	_update_name_hint()
+	_icon_category = PartyPresets.icon_category(_selected_icon_index)
+	_refresh_icon_grid_selection()
+	_build_color_row()
+	_update_preview()
+	_refresh_players_panel()
 
 ## "Kilitle ve Hazır Ver" / iptal: kilitliyken tüm seçim kontrolleri
 ## devre dışı kalır (yanlışlıkla değiştirilemesin diye), tekrar basınca açılır.
@@ -430,6 +497,8 @@ func _push_party() -> void:
 ## uygulayıp oyunu erken/varsayılan veriyle başlatma riski bu şekilde
 ## tamamen ortadan kalkıyor (bkz. PartyManager.set_party_and_ready).
 func _on_ready_pressed() -> void:
+	if _editing_bot():
+		return
 	_is_locked = not _is_locked
 	_set_controls_disabled(_is_locked)
 	ready_button.text = "✕ İptal Et" if _is_locked else "🔒 Kilitle ve Hazır Ver"

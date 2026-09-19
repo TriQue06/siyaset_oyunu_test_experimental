@@ -16,16 +16,18 @@ const COLORS: Array[Color] = [
 	Color("FA6E66"), # somon kırmızısı
 	Color("F27E1F"), # turuncu
 	Color("F0A824"), # sarı-turuncu
-	Color("F7C42A"), # sarı
+	Color("FAD028"), # sarı
 	Color("9DC94B"), # limon sarısı
-	Color("3CBA48"), # yeşil
+	Color("31C440"), # yeşil
 	Color("3FB586"), # su yeşili
 	Color("27DBDB"), # turkuaz
+	Color("83B7EB"), # açık mavi
 	Color("22A9D6"), # mavi
-	Color("2569CF"), # lacivert
+	Color("2569CF"), # koyu mavi
+	Color("244FB3"), # lacivert
 	Color("7647CC"), # indigo
 	Color("B141E0"), # mor
-	Color("E041D8"), # eflatun
+	Color("AB39DB"), # eflatun
 	Color("F04391"), # fuşya
 	Color("A6325A"), # bordo
 ]

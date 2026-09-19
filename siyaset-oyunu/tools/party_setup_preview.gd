@@ -53,7 +53,7 @@ func _initialize() -> void:
 		root.get_texture().get_image().save_png("%s/party_setup.png" % OS.get_user_data_dir())
 	# İkon kategorileri: Kurgusal / Türkiye.
 	var presets = root.get_node("PartyPresets")
-	check("16 parti rengi", colors.size() == 16)
+	check("18 parti rengi", colors.size() == 18)
 	check("27 Turkiye ikonu yuklendi", presets.icon_indices(1).size() == 27, str(presets.icon_indices(1).size()))
 	var turkiye_tab: Button = scene._icon_tabs.get_child(1)
 	turkiye_tab.pressed.emit()

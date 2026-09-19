@@ -313,6 +313,7 @@ func _initialize() -> void:
 
 	cm.current_turn_index = 0
 	cm.mana[3] = 3
+	cm.agenda = {"type": "gundem_social_p", "until": cm.round_number + 1}
 	var law_soc: String = cp.law_type("social", 1)
 	cm._apply_law(3, law_soc)
 	check("yasa hamlesi meclise geldi, 1 mana harcandi",

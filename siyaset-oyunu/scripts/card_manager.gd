@@ -13,7 +13,7 @@ extends Node
 ##   c) TEŞKİLATLANMA (GameRules.ORG_MANA_COST): bir ilde teşkilat kur / geliştir
 ##      (oy bonusu + ilin görüşü + 2. seviyeden itibaren anket).
 ##   d) PAS: hamle yapmadan geç, +GameRules.MANA_PASS_BONUS mana.
-##   KART ÇEKMEK: bedava, turda GameRules.DRAWS_PER_TURN kez; kart oynamak sınırsız.
+##   KART: sırası gelen oyuncuya oyun bir kart verir (_deal_turn_card); kart oynamak sınırsız.
 ##   Manası biten oyuncunun sırası kendiliğinden devreder (_auto_end_if_broke).
 ##   GameRules.TURN_TIMEOUT dolarsa otomatik pas geçilir (mana bonusu yok).
 ##   Hükümet kurulurken / meclis oylarken tur DURUR (is_turn_blocked).
@@ -65,8 +65,6 @@ const PROVINCE_EVENT_LIMIT := 6
 
 ## Deste ağırlıkları (bkz. _draw_weights).
 const WEIGHT_STEAL := 1.0
-## Her gündem kartının ağırlığı (6 kart; toplamda ~1.8).
-const WEIGHT_AGENDA := 0.3
 const WEIGHT_PROPAGANDA := 1.6
 const WEIGHT_POPULISM := 1.0
 const WEIGHT_MANA_BONUS := 1.2
@@ -90,8 +88,10 @@ var has_drawn_this_turn: bool = false
 var law_rounds: Dictionary = {}
 ## Popülizm bonusu: peer_id -> bittiği tur (o turdan önceki son tura kadar sürer).
 var populism: Dictionary = {}
-## GÜNDEM: {"type": gündem kartı türü, "until": bittiği tur} (boş = gündem yok).
+## GÜNDEM: {"type": gündem türü, "until": bittiği tur} (boş = gündem yok).
 var agenda: Dictionary = {}
+## Sadece host: bu üçlemenin eksen sırası (her üçlemede karıştırılır).
+var _agenda_axes: Array = []
 ## peer_id -> int: son seçimde ulusal listeden kazanılan vekil.
 var national_list: Dictionary = {}
 ## Eksen keskinliği: il bazlı seçim sonuçlarının ne kadar keskin çıkacağını
@@ -227,10 +227,9 @@ func is_my_turn() -> bool:
 func can_draw() -> bool:
 	return can_draw_for(multiplayer.get_unique_id())
 
-## Kart çekmek bedava, turda bir kez.
-func can_draw_for(peer_id: int) -> bool:
-	return can_choose_main_action(peer_id) and not has_drawn_this_turn and mana_of(peer_id) >= GameRules.DRAW_MANA_COST \
-		and inventories.get(peer_id, []).size() < MAX_HAND_SIZE
+## Kart çekme yok: kart her sıra gelişte otomatik verilir (bkz. _deal_turn_card).
+func can_draw_for(_peer_id: int) -> bool:
+	return false
 
 ## Sıra bende VE tur akışı engellenmemiş mi? (UI bunu kullanmalı.)
 func can_act() -> bool:
@@ -270,6 +269,12 @@ func can_propose_law(peer_id: int, law_type: String = "") -> bool:
 		return false
 	if not has_seats(peer_id):
 		return false  # meclis dışı parti yasa teklif edemez
+	# Yasa sadece gündemdeki eksende sunulabilir.
+	var current := agenda_type()
+	if current == "":
+		return false
+	if law_type != "" and CardPresets.law_data(law_type).get("axis", "") != CardPresets.agenda_data(current)["axis"]:
+		return false
 	if has_proposed_law_this_round(peer_id):
 		return false
 	if law_type != "" and not CardPresets.is_law_card(law_type):
@@ -553,6 +558,7 @@ func init_game() -> void:
 	law_rounds = {}
 	populism = {}
 	agenda = {}
+	_agenda_axes = []
 	national_list = {}
 	current_axis_sharpness = MultiplayerManager.axis_sharpness_start
 	round_number = 1
@@ -632,8 +638,6 @@ func draw_card() -> void:
 func _draw_weights(peer_id: int = -1) -> Dictionary:
 	var weights := {}
 	weights[CardPresets.PROPAGANDA_CARD_TYPE] = WEIGHT_PROPAGANDA
-	for card_type in CardPresets.AGENDAS.keys():
-		weights[card_type] = WEIGHT_AGENDA
 	if not last_seats.is_empty():
 		for card_type in CardPresets.STEAL_CARD_TYPES:
 			weights[card_type] = WEIGHT_STEAL
@@ -730,19 +734,9 @@ func request_full_sync() -> void:
 
 # --- Host tarafı: uygulama --------------------------------------------------
 
-func _apply_draw(peer_id: int) -> void:
-	if not can_draw_for(peer_id):
-		return
-	if not inventories.has(peer_id):
-		inventories[peer_id] = []
-	mana[peer_id] = mana_of(peer_id) - GameRules.DRAW_MANA_COST
-	var card_type := CardPresets.weighted_pick(_draw_weights(peer_id), _rng)
-	card_drawn.emit(peer_id, card_type)
-	# Yeni kart elin ORTASINA yerleşir.
-	inventories[peer_id].insert(inventories[peer_id].size() / 2, card_type)
-	has_drawn_this_turn = true
-	_push_state({"type": "drawn", "peer_id": peer_id, "card": card_type})
-	_auto_end_if_broke()
+## Kart çekme kaldırıldı: kart her sıra gelişte otomatik verilir.
+func _apply_draw(_peer_id: int) -> void:
+	pass
 
 func _apply_play(peer_id: int, hand_index: int, target_peer_id: int = -1, target_province: String = "") -> void:
 	if is_turn_blocked() or peer_id != current_turn_peer_id():
@@ -839,9 +833,6 @@ func _apply_miting_move(peer_id: int, province_id: String) -> void:
 func _apply_card_effect(peer_id: int, card_type: String, target_peer_id: int = -1, target_province: String = "") -> bool:
 	if CardPresets.needs_target(card_type):
 		return _apply_steal(peer_id, target_peer_id, card_type)
-	if CardPresets.is_agenda_card(card_type):
-		_start_agenda(card_type, peer_id)
-		return false
 	match card_type:
 		CardPresets.POPULISM_CARD_TYPE:
 			populism[peer_id] = round_number + GameRules.POPULISM_ROUNDS
@@ -971,22 +962,33 @@ func agenda_law_mult(law_type: String) -> float:
 		return 1.0
 	return PublicOpinion.AGENDA_MATCH_MULT if int(law["dir"]) == int(data["dir"]) else PublicOpinion.AGENDA_AXIS_MULT
 
-## Gündemi başlatır (kartla peer_id, rastgele -1). Mesajı _event_message'a yazar.
-func _start_agenda(card_type: String, peer_id: int = -1) -> void:
-	agenda = {"type": card_type, "until": round_number + GameRules.AGENDA_ROUNDS}
-	var data := CardPresets.agenda_data(card_type)
-	_event_message = "GÜNDEM%s: %s — %d tur boyunca %s." % [
-		(" (%s)" % _party_name(peer_id)) if peer_id != -1 else "", data["title"], GameRules.AGENDA_ROUNDS,
-		CardPresets.agenda_effect_text(card_type)]
-
-## Tur sonunda gündem yoksa rastgele bir gündem başlayabilir.
-func _maybe_random_agenda() -> void:
-	if agenda_type() != "" or _rng.randf() >= GameRules.AGENDA_RANDOM_CHANCE:
+## Yeni turun gündemi takvimden: ilk seçimden sonraki turdan itibaren
+## AGENDA_ROUNDS tur gündem (her tur farklı eksen), AGENDA_GAP tur ara.
+func _schedule_agenda() -> void:
+	var k := round_number - (GameRules.FIRST_ELECTION_ROUND + 1)
+	if k < 0 or last_seats.is_empty():
+		agenda = {}
 		return
-	var types: Array = CardPresets.AGENDAS.keys()
-	_event_message = ""
-	_start_agenda(String(types[_rng.randi_range(0, types.size() - 1)]))
-	_push_state({"type": "agenda", "message": _event_message})
+	var pos := k % (GameRules.AGENDA_ROUNDS + GameRules.AGENDA_GAP)
+	if pos >= GameRules.AGENDA_ROUNDS:
+		var was_active := not agenda.is_empty()
+		agenda = {}
+		if was_active and pos == GameRules.AGENDA_ROUNDS:
+			_push_state({"type": "agenda", "message": "Gündem arası: %d tur yasa yok, sonra yeni gündemler." % GameRules.AGENDA_GAP})
+		return
+	if pos == 0 or _agenda_axes.size() != IdeologyAxes.AXES.size():
+		_agenda_axes = IdeologyAxes.AXES.duplicate()
+		for i in range(_agenda_axes.size() - 1, 0, -1):
+			var j := _rng.randi_range(0, i)
+			var tmp = _agenda_axes[i]
+			_agenda_axes[i] = _agenda_axes[j]
+			_agenda_axes[j] = tmp
+	var axis: String = _agenda_axes[pos % _agenda_axes.size()]
+	var type := "gundem_%s_%s" % [axis, "p" if _rng.randf() < 0.5 else "n"]
+	agenda = {"type": type, "until": round_number + 1, "index": pos + 1}
+	var data := CardPresets.agenda_data(type)
+	_push_state({"type": "agenda", "message": "GÜNDEM (%d/%d): %s — bu tur %s." % [pos + 1, GameRules.AGENDA_ROUNDS,
+		data["title"], CardPresets.agenda_effect_text(type)]})
 
 ## GovernmentManager, reddedilen gensorudan sonra (host) çağırır: getiren parti
 ## ulusal destek kaybeder. Durum GovernmentManager'ın yayınıyla birlikte gider.
@@ -1109,8 +1111,6 @@ func _auto_end_if_broke() -> void:
 	var peer_id := current_turn_peer_id()
 	if mana_of(peer_id) > 0:
 		return
-	if can_draw_for(peer_id):
-		return  # bedava kart hakkı duruyor
 	for card_type in inventories.get(peer_id, []):
 		if CardPresets.card_cost(String(card_type)) <= 0:
 			return
@@ -1140,6 +1140,17 @@ func _grant_turn_income() -> void:
 	var peer_id := current_turn_peer_id()
 	if peer_id != -1:
 		mana[peer_id] = mana_of(peer_id) + GameRules.MANA_PER_ROUND
+		_deal_turn_card(peer_id)
+
+## Sırası gelen oyuncuya desteden bir kart verilir (el doluysa verilmez).
+## Kullanmak ya da biriktirmek oyuncuya kalmış.
+func _deal_turn_card(peer_id: int) -> void:
+	if not inventories.has(peer_id):
+		inventories[peer_id] = []
+	if inventories[peer_id].size() >= MAX_HAND_SIZE:
+		return
+	var card_type := CardPresets.weighted_pick(_draw_weights(peer_id), _rng)
+	inventories[peer_id].insert(inventories[peer_id].size() / 2, card_type)
 
 # --- Tur sonu / seçim / oyun sonu -------------------------------------------
 
@@ -1177,7 +1188,7 @@ func _finish_round() -> void:
 	else:
 		_decay_opinion()
 		_push_state({"type": "round"})
-	_maybe_random_agenda()
+	_schedule_agenda()
 
 ## Seçimde kullanılacak güç çarpanları:
 ##   ulusal : ulusal puan + İKTİDAR DENGESİ + POPÜLİZM + VEKİL MOMENTUMU (seçimden bu

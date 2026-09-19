@@ -247,11 +247,7 @@ func _initialize() -> void:
 	check("sirasi gelen 2 gelirini aldi", cm.mana_of(2) == GameRules.MANA_START + GameRules.MANA_PER_ROUND)
 	cm.tick(GameRules.TURN_TIMEOUT + 1.0)
 	check("sure dolunca sira devreder", cm.current_turn_peer_id() == 3)
-	var mana3: int = cm.mana_of(3)
-	cm._apply_draw(3)
-	check("kart cekmek bedava, sira devretmez", cm.mana_of(3) == mana3 		and cm.inventories[3].size() == 1 and cm.current_turn_peer_id() == 3)
-	cm._apply_draw(3)
-	check("turda en fazla 1 kart cekilir", cm.inventories[3].size() == 1 and not cm.can_draw_for(3))
+	check("sirasi gelen oyuncunun elinde otomatik verilen kart var", cm.inventories[3].size() >= 1 and not cm.can_draw_for(3))
 	cm.mana[3] = 0
 	check("mana yoksa teskilat yok", not cm.can_build_organization(3, "ankara"))
 	cm._apply_pass(3)
@@ -267,7 +263,12 @@ func _initialize() -> void:
 	cm._apply_law(1, law_type)
 	check("secim oncesi yasa reddedildi: mana ve gorus degismedi", cm.mana_of(1) == 10 and near(float(pm.parties[1]["ideology"]["economic"]), 0.0))
 	cm.last_seats = {1: 150, 2: 140, 3: 100}
-	check("meclis varken yasa sunulabilir", cm.can_propose_law(1))
+	cm.agenda = {}
+	check("gundem yokken yasa sunulamaz", not cm.can_propose_law(1))
+	cm.agenda = {"type": "gundem_social_n", "until": cm.round_number + 1}
+	check("gundem baska eksendeyse bu yasa sunulamaz", not cm.can_propose_law(1, law_type))
+	cm.agenda = {"type": "gundem_economic_n", "until": cm.round_number + 1}
+	check("meclis ve gundem varken gundemdeki eksende yasa sunulabilir", cm.can_propose_law(1, law_type))
 	cm._apply_law(1, law_type)
 	check("yasa 1 mana, meclis oylamasi acildi, sira devretmedi", cm.mana_of(1) == 10 - GameRules.LAW_MANA_COST and gm.phase == gm.Phase.VOTING 		and cm.current_turn_peer_id() == 1)
 	for id in [1, 2, 3]:
@@ -283,7 +284,7 @@ func _initialize() -> void:
 		projected += int(projection[id]["seats"])
 	check("anlik vekil tahmini ilin vekil sayisina esit", projected == cm.province_seat_count("ankara"), str(projection))
 	cm.mana[1] = 2
-	cm.has_drawn_this_turn = true
+	cm.inventories[1] = []  # otomatik gelen kart bedava olabilir (mana bonusu)
 	check("2 mana ile il baskanligi kurulabilir", cm.can_build_organization(1, "ankara"))
 	cm._apply_organization(1, "ankara")
 	check("il baskanligi kuruldu, 2 mana harcandi; mana bitti -> sira kendiliginden devretti", cm.organization_level("ankara", 1) == 1 		and cm.mana_of(1) == 0 and cm.current_turn_peer_id() != 1)
@@ -320,13 +321,13 @@ func _initialize() -> void:
 	cm._apply_miting_move(1, "konya")
 	check("mana bitti ama elde bedava kart var -> sira devretmez", cm.mana_of(1) == 0 and cm.current_turn_peer_id() == 1)
 	cm.inventories[1] = []
-	cm.has_drawn_this_turn = false
 	cm.mana[1] = 2
+	var next_peer: int = cm.turn_order[(cm.turn_order.find(1) + 1) % cm.turn_order.size()]
+	var next_hand: int = cm.inventories.get(next_peer, []).size()
 	cm._apply_miting_move(1, "sivas")
-	check("mana bitti ama bedava kart cekme hakki var -> sira devretmez", cm.mana_of(1) == 0 and cm.current_turn_peer_id() == 1)
-	cm._apply_draw(1)
-	var drawn_free: bool = cm.inventories[1].size() == 1 and cm.inventories[1][0] == "mana_bonusu"
-	check("kart cekildi; elde bedava kart yoksa sira devreder", drawn_free or cm.current_turn_peer_id() != 1)
+	check("mana bitti, elde bedava kart yok -> sira devreder", cm.current_turn_peer_id() == next_peer)
+	check("sirasi gelen oyuncuya otomatik 1 kart verildi", cm.inventories[next_peer].size() == next_hand + 1)
+	check("kart cekme hamlesi yok", not cm.can_draw_for(next_peer))
 	cm.current_turn_index = cm.turn_order.find(1)
 	cm.inventories[1] = []
 
@@ -484,6 +485,32 @@ func _initialize() -> void:
 	check("partiler notr baslar", axes.is_valid_start_ideology(axes.default_values()) \
 		and not axes.is_valid_start_ideology(ideology(1, 0, 0)))
 	check("desteden yasa ve ideoloji karti gelmez", not cm._draw_pool(1).has("capitalist") and not cm._draw_pool(1).has("law_privatization"))
+
+	print("")
+	print("=== 13) GUNDEM TAKVIMI ===")
+	GameRules.configure(4, 7)
+	new_game({1: ideology(0, 0, 0), 2: ideology(0, 0, 0), 3: ideology(0, 0, 0)})
+	var calendar := {}
+	for rr in range(1, 16):
+		cm.round_number = rr
+		cm.last_seats = {} if rr <= GameRules.FIRST_ELECTION_ROUND else {1: 150, 2: 140, 3: 110}
+		cm._schedule_agenda()
+		calendar[rr] = cm.agenda_type()
+	var no_early := true
+	for rr in range(1, 5):
+		if calendar[rr] != "":
+			no_early = false
+	check("ilk secimden once gundem yok", no_early, str(calendar))
+	var pattern_ok: bool = calendar[5] != "" and calendar[6] != "" and calendar[7] != "" and calendar[8] == "" and calendar[9] == "" 		and calendar[10] != "" and calendar[11] != "" and calendar[12] != "" and calendar[13] == "" and calendar[14] == "" and calendar[15] != ""
+	check("3 tur gundem, 2 tur ara", pattern_ok, str(calendar))
+	var ag_axes := {}
+	for rr in [5, 6, 7]:
+		ag_axes[cp.agenda_data(calendar[rr])["axis"]] = true
+	var ag_axes2 := {}
+	for rr in [10, 11, 12]:
+		ag_axes2[cp.agenda_data(calendar[rr])["axis"]] = true
+	check("uclemedeki uc gundem uc farkli eksen", ag_axes.size() == 3 and ag_axes2.size() == 3)
+	check("gundem karti destede yok", not cm._draw_pool(1).has("gundem_economic_n"))
 
 	print("")
 	if fails == 0:

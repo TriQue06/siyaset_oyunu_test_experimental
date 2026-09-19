@@ -544,7 +544,7 @@ func _on_turn_changed(_peer_id: int) -> void:
 	if current != _last_turn_peer:
 		_last_turn_peer = current
 		if current == multiplayer.get_unique_id() and not CardManager.game_finished:
-			_show_toast("Sıra sende: +%d mana (toplam %d)" % [GameRules.MANA_PER_ROUND, CardManager.mana_of(current)])
+			_show_toast("Sıra sende: +%d mana (toplam %d), +1 kart" % [GameRules.MANA_PER_ROUND, CardManager.mana_of(current)])
 	_update_turn_indicator()
 	_refresh_deck_button()
 	_refresh_pass_button()
@@ -576,9 +576,11 @@ func _update_turn_indicator_text() -> void:
 	var timer := "" if CardManager.is_turn_blocked() else "\nSüre: %s" % GameRules.format_seconds(CardManager.turn_seconds_left())
 	turn_indicator_label.text = "Sıra: %s%s%s" % [pname, suffix, timer]
 
+## Deste artık süs: kart her sıra gelişte kendiliğinden gelir.
 func _refresh_deck_button() -> void:
-	deck_button.disabled = not CardManager.can_draw()
-	deck_button.modulate.a = 1.0 if not deck_button.disabled else 0.5
+	deck_button.disabled = true
+	deck_button.modulate.a = 1.0
+	deck_button.tooltip_text = "Her sıran geldiğinde desteden 1 kart alırsın."
 
 func _refresh_pass_button() -> void:
 	pass_button.disabled = not CardManager.can_act()
@@ -1821,6 +1823,8 @@ func _action_block_reason(cost: int, is_law: bool = false) -> String:
 		return "İlk seçime kadar meclis yok: yasa yapılamaz."
 	if is_law and not CardManager.has_seats(me):
 		return "Mecliste vekilin yok: yasa teklif edemezsin."
+	if is_law and CardManager.agenda_type() == "":
+		return "Gündem yok: yasa sadece gündemdeki eksende sunulabilir."
 	if not CardManager.can_act():
 		return "Sıran değil."
 	if is_law and CardManager.has_proposed_law_this_round(me):
@@ -1872,8 +1876,8 @@ func _refresh_agenda_banner() -> void:
 	if current == "":
 		return
 	var data := CardPresets.agenda_data(current)
-	_agenda_label.text = "GÜNDEM  ·  %s  ·  %d tur kaldı\n%s" % [data["title"], CardManager.agenda_rounds_left(),
-		CardPresets.agenda_effect_text(current)]
+	_agenda_label.text = "GÜNDEM %d/%d  ·  %s\n%s" % [int(CardManager.agenda.get("index", 1)), GameRules.AGENDA_ROUNDS,
+		data["title"], CardPresets.agenda_effect_text(current)]
 	_agenda_banner.reset_size()
 	var viewport_size := get_viewport_rect().size
 	_agenda_banner.position = Vector2(viewport_size.x - RIGHT_COLUMN_WIDTH - _agenda_banner.size.x - 24.0, 16.0)
@@ -1951,10 +1955,10 @@ func _refresh_law_designer() -> void:
 		GameRules.LAW_MANA_COST]
 	var current := CardManager.agenda_type()
 	if current == "":
-		_law_agenda_label.text = "Gündem yok"
+		_law_agenda_label.text = "Gündem yok: bu tur yasa sunulamaz."
 	else:
 		var data := CardPresets.agenda_data(current)
-		_law_agenda_label.text = "Gündem: %s (%d tur)" % [data["title"], CardManager.agenda_rounds_left()]
+		_law_agenda_label.text = "Gündem: %s — sadece %s yasaları" % [data["title"], data["axis_title"]]
 	for child in _law_rows.get_children():
 		child.queue_free()
 	var ideology: Dictionary = PartyManager.parties.get(me, {}).get("ideology", {})
@@ -2019,6 +2023,8 @@ func _law_circle(axis: String, dir: int) -> Control:
 	var circle := Panel.new()
 	circle.custom_minimum_size = Vector2(54, 54)
 	var mult := CardManager.agenda_law_mult(law_type)
+	if mult <= 1.0:
+		circle.modulate = Color(1, 1, 1, 0.3)  # gündemde değil: sunulamaz
 	var style := StyleBoxFlat.new()
 	style.bg_color = _law_color(axis, dir)
 	style.set_corner_radius_all(27)
@@ -2053,6 +2059,10 @@ func _law_circle(axis: String, dir: int) -> Control:
 	return circle
 
 func _start_law_drag(law_type: String) -> void:
+	var current := CardManager.agenda_type()
+	if current != "" and CardPresets.law_data(law_type)["axis"] != CardPresets.agenda_data(current)["axis"]:
+		_show_toast("Bu eksen gündemde değil: bu tur sadece %s yasaları sunulabilir." % CardPresets.agenda_data(current)["axis_title"])
+		return
 	if not CardManager.can_propose_law(multiplayer.get_unique_id(), law_type):
 		_show_toast(_action_block_reason(GameRules.LAW_MANA_COST, true))
 		return

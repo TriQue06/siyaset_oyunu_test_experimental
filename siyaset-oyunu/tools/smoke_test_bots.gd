@@ -98,7 +98,10 @@ func _initialize() -> void:
 	check("botlar miting yapti", int(played.get("miting", 0)) > 0)
 	check("botlar kart oynadi", int(played.get("karalama", 0)) + int(played.get("anket", 0)) + int(played.get("steal_weak", 0)) \
 		+ int(played.get("steal_medium", 0)) + int(played.get("steal_strong", 0)) > 0)
-	check("botlar kart cekti (bedava)", int(played.get("draw", 0)) > 0)
+	var dealt := 0
+	for id in cm.turn_order:
+		dealt += cm.inventories.get(id, []).size()
+	check("botlara her sira otomatik kart verildi (kart oynandi ya da elde)", dealt > 0 or int(played.get("karalama", 0)) > 0)
 	check("bir turda birden cok hamle yapildi", max_actions >= 2, str(max_actions))
 	# Yarım adım kaymasının kendisi smoke_test_rules'ta; burada değerlerin geçerliliği.
 	var valid := true

@@ -28,7 +28,7 @@ const LEANING_ESTIMATE := 2.0
 ## işe yarayacaksa sunsun (miting / il başkanlığı / kartlar öne geçebilsin).
 const LAW_BASE_SCORE := 1.0
 ## Bot bir yasayı en fazla bu kadar turda bir sunar.
-const LAW_EVERY_ROUNDS := 3
+const LAW_EVERY_ROUNDS := 2
 
 static func _ideology(peer_id: int) -> Dictionary:
 	return PartyManager.parties.get(peer_id, {}).get("ideology", IdeologyAxes.default_values())
@@ -97,9 +97,9 @@ static func choose_action(bot: int) -> Dictionary:
 
 	if CardManager.can_propose_law(bot):
 		var law := _best_law(bot, known)
-		# Yasa sıklığı sınırı: gündemdeki eksenin yasası bu sınıra takılmaz.
+		# Yasa sıklığı sınırı (her gündem turunda herkes yasa sunup meclisi kilitlemesin).
 		var rested: bool = CardManager.round_number - int(CardManager.law_rounds.get(bot, -99)) >= LAW_EVERY_ROUNDS
-		if not law.is_empty() and not rested and CardManager.agenda_law_mult(String(law["law"])) <= 1.0:
+		if not rested:
 			law = {}
 		if not law.is_empty() and float(law["score"]) - GameRules.LAW_MANA_COST * mana_value > best_score:
 			best = {"type": "law", "law": law["law"]}
@@ -129,10 +129,6 @@ static func choose_action(bot: int) -> Dictionary:
 			best_score = float(miting["score"]) - GameRules.MITING_MANA_COST * mana_value
 
 
-	if CardManager.can_draw_for(bot):
-		# Kart çekmek bedava (turda bir): el dolu değilse her zaman çek.
-		if hand.size() < CardManager.MAX_HAND_SIZE - 1:
-			best = {"type": "draw"}
 	return best
 
 ## Seçim desteğini en çok artıracak yasa: bilinen illerdeki etkiler (geçme
@@ -151,7 +147,7 @@ static func _best_law(bot: int, known: Dictionary) -> Dictionary:
 	if known_seats <= 0.0:
 		return _exploration_law(bot, mine)
 	var confidence := clampf(known_seats / 60.0, 0.3, 1.0)
-	for axis in IdeologyAxes.AXES:
+	for axis in _law_axes():
 		for dir in [-1, 1]:
 			var law_type := CardPresets.law_type(axis, dir)
 			var sum := 0.0
@@ -189,8 +185,9 @@ static func _exploration_law(bot: int, mine: Dictionary) -> Dictionary:
 	var best_law := ""
 	var best_penalty := INF
 	var offset := absi(bot) + CardManager.round_number
-	for i in IdeologyAxes.AXES.size():
-		var axis: String = IdeologyAxes.AXES[(i + offset) % IdeologyAxes.AXES.size()]
+	var axes := _law_axes()
+	for i in axes.size():
+		var axis: String = axes[(i + offset) % axes.size()]
 		var v := float(mine.get(axis, 0))
 		var dir := 1 if v > 0 else (-1 if v < 0 else (1 if (absi(bot) / 7 + i) % 2 == 0 else -1))
 		var law_type := CardPresets.law_type(axis, dir)
@@ -199,6 +196,14 @@ static func _exploration_law(bot: int, mine: Dictionary) -> Dictionary:
 			best_penalty = penalty
 			best_law = law_type
 	return {"law": best_law, "score": 1.0}
+
+## Yasa sunulabilecek eksenler: sadece gündemdeki eksen (gündem yoksa hepsi;
+## zaten yasa sunulamaz).
+static func _law_axes() -> Array:
+	var current := CardManager.agenda_type()
+	if current == "":
+		return IdeologyAxes.AXES
+	return [CardPresets.agenda_data(current)["axis"]]
 
 ## Botun son sunduğu yasalar: aynı yasayı (ve aynı ekseni) üst üste sunmasın.
 static var _recent_laws: Dictionary = {}
@@ -319,25 +324,9 @@ static func _evaluate(bot: int, card_type: String, known: Dictionary) -> Diction
 			return {"score": 0.9 if CardManager.mana_of(bot) < GameRules.MITING_MANA_COST else 0.3, "peer": -1, "province": ""}
 		CardPresets.PROPAGANDA_CARD_TYPE:
 			return _eval_propaganda(bot, known)
-	if CardPresets.is_agenda_card(card_type):
-		return _eval_agenda(bot, card_type)
 	if CardPresets.needs_target(card_type):
 		return _eval_steal(bot, card_type)
 	return {}
-
-## Gündem kartı: gündem boşken ve konu partinin görüşüne uyuyorsa (ya da nötrse)
-## oynanır; ardından o eksende yasa sunmak çok daha etkili olur.
-static func _eval_agenda(bot: int, card_type: String) -> Dictionary:
-	if CardManager.agenda_type() != "":
-		return {}
-	var data := CardPresets.agenda_data(card_type)
-	var lean := float(_ideology(bot).get(data["axis"], 0))
-	if lean * float(data["dir"]) < 0.0:
-		return {}  # rakiplerin konusunu gündeme taşıma
-	var score := 1.3 if lean == 0.0 else 1.9
-	if CardManager.can_propose_law(bot) or CardManager.has_seats(bot):
-		score += 0.5
-	return {"score": score, "peer": -1, "province": ""}
 
 ## Beklenen il gücü kazancı × ilin vekil sayısı × partinin o ildeki (bilinen) şansı.
 static func _eval_miting(bot: int, known: Dictionary) -> Dictionary:

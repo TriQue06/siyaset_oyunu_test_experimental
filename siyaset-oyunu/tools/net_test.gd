@@ -103,11 +103,14 @@ func run_host() -> void:
 	mm.finish_party_setup()
 	cm.turn_order = [client_id, 1]
 	cm.current_turn_index = 0
-	cm.mana[client_id] = 10  # kart çek (1) + her kart (en çok 4) + gözcü (1)
+	cm.mana[client_id] = 10  # teşkilat (2) + her kart (en çok 3)
+	cm.inventories[client_id] = []
+	cm.inventories[1] = []
+	cm._deal_turn_card(client_id)  # sıra gelen oyuncuya otomatik kart
 	cm._push_state({"type": "full"}, true)
 	log_line("oyun başladı, sıra client'ta (id %d)" % client_id)
 
-	if not await wait_until(func(): return cm.current_turn_peer_id() == 1, "client kart çekip oynadı, sıra host'ta"):
+	if not await wait_until(func(): return cm.current_turn_peer_id() == 1, "client hamle yapıp turu bitirdi, sıra host'ta"):
 		return
 	cm.pass_turn()
 	# İlk seçim normalde 3. tur sonunda: test hızlı olsun diye host doğrudan yaptırır.
@@ -147,8 +150,8 @@ func run_client() -> void:
 	if not await wait_until(func(): return cm.turn_order.size() == 2 and pm.parties.has(me) and cm.is_my_turn(),
 			"tam durum + parti verisi alındı, sıra bende"):
 		return
-	cm.draw_card()
-	if not await wait_until(func(): return cm.my_inventory().size() == 1, "kart çekme RPC'si"):
+	# Kart çekme yok: sıra gelince oyun bir kart verir.
+	if not await wait_until(func(): return cm.my_inventory().size() == 1, "sıra gelince otomatik kart verildi"):
 		return
 	var card: String = cm.my_inventory()[0]
 	# Hamle sınırı yok: önce teşkilat (2 mana), sonra manası yeterse çekilen kart.

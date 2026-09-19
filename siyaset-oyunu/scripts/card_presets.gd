@@ -1,7 +1,7 @@
 extends Node
 ## Autoload. Kart ve hamle katalogu. Görseller normal PNG'ler (assets/cards/).
 ##
-## DESTE KARTLARI (çekmek GameRules.DRAW_MANA_COST; oynamanın bedeli CARD_MANA_COSTS).
+## KARTLAR: sırası gelen oyuncuya oyun bir kart verir; oynamanın bedeli CARD_MANA_COSTS.
 ## YATIRIM ve GENSORU da artık hamle (bkz. CardManager.invest / censure).
 ##   - POPÜLİZM BONUSU : POPULISM_ROUNDS tur kendi hamlelerinin iyi etkisi artar, kötüsü azalır.
 ##   - MANA BONUSU     : +MANA_BONUS_AMOUNT mana; kullanınca sıra devreder.
@@ -36,8 +36,8 @@ const PROPAGANDA_CARD_TYPE := "karalama"
 const POPULISM_CARD_TYPE := "populizm"
 const MANA_BONUS_CARD_TYPE := "mana_bonusu"
 
-## GÜNDEM KARTLARI: her eksenin her ucu için bir sıcak konu. Oynayan gündemi
-## GameRules.AGENDA_ROUNDS tur boyunca bu konuya çeker.
+## GÜNDEMLER: her eksenin her ucu için bir sıcak konu (bkz. GameRules gündem
+## takvimi). Artık kart değil; oyun takvime göre kendisi seçer.
 const AGENDAS := {
 	"gundem_economic_n": {"axis": "economic", "dir": -1, "title": "Hayat Pahalılığı",
 		"text": "Fiyatlar uçtu, seçmen devletten koruma bekliyor."},
@@ -65,12 +65,6 @@ const CARD_TYPES: Array[String] = [
 	"karalama",
 	"populizm",
 	"mana_bonusu",
-	"gundem_economic_n",
-	"gundem_economic_p",
-	"gundem_social_n",
-	"gundem_social_p",
-	"gundem_administrative_n",
-	"gundem_administrative_p",
 ]
 
 const AXIS_TITLES := {
@@ -161,7 +155,7 @@ func agenda_effect_text(card_type: String) -> String:
 	var data := agenda_data(card_type)
 	if data.is_empty():
 		return ""
-	return "%s yasaları %d kat, %s yasaları %d kat etkili" % [data["side"], int(PublicOpinion.AGENDA_MATCH_MULT),
+	return "sadece %s yasaları: %s %d kat, %s %d kat etkili" % [data["axis_title"],data["side"], int(PublicOpinion.AGENDA_MATCH_MULT),
 		String(AXIS_TITLES[data["axis"]]["pos" if int(data["dir"]) < 0 else "neg"]), int(PublicOpinion.AGENDA_AXIS_MULT)]
 
 func is_censure_card(card_type: String) -> bool:

@@ -868,7 +868,7 @@ func _start_drag(hand_index: int, card_type: String, holder: Control) -> void:
 	_drag_ghost.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_drag_ghost.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_drag_ghost.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_drag_ghost.size = Vector2(72, 72) if not law.is_empty() else CARD_DISPLAY_SIZE * 0.6
+	_drag_ghost.size = Vector2(52, 52) if not law.is_empty() else CARD_DISPLAY_SIZE * 0.6
 	_drag_ghost.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_drag_ghost.z_index = 150
 	add_child(_drag_ghost)
@@ -1618,7 +1618,10 @@ func _on_government_phase_changed() -> void:
 ## Görevli olmayan herkes, teklif meclise gelene kadar bu perdeyi görür.
 func _refresh_waiting_overlay() -> void:
 	var forming: bool = GovernmentManager.phase == GovernmentManager.Phase.FORMING
-	_waiting_overlay.visible = forming and not GovernmentManager.is_my_mandate()
+	# Seçim sonucu henüz gösterilmediyse (sonuç ekranına geçiliyor ya da seçim
+	# gecesi payı sürüyor) perde görevli partiyi açık etmesin: spoiler.
+	var results_pending: bool = _leaving_for_results 		or GovernmentManager.phase_seconds_left() > GameRules.FORMATION_TIMEOUT + 0.5
+	_waiting_overlay.visible = forming and not GovernmentManager.is_my_mandate() and not results_pending
 	if not _waiting_overlay.visible:
 		return
 	var holder: int = GovernmentManager.mandate_peer_id()
@@ -1882,54 +1885,57 @@ func _build_law_designer() -> void:
 	style.set_corner_radius_all(12)
 	style.set_border_width_all(2)
 	style.border_color = Color(0.62, 0.45, 0.9, 0.8)
-	style.set_content_margin_all(16)
+	style.set_content_margin_all(10)
 	style.shadow_color = Color(0, 0, 0, 0.5)
-	style.shadow_size = 12
+	style.shadow_size = 10
 	_law_designer.add_theme_stylebox_override("panel", style)
 	_law_designer.z_index = 108
 	_law_designer.mouse_filter = Control.MOUSE_FILTER_STOP
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 8)
+	box.add_theme_constant_override("separation", 4)
 	_law_designer.add_child(box)
 	var header := HBoxContainer.new()
 	box.add_child(header)
 	var title := Label.new()
 	title.text = "YASA TEKLİFİ"
-	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_font_size_override("font_size", 14)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title)
 	var close := Button.new()
 	close.text = "Kapat"
 	UiSkin.skin_button(close)
+	close.add_theme_font_size_override("font_size", 11)
 	close.pressed.connect(func(): _law_designer.hide())
 	header.add_child(close)
 	# Kazanç satırı: kabul edilirse puan, bedel.
 	_law_points_label = Label.new()
-	_law_points_label.add_theme_font_size_override("font_size", 13)
+	_law_points_label.add_theme_font_size_override("font_size", 11)
+	_law_points_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_law_points_label.custom_minimum_size = Vector2(240, 0)
 	_law_points_label.add_theme_color_override("font_color", Color(0.55, 1.0, 0.6))
 	box.add_child(_law_points_label)
 	# Gündem şeridi.
 	_law_agenda_label = Label.new()
 	_law_agenda_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_law_agenda_label.custom_minimum_size = Vector2(340, 0)
-	_law_agenda_label.add_theme_font_size_override("font_size", 13)
+	_law_agenda_label.custom_minimum_size = Vector2(240, 0)
+	_law_agenda_label.add_theme_font_size_override("font_size", 11)
 	_law_agenda_label.add_theme_color_override("font_color", Color(1.0, 0.72, 0.35))
 	box.add_child(_law_agenda_label)
 	_law_rows = VBoxContainer.new()
-	_law_rows.add_theme_constant_override("separation", 6)
+	_law_rows.add_theme_constant_override("separation", 3)
 	box.add_child(_law_rows)
 	var hint := Label.new()
-	hint.text = "Bir daireyi meclis diyagramına sürükle. Yakın illerde güç kazandırır, zıt illerde kaybettirir; kabul edilirse etkisi 2 kat. Partin o yöne 1, EVET diyenler yarım adım kayar."
+	hint.text = "Daireyi meclise sürükle. Yakın illerde güç kazandırır, zıt illerde kaybettirir."
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hint.custom_minimum_size = Vector2(340, 0)
-	hint.add_theme_font_size_override("font_size", 11)
+	hint.custom_minimum_size = Vector2(240, 0)
+	hint.add_theme_font_size_override("font_size", 10)
 	hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.55))
 	box.add_child(hint)
 	_law_info = Label.new()
 	_law_info.text = "Bir daireye dokun: ne yaptığı burada yazar."
 	_law_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_law_info.custom_minimum_size = Vector2(340, 0)
-	_law_info.add_theme_font_size_override("font_size", 12)
+	_law_info.custom_minimum_size = Vector2(240, 0)
+	_law_info.add_theme_font_size_override("font_size", 10)
 	_law_info.add_theme_color_override("font_color", Color(1.0, 0.85, 0.45))
 	box.add_child(_law_info)
 	_law_designer.hide()
@@ -1940,16 +1946,15 @@ func _build_law_designer() -> void:
 func _refresh_law_designer() -> void:
 	var me := multiplayer.get_unique_id()
 	var in_gov := CardManager.is_government_party(me)
-	_law_points_label.text = "Kabul edilirse +%d puan%s  ·  %d mana  ·  turda 1 yasa" % [
-		CardManager.law_pass_score(in_gov), " (hükümet yasası)" if in_gov else " (hükümette +%d)" % GameRules.LAW_PASS_SCORE_GOV,
+	_law_points_label.text = "Kabul: +%d puan%s · %d mana" % [
+		CardManager.law_pass_score(in_gov), "" if in_gov else " (hükümette +%d)" % GameRules.LAW_PASS_SCORE_GOV,
 		GameRules.LAW_MANA_COST]
 	var current := CardManager.agenda_type()
 	if current == "":
-		_law_agenda_label.text = "Gündem yok: bütün yasalar normal etkide."
+		_law_agenda_label.text = "Gündem yok"
 	else:
 		var data := CardPresets.agenda_data(current)
-		_law_agenda_label.text = "GÜNDEM: %s (%d tur) — %s." % [data["title"], CardManager.agenda_rounds_left(),
-			CardPresets.agenda_effect_text(current)]
+		_law_agenda_label.text = "Gündem: %s (%d tur)" % [data["title"], CardManager.agenda_rounds_left()]
 	for child in _law_rows.get_children():
 		child.queue_free()
 	var ideology: Dictionary = PartyManager.parties.get(me, {}).get("ideology", {})
@@ -1957,22 +1962,23 @@ func _refresh_law_designer() -> void:
 		var info: Dictionary = CardPresets.AXIS_TITLES[axis]
 		var row := HBoxContainer.new()
 		row.alignment = BoxContainer.ALIGNMENT_CENTER
-		row.add_theme_constant_override("separation", 10)
+		row.add_theme_constant_override("separation", 6)
 		row.add_child(_law_circle(axis, -1))
 		var middle := VBoxContainer.new()
 		middle.alignment = BoxContainer.ALIGNMENT_CENTER
-		middle.custom_minimum_size = Vector2(150, 0)
+		middle.add_theme_constant_override("separation", 0)
+		middle.custom_minimum_size = Vector2(110, 0)
 		var axis_label := Label.new()
 		axis_label.text = String(info["title"]).to_upper()
 		axis_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		axis_label.add_theme_font_size_override("font_size", 13)
+		axis_label.add_theme_font_size_override("font_size", 10)
 		axis_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.8))
 		middle.add_child(axis_label)
 		middle.add_child(_ideology_bar(axis, float(ideology.get(axis, 0))))
 		var pos_label := Label.new()
 		pos_label.text = "partin: %s" % IdeologyAxes.format_value(float(ideology.get(axis, 0)))
 		pos_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		pos_label.add_theme_font_size_override("font_size", 11)
+		pos_label.add_theme_font_size_override("font_size", 9)
 		pos_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.55))
 		middle.add_child(pos_label)
 		row.add_child(middle)
@@ -1982,7 +1988,7 @@ func _refresh_law_designer() -> void:
 ## Eksende partinin yeri: −3..+3 çubuğu ve üstünde işaret.
 func _ideology_bar(axis: String, value: float) -> Control:
 	var bar := Control.new()
-	bar.custom_minimum_size = Vector2(150, 16)
+	bar.custom_minimum_size = Vector2(110, 12)
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var left := _law_color(axis, -1)
 	var right := _law_color(axis, 1)
@@ -1994,12 +2000,12 @@ func _ideology_bar(axis: String, value: float) -> Control:
 		for i in steps:
 			var x0 := w * i / steps
 			var x1 := w * (i + 1) / steps
-			bar.draw_rect(Rect2(x0, y - 3.0, x1 - x0 + 0.5, 6.0), left.lerp(right, float(i) / (steps - 1)))
+			bar.draw_rect(Rect2(x0, y - 2.0, x1 - x0 + 0.5, 4.0), left.lerp(right, float(i) / (steps - 1)))
 		bar.draw_line(Vector2(w * 0.5, y - 6.0), Vector2(w * 0.5, y + 6.0), Color(1, 1, 1, 0.5), 1.0)
 		var x := w * (clampf(value, IdeologyAxes.AXIS_MIN, IdeologyAxes.AXIS_MAX) - IdeologyAxes.AXIS_MIN) \
 			/ (IdeologyAxes.AXIS_MAX - IdeologyAxes.AXIS_MIN)
-		bar.draw_circle(Vector2(x, y), 7.0, Color.BLACK, true, -1.0, true)
-		bar.draw_circle(Vector2(x, y), 5.5, mine, true, -1.0, true))
+		bar.draw_circle(Vector2(x, y), 5.5, Color.BLACK, true, -1.0, true)
+		bar.draw_circle(Vector2(x, y), 4.0, mine, true, -1.0, true))
 	return bar
 
 func _law_color(axis: String, dir: int) -> Color:
@@ -2011,12 +2017,12 @@ func _law_circle(axis: String, dir: int) -> Control:
 	var law_type := CardPresets.law_type(axis, dir)
 	var law := CardPresets.law_data(law_type)
 	var circle := Panel.new()
-	circle.custom_minimum_size = Vector2(80, 80)
+	circle.custom_minimum_size = Vector2(54, 54)
 	var mult := CardManager.agenda_law_mult(law_type)
 	var style := StyleBoxFlat.new()
 	style.bg_color = _law_color(axis, dir)
-	style.set_corner_radius_all(40)
-	style.set_border_width_all(4 if mult > 1.0 else 3)
+	style.set_corner_radius_all(27)
+	style.set_border_width_all(3 if mult > 1.0 else 2)
 	style.border_color = Color(1.0, 0.72, 0.3) if mult > 1.0 else Color(1, 1, 1, 0.55)
 	circle.add_theme_stylebox_override("panel", style)
 	circle.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -2026,9 +2032,9 @@ func _law_circle(axis: String, dir: int) -> Control:
 	label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_font_size_override("font_size", 9)
 	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
-	label.add_theme_constant_override("outline_size", 4)
+	label.add_theme_constant_override("outline_size", 3)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	circle.add_child(label)
 	if mult > 1.0:

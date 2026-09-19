@@ -24,6 +24,8 @@ const SEAT_RADIUS_FACTOR := 0.8  # orijinal JS: SRF
 var _dot_positions: Array = [] # Array[Vector2], normalize (x: 0..2, merkez=1 / y: 0..~1)
 var _dot_colors: Array = []    # Array[Color], _dot_positions ile aynı sırada
 var _seat_radius_norm: float = 0.0 # normalize koltuk yarıçapı (tüm noktalar için sabit)
+## Ortadaki toplam vekil sayısının yazı boyutu (diyagram boyutundan bağımsız).
+const COUNT_FONT_SIZE := 24
 var _total_seats: int = 0
 var _layout_total: int = -1
 var _layout: Dictionary = {}
@@ -97,7 +99,8 @@ func _draw() -> void:
 	# sayısı (createParliamentArch'taki <text>{total}</text> karşılığı).
 	if _total_seats > 0:
 		var font := get_theme_default_font()
-		var font_size: int = int(round(size.x * 0.06))
+		# Sabit boyut: oyun ekranında ve seçim sonucunda aynı görünsün.
+		var font_size: int = COUNT_FONT_SIZE
 		var text := str(_total_seats)
 		var text_width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 		draw_string(font, Vector2(size.x * 0.5 - text_width * 0.5, size.y - 4.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(1, 1, 1, 0.9))

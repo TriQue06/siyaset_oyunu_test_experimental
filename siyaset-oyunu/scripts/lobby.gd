@@ -6,7 +6,7 @@ extends Control
 ## girmez; sadece oda kurulunca üretilen 5 harfli kod yeterlidir. Oda nerede
 ## kapanırsa kapansın oyuncu buraya sebebiyle birlikte döner.
 
-const CARD_WIDTH := 440.0
+const CARD_WIDTH := 320.0
 const ACCENT := Color(0.93, 0.66, 0.22)
 const BG_TOP := Color(0.08, 0.1, 0.17)
 const BG_BOTTOM := Color(0.16, 0.12, 0.24)
@@ -80,10 +80,10 @@ func _button(text: String, color: Color, height: float = 54.0) -> Button:
 	var button := Button.new()
 	button.text = text
 	button.custom_minimum_size = Vector2(0, height)
-	button.add_theme_font_size_override("font_size", 20)
+	button.add_theme_font_size_override("font_size", 16)
 	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
 		var style := StyleBoxFlat.new()
-		style.set_corner_radius_all(12)
+		style.set_corner_radius_all(10)
 		style.bg_color = color
 		style.set_content_margin_all(8)
 		match state:
@@ -105,8 +105,8 @@ func _field(placeholder: String, max_length: int) -> LineEdit:
 	edit.placeholder_text = placeholder
 	edit.max_length = max_length
 	edit.alignment = HORIZONTAL_ALIGNMENT_CENTER
-	edit.custom_minimum_size = Vector2(0, 50)
-	edit.add_theme_font_size_override("font_size", 20)
+	edit.custom_minimum_size = Vector2(0, 40)
+	edit.add_theme_font_size_override("font_size", 16)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.05, 0.06, 0.1)
 	style.border_color = Color(1, 1, 1, 0.18)
@@ -132,50 +132,55 @@ func _build_card() -> void:
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(center)
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 18)
+	column.add_theme_constant_override("separation", 14)
 	center.add_child(column)
 
-	var title := Label.new()
-	title.text = "SİYASET OYUNU"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 46)
-	title.add_theme_color_override("font_color", ACCENT)
-	title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
-	title.add_theme_constant_override("outline_size", 8)
-	column.add_child(title)
-	var subtitle := _small_label("Parti kur · seçim kazan · hükümeti sen kur")
-	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	subtitle.add_theme_font_size_override("font_size", 16)
-	column.add_child(subtitle)
+	# KİMLİK: ince, hap biçimli ayrı bir şerit (oda kartından farklı görünür).
+	var profile := PanelContainer.new()
+	var profile_style := _panel_style(Color(0.2, 0.16, 0.3, 0.85), Color(ACCENT, 0.55), 22)
+	profile_style.set_content_margin_all(8)
+	profile_style.content_margin_left = 16
+	profile_style.content_margin_right = 10
+	profile_style.shadow_size = 8
+	profile.add_theme_stylebox_override("panel", profile_style)
+	profile.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	column.add_child(profile)
+	var profile_row := HBoxContainer.new()
+	profile_row.add_theme_constant_override("separation", 10)
+	profile.add_child(profile_row)
+	var who := _small_label("Oyuncu adın")
+	who.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	who.add_theme_color_override("font_color", Color(ACCENT, 0.9))
+	profile_row.add_child(who)
+	name_edit = _field("Oyuncu adı", 20)
+	name_edit.custom_minimum_size = Vector2(190, 34)
+	name_edit.add_theme_font_size_override("font_size", 15)
+	name_edit.text = PlayerProfile.player_name
+	name_edit.text_changed.connect(_on_name_changed)
+	profile_row.add_child(name_edit)
 
+	# ODA: kurma ve katılma.
 	var card := PanelContainer.new()
 	card.custom_minimum_size = Vector2(CARD_WIDTH, 0)
-	card.add_theme_stylebox_override("panel", _panel_style(Color(0.1, 0.11, 0.17, 0.94), Color(1, 1, 1, 0.12)))
+	var card_style := _panel_style(Color(0.1, 0.11, 0.17, 0.94), Color(1, 1, 1, 0.1), 14)
+	card_style.set_content_margin_all(18)
+	card.add_theme_stylebox_override("panel", card_style)
 	column.add_child(card)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)
 	card.add_child(box)
 
-	box.add_child(_small_label("OYUNCU ADIN"))
-	name_edit = _field("Oyuncu adı", 20)
-	name_edit.text = PlayerProfile.player_name
-	name_edit.text_changed.connect(_on_name_changed)
-	box.add_child(name_edit)
-
-	var gap := Control.new()
-	gap.custom_minimum_size = Vector2(0, 6)
-	box.add_child(gap)
-	create_button = _button("ODA KUR", ACCENT, 58.0)
+	create_button = _button("Oda Kur", ACCENT, 42.0)
 	create_button.pressed.connect(_on_create_pressed)
 	box.add_child(create_button)
 
 	var divider := HBoxContainer.new()
-	divider.add_theme_constant_override("separation", 10)
+	divider.add_theme_constant_override("separation", 8)
 	var left := HSeparator.new()
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	left.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	divider.add_child(left)
-	divider.add_child(_small_label("ya da bir odaya katıl"))
+	divider.add_child(_small_label("ya da koda katıl"))
 	var right := HSeparator.new()
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	right.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -183,16 +188,18 @@ func _build_card() -> void:
 	box.add_child(divider)
 
 	var join_row := HBoxContainer.new()
-	join_row.add_theme_constant_override("separation", 10)
+	join_row.add_theme_constant_override("separation", 8)
 	code_edit = _field("ODA KODU", 5)
+	code_edit.custom_minimum_size = Vector2(0, 40)
+	code_edit.add_theme_font_size_override("font_size", 16)
 	code_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	code_edit.secret_character = "•"
 	code_edit.secret = GameSettings.streamer_mode
 	code_edit.text_changed.connect(_on_code_text_changed)
 	code_edit.text_submitted.connect(func(_t): _on_join_pressed())
 	join_row.add_child(code_edit)
-	join_button = _button("KATIL", Color(0.25, 0.45, 0.8), 50.0)
-	join_button.custom_minimum_size.x = 130
+	join_button = _button("Katıl", Color(0.25, 0.45, 0.8), 40.0)
+	join_button.custom_minimum_size.x = 96
 	join_button.pressed.connect(_on_join_pressed)
 	join_row.add_child(join_button)
 	box.add_child(join_row)
@@ -200,24 +207,24 @@ func _build_card() -> void:
 	status_label = Label.new()
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	status_label.custom_minimum_size = Vector2(CARD_WIDTH - 48.0, 22)
-	status_label.add_theme_font_size_override("font_size", 14)
+	status_label.custom_minimum_size = Vector2(CARD_WIDTH - 36.0, 18)
+	status_label.add_theme_font_size_override("font_size", 12)
 	box.add_child(status_label)
 
 func _build_footer() -> void:
 	var version := Label.new()
 	version.text = "sürüm %s" % MultiplayerManager.game_version()
-	version.add_theme_font_size_override("font_size", 16)
+	version.add_theme_font_size_override("font_size", 13)
 	version.modulate = Color(1, 1, 1, 0.6)
 	version.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	version.position += Vector2(12, -28)
 	version.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(version)
-	var quit := _button("Çıkış", Color(0.3, 0.3, 0.36), 40.0)
-	quit.add_theme_font_size_override("font_size", 16)
-	quit.custom_minimum_size.x = 110
+	var quit := _button("Çıkış", Color(0.3, 0.3, 0.36), 32.0)
+	quit.add_theme_font_size_override("font_size", 13)
+	quit.custom_minimum_size.x = 84
 	quit.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-	quit.position += Vector2(-126, -56)
+	quit.position += Vector2(-100, -46)
 	quit.pressed.connect(func(): get_tree().quit())
 	add_child(quit)
 

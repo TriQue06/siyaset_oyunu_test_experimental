@@ -29,6 +29,8 @@ const LEANING_ESTIMATE := 2.0
 const LAW_BASE_SCORE := 1.0
 ## Bot bir yasayı en fazla bu kadar turda bir sunar.
 const LAW_EVERY_ROUNDS := 2
+## Muhalefetteki bot, hükümete bu mesafeden yakınsa gensoruda çekimser kalır.
+const CENSURE_LOYALTY_DISTANCE := 1.2
 
 # --- BOT BLOĞU ------------------------------------------------------------------
 ## Hükümeti bir İNSAN partisi kurduysa muhalefetteki botlar birleşir:
@@ -573,15 +575,39 @@ static func choose_vote(bot: int) -> int:
 			if bloc_active():
 				_bloc_forming = true
 				return GovernmentManager.VOTE_YES
-			if ElectionModel.distance(_ideology(bot), _ideology(GovernmentManager.main_gov_peer_id)) < 2.0:
-				return GovernmentManager.VOTE_ABSTAIN
-			return GovernmentManager.VOTE_YES
+			return _censure_vote(bot)
 		GovernmentManager.KIND_LAW:
 			if bot == GovernmentManager.proposal_peer_id:
 				return GovernmentManager.VOTE_YES
 			return _best_law_vote(bot, GovernmentManager.proposal_law, GovernmentManager.proposal_peer_id,
 				GovernmentManager.proposal_gov_ids, _known_centers(bot))
 	return GovernmentManager.VOTE_ABSTAIN
+
+## Muhalefetteki botun gensoru oyu. Hükümetin düşmesi ona yeni bir hükümet
+## şansı verir: kendisi ya da kendisine hükümetten DAHA YAKIN olan gensoru
+## sahibi hükümet kurabilir. Bu yüzden varsayılan EVET'tir; sadece hükümet
+## ideolojik olarak çok yakınken ve gensoruyu veren belirgin biçimde uzakken
+## çekimser kalır.
+static func _censure_vote(bot: int) -> int:
+	var gov := GovernmentManager.main_gov_peer_id
+	if gov == -1:
+		return GovernmentManager.VOTE_YES
+	var d_gov := ElectionModel.distance(_ideology(bot), _ideology(gov))
+	var d_prop := ElectionModel.distance(_ideology(bot), _ideology(GovernmentManager.proposal_peer_id))
+	# Muhalefetin en büyük partisiyse hükümet kurma sırası ona gelebilir.
+	var biggest_in_opposition := true
+	for peer_id in GovernmentManager.voter_ids():
+		if peer_id == bot or CardManager.is_government_party(peer_id):
+			continue
+		if GovernmentManager.seats_of(peer_id) > GovernmentManager.seats_of(bot):
+			biggest_in_opposition = false
+	if biggest_in_opposition and d_gov >= 1.0:
+		return GovernmentManager.VOTE_YES
+	if d_prop <= d_gov:
+		return GovernmentManager.VOTE_YES  # gensoruyu veren, hükümetten daha yakın
+	if d_gov < CENSURE_LOYALTY_DISTANCE:
+		return GovernmentManager.VOTE_ABSTAIN  # hükümet çok yakın: düşürmeye ortak olmaz
+	return GovernmentManager.VOTE_YES
 
 # --- Hükümet kurma -------------------------------------------------------------
 

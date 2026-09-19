@@ -163,6 +163,30 @@ func _initialize() -> void:
 	mm.players[human]["bot"] = true
 
 	print("")
+	print("=== MUHALEFETTEKI BOT GENSORUYU DESTEKLER ===")
+	# 3 kisilik senaryo: bot azinlik hukumeti, insan gensoru veriyor, ucuncu
+	# parti (bot) muhalefette. Bot, hukumet cok yakin degilse EVET demeli.
+	var gov_bot: int = ids[1]
+	var other_bot: int = ids[2]
+	pm.parties[gov_bot]["ideology"] = {"economic": 3, "social": 3, "administrative": 3}
+	pm.parties[other_bot]["ideology"] = {"economic": -2, "social": 0, "administrative": -1}
+	pm.parties[human]["ideology"] = {"economic": 0, "social": 0, "administrative": 0}
+	cm.last_seats = {human: 150, gov_bot: 160, other_bot: 90}
+	var gov2 := {}
+	for post in load("res://scripts/government_presets.gd").POSTS:
+		gov2[post["id"]] = gov_bot
+	gm.government = gov2
+	gm.main_gov_peer_id = gov_bot
+	gm.proposal_kind = gm.KIND_CENSURE
+	gm.proposal_peer_id = human
+	check("muhalefet botu gensoruya evet", brain.choose_vote(other_bot) == gm.VOTE_YES)
+	pm.parties[other_bot]["ideology"] = {"economic": 3, "social": 3, "administrative": 2.5}
+	check("hukumete cok yakin bot cekimser kalir", brain.choose_vote(other_bot) == gm.VOTE_ABSTAIN)
+	check("hukumet partisi hayir der", brain.choose_vote(gov_bot) == gm.VOTE_NO)
+	gm.government = {}
+	gm.main_gov_peer_id = -1
+
+	print("")
 	if fails == 0:
 		print("=== TUM TESTLER GECTI ===")
 	else:

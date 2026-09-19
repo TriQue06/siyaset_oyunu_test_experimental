@@ -128,6 +128,41 @@ func _initialize() -> void:
 	check("mana hic eksiye dusmedi", mana_ok, str(cm.mana))
 
 	print("")
+	print("=== BOT BLOGU ===")
+	# Senaryo: "insan" (ilk parti) tek başına hükümet, 5 bot muhalefette.
+	var human: int = cm.turn_order[0]
+	mm.players[human]["bot"] = false
+	var ids: Array = cm.turn_order.duplicate()
+	cm.last_seats = {}
+	cm.last_seats[human] = 210
+	for i in range(1, ids.size()):
+		cm.last_seats[ids[i]] = 38
+	cm.last_seats[ids[1]] = 60
+	var gov := {}
+	for post in load("res://scripts/government_presets.gd").POSTS:
+		gov[post["id"]] = human
+	gm.government = gov
+	gm.main_gov_peer_id = human
+	gm.formed_round = cm.round_number - 5
+	gm.censure_round = -1
+	check("insan hukumeti varken blok aktif", brain.bloc_active() and brain.bloc_members().size() == ids.size() - 1)
+	check("blok lideri en buyuk bot", brain.bloc_leader() == ids[1])
+	var st: Dictionary = brain._eval_steal(ids[2], "steal_strong")
+	check("blok uyesi insanin partisinden calar", int(st.get("peer", -1)) == human, str(st))
+	check("blok gensoruyu gecer sayar (5 bot 212 > 210)", brain._censure_worth_it(ids[2]))
+	gm.proposal_kind = gm.KIND_CENSURE
+	gm.proposal_peer_id = ids[2]
+	check("blok botu gensoruya evet der", brain.choose_vote(ids[3]) == gm.VOTE_YES)
+	gm.government = {}
+	gm.main_gov_peer_id = -1
+	var plan: Dictionary = brain.build_government(ids[1])
+	var partners := {}
+	for post in plan.keys():
+		partners[plan[post]] = true
+	check("gensoru sonrasi blok lideri ortak olarak botlari secer", not partners.has(human), str(partners.keys()))
+	mm.players[human]["bot"] = true
+
+	print("")
 	if fails == 0:
 		print("=== TUM TESTLER GECTI ===")
 	else:

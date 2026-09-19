@@ -30,6 +30,48 @@ const LAW_BASE_SCORE := 1.0
 ## Bot bir yasayı en fazla bu kadar turda bir sunar.
 const LAW_EVERY_ROUNDS := 2
 
+# --- BOT BLOĞU ------------------------------------------------------------------
+## Hükümeti bir İNSAN partisi kurduysa muhalefetteki botlar birleşir:
+##   1. Hepsi vekil çalma kartlarını hükümetin ana partisine yöneltir; bloğun
+##      en büyük botunu birinci parti yapmak (hükümet kurma yetkisi sırası
+##      sandalyeye göre) ve hükümeti azınlığa düşürmek ek puan kazandırır.
+##   2. Gensoruyu blok olarak hesaplar ve oylar (ideolojik yakınlık fark etmez).
+##   3. Gensoru geçince kurulacak hükümette bloğun botları birbirini destekler
+##      ve ortak olarak önce birbirini seçer.
+## Blokta gensoru ile düşen hükümetin ardından kurma süreci işaretlenir.
+const BLOC_STEAL_BONUS := 2.5
+const BLOC_OVERTAKE_BONUS := 3.0
+static var _bloc_forming := false
+
+## Blok şu an hedefte mi (insan hükümeti var)?
+static func bloc_active() -> bool:
+	if not GovernmentManager.has_government():
+		return false
+	var main := GovernmentManager.main_gov_peer_id
+	return main != -1 and not MultiplayerManager.is_bot(main)
+
+## Muhalefetteki (vekili olan) botlar.
+static func bloc_members() -> Array:
+	var members: Array = []
+	for peer_id in GovernmentManager.voter_ids():
+		if MultiplayerManager.is_bot(peer_id) and not CardManager.is_government_party(peer_id):
+			members.append(peer_id)
+	return members
+
+## Bloğun en büyük botu: gensorudan sonra hükümeti kuracak aday.
+static func bloc_leader() -> int:
+	var leader := -1
+	for peer_id in bloc_members():
+		if leader == -1 or GovernmentManager.seats_of(peer_id) > GovernmentManager.seats_of(leader):
+			leader = peer_id
+	return leader
+
+## Gensoru sonrası kurma sürecinde blok dayanışması sürüyor mu?
+static func _bloc_solidarity() -> bool:
+	if GovernmentManager.has_government() or CardManager.round_number <= 1:
+		_bloc_forming = false
+	return _bloc_forming
+
 static func _ideology(peer_id: int) -> Dictionary:
 	return PartyManager.parties.get(peer_id, {}).get("ideology", IdeologyAxes.default_values())
 
@@ -118,9 +160,12 @@ static func choose_action(bot: int) -> Dictionary:
 
 	if CardManager.can_censure(bot) and _censure_worth_it(bot):
 		# Geçeceği hesaplanan gensoru: hükümet düşer, yeni kurma turu başlar.
-		if 4.0 - GameRules.CENSURE_MANA_COST * mana_value > best_score:
+		# Blokta gensoru planın son adımı: çok daha değerli.
+		var censure_score := 7.0 if bloc_active() else 4.0
+		if censure_score - GameRules.CENSURE_MANA_COST * mana_value > best_score:
 			best = {"type": "censure"}
-			best_score = 4.0 - GameRules.CENSURE_MANA_COST * mana_value
+			_bloc_forming = bloc_active()
+			best_score = censure_score - GameRules.CENSURE_MANA_COST * mana_value
 
 	if CardManager.can_miting(bot):
 		var miting := _eval_miting(bot, known)
@@ -395,6 +440,10 @@ static func _eval_propaganda(bot: int, known: Dictionary) -> Dictionary:
 
 ## İktidardaysa en büyük muhalefetten, muhalefetteyse hükümetten çal.
 static func _eval_steal(bot: int, card_type: String) -> Dictionary:
+	if bloc_active() and bloc_members().has(bot):
+		var bloc := _eval_bloc_steal(bot, card_type)
+		if not bloc.is_empty():
+			return bloc
 	var in_gov := CardManager.is_government_party(bot)
 	var target := -1
 	for peer_id in CardManager.turn_order:
@@ -421,6 +470,23 @@ static func _eval_steal(bot: int, card_type: String) -> Dictionary:
 			score += 3.0
 	return {"score": score, "peer": target, "province": ""}
 
+## Blok üyesi: hedef hükümetin ana partisi (insan). Bloğun lideri birinci
+## partiyi geçebiliyorsa ya da hükümet azınlığa düşüyorsa hamle çok değerli.
+static func _eval_bloc_steal(bot: int, card_type: String) -> Dictionary:
+	var target := GovernmentManager.main_gov_peer_id
+	if not CardManager.is_valid_steal_target(bot, target):
+		return {}
+	var r: Dictionary = CardManager.steal_range(bot, target, card_type)
+	var avg: float = (float(r["min"]) + float(r["max"])) / 2.0
+	var score := 1.8 + avg / 3.5 + BLOC_STEAL_BONUS
+	var leader := bloc_leader()
+	var leader_seats := float(GovernmentManager.seats_of(leader)) + (avg if leader == bot else 0.0)
+	if leader_seats > float(GovernmentManager.seats_of(target)) - avg:
+		score += BLOC_OVERTAKE_BONUS  # blok lideri birinci parti olur
+	if GovernmentManager.has_majority() and (GovernmentManager.government_seats() - avg) * 2.0 <= GovernmentManager.total_seats():
+		score += BLOC_OVERTAKE_BONUS  # hükümet çoğunluğu kaybeder
+	return {"score": score, "peer": target, "province": ""}
+
 ## Gensoru ancak geçeceği hesaplanıyorsa ve hükümet yeni kurulmamışsa verilir;
 ## aynı tur içinde ikinci gensoru yok (her tur meclisi kilitlemesin).
 static func _censure_worth_it(bot: int) -> bool:
@@ -436,6 +502,8 @@ static func _censure_worth_it(bot: int) -> bool:
 			continue
 		if CardManager.is_government_party(peer_id):
 			no += GovernmentManager.seats_of(peer_id)
+		elif bloc_active() and MultiplayerManager.is_bot(peer_id):
+			yes += GovernmentManager.seats_of(peer_id)  # blok üyesi: kesin evet
 		elif not MultiplayerManager.is_bot(peer_id):
 			continue  # insanın oyu bilinmez: hesaba katılmaz
 		elif ElectionModel.distance(_ideology(peer_id), _ideology(main_gov)) < 2.0:
@@ -451,6 +519,8 @@ static func choose_vote(bot: int) -> int:
 		GovernmentManager.KIND_GOVERNMENT:
 			if bot == GovernmentManager.proposal_peer_id or GovernmentManager.proposal_partner_ids().has(bot):
 				return GovernmentManager.VOTE_YES
+			if _bloc_solidarity() and MultiplayerManager.is_bot(GovernmentManager.proposal_peer_id):
+				return GovernmentManager.VOTE_YES  # blok, kendi botunun hükümetini destekler
 			var pm := int(GovernmentManager.proposal_assignments.get(GovernmentPresets.POST_PM, GovernmentManager.proposal_peer_id))
 			var d := ElectionModel.distance(_ideology(bot), _ideology(pm))
 			if d < 2.5:
@@ -463,6 +533,9 @@ static func choose_vote(bot: int) -> int:
 				return GovernmentManager.VOTE_YES
 			if CardManager.is_government_party(bot):
 				return GovernmentManager.VOTE_NO
+			if bloc_active():
+				_bloc_forming = true
+				return GovernmentManager.VOTE_YES
 			if ElectionModel.distance(_ideology(bot), _ideology(GovernmentManager.main_gov_peer_id)) < 2.0:
 				return GovernmentManager.VOTE_ABSTAIN
 			return GovernmentManager.VOTE_YES
@@ -483,7 +556,11 @@ static func build_government(bot: int) -> Dictionary:
 	var mine := _ideology(bot)
 	var candidates: Array = GovernmentManager.voter_ids()
 	candidates.erase(bot)
+	var bloc := _bloc_solidarity()
 	candidates.sort_custom(func(a, b):
+		# Blok dayanışmasında önce diğer botlar ortak seçilir.
+		if bloc and MultiplayerManager.is_bot(a) != MultiplayerManager.is_bot(b):
+			return MultiplayerManager.is_bot(a)
 		return ElectionModel.distance(mine, _ideology(a)) < ElectionModel.distance(mine, _ideology(b)))
 	var shift := GovernmentManager.attempts_used % maxi(1, candidates.size())
 	candidates = candidates.slice(shift) + candidates.slice(0, shift)

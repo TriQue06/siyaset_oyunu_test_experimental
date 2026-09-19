@@ -332,5 +332,5 @@ func _card_effect_text(card_type: String) -> String:
 				GameRules.POPULISM_ROUNDS, int(PublicOpinion.POPULISM_GOOD_MULT), PublicOpinion.POPULISM_STEAL_MULT,
 				int(round((1.0 - PublicOpinion.POPULISM_BAD_MULT) * 100)), PublicOpinion.POPULISM_ELECTION_NATIONAL]
 		MANA_BONUS_CARD_TYPE:
-			return "+%d mana kazan. Kullanınca sıra sonraki oyuncuya geçer.\nSeçmek için dokun, tekrar dokun: kullan." % GameRules.MANA_BONUS_AMOUNT
+			return "+%d mana kazan.\nSeçmek için dokun, tekrar dokun: kullan." % GameRules.MANA_BONUS_AMOUNT
 	return ""

@@ -587,7 +587,24 @@ func _refresh_deck_button() -> void:
 func _refresh_pass_button() -> void:
 	pass_button.disabled = not CardManager.can_act()
 	pass_button.text = "Turu Bitir"
-	pass_button.modulate.a = 1.0 if not pass_button.disabled else 0.5
+	# Mana bittiyse tur kendiliğinden geçmez; buton nabız gibi atarak hatırlatır.
+	var should_pulse: bool = not pass_button.disabled and CardManager.mana_of(multiplayer.get_unique_id()) <= 0
+	if should_pulse and _pass_pulse == null:
+		pass_button.pivot_offset = pass_button.size * 0.5
+		_pass_pulse = create_tween().set_loops()
+		_pass_pulse.tween_property(pass_button, "scale", Vector2(1.08, 1.08), 0.45).set_trans(Tween.TRANS_SINE)
+		_pass_pulse.parallel().tween_property(pass_button, "modulate", Color(1.35, 1.2, 0.6), 0.45).set_trans(Tween.TRANS_SINE)
+		_pass_pulse.tween_property(pass_button, "scale", Vector2.ONE, 0.45).set_trans(Tween.TRANS_SINE)
+		_pass_pulse.parallel().tween_property(pass_button, "modulate", Color.WHITE, 0.45).set_trans(Tween.TRANS_SINE)
+	elif not should_pulse and _pass_pulse != null:
+		_pass_pulse.kill()
+		_pass_pulse = null
+		pass_button.scale = Vector2.ONE
+		pass_button.modulate = Color.WHITE
+	if _pass_pulse == null:
+		pass_button.modulate.a = 1.0 if not pass_button.disabled else 0.5
+
+var _pass_pulse: Tween
 
 ## Sıra sende değilken eldeki kartlar tıklanamaz + soluk görünür — kullanıcı
 ## "neden hiçbir şey olmuyor" diye şaşırmasın diye net bir görsel geri bildirim.

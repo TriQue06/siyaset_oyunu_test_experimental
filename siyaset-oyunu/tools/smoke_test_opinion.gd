@@ -346,7 +346,7 @@ func _initialize() -> void:
 	check("populizm: baskasinin karalamasi etkilenmez", near(cm.local_of("konya", 3), -2.0 * PublicOpinion.POPULISM_BAD_MULT - 2.0))
 	cm._apply_play(3, 0)
 	check("mana bonusu +5 mana", cm.mana_of(3) == 9 + GameRules.MANA_BONUS_AMOUNT and GameRules.MANA_BONUS_AMOUNT == 5)
-	check("mana bonusu hamle sayilir: sira devretti", cm.current_turn_peer_id() == 1)
+	check("mana bonusu sirayi devretmez", cm.current_turn_peer_id() == 3)
 	cm.round_number += GameRules.POPULISM_ROUNDS
 	check("populizm 5 tur sonra biter", cm.populism_rounds_left(3) == 0)
 

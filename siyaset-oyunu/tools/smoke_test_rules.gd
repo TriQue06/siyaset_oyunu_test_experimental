@@ -293,7 +293,7 @@ func _initialize() -> void:
 	cm.has_drawn_this_turn = true  # bedava kart hakkı duruyorsa sıra kendiliğinden geçmez
 	check("2 mana ile il baskanligi kurulabilir", cm.can_build_organization(1, "ankara"))
 	cm._apply_organization(1, "ankara")
-	check("il baskanligi kuruldu, 2 mana harcandi; mana bitti -> sira kendiliginden devretti", cm.organization_level("ankara", 1) == 1 		and cm.mana_of(1) == 0 and cm.current_turn_peer_id() != 1)
+	check("il baskanligi kuruldu, 2 mana harcandi; mana bitti -> sira devretmez", cm.organization_level("ankara", 1) == 1 		and cm.mana_of(1) == 0 and cm.current_turn_peer_id() == 1)
 	cm.current_turn_index = cm.turn_order.find(1)
 	check("teskilat 1: az oy bonusu + il gorusu, anket yok", near(cm.activity_of("ankara", 1) - cm.local_of("ankara", 1), PublicOpinion.org_activity(1)) \
 		and cm.knows_leaning(1, "ankara") and cm.province_poll(1, "ankara").is_empty() and not cm.knows_leaning(2, "ankara"))
@@ -325,7 +325,7 @@ func _initialize() -> void:
 	cm.has_drawn_this_turn = true
 	cm.mana[1] = 2
 	cm._apply_miting_move(1, "konya")
-	check("mana bitti ama elde bedava kart var -> sira devretmez", cm.mana_of(1) == 0 and cm.current_turn_peer_id() == 1)
+	check("mana bitti -> sira devretmez", cm.mana_of(1) == 0 and cm.current_turn_peer_id() == 1)
 	cm.inventories[1] = []
 	cm.mana[1] = 2
 	var next_peer: int = cm.turn_order[(cm.turn_order.find(1) + 1) % cm.turn_order.size()]
@@ -333,8 +333,9 @@ func _initialize() -> void:
 	cm._apply_miting_move(1, "sivas")
 	check("mana bitti ama kart cekme hakki var -> sira devretmez", cm.current_turn_peer_id() == 1)
 	cm._apply_draw(1)
-	var drew_free: bool = cm.inventories[1].size() == 1 and cp.card_cost(String(cm.inventories[1][0])) == 0
-	check("kart cekildi; elde bedava kart yoksa sira devreder", drew_free or cm.current_turn_peer_id() == next_peer)
+	check("mana yok, kart cekildi -> yine de sira devretmez", cm.current_turn_peer_id() == 1)
+	cm._apply_pass(1)
+	check("turu bitir -> sira devreder", cm.current_turn_peer_id() == next_peer)
 	cm.current_turn_index = cm.turn_order.find(1)
 	cm.inventories[1] = []
 

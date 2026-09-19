@@ -177,7 +177,7 @@ func run_client() -> void:
 		if not await wait_until(func(): return cm.populism_rounds_left(me) > 0, "popülizm senkronlandı"):
 			return
 	# Mana bonusu sırayı kendisi devreder; diğerlerinde turu bitir.
-	if card != "mana_bonusu" and card != "atlandi":
+	if card != "atlandi":
 		cm.pass_turn()
 	if not await wait_until(func(): return cm.province_ideology.size() == 67, "illerin görüşü senkronlandı"):
 		return

@@ -14,7 +14,7 @@ extends Node
 ##      (oy bonusu + ilin görüşü + 2. seviyeden itibaren anket).
 ##   d) PAS: hamle yapmadan geç, +GameRules.MANA_PASS_BONUS mana.
 ##   KART ÇEKMEK: bedava, turda bir kez; kart oynamak sınırsız. Her seçimden sonra herkese 1 kart hediye.
-##   Manası biten oyuncunun sırası kendiliğinden devreder (_auto_end_if_broke).
+##   Tur otomatik geçmez: oyuncu "Turu Bitir"e basar ya da süre dolar.
 ##   GameRules.TURN_TIMEOUT dolarsa otomatik pas geçilir (mana bonusu yok).
 ##   Hükümet kurulurken / meclis oylarken tur DURUR (is_turn_blocked).
 ##
@@ -747,7 +747,6 @@ func _apply_draw(peer_id: int) -> void:
 	inventories[peer_id].insert(inventories[peer_id].size() / 2, card_type)
 	has_drawn_this_turn = true
 	_push_state({"type": "drawn", "peer_id": peer_id, "card": card_type})
-	_auto_end_if_broke()
 
 func _apply_play(peer_id: int, hand_index: int, target_peer_id: int = -1, target_province: String = "") -> void:
 	if is_turn_blocked() or peer_id != current_turn_peer_id():
@@ -768,16 +767,9 @@ func _apply_play(peer_id: int, hand_index: int, target_peer_id: int = -1, target
 		"target": target_peer_id, "province": target_province, "seats_changed": seats_changed_now}
 	if _event_message != "":
 		event["message"] = _event_message
-	# Mana bonusu bir hamle sayılır: kullanınca sıra sonraki oyuncuya geçer.
-	var wrapped := false
-	if card_type == CardPresets.MANA_BONUS_CARD_TYPE:
-		wrapped = _advance_turn()
+	# Hiçbir kart sırayı devretmez; tur sadece "Turu Bitir" ya da süreyle biter.
 	_push_state(event, seats_changed_now)
-	if card_type == CardPresets.MANA_BONUS_CARD_TYPE:
-		_finish_round_if_needed(wrapped)
-	else:
-		_auto_end_if_broke()
-
+	
 ## Turu bitir (voluntary=false: süre doldu). Mana bonusu yok.
 func _apply_pass(peer_id: int, _voluntary: bool = true) -> void:
 	if is_turn_blocked() or peer_id != current_turn_peer_id():
@@ -811,7 +803,6 @@ func _apply_organization(peer_id: int, province_id: String) -> void:
 	_log_province(province_id, "%s teşkilat %s (seviye %d)" % [_party_name(peer_id), verb, level])
 	_push_state({"type": "organization", "peer_id": peer_id, "province": province_id,
 		"message": "%s, %s'da teşkilat %s (seviye %d)." % [_party_name(peer_id), _province_name(province_id), verb, level]})
-	_auto_end_if_broke()
 
 func _apply_invest_move(peer_id: int, province_id: String) -> void:
 	if not can_invest(peer_id, province_id):
@@ -820,7 +811,6 @@ func _apply_invest_move(peer_id: int, province_id: String) -> void:
 	_event_message = ""
 	_apply_investment(peer_id, province_id)
 	_push_state({"type": "invest", "peer_id": peer_id, "province": province_id, "message": _event_message})
-	_auto_end_if_broke()
 
 func _apply_censure_move(peer_id: int) -> void:
 	if not can_censure(peer_id):
@@ -837,7 +827,6 @@ func _apply_miting_move(peer_id: int, province_id: String) -> void:
 	_event_message = ""
 	_apply_miting(peer_id, province_id)
 	_push_state({"type": "miting", "peer_id": peer_id, "province": province_id, "message": _event_message})
-	_auto_end_if_broke()
 
 ## Kartın etkisini uygular. Milletvekili dağılımı değiştiyse true döner.
 ## Herkese duyurulacak bir sonuç varsa _event_message'a yazar.
@@ -1114,21 +1103,6 @@ func _apply_steal(peer_id: int, target_peer_id: int, card_type: String) -> bool:
 	_event_message = "%s, %s'dan %d milletvekili transfer etti." % [_party_name(peer_id), _party_name(target_peer_id), moved]
 	return true
 
-## Sırası gelen oyuncunun manası bittiyse (ve elinde bedava oynanabilecek kart
-## yoksa) sıra kendiliğinden sonraki oyuncuya geçer.
-func _auto_end_if_broke() -> void:
-	if not _is_authority() or game_finished or turn_order.is_empty() or is_turn_blocked():
-		return
-	var peer_id := current_turn_peer_id()
-	if mana_of(peer_id) > 0:
-		return
-	if can_draw_for(peer_id):
-		return  # bedava kart hakkı duruyor
-	for card_type in inventories.get(peer_id, []):
-		if CardPresets.card_cost(String(card_type)) <= 0:
-			return
-	_apply_pass(peer_id, false)
-
 ## GovernmentManager, hükümet güvenoyu alınca çağırır: hükümet partilerine mana.
 func grant_government_mana(peer_ids: Array) -> void:
 	if not _is_authority():
@@ -1318,7 +1292,6 @@ func on_block_state_changed() -> void:
 	else:
 		_push_state({"type": "timer"})
 	# Yasa/gensoru son manayla verildiyse oylama bitince sıra devreder.
-	_auto_end_if_broke()
 
 ## Host: oyun sırasında ayrılan oyuncuyu sıradan, envanterden, meclisten ve
 ## hükümet süreçlerinden çıkarır. Onsuz sırası gelen/oy bekleyen oyun kilitlenirdi.

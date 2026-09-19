@@ -26,8 +26,8 @@ const COLORS: Array[Color] = [
 	Color("2569CF"), # koyu mavi
 	Color("244FB3"), # lacivert
 	Color("7647CC"), # indigo
-	Color("B141E0"), # mor
-	Color("AB39DB"), # eflatun
+	Color("AB39DB"), # mor
+	Color("E041D8"), # eflatun
 	Color("F04391"), # fuşya
 	Color("A6325A"), # bordo
 ]

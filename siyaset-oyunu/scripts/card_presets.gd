@@ -85,10 +85,34 @@ const CARD_NATIVE_SIZE := Vector2(72, 96)
 
 ## Vekil çalma kartlarının çaldığı milletvekili aralığı (her değer eşit olası).
 const STEAL_RANGES := {
-	"steal_weak": {"min": 3, "max": 7},
-	"steal_medium": {"min": 8, "max": 13},
-	"steal_strong": {"min": 14, "max": 20},
+	"steal_weak": {"min": 2, "max": 4},
+	"steal_medium": {"min": 5, "max": 9},
+	"steal_strong": {"min": 10, "max": 16},
 }
+
+## İdeolojik yakınlığa göre aralık: yukarıdaki STEAL_RANGES NÖTR hâl (orta
+## yakınlık); ideolojiler birebir aynıysa STEAL_RANGES_CLOSE (2 kat), iki parti
+## zıt radikal uçlardaysa STEAL_RANGES_FAR. Arası doğrusal (bkz. steal_range).
+const STEAL_RANGES_CLOSE := {
+	"steal_weak": {"min": 4, "max": 8},
+	"steal_medium": {"min": 10, "max": 18},
+	"steal_strong": {"min": 20, "max": 32},
+}
+const STEAL_RANGES_FAR := {
+	"steal_weak": {"min": 1, "max": 2},
+	"steal_medium": {"min": 3, "max": 5},
+	"steal_strong": {"min": 6, "max": 9},
+}
+
+## closeness: 0 (en uzak) .. 0.5 (nötr) .. 1 (aynı ideoloji) -> {"min", "max"}.
+func steal_range(card_type: String, closeness: float) -> Dictionary:
+	var mid: Dictionary = STEAL_RANGES.get(card_type, {})
+	if mid.is_empty():
+		return {}
+	var other: Dictionary = STEAL_RANGES_CLOSE[card_type] if closeness >= 0.5 else STEAL_RANGES_FAR[card_type]
+	var t: float = absf(closeness - 0.5) * 2.0
+	return {"min": int(round(lerpf(float(mid["min"]), float(other["min"]), t))),
+		"max": int(round(lerpf(float(mid["max"]), float(other["max"]), t)))}
 
 ## Kartın elden oynanma bedeli (mana).
 const CARD_MANA_COSTS := {
@@ -282,7 +306,10 @@ func _card_effect_text(card_type: String) -> String:
 		return law_description(card_type)
 	if needs_target(card_type):
 		var r: Dictionary = STEAL_RANGES[card_type]
-		return "Seçtiğin partiden %d-%d vekil çal (vekili azsa hepsi gidebilir).\nSağdaki bir parti kartına sürükle." % [int(r["min"]), int(r["max"])]
+		var close: Dictionary = STEAL_RANGES_CLOSE[card_type]
+		var far: Dictionary = STEAL_RANGES_FAR[card_type]
+		return "Seçtiğin partiden vekil çal: %d-%d; görüşü sana yakınsa %d-%d'e kadar, zıt uçtaysa %d-%d.\nSağdaki bir parti kartına sürükle." % [
+			int(r["min"]), int(r["max"]), int(close["min"]), int(close["max"]), int(far["min"]), int(far["max"])]
 	if is_agenda_card(card_type):
 		var agenda := agenda_data(card_type)
 		return "%s\n%d tur boyunca gündem bu: %s.\nDokun, tekrar dokun: kullan." % [agenda["text"], GameRules.AGENDA_ROUNDS,

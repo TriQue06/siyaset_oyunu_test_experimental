@@ -129,6 +129,10 @@ static func choose_action(bot: int) -> Dictionary:
 			best_score = float(miting["score"]) - GameRules.MITING_MANA_COST * mana_value
 
 
+	if CardManager.can_draw_for(bot):
+		# Kart çekmek bedava (turda bir): el dolu değilse her zaman çek.
+		if hand.size() < CardManager.MAX_HAND_SIZE - 1:
+			best = {"type": "draw"}
 	return best
 
 ## Seçim desteğini en çok artıracak yasa: bilinen illerdeki etkiler (geçme
@@ -407,7 +411,7 @@ static func _eval_steal(bot: int, card_type: String) -> Dictionary:
 				target = peer_id
 	if target == -1:
 		return {}
-	var r: Dictionary = CardPresets.STEAL_RANGES[card_type]
+	var r: Dictionary = CardManager.steal_range(bot, target, card_type)
 	# Vekil sayısı bir sonraki seçime de momentum olarak yansır.
 	var score := 1.8 + (float(r["min"]) + float(r["max"])) / 7.0
 	# Muhalefetten hükümeti azınlığa düşürebilecek hamle çok değerli (gensoru yolu).

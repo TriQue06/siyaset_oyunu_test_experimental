@@ -23,8 +23,8 @@ extends RefCounted
 ##   - TEŞKİLATLANMA (eski il başkanlığı + gözcü) il başına 3 seviye; her
 ##     seviye ORG_MANA_COST. 1: az oy bonusu + ilin görüşü (her eksende hangi uç),
 ##     2: orta bonus + orta isabetli anket, 3: yüksek bonus + yüksek isabetli anket.
-##     KART: sırası gelen oyuncuya oyun bir kart verir (el doluysa vermez);
-##     kart oynamak sınırsız (kartların kendi bedeli var).
+##     KART ÇEKMEK bedava, turda DRAWS_PER_TURN kez; kart oynamak sınırsız
+##     (kartların kendi bedeli var). Her seçimden sonra herkese 1 kart hediye.
 ##     Kartları oynamanın bedeli CardPresets.CARD_MANA_COSTS.
 ##   - Hükümet kurulamazsa (tüm görev hakları biterse) o turun sonunda ERKEN
 ##     SEÇİM yapılır.
@@ -56,6 +56,8 @@ const MANA_START := 0
 const MANA_PER_ROUND := 3
 const LAW_MANA_COST := 1
 const LAWS_PER_ROUND := 1
+const DRAW_MANA_COST := 0
+const DRAWS_PER_TURN := 1
 ## Teşkilat anketinin sapması (her partinin oyu en fazla bu oranda sapar):
 ## 2. seviye orta isabet, 3. seviye yüksek isabet.
 const POLL_ERROR_MEDIUM := 0.3
@@ -71,10 +73,10 @@ const MANA_BONUS_AMOUNT := 5
 const ELECTION_MANA_BONUS := 1
 ## GÜNDEM TAKVİMİ: ilk seçimden hemen sonraki turdan itibaren AGENDA_ROUNDS tur
 ## gündem, AGENDA_GAP tur ara, yine AGENDA_ROUNDS tur gündem... Gündemli her tur
-## tek bir eksenin bir ucudur; bir üçlemedeki üç tur üç farklı eksendir (sıra
-## her üçlemede rastgele). YASA sadece gündemdeki eksende sunulabilir.
-const AGENDA_ROUNDS := 3
-const AGENDA_GAP := 2
+## tek bir eksenin bir ucudur; bir gündem dönemindeki turlar farklı eksenlerdir
+## (eksenler her dönemde rastgele). YASA sadece gündemdeki eksende sunulabilir.
+const AGENDA_ROUNDS := 2
+const AGENDA_GAP := 3
 ## Kabul edilen yasa, getiren partiye puan tablosunda bu kadar puan yazar
 ## (hükümet partisinin yasası daha çok).
 const LAW_PASS_SCORE := 4

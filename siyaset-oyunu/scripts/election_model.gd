@@ -80,7 +80,10 @@ static func expected_shares(parties: Dictionary, center: Dictionary, sharpness: 
 		result[peer_id] = s
 		sharp_total += s
 	for peer_id in peer_ids:
-		result[peer_id] = float(result[peer_id]) / sharp_total * 100.0
+		result[peer_id] = float(result[peer_id]) / sharp_total
+	result = cap_shares(result)
+	for peer_id in peer_ids:
+		result[peer_id] = float(result[peer_id]) * 100.0
 	return result
 
 ## parties: peer_id -> ideoloji sözlüğü
@@ -96,6 +99,31 @@ static func expected_shares(parties: Dictionary, center: Dictionary, sharpness: 
 ## ULUSAL LİSTE: bu kadar milletvekili illerden değil, barajı geçen partiler
 ## arasında ULUSAL oy oranına göre (D'Hondt) dağıtılır.
 const NATIONAL_LIST_SEATS := 10
+## Bir partinin bir ildeki oy payı en fazla bu kadar olabilir: keskinlik
+## arttıkça iller %90'ları görmesin. Fazlası diğer partilere oranla dağılır.
+const PROVINCE_MAX_SHARE := 0.68
+
+## shares: peer_id -> pay (toplam 1). Tavanı aşan payı diğerlerine dağıtır.
+static func cap_shares(shares: Dictionary, cap: float = PROVINCE_MAX_SHARE) -> Dictionary:
+	if shares.size() < 2:
+		return shares
+	for _i in 4:
+		var excess := 0.0
+		var free_total := 0.0
+		for peer_id in shares.keys():
+			var v: float = shares[peer_id]
+			if v > cap:
+				excess += v - cap
+				shares[peer_id] = cap
+			elif v < cap:
+				free_total += v
+		if excess <= 0.0 or free_total <= 0.0:
+			break
+		for peer_id in shares.keys():
+			var v: float = shares[peer_id]
+			if v < cap:
+				shares[peer_id] = v + excess * v / free_total
+	return shares
 
 static func compute(parties: Dictionary, province_seats: Dictionary, voters: Dictionary,
 		threshold_percent: float, sharpness: float, rng: RandomNumberGenerator,
@@ -152,9 +180,10 @@ static func compute(parties: Dictionary, province_seats: Dictionary, voters: Dic
 			sharp_total += s
 		var shares: Dictionary = {}
 		for peer_id in peer_ids:
-			var share: float = float(sharpened[peer_id]) / sharp_total
-			shares[peer_id] = share
-			national[peer_id] = float(national[peer_id]) + share * seats_here
+			shares[peer_id] = float(sharpened[peer_id]) / sharp_total
+		shares = cap_shares(shares)
+		for peer_id in peer_ids:
+			national[peer_id] = float(national[peer_id]) + float(shares[peer_id]) * seats_here
 		province_shares[province_id] = shares
 
 	var eligible: Array = []

@@ -547,7 +547,7 @@ func _on_turn_changed(_peer_id: int) -> void:
 	if current != _last_turn_peer:
 		_last_turn_peer = current
 		if current == multiplayer.get_unique_id() and not CardManager.game_finished:
-			_show_toast("Sıra sende: +%d mana (toplam %d), +1 kart" % [GameRules.MANA_PER_ROUND, CardManager.mana_of(current)])
+			_show_toast("Sıra sende: +%d mana (toplam %d)" % [GameRules.MANA_PER_ROUND, CardManager.mana_of(current)])
 	_update_turn_indicator()
 	_refresh_deck_button()
 	_refresh_pass_button()
@@ -579,11 +579,10 @@ func _update_turn_indicator_text() -> void:
 	var timer := "" if CardManager.is_turn_blocked() else "\nSüre: %s" % GameRules.format_seconds(CardManager.turn_seconds_left())
 	turn_indicator_label.text = "Sıra: %s%s%s" % [pname, suffix, timer]
 
-## Deste artık süs: kart her sıra gelişte kendiliğinden gelir.
 func _refresh_deck_button() -> void:
-	deck_button.disabled = true
-	deck_button.modulate.a = 1.0
-	deck_button.tooltip_text = "Her sıran geldiğinde desteden 1 kart alırsın."
+	deck_button.disabled = not CardManager.can_draw()
+	deck_button.modulate.a = 1.0 if not deck_button.disabled else 0.5
+	deck_button.tooltip_text = "Kart çek (bedava, turda 1). Her seçimden sonra herkese 1 kart hediye."
 
 func _refresh_pass_button() -> void:
 	pass_button.disabled = not CardManager.can_act()
@@ -945,7 +944,9 @@ func _drop_target(card_type: String) -> Dictionary:
 			result["label"] = "Vekil çalmak için sağdaki bir partinin logosuna bırak"
 		elif CardManager.is_valid_steal_target(me, peer):
 			result["valid"] = true
-			result["label"] = "Bırak: %s partisinden vekil çal" % _party_name_of(peer)
+			var r := CardManager.steal_range(me, peer, card_type)
+			result["label"] = "Bırak: %s partisinden %d-%d vekil çal (ideolojik yakınlık %%%d)" % [_party_name_of(peer),
+				int(r["min"]), int(r["max"]), int(round(CardManager.ideological_closeness(me, peer) * 100.0))]
 		else:
 			result["label"] = "Bu partiden vekil çalınamaz"
 			result["error"] = result["label"]
@@ -2372,11 +2373,13 @@ func _strength_t(entry: Dictionary, me: int) -> float:
 	var mine: Dictionary = entry[me]
 	var seat_count := maxi(1, int(entry.get("seat_count", 1)))
 	var won := int(mine["seats"])
+	var quotient := float(mine["quotient"])
+	# Sürekli ölçü: oy / son kazanan bölüm ≈ "kesirli vekil". Böylece miting,
+	# yatırım gibi her hamle vekil sayısı değişmese de rengi kaydırır.
+	var fractional := float(mine["percent"]) / quotient if quotient > 0.0 and quotient < INF else 0.0
 	if won <= 0:
-		var quotient := float(mine["quotient"])
-		var closeness := clampf(float(mine["percent"]) / quotient, 0.0, 1.0) if quotient > 0.0 and quotient < INF else 0.0
-		return -1.0 + 0.85 * closeness
-	return 0.2 + 0.8 * clampf(float(won) / float(seat_count) / 0.5, 0.0, 1.0)
+		return -1.0 + 0.85 * clampf(fractional, 0.0, 1.0)
+	return 0.2 + 0.8 * clampf(maxf(float(won), fractional) / float(seat_count) / 0.5, 0.0, 1.0)
 
 ## Katmanı değiştirir: eski görünümün anlık görüntüsü bir yana, yeni katman
 ## öbür yandan kayarak gelir (sağdaki katman sağdan, soldaki soldan).

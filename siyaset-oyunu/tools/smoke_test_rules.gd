@@ -247,7 +247,12 @@ func _initialize() -> void:
 	check("sirasi gelen 2 gelirini aldi", cm.mana_of(2) == GameRules.MANA_START + GameRules.MANA_PER_ROUND)
 	cm.tick(GameRules.TURN_TIMEOUT + 1.0)
 	check("sure dolunca sira devreder", cm.current_turn_peer_id() == 3)
-	check("sirasi gelen oyuncunun elinde otomatik verilen kart var", cm.inventories[3].size() >= 1 and not cm.can_draw_for(3))
+	var hand3: int = cm.inventories[3].size()
+	check("sira gelince kart otomatik verilmez", hand3 == 0, str(hand3))
+	cm._apply_draw(3)
+	check("kart cekmek bedava, sira devretmez", cm.inventories[3].size() == 1 and cm.current_turn_peer_id() == 3)
+	cm._apply_draw(3)
+	check("turda en fazla 1 kart cekilir", cm.inventories[3].size() == 1 and not cm.can_draw_for(3))
 	cm.mana[3] = 0
 	check("mana yoksa teskilat yok", not cm.can_build_organization(3, "ankara"))
 	cm._apply_pass(3)
@@ -284,7 +289,8 @@ func _initialize() -> void:
 		projected += int(projection[id]["seats"])
 	check("anlik vekil tahmini ilin vekil sayisina esit", projected == cm.province_seat_count("ankara"), str(projection))
 	cm.mana[1] = 2
-	cm.inventories[1] = []  # otomatik gelen kart bedava olabilir (mana bonusu)
+	cm.inventories[1] = []
+	cm.has_drawn_this_turn = true  # bedava kart hakkı duruyorsa sıra kendiliğinden geçmez
 	check("2 mana ile il baskanligi kurulabilir", cm.can_build_organization(1, "ankara"))
 	cm._apply_organization(1, "ankara")
 	check("il baskanligi kuruldu, 2 mana harcandi; mana bitti -> sira kendiliginden devretti", cm.organization_level("ankara", 1) == 1 		and cm.mana_of(1) == 0 and cm.current_turn_peer_id() != 1)
@@ -323,11 +329,12 @@ func _initialize() -> void:
 	cm.inventories[1] = []
 	cm.mana[1] = 2
 	var next_peer: int = cm.turn_order[(cm.turn_order.find(1) + 1) % cm.turn_order.size()]
-	var next_hand: int = cm.inventories.get(next_peer, []).size()
+	cm.has_drawn_this_turn = false
 	cm._apply_miting_move(1, "sivas")
-	check("mana bitti, elde bedava kart yok -> sira devreder", cm.current_turn_peer_id() == next_peer)
-	check("sirasi gelen oyuncuya otomatik 1 kart verildi", cm.inventories[next_peer].size() == next_hand + 1)
-	check("kart cekme hamlesi yok", not cm.can_draw_for(next_peer))
+	check("mana bitti ama kart cekme hakki var -> sira devretmez", cm.current_turn_peer_id() == 1)
+	cm._apply_draw(1)
+	var drew_free: bool = cm.inventories[1].size() == 1 and cp.card_cost(String(cm.inventories[1][0])) == 0
+	check("kart cekildi; elde bedava kart yoksa sira devreder", drew_free or cm.current_turn_peer_id() == next_peer)
 	cm.current_turn_index = cm.turn_order.find(1)
 	cm.inventories[1] = []
 
@@ -501,15 +508,34 @@ func _initialize() -> void:
 		if calendar[rr] != "":
 			no_early = false
 	check("ilk secimden once gundem yok", no_early, str(calendar))
-	var pattern_ok: bool = calendar[5] != "" and calendar[6] != "" and calendar[7] != "" and calendar[8] == "" and calendar[9] == "" 		and calendar[10] != "" and calendar[11] != "" and calendar[12] != "" and calendar[13] == "" and calendar[14] == "" and calendar[15] != ""
-	check("3 tur gundem, 2 tur ara", pattern_ok, str(calendar))
-	var ag_axes := {}
-	for rr in [5, 6, 7]:
-		ag_axes[cp.agenda_data(calendar[rr])["axis"]] = true
-	var ag_axes2 := {}
-	for rr in [10, 11, 12]:
-		ag_axes2[cp.agenda_data(calendar[rr])["axis"]] = true
-	check("uclemedeki uc gundem uc farkli eksen", ag_axes.size() == 3 and ag_axes2.size() == 3)
+	var pattern_ok: bool = calendar[5] != "" and calendar[6] != "" and calendar[7] == "" and calendar[8] == "" and calendar[9] == "" \
+		and calendar[10] != "" and calendar[11] != "" and calendar[12] == "" and calendar[13] == "" and calendar[14] == "" and calendar[15] != ""
+	check("2 tur gundem, 3 tur ara", pattern_ok, str(calendar))
+	check("donemdeki iki gundem farkli eksen", cp.agenda_data(calendar[5])["axis"] != cp.agenda_data(calendar[6])["axis"] \
+		and cp.agenda_data(calendar[10])["axis"] != cp.agenda_data(calendar[11])["axis"])
+
+	print("")
+	print("=== 14) IDEOLOJIYE BAGLI VEKIL CALMA, IL TAVANI, SECIM HEDIYESI ===")
+	check("notr (orta yakinlik) guclu: 10-16", str(cp.steal_range("steal_strong", 0.5)) == str({"min": 10, "max": 16}))
+	check("ayni ideoloji guclu: 20-32", str(cp.steal_range("steal_strong", 1.0)) == str({"min": 20, "max": 32}))
+	check("zit uclar: zayif 1-2, orta 3-5, guclu 6-9", str(cp.steal_range("steal_weak", 0.0)) == str({"min": 1, "max": 2}) \
+		and str(cp.steal_range("steal_medium", 0.0)) == str({"min": 3, "max": 5}) and str(cp.steal_range("steal_strong", 0.0)) == str({"min": 6, "max": 9}))
+	pm.parties[1]["ideology"] = ideology(3, 3, 3)
+	pm.parties[2]["ideology"] = ideology(-3, -3, -3)
+	pm.parties[3]["ideology"] = ideology(3, 3, 3)
+	check("yakinlik: ayni ideoloji 1, zit uclar 0", is_equal_approx(cm.ideological_closeness(1, 3), 1.0) and is_equal_approx(cm.ideological_closeness(1, 2), 0.0))
+	var capped := ElectionModel.cap_shares({1: 0.95, 2: 0.04, 3: 0.01})
+	check("il oy tavani: kimse %68'i asamaz, toplam 1", float(capped[1]) <= ElectionModel.PROVINCE_MAX_SHARE + 0.0001 \
+		and is_equal_approx(float(capped[1]) + float(capped[2]) + float(capped[3]), 1.0), str(capped))
+	var hands_before := {}
+	for id in cm.turn_order:
+		hands_before[id] = cm.inventories.get(id, []).size()
+	cm._hold_election(cm.round_number, false)
+	var gift_ok := true
+	for id in cm.turn_order:
+		if cm.inventories[id].size() != mini(int(hands_before[id]) + 1, cm.MAX_HAND_SIZE):
+			gift_ok = false
+	check("secimden sonra herkese 1 kart hediye", gift_ok)
 	check("gundem karti destede yok", not cm._draw_pool(1).has("gundem_economic_n"))
 
 	print("")

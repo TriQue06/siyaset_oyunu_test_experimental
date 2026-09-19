@@ -13,7 +13,7 @@ extends Node
 ##   c) TEŞKİLATLANMA (GameRules.ORG_MANA_COST): bir ilde teşkilat kur / geliştir
 ##      (oy bonusu + ilin görüşü + 2. seviyeden itibaren anket).
 ##   d) PAS: hamle yapmadan geç, +GameRules.MANA_PASS_BONUS mana.
-##   KART: sırası gelen oyuncuya oyun bir kart verir (_deal_turn_card); kart oynamak sınırsız.
+##   KART ÇEKMEK: bedava, turda bir kez; kart oynamak sınırsız. Her seçimden sonra herkese 1 kart hediye.
 ##   Manası biten oyuncunun sırası kendiliğinden devreder (_auto_end_if_broke).
 ##   GameRules.TURN_TIMEOUT dolarsa otomatik pas geçilir (mana bonusu yok).
 ##   Hükümet kurulurken / meclis oylarken tur DURUR (is_turn_blocked).
@@ -227,9 +227,10 @@ func is_my_turn() -> bool:
 func can_draw() -> bool:
 	return can_draw_for(multiplayer.get_unique_id())
 
-## Kart çekme yok: kart her sıra gelişte otomatik verilir (bkz. _deal_turn_card).
-func can_draw_for(_peer_id: int) -> bool:
-	return false
+## Kart çekmek bedava, turda bir kez.
+func can_draw_for(peer_id: int) -> bool:
+	return can_choose_main_action(peer_id) and not has_drawn_this_turn and mana_of(peer_id) >= GameRules.DRAW_MANA_COST \
+		and inventories.get(peer_id, []).size() < MAX_HAND_SIZE
 
 ## Sıra bende VE tur akışı engellenmemiş mi? (UI bunu kullanmalı.)
 func can_act() -> bool:
@@ -734,9 +735,19 @@ func request_full_sync() -> void:
 
 # --- Host tarafı: uygulama --------------------------------------------------
 
-## Kart çekme kaldırıldı: kart her sıra gelişte otomatik verilir.
-func _apply_draw(_peer_id: int) -> void:
-	pass
+func _apply_draw(peer_id: int) -> void:
+	if not can_draw_for(peer_id):
+		return
+	if not inventories.has(peer_id):
+		inventories[peer_id] = []
+	mana[peer_id] = mana_of(peer_id) - GameRules.DRAW_MANA_COST
+	var card_type := CardPresets.weighted_pick(_draw_weights(peer_id), _rng)
+	card_drawn.emit(peer_id, card_type)
+	# Yeni kart elin ORTASINA yerleşir.
+	inventories[peer_id].insert(inventories[peer_id].size() / 2, card_type)
+	has_drawn_this_turn = true
+	_push_state({"type": "drawn", "peer_id": peer_id, "card": card_type})
+	_auto_end_if_broke()
 
 func _apply_play(peer_id: int, hand_index: int, target_peer_id: int = -1, target_province: String = "") -> void:
 	if is_turn_blocked() or peer_id != current_turn_peer_id():
@@ -983,7 +994,7 @@ func _schedule_agenda() -> void:
 			var tmp = _agenda_axes[i]
 			_agenda_axes[i] = _agenda_axes[j]
 			_agenda_axes[j] = tmp
-	var axis: String = _agenda_axes[pos % _agenda_axes.size()]
+	var axis: String = _agenda_axes[pos % _agenda_axes.size()]  # dönemde her tur farklı eksen
 	var type := "gundem_%s_%s" % [axis, "p" if _rng.randf() < 0.5 else "n"]
 	agenda = {"type": type, "until": round_number + 1, "index": pos + 1}
 	var data := CardPresets.agenda_data(type)
@@ -1054,7 +1065,7 @@ func _decay_opinion() -> void:
 func _apply_steal(peer_id: int, target_peer_id: int, card_type: String) -> bool:
 	if not is_valid_steal_target(peer_id, target_peer_id):
 		return false
-	var range_info: Dictionary = CardPresets.STEAL_RANGES.get(card_type, {})
+	var range_info := steal_range(peer_id, target_peer_id, card_type)
 	if range_info.is_empty():
 		return false
 	var wanted: int = _rng.randi_range(int(range_info["min"]), int(range_info["max"]))
@@ -1111,6 +1122,8 @@ func _auto_end_if_broke() -> void:
 	var peer_id := current_turn_peer_id()
 	if mana_of(peer_id) > 0:
 		return
+	if can_draw_for(peer_id):
+		return  # bedava kart hakkı duruyor
 	for card_type in inventories.get(peer_id, []):
 		if CardPresets.card_cost(String(card_type)) <= 0:
 			return
@@ -1124,6 +1137,16 @@ func grant_government_mana(peer_ids: Array) -> void:
 		if mana.has(peer_id):
 			mana[peer_id] = mana_of(peer_id) + GameRules.GOVERNMENT_MANA_BONUS
 	_push_state({"type": "mana"})
+
+## İki partinin ideolojik yakınlığı: 1 aynı görüş, 0 zıt radikal uçlar.
+func ideological_closeness(a: int, b: int) -> float:
+	var ia: Dictionary = PartyManager.parties.get(a, {}).get("ideology", IdeologyAxes.default_values())
+	var ib: Dictionary = PartyManager.parties.get(b, {}).get("ideology", IdeologyAxes.default_values())
+	return clampf(1.0 - IdeologyAxes.distance(ia, ib) / IdeologyAxes.max_distance(), 0.0, 1.0)
+
+## Bu partinin hedeften bu kartla çalabileceği vekil aralığı (yakınlığa göre).
+func steal_range(peer_id: int, target_peer_id: int, card_type: String) -> Dictionary:
+	return CardPresets.steal_range(card_type, ideological_closeness(peer_id, target_peer_id))
 
 ## Sırayı bir sonrakine devreder; index başa sardıysa (tur bitti) true döner.
 func _advance_turn() -> bool:
@@ -1140,10 +1163,8 @@ func _grant_turn_income() -> void:
 	var peer_id := current_turn_peer_id()
 	if peer_id != -1:
 		mana[peer_id] = mana_of(peer_id) + GameRules.MANA_PER_ROUND
-		_deal_turn_card(peer_id)
 
-## Sırası gelen oyuncuya desteden bir kart verilir (el doluysa verilmez).
-## Kullanmak ya da biriktirmek oyuncuya kalmış.
+## Desteden bir kartı doğrudan ele verir (seçim hediyesi). El doluysa verilmez.
 func _deal_turn_card(peer_id: int) -> void:
 	if not inventories.has(peer_id):
 		inventories[peer_id] = []
@@ -1231,9 +1252,10 @@ func _hold_election(finished_round: int, early: bool) -> void:
 	election_seats = last_seats.duplicate()
 	last_election_round = finished_round
 	last_election_was_early = early
-	# Seçim sonrası herkese mana.
+	# Seçim sonrası herkese mana ve 1 kart hediye.
 	for peer_id in turn_order:
 		mana[peer_id] = mana_of(peer_id) + GameRules.ELECTION_MANA_BONUS
+		_deal_turn_card(peer_id)
 	# Seçimde kullanıldıktan SONRA söner: seçimden hemen önceki hamleler tam etkili.
 	_decay_opinion()
 	_push_state({"type": "election"}, true)

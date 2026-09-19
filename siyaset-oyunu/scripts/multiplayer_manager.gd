@@ -46,6 +46,7 @@ signal connection_status(text: String)
 ##   2. ortam değişkeni: SIYASET_RELAY_URL=wss://ornek.com
 ##   3. proje ayarı:     siyaset/network/relay_url
 const DEFAULT_RELAY_URL := "wss://siyaset-oyunu-test-experimental.onrender.com"
+const RELAY_KEEP_ALIVE_SEC := 240.0
 const RELAY_URL_SETTING := "siyaset/network/relay_url"
 
 enum Stage { LOBBY, PARTY_SETUP, IN_GAME }
@@ -115,6 +116,17 @@ func _ready() -> void:
 	multiplayer.server_disconnected.connect(_on_server_disconnected)
 	room_closed.connect(_on_room_closed_any)
 	_wake_relay()
+	# Ücretsiz sunucu ~15 dk boyunca yeni HTTP isteği gelmezse uykuya geçiyor;
+	# WebSocket trafiği bunu engellemiyor ve oyun ortasında (~15. tur) bağlantı
+	# kopuyordu. Odadayken birkaç dakikada bir HTTP isteğiyle uyanık tutulur.
+	if DisplayServer.get_name() != "headless":
+		var keep_alive := Timer.new()
+		keep_alive.wait_time = RELAY_KEEP_ALIVE_SEC
+		keep_alive.autostart = true
+		keep_alive.timeout.connect(func():
+			if room_code != "":
+				_wake_relay())
+		add_child(keep_alive)
 
 ## Oyun açılır açılmaz röle sunucusuna basit bir HTTP isteği atar. Ücretsiz
 ## sunucu kullanılmayınca uyuyor ve uyanması 30-60 sn sürüyor; oyuncu menüde

@@ -73,14 +73,16 @@ const THRESHOLD_DEFAULT := 0.0
 # AXIS_SHARPNESS_INCREMENT_DEFAULT kadar artar; "sınırlı" seçildiyse
 # AXIS_SHARPNESS_CAP_OPTIONS'taki bir tavanda durur.
 const AXIS_SHARPNESS_START_MIN := 0.5
-const AXIS_SHARPNESS_START_MAX := 5.0
+const AXIS_SHARPNESS_START_MAX := 2.0
 const AXIS_SHARPNESS_START_DEFAULT := 0.5
 const AXIS_SHARPNESS_INCREMENT_MIN := 0.0
 const AXIS_SHARPNESS_INCREMENT_MAX := 1.0
 const AXIS_SHARPNESS_INCREMENT_DEFAULT := 0.125
-const AXIS_SHARPNESS_CAP_OPTIONS: Array[float] = [5.0, 10.0, 15.0, 20.0, 25.0]
-const AXIS_SHARPNESS_MAX_ENABLED_DEFAULT := false
-const AXIS_SHARPNESS_MAX_VALUE_DEFAULT := 10.0
+## Keskinlik hiçbir ayarda 2'yi aşamaz (iller tek partiye kilitlenmesin).
+const AXIS_SHARPNESS_HARD_MAX := 2.0
+const AXIS_SHARPNESS_CAP_OPTIONS: Array[float] = [1.0, 1.25, 1.5, 1.75, 2.0]
+const AXIS_SHARPNESS_MAX_ENABLED_DEFAULT := true
+const AXIS_SHARPNESS_MAX_VALUE_DEFAULT := 2.0
 
 var room_code: String = ""
 var is_host: bool = false

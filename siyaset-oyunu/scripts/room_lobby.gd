@@ -314,9 +314,7 @@ func _refresh_settings_display() -> void:
 		axis_increment_slider.value = MultiplayerManager.axis_sharpness_increment
 
 	axis_max_enabled_check.button_pressed = MultiplayerManager.axis_sharpness_max_enabled
-	axis_max_value_row.visible = MultiplayerManager.axis_sharpness_max_enabled
-	axis_max_value_slider.visible = MultiplayerManager.axis_sharpness_max_enabled
-	axis_max_value_value_label.text = "%.0f" % MultiplayerManager.axis_sharpness_max_value
+	axis_max_value_value_label.text = "%.2f" % MultiplayerManager.axis_sharpness_max_value
 	if not axis_max_value_slider.has_focus():
 		var cap_idx := MultiplayerManager.AXIS_SHARPNESS_CAP_OPTIONS.find(MultiplayerManager.axis_sharpness_max_value)
 		axis_max_value_slider.value = cap_idx if cap_idx != -1 else 0
@@ -340,8 +338,6 @@ func _on_axis_increment_slider_changed(value: float) -> void:
 	MultiplayerManager.set_axis_sharpness_increment(value)
 
 func _on_axis_max_enabled_toggled(enabled: bool) -> void:
-	axis_max_value_row.visible = enabled
-	axis_max_value_slider.visible = enabled
 	MultiplayerManager.set_axis_sharpness_max_enabled(enabled)
 
 func _on_axis_max_value_slider_changed(index: float) -> void:
@@ -386,8 +382,9 @@ func _build_settings_panel() -> void:
 	axis_max_enabled_check = CheckButton.new()
 	cap_row.add_child(axis_max_enabled_check)
 	axis.add_child(cap_row)
+	cap_row.visible = false  # tavan hep açık (en fazla 2); sadece değeri seçilir
 	axis_max_value_row = HBoxContainer.new()
-	axis_max_value_row.add_child(_row_label("Sınır değeri"))
+	axis_max_value_row.add_child(_row_label("Üst sınır"))
 	axis_max_value_value_label = _value_label()
 	axis_max_value_row.add_child(axis_max_value_value_label)
 	axis.add_child(axis_max_value_row)

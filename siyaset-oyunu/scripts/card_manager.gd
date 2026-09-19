@@ -456,7 +456,7 @@ func projected_eligible(mods: Dictionary = {}) -> Array:
 	for province_id in _province_ids:
 		var seats := float(province_seat_count(province_id))
 		var shares := ElectionModel.expected_shares(ideologies, province_center(province_id), current_axis_sharpness,
-			mods["national"], local_mods.get(province_id, {}))
+			mods["national"], local_mods.get(province_id, {}), _expected_national(mods))
 		for peer_id in shares.keys():
 			national[peer_id] = float(national.get(peer_id, 0.0)) + float(shares[peer_id]) * seats
 		total += seats
@@ -468,13 +468,30 @@ func projected_eligible(mods: Dictionary = {}) -> Array:
 		eligible = turn_order.duplicate()
 	return eligible
 
+## Gürültüsüz beklenen ulusal paylar (il payları bununla karışır). Aynı
+## modifier sözlüğü için önbellekli: bir harita çizimi 67 kez sormasın.
+var _national_cache_key: Dictionary = {}
+var _national_cache: Dictionary = {}
+func _expected_national(mods: Dictionary) -> Dictionary:
+	if is_same(mods, _national_cache_key):
+		return _national_cache
+	var centers := {}
+	var seats := {}
+	for province_id in _province_ids:
+		centers[province_id] = province_center(province_id)
+		seats[province_id] = province_seat_count(province_id)
+	_national_cache = ElectionModel.expected_national(_ideologies(), centers, seats, current_axis_sharpness,
+		mods["national"], mods["local"])
+	_national_cache_key = mods
+	return _national_cache
+
 ## Şimdi seçim olsa bu ilde: peer_id -> {"percent", "seats"} (gürültüsüz beklenen
 ## oylar, ildeki vekiller D'Hondt ile; baraj yok sayılır). Gözcü raporu için.
 func province_projection(province_id: String) -> Dictionary:
 	var mods := election_modifiers()
 	var local_mods: Dictionary = mods["local"]
 	var shares := ElectionModel.expected_shares(_ideologies(), province_center(province_id), current_axis_sharpness,
-		mods["national"], local_mods.get(province_id, {}))
+		mods["national"], local_mods.get(province_id, {}), _expected_national(mods))
 	var alloc := ElectionModel.dhondt(shares, projected_eligible(mods), province_seat_count(province_id))
 	var result := {}
 	for peer_id in turn_order:
@@ -497,7 +514,7 @@ func projection_all(viewer: int = -1) -> Dictionary:
 			continue
 		var seat_count := province_seat_count(province_id)
 		var shares := ElectionModel.expected_shares(ideologies, province_center(province_id), current_axis_sharpness,
-			mods["national"], local_mods.get(province_id, {}))
+			mods["national"], local_mods.get(province_id, {}), _expected_national(mods))
 		if viewer != -1:
 			var noisy := {}
 			for peer_id in shares.keys():
@@ -561,7 +578,7 @@ func init_game() -> void:
 	agenda = {}
 	_agenda_axes = []
 	national_list = {}
-	current_axis_sharpness = MultiplayerManager.axis_sharpness_start
+	current_axis_sharpness = minf(MultiplayerManager.axis_sharpness_start, MultiplayerManager.axis_sharpness_max_value if MultiplayerManager.axis_sharpness_max_enabled else MultiplayerManager.AXIS_SHARPNESS_HARD_MAX)
 	round_number = 1
 	last_election_round = 0
 	last_election_was_early = false
@@ -1164,7 +1181,8 @@ func _finish_round() -> void:
 	GovernmentManager.award_round_scores()
 	var finished_round := round_number
 	round_number += 1
-	current_axis_sharpness += MultiplayerManager.axis_sharpness_increment
+	current_axis_sharpness = minf(current_axis_sharpness + MultiplayerManager.axis_sharpness_increment,
+		MultiplayerManager.AXIS_SHARPNESS_HARD_MAX)
 	if MultiplayerManager.axis_sharpness_max_enabled:
 		current_axis_sharpness = minf(current_axis_sharpness, MultiplayerManager.axis_sharpness_max_value)
 

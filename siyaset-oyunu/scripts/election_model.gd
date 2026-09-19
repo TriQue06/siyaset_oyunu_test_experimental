@@ -14,6 +14,10 @@ extends RefCounted
 ##   3. Küçük rastgelelik: parti başına ulusal dalga + il başına sapma.
 ##   4. Eksen keskinliği: il payları bu üsse yükseltilip yeniden normalize
 ##      edilir (>1 öndekini abartır, <1 payları birbirine yaklaştırır).
+##   4b. ÜLKE GENELİ KARIŞIMI: il payı = NATIONAL_BLEND × ulusal pay +
+##      (1 - NATIONAL_BLEND) × il payı. Bir yerde %70 alıp başka yerde %0
+##      almak olmasın: partinin illerdeki oyu ülke genelindeki oyu etrafında
+##      dalgalanır (ağırlıklı ortalama, yani ulusal oy, değişmez).
 ##   5. Ulusal oy oranı, il paylarının milletvekili sayısıyla ağırlıklı
 ##      ortalamasıdır (milletvekili sayısı nüfusun vekili).
 ##   6. BARAJ: ulusal oyu barajın altında kalan parti hiçbir ilde vekil
@@ -57,10 +61,30 @@ static func support(party_ideology: Dictionary, voter_center: Dictionary) -> flo
 	var d := distance(party_ideology, voter_center)
 	return SUPPORT_FLOOR + exp(-(d * d) / (2.0 * SUPPORT_SIGMA * SUPPORT_SIGMA))
 
+## Rastgelelik OLMADAN beklenen ulusal paylar (karışımdan önce; toplam 1).
+## centers: province_id -> seçmen merkezi, local_mod: province_id -> {peer -> puan}.
+static func expected_national(parties: Dictionary, centers: Dictionary, province_seats: Dictionary,
+		sharpness: float, national_mod: Dictionary = {}, local_mod: Dictionary = {}) -> Dictionary:
+	var national := {}
+	var total := 0.0
+	for province_id in province_seats.keys():
+		var n := float(province_seats[province_id])
+		if n <= 0.0:
+			continue
+		var shares := expected_shares(parties, centers.get(province_id, {}), sharpness, national_mod, local_mod.get(province_id, {}))
+		for peer_id in shares.keys():
+			national[peer_id] = float(national.get(peer_id, 0.0)) + float(shares[peer_id]) / 100.0 * n
+		total += n
+	if total > 0.0:
+		for peer_id in national.keys():
+			national[peer_id] = float(national[peer_id]) / total
+	return national
+
 ## Rastgelelik OLMADAN bir ildeki beklenen oy payları (peer_id -> yüzde).
 ## Anket kartı kullanır (hata payını CardManager ekler).
+## national: ulusal paylar (bkz. expected_national); verilirse il payı onunla karışır.
 static func expected_shares(parties: Dictionary, center: Dictionary, sharpness: float,
-		national_mod: Dictionary = {}, local_here: Dictionary = {}) -> Dictionary:
+		national_mod: Dictionary = {}, local_here: Dictionary = {}, national: Dictionary = {}) -> Dictionary:
 	var peer_ids: Array = parties.keys()
 	peer_ids.sort()
 	var raw := {}
@@ -81,7 +105,7 @@ static func expected_shares(parties: Dictionary, center: Dictionary, sharpness: 
 		sharp_total += s
 	for peer_id in peer_ids:
 		result[peer_id] = float(result[peer_id]) / sharp_total
-	result = cap_shares(result)
+	result = cap_shares(blend_national(result, national))
 	for peer_id in peer_ids:
 		result[peer_id] = float(result[peer_id]) * 100.0
 	return result
@@ -102,6 +126,16 @@ const NATIONAL_LIST_SEATS := 10
 ## Bir partinin bir ildeki oy payı en fazla bu kadar olabilir: keskinlik
 ## arttıkça iller %90'ları görmesin. Fazlası diğer partilere oranla dağılır.
 const PROVINCE_MAX_SHARE := 0.68
+## İl payının ne kadarı ülke genelindeki paydan gelir (bkz. model 4b).
+const NATIONAL_BLEND := 0.4
+
+## national: peer_id -> ulusal pay (toplam 1). İl payını onunla karıştırır.
+static func blend_national(shares: Dictionary, national: Dictionary) -> Dictionary:
+	if national.is_empty():
+		return shares
+	for peer_id in shares.keys():
+		shares[peer_id] = NATIONAL_BLEND * float(national.get(peer_id, 0.0)) + (1.0 - NATIONAL_BLEND) * float(shares[peer_id])
+	return shares
 
 ## shares: peer_id -> pay (toplam 1). Tavanı aşan payı diğerlerine dağıtır.
 static func cap_shares(shares: Dictionary, cap: float = PROVINCE_MAX_SHARE) -> Dictionary:
@@ -181,10 +215,20 @@ static func compute(parties: Dictionary, province_seats: Dictionary, voters: Dic
 		var shares: Dictionary = {}
 		for peer_id in peer_ids:
 			shares[peer_id] = float(sharpened[peer_id]) / sharp_total
-		shares = cap_shares(shares)
 		for peer_id in peer_ids:
 			national[peer_id] = float(national[peer_id]) + float(shares[peer_id]) * seats_here
 		province_shares[province_id] = shares
+
+	# Ülke geneli karışımı (model 4b), sonra il tavanı; ulusal oy yeniden toplanır.
+	var national_share := {}
+	for peer_id in peer_ids:
+		national_share[peer_id] = float(national[peer_id]) / float(total_seats)
+		national[peer_id] = 0.0
+	for province_id in province_ids:
+		var shares: Dictionary = cap_shares(blend_national(province_shares[province_id], national_share))
+		province_shares[province_id] = shares
+		for peer_id in peer_ids:
+			national[peer_id] = float(national[peer_id]) + float(shares[peer_id]) * int(province_seats[province_id])
 
 	var eligible: Array = []
 	for peer_id in peer_ids:

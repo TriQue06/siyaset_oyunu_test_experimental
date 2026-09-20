@@ -50,7 +50,6 @@ var _icon_tabs: HBoxContainer
 var _icon_category: int = PartyPresets.CATEGORY_FICTIONAL
 @onready var bg_color_row: HFlowContainer = %BgColorRow
 @onready var ideology_container: VBoxContainer = %IdeologyContainer
-@onready var random_button: Button = %RandomButton
 @onready var ready_button: Button = %ReadyButton
 
 var _party_name: String = ""
@@ -91,7 +90,6 @@ func _ready() -> void:
 		var node := ideology_container.get_parent().get_node_or_null(node_name)
 		if node != null:
 			node.hide()
-	random_button.pressed.connect(_on_random_pressed)
 	ready_button.pressed.connect(_on_ready_pressed)
 	MultiplayerManager.party_setup_finished.connect(_on_party_setup_finished)
 	PartyManager.parties_updated.connect(_refresh_ready_count)
@@ -459,22 +457,6 @@ func _on_ideology_slider_changed(index: float, axis: String) -> void:
 	_ideology_value_labels[axis].text = "%+d" % value
 	_push_party()
 
-## Sadece ikon ve arka plan rengini rastgeleler — İDEOLOJİYE DOKUNMAZ. İdeoloji
-## daha stratejik bir seçim olduğu için kazara "rastgele" ile karışmasın diye
-## kasıtlı olarak buraya dahil edilmedi.
-func _on_random_pressed() -> void:
-	_selected_icon_index = PartyPresets.random_icon_index()
-	var free: Array = []
-	for color in PartyPresets.COLORS:
-		if _is_allowed_bg_color(color) and not _is_taken_by_player(color):
-			free.append(color)
-	if not free.is_empty():
-		_selected_bg_color = free[randi_range(0, free.size() - 1)]
-	_refresh_icon_grid_selection()
-	_build_color_row()
-	_update_preview()
-	_push_party()
-
 func _update_preview() -> void:
 	preview_bg.color = _selected_bg_color
 	preview_icon.texture = PartyPresets.get_icon_texture(_selected_icon_index, PREVIEW_ICON_PIXEL_SIZE)
@@ -543,7 +525,6 @@ func _on_ready_pressed() -> void:
 
 func _set_controls_disabled(disabled: bool) -> void:
 	name_edit.editable = not disabled
-	random_button.disabled = disabled
 	for btn in icon_grid.get_children():
 		btn.disabled = disabled
 	_build_color_row()

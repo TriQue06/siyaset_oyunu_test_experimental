@@ -235,15 +235,6 @@ theme_override_constants/separation = 6
 [node name="HSeparator3b" type="HSeparator" parent="RightPanel/Margin/Scroll/VBox" unique_id=2089995144]
 layout_mode = 2
 
-[node name="RandomButton" type="Button" parent="RightPanel/Margin/Scroll/VBox" unique_id=493911054]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 48)
-layout_mode = 2
-text = "🎲 Beni Şaşırt"
-
-[node name="HSeparator4" type="HSeparator" parent="RightPanel/Margin/Scroll/VBox" unique_id=1623326340]
-layout_mode = 2
-
 [node name="ReadyButton" type="Button" parent="RightPanel/Margin/Scroll/VBox" unique_id=1401694460]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 52)

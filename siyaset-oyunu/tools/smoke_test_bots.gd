@@ -163,6 +163,39 @@ func _initialize() -> void:
 	mm.players[human]["bot"] = true
 
 	print("")
+	print("=== AZINLIK HUKUMETI VE KOALISYON PAZARLIGI ===")
+	var gp2 = load("res://scripts/government_presets.gd")
+	brain._bloc_forming = false  # önceki senaryodan kalan blok dayanışması
+	cm.last_seats = {}
+	cm.last_seats[human] = 150
+	for i in range(1, ids.size()):
+		cm.last_seats[ids[i]] = 50
+	pm.parties[human]["ideology"] = {"economic": 0, "social": 0, "administrative": 0}
+	pm.parties[ids[1]]["ideology"] = {"economic": -3, "social": -2, "administrative": -2}
+	pm.parties[ids[2]]["ideology"] = {"economic": 0.5, "social": 0, "administrative": 0}
+	var solo := {}
+	for post in gp2.POSTS:
+		solo[post["id"]] = human
+	gm.proposal_kind = gm.KIND_GOVERNMENT
+	gm.proposal_peer_id = human
+	gm.proposal_assignments = solo
+	check("azinlik hukumetine uzak bot HAYIR", brain.choose_vote(ids[1]) == gm.VOTE_NO)
+	check("azinlik hukumetine cok yakin bot EVET", brain.choose_vote(ids[2]) == gm.VOTE_YES)
+	cm.last_seats[human] = 260
+	check("cogunluk hukumetinde olcut ideolojik yakinlik", brain.choose_vote(ids[1]) != gm.VOTE_YES)
+	cm.last_seats[human] = 150
+	var stingy := solo.duplicate()
+	stingy["ministry_health"] = ids[1]
+	gm.proposal_assignments = stingy
+	check("tek bakanlikla ikna olmaz", brain.choose_vote(ids[1]) == gm.VOTE_NO)
+	var fair := solo.duplicate()
+	fair[gp2.POST_DEPUTY_PM] = ids[1]
+	fair["ministry_health"] = ids[1]
+	gm.proposal_assignments = fair
+	check("basbakan yardimciligi + bakanlik kabul", brain.choose_vote(ids[1]) == gm.VOTE_YES)
+	gm.proposal_assignments = {}
+
+	print("")
 	print("=== MUHALEFETTEKI BOT GENSORUYU DESTEKLER ===")
 	# 3 kisilik senaryo: bot azinlik hukumeti, insan gensoru veriyor, ucuncu
 	# parti (bot) muhalefette. Bot, hukumet cok yakin degilse EVET demeli.

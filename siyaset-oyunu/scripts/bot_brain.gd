@@ -31,6 +31,12 @@ const LAW_BASE_SCORE := 1.0
 const LAW_EVERY_ROUNDS := 2
 ## Muhalefetteki bot, hükümete bu mesafeden yakınsa gensoruda çekimser kalır.
 const CENSURE_LOYALTY_DISTANCE := 1.2
+## Koalisyon ortağı, sandalye payına düşen makam puanının en az bu oranını ister.
+const COALITION_FAIR_SHARE := 0.75
+## Ortak olacak parti en az bu kadar makam puanı ister (1 bakanlık yetmez).
+const COALITION_MIN_POINTS := 2
+## Hükümete alınmayan bot, azınlık hükümetine ancak bu mesafeden yakınsa güvenoyu verir.
+const MINORITY_TRUST_DISTANCE := 1.0
 
 # --- BOT BLOĞU ------------------------------------------------------------------
 ## Hükümeti bir İNSAN partisi kurduysa muhalefetteki botlar birleşir:
@@ -556,17 +562,13 @@ static func _censure_worth_it(bot: int) -> bool:
 static func choose_vote(bot: int) -> int:
 	match GovernmentManager.proposal_kind:
 		GovernmentManager.KIND_GOVERNMENT:
-			if bot == GovernmentManager.proposal_peer_id or GovernmentManager.proposal_partner_ids().has(bot):
+			if bot == GovernmentManager.proposal_peer_id:
 				return GovernmentManager.VOTE_YES
+			if GovernmentManager.proposal_partner_ids().has(bot):
+				return _coalition_offer_vote(bot)
 			if _bloc_solidarity() and MultiplayerManager.is_bot(GovernmentManager.proposal_peer_id):
 				return GovernmentManager.VOTE_YES  # blok, kendi botunun hükümetini destekler
-			var pm := int(GovernmentManager.proposal_assignments.get(GovernmentPresets.POST_PM, GovernmentManager.proposal_peer_id))
-			var d := ElectionModel.distance(_ideology(bot), _ideology(pm))
-			if d < 2.5:
-				return GovernmentManager.VOTE_YES
-			if d < 4.0:
-				return GovernmentManager.VOTE_ABSTAIN
-			return GovernmentManager.VOTE_NO
+			return _government_confidence_vote(bot)
 		GovernmentManager.KIND_CENSURE:
 			if bot == GovernmentManager.proposal_peer_id:
 				return GovernmentManager.VOTE_YES
@@ -582,6 +584,51 @@ static func choose_vote(bot: int) -> int:
 			return _best_law_vote(bot, GovernmentManager.proposal_law, GovernmentManager.proposal_peer_id,
 				GovernmentManager.proposal_gov_ids, _known_centers(bot))
 	return GovernmentManager.VOTE_ABSTAIN
+
+## ORTAK OLARAK ÇAĞRILAN BOT (koalisyon görüşmesi): teklif edilen makamların
+## puanı, koalisyondaki sandalye payına göre hakkının altındaysa reddeder.
+## İki partilik bir koalisyonda tek bakanlık (1 puan) hiçbir zaman yetmez.
+static func _coalition_offer_vote(bot: int) -> int:
+	var offered := 0
+	var gov_seats := float(GovernmentManager.seats_of(GovernmentManager.proposal_peer_id))
+	for post in GovernmentManager.proposal_assignments.keys():
+		if int(GovernmentManager.proposal_assignments[post]) == bot:
+			offered += GovernmentPresets.post_points(String(post))
+	for peer_id in GovernmentManager.proposal_partner_ids():
+		gov_seats += float(GovernmentManager.seats_of(peer_id))
+	var total_points := 0
+	for post in GovernmentPresets.POSTS:
+		total_points += int(post["points"])
+	var share: float = float(GovernmentManager.seats_of(bot)) / maxf(1.0, gov_seats)
+	# Hakkının en az COALITION_FAIR_SHARE'i teklif edilmeli; küçük ortak bile
+	# sembolik bir bakanlıkla yetinmez (en az COALITION_MIN_POINTS puan).
+	var required: float = maxf(float(COALITION_MIN_POINTS), float(total_points) * share * COALITION_FAIR_SHARE)
+	if float(offered) + 0.01 < required:
+		return GovernmentManager.VOTE_NO
+	return GovernmentManager.VOTE_YES
+
+## HÜKÜMETE ALINMAYAN BOT (meclis oylaması): azınlık hükümetine kolay geçit
+## vermez — ideolojik olarak çok yakın değilse reddeder. Çoğunluğu olan
+## hükümeti ise durduramayacağı için ideolojik yakınlığa göre oylar.
+static func _government_confidence_vote(bot: int) -> int:
+	var pm := int(GovernmentManager.proposal_assignments.get(GovernmentPresets.POST_PM, GovernmentManager.proposal_peer_id))
+	var d := ElectionModel.distance(_ideology(bot), _ideology(pm))
+	var gov_seats := GovernmentManager.seats_of(GovernmentManager.proposal_peer_id)
+	for peer_id in GovernmentManager.proposal_partner_ids():
+		gov_seats += GovernmentManager.seats_of(peer_id)
+	var minority: bool = gov_seats * 2 <= GovernmentManager.total_seats()
+	if minority:
+		# Dışarıda bırakıldı ve hükümetin çoğunluğu yok: güvenoyu bedava değil.
+		if d < MINORITY_TRUST_DISTANCE:
+			return GovernmentManager.VOTE_YES
+		if d < MINORITY_TRUST_DISTANCE * 2.0:
+			return GovernmentManager.VOTE_ABSTAIN
+		return GovernmentManager.VOTE_NO
+	if d < 2.5:
+		return GovernmentManager.VOTE_YES
+	if d < 4.0:
+		return GovernmentManager.VOTE_ABSTAIN
+	return GovernmentManager.VOTE_NO
 
 ## Muhalefetteki botun gensoru oyu. Hükümetin düşmesi ona yeni bir hükümet
 ## şansı verir: kendisi ya da kendisine hükümetten DAHA YAKIN olan gensoru

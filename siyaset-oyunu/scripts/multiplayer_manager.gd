@@ -7,8 +7,12 @@ extends Node
 ## - Oda kodu: 5 haneli, sadece büyük İngilizce harf (A-Z), rakam yok.
 ## - Lobi sahipliği başka bir oyuncuya devredilebilir; kod bundan etkilenmez,
 ##   aynı kalır.
-## - O ANKİ lobi sahibi odadan ayrılırsa (bağlantısı kesilirse) oda TAMAMEN
-##   kapanır ve içindeki herkes (host dahil) odadan çıkarılır.
+## - Host OLMAYAN bir lobi sahibi ayrılırsa oda kapanmaz, sahiplik host'a
+##   geçer. HOST ayrılırsa oda kapanır: tüm oyun durumu host'ta yaşadığı ve
+##   röle sunucusu oyunu çalıştırmadığı için devralınamaz; herkes oda
+##   ekranına sebebiyle birlikte döner.
+## - Oyun başladıktan sonra odaya katılınamaz. Oyun sırasında ayrılan oyuncu
+##   sıradan/meclisten/hükümet süreçlerinden çıkarılır (CardManager.remove_player).
 ## - "is_host" = bu instance'ın ENet SUNUCUSU olması (her zaman ilk kurucu,
 ##   peer id 1). "owner_id" = LOBİ SAHİBİ rolü — devredilebilir, host'tan
 ##   BAĞIMSIZ bir kavramdır (devredilirse host olmayan bir istemci sahip
@@ -33,10 +37,19 @@ signal room_closed(reason: String)
 signal settings_updated
 signal game_started
 signal party_setup_finished
+## Bağlantı sürerken kullanıcıya gösterilecek ara bilgi (örn. sunucu uyanıyor).
+signal connection_status(text: String)
 
-## Röle sunucusunun adresi. relay-server/ deploy edildikten sonra buradaki
-## adresi gerçek deploy URL'i ile değiştir (örn. "wss://<servis-adin>.onrender.com").
-const RELAY_URL := "wss://siyaset-oyunu-test-experimental.onrender.com"
+## Varsayılan röle sunucusu. Kodu değiştirmeden başka bir sunucu kullanmak
+## için (öncelik sırasıyla):
+##   1. komut satırı:   godot -- --relay=wss://ornek.com
+##   2. ortam değişkeni: SIYASET_RELAY_URL=wss://ornek.com
+##   3. proje ayarı:     siyaset/network/relay_url
+const DEFAULT_RELAY_URL := "wss://siyaset-oyunu-test-experimental.onrender.com"
+const RELAY_KEEP_ALIVE_SEC := 240.0
+const RELAY_URL_SETTING := "siyaset/network/relay_url"
+
+enum Stage { LOBBY, PARTY_SETUP, IN_GAME }
 
 const RelayMultiplayerPeerScript := preload("res://scripts/relay_multiplayer_peer.gd")
 
@@ -53,9 +66,6 @@ const THRESHOLD_DEFAULT := 0.0
 
 # Parti kurulum süresi seçenekleri (saniye). 0 = SINIRSIZ (süre yok, sadece
 # herkes hazır verince başlar). Sadece bu değerler geçerlidir.
-const PARTY_DURATION_OPTIONS: Array[int] = [0, 30, 60, 90, 120]
-const PARTY_DURATION_UNLIMITED := 0
-const PARTY_DURATION_DEFAULT := PARTY_DURATION_UNLIMITED
 
 # --- Eksen keskinliği: her kart oynanışında ideoloji kayması, giderek büyüyen
 # bir çarpanla ölçeklenir (bkz. CardManager.current_axis_sharpness). Oyun
@@ -63,14 +73,16 @@ const PARTY_DURATION_DEFAULT := PARTY_DURATION_UNLIMITED
 # AXIS_SHARPNESS_INCREMENT_DEFAULT kadar artar; "sınırlı" seçildiyse
 # AXIS_SHARPNESS_CAP_OPTIONS'taki bir tavanda durur.
 const AXIS_SHARPNESS_START_MIN := 0.5
-const AXIS_SHARPNESS_START_MAX := 5.0
+const AXIS_SHARPNESS_START_MAX := 2.0
 const AXIS_SHARPNESS_START_DEFAULT := 0.5
 const AXIS_SHARPNESS_INCREMENT_MIN := 0.0
 const AXIS_SHARPNESS_INCREMENT_MAX := 1.0
-const AXIS_SHARPNESS_INCREMENT_DEFAULT := 0.25
-const AXIS_SHARPNESS_CAP_OPTIONS: Array[float] = [5.0, 10.0, 15.0, 20.0, 25.0]
-const AXIS_SHARPNESS_MAX_ENABLED_DEFAULT := false
-const AXIS_SHARPNESS_MAX_VALUE_DEFAULT := 10.0
+const AXIS_SHARPNESS_INCREMENT_DEFAULT := 0.125
+## Keskinlik hiçbir ayarda 2'yi aşamaz (iller tek partiye kilitlenmesin).
+const AXIS_SHARPNESS_HARD_MAX := 2.0
+const AXIS_SHARPNESS_CAP_OPTIONS: Array[float] = [1.0, 1.25, 1.5, 1.75, 2.0]
+const AXIS_SHARPNESS_MAX_ENABLED_DEFAULT := true
+const AXIS_SHARPNESS_MAX_VALUE_DEFAULT := 2.0
 
 var room_code: String = ""
 var is_host: bool = false
@@ -81,7 +93,9 @@ var players: Dictionary = {}
 
 # --- Lobi ayarları (lobi sahibi yetkili, tüm oyunculara senkronize) ---
 var election_threshold: float = THRESHOLD_DEFAULT
-var party_setup_duration: int = PARTY_DURATION_DEFAULT
+## Oyun süresi: seçimler kaç turda bir ve kaç seçim olacak (bkz. GameRules.configure).
+var election_interval: int = GameRules.DEFAULT_ELECTION_INTERVAL
+var election_count: int = GameRules.DEFAULT_ELECTION_COUNT
 var axis_sharpness_start: float = AXIS_SHARPNESS_START_DEFAULT
 var axis_sharpness_increment: float = AXIS_SHARPNESS_INCREMENT_DEFAULT
 var axis_sharpness_max_enabled: bool = AXIS_SHARPNESS_MAX_ENABLED_DEFAULT
@@ -90,23 +104,73 @@ var axis_sharpness_max_value: float = AXIS_SHARPNESS_MAX_VALUE_DEFAULT
 var _pending_code: String = ""
 var _has_synced_once: bool = false
 var _closing: bool = false
+var _connect_error_reported: bool = false
+
+## Sadece host'ta anlamlı: oda şu an hangi aşamada.
+var stage: int = Stage.LOBBY
+## Oda kapanınca sebebi; oda ekranı açılınca gösterilir.
+var last_close_reason: String = ""
 
 func _ready() -> void:
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	multiplayer.connected_to_server.connect(_on_connected_to_server)
 	multiplayer.connection_failed.connect(_on_connection_failed)
 	multiplayer.server_disconnected.connect(_on_server_disconnected)
+	room_closed.connect(_on_room_closed_any)
+	_wake_relay()
+	# Ücretsiz sunucu ~15 dk boyunca yeni HTTP isteği gelmezse uykuya geçiyor;
+	# WebSocket trafiği bunu engellemiyor ve oyun ortasında (~15. tur) bağlantı
+	# kopuyordu. Odadayken birkaç dakikada bir HTTP isteğiyle uyanık tutulur.
+	if DisplayServer.get_name() != "headless":
+		var keep_alive := Timer.new()
+		keep_alive.wait_time = RELAY_KEEP_ALIVE_SEC
+		keep_alive.autostart = true
+		keep_alive.timeout.connect(func():
+			if room_code != "":
+				_wake_relay())
+		add_child(keep_alive)
+
+## Oyun açılır açılmaz röle sunucusuna basit bir HTTP isteği atar. Ücretsiz
+## sunucu kullanılmayınca uyuyor ve uyanması 30-60 sn sürüyor; oyuncu menüde
+## adını girip "Oda Kur"a basana kadar sunucu büyük ölçüde uyanmış olur.
+## Sonuç önemsiz (hata da olsa sessizce yok sayılır). Headless testlerde atlanır.
+func _wake_relay() -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	var url := relay_url().replace("wss://", "https://").replace("ws://", "http://")
+	var request := HTTPRequest.new()
+	request.timeout = 90.0
+	add_child(request)
+	request.request_completed.connect(func(_result, _code, _headers, _body): request.queue_free())
+	if request.request(url) != OK:
+		request.queue_free()
+
+static func relay_url() -> String:
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--relay="):
+			return arg.substr("--relay=".length())
+	var env := OS.get_environment("SIYASET_RELAY_URL")
+	if env != "":
+		return env
+	return str(ProjectSettings.get_setting(RELAY_URL_SETTING, DEFAULT_RELAY_URL))
+
+## Oda nerede kapanırsa kapansın (oyun ekranı, parti kurulum, hükümet kurma…)
+## oyuncu oda ekranına döner; eskiden sadece oda lobisi bunu dinlediği için
+## oyun ortasında host ayrılınca diğerleri ölü bir ekranda kalıyordu.
+func _on_room_closed_any(reason: String) -> void:
+	last_close_reason = reason
+	var scene := get_tree().current_scene
+	var path: String = scene.scene_file_path if scene != null else ""
+	if path in ["res://scenes/RoomLobby.tscn", "res://scenes/Lobby.tscn"]:
+		return
+	get_tree().change_scene_to_file.call_deferred("res://scenes/Lobby.tscn")
+
+func _on_relay_connecting_slow() -> void:
+	connection_status.emit("Sunucu uyanıyor olabilir (ücretsiz sunucu uykudan kalkarken ~1 dk sürebilir)…")
 
 static func snap_threshold(value: float) -> float:
 	value = clampf(value, THRESHOLD_MIN, THRESHOLD_MAX)
 	return round(value / THRESHOLD_STEP) * THRESHOLD_STEP
-
-static func snap_party_duration(value: int) -> int:
-	var closest: int = PARTY_DURATION_OPTIONS[0]
-	for option in PARTY_DURATION_OPTIONS:
-		if abs(option - value) < abs(closest - value):
-			closest = option
-	return closest
 
 static func snap_axis_sharpness_start(value: float) -> float:
 	return clampf(value, AXIS_SHARPNESS_START_MIN, AXIS_SHARPNESS_START_MAX)
@@ -130,19 +194,23 @@ func create_room(player_name: String) -> void:
 	room_code = ""
 	_closing = false
 	election_threshold = THRESHOLD_DEFAULT
-	party_setup_duration = PARTY_DURATION_DEFAULT
+	election_interval = GameRules.DEFAULT_ELECTION_INTERVAL
+	election_count = GameRules.DEFAULT_ELECTION_COUNT
+	GameRules.configure(election_interval, election_count)
 	axis_sharpness_start = AXIS_SHARPNESS_START_DEFAULT
 	axis_sharpness_increment = AXIS_SHARPNESS_INCREMENT_DEFAULT
 	axis_sharpness_max_enabled = AXIS_SHARPNESS_MAX_ENABLED_DEFAULT
 	axis_sharpness_max_value = AXIS_SHARPNESS_MAX_VALUE_DEFAULT
 	players.clear()
 	var peer := RelayMultiplayerPeerScript.new()
+	_connect_error_reported = false
 	peer.room_created.connect(_on_relay_room_created)
 	peer.room_error.connect(_on_relay_error)
+	peer.connecting_slow.connect(_on_relay_connecting_slow)
 	# SceneMultiplayer, atama anında peer'in en azindan "connecting" durumunda
 	# olmasini zorunlu tutuyor; o yuzden once baglanmayi baslatip (durumu
 	# CONNECTING'e cekip) sonra multiplayer_peer'a atiyoruz.
-	peer.start_create_room(RELAY_URL, local_player_name)
+	peer.start_create_room(relay_url(), local_player_name)
 	multiplayer.multiplayer_peer = peer
 
 func _on_relay_room_created(code: String) -> void:
@@ -155,11 +223,15 @@ func _on_relay_room_created(code: String) -> void:
 	player_list_updated.emit()
 
 func _on_relay_error(reason: String) -> void:
+	if _connect_error_reported:
+		return
 	if is_host and room_code == "":
+		_connect_error_reported = true
 		multiplayer.multiplayer_peer = null
 		is_host = false
 		connection_error.emit(reason)
 	elif not is_host and not _has_synced_once:
+		_connect_error_reported = true
 		multiplayer.multiplayer_peer = null
 		join_failed.emit(reason)
 
@@ -172,8 +244,10 @@ func join_room(code: String, player_name: String) -> void:
 	_closing = false
 	is_host = false
 	var peer := RelayMultiplayerPeerScript.new()
+	_connect_error_reported = false
 	peer.room_error.connect(_on_relay_error)
-	peer.start_join_room(RELAY_URL, _pending_code, local_player_name)
+	peer.connecting_slow.connect(_on_relay_connecting_slow)
+	peer.start_join_room(relay_url(), _pending_code, local_player_name)
 	multiplayer.multiplayer_peer = peer
 
 ## Oyuncu kendi isteğiyle odadan ayrılır. Ayrılan kişi lobi sahibiyse
@@ -184,6 +258,100 @@ func leave_room() -> void:
 		multiplayer.multiplayer_peer.close()
 	_reset_state()
 
+## ESC menüsündeki "Oyundan Ayrıl": oyuncu odadan düzgünce çıkar ve ana menüye
+## döner. Host OLMAYAN oyuncu ayrılınca host bunu peer_disconnected ile görür
+## ve oyunu ona uyarlar (sıradan/meclisten/oylamadan/hükümetten çıkarır, bkz.
+## CardManager.remove_player). HOST ayrılırsa oyun durumu onda yaşadığı için
+## oda kapanır; diğerlerine önce sebep bildirilir.
+func leave_game() -> void:
+	if room_code != "" and is_host and multiplayer.multiplayer_peer != null:
+		_closing = true
+		_notify_room_closed.rpc("Oda sahibi oyundan ayrıldı, oda kapatıldı.")
+		# RPC'nin ağa çıkması için birkaç kare bekle.
+		for i in 3:
+			await get_tree().process_frame
+	leave_room()
+	get_tree().change_scene_to_file("res://scenes/Lobby.tscn")
+	# Eski oyun ekranı gittikten sonra yerel oyun durumunu temizle.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	CardManager.abandon_game()
+	GovernmentManager.reset()
+	PartyManager.parties = {}
+
+# --- Botlar (sadece lobide, sahip ekler/çıkarır; host oynatır: BotManager) ---
+
+## Gerçek peer id'leriyle çakışmasın diye çok büyük sayılardan geriye doğru.
+const BOT_ID_BASE := 2000000000
+var _next_bot_index: int = 0
+
+func is_bot(peer_id: int) -> bool:
+	return bool(players.get(peer_id, {}).get("bot", false))
+
+func bot_ids() -> Array:
+	var ids: Array = []
+	for peer_id in players.keys():
+		if is_bot(peer_id):
+			ids.append(peer_id)
+	return ids
+
+## Lobi kartlarının sırası: önce insanlar (katılma sırasıyla), sonra botlar.
+## Botlar varken bir oyuncu katılırsa botlar otomatik olarak bir sonraki
+## karta kayar.
+func lobby_order() -> Array:
+	var humans: Array = []
+	var bots: Array = []
+	for peer_id in players.keys():
+		if is_bot(peer_id):
+			bots.append(peer_id)
+		else:
+			humans.append(peer_id)
+	return humans + bots
+
+func add_bot() -> void:
+	if not is_local_owner():
+		return
+	if is_host or room_code == "":
+		_apply_add_bot()
+	else:
+		_request_add_bot.rpc_id(1)
+
+func remove_bot(peer_id: int) -> void:
+	if not is_local_owner():
+		return
+	if is_host or room_code == "":
+		_apply_remove_bot(peer_id)
+	else:
+		_request_remove_bot.rpc_id(1, peer_id)
+
+func _apply_add_bot() -> void:
+	if players.size() >= MAX_PLAYERS or stage != Stage.LOBBY:
+		return
+	_next_bot_index += 1
+	players[BOT_ID_BASE - _next_bot_index] = {"name": "Bot %d" % _next_bot_index, "bot": true}
+	_broadcast_player_list()
+
+func _apply_remove_bot(peer_id: int) -> void:
+	if not is_bot(peer_id) or stage != Stage.LOBBY:
+		return
+	players.erase(peer_id)
+	_broadcast_player_list()
+
+func _broadcast_player_list() -> void:
+	if room_code != "" and multiplayer.multiplayer_peer != null:
+		_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+	player_list_updated.emit()
+
+@rpc("any_peer", "reliable")
+func _request_add_bot() -> void:
+	if is_host and multiplayer.get_remote_sender_id() == owner_id:
+		_apply_add_bot()
+
+@rpc("any_peer", "reliable")
+func _request_remove_bot(peer_id: int) -> void:
+	if is_host and multiplayer.get_remote_sender_id() == owner_id:
+		_apply_remove_bot(peer_id)
+
 ## Lobi sahipliği rolü — ağ host'u olup olmamasından BAĞIMSIZDIR.
 func is_local_owner() -> bool:
 	return multiplayer.get_unique_id() == owner_id
@@ -193,11 +361,11 @@ func is_local_owner() -> bool:
 func transfer_ownership(new_owner_id: int) -> void:
 	if not is_local_owner():
 		return
-	if not players.has(new_owner_id):
+	if not players.has(new_owner_id) or is_bot(new_owner_id):
 		return
 	if is_host:
 		owner_id = new_owner_id
-		_sync_player_list.rpc(players, owner_id, election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+		_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
 		player_list_updated.emit()
 	else:
 		_request_transfer_ownership.rpc_id(1, new_owner_id)
@@ -210,23 +378,26 @@ func set_election_threshold(value: float) -> void:
 	var snapped := snap_threshold(value)
 	if is_host:
 		election_threshold = snapped
-		_sync_settings.rpc(election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+		_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
 		settings_updated.emit()
 	else:
 		_request_set_threshold.rpc_id(1, snapped)
 
-## Parti kurulum süresini (saniye) ayarlar. Sadece mevcut lobi sahibi çağırabilir.
-## Değer PARTY_DURATION_OPTIONS içindeki en yakın seçeneğe yuvarlanır.
-func set_party_setup_duration(value: int) -> void:
+## Oyun süresini ayarlar: seçimler kaç turda bir ve kaç seçim olacak. Sadece
+## mevcut lobi sahibi çağırabilir.
+func set_game_length(interval: int, count: int) -> void:
 	if not is_local_owner():
 		return
-	var snapped := snap_party_duration(value)
+	interval = clampi(interval, GameRules.ELECTION_INTERVAL_MIN, GameRules.ELECTION_INTERVAL_MAX)
+	count = clampi(count, GameRules.ELECTION_COUNT_MIN, GameRules.ELECTION_COUNT_MAX)
 	if is_host:
-		party_setup_duration = snapped
-		_sync_settings.rpc(election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+		election_interval = interval
+		election_count = count
+		GameRules.configure(election_interval, election_count)
+		_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
 		settings_updated.emit()
 	else:
-		_request_set_party_duration.rpc_id(1, snapped)
+		_request_set_game_length.rpc_id(1, interval, count)
 
 ## Eksen keskinliğinin başlangıç değerini ayarlar (0.5-5.0). Sadece mevcut
 ## lobi sahibi çağırabilir.
@@ -236,7 +407,7 @@ func set_axis_sharpness_start(value: float) -> void:
 	var snapped := snap_axis_sharpness_start(value)
 	if is_host:
 		axis_sharpness_start = snapped
-		_sync_settings.rpc(election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+		_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
 		settings_updated.emit()
 	else:
 		_request_set_axis_sharpness_start.rpc_id(1, snapped)
@@ -249,7 +420,7 @@ func set_axis_sharpness_increment(value: float) -> void:
 	var snapped := snap_axis_sharpness_increment(value)
 	if is_host:
 		axis_sharpness_increment = snapped
-		_sync_settings.rpc(election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+		_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
 		settings_updated.emit()
 	else:
 		_request_set_axis_sharpness_increment.rpc_id(1, snapped)
@@ -261,7 +432,7 @@ func set_axis_sharpness_max_enabled(enabled: bool) -> void:
 		return
 	if is_host:
 		axis_sharpness_max_enabled = enabled
-		_sync_settings.rpc(election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+		_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
 		settings_updated.emit()
 	else:
 		_request_set_axis_sharpness_max_enabled.rpc_id(1, enabled)
@@ -274,7 +445,7 @@ func set_axis_sharpness_max_value(value: float) -> void:
 	var snapped := snap_axis_sharpness_max_value(value)
 	if is_host:
 		axis_sharpness_max_value = snapped
-		_sync_settings.rpc(election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+		_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
 		settings_updated.emit()
 	else:
 		_request_set_axis_sharpness_max_value.rpc_id(1, snapped)
@@ -298,22 +469,48 @@ func _reset_state() -> void:
 	is_host = false
 	owner_id = 1
 	election_threshold = THRESHOLD_DEFAULT
-	party_setup_duration = PARTY_DURATION_DEFAULT
+	election_interval = GameRules.DEFAULT_ELECTION_INTERVAL
+	election_count = GameRules.DEFAULT_ELECTION_COUNT
+	GameRules.configure(election_interval, election_count)
 	axis_sharpness_start = AXIS_SHARPNESS_START_DEFAULT
 	axis_sharpness_increment = AXIS_SHARPNESS_INCREMENT_DEFAULT
 	axis_sharpness_max_enabled = AXIS_SHARPNESS_MAX_ENABLED_DEFAULT
 	axis_sharpness_max_value = AXIS_SHARPNESS_MAX_VALUE_DEFAULT
 	_has_synced_once = false
 	_closing = false
+	stage = Stage.LOBBY
+	_next_bot_index = 0
 
 # --- Bağlantı olayları -------------------------------------------------
 
 func _on_connected_to_server() -> void:
-	_request_join.rpc_id(1, _pending_code, local_player_name)
+	_request_join.rpc_id(1, _pending_code, local_player_name, network_signature())
 
+## Ağ sürüm imzası = oyun sürümü. Godot RPC'leri SIRA NUMARASIYLA eşler; iki
+## cihazda farklı sürüm varsa istemcinin istekleri sunucuda yanlış fonksiyona
+## gider ya da sessizce düşer. Katılırken karşılaştırılır; her derlemede sürüm
+## artırıldığı için farklı derlemeler asla eşleşmez.
+func network_signature() -> String:
+	return game_version()
+
+## Oyun sürümü (project.godot: application/config/version). Her yeni derlemede
+## son rakam 1 artırılır (0.0.1, 0.0.2, ...); Android version/name ile aynı tutulur.
+static func game_version() -> String:
+	return str(ProjectSettings.get_setting("application/config/version", "0.0.0"))
+
+## Röle peer'ı aynı hatayı room_error ile de bildirebilir; kullanıcıya tek
+## mesaj gitsin, ve oda KURARKEN düşen bağlantı "katılma" hatası sanılmasın.
 func _on_connection_failed() -> void:
+	if _connect_error_reported:
+		return
+	_connect_error_reported = true
+	var hosting := is_host
 	multiplayer.multiplayer_peer = null
-	join_failed.emit("Sunucuya ulaşılamadı.")
+	if hosting:
+		is_host = false
+		connection_error.emit("Sunucuya ulaşılamadı.")
+	else:
+		join_failed.emit("Sunucuya ulaşılamadı.")
 
 func _on_server_disconnected() -> void:
 	_reset_state()
@@ -322,14 +519,22 @@ func _on_server_disconnected() -> void:
 func _on_peer_disconnected(id: int) -> void:
 	if not is_host or _closing:
 		return
+	var was_player := players.has(id)
+	players.erase(id)
 	if id == owner_id:
-		# Lobi sahibi ayrıldı: oda herkes için tamamen kapanır.
-		_close_room("Oda sahibi ayrıldı, oda kapatıldı.")
-		return
-	if players.has(id):
-		players.erase(id)
-	_sync_player_list.rpc(players, owner_id, election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+		# Host olmayan lobi sahibi ayrıldı: oda kapanmaz, sahiplik host'a geçer.
+		owner_id = multiplayer.get_unique_id()
+	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
 	player_list_updated.emit()
+	if not was_player:
+		return
+	match stage:
+		Stage.PARTY_SETUP:
+			# Ayrılan kişi "hazır" bekleniyordu; kalanların hepsi hazırsa başla.
+			if PartyManager.all_ready():
+				finish_party_setup()
+		Stage.IN_GAME:
+			CardManager.remove_player(id)
 
 ## Sadece host çağırır: tüm istemcileri bilgilendirip sunucuyu kapatır.
 func _close_room(reason: String) -> void:
@@ -345,15 +550,21 @@ func _close_room(reason: String) -> void:
 
 ## Sadece host çağırır: parti verilerini sıfırlayıp herkesi oyuna başlatır.
 func _broadcast_game_start() -> void:
+	stage = Stage.PARTY_SETUP
 	PartyManager.reset()
+	for bot in bot_ids():
+		PartyManager.add_bot_party(bot)
 	_notify_game_start.rpc()
 	game_started.emit()
 
 ## Sadece host çağırır (Parti Kurulum ekranındaki geri sayım host'ta bitince):
 ## herkesi Oyun Ekranı'na geçirir.
 func finish_party_setup() -> void:
-	if not is_host:
+	# Aşama kontrolü: süre dolması, son "hazır" ve bir oyuncunun ayrılması aynı
+	# anda olursa oyun iki kez başlatılmasın.
+	if not is_host or stage != Stage.PARTY_SETUP:
 		return
+	stage = Stage.IN_GAME
 	CardManager.init_game()
 	_notify_party_setup_finished.rpc()
 	party_setup_finished.emit()
@@ -367,20 +578,32 @@ func _notify_party_setup_finished() -> void:
 # --- RPC'ler -------------------------------------------------------------
 
 @rpc("any_peer", "reliable")
-func _request_join(code: String, player_name: String) -> void:
+func _request_join(code: String, player_name: String, signature: String) -> void:
 	if not is_host:
 		return
 	var sender_id := multiplayer.get_remote_sender_id()
+	if signature != network_signature():
+		_join_rejected.rpc_id(sender_id, "Oyun sürümleri farklı (sen %s, oda %s). İki cihazda da aynı güncel sürümü kullanın." % [
+			signature, game_version()])
+		multiplayer.multiplayer_peer.disconnect_peer(sender_id)
+		return
 	if code != room_code:
 		_join_rejected.rpc_id(sender_id, "Kod hatalı.")
 		multiplayer.multiplayer_peer.disconnect_peer(sender_id)
 		return
-	if players.size() >= MAX_PLAYERS:
+	if players.size() >= MAX_PLAYERS and (bot_ids().is_empty() or stage != Stage.LOBBY):
 		_join_rejected.rpc_id(sender_id, "Oda dolu.")
 		multiplayer.multiplayer_peer.disconnect_peer(sender_id)
 		return
+	if stage != Stage.LOBBY:
+		_join_rejected.rpc_id(sender_id, "Bu odada oyun zaten başladı.")
+		multiplayer.multiplayer_peer.disconnect_peer(sender_id)
+		return
+	# Oda botlarla doluysa en son eklenen bot insan oyuncuya yer açar.
+	if players.size() >= MAX_PLAYERS:
+		players.erase(bot_ids().back())
 	players[sender_id] = {"name": player_name}
-	_sync_player_list.rpc(players, owner_id, election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
 	player_list_updated.emit()
 
 @rpc("authority", "reliable")
@@ -389,11 +612,13 @@ func _join_rejected(reason: String) -> void:
 	join_failed.emit(reason)
 
 @rpc("authority", "reliable")
-func _sync_player_list(new_players: Dictionary, new_owner: int, threshold: float, duration: int, axis_start: float, axis_increment: float, axis_max_enabled: bool, axis_max_value: float) -> void:
+func _sync_player_list(new_players: Dictionary, new_owner: int, threshold: float, interval: int, count: int, axis_start: float, axis_increment: float, axis_max_enabled: bool, axis_max_value: float) -> void:
 	players = new_players
 	owner_id = new_owner
 	election_threshold = threshold
-	party_setup_duration = duration
+	election_interval = interval
+	election_count = count
+	GameRules.configure(election_interval, election_count)
 	axis_sharpness_start = axis_start
 	axis_sharpness_increment = axis_increment
 	axis_sharpness_max_enabled = axis_max_enabled
@@ -409,10 +634,10 @@ func _request_transfer_ownership(new_owner_id: int) -> void:
 	if not is_host:
 		return
 	var sender_id := multiplayer.get_remote_sender_id()
-	if sender_id != owner_id or not players.has(new_owner_id):
+	if sender_id != owner_id or not players.has(new_owner_id) or is_bot(new_owner_id):
 		return
 	owner_id = new_owner_id
-	_sync_player_list.rpc(players, owner_id, election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
 	player_list_updated.emit()
 
 ## Host-olmayan mevcut sahip, baraj değiştirmek istediğinde host'a istek yollar.
@@ -424,20 +649,20 @@ func _request_set_threshold(value: float) -> void:
 	if sender_id != owner_id:
 		return
 	election_threshold = snap_threshold(value)
-	_sync_settings.rpc(election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+	_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
 	settings_updated.emit()
 
-## Host-olmayan mevcut sahip, parti kurulum süresini değiştirmek istediğinde
-## host'a istek yollar.
+## Host-olmayan mevcut sahip, oyun süresini değiştirmek istediğinde host'a istek yollar.
 @rpc("any_peer", "reliable")
-func _request_set_party_duration(value: int) -> void:
+func _request_set_game_length(interval: int, count: int) -> void:
 	if not is_host:
 		return
-	var sender_id := multiplayer.get_remote_sender_id()
-	if sender_id != owner_id:
+	if multiplayer.get_remote_sender_id() != owner_id:
 		return
-	party_setup_duration = snap_party_duration(value)
-	_sync_settings.rpc(election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+	election_interval = clampi(interval, GameRules.ELECTION_INTERVAL_MIN, GameRules.ELECTION_INTERVAL_MAX)
+	election_count = clampi(count, GameRules.ELECTION_COUNT_MIN, GameRules.ELECTION_COUNT_MAX)
+	GameRules.configure(election_interval, election_count)
+	_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
 	settings_updated.emit()
 
 ## Host-olmayan mevcut sahip, eksen keskinliği ayarlarından birini değiştirmek
@@ -449,7 +674,7 @@ func _request_set_axis_sharpness_start(value: float) -> void:
 	if multiplayer.get_remote_sender_id() != owner_id:
 		return
 	axis_sharpness_start = snap_axis_sharpness_start(value)
-	_sync_settings.rpc(election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+	_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
 	settings_updated.emit()
 
 @rpc("any_peer", "reliable")
@@ -459,7 +684,7 @@ func _request_set_axis_sharpness_increment(value: float) -> void:
 	if multiplayer.get_remote_sender_id() != owner_id:
 		return
 	axis_sharpness_increment = snap_axis_sharpness_increment(value)
-	_sync_settings.rpc(election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+	_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
 	settings_updated.emit()
 
 @rpc("any_peer", "reliable")
@@ -469,7 +694,7 @@ func _request_set_axis_sharpness_max_enabled(enabled: bool) -> void:
 	if multiplayer.get_remote_sender_id() != owner_id:
 		return
 	axis_sharpness_max_enabled = enabled
-	_sync_settings.rpc(election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+	_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
 	settings_updated.emit()
 
 @rpc("any_peer", "reliable")
@@ -479,13 +704,15 @@ func _request_set_axis_sharpness_max_value(value: float) -> void:
 	if multiplayer.get_remote_sender_id() != owner_id:
 		return
 	axis_sharpness_max_value = snap_axis_sharpness_max_value(value)
-	_sync_settings.rpc(election_threshold, party_setup_duration, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+	_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
 	settings_updated.emit()
 
 @rpc("authority", "reliable")
-func _sync_settings(threshold: float, duration: int, axis_start: float, axis_increment: float, axis_max_enabled: bool, axis_max_value: float) -> void:
+func _sync_settings(threshold: float, interval: int, count: int, axis_start: float, axis_increment: float, axis_max_enabled: bool, axis_max_value: float) -> void:
 	election_threshold = threshold
-	party_setup_duration = duration
+	election_interval = interval
+	election_count = count
+	GameRules.configure(election_interval, election_count)
 	axis_sharpness_start = axis_start
 	axis_sharpness_increment = axis_increment
 	axis_sharpness_max_enabled = axis_max_enabled

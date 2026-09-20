@@ -44,15 +44,15 @@ unique_name_in_owner = true
 unique_name_in_owner = true
 layout_mode = 1
 anchor_left = 1.0
-anchor_top = 0.28
+anchor_top = 1.0
 anchor_right = 1.0
-anchor_bottom = 0.28
-offset_left = -346.0
-offset_top = -144.0
-offset_right = -130.0
-offset_bottom = 144.0
+anchor_bottom = 1.0
+offset_left = -148.0
+offset_top = -276.0
+offset_right = -52.0
+offset_bottom = -148.0
 grow_horizontal = 0
-grow_vertical = 2
+grow_vertical = 0
 ignore_texture_size = true
 stretch_mode = 5
 
@@ -60,27 +60,29 @@ stretch_mode = 5
 unique_name_in_owner = true
 layout_mode = 1
 anchor_left = 1.0
-anchor_top = 0.28
+anchor_top = 1.0
 anchor_right = 1.0
-anchor_bottom = 0.28
-offset_left = -346.0
-offset_top = 154.0
-offset_right = -130.0
-offset_bottom = 190.0
+anchor_bottom = 1.0
+offset_left = -184.0
+offset_top = -140.0
+offset_right = -16.0
+offset_bottom = -106.0
 grow_horizontal = 0
-grow_vertical = 2
+grow_vertical = 0
 text = "Pas Geç"
 
 [node name="PlayerPanel" type="Control" parent="." unique_id=1341816534]
 layout_mode = 1
 anchor_left = 1.0
 anchor_right = 1.0
-anchor_bottom = 0.62
-offset_left = -120.0
+anchor_bottom = 1.0
+offset_left = -200.0
+offset_top = 76.0
+offset_bottom = -286.0
 grow_horizontal = 0
 grow_vertical = 2
 
-[node name="PlayerPanelList" type="VBoxContainer" parent="PlayerPanel" unique_id=2066101759]
+[node name="PlayerPanelList" type="GridContainer" parent="PlayerPanel" unique_id=2066101759]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 8
@@ -88,18 +90,16 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -60.0
-offset_right = 60.0
 grow_horizontal = 2
 grow_vertical = 2
-alignment = 1
-theme_override_constants/separation = 14
+theme_override_constants/h_separation = 6
+theme_override_constants/v_separation = 6
 
 [node name="BottomArea" type="Control" parent="." unique_id=3821004440]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15
-anchor_top = 0.62
+anchor_top = 0.54
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
@@ -111,8 +111,8 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = -10.0
-offset_bottom = -10.0
+offset_top = 8.0
+offset_bottom = -6.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
@@ -122,9 +122,9 @@ theme_override_constants/separation = 4
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
-theme_override_constants/margin_left = 24
+theme_override_constants/margin_left = 8
 theme_override_constants/margin_top = 0
-theme_override_constants/margin_right = 12
+theme_override_constants/margin_right = 8
 theme_override_constants/margin_bottom = 8
 
 [node name="ParliamentVBox" type="VBoxContainer" parent="BottomArea/ChamberSplit/ParliamentChamber" unique_id=3821004460]
@@ -165,53 +165,29 @@ texture_filter = 1
 unique_name_in_owner = true
 layout_mode = 2
 horizontal_alignment = 1
+custom_minimum_size = Vector2(0, 50)
 theme_override_font_sizes/font_size = 12
 modulate = Color(1, 1, 1, 0.75)
 text = ""
 autowrap_mode = 2
-
-[node name="VoteChamber" type="MarginContainer" parent="BottomArea/ChamberSplit" unique_id=3821004446]
-layout_mode = 2
-size_flags_horizontal = 3
-mouse_filter = 2
-theme_override_constants/margin_left = 12
-theme_override_constants/margin_top = 14
-theme_override_constants/margin_right = 24
-theme_override_constants/margin_bottom = 10
-
-[node name="VoteVBox" type="VBoxContainer" parent="BottomArea/ChamberSplit/VoteChamber" unique_id=3821004447]
-layout_mode = 2
-mouse_filter = 2
-theme_override_constants/separation = 8
-
-[node name="VoteTitle" type="Label" parent="BottomArea/ChamberSplit/VoteChamber/VoteVBox" unique_id=3821004448]
-layout_mode = 2
-theme_override_font_sizes/font_size = 13
-modulate = Color(1, 1, 1, 0.6)
-text = "SON OY ORANLARI"
-
-[node name="VoteScroll" type="ScrollContainer" parent="BottomArea/ChamberSplit/VoteChamber/VoteVBox" unique_id=3821004450]
-layout_mode = 2
-size_flags_vertical = 3
-horizontal_scroll_mode = 0
-mouse_filter = 2
-
-[node name="VoteSharePanel" type="VBoxContainer" parent="BottomArea/ChamberSplit/VoteChamber/VoteVBox/VoteScroll" unique_id=3821004449]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-mouse_filter = 2
-script = ExtResource("5")
+max_lines_visible = 3
+text_overrun_behavior = 3
 
 [node name="TurnIndicator" type="PanelContainer" parent="." unique_id=3821004420]
 unique_name_in_owner = true
 theme_override_styles/panel = SubResource("StyleBoxFlat_turnindicator")
 layout_mode = 1
-anchors_preset = 0
-offset_left = 16.0
-offset_top = 16.0
-offset_right = 190.0
-offset_bottom = 74.0
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -200.0
+offset_top = -96.0
+offset_right = -16.0
+offset_bottom = -16.0
+grow_horizontal = 0
+grow_vertical = 0
 
 [node name="TurnIndicatorMargin" type="MarginContainer" parent="TurnIndicator" unique_id=3821004421]
 layout_mode = 2
@@ -227,67 +203,82 @@ theme_override_constants/separation = 8
 
 [node name="TurnIndicatorBadgeSlot" type="Control" parent="TurnIndicator/TurnIndicatorMargin/TurnIndicatorRow" unique_id=3821004423]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(42, 42)
+custom_minimum_size = Vector2(32, 32)
 layout_mode = 2
 
 [node name="TurnIndicatorLabel" type="Label" parent="TurnIndicator/TurnIndicatorMargin/TurnIndicatorRow" unique_id=3821004424]
 unique_name_in_owner = true
 layout_mode = 2
+size_flags_horizontal = 3
 size_flags_vertical = 4
 text = "Sıra: -"
-autowrap_mode = 2
-theme_override_font_sizes/font_size = 14
-
-[node name="LeftOverlay" type="VBoxContainer" parent="." unique_id=3821004470]
-layout_mode = 1
-anchors_preset = 0
-offset_left = 16.0
-offset_top = 82.0
-offset_right = 250.0
-offset_bottom = 400.0
-mouse_filter = 2
-theme_override_constants/separation = 8
-
-[node name="GameSettingsLabel" type="Label" parent="LeftOverlay" unique_id=3821004450]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 13
+text_overrun_behavior = 3
+clip_text = true
+
+[node name="LeftPanel" type="PanelContainer" parent="." unique_id=3821004470]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 9
+anchor_bottom = 1.0
+offset_right = 260.0
+grow_vertical = 2
+
+[node name="LeftMargin" type="MarginContainer" parent="LeftPanel" unique_id=3821004472]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 14
+
+[node name="LeftVBox" type="VBoxContainer" parent="LeftPanel/LeftMargin" unique_id=3821004471]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="GameSettingsLabel" type="Label" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004450]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
 text = "Baraj: %0"
+autowrap_mode = 2
 
-[node name="GovernmentPanel" type="PanelContainer" parent="LeftOverlay" unique_id=3821004471]
+[node name="Separator1" type="HSeparator" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004474]
+layout_mode = 2
+
+[node name="GovernmentVBox" type="VBoxContainer" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004473]
 unique_name_in_owner = true
 layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Separator2" type="HSeparator" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004475]
+layout_mode = 2
+
+[node name="VoteTitle" type="Label" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004448]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+modulate = Color(1, 1, 1, 0.6)
+text = "SON SEÇİM — OY ORANLARI"
+
+[node name="VoteScroll" type="ScrollContainer" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004447]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="VoteSharePanel" type="VBoxContainer" parent="LeftPanel/LeftMargin/LeftVBox/VoteScroll" unique_id=3821004449]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
 mouse_filter = 2
+script = ExtResource("5")
+compact = true
 
-[node name="GovernmentMargin" type="MarginContainer" parent="LeftOverlay/GovernmentPanel" unique_id=3821004472]
+[node name="Separator3" type="HSeparator" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004446]
 layout_mode = 2
-theme_override_constants/margin_left = 10
-theme_override_constants/margin_top = 7
-theme_override_constants/margin_right = 10
-theme_override_constants/margin_bottom = 8
 
-[node name="GovernmentVBox" type="VBoxContainer" parent="LeftOverlay/GovernmentPanel/GovernmentMargin" unique_id=3821004473]
+[node name="ScoreVBox" type="VBoxContainer" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004476]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 4
-
-[node name="ScorePanel" type="PanelContainer" parent="LeftOverlay" unique_id=3821004474]
-unique_name_in_owner = true
-layout_mode = 2
-mouse_filter = 2
-
-[node name="ScoreMargin" type="MarginContainer" parent="LeftOverlay/ScorePanel" unique_id=3821004475]
-layout_mode = 2
-theme_override_constants/margin_left = 10
-theme_override_constants/margin_top = 7
-theme_override_constants/margin_right = 10
-theme_override_constants/margin_bottom = 8
-
-[node name="ScoreVBox" type="VBoxContainer" parent="LeftOverlay/ScorePanel/ScoreMargin" unique_id=3821004476]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 3
+theme_override_constants/separation = 6
 
 [node name="HandArea" type="Control" parent="." unique_id=3821004412]
 unique_name_in_owner = true

@@ -10,34 +10,44 @@ extends Node
 const ICONS_DIR := "res://assets/icons"
 const ICON_NATIVE_SIZE := 24.0  # kaynak SVG'lerin viewBox boyutu (24dp)
 
-# 20 renk + siyah + beyaz = 22 preset. Hem ikon rengi hem arka plan rengi
-# seçimi bu paletten yapılır.
+# Parti (arka plan) renkleri. İkon rengi her zaman beyazdır.
 const COLORS: Array[Color] = [
-	Color("F20C1F"),
-	Color("F26C0C"),
-	Color("F2920C"),
-	Color("FABD05"),
-	Color("D4E619"),
-	Color("90C91C"),
-	Color("59BD28"),
-	Color("29A33D"),
-	Color("1FAD66"),
-	Color("17CFA1"),
-	Color("11D4C3"),
-	Color("13DBED"),
-	Color("1791CF"),
-	Color("1C48C9"),
-	Color("261C99"),
-	Color("5A1FAD"),
-	Color("8C21C2"),
-	Color("BB27D9"),
-	Color("D927CA"),
-	Color("ED2B7C"),
-	Color("000000"), # siyah
-	Color("FFFFFF"), # beyaz
+	Color("F2132A"), # kırmızı
+	Color("FA6E66"), # somon kırmızısı
+	Color("F27E1F"), # turuncu
+	Color("F0A824"), # sarı-turuncu
+	Color("FAD028"), # sarı
+	Color("9DC94B"), # limon sarısı
+	Color("31C440"), # yeşil
+	Color("3FB586"), # su yeşili
+	Color("27DBDB"), # turkuaz
+	Color("83B7EB"), # açık mavi
+	Color("22A9D6"), # mavi
+	Color("2569CF"), # koyu mavi
+	Color("244FB3"), # lacivert
+	Color("7647CC"), # indigo
+	Color("AB39DB"), # mor
+	Color("E041D8"), # eflatun
+	Color("F04391"), # fuşya
+	Color("A6325A"), # bordo
 ]
 
+## İKON KATEGORİLERİ: 0 kurgusal (assets/icons/*.svgdata), 1 Türkiye
+## (assets/icons/turkiye/, gerçek parti amblemleri). icon_index tek bir
+## listede: önce kurgusallar, sonra Türkiye ikonları.
+const CATEGORY_FICTIONAL := 0
+const CATEGORY_TURKIYE := 1
+const CATEGORY_TITLES := ["Kurgusal", "Türkiye"]
+const TURKIYE_DIR := "res://assets/icons/turkiye"
+## Dizin taraması paketli oyunda güvenilmez olabildiği için dosya adları sabit.
+const TURKIYE_ICONS := ["a_parti", "ak_parti", "anap", "ap", "btp", "buyuk_birlik", "chp", "dem_parti",
+	"deva_partisi", "dp", "dsp", "gelecek_partisi", "genc_parti", "hdp", "huda_par", "iyi_parti", "ldp",
+	"memleket", "mhp", "saadet", "sol_parti", "tip", "tkp", "yeni_parti", "yeni_yol", "yeniden_refah",
+	"zafer_partisi"]
+
 var icon_paths: Array[String] = []
+## Kurgusal ikon sayısı (bu indeksten sonrası Türkiye kategorisi).
+var fictional_count: int = 0
 # "<index>_<pixel_size>" -> ImageTexture (aynı boyut tekrar istenirse yeniden
 # rasterize etmeyelim diye önbellek).
 var _texture_cache: Dictionary = {}
@@ -75,6 +85,18 @@ func _scan_icons() -> void:
 			push_warning("İkon dizini taranamadı, %d ikon yedek listeyle bulundu." % icon_paths.size())
 		else:
 			push_warning("İkon klasörü bulunamadı: %s" % ICONS_DIR)
+	fictional_count = icon_paths.size()
+	for icon_name in TURKIYE_ICONS:
+		var path := TURKIYE_DIR.path_join("%s.svgdata" % icon_name)
+		if FileAccess.file_exists(path):
+			icon_paths.append(path)
+
+func icon_category(index: int) -> int:
+	return CATEGORY_TURKIYE if index >= fictional_count else CATEGORY_FICTIONAL
+
+## Bir kategorideki ikonların indeksleri.
+func icon_indices(category: int) -> Array:
+	return range(fictional_count, icon_paths.size()) if category == CATEGORY_TURKIYE else range(0, fictional_count)
 
 func icon_count() -> int:
 	return icon_paths.size()
@@ -95,8 +117,9 @@ func get_icon_texture(index: int, target_pixel_size: int = 128) -> Texture2D:
 		_texture_cache[key] = tex
 	return tex
 
+## Botlar ve rastgele parti kurgusal ikonlardan seçer.
 func random_icon_index() -> int:
-	return randi_range(0, icon_paths.size() - 1)
+	return randi_range(0, maxi(0, fictional_count - 1))
 
 func random_color() -> Color:
 	return COLORS[randi_range(0, COLORS.size() - 1)]

@@ -3,7 +3,7 @@ extends Control
 ##
 ##   1) ORTAKLAR: hükümete hangi partiler girecek seçilir. Görevi alan parti
 ##      her zaman dahildir ve çıkarılamaz.
-##   2) DAĞITIM: 10 görev (1 başbakanlık, 1 başbakan yardımcılığı, 8 bakanlık)
+##   2) DAĞITIM: görevler (1 başbakanlık, 1 başbakan yardımcılığı, bakanlıklar)
 ##      SADECE seçilen ortaklar arasında paylaştırılır.
 ##
 ## Sonra "Teklifte Bulun" ile teklif meclise gider. Bu sahne yalnızca görevli
@@ -19,6 +19,12 @@ const CHIP_SIZE := Vector2(34, 34)
 @onready var summary_label: Label = %SummaryLabel
 @onready var propose_button: Button = %ProposeButton
 @onready var back_button: Button = %BackButton
+@onready var parliament_diagram: ParliamentDiagram = %ParliamentDiagram
+@onready var seat_list: VoteSharePanel = %SeatList
+
+## Başlığın süre sayacı eklenmemiş hali.
+var _title_base: String = ""
+var _last_shown_second: int = -1
 
 var _step: int = Step.PARTNERS
 ## Hükümete girecek partiler (peer_id listesi).
@@ -50,6 +56,15 @@ func _on_phase_changed() -> void:
 	if GovernmentManager.phase != GovernmentManager.Phase.FORMING or not GovernmentManager.is_my_mandate():
 		SceneTransition.fade_to_scene("res://scenes/GameScreen.tscn")
 
+func _process(_delta: float) -> void:
+	var second := int(ceil(GovernmentManager.phase_seconds_left()))
+	if second != _last_shown_second:
+		_last_shown_second = second
+		_update_title()
+
+func _update_title() -> void:
+	title_label.text = "%s   (Süre: %s)" % [_title_base, GameRules.format_seconds(GovernmentManager.phase_seconds_left())]
+
 func _rebuild() -> void:
 	for child in post_list.get_children():
 		child.queue_free()
@@ -57,23 +72,79 @@ func _rebuild() -> void:
 
 	var attempt: int = GovernmentManager.MAX_ATTEMPTS - GovernmentManager.attempts_left() + 1
 	if _step == Step.PARTNERS:
-		title_label.text = "1/2 — Hükümet Ortakları"
-		info_label.text = "Hükümete girecek partileri seç. Kendi partin her zaman dahildir.\n%d. teklif hakkın (toplam %d)." % [
+		_title_base = "1/2 — Hükümet Ortakları"
+		info_label.text = "Hükümete girecek partileri seç. Kendi partin her zaman dahildir.\nGörev verdiğin her ortak oylamada EVET demezse teklif düşer. Süre dolarsa hak yanar.\n%d. teklif hakkın (toplam %d)." % [
 			attempt, GovernmentManager.MAX_ATTEMPTS,
 		]
 		propose_button.text = "Dağıtıma Geç"
 		back_button.visible = false
 		_build_partner_rows()
 	else:
-		title_label.text = "2/2 — Görev Dağılımı"
-		info_label.text = "10 görevi ortaklar arasında paylaştır. Başbakanlık kimdeyse ANA İKTİDAR PARTİSİ odur.\nMecliste %d sandalye var; teklifin düşmesi için HAYIR oylarının %d sandalyeyi geçmesi gerekir." % [
-			GovernmentManager.total_seats(), GovernmentManager.total_seats() / 2,
+		_title_base = "2/2 — Görev Dağılımı"
+		info_label.text = "%d görevi ortaklar arasında paylaştır. Başbakanlık kimdeyse ANA İKTİDAR PARTİSİ odur.\nMecliste %d sandalye var; teklifin düşmesi için HAYIR oylarının %d sandalyeyi geçmesi gerekir." % [
+			GovernmentPresets.POSTS.size(), GovernmentManager.total_seats(), GovernmentManager.total_seats() / 2,
 		]
 		propose_button.text = "Teklifte Bulun"
 		back_button.visible = true
 		_build_post_rows()
 
 	_refresh_summary()
+	_refresh_seat_view()
+	_update_title()
+
+## Soldaki meclis görünümü: her partinin sandalye sayısı (liste) ve parlamento
+## diyagramı. Hükümete seçilen ortaklar diyagramın solunda TAM renkli,
+## dışarıda kalanlar soluk — koalisyonun meclisteki ağırlığı bir bakışta görünür.
+func _refresh_seat_view() -> void:
+	var ids: Array = GovernmentManager.voter_ids()
+	ids.sort_custom(func(a, b):
+		var in_a: bool = _partners.has(a)
+		var in_b: bool = _partners.has(b)
+		if in_a != in_b:
+			return in_a
+		return GovernmentManager.seats_of(a) > GovernmentManager.seats_of(b)
+	)
+	var seat_entries: Array = []
+	var rows: Array = []
+	for peer_id in ids:
+		var party: Dictionary = PartyManager.parties.get(peer_id, {})
+		var color: Color = party.get("bg_color", Color(0.5, 0.5, 0.5))
+		var seats := GovernmentManager.seats_of(peer_id)
+		seat_entries.append({"seats": seats, "color": color if _partners.has(peer_id) else color.darkened(0.6)})
+		rows.append({
+			"party": party,
+			"name": party.get("name", "?"),
+			"leader": MultiplayerManager.players.get(peer_id, {}).get("name", ""),
+			"color": color,
+			"percent": float(CardManager.last_vote_shares.get(peer_id, 0.0)),
+			"seats": seats,
+		})
+	parliament_diagram.set_results(seat_entries)
+	seat_list.set_data(rows)
+
+## Dağıtım adımının başında: ortakları geri dönmeden ekleyip çıkarmak için.
+## Çıkarılan ortağın görevleri görevli partiye geçer (bkz. _build_post_rows).
+func _build_partner_bar() -> void:
+	var bar := HFlowContainer.new()
+	bar.add_theme_constant_override("h_separation", 8)
+	bar.add_theme_constant_override("v_separation", 6)
+	var title := Label.new()
+	title.text = "Ortaklar (tıkla: ekle/çıkar):"
+	title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	bar.add_child(title)
+	var me := multiplayer.get_unique_id()
+	for peer_id in GovernmentManager.voter_ids():
+		var in_gov: bool = _partners.has(peer_id)
+		var btn := Button.new()
+		UiSkin.skin_button(btn)
+		btn.text = "%s (%d)" % [PartyManager.parties.get(peer_id, {}).get("name", "?"), GovernmentManager.seats_of(peer_id)]
+		btn.modulate = Color.WHITE if in_gov else Color(1, 1, 1, 0.5)
+		btn.tooltip_text = "Görevli parti (sabit)" if peer_id == me else ("Hükümetten çıkar" if in_gov else "Hükümete ekle")
+		btn.disabled = peer_id == me
+		if peer_id != me:
+			btn.pressed.connect(_on_partner_toggled.bind(peer_id))
+		bar.add_child(btn)
+	post_list.add_child(bar)
 
 # --- 1. Aşama: ortak seçimi -------------------------------------------------
 
@@ -133,6 +204,7 @@ func _on_partner_toggled(peer_id: int) -> void:
 # --- 2. Aşama: görev dağılımı ----------------------------------------------
 
 func _build_post_rows() -> void:
+	_build_partner_bar()
 	for post in GovernmentPresets.POSTS:
 		var post_id: String = post["id"]
 		# Ortak listesi değiştiyse geçersiz kalan atamaları tazele.
@@ -194,7 +266,9 @@ func _refresh_chip_states() -> void:
 			var halo: Control = chip.get_node_or_null("Halo")
 			if halo != null:
 				halo.visible = peer_id == selected
-			chip.modulate = Color.WHITE if peer_id == selected else Color(1, 1, 1, 0.5)
+			# Seçilmeyen çip soluklaşmaz, sadece biraz söner: parti rengi
+			# (özellikle koyu renkler) tanınmaz hâle gelmesin.
+			chip.modulate = Color.WHITE if peer_id == selected else Color(0.82, 0.82, 0.82, 0.95)
 
 # --- Ortak parçalar ---------------------------------------------------------
 
@@ -211,23 +285,12 @@ func _build_party_chip(peer_id: int) -> Control:
 		MultiplayerManager.players.get(peer_id, {}).get("name", "?"),
 	]
 
-	var bg := UiSkin.color_surface(party.get("bg_color", Color(0.4, 0.4, 0.4)), UiSkin.SLOT)
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	chip.add_child(bg)
-
-	if party.has("icon_index"):
-		var icon := TextureRect.new()
-		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		icon.texture = PartyPresets.get_icon_texture(party["icon_index"], 64)
-		icon.modulate = party.get("icon_color", Color.WHITE)
-		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon.set_anchors_preset(Control.PRESET_FULL_RECT)
-		icon.offset_left = 6
-		icon.offset_top = 6
-		icon.offset_right = -6
-		icon.offset_bottom = -6
-		chip.add_child(icon)
+	# Parti rengi olduğu gibi görünsün: koyu 9-slice zemin yerine rozet
+	# (renkli daire + beyaz logo) — oyunun geri kalanıyla da aynı görünüm.
+	var badge := PartyBadge.build(party, CHIP_SIZE, 64)
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.set_anchors_preset(Control.PRESET_FULL_RECT)
+	chip.add_child(badge)
 
 	var halo := TextureRect.new()
 	halo.name = "Halo"
@@ -284,8 +347,10 @@ func _on_back_pressed() -> void:
 
 func _on_primary_pressed() -> void:
 	if _step == Step.PARTNERS:
+		# Atamalar KORUNUR: geri dönüp ortak ekleyip/çıkarıp tekrar ilerleyince
+		# yapılan dağıtım kaybolmaz; sadece artık ortak olmayan partinin
+		# görevleri görevli partiye düşer (bkz. _build_post_rows).
 		_step = Step.DISTRIBUTE
-		_assignments.clear()
 		_rebuild()
 		return
 	propose_button.disabled = true

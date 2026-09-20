@@ -14,18 +14,22 @@ extends Control
 const SPAN := 180.0          # yay açısı (derece) — orijinal JS: SPAN
 const SEAT_RADIUS_FACTOR := 0.8  # orijinal JS: SRF
 
-## Türkiye haritasındaki kalın beyaz kontur ile aynı görsel dilde, koltuk
-## noktalarının HER BİRİNİN arkasına biraz daha büyük beyaz bir daire
-## çizilir; koltuklar birbirine yakın olduğu için bitişik beyaz daireler
-## görsel olarak birleşip tüm diyagramın etrafında tek parça, kalın beyaz
-## bir kontur izlenimi yaratır.
-@export var outline_width: float = 3.2
-@export var outline_color: Color = Color(1, 1, 1, 0.95)
+## Her koltuk: koyu ince konturlu, kenarı yumuşatılmış (antialiased) daire.
+## Konturun kalınlığı koltuk yarıçapına ORANLI tek bir değer — bütün koltuklarda
+## birebir aynı. Toplam yarıçap (kontur dahil) komşu koltuk mesafesinin
+## yarısından küçük tutulur, daireler hiçbir zaman iç içe geçmez.
+@export var outline_ratio: float = 0.16
+@export var outline_color: Color = Color(0.07, 0.08, 0.1)
 
 var _dot_positions: Array = [] # Array[Vector2], normalize (x: 0..2, merkez=1 / y: 0..~1)
 var _dot_colors: Array = []    # Array[Color], _dot_positions ile aynı sırada
 var _seat_radius_norm: float = 0.0 # normalize koltuk yarıçapı (tüm noktalar için sabit)
+## Ortadaki toplam vekil sayısının yazı boyutu (diyagram boyutundan bağımsız).
+const COUNT_FONT_SIZE := 24
 var _total_seats: int = 0
+var _layout_total: int = -1
+var _layout: Dictionary = {}
+var _min_gap_norm: float = 0.0 # en yakın iki koltuk merkezi arası (normalize)
 
 ## entries: Array of {"seats": int, "color": Color} — sıra ÖNEMLİ, koltuklar
 ## bu sırayla soldan başlanarak dolduruluyor.
@@ -35,9 +39,13 @@ func set_results(entries: Array) -> void:
 		total += int(e["seats"])
 	_total_seats = total
 
-	var layout := _compute_seat_layout(total)
-	var positions: Array = layout["positions"]
-	_seat_radius_norm = layout["seat_radius"]
+	# Yerleşim sadece toplam değişince hesaplanır (seçim gecesi her karede çağırır).
+	if total != _layout_total:
+		_layout_total = total
+		_layout = _compute_seat_layout(total)
+		_min_gap_norm = _nearest_distance(_layout["positions"])
+	var positions: Array = _layout["positions"]
+	_seat_radius_norm = _layout["seat_radius"]
 
 	_dot_positions.clear()
 	_dot_colors.clear()
@@ -53,32 +61,46 @@ func set_results(entries: Array) -> void:
 			idx += 1
 	queue_redraw()
 
+## Koltuklar arası en küçük mesafe (satırlar içinde ve komşu satırlarda).
+static func _nearest_distance(positions: Array) -> float:
+	var best := INF
+	for i in positions.size():
+		for j in range(i + 1, mini(positions.size(), i + 60)):
+			best = minf(best, (positions[i] as Vector2).distance_to(positions[j]))
+	return 0.0 if best == INF else best
+
+func _ready() -> void:
+	# Pencere ölçeği değişince kontrol boyutu aynı kalsa bile ekran piksel
+	# ızgarası değişir; kareler yeniden hizalanmalı.
+	get_viewport().size_changed.connect(queue_redraw)
+
 func _draw() -> void:
 	if _dot_positions.is_empty():
 		return
 	# x normalize [0,2] (merkez=1), y normalize [0,~1] — kontrol alanına sığdır.
 	var scale: float = minf(size.x * 0.5, size.y * 0.96)
 	var origin := Vector2(size.x * 0.5, size.y * 0.98)
-	var dot_radius: float = maxf(2.5, _seat_radius_norm * scale)
-	var pixel_positions: Array = []
+
+	# Daireler kesirli konumlarda antialiased çizilir: piksel ızgarasına yuvarlamak
+	# eşit aralıkları bozuyordu. Yarıçap, en yakın komşu mesafesinin %45'i ile
+	# sınırlı: kontur dahil hiçbir daire komşusuna değmez.
+	var radius: float = _seat_radius_norm * scale
+	if _min_gap_norm > 0.0:
+		radius = minf(radius, _min_gap_norm * scale * 0.45)
+	radius = maxf(1.5, radius)
+	var inner: float = radius * (1.0 - outline_ratio)
 	for i in _dot_positions.size():
 		var p: Vector2 = _dot_positions[i]
-		pixel_positions.append(origin + Vector2(p.x - 1.0, -p.y) * scale)
-	# Pixel-art harita/UI ile tutarlı olsun diye artık antialiased YUVARLAK
-	# değil, keskin kenarlı KARE koltuklar çiziliyor (draw_rect, antialiased
-	# kapalı) — köşeleri net, bulanıklık yok.
-	for pixel_pos in pixel_positions:
-		var outline_half: float = dot_radius + outline_width
-		draw_rect(Rect2(pixel_pos - Vector2(outline_half, outline_half), Vector2(outline_half, outline_half) * 2.0), outline_color, true)
-	for i in _dot_positions.size():
-		var half: float = dot_radius
-		draw_rect(Rect2(pixel_positions[i] - Vector2(half, half), Vector2(half, half) * 2.0), _dot_colors[i], true)
+		var center := origin + Vector2(p.x - 1.0, -p.y) * scale
+		draw_circle(center, radius, outline_color, true, -1.0, true)
+		draw_circle(center, inner, _dot_colors[i], true, -1.0, true)
 
 	# eksen_projeksiyon'daki gibi, yayın altında ortalanmış toplam sandalye
 	# sayısı (createParliamentArch'taki <text>{total}</text> karşılığı).
 	if _total_seats > 0:
 		var font := get_theme_default_font()
-		var font_size: int = int(round(size.x * 0.06))
+		# Sabit boyut: oyun ekranında ve seçim sonucunda aynı görünsün.
+		var font_size: int = COUNT_FONT_SIZE
 		var text := str(_total_seats)
 		var text_width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 		draw_string(font, Vector2(size.x * 0.5 - text_width * 0.5, size.y - 4.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(1, 1, 1, 0.9))

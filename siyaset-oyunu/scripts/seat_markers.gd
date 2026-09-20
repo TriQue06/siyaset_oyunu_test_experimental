@@ -82,6 +82,11 @@ func clear_province(province_id: String) -> void:
 	_seats.erase(province_id)
 	_rebuild()
 
+## Tüm illeri tek seferde ayarlar (tek yeniden hesaplama). province_id -> Array[Color]
+func set_all(seats_by_province: Dictionary) -> void:
+	_seats = seats_by_province.duplicate()
+	_rebuild()
+
 func clear_all() -> void:
 	_seats.clear()
 	_rebuild()
@@ -200,9 +205,8 @@ func _centroid_anchor(center: Vector2, layout: Array, cell: float) -> Vector2:
 		return center
 	return center - sum / float(total)
 
-## Pixel-art haritayla tutarlı olsun diye YUVARLAK değil, keskin kenarlı KARE
-## noktalar çiziliyor: önce biraz daha büyük koyu bir kare (kontur), üstüne
-## parti renginde asıl kare (eksen_projeksiyon'daki stroke="#1c1e21" karşılığı).
+## Vekiller DAİRE olarak çiziliyor: önce biraz daha büyük koyu bir daire (kontur),
+## üstüne parti renginde asıl daire (eksen_projeksiyon'daki stroke="#1c1e21" karşılığı).
 ##
 ## PİKSEL IZGARASI (bu fonksiyonun asıl işi): harita kesirli bir ölçekle
 ## (fit_scale, ör. 0.678) büyütülüyor. Nokta konumları harita biriminde
@@ -218,12 +222,20 @@ func _centroid_anchor(center: Vector2, layout: Array, cell: float) -> Vector2:
 func _draw() -> void:
 	if _groups.is_empty():
 		return
-	var xform := get_global_transform()
+	# GERÇEK ekran pikseli: düğümün kendi global dönüşümü, projenin
+	# "canvas_items" esnetme ölçeğini İÇERMİYOR. Pencere temel çözünürlükten
+	# farklı boyuttayken bu kesirli ölçek yüzünden "tam piksele hizalı" sanılan
+	# kareler gerçekte piksel sınırlarına farklı düşüyor, bazı karelerin
+	# konturu kalın bazılarınınki ince görünüyordu. Viewport'un nihai
+	# (esnetme) dönüşümünü de katınca hizalama gerçek piksellerde yapılıyor.
+	var xform := get_viewport().get_final_transform() * get_global_transform_with_canvas()
 	var scale: float = maxf(0.0001, xform.get_scale().x)
 	var inv := xform.affine_inverse()
 
 	var dot_half_px: int = maxi(1, int(roundf(dot_radius * scale)))
-	var outline_half_px: int = maxi(dot_half_px + 1, int(roundf((dot_radius + dot_outline_width) * scale)))
+	# Kontur kalınlığı AYRI yuvarlanıyor: iki boyutu bağımsız yuvarlamak ölçeğe
+	# göre konturu 1 piksel oynatabiliyordu.
+	var outline_half_px: int = dot_half_px + maxi(1, int(roundf(dot_outline_width * scale)))
 	var cell := dot_radius * 2.0 + dot_spacing
 	var step_px: int = maxi(outline_half_px * 2 + min_screen_gap_px, int(roundf(cell * scale)))
 
@@ -247,13 +259,12 @@ func _draw() -> void:
 						break
 					var color: Color = dot_outline_color if pass_index == 0 else colors[idx]
 					var center_px := Vector2(x0_px + col * step_px, y_px)
-					_draw_rect_at_screen_px(inv, center_px, half_px, color)
+					_draw_circle_at_screen_px(inv, scale, center_px, half_px, color)
 					idx += 1
 
-## Ekran (global) piksel uzayında verilen kare, local uzaya geri çevrilerek
-## çiziliyor — böylece Node2D ölçeği ne olursa olsun kenarlar tam piksele
-## oturur, yarım piksel bulanıklığı olmaz.
-func _draw_rect_at_screen_px(inv: Transform2D, center_px: Vector2, half_px: int, color: Color) -> void:
-	var top_left: Vector2 = inv * (center_px - Vector2(half_px, half_px))
-	var bottom_right: Vector2 = inv * (center_px + Vector2(half_px, half_px))
-	draw_rect(Rect2(top_left, bottom_right - top_left), color, true)
+## Ekran piksel uzayında (tam sayı merkez, tam sayı yarıçap) antialiased daire;
+## yerel uzaya geri çevrilerek çizilir. Bütün dairelerin merkezi ve yarıçapı
+## ekranda aynı tam sayılara oturduğu için kenar yumuşatması her birinde birebir
+## aynı görünür; adım konturlu çapın üstünde olduğundan daireler değmez.
+func _draw_circle_at_screen_px(inv: Transform2D, screen_scale: float, center_px: Vector2, half_px: int, color: Color) -> void:
+	draw_circle(inv * center_px, float(half_px) / screen_scale, color, true, -1.0, true)

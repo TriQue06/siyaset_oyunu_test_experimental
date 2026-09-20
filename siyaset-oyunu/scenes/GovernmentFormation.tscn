@@ -1,7 +1,9 @@
-[gd_scene load_steps=3 format=3 uid="uid://c7g0v3rn0f0r1"]
+[gd_scene load_steps=5 format=3 uid="uid://c7g0v3rn0f0r1"]
 
 [ext_resource type="Script" path="res://scripts/government_formation.gd" id="1"]
 [ext_resource type="Theme" uid="uid://cmjk3bfl8mavr" path="res://assets/ui/main_theme.tres" id="2"]
+[ext_resource type="Script" path="res://scripts/parliament_diagram.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/vote_share_panel.gd" id="4"]
 
 [node name="GovernmentFormation" type="Control"]
 layout_mode = 3
@@ -42,12 +44,48 @@ theme_override_font_sizes/font_size = 14
 text = "-"
 autowrap_mode = 2
 
-[node name="Scroll" type="ScrollContainer" parent="Margin/VBox"]
+[node name="Body" type="HBoxContainer" parent="Margin/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 24
+
+[node name="SeatColumn" type="VBoxContainer" parent="Margin/VBox/Body"]
+custom_minimum_size = Vector2(360, 0)
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SeatTitle" type="Label" parent="Margin/VBox/Body/SeatColumn"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+modulate = Color(1, 1, 1, 0.65)
+text = "MECLİS — soluk olanlar hükümet dışı"
+
+[node name="ParliamentDiagram" type="Control" parent="Margin/VBox/Body/SeatColumn"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(360, 190)
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("3")
+
+[node name="SeatScroll" type="ScrollContainer" parent="Margin/VBox/Body/SeatColumn"]
 layout_mode = 2
 size_flags_vertical = 3
 horizontal_scroll_mode = 0
 
-[node name="PostList" type="VBoxContainer" parent="Margin/VBox/Scroll"]
+[node name="SeatList" type="VBoxContainer" parent="Margin/VBox/Body/SeatColumn/SeatScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+script = ExtResource("4")
+
+[node name="Scroll" type="ScrollContainer" parent="Margin/VBox/Body"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="PostList" type="VBoxContainer" parent="Margin/VBox/Body/Scroll"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3

@@ -17,9 +17,19 @@
 //     DATA (server->client) payload: senderPeer(4 LE) + oyun verisi
 //   7 ROOM_CLOSED  (server->client) payload: sebep (utf8)
 
+//
+// HTTP: GET istekleri "ok" dondurur (saglik kontrolu / uyku modundaki ucretsiz
+// sunucuyu uyandirmak icin). WebSocket ayni port uzerinden calisir.
+// Olu baglantilar (sekmesi kapanan, agi kopan oyuncu) HEARTBEAT_MS'de bir
+// ping ile tespit edilip kapatilir; boylece odadaki digerleri
+// PEER_DISCONNECTED alir ve oyun o oyuncuyu beklemekten kurtulur.
+
+const http = require("http");
 const { WebSocketServer } = require("ws");
 
 const PORT = process.env.PORT || 8080;
+const HEARTBEAT_MS = 25000;
+const MAX_PAYLOAD_BYTES = 8 * 1024 * 1024;
 const MAX_PEERS_PER_ROOM = 8;
 const CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const CODE_LENGTH = 5;
@@ -205,12 +215,34 @@ function handleClose(ws) {
   broadcastPeerEvent(room, TYPE.PEER_DISCONNECTED, ws.peerId, ws);
 }
 
-const wss = new WebSocketServer({ port: PORT });
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+  res.end(`ok rooms=${rooms.size}\n`);
+});
+
+const wss = new WebSocketServer({ server, maxPayload: MAX_PAYLOAD_BYTES });
+
+const heartbeat = setInterval(() => {
+  for (const ws of wss.clients) {
+    if (!ws.isAlive) {
+      ws.terminate(); // "close" olayi handleClose'u tetikler
+      continue;
+    }
+    ws.isAlive = false;
+    ws.ping();
+  }
+}, HEARTBEAT_MS);
+
+wss.on("close", () => clearInterval(heartbeat));
 
 wss.on("connection", (ws) => {
   ws.roomCode = null;
   ws.peerId = 0;
   ws.isHost = false;
+  ws.isAlive = true;
+  ws.on("pong", () => {
+    ws.isAlive = true;
+  });
 
   ws.on("message", (data) => {
     if (!Buffer.isBuffer(data) || data.length < 1) return;
@@ -236,4 +268,6 @@ wss.on("connection", (ws) => {
   ws.on("error", () => {});
 });
 
-console.log(`Siyaset Oyunu role sunucusu ${PORT} portunda calisiyor.`);
+server.listen(PORT, () => {
+  console.log(`Siyaset Oyunu role sunucusu ${PORT} portunda calisiyor.`);
+});

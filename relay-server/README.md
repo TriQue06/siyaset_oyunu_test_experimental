@@ -17,15 +17,18 @@ doğru oyuncuya yönlendirir.
    - **Start Command**: `npm start`
    - **Instance Type**: Free
 5. Deploy tamamlanınca Render sana `https://<servis-adin>.onrender.com` gibi bir adres verir.
-6. Oyunun içinde `scripts/multiplayer_manager.gd` dosyasındaki `RELAY_URL` sabitini bul ve
-   `https://` yerine `wss://` koyarak güncelle:
-   ```gdscript
-   const RELAY_URL := "wss://<servis-adin>.onrender.com"
-   ```
+6. Oyuna adresi `https://` yerine `wss://` ile ver. Kodu değiştirmeden (öncelik sırasıyla):
+   - komut satırı: `godot -- --relay=wss://<servis-adin>.onrender.com`
+   - ortam değişkeni: `SIYASET_RELAY_URL=wss://<servis-adin>.onrender.com`
+   - proje ayarı: `siyaset/network/relay_url`
+   Hiçbiri yoksa `scripts/multiplayer_manager.gd` içindeki `DEFAULT_RELAY_URL` kullanılır.
 
 **Not:** Render'ın ücretsiz planı, 15 dakika istek gelmezse sunucuyu uyutur; ilk
 bağlantı isteği sunucuyu uyandırırken birkaç saniye sürebilir (oda kurarken
-"Oda kuruluyor..." biraz uzun sürebilir, normaldir). Sık oynanacaksa
+"Oda kuruluyor..." biraz uzun sürebilir, normaldir). Oyun 4 saniyeden uzun
+süren bağlantılarda "sunucu uyanıyor" bilgisi gösterir ve 75 saniye bekler.
+Sunucu `GET /` isteğine `ok` döndürür; bir uptime servisiyle bu adrese
+periyodik istek atarak uyumasını da engelleyebilirsin. Sık oynanacaksa
 ücretli bir plana geçmek bunu ortadan kaldırır.
 
 ## Yerelde test etmek için

@@ -11,7 +11,9 @@ config_version=5
 [application]
 
 config/name="Siyaset Oyunu"
+config/version="0.0.29"
 run/main_scene="res://scenes/Lobby.tscn"
+config/quit_on_go_back=false
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
 
@@ -27,6 +29,7 @@ CardPresets="*res://scripts/card_presets.gd"
 CardManager="*res://scripts/card_manager.gd"
 GovernmentPresets="*res://scripts/government_presets.gd"
 GovernmentManager="*res://scripts/government_manager.gd"
+BotManager="*res://scripts/bot_manager.gd"
 SettingsOverlay="*res://scenes/SettingsOverlay.tscn"
 SceneTransition="*res://scenes/SceneTransition.tscn"
 
@@ -49,3 +52,4 @@ svg={
 
 textures/canvas_textures/default_texture_filter=0
 rendering_device/driver.windows="d3d12"
+textures/vram_compression/import_etc2_astc=true

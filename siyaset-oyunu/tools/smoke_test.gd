@@ -7,7 +7,6 @@ extends SceneTree
 func _initialize() -> void:
 	var scenes := [
 		"res://scenes/Lobby.tscn",
-		"res://scenes/RoomSetup.tscn",
 		"res://scenes/RoomLobby.tscn",
 		"res://scenes/Map.tscn",
 		"res://scenes/SettingsOverlay.tscn",

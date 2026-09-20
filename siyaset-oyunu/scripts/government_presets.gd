@@ -1,7 +1,7 @@
 extends Node
 ## Autoload. Hükümet görevlerinin (koltukların) katalogu ve puan değerleri.
 ##
-## Toplam 10 görev: 1 başbakanlık, 1 başbakan yardımcılığı, 8 bakanlık.
+## Toplam 8 görev: 1 başbakanlık, 1 başbakan yardımcılığı, 6 bakanlık.
 ## Hükümetin BAŞI başbakanlıktır — birinci parti başbakanlığı ortağına
 ## verirse, ANA İKTİDAR PARTİSİ o ortak sayılır (bkz.
 ## GovernmentManager.main_gov_peer_id).
@@ -13,6 +13,12 @@ const PM_POINTS := 3
 const DEPUTY_PM_POINTS := 2
 const MINISTRY_POINTS := 1
 
+## Koalisyondan çekilen küçük ortağın puan cezası.
+const WITHDRAW_SCORE_PENALTY := 3
+## Ortağı çekildiği için TEK BAŞINA kalan ana iktidar partisi gensoruyla
+## düşerse: çok daha büyük puan cezası.
+const ABANDONED_FALL_PENALTY := 8
+
 ## Sıra ÖNEMLİ: hükümet kurma ekranında bu sırayla listelenir.
 const POSTS: Array[Dictionary] = [
 	{"id": POST_PM, "title": "Başbakanlık", "points": PM_POINTS},
@@ -23,8 +29,6 @@ const POSTS: Array[Dictionary] = [
 	{"id": "ministry_justice", "title": "Adalet Bakanlığı", "points": MINISTRY_POINTS},
 	{"id": "ministry_education", "title": "Milli Eğitim Bakanlığı", "points": MINISTRY_POINTS},
 	{"id": "ministry_health", "title": "Sağlık Bakanlığı", "points": MINISTRY_POINTS},
-	{"id": "ministry_transport", "title": "Ulaştırma Bakanlığı", "points": MINISTRY_POINTS},
-	{"id": "ministry_agriculture", "title": "Tarım Bakanlığı", "points": MINISTRY_POINTS},
 ]
 
 func post_ids() -> Array:

@@ -144,7 +144,7 @@ static func _fill_cabinet(box: VBoxContainer, government: Dictionary) -> void:
 ## satır yüksekliğinde — 8 oyuncuda da sol panele sığsın.
 static func fill_score_panel(box: VBoxContainer, peer_ids: Array, my_id: int) -> void:
 	_clear(box)
-	box.add_child(section_title("PUAN TABLOSU   (kamuoyu · puan)"))
+	box.add_child(section_title("Puan tablosu"))
 	var ids: Array = peer_ids.duplicate()
 	ids.sort_custom(func(a, b):
 		var sa := GovernmentManager.score_of(a)

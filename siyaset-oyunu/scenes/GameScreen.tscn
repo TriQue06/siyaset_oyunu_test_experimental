@@ -216,8 +216,7 @@ size_flags_horizontal = 3
 size_flags_vertical = 4
 text = "Sıra: -"
 theme_override_font_sizes/font_size = 13
-text_overrun_behavior = 3
-clip_text = true
+autowrap_mode = 2
 
 [node name="LeftPanel" type="PanelContainer" parent="." unique_id=3821004470]
 unique_name_in_owner = true

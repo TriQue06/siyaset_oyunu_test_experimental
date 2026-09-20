@@ -168,7 +168,7 @@ func _initialize() -> void:
 	cm._push_state({"type": "timer"})
 	await _frames(3)
 	check("gundem bandi gorunur", scene._agenda_banner.visible)
-	check("gundem carpani: devletci 3, piyasaci 2, diger 1", is_equal_approx(cm.agenda_law_mult("law:economic:-1"), 3.0) 		and is_equal_approx(cm.agenda_law_mult("law:economic:1"), 2.0) and is_equal_approx(cm.agenda_law_mult("law:social:1"), 1.0))
+	check("gundem sadece ekseni belirler (carpan yok)", cm.law_on_agenda("law:economic:-1") and cm.law_on_agenda("law:economic:1") 		and not cm.law_on_agenda("law:social:1"))
 	scene._on_law_button_pressed()
 	await create_timer(0.3).timeout
 	_shot("law_designer")
@@ -194,7 +194,7 @@ func _initialize() -> void:
 	await _frames(5)
 	_shot("panel_plain")
 	scene._province_panel.hide()
-	cm._end_game("32 tur tamamlandı. Son seçimle kurulan Partim3 hükümeti makam puanlarını aldı.")
+	cm._end_game("32 yıl tamamlandı. Son seçimle kurulan Partim3 hükümeti makam puanlarını aldı.")
 	await create_timer(0.4).timeout
 	_shot("game_over_fading")
 	await create_timer(3.0).timeout

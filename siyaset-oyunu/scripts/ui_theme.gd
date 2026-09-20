@@ -91,12 +91,17 @@ static func mono_regular() -> FontFile:
 # --- YARDIMCILAR -----------------------------------------------------------
 
 ## Panel başlığı: monospace, altın, büyük harf, "> " önekli.
+## Monospace geniş olduğu için başlık paneli ZORLA GENİŞLETMEZ: sığmazsa
+## satır kaydırır (sol panelin 260 piksellik genişliği sabit kalsın).
 static func section_label(text: String, color: Color = GOLD) -> Label:
 	var label := Label.new()
 	label.text = "> " + text.to_upper()
 	label.add_theme_font_override("font", mono())
 	label.add_theme_font_size_override("font_size", FS_TINY + 3)
 	label.add_theme_color_override("font_color", color)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.custom_minimum_size.x = 1.0
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return label
 
 ## Monospace etiket (rakamlar, başlıklar).

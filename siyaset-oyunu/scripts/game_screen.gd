@@ -214,6 +214,9 @@ func _ready() -> void:
 	CardManager.opinion_changed.connect(_on_opinion_changed)
 
 	UiSkin.skin_panel(left_panel, UiSkin.PANEL_DARK)
+	# Monospace yazı geniş: panelin kendi genişliğini aşmasını engelle.
+	left_panel.clip_contents = true
+	left_panel.custom_minimum_size.x = LEFT_PANEL_WIDTH
 	_build_waiting_overlay()
 	_build_toast()
 	_build_target_hint()
@@ -340,8 +343,10 @@ func _build_toast() -> void:
 	_toast.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_toast.offset_top = 16.0
 	_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_toast.add_theme_font_size_override("font_size", 18)
-	_toast.add_theme_color_override("font_outline_color", Color.BLACK)
+	_toast.add_theme_font_override("font", UiTheme.mono())
+	_toast.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
+	_toast.add_theme_color_override("font_color", UiTheme.GOLD)
+	_toast.add_theme_color_override("font_outline_color", UiTheme.INK)
 	_toast.add_theme_constant_override("outline_size", 6)
 	_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_toast.z_index = 110
@@ -1495,11 +1500,11 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 		tags.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		tags.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		if is_turn:
-			tags.add_child(_avatar_tag("SIRADA", UiTheme.TEXT, UiTheme.INK))
+			tags.add_child(_avatar_tag("SIRA", UiTheme.TEXT, UiTheme.INK))
 		if is_self and not (is_turn and compact):
 			tags.add_child(_avatar_tag("SEN", UiTheme.GOLD, UiTheme.INK))
 		if populism_left > 0 and not (compact and tags.get_child_count() >= 2):
-			tags.add_child(_avatar_tag("POPÜLİZM %d" % populism_left, UiTheme.PURPLE, UiTheme.TEXT))
+			tags.add_child(_avatar_tag("POP %d" % populism_left, UiTheme.PURPLE, UiTheme.TEXT))
 		row.add_child(tags)
 	# Hangi oyuncuya ait olduğu düğümün ÜSTÜNDE saklanıyor: hover tespiti ve
 	# tooltip konumu panelin çocuk SIRASINA güvenmez (bkz. _party_under_mouse).
@@ -1569,8 +1574,8 @@ func _avatar_tag(text: String, bg: Color, fg: Color) -> Control:
 	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var style := UiSkin.color_box(bg, UiSkin.FILL)
-	style.content_margin_left = 5
-	style.content_margin_right = 5
+	style.content_margin_left = 3
+	style.content_margin_right = 3
 	tag.add_theme_stylebox_override("normal", style)
 	return tag
 
@@ -1688,7 +1693,9 @@ func _build_waiting_overlay() -> void:
 	_waiting_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_waiting_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_waiting_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_waiting_label.add_theme_font_size_override("font_size", 20)
+	_waiting_label.add_theme_font_override("font", UiTheme.mono())
+	_waiting_label.add_theme_font_size_override("font_size", UiTheme.FS_HEAD)
+	_waiting_label.add_theme_color_override("font_color", UiTheme.TEXT)
 	_waiting_overlay.add_child(_waiting_label)
 
 	add_child(_waiting_overlay)
@@ -1795,9 +1802,10 @@ func _build_action_buttons() -> void:
 	_mana_box.add_child(mana_icon)
 	_mana_label = Label.new()
 	_mana_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_mana_label.add_theme_font_override("font", UiTheme.mono(true))
 	_mana_label.add_theme_font_size_override("font_size", 22)
 	_mana_label.add_theme_color_override("font_color", MANA_COLOR)
-	_mana_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	_mana_label.add_theme_color_override("font_outline_color", UiTheme.INK)
 	_mana_label.add_theme_constant_override("outline_size", 5)
 	_mana_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_mana_box.add_child(_mana_label)

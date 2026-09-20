@@ -370,6 +370,20 @@ func transfer_ownership(new_owner_id: int) -> void:
 	else:
 		_request_transfer_ownership.rpc_id(1, new_owner_id)
 
+## ANAYASA DEĞİŞİKLİĞİ: meclis 2/3 çoğunlukla kabul ettiyse oyunun kuralları
+## değişir. Lobi ayarından farkı: oyun İÇİNDE, oylamayla ve sahiplik aranmadan
+## uygulanır (host yazar, herkese senkronlanır).
+func apply_constitution(threshold: float, interval_years: int) -> void:
+	var local_only := room_code == ""
+	if not is_host and not local_only:
+		return
+	election_threshold = snap_threshold(threshold)
+	election_interval = clampi(interval_years, GameRules.ELECTION_INTERVAL_MIN, GameRules.ELECTION_INTERVAL_MAX)
+	GameRules.configure(election_interval, election_count)
+	if not local_only:
+		_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+	settings_updated.emit()
+
 ## Seçim barajını (%) ayarlar. Sadece mevcut lobi sahibi çağırabilir.
 ## value 0-10 arasına ve 0.5'in katlarına yuvarlanır.
 func set_election_threshold(value: float) -> void:

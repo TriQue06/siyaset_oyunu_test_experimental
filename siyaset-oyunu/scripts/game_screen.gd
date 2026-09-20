@@ -68,6 +68,13 @@ const PLAY_POP_DURATION := 0.18   # ortada küçülüp "puf" kaybolma
 var _deck_shadow: TextureRect
 ## Kartı sürükleyip bırakınca atmaya yarayan çöp kutusu.
 var _trash_button: Button
+## Anayasa paketi: oyuncunun seçtiği baraj ve seçim aralığı.
+var _constitution_threshold: float = 0.0
+var _constitution_interval: int = 4
+var _constitution_threshold_label: Label
+var _constitution_interval_label: Label
+var _constitution_button: Button
+var _constitution_info: Label
 @onready var pass_button: Button = %PassButton
 @onready var player_panel_list: GridContainer = %PlayerPanelList
 @onready var hand_container: HBoxContainer = %HandContainer
@@ -225,6 +232,8 @@ func _ready() -> void:
 	_build_card_info()
 	_build_action_buttons()
 	_build_trash_button()
+	# Çöp kutusu destenin yanına otursun (yerleşim butonlar kurulduktan sonra).
+	_place_right_column_controls()
 	_build_law_designer()
 	_build_agenda_banner()
 	_build_propaganda_menu()
@@ -494,6 +503,11 @@ func _format_threshold(value: float) -> String:
 	if is_equal_approx(value, round(value)):
 		return str(int(round(value)))
 	return "%.1f" % value
+
+## Anayasa paketi meclise sunulur (2/3 gerekir).
+func _on_constitution_pressed() -> void:
+	CardManager.propose_constitution({"threshold": _constitution_threshold, "interval": _constitution_interval})
+	_law_designer.hide()
 
 func _on_deck_pressed() -> void:
 	CardManager.draw_card()
@@ -2006,12 +2020,92 @@ func _build_law_designer() -> void:
 	_law_info.add_theme_font_size_override("font_size", 10)
 	_law_info.add_theme_color_override("font_color", UiTheme.GOLD)
 	box.add_child(_law_info)
+	box.add_child(UiTheme.rule())
+	_build_constitution_section(box)
 	_law_designer.hide()
 	add_child(_law_designer)
+
+## ANAYASA DEĞİŞİKLİĞİ paneli (yasa panelinin altında). Gündeme bağlı değil,
+## ama meclisin 2/3'ü gerekir. Oyuncu barajı ve seçim aralığını seçip paket
+## halinde sunar.
+func _build_constitution_section(box: VBoxContainer) -> void:
+	box.add_child(UiTheme.section_label("Anayasa değişikliği"))
+	_constitution_threshold = MultiplayerManager.election_threshold
+	_constitution_interval = MultiplayerManager.election_interval
+
+	var threshold_row := HBoxContainer.new()
+	threshold_row.add_theme_constant_override("separation", 6)
+	threshold_row.add_child(UiTheme.body_label("Baraj", UiTheme.FS_TINY, UiTheme.TEXT_MUTED))
+	_constitution_threshold_label = UiTheme.mono_label("", UiTheme.FS_SMALL)
+	_constitution_threshold_label.custom_minimum_size.x = 48
+	_constitution_threshold_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	threshold_row.add_child(_stepper_button("−", func(): _change_constitution(-0.5, 0)))
+	threshold_row.add_child(_constitution_threshold_label)
+	threshold_row.add_child(_stepper_button("+", func(): _change_constitution(0.5, 0)))
+	box.add_child(threshold_row)
+
+	var interval_row := HBoxContainer.new()
+	interval_row.add_theme_constant_override("separation", 6)
+	interval_row.add_child(UiTheme.body_label("Seçim", UiTheme.FS_TINY, UiTheme.TEXT_MUTED))
+	_constitution_interval_label = UiTheme.mono_label("", UiTheme.FS_SMALL)
+	_constitution_interval_label.custom_minimum_size.x = 48
+	_constitution_interval_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	interval_row.add_child(_stepper_button("−", func(): _change_constitution(0.0, -1)))
+	interval_row.add_child(_constitution_interval_label)
+	interval_row.add_child(_stepper_button("+", func(): _change_constitution(0.0, 1)))
+	box.add_child(interval_row)
+
+	_constitution_button = Button.new()
+	_constitution_button.text = "ANAYASAYI DEĞİŞTİR"
+	_constitution_button.add_theme_font_size_override("font_size", UiTheme.FS_TINY)
+	UiSkin.skin_color_button(_constitution_button, UiTheme.GOLD.darkened(0.25))
+	_constitution_button.pressed.connect(_on_constitution_pressed)
+	box.add_child(_constitution_button)
+
+	_constitution_info = Label.new()
+	_constitution_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_constitution_info.custom_minimum_size = Vector2(240, 0)
+	_constitution_info.add_theme_font_size_override("font_size", 10)
+	_constitution_info.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
+	box.add_child(_constitution_info)
+
+func _stepper_button(text: String, action: Callable) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.custom_minimum_size = Vector2(28, 24)
+	button.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
+	button.focus_mode = Control.FOCUS_NONE
+	button.pressed.connect(action)
+	return button
+
+func _change_constitution(threshold_delta: float, interval_delta: int) -> void:
+	_constitution_threshold = clampf(_constitution_threshold + threshold_delta, 0.0, 10.0)
+	_constitution_interval = clampi(_constitution_interval + interval_delta,
+		GameRules.ELECTION_INTERVAL_MIN, GameRules.ELECTION_INTERVAL_MAX)
+	_refresh_constitution_section()
+
+func _refresh_constitution_section() -> void:
+	if _constitution_threshold_label == null:
+		return
+	_constitution_threshold_label.text = "%%%s" % String.num(_constitution_threshold, 1)
+	_constitution_interval_label.text = "%d yıl" % _constitution_interval
+	var me := multiplayer.get_unique_id()
+	var can := CardManager.can_propose_constitution(me)
+	_constitution_button.disabled = not can
+	var needed := GovernmentManager.constitution_threshold_seats()
+	var changed: bool = not is_equal_approx(_constitution_threshold, MultiplayerManager.election_threshold) 		or _constitution_interval != MultiplayerManager.election_interval
+	if not changed:
+		_constitution_info.text = "Şu anki kuralları değiştirmiyor. Baraj ya da seçim aralığını değiştir."
+		_constitution_button.disabled = true
+	elif can:
+		_constitution_info.text = "Meclisin 2/3'ü (%d vekil) EVET derse yürürlüğe girer. Gündem şartı yok, ama dönemdeki yasa hakkını kullanır." % needed
+	else:
+		_constitution_info.text = _action_block_reason(0, true)
 
 ## Yasa panelinin değişen kısımları: puan, gündem, her eksende partinin yeri
 ## ve gündem çarpanı rozetleri. Panel her açılışta tazelenir.
 func _refresh_law_designer() -> void:
+	_refresh_constitution_section()
 	var me := multiplayer.get_unique_id()
 	var in_gov := CardManager.is_government_party(me)
 	_law_points_label.text = "Kabul: +%d puan%s · %d mana" % [

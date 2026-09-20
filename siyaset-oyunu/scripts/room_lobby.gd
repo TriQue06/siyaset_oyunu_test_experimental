@@ -284,7 +284,7 @@ func _refresh_settings_display() -> void:
 		years.append(str(GameRules.START_YEAR + interval * i))
 	if years.size() > 5:
 		years = years.slice(0, 3) + ["…"] + years.slice(years.size() - 1)
-	game_length_summary.text = "%d'de başlar, %d yıl sürer. Seçimler: %s." % [GameRules.START_YEAR,
+	game_length_summary.text = "%d'de başlar, %d yıl sürer (bir tur 6 ay). Seçimler: %s." % [GameRules.START_YEAR,
 		interval * count, ", ".join(PackedStringArray(years))]
 	if MultiplayerManager.is_local_owner():
 		interval_minus.disabled = interval <= GameRules.ELECTION_INTERVAL_MIN

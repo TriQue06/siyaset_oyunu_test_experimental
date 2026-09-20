@@ -589,6 +589,32 @@ static func choose_vote(bot: int) -> int:
 			if bot == GovernmentManager.proposal_peer_id:
 				return GovernmentManager.VOTE_YES
 			return _early_election_vote(bot)
+		GovernmentManager.KIND_CONSTITUTION:
+			if bot == GovernmentManager.proposal_peer_id:
+				return GovernmentManager.VOTE_YES
+			return _constitution_vote(bot)
+	return GovernmentManager.VOTE_ABSTAIN
+
+## ANAYASA DEĞİŞİKLİĞİ: küçük parti barajın DÜŞMESİNİ ister, büyük parti
+## yükselmesini. Seçim aralığının uzaması iktidardakinin işine gelir.
+static func _constitution_vote(bot: int) -> int:
+	var payload: Dictionary = GovernmentManager.proposal_assignments
+	var new_threshold := float(payload.get("threshold", MultiplayerManager.election_threshold))
+	var new_interval := int(payload.get("interval", MultiplayerManager.election_interval))
+	var score := 0.0
+	# Oy oranı barajın altına yakınsa baraj düşmesi hayat kurtarır.
+	var share := float(CardManager.last_vote_shares.get(bot, 0.0))
+	var threshold_delta := new_threshold - MultiplayerManager.election_threshold
+	if share < MultiplayerManager.election_threshold + 5.0:
+		score -= threshold_delta   # baraj düşerse iyi
+	else:
+		score += threshold_delta * 0.5   # büyük parti: baraj yükselsin
+	var interval_delta := float(new_interval - MultiplayerManager.election_interval)
+	score += interval_delta * (1.0 if CardManager.is_government_party(bot) else -1.0)
+	if score > 0.4:
+		return GovernmentManager.VOTE_YES
+	if score < -0.4:
+		return GovernmentManager.VOTE_NO
 	return GovernmentManager.VOTE_ABSTAIN
 
 ## ERKEN SEÇİM ÖNERGESİ: iktidardaki bot sandığa gitmek istemez; muhalefetteki
@@ -692,6 +718,17 @@ static func build_government(bot: int) -> Dictionary:
 		return ElectionModel.distance(mine, _ideology(a)) < ElectionModel.distance(mine, _ideology(b)))
 	var shift := GovernmentManager.attempts_used % maxi(1, candidates.size())
 	candidates = candidates.slice(shift) + candidates.slice(0, shift)
+	# Döndürme blok dayanışmasını bozmasın: blok varken botlar yine önde kalır
+	# (yoksa teklif hakkı el değiştirdikçe insan oyuncu koalisyona sızabiliyordu).
+	if bloc:
+		var bots: Array = []
+		var others: Array = []
+		for peer_id in candidates:
+			if MultiplayerManager.is_bot(peer_id):
+				bots.append(peer_id)
+			else:
+				others.append(peer_id)
+		candidates = bots + others
 
 	var partners: Array = []
 	var seats := GovernmentManager.seats_of(bot)

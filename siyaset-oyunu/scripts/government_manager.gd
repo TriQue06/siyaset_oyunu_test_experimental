@@ -46,6 +46,10 @@ const KIND_CENSURE := "censure"
 const KIND_LAW := "law"
 ## Erken seçim önergesi: basit çoğunlukla kabul edilir.
 const KIND_EARLY := "early"
+## Anayasa değişikliği: 2/3 çoğunluk ister, oyunun kurallarını değiştirir.
+const KIND_CONSTITUTION := "constitution"
+## Kabul için gereken pay (meclisin tamamına göre).
+const CONSTITUTION_MAJORITY := 2.0 / 3.0
 ## Bir partinin hükümet kurma hakkı (3. teklif de geçmezse sıra devreder).
 const MAX_ATTEMPTS := 3
 ## Hükümet teklifinin oylama aşamaları (bkz. AKIŞ 4).
@@ -449,6 +453,28 @@ func _request_withdraw() -> void:
 func _notify_coalition(text: String) -> void:
 	coalition_changed.emit(text)
 
+## ANAYASA DEĞİŞİKLİĞİ ÖNERGESİ. payload: {"threshold": float, "interval": int}
+## Gündeme bağlı değildir; her dönem sunulabilir (yasa hakkını kullanır).
+func submit_constitution(peer_id: int, payload: Dictionary) -> bool:
+	if not _is_authority() or not can_submit_law():
+		return false
+	_clear_proposal()
+	proposal_kind = KIND_CONSTITUTION
+	proposal_peer_id = peer_id
+	proposal_gov_ids = government_party_ids()
+	proposal_assignments = payload.duplicate()
+	votes = {peer_id: VOTE_YES}
+	_set_phase(Phase.VOTING)
+	if _all_voted():
+		_begin_resolution()
+	else:
+		_push_state()
+	return true
+
+## Anayasa değişikliği için gereken EVET vekil sayısı (meclisin 2/3'ü).
+func constitution_threshold_seats() -> int:
+	return int(ceil(total_seats() * CONSTITUTION_MAJORITY))
+
 ## ERKEN SEÇİM ÖNERGESİ (erken seçim kartı oynanınca CardManager çağırır).
 ## Yasalarla aynı akış: basit çoğunluk (EVET vekilleri HAYIR'dan fazla).
 func submit_early_election(peer_id: int) -> bool:
@@ -598,6 +624,27 @@ func _resolve_proposal() -> void:
 		if not _is_local_only():
 			_notify_resolved.rpc(passed, kind, proposer)
 		proposal_resolved.emit(passed, kind, proposer)
+		return
+
+	if kind == KIND_CONSTITUTION:
+		var needed := constitution_threshold_seats()
+		var const_passed: bool = totals.x >= needed
+		var payload := proposal_assignments.duplicate()
+		_clear_proposal()
+		_set_phase(Phase.GOVERNING if has_government() else Phase.IDLE)
+		last_resolution_reason = "Anayasa değişikliği %s (EVET %d / gereken %d)." % [
+			"KABUL EDİLDİ" if const_passed else "reddedildi", totals.x, needed]
+		if const_passed:
+			MultiplayerManager.apply_constitution(float(payload.get("threshold", MultiplayerManager.election_threshold)),
+				int(payload.get("interval", MultiplayerManager.election_interval)))
+			# Takvim son seçimden itibaren yeni aralıkla işlesin.
+			CardManager.rebase_election_calendar()
+			last_resolution_reason += " Yeni baraj %%%s, seçimler %d yılda bir." % [
+				String.num(MultiplayerManager.election_threshold, 1), MultiplayerManager.election_interval]
+		_push_state()
+		if not _is_local_only():
+			_notify_resolved.rpc(const_passed, kind, proposer)
+		proposal_resolved.emit(const_passed, kind, proposer)
 		return
 
 	if kind == KIND_EARLY:

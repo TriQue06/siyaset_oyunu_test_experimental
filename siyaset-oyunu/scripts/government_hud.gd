@@ -266,6 +266,19 @@ static func proposal_status_text(my_id: int) -> String:
 			var mine := ""
 			if GovernmentManager.has_voted(my_id):
 				mine = "  (oyun: %s)" % GovernmentManager.vote_text(GovernmentManager.my_vote())
+			var totals_now := GovernmentManager.vote_seat_totals()
+			if GovernmentManager.proposal_kind == GovernmentManager.KIND_EARLY:
+				return "ERKEN SEÇİM önergesi oylanıyor — %s getirdi · EVET %d / HAYIR %d · %s kaldı%s" % [
+					party_name_of(GovernmentManager.proposal_peer_id), totals_now.x, totals_now.y, time_text, mine,
+				]
+			if GovernmentManager.proposal_kind == GovernmentManager.KIND_CONSTITUTION:
+				var payload := GovernmentManager.proposal_assignments
+				return "ANAYASA DEĞİŞİKLİĞİ oylanıyor — %s getirdi · baraj %%%s, seçimler %d yılda bir
+EVET %d / gereken %d (2/3) · %s kaldı%s" % [
+					party_name_of(GovernmentManager.proposal_peer_id),
+					String.num(float(payload.get("threshold", 0.0)), 1), int(payload.get("interval", 0)),
+					totals_now.x, GovernmentManager.constitution_threshold_seats(), time_text, mine,
+				]
 			return "GENSORU oylanıyor — %d/%d oy, %s kaldı%s" % [
 				GovernmentManager.votes.size(), GovernmentManager.voter_ids().size(), time_text, mine,
 			]

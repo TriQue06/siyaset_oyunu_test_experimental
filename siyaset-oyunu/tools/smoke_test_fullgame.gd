@@ -107,5 +107,35 @@ func _initialize() -> void:
 	check("son SECIM sonucu esas: hala yari verim", is_equal_approx(cm.steal_efficiency(1), 0.5))
 
 	print("")
+	print("=== 5) ANAYASA DEGISIKLIGI (2/3 cogunluk) ===")
+	GameRules.configure(4, 8)
+	cm.init_game()
+	gm.result_hold_seconds = 0.0
+	cm.turn_order = ids.duplicate()
+	cm.last_seats = {1: 150, 2: 200, 3: 50}
+	cm.election_seats = cm.last_seats.duplicate()
+	cm.round_number = 12
+	cm.last_election_round = 8
+	mm.election_threshold = 7.0
+	mm.election_interval = 4
+	check("anayasa gundem sarti aramaz", cm.can_propose_constitution(1))
+	var needed: int = gm.constitution_threshold_seats()
+	check("gereken cogunluk meclisin 2/3'u", needed == int(ceil(400 * 2.0 / 3.0)), str(needed))
+	cm._apply_constitution_proposal(1, {"threshold": 3.0, "interval": 6})
+	gm._apply_vote(1, gm.VOTE_YES)
+	gm._apply_vote(2, gm.VOTE_NO)
+	gm._apply_vote(3, gm.VOTE_NO)
+	check("2/3 yoksa reddedilir", is_equal_approx(mm.election_threshold, 7.0), gm.last_resolution_reason)
+	cm.law_rounds = {}
+	cm._apply_constitution_proposal(1, {"threshold": 3.0, "interval": 6})
+	gm._apply_vote(1, gm.VOTE_YES)
+	gm._apply_vote(2, gm.VOTE_YES)
+	gm._apply_vote(3, gm.VOTE_NO)
+	check("2/3 varsa kurallar degisti", is_equal_approx(mm.election_threshold, 3.0) and mm.election_interval == 6,
+		"baraj %.1f, aralik %d" % [mm.election_threshold, mm.election_interval])
+	check("takvim son secimden itibaren yeni aralikla", GameRules.ELECTION_INTERVAL == 12 		and cm.election_anchor == 8 and GameRules.is_election_round(20), str(GameRules.ELECTION_ANCHOR))
+	check("ayni donemde ikinci yasa hakki yok", not cm.can_propose_constitution(1))
+
+	print("")
 	print("=== TUM TESTLER GECTI ===" if _failed == 0 else "=== %d TEST BASARISIZ ===" % _failed)
 	quit(1 if _failed > 0 else 0)

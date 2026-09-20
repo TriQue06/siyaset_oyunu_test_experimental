@@ -301,6 +301,42 @@ func can_propose_law(peer_id: int, law_type: String = "") -> bool:
 	# İlk seçime kadar meclis yok: yasa yapılamaz (saf propaganda dönemi).
 	return not last_seats.is_empty() and GovernmentManager.can_submit_law()
 
+## ANAYASA DEĞİŞİKLİĞİ sunulabilir mi? Yasadan farkı: GÜNDEM ŞARTI YOK
+## (anayasa her dönem gündeme bakılmaksızın önerilebilir). Yasa hakkını
+## kullanır: aynı dönemde ikisinden sadece biri sunulabilir.
+func can_propose_constitution(peer_id: int) -> bool:
+	if not can_choose_main_action(peer_id):
+		return false
+	if not has_seats(peer_id):
+		return false
+	if has_proposed_law_this_round(peer_id):
+		return false
+	return not last_seats.is_empty() and GovernmentManager.can_submit_law()
+
+## Anayasa paketi: {"threshold": %, "interval": kaç yılda bir seçim}
+func propose_constitution(payload: Dictionary) -> void:
+	if not can_propose_constitution(multiplayer.get_unique_id()):
+		return
+	if _is_authority():
+		_apply_constitution_proposal(multiplayer.get_unique_id(), payload)
+	else:
+		_request_constitution.rpc_id(1, payload)
+
+func _apply_constitution_proposal(peer_id: int, payload: Dictionary) -> void:
+	if not can_propose_constitution(peer_id):
+		return
+	_event_message = ""
+	if not GovernmentManager.submit_constitution(peer_id, payload):
+		return
+	law_rounds[peer_id] = round_number
+	_push_state({"type": "law", "peer_id": peer_id, "law": "anayasa"})
+
+@rpc("any_peer", "reliable")
+func _request_constitution(payload: Dictionary) -> void:
+	if not MultiplayerManager.is_host:
+		return
+	_apply_constitution_proposal(multiplayer.get_remote_sender_id(), payload)
+
 func has_proposed_law_this_round(peer_id: int) -> bool:
 	return int(law_rounds.get(peer_id, 0)) == round_number
 
@@ -1344,6 +1380,14 @@ func _finish_round_if_needed(wrapped: bool) -> void:
 		_round_end_pending = true
 		return
 	_finish_round()
+
+## Anayasa değişikliği seçim aralığını değiştirdi: takvim SON SEÇİMDEN
+## itibaren yeni aralıkla işlesin (yoksa çıpa eski aralığa göre kalır).
+func rebase_election_calendar() -> void:
+	election_anchor = maxi(last_election_round, 0)
+	if election_anchor <= 0:
+		election_anchor = GameRules.FIRST_ELECTION_ROUND
+	GameRules.set_election_anchor(election_anchor)
 
 ## Meclis erken seçimi kabul etti (GovernmentManager çağırır).
 func schedule_early_election() -> void:

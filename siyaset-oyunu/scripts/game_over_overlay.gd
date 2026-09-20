@@ -9,8 +9,8 @@ extends Control
 const FADE_SECONDS := 0.9
 const ROW_DELAY := 0.12
 const ROW_FADE_SECONDS := 0.35
-const GOLD := Color(1.0, 0.85, 0.35)
-const DIM := Color(1, 1, 1, 0.6)
+const GOLD := UiTheme.GOLD
+const DIM := UiTheme.TEXT_MUTED
 
 var _reveal: Array = []  # sırayla beliren düğümler
 
@@ -21,7 +21,7 @@ func _ready() -> void:
 
 	var backdrop := ColorRect.new()
 	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	backdrop.color = Color(0.04, 0.05, 0.07, 0.94)
+	backdrop.color = Color(UiTheme.INK.r, UiTheme.INK.g, UiTheme.INK.b, 0.95)
 	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(backdrop)
 
@@ -91,22 +91,17 @@ func _play_intro(backdrop: ColorRect) -> void:
 func _ranking_row(index: int, entry: Dictionary, is_me: bool) -> Control:
 	var color: Color = entry.get("color", Color(0.5, 0.5, 0.5))
 	var panel := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.1, 0.11, 0.15, 0.95)
-	style.set_corner_radius_all(8)
-	style.border_width_left = 6
-	style.border_color = color
+	var style := UiSkin.stylebox(UiSkin.PANEL_DARK)
 	style.content_margin_left = 12
 	style.content_margin_right = 14
-	style.content_margin_top = 3
-	style.content_margin_bottom = 3
-	if is_me:
-		style.shadow_color = Color(GOLD, 0.5)
-		style.shadow_size = 5
+	style.content_margin_top = 4
+	style.content_margin_bottom = 4
 	panel.add_theme_stylebox_override("panel", style)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	panel.add_child(row)
+	# Solda parti renginde şerit; kazanan/kendi satırın altın renkli olur.
+	row.add_child(UiTheme.stripe(GOLD if is_me else color))
 	var rank := _label("%d." % (index + 1), 18, GOLD if index == 0 else Color.WHITE)
 	rank.custom_minimum_size = Vector2(34, 0)
 	row.add_child(rank)

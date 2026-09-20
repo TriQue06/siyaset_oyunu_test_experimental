@@ -21,13 +21,13 @@ const MAP_REFRESH_INTERVAL := 0.3
 const FLASH_SECONDS := 2.6
 const TICKER_SPEED := 120.0
 
-const BG_TOP := Color(0.04, 0.08, 0.19)
-const BG_BOTTOM := Color(0.01, 0.02, 0.06)
-const STRIP_COLOR := Color(0.03, 0.06, 0.16, 0.97)
-const RED := Color(0.84, 0.05, 0.1)
-const GOLD := Color(1.0, 0.78, 0.18)
-const TEXT_DIM := Color(0.68, 0.74, 0.86)
-const UNCOUNTED := Color(0.17, 0.2, 0.27)
+const BG_TOP := UiTheme.BG
+const BG_BOTTOM := UiTheme.INK
+const STRIP_COLOR := UiTheme.PANEL_DARK
+const RED := UiTheme.RED
+const GOLD := UiTheme.GOLD
+const TEXT_DIM := UiTheme.TEXT_MUTED
+const UNCOUNTED := UiTheme.PANEL_LIGHT
 
 const FLAVOR := [
 	"Yurt genelinde sandıklar tek tek açılıyor",
@@ -194,7 +194,7 @@ func _refresh_parliament() -> void:
 	_last_parliament_key = key
 	entries.append({"seats": maxi(0, _sim.total_seats - assigned), "color": UNCOUNTED})
 	_parliament.set_results(entries)
-	_majority_label.text = "Salt çoğunluk: %d   ·   Dağıtılan vekil: %d / %d" % [
+	_majority_label.text = "Salt çoğunluk %d  ·  Vekil %d/%d" % [
 		_sim.total_seats / 2 + 1, assigned, _sim.total_seats]
 
 func _refresh_map() -> void:
@@ -448,7 +448,7 @@ func _build_ui() -> void:
 	_top_bar.add_child(_counted)
 
 	_progress_bg = ColorRect.new()
-	_progress_bg.color = Color(1, 1, 1, 0.08)
+	_progress_bg.color = UiTheme.SLOT
 	_progress_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_progress_bg)
 	_progress_fill = ColorRect.new()
@@ -466,7 +466,7 @@ func _build_ui() -> void:
 	_parliament = ParliamentDiagram.new()
 	_parliament.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_parliament)
-	_majority_label = _label("", 14, TEXT_DIM)
+	_majority_label = _label("", 12, TEXT_DIM)
 	_majority_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	add_child(_majority_label)
 
@@ -474,7 +474,7 @@ func _build_ui() -> void:
 	_final_stamp.visible = false
 	add_child(_final_stamp)
 
-	_flash = _panel(Color(0.97, 0.97, 0.98))
+	_flash = _panel(UiTheme.GOLD)
 	_flash.modulate.a = 0.0
 	add_child(_flash)
 	var flash_tag_bg := _panel(RED)
@@ -485,13 +485,13 @@ func _build_ui() -> void:
 	_flash_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_flash_tag.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	flash_tag_bg.add_child(_flash_tag)
-	_flash_text = _label("", 17, Color(0.06, 0.08, 0.16), false)
+	_flash_text = _label("", 17, UiTheme.INK, false)
 	_flash_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_flash_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_flash_text.clip_text = true
 	_flash.add_child(_flash_text)
 
-	_ticker_bg = _panel(Color(0.02, 0.03, 0.08))
+	_ticker_bg = _panel(UiTheme.INK)
 	add_child(_ticker_bg)
 	_ticker_tag = _panel(RED)
 	_ticker_bg.add_child(_ticker_tag)
@@ -581,19 +581,18 @@ func _layout_flash() -> void:
 
 func _panel(color: Color) -> Panel:
 	var panel := Panel.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = color
-	panel.add_theme_stylebox_override("panel", style)
+	panel.add_theme_stylebox_override("panel", UiSkin.color_box(color))
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return panel
 
 func _label(text: String, font_size: int, color: Color, outline: bool = true) -> Label:
 	var label := Label.new()
 	label.text = text
+	label.add_theme_font_override("font", UiTheme.mono())
 	label.add_theme_font_size_override("font_size", font_size)
 	label.add_theme_color_override("font_color", color)
 	if outline:
-		label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+		label.add_theme_color_override("font_outline_color", UiTheme.INK)
 		label.add_theme_constant_override("outline_size", 4)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return label
@@ -608,7 +607,8 @@ class LiveBars extends Control:
 	func _draw() -> void:
 		if rows.is_empty():
 			return
-		var font := get_theme_default_font()
+		# Rakamlar ve parti adları monospace: yayın grafiği havası (bkz. UiTheme).
+		var font: Font = UiTheme.mono()
 		var n := rows.size()
 		var row_h: float = minf(60.0, size.y / float(n))
 		var h: float = row_h - 8.0
@@ -635,24 +635,24 @@ class LiveBars extends Control:
 				draw_texture_rect(icon, badge_rect.grow(-badge * 0.14), false, Color(1, 1, 1, alpha))
 			var text_x := badge + 8.0
 			draw_string(font, Vector2(text_x, y + h * 0.5 + 2), String(r["name"]), HORIZONTAL_ALIGNMENT_LEFT,
-				name_w - text_x, name_size, Color(1, 1, 1, alpha))
+				name_w - text_x, name_size, Color(UiTheme.TEXT, alpha))
 			draw_string(font, Vector2(text_x, y + h * 0.5 + 4 + name_size * 0.8), String(r["leader"]), HORIZONTAL_ALIGNMENT_LEFT,
-				name_w - text_x, maxi(9, name_size - 6), Color(0.65, 0.7, 0.8, alpha))
-			draw_rect(Rect2(bar_x, y + 2, bar_w, h), Color(1, 1, 1, 0.05))
+				name_w - text_x, maxi(9, name_size - 6), Color(UiTheme.TEXT_MUTED, alpha))
+			draw_rect(Rect2(bar_x, y + 2, bar_w, h), Color(UiTheme.SLOT, alpha))
 			var fill: float = bar_w * clampf(float(r["percent"]) / scale, 0.0, 1.0)
 			draw_rect(Rect2(bar_x, y + 2, fill, h), Color(color, alpha))
-			draw_rect(Rect2(bar_x, y + 2, fill, maxf(2.0, h * 0.12)), Color(1, 1, 1, 0.2 * alpha))
+			draw_rect(Rect2(bar_x, y + 2, fill, maxf(2.0, h * 0.12)), Color(UiTheme.TEXT, 0.25 * alpha))
 			draw_string(font, Vector2(size.x - value_w, y + h * 0.5 + 4), "%%%.2f" % float(r["percent"]),
-				HORIZONTAL_ALIGNMENT_RIGHT, value_w, clampi(int(h * 0.45), 12, 24), Color(1, 1, 1, alpha))
+				HORIZONTAL_ALIGNMENT_RIGHT, value_w, clampi(int(h * 0.45), 12, 24), Color(UiTheme.TEXT, alpha))
 			var sub := "BARAJ ALTI" if below else "%d vekil" % int(r["seats"])
 			draw_string(font, Vector2(size.x - value_w, y + h * 0.5 + 6 + name_size * 0.8), sub,
 				HORIZONTAL_ALIGNMENT_RIGHT, value_w, maxi(9, name_size - 6),
-				Color(1, 0.45, 0.45) if below else Color(0.7, 0.75, 0.85))
+				UiTheme.RED if below else UiTheme.TEXT_MUTED)
 		if threshold > 0.0:
 			var tx: float = bar_x + bar_w * clampf(threshold / scale, 0.0, 1.0)
 			var yy := 0.0
 			while yy < row_h * n:
-				draw_line(Vector2(tx, yy), Vector2(tx, minf(yy + 6.0, row_h * n)), Color(1, 0.3, 0.3, 0.85), 2.0)
+				draw_line(Vector2(tx, yy), Vector2(tx, minf(yy + 6.0, row_h * n)), UiTheme.RED, 3.0)
 				yy += 11.0
 			draw_string(font, Vector2(tx + 4, row_h * n + 12), "BARAJ %%%s" % String.num(threshold, 1),
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(1, 0.45, 0.45))
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UiTheme.RED)

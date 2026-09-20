@@ -50,19 +50,36 @@ func _ready() -> void:
 	streamer_mode_check.toggled.connect(_on_streamer_mode_toggled)
 
 	_build_volume_rows()
+	_apply_pixel_style()
 
 	close_button.pressed.connect(close)
 	open_settings_button.pressed.connect(_on_menu_button_pressed)
 	panel.hide()
 	_build_menu()
 
+## Ekranın tarzı tek kaynaktan (UiTheme) geliyor: başlık monospace + altın,
+## bölüm adları "> " önekli. Sahnedeki etiketler burada biçimlendirilir.
+func _apply_pixel_style() -> void:
+	var box := panel.get_node("CenterBox") as VBoxContainer
+	box.add_theme_constant_override("separation", UiTheme.GAP_M)
+	var title := box.get_node("TitleLabel") as Label
+	title.add_theme_font_override("font", UiTheme.mono(true))
+	title.add_theme_font_size_override("font_size", UiTheme.FS_TITLE)
+	title.add_theme_color_override("font_color", UiTheme.GOLD)
+	var display_label := box.get_node_or_null("DisplayModeLabel") as Label
+	if display_label != null:
+		display_label.text = "> EKRAN MODU"
+		display_label.add_theme_font_override("font", UiTheme.mono())
+		display_label.add_theme_font_size_override("font_size", UiTheme.FS_TINY + 3)
+		display_label.add_theme_color_override("font_color", UiTheme.GOLD)
+	fps_label.add_theme_font_override("font", UiTheme.mono())
+
 ## SES seviyeleri: ana ses, müzik, efekt. Sahneye elle node eklemek yerine
 ## kod içinde kurulur (satırların hepsi aynı kalıpta).
 func _build_volume_rows() -> void:
 	var box := panel.get_node("CenterBox") as VBoxContainer
 	# "Kapat" butonu her zaman en altta kalsın: yeni satırlar onun ÜSTÜNE girer.
-	var title := Label.new()
-	title.text = "Ses"
+	var title := UiTheme.section_label("Ses")
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_insert_before_close(box, title)
 	for row in [["master", "Ana ses"], ["music", "Müzik"], ["sfx", "Efektler"]]:
@@ -77,7 +94,7 @@ func _insert_before_close(box: VBoxContainer, node: Control) -> void:
 func _volume_row(box: VBoxContainer, kind: String, title: String) -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
-	var label := Label.new()
+	var label := UiTheme.mono_label("", UiTheme.FS_BODY)
 	label.custom_minimum_size.x = 150.0
 	row.add_child(label)
 	var slider := HSlider.new()
@@ -116,7 +133,7 @@ func _build_menu() -> void:
 	var backdrop := ColorRect.new()
 	backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
 	# Arkadaki ekranın yazıları menü başlığıyla karışmasın diye neredeyse opak.
-	backdrop.color = Color(0.05, 0.05, 0.08, 0.92)
+	backdrop.color = Color(UiTheme.INK.r, UiTheme.INK.g, UiTheme.INK.b, 0.94)
 	_menu.add_child(backdrop)
 
 	var center := CenterContainer.new()
@@ -146,7 +163,7 @@ func _build_menu() -> void:
 	_leave_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_leave_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_leave_note.add_theme_font_size_override("font_size", 13)
-	_leave_note.modulate = Color(1, 0.8, 0.6)
+	_leave_note.modulate = UiTheme.GOLD
 	box.add_child(_leave_note)
 
 func _menu_button(text: String, callback: Callable) -> Button:

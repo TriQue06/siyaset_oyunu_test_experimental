@@ -1,41 +1,154 @@
-[gd_resource type="Theme" format=3 uid="uid://cmjk3bfl8mavr"]
+[gd_resource type="Theme" load_steps=12 format=3 uid="uid://cmjk3bfl8mavr"]
+
+; TEMA — Konsept C (Piksel). Renk/punto değerleri scripts/ui_theme.gd ile aynı.
+; Buradaki amaç: sahnelerde tek tek override yapmadan her kontrolün doğru
+; görünmesi. Dokular tools/make_ui_art.py ile üretilir.
 
 [ext_resource type="Texture2D" uid="uid://cvqbv3f857576" path="res://assets/ui/button_normal.png" id="1"]
 [ext_resource type="Texture2D" uid="uid://cpc5g6u6v06rc" path="res://assets/ui/button_hover.png" id="2"]
 [ext_resource type="Texture2D" uid="uid://kvux287nned1" path="res://assets/ui/button_pressed.png" id="3"]
 [ext_resource type="Texture2D" uid="uid://c61um0fvvjmn5" path="res://assets/ui/button_disabled.png" id="4"]
-
-[sub_resource type="StyleBoxTexture" id="SB_disabled"]
-texture = ExtResource("4")
-texture_margin_left = 8.0
-texture_margin_top = 8.0
-texture_margin_right = 8.0
-texture_margin_bottom = 8.0
-
-[sub_resource type="StyleBoxTexture" id="SB_hover"]
-texture = ExtResource("2")
-texture_margin_left = 8.0
-texture_margin_top = 8.0
-texture_margin_right = 8.0
-texture_margin_bottom = 8.0
+[ext_resource type="Texture2D" path="res://assets/ui/ui_panel.png" id="5"]
+[ext_resource type="Texture2D" path="res://assets/ui/ui_slot.png" id="6"]
+[ext_resource type="FontFile" path="res://assets/fonts/IBMPlexMono-SemiBold.ttf" id="7"]
+[ext_resource type="Texture2D" path="res://assets/ui/ui_fill.png" id="8"]
+[ext_resource type="Texture2D" path="res://assets/ui/ui_track.png" id="9"]
+[ext_resource type="Texture2D" path="res://assets/ui/ui_grabber.png" id="10"]
 
 [sub_resource type="StyleBoxTexture" id="SB_normal"]
 texture = ExtResource("1")
-texture_margin_left = 8.0
-texture_margin_top = 8.0
-texture_margin_right = 8.0
-texture_margin_bottom = 8.0
+texture_margin_left = 5.0
+texture_margin_top = 5.0
+texture_margin_right = 5.0
+texture_margin_bottom = 5.0
+content_margin_left = 18.0
+content_margin_top = 10.0
+content_margin_right = 18.0
+content_margin_bottom = 10.0
+
+[sub_resource type="StyleBoxTexture" id="SB_hover"]
+texture = ExtResource("2")
+texture_margin_left = 5.0
+texture_margin_top = 5.0
+texture_margin_right = 5.0
+texture_margin_bottom = 5.0
+content_margin_left = 18.0
+content_margin_top = 10.0
+content_margin_right = 18.0
+content_margin_bottom = 10.0
 
 [sub_resource type="StyleBoxTexture" id="SB_pressed"]
 texture = ExtResource("3")
-texture_margin_left = 8.0
-texture_margin_top = 8.0
-texture_margin_right = 8.0
-texture_margin_bottom = 8.0
+texture_margin_left = 5.0
+texture_margin_top = 5.0
+texture_margin_right = 5.0
+texture_margin_bottom = 5.0
+content_margin_left = 18.0
+content_margin_top = 11.0
+content_margin_right = 18.0
+content_margin_bottom = 9.0
+
+[sub_resource type="StyleBoxTexture" id="SB_disabled"]
+texture = ExtResource("4")
+texture_margin_left = 5.0
+texture_margin_top = 5.0
+texture_margin_right = 5.0
+texture_margin_bottom = 5.0
+content_margin_left = 18.0
+content_margin_top = 10.0
+content_margin_right = 18.0
+content_margin_bottom = 10.0
+
+[sub_resource type="StyleBoxTexture" id="SB_panel"]
+texture = ExtResource("5")
+texture_margin_left = 5.0
+texture_margin_top = 5.0
+texture_margin_right = 5.0
+texture_margin_bottom = 5.0
+content_margin_left = 14.0
+content_margin_top = 14.0
+content_margin_right = 14.0
+content_margin_bottom = 14.0
+
+[sub_resource type="StyleBoxTexture" id="SB_slot"]
+texture = ExtResource("6")
+texture_margin_left = 5.0
+texture_margin_top = 5.0
+texture_margin_right = 5.0
+texture_margin_bottom = 5.0
+content_margin_left = 12.0
+content_margin_top = 8.0
+content_margin_right = 12.0
+content_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxTexture" id="SB_rule"]
+texture = ExtResource("8")
+modulate_color = Color(0.29, 0.247, 0.478, 1)
+
+[sub_resource type="StyleBoxTexture" id="SB_bar"]
+texture = ExtResource("9")
+texture_margin_left = 2.0
+texture_margin_top = 2.0
+texture_margin_right = 2.0
+texture_margin_bottom = 2.0
+
+[sub_resource type="StyleBoxTexture" id="SB_grabber"]
+texture = ExtResource("8")
+modulate_color = Color(0.29, 0.247, 0.478, 1)
+
+[sub_resource type="StyleBoxTexture" id="SB_grabber_hl"]
+texture = ExtResource("8")
+modulate_color = Color(1, 0.788, 0.235, 1)
 
 [resource]
+default_font_size = 16
+
+HSeparator/styles/separator = SubResource("SB_rule")
+HSeparator/constants/separation = 7
+VSeparator/styles/separator = SubResource("SB_rule")
+VSeparator/constants/separation = 7
+
+HSlider/styles/slider = SubResource("SB_bar")
+HSlider/styles/grabber_area = SubResource("SB_grabber_hl")
+HSlider/styles/grabber_area_highlight = SubResource("SB_grabber_hl")
+HSlider/icons/grabber = ExtResource("10")
+HSlider/icons/grabber_highlight = ExtResource("10")
+HSlider/icons/grabber_disabled = ExtResource("10")
+
+HScrollBar/styles/scroll = SubResource("SB_bar")
+HScrollBar/styles/grabber = SubResource("SB_grabber")
+HScrollBar/styles/grabber_highlight = SubResource("SB_grabber_hl")
+HScrollBar/styles/grabber_pressed = SubResource("SB_grabber_hl")
+VScrollBar/styles/scroll = SubResource("SB_bar")
+VScrollBar/styles/grabber = SubResource("SB_grabber")
+VScrollBar/styles/grabber_highlight = SubResource("SB_grabber_hl")
+VScrollBar/styles/grabber_pressed = SubResource("SB_grabber_hl")
+
+Button/colors/font_color = Color(0.949, 0.937, 1, 1)
+Button/colors/font_hover_color = Color(1, 0.788, 0.235, 1)
+Button/colors/font_pressed_color = Color(1, 0.788, 0.235, 1)
+Button/colors/font_focus_color = Color(0.949, 0.937, 1, 1)
+Button/colors/font_disabled_color = Color(0.42, 0.384, 0.627, 1)
+Button/fonts/font = ExtResource("7")
+Button/font_sizes/font_size = 18
 Button/styles/disabled = SubResource("SB_disabled")
 Button/styles/focus = SubResource("SB_hover")
 Button/styles/hover = SubResource("SB_hover")
 Button/styles/normal = SubResource("SB_normal")
 Button/styles/pressed = SubResource("SB_pressed")
+
+Label/colors/font_color = Color(0.949, 0.937, 1, 1)
+Label/font_sizes/font_size = 16
+
+Panel/styles/panel = SubResource("SB_panel")
+PanelContainer/styles/panel = SubResource("SB_panel")
+
+LineEdit/colors/font_color = Color(0.949, 0.937, 1, 1)
+LineEdit/colors/font_placeholder_color = Color(0.42, 0.384, 0.627, 1)
+LineEdit/colors/caret_color = Color(1, 0.788, 0.235, 1)
+LineEdit/colors/selection_color = Color(0.29, 0.247, 0.478, 1)
+LineEdit/fonts/font = ExtResource("7")
+LineEdit/font_sizes/font_size = 18
+LineEdit/styles/normal = SubResource("SB_slot")
+LineEdit/styles/focus = SubResource("SB_slot")
+LineEdit/styles/read_only = SubResource("SB_slot")

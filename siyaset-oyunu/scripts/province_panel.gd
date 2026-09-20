@@ -15,8 +15,8 @@ signal closed
 
 const PANEL_WIDTH := 340.0
 const BADGE_SIZE := Vector2(22, 22)
-const DIM := Color(1, 1, 1, 0.6)
-const INTEL_COLOR := Color(0.6, 0.85, 1.0)
+const DIM := UiTheme.TEXT_MUTED
+const INTEL_COLOR := UiTheme.BLUE
 
 var province_id: String = ""
 var _body: VBoxContainer
@@ -75,8 +75,8 @@ func refresh() -> void:
 	_build_events()
 
 func _section(text: String) -> void:
-	_body.add_child(HSeparator.new())
-	_body.add_child(_label(text, 11, DIM))
+	_body.add_child(UiTheme.rule())
+	_body.add_child(UiTheme.section_label(text))
 
 func _build_intel() -> void:
 	var me := multiplayer.get_unique_id()
@@ -124,7 +124,7 @@ func _party_row(peer_id: int, stats_text: String, show_strength: bool) -> Contro
 	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(badge)
-	var name_label := _label(party.get("name", "?"), 12, Color(1.0, 0.85, 0.35) if peer_id == me else Color.WHITE)
+	var name_label := _label(party.get("name", "?"), UiTheme.FS_TINY, UiTheme.GOLD if peer_id == me else UiTheme.TEXT)
 	name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(name_label)
@@ -139,7 +139,7 @@ func _party_row(peer_id: int, stats_text: String, show_strength: bool) -> Contro
 		activity_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		row.add_child(activity_label)
 		var level := CardManager.organization_level(province_id, peer_id)
-		var org_label := _label("B%d" % level if level > 0 else "—", 12, Color(0.55, 0.9, 0.85) if level > 0 else DIM)
+		var org_label := _label("B%d" % level if level > 0 else "—", UiTheme.FS_TINY, UiTheme.GREEN if level > 0 else DIM)
 		org_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 		org_label.custom_minimum_size = Vector2(24, 0)
 		org_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -164,7 +164,7 @@ func _build_own() -> void:
 		return
 	_section("SEN BU İLDE")
 	var risk := CardManager.miting_risk(me, province_id)
-	var color := Color(0.6, 1.0, 0.6) if risk < 0.15 else (Color(1.0, 0.85, 0.4) if risk < 0.3 else Color(1.0, 0.5, 0.45))
+	var color := UiTheme.GREEN if risk < 0.15 else (UiTheme.GOLD if risk < 0.3 else UiTheme.RED)
 	_body.add_child(_label("Miting provokasyon riski: %%%d" % int(round(risk * 100.0)), 13, color))
 	var power := CardManager.activity_of(province_id, me)
 	_body.add_child(_label("Buradaki gücün: %+.1f" % power, 12, _opinion_color(power)))
@@ -187,9 +187,9 @@ func _build_events() -> void:
 
 static func _opinion_color(value: float) -> Color:
 	if value > 0.05:
-		return Color(0.55, 1.0, 0.55)
+		return UiTheme.GREEN
 	if value < -0.05:
-		return Color(1.0, 0.5, 0.45)
+		return UiTheme.RED
 	return DIM
 
 
@@ -216,5 +216,5 @@ class SeatDots extends Control:
 		var per_row := _per_row()
 		for i in colors.size():
 			var center := Vector2((i % per_row) * (DOT + GAP) + DOT * 0.5, (i / per_row) * (DOT + GAP) + DOT * 0.5)
-			draw_circle(center, DOT * 0.5, Color(0.05, 0.05, 0.07), true, -1.0, true)
+			draw_circle(center, DOT * 0.5, UiTheme.INK, true, -1.0, true)
 			draw_circle(center, DOT * 0.5 - 2.0, colors[i], true, -1.0, true)

@@ -20,7 +20,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.09, 0.1, 0.14, 1)
+color = Color(0.094, 0.078, 0.188, 1)
 
 [node name="SettingsButton" type="Button" parent="." unique_id=991531772]
 unique_name_in_owner = true
@@ -134,7 +134,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.09, 0.1, 0.14, 1)
+color = Color(0.094, 0.078, 0.188, 1)
 
 [node name="Margin" type="MarginContainer" parent="SettingsSidePanel" unique_id=1097474865]
 layout_mode = 1

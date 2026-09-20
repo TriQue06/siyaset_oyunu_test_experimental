@@ -14,13 +14,13 @@ const NAME_LABEL_WIDTH := 78.0
 const SEAT_BADGE_WIDTH := 30.0
 const NAME_FONT_SIZE := 12
 const PERCENT_FONT_SIZE := 11
-const NAME_COLOR := Color(0.62, 0.62, 0.65) # eksen_projeksiyon: #888
+const NAME_COLOR := UiTheme.TEXT_MUTED
 ## Parti liderinin (oyuncunun) adı — parti adının hemen altında, daha küçük
 ## ve daha soluk.
 const LEADER_FONT_SIZE := 9
-const LEADER_COLOR := Color(0.52, 0.52, 0.56)
-const SEAT_BADGE_BG := Color(0.09, 0.09, 0.09) # eksen_projeksiyon: #111
-const BAR_BG_COLOR := Color(1, 1, 1, 0.07)      # eksen_projeksiyon: var(--surface-alt) yaklaşık karşılığı
+const LEADER_COLOR := UiTheme.TEXT_DIM
+const SEAT_BADGE_BG := UiTheme.SLOT
+const BAR_BG_COLOR := UiTheme.SLOT
 
 ## Satırlar kaydırma kutusundan kısaysa dikey olarak ortalansın mı?
 @export var center_vertically: bool = false
@@ -109,26 +109,26 @@ func _build_compact_row(e: Dictionary, max_percent: float) -> Control:
 	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(top)
 	top.add_child(_badge_or_dot(e, color, 20.0))
-	var name_label := _plain_label(String(e["name"]), 13, Color(0.93, 0.94, 0.97))
+	var name_label := _plain_label(String(e["name"]), UiTheme.FS_SMALL, UiTheme.TEXT)
 	name_label.clip_text = true
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(name_label)
-	top.add_child(_plain_label("baraj altı" if below else "%d mv" % int(e.get("seats", 0)), 11, Color(0.6, 0.64, 0.72)))
-	var percent_label := _plain_label("%%%.1f" % float(e["percent"]), 14, Color.WHITE)
+	top.add_child(_mono_label("baraj altı" if below else "%d mv" % int(e.get("seats", 0)), UiTheme.FS_TINY, UiTheme.TEXT_MUTED))
+	var percent_label := _mono_label("%%%.1f" % float(e["percent"]), UiTheme.FS_SMALL, UiTheme.TEXT)
 	percent_label.custom_minimum_size = Vector2(48, 0)
 	percent_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	top.add_child(percent_label)
 
 	var track := Panel.new()
-	track.custom_minimum_size = Vector2(0, 6)
+	track.custom_minimum_size = Vector2(0, 10)
 	track.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	track.add_theme_stylebox_override("panel", _rounded(Color(1, 1, 1, 0.08), 3))
+	track.add_theme_stylebox_override("panel", UiSkin.stylebox(UiSkin.TRACK, 2))
 	box.add_child(track)
 	var fill := Panel.new()
 	fill.set_anchors_preset(Control.PRESET_LEFT_WIDE)
 	fill.anchor_right = clampf(float(e["percent"]) / max_percent, 0.02, 1.0)
 	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	fill.add_theme_stylebox_override("panel", _rounded(color, 3))
+	fill.add_theme_stylebox_override("panel", UiSkin.color_box(color))
 	track.add_child(fill)
 	return margin
 
@@ -144,14 +144,14 @@ func _badge_or_dot(e: Dictionary, color: Color, badge_size: float) -> Control:
 	dot.custom_minimum_size = Vector2(10, 10)
 	dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	dot.add_theme_stylebox_override("panel", _rounded(color, 5))
+	dot.add_theme_stylebox_override("panel", UiSkin.color_box(color))
 	return dot
 
-func _rounded(color: Color, radius: int) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = color
-	style.set_corner_radius_all(radius)
-	return style
+## Monospace etiket (rakamlar ve rozetler her yerde monospace).
+func _mono_label(text: String, font_size: int, color: Color) -> Label:
+	var label := _plain_label(text, font_size, color)
+	label.add_theme_font_override("font", UiTheme.mono())
+	return label
 
 func _plain_label(text: String, font_size: int, color: Color) -> Label:
 	var label := Label.new()
@@ -192,33 +192,29 @@ func _build_row(party_name: String, color: Color, percent: float, seats: int, ma
 
 	var seat_badge := PanelContainer.new()
 	seat_badge.custom_minimum_size = Vector2(SEAT_BADGE_WIDTH, 0)
-	var badge_style := StyleBoxFlat.new()
-	badge_style.bg_color = SEAT_BADGE_BG
+	var badge_style := UiSkin.stylebox(UiSkin.TRACK, 2)
 	badge_style.set_content_margin_all(3)
 	seat_badge.add_theme_stylebox_override("panel", badge_style)
 	var seat_label := Label.new()
 	seat_label.text = str(seats)
 	seat_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	seat_label.add_theme_font_override("font", UiTheme.mono())
 	seat_label.add_theme_font_size_override("font_size", PERCENT_FONT_SIZE)
-	seat_label.add_theme_color_override("font_color", Color.WHITE)
+	seat_label.add_theme_color_override("font_color", UiTheme.TEXT)
 	seat_badge.add_child(seat_label)
 	row.add_child(seat_badge)
 
 	var bar_bg := Panel.new()
 	bar_bg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar_bg.custom_minimum_size = Vector2(0, BAR_HEIGHT * (0.8 if compact else 1.0))
-	var bg_style := StyleBoxFlat.new()
-	bg_style.bg_color = BAR_BG_COLOR
-	bar_bg.add_theme_stylebox_override("panel", bg_style)
+	bar_bg.add_theme_stylebox_override("panel", UiSkin.stylebox(UiSkin.TRACK, 2))
 
 	var fill_width_ratio: float = clampf(percent / max_percent, 0.0, 1.0)
 
 	var bar_fill := Panel.new()
 	bar_fill.set_anchors_preset(Control.PRESET_LEFT_WIDE)
 	bar_fill.anchor_right = fill_width_ratio
-	var fill_style := StyleBoxFlat.new()
-	fill_style.bg_color = color
-	bar_fill.add_theme_stylebox_override("panel", fill_style)
+	bar_fill.add_theme_stylebox_override("panel", UiSkin.color_box(color))
 	bar_bg.add_child(bar_fill)
 
 	# eksen_projeksiyon'daki clip-path ikilisi: dolu kısımda BEYAZ, boş
@@ -229,8 +225,9 @@ func _build_row(party_name: String, color: Color, percent: float, seats: int, ma
 	label_white.set_anchors_preset(Control.PRESET_FULL_RECT)
 	label_white.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label_white.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label_white.add_theme_font_override("font", UiTheme.mono())
 	label_white.add_theme_font_size_override("font_size", PERCENT_FONT_SIZE)
-	label_white.add_theme_color_override("font_color", Color.WHITE)
+	label_white.add_theme_color_override("font_color", UiTheme.TEXT)
 	label_white.clip_text = true
 	bar_bg.add_child(label_white)
 

@@ -37,7 +37,7 @@ const HAND_CARD_SEPARATION := 8
 ## Fare bu kadar kaydırılırsa tık değil SÜRÜKLEME başlar.
 const TAP_MAX_MOVE_PX := 10.0
 ## Oylamada parlamento koltuklarının ve profil etiketlerinin rengi.
-const VOTE_COLORS := {1: Color(0.32, 0.82, 0.38), 0: Color(0.92, 0.78, 0.3), -1: Color(0.92, 0.3, 0.3)}
+const VOTE_COLORS := {1: UiTheme.GREEN, 0: UiTheme.GOLD, -1: UiTheme.RED}
 
 ## HARİTA KATMANLARI: aynı Türkiye haritasının üç ayrı görünümü; butonlarla
 ## geçilir, harita yan yana dizilmiş sayfalar gibi yana kayar.
@@ -55,7 +55,7 @@ const MAP_BLANK_COLOR := Color(0.97, 0.97, 0.95)
 ## Teşkilat hamlesinden sonra haritanın teşkilat katmanında kaldığı süre.
 const ORG_RESULT_HOLD := 1.2
 const SHADOW_OFFSET := Vector2(4, 5)
-const SHADOW_COLOR := Color(0, 0, 0, 0.38)
+const SHADOW_COLOR := Color(UiTheme.INK.r, UiTheme.INK.g, UiTheme.INK.b, 0.6)
 
 const DRAW_FLY_DURATION := 0.16   # deste -> ekran ortası (hızlı)
 const DRAW_SETTLE_DURATION := 0.16  # ekran ortası -> el'deki yeni yeri
@@ -505,7 +505,7 @@ func _highlight_province(province_id: String) -> void:
 		if base.a > 0.0:
 			map_holder.set_province_color(province_id, base.darkened(0.45 if base.get_luminance() < 0.85 else 0.3))
 		else:
-			map_holder.set_province_color(province_id, Color(0.08, 0.08, 0.1, 0.6))
+			map_holder.set_province_color(province_id, Color(UiTheme.INK.r, UiTheme.INK.g, UiTheme.INK.b, 0.6))
 
 func _on_parties_updated() -> void:
 	_rebuild_player_panel()
@@ -809,10 +809,8 @@ func _card_title_banner(card_type: String) -> Control:
 	banner.position = Vector2(6, 8)
 	banner.size = Vector2(CARD_DISPLAY_SIZE.x - 12, 44)
 	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.07, 0.08, 0.11, 0.86)
-	style.set_corner_radius_all(6)
-	style.set_content_margin_all(3)
+	var style := UiSkin.stylebox(UiSkin.PANEL_DARK)
+	style.set_content_margin_all(4)
 	banner.add_theme_stylebox_override("panel", style)
 	var title := Label.new()
 	title.text = CardPresets.card_short_title(card_type)
@@ -830,11 +828,11 @@ func _card_title_banner(card_type: String) -> Control:
 func _card_cost_badge(cost: int) -> Control:
 	var badge := PanelContainer.new()
 	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.05, 0.07, 0.12, 0.85)
-	style.set_corner_radius_all(10)
-	style.content_margin_left = 4
-	style.content_margin_right = 7
+	var style := UiSkin.stylebox(UiSkin.SLOT, 3)
+	style.content_margin_left = 6
+	style.content_margin_right = 8
+	style.content_margin_top = 2
+	style.content_margin_bottom = 2
 	badge.add_theme_stylebox_override("panel", style)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 2)
@@ -909,7 +907,7 @@ func _update_drag() -> void:
 	var target := _drop_target(_drag_card_type)
 	_set_target_hint(String(target["label"]) + "  ·  Geçersiz yere bırak: iptal")
 	var valid: bool = target["valid"]
-	_drag_ghost.modulate = Color(1, 1, 1, 0.95) if valid else Color(1, 0.75, 0.75, 0.8)
+	_drag_ghost.modulate = Color(1, 1, 1, 0.95) if valid else Color(1, 0.6, 0.6, 0.85)
 	parliament_diagram.modulate = Color(1.3, 1.3, 1.05) if bool(target["parliament"]) else Color.WHITE
 	if CardPresets.needs_province_target(_drag_card_type):
 		var province_id: String = target["province"]
@@ -1205,7 +1203,7 @@ func _build_target_hint() -> void:
 	_target_hint = Label.new()
 	_target_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_target_hint.add_theme_font_size_override("font_size", 16)
-	_target_hint.add_theme_color_override("font_color", Color(1.0, 0.9, 0.45))
+	_target_hint.add_theme_color_override("font_color", UiTheme.GOLD)
 	_target_hint.add_theme_color_override("font_outline_color", Color.BLACK)
 	_target_hint.add_theme_constant_override("outline_size", 6)
 	_target_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1276,7 +1274,7 @@ func _refresh_target_highlights() -> void:
 		var valid: bool = targeting and CardManager.is_valid_steal_target(me, peer_id)
 		if halo != null:
 			halo.visible = valid
-		avatar.modulate = Color.WHITE if (not targeting or valid) else Color(1, 1, 1, 0.45)
+		avatar.modulate = Color.WHITE if (not targeting or valid) else Color(0.55, 0.55, 0.55, 1.0)
 
 ## Hedef seçme modundayken sağdaki panelden bir partiye tıklanması.
 func _on_target_party_clicked(peer_id: int) -> void:
@@ -1399,7 +1397,7 @@ func _spawn_puf_particles(center_pos: Vector2) -> void:
 	particles.gravity = Vector2(0, 200)
 	particles.scale_amount_min = 2.0
 	particles.scale_amount_max = 4.0
-	particles.color = Color(1.0, 0.9, 0.6, 0.9)
+	particles.color = UiTheme.GOLD
 	particles.emitting = true
 	await get_tree().create_timer(particles.lifetime + 0.2).timeout
 	if is_instance_valid(particles):
@@ -1454,28 +1452,23 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 	var card := PanelContainer.new()
 	card.custom_minimum_size = Vector2(RIGHT_COLUMN_WIDTH - 16.0, _avatar_height)
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
-	var style := StyleBoxFlat.new()
-	# SIRA KİMDE: açık zemin + beyaz çerçeve + "SIRADA" etiketi (nabız gibi atar).
-	# BEN: altın rengi isim + altın parıltı + "SEN" etiketi. İkisi birlikte olabilir.
-	style.bg_color = Color(0.2, 0.22, 0.3, 0.98) if is_turn else Color(0.09, 0.1, 0.14, 0.94)
-	style.set_corner_radius_all(8)
-	style.border_width_left = 6
-	style.border_color = color
-	style.content_margin_left = 12
+	# SIRA KİMDE: açık zemin + altın çerçeve + "SIRADA" etiketi (nabız gibi atar).
+	# BEN: altın rengi isim + "SEN" etiketi. İkisi birlikte olabilir.
+	var style := UiSkin.stylebox(UiSkin.PANEL if is_turn else UiSkin.PANEL_DARK)
+	style.content_margin_left = 6
 	style.content_margin_right = 8
 	# Çok oyunculu ve alçak ekranda kart sıkışır: tek satır (sadece parti adı).
 	var compact := _avatar_height < 42.0
 	style.content_margin_top = 1 if compact else 4
 	style.content_margin_bottom = 1 if compact else 4
-	if is_self:
-		style.shadow_color = Color(1.0, 0.82, 0.15, 0.55)
-		style.shadow_size = 5
 	card.add_theme_stylebox_override("panel", style)
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(row)
+	# Solda parti renginde şerit: kartın kime ait olduğu ilk bakışta belli.
+	row.add_child(UiTheme.stripe(color))
 	var badge_size: float = clampf(_avatar_height - (6.0 if compact else 16.0), 18.0, 44.0)
 	var badge := PartyBadge.build(party, Vector2(badge_size, badge_size), BADGE_ICON_PIXEL_SIZE)
 	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1488,12 +1481,12 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 	info.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(info)
-	info.add_child(_avatar_label(String(party.get("name", "?")), 14, Color(1.0, 0.85, 0.35) if is_self else Color.WHITE))
+	info.add_child(_avatar_label(String(party.get("name", "?")), UiTheme.FS_SMALL, UiTheme.GOLD if is_self else UiTheme.TEXT))
 	if not compact:
-		info.add_child(_avatar_label(_leader_name_of(peer_id) + ("  (Sen)" if is_self else ""), 11, Color(0.68, 0.72, 0.8)))
+		info.add_child(_avatar_label(_leader_name_of(peer_id) + ("  (Sen)" if is_self else ""), UiTheme.FS_TINY, UiTheme.TEXT_MUTED))
 	if _avatar_height >= 58.0:
 		var seats_text := ("%d vekil · " % int(CardManager.last_seats[peer_id])) if CardManager.last_seats.has(peer_id) else ""
-		info.add_child(_avatar_label("%s%d mana" % [seats_text, CardManager.mana_of(peer_id)], 11, Color(0.6, 0.65, 0.75)))
+		info.add_child(_avatar_label("%s%d mana" % [seats_text, CardManager.mana_of(peer_id)], UiTheme.FS_TINY, UiTheme.TEXT_MUTED))
 
 	var populism_left := CardManager.populism_rounds_left(peer_id)
 	if is_self or is_turn or populism_left > 0:
@@ -1502,11 +1495,11 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 		tags.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		tags.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		if is_turn:
-			tags.add_child(_avatar_tag("SIRADA", Color(1, 1, 1), Color(0.1, 0.1, 0.12)))
+			tags.add_child(_avatar_tag("SIRADA", UiTheme.TEXT, UiTheme.INK))
 		if is_self and not (is_turn and compact):
-			tags.add_child(_avatar_tag("SEN", Color(1.0, 0.82, 0.2), Color(0.15, 0.1, 0.0)))
+			tags.add_child(_avatar_tag("SEN", UiTheme.GOLD, UiTheme.INK))
 		if populism_left > 0 and not (compact and tags.get_child_count() >= 2):
-			tags.add_child(_avatar_tag("POPÜLİZM %d" % populism_left, Color(0.85, 0.35, 0.75), Color.WHITE))
+			tags.add_child(_avatar_tag("POPÜLİZM %d" % populism_left, UiTheme.PURPLE, UiTheme.TEXT))
 		row.add_child(tags)
 	# Hangi oyuncuya ait olduğu düğümün ÜSTÜNDE saklanıyor: hover tespiti ve
 	# tooltip konumu panelin çocuk SIRASINA güvenmez (bkz. _party_under_mouse).
@@ -1515,7 +1508,7 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 	if GovernmentManager.is_voting() and GovernmentManager.eligible_voter_ids().has(peer_id):
 		var voted: bool = GovernmentManager.votes.has(peer_id)
 		var tag := _avatar_label(GovernmentManager.vote_text(GovernmentManager.votes[peer_id]) if voted else "…", 11,
-			VOTE_COLORS[int(GovernmentManager.votes[peer_id])] if voted else Color(1, 1, 1, 0.6))
+			VOTE_COLORS[int(GovernmentManager.votes[peer_id])] if voted else UiTheme.TEXT_MUTED)
 		tag.clip_text = false
 		tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(tag)
@@ -1523,24 +1516,14 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 	var halo := Panel.new()
 	halo.name = "TargetHalo"
 	halo.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var halo_style := StyleBoxFlat.new()
-	halo_style.draw_center = false
-	halo_style.set_border_width_all(3)
-	halo_style.border_color = Color(1.0, 0.85, 0.3)
-	halo_style.set_corner_radius_all(8)
-	halo.add_theme_stylebox_override("panel", halo_style)
+	halo.add_theme_stylebox_override("panel", UiSkin.color_box(UiTheme.GOLD, UiSkin.TARGET))
 	halo.visible = false
 	card.add_child(halo)
 	if is_turn:
 		var frame := Panel.new()
 		frame.name = "TurnFrame"
 		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var frame_style := StyleBoxFlat.new()
-		frame_style.draw_center = false
-		frame_style.set_border_width_all(2)
-		frame_style.border_color = Color(1, 1, 1, 0.95)
-		frame_style.set_corner_radius_all(8)
-		frame.add_theme_stylebox_override("panel", frame_style)
+		frame.add_theme_stylebox_override("panel", UiSkin.color_box(UiTheme.TEXT, UiSkin.TARGET))
 		card.add_child(frame)
 		var pulse := frame.create_tween().set_loops()
 		pulse.tween_property(frame, "modulate:a", 0.35, 0.7).set_trans(Tween.TRANS_SINE)
@@ -1580,15 +1563,14 @@ func _hide_profile() -> void:
 func _avatar_tag(text: String, bg: Color, fg: Color) -> Control:
 	var tag := Label.new()
 	tag.text = text
+	tag.add_theme_font_override("font", UiTheme.mono())
 	tag.add_theme_font_size_override("font_size", 9)
 	tag.add_theme_color_override("font_color", fg)
 	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := StyleBoxFlat.new()
-	style.bg_color = bg
-	style.set_corner_radius_all(4)
-	style.content_margin_left = 4
-	style.content_margin_right = 4
+	var style := UiSkin.color_box(bg, UiSkin.FILL)
+	style.content_margin_left = 5
+	style.content_margin_right = 5
 	tag.add_theme_stylebox_override("normal", style)
 	return tag
 
@@ -1759,13 +1741,13 @@ func _refresh_score_panel() -> void:
 
 ## Yasa dairesi sürüklenirken _drag_hand_index bu değeri alır (elde kart yok).
 const LAW_DRAG_INDEX := -2
-const MANA_COLOR := Color(0.55, 0.8, 1.0)
+const MANA_COLOR := UiTheme.BLUE
 const MANA_ICON := preload("res://assets/icons/mana_icon.png")
-const EMPTY_SEAT_COLOR := Color(0.95, 0.95, 0.95)
+const EMPTY_SEAT_COLOR := UiTheme.TEXT
 const LAW_AXIS_COLORS := {
-	"economic": Color(0.85, 0.58, 0.14),
-	"social": Color(0.6, 0.32, 0.78),
-	"administrative": Color(0.16, 0.58, 0.64),
+	"economic": UiTheme.GOLD,
+	"social": UiTheme.PURPLE,
+	"administrative": UiTheme.BLUE,
 }
 
 ## Sağ sütunun alt kısmı (aşağıdan yukarı): sıra göstergesi, pas, deste ve
@@ -1831,15 +1813,15 @@ func _build_action_buttons() -> void:
 		1, GameRules.ELECTION_MANA_BONUS, GameRules.GOVERNMENT_MANA_BONUS]
 	add_child(_mana_box)
 	# HAMLELER (sağ sütun, destenin yanında alt alta). Kartlar bonus niteliğinde.
-	_law_button = _action_button("YASA", "bedava", Color(0.42, 0.26, 0.62), -292.0, 0)
+	_law_button = _action_button("YASA", "bedava", UiTheme.PURPLE, -292.0, 0)
 	_law_button.pressed.connect(_on_law_button_pressed)
-	_miting_button = _action_button("MİTİNG", "%d mana" % GameRules.MITING_MANA_COST, Color(0.72, 0.3, 0.14), -292.0, 1)
+	_miting_button = _action_button("MİTİNG", "%d mana" % GameRules.MITING_MANA_COST, UiTheme.RED, -292.0, 1)
 	_miting_button.pressed.connect(_on_miting_button_pressed)
-	_org_button = _action_button("TEŞKİLATLANMA", "%d mana" % GameRules.ORG_MANA_COST, Color(0.1, 0.44, 0.48), -256.0, 0)
+	_org_button = _action_button("TEŞKİLATLANMA", "%d mana" % GameRules.ORG_MANA_COST, UiTheme.BLUE, -256.0, 0)
 	_org_button.pressed.connect(_on_org_button_pressed)
-	_invest_button = _action_button("YATIRIM", "%d mana" % GameRules.INVEST_MANA_COST, Color(0.2, 0.5, 0.22), -256.0, 1)
+	_invest_button = _action_button("YATIRIM", "%d mana" % GameRules.INVEST_MANA_COST, UiTheme.GREEN_DARK, -256.0, 1)
 	_invest_button.pressed.connect(_on_invest_button_pressed)
-	_censure_button = _action_button("GENSORU", "%d mana" % GameRules.CENSURE_MANA_COST, Color(0.6, 0.16, 0.2), -220.0, 0)
+	_censure_button = _action_button("GENSORU", "%d mana" % GameRules.CENSURE_MANA_COST, UiTheme.RED_DARK, -220.0, 0)
 	_censure_button.pressed.connect(_on_censure_button_pressed)
 
 ## column: 0 sol, 1 sağ (sağ sütunda iki sütunlu ızgara).
@@ -1853,23 +1835,9 @@ func _action_button(title: String, cost_text: String, color: Color, top: float, 
 	button.offset_right = -108.0 if column == 0 else -16.0
 	button.offset_top = top
 	button.offset_bottom = top + 32.0
-	button.add_theme_font_size_override("font_size", 10)
-	button.add_theme_constant_override("line_spacing", -3)
-	button.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.35))
-	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
-		var style := StyleBoxFlat.new()
-		style.set_corner_radius_all(10)
-		style.set_border_width_all(2)
-		style.bg_color = color
-		style.border_color = Color(1, 1, 1, 0.3)
-		if state == "hover" or state == "focus":
-			style.bg_color = color.lightened(0.15)
-		elif state == "pressed":
-			style.bg_color = color.darkened(0.2)
-		elif state == "disabled":
-			style.bg_color = Color(0.18, 0.19, 0.23)
-			style.border_color = Color(1, 1, 1, 0.08)
-		button.add_theme_stylebox_override(state, style)
+	button.add_theme_font_size_override("font_size", UiTheme.FS_TINY)
+	button.add_theme_constant_override("line_spacing", -1)
+	UiSkin.skin_color_button(button, color)
 	add_child(button)
 	return button
 
@@ -1908,17 +1876,15 @@ func _refresh_action_buttons() -> void:
 
 func _build_agenda_banner() -> void:
 	_agenda_banner = PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.36, 0.14, 0.05, 0.92)
-	style.set_corner_radius_all(10)
-	style.set_border_width_all(2)
-	style.border_color = Color(1.0, 0.7, 0.3, 0.9)
-	style.set_content_margin_all(8)
+	var style := UiSkin.color_box(UiTheme.GOLD.darkened(0.45), UiSkin.BUTTON_TINT_NORMAL)
+	style.set_content_margin_all(UiTheme.PAD_S)
 	_agenda_banner.add_theme_stylebox_override("panel", style)
 	_agenda_banner.z_index = 6
 	_agenda_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_agenda_label = Label.new()
-	_agenda_label.add_theme_font_size_override("font_size", 13)
+	_agenda_label.add_theme_font_override("font", UiTheme.mono())
+	_agenda_label.add_theme_font_size_override("font_size", UiTheme.FS_TINY)
+	_agenda_label.add_theme_color_override("font_color", UiTheme.TEXT)
 	_agenda_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_agenda_banner.add_child(_agenda_label)
 	add_child(_agenda_banner)
@@ -1941,14 +1907,8 @@ func _refresh_agenda_banner() -> void:
 
 func _build_law_designer() -> void:
 	_law_designer = PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.07, 0.08, 0.11, 0.97)
-	style.set_corner_radius_all(12)
-	style.set_border_width_all(2)
-	style.border_color = Color(0.62, 0.45, 0.9, 0.8)
-	style.set_content_margin_all(10)
-	style.shadow_color = Color(0, 0, 0, 0.5)
-	style.shadow_size = 10
+	var style := UiSkin.stylebox(UiSkin.PANEL)
+	style.set_content_margin_all(UiTheme.PAD_M)
 	_law_designer.add_theme_stylebox_override("panel", style)
 	_law_designer.z_index = 108
 	_law_designer.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -1973,14 +1933,14 @@ func _build_law_designer() -> void:
 	_law_points_label.add_theme_font_size_override("font_size", 11)
 	_law_points_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_law_points_label.custom_minimum_size = Vector2(240, 0)
-	_law_points_label.add_theme_color_override("font_color", Color(0.55, 1.0, 0.6))
+	_law_points_label.add_theme_color_override("font_color", UiTheme.GREEN)
 	box.add_child(_law_points_label)
 	# Gündem şeridi.
 	_law_agenda_label = Label.new()
 	_law_agenda_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_law_agenda_label.custom_minimum_size = Vector2(240, 0)
 	_law_agenda_label.add_theme_font_size_override("font_size", 11)
-	_law_agenda_label.add_theme_color_override("font_color", Color(1.0, 0.72, 0.35))
+	_law_agenda_label.add_theme_color_override("font_color", UiTheme.GOLD)
 	box.add_child(_law_agenda_label)
 	_law_rows = VBoxContainer.new()
 	_law_rows.add_theme_constant_override("separation", 3)
@@ -1990,14 +1950,14 @@ func _build_law_designer() -> void:
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint.custom_minimum_size = Vector2(240, 0)
 	hint.add_theme_font_size_override("font_size", 10)
-	hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.55))
+	hint.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
 	box.add_child(hint)
 	_law_info = Label.new()
 	_law_info.text = "Bir daireye dokun: ne yaptığı burada yazar."
 	_law_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_law_info.custom_minimum_size = Vector2(240, 0)
 	_law_info.add_theme_font_size_override("font_size", 10)
-	_law_info.add_theme_color_override("font_color", Color(1.0, 0.85, 0.45))
+	_law_info.add_theme_color_override("font_color", UiTheme.GOLD)
 	box.add_child(_law_info)
 	_law_designer.hide()
 	add_child(_law_designer)
@@ -2033,14 +1993,14 @@ func _refresh_law_designer() -> void:
 		axis_label.text = String(info["title"]).to_upper()
 		axis_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		axis_label.add_theme_font_size_override("font_size", 10)
-		axis_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.8))
+		axis_label.add_theme_color_override("font_color", UiTheme.TEXT)
 		middle.add_child(axis_label)
 		middle.add_child(_ideology_bar(axis, float(ideology.get(axis, 0))))
 		var pos_label := Label.new()
 		pos_label.text = "partin: %s" % IdeologyAxes.format_value(float(ideology.get(axis, 0)))
 		pos_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		pos_label.add_theme_font_size_override("font_size", 9)
-		pos_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.55))
+		pos_label.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
 		middle.add_child(pos_label)
 		row.add_child(middle)
 		row.add_child(_law_circle(axis, 1))
@@ -2062,7 +2022,7 @@ func _ideology_bar(axis: String, value: float) -> Control:
 			var x0 := w * i / steps
 			var x1 := w * (i + 1) / steps
 			bar.draw_rect(Rect2(x0, y - 2.0, x1 - x0 + 0.5, 4.0), left.lerp(right, float(i) / (steps - 1)))
-		bar.draw_line(Vector2(w * 0.5, y - 6.0), Vector2(w * 0.5, y + 6.0), Color(1, 1, 1, 0.5), 1.0)
+		bar.draw_line(Vector2(w * 0.5, y - 6.0), Vector2(w * 0.5, y + 6.0), UiTheme.TEXT_MUTED, 2.0)
 		var x := w * (clampf(value, IdeologyAxes.AXIS_MIN, IdeologyAxes.AXIS_MAX) - IdeologyAxes.AXIS_MIN) \
 			/ (IdeologyAxes.AXIS_MAX - IdeologyAxes.AXIS_MIN)
 		bar.draw_circle(Vector2(x, y), 5.5, Color.BLACK, true, -1.0, true)
@@ -2082,12 +2042,13 @@ func _law_circle(axis: String, dir: int) -> Control:
 	var on_agenda := CardManager.law_on_agenda(law_type)
 	if not on_agenda:
 		circle.modulate = Color(1, 1, 1, 0.3)  # gündemde değil: sunulamaz
-	var style := StyleBoxFlat.new()
-	style.bg_color = _law_color(axis, dir)
-	style.set_corner_radius_all(27)
-	style.set_border_width_all(3 if on_agenda else 2)
-	style.border_color = Color(1.0, 0.72, 0.3) if on_agenda else Color(1, 1, 1, 0.55)
-	circle.add_theme_stylebox_override("panel", style)
+	circle.add_theme_stylebox_override("panel",
+		UiSkin.color_box(_law_color(axis, dir), UiSkin.BUTTON_TINT_NORMAL))
+	if on_agenda:
+		# Gündemdeki eksen altın çerçeveyle ayrılır.
+		var ring := UiSkin.color_surface(UiTheme.GOLD, UiSkin.TARGET)
+		ring.set_anchors_preset(Control.PRESET_FULL_RECT)
+		circle.add_child(ring)
 	circle.mouse_filter = Control.MOUSE_FILTER_STOP
 	circle.mouse_default_cursor_shape = Control.CURSOR_DRAG
 	var label := Label.new()
@@ -2096,12 +2057,12 @@ func _law_circle(axis: String, dir: int) -> Control:
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.add_theme_font_size_override("font_size", 9)
-	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
+	label.add_theme_color_override("font_outline_color", UiTheme.INK)
 	label.add_theme_constant_override("outline_size", 3)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	circle.add_child(label)
 	if on_agenda:
-		label.add_theme_color_override("font_color", Color(1.0, 0.92, 0.7))
+		label.add_theme_color_override("font_color", UiTheme.GOLD)
 	circle.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
@@ -2278,32 +2239,29 @@ func _place_layer_bar() -> void:
 	_layer_legend.reset_size()
 	_layer_legend.position = Vector2(_layer_bar.position.x + 4.0, _layer_bar.position.y - _layer_legend.size.y - 6.0)
 
-func _layer_button_style(color: Color, left: bool, right: bool) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = color
-	style.set_border_width_all(1)
-	style.border_color = Color(0, 0, 0, 0.55)
-	style.corner_radius_top_left = 9 if left else 0
-	style.corner_radius_bottom_left = 9 if left else 0
-	style.corner_radius_top_right = 9 if right else 0
-	style.corner_radius_bottom_right = 9 if right else 0
-	style.content_margin_left = 8
-	style.content_margin_right = 8
+## Harita katman düğmesi (Vekiller / Teşkilat / Güç). Köşe yarıçapı yok:
+## pixel tarzda hepsi kare, seçili olan altın.
+func _layer_button_style(color: Color, _left: bool, _right: bool) -> StyleBoxTexture:
+	var style := UiSkin.color_box(color, UiSkin.BUTTON_TINT_NORMAL)
+	style.content_margin_left = 10
+	style.content_margin_right = 10
+	style.content_margin_top = 6
+	style.content_margin_bottom = 6
 	return style
 
 func _refresh_layer_bar() -> void:
 	for i in _layer_buttons.size():
 		var button: Button = _layer_buttons[i]
 		var active := i == _map_layer
-		var color := Color(0.95, 0.8, 0.3) if active else Color(0.1, 0.11, 0.15, 0.9)
+		var color := UiTheme.GOLD if active else UiTheme.PANEL
 		var first := i == 0
 		var last := i == _layer_buttons.size() - 1
 		for state in ["normal", "hover", "pressed", "focus"]:
 			var c := color.lightened(0.08) if state == "hover" and not active else color
 			button.add_theme_stylebox_override(state, _layer_button_style(c, first, last))
-		button.add_theme_color_override("font_color", Color(0.1, 0.08, 0.02) if active else Color(1, 1, 1, 0.85))
-		button.add_theme_color_override("font_hover_color", Color(0.1, 0.08, 0.02) if active else Color.WHITE)
-		button.add_theme_color_override("font_pressed_color", Color(0.1, 0.08, 0.02))
+		button.add_theme_color_override("font_color", UiTheme.INK if active else UiTheme.TEXT)
+		button.add_theme_color_override("font_hover_color", UiTheme.INK if active else UiTheme.TEXT)
+		button.add_theme_color_override("font_pressed_color", UiTheme.INK)
 	_rebuild_layer_legend()
 
 ## Katmanın küçük açıklaması (renk anahtarı), butonların hemen üstünde.
@@ -2328,18 +2286,13 @@ func _rebuild_layer_legend() -> void:
 			var label := Label.new()
 			label.text = String(entry[1])
 			label.add_theme_font_size_override("font_size", 12)
-			label.add_theme_color_override("font_outline_color", Color.BLACK)
+			label.add_theme_color_override("font_outline_color", UiTheme.INK)
 			label.add_theme_constant_override("outline_size", 4)
 			_layer_legend.add_child(label)
 			continue
 		var swatch := Panel.new()
 		swatch.custom_minimum_size = Vector2(22, 16)
-		var style := StyleBoxFlat.new()
-		style.bg_color = entry[0]
-		style.set_corner_radius_all(3)
-		style.set_border_width_all(1)
-		style.border_color = Color(0, 0, 0, 0.6)
-		swatch.add_theme_stylebox_override("panel", style)
+		swatch.add_theme_stylebox_override("panel", UiSkin.color_box(entry[0], UiSkin.BUTTON_TINT_NORMAL))
 		if String(entry[1]) != "":
 			var num := Label.new()
 			num.text = String(entry[1])
@@ -2347,7 +2300,7 @@ func _rebuild_layer_legend() -> void:
 			num.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			num.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 			num.add_theme_font_size_override("font_size", 11)
-			num.add_theme_color_override("font_color", Color.BLACK if (entry[0] as Color).get_luminance() > 0.5 else Color.WHITE)
+			num.add_theme_color_override("font_color", UiTheme.INK if (entry[0] as Color).get_luminance() > 0.5 else UiTheme.TEXT)
 			swatch.add_child(num)
 		_layer_legend.add_child(swatch)
 	if _map_clip != null:

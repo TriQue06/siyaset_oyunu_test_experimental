@@ -22,7 +22,7 @@ const BOT_BUTTON_SIZE := 34.0
 @onready var settings_vbox: VBoxContainer = $SettingsSidePanel/Margin/VBox
 
 ## Ayar paneli kodla kurulur (bkz. _build_settings_panel).
-const SECTION_COLOR := Color(0.93, 0.66, 0.22)
+const SECTION_COLOR := UiTheme.GOLD
 var interval_value_label: Label
 var interval_minus: Button
 var interval_plus: Button
@@ -143,7 +143,7 @@ func _build_player_card(peer_id: int, index: int, am_owner: bool, local_id: int)
 	UiSkin.skin_panel(card, UiSkin.PANEL)
 	card.custom_minimum_size = Vector2(420, 60)
 	if peer_id == local_id:
-		card.modulate = Color(1.08, 1.05, 0.9)
+		card.modulate = Color(1.12, 1.08, 0.92)  # sıradaki/senin kartın hafif altın
 
 	var margin := MarginContainer.new()
 	for side in ["left", "right", "top", "bottom"]:
@@ -156,10 +156,9 @@ func _build_player_card(peer_id: int, index: int, am_owner: bool, local_id: int)
 
 	var avatar := PanelContainer.new()
 	avatar.custom_minimum_size = Vector2(44, 44)
-	var avatar_style := StyleBoxFlat.new()
-	avatar_style.bg_color = color.darkened(0.2) if not is_bot else Color(0.35, 0.37, 0.42)
-	avatar_style.set_corner_radius_all(22)
-	avatar.add_theme_stylebox_override("panel", avatar_style)
+	# Kare rozet (pixel tarz): koyu çizgi + düz renk.
+	avatar.add_theme_stylebox_override("panel",
+		UiSkin.color_box(color if not is_bot else UiTheme.PANEL_LIGHT, UiSkin.BUTTON_TINT_NORMAL))
 	if is_bot:
 		var robot := RobotIcon.new()
 		robot.custom_minimum_size = Vector2(44, 44)
@@ -192,7 +191,7 @@ func _build_player_card(peer_id: int, index: int, am_owner: bool, local_id: int)
 		var tag_label := Label.new()
 		tag_label.text = "  ·  ".join(tags)
 		tag_label.add_theme_font_size_override("font_size", 12)
-		tag_label.modulate = Color(1.0, 0.85, 0.4) if peer_id == MultiplayerManager.owner_id else Color(1, 1, 1, 0.6)
+		tag_label.modulate = UiTheme.GOLD if peer_id == MultiplayerManager.owner_id else UiTheme.TEXT_MUTED
 		info.add_child(tag_label)
 	row.add_child(info)
 
@@ -229,20 +228,10 @@ func _build_slot(card: Control, show_bot_button: bool, enabled: bool) -> Control
 	button.offset_bottom = BOT_BUTTON_SIZE
 	button.disabled = not enabled
 	button.focus_mode = Control.FOCUS_NONE
-	for state in ["normal", "hover", "pressed", "disabled"]:
-		var style := StyleBoxFlat.new()
-		style.set_corner_radius_all(int(BOT_BUTTON_SIZE / 2.0))
-		style.set_border_width_all(2)
-		style.border_color = Color(1, 1, 1, 0.85 if enabled else 0.25)
-		style.bg_color = Color(0.16, 0.55, 0.5) if enabled else Color(0.22, 0.24, 0.28)
-		if state == "hover":
-			style.bg_color = style.bg_color.lightened(0.15)
-		elif state == "pressed":
-			style.bg_color = style.bg_color.darkened(0.2)
-		button.add_theme_stylebox_override(state, style)
+	UiSkin.skin_color_button(button, UiTheme.GREEN_DARK if enabled else UiTheme.PANEL_DARK)
 	var robot := RobotIcon.new()
 	robot.set_anchors_preset(Control.PRESET_FULL_RECT)
-	robot.color = Color.WHITE if enabled else Color(1, 1, 1, 0.35)
+	robot.color = UiTheme.TEXT if enabled else UiTheme.TEXT_DIM
 	button.add_child(robot)
 	if enabled:
 		button.pressed.connect(MultiplayerManager.add_bot)
@@ -252,7 +241,7 @@ func _build_slot(card: Control, show_bot_button: bool, enabled: bool) -> Control
 func _build_empty_card(index: int) -> Control:
 	var card := PanelContainer.new()
 	UiSkin.skin_panel(card, UiSkin.PANEL)
-	card.modulate = Color(1, 1, 1, 0.4)
+	card.modulate = Color(0.75, 0.75, 0.75, 1.0)
 	var label := Label.new()
 	label.text = "%d · Boş" % (index + 1)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -362,7 +351,7 @@ func _build_settings_panel() -> void:
 	count_value_label = count_row[1]
 	count_plus = count_row[2]
 	game_length_summary = _note(length, "")
-	game_length_summary.add_theme_color_override("font_color", Color(SECTION_COLOR, 0.9))
+	game_length_summary.add_theme_color_override("font_color", SECTION_COLOR)
 
 	var election := _section("SEÇİM", "")
 	var threshold_row := _value_row(election, "Seçim barajı")
@@ -395,12 +384,8 @@ func _build_settings_panel() -> void:
 ## Başlıklı, çerçeveli bir ayar bölümü; içeriğin ekleneceği kutuyu döner.
 func _section(title_text: String, note_text: String) -> VBoxContainer:
 	var panel := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(1, 1, 1, 0.04)
-	style.border_color = Color(1, 1, 1, 0.1)
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(10)
-	style.set_content_margin_all(10)
+	var style := UiSkin.stylebox(UiSkin.PANEL_DARK)
+	style.set_content_margin_all(UiTheme.PAD_M)
 	panel.add_theme_stylebox_override("panel", style)
 	settings_vbox.add_child(panel)
 	var box := VBoxContainer.new()
@@ -420,7 +405,7 @@ func _note(parent: Control, text: String) -> Label:
 	label.text = text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.add_theme_font_size_override("font_size", 11)
-	label.add_theme_color_override("font_color", Color(1, 1, 1, 0.5))
+	label.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
 	parent.add_child(label)
 	return label
 
@@ -434,7 +419,7 @@ func _row_label(text: String) -> Label:
 func _value_label() -> Label:
 	var label := Label.new()
 	label.add_theme_font_size_override("font_size", 14)
-	label.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
+	label.add_theme_color_override("font_color", UiTheme.TEXT)
 	return label
 
 ## "Etiket ........ değer" satırı; değer etiketini döner.

@@ -1,8 +1,11 @@
 class_name PartyBadge
 extends RefCounted
 ## Bir partinin "logosu": parti rengi + ikon. Oyun ekranındaki oyuncu panelinde
-## (pixel-art çerçeveli) ve tur göstergesinde (prosedürel yuvarlak) kullanılır.
-## game_screen.gd'den ayrıldı.
+## (pixel-art çerçeveli) ve listelerde kullanılır. game_screen.gd'den ayrıldı.
+##
+## TARZ (Konsept C): yuvarlak değil KARE rozet — kalın koyu dış çizgi, içinde
+## düz parti rengi. Kendi partin altın çizgiyle ayrılır. Yuvarlak köşe ve
+## yumuşak gölge yok; her şey PNG dokudan (bkz. UiSkin.color_box).
 
 ## Oyuncu panelindeki logoların pixel-art çerçevesi. Çerçevenin ortasındaki
 ## saydam delik, logonun görüneceği alandır; deliğin konumu/boyutu koda
@@ -11,7 +14,7 @@ extends RefCounted
 const FRAME_PATH := "res://assets/ui/party_profile_picture_frame.png"
 ## Çerçevenin büyütme katı. TAM SAYI olmalı, yoksa pixel-art bulanıklaşır.
 const FRAME_SCALE := 3
-const SHADOW_COLOR := Color(0, 0, 0, 0.38)
+
 
 static var _frame_texture: Texture2D = null
 static var _frame_interior := Rect2i()
@@ -30,27 +33,19 @@ static func build(party: Dictionary, size: Vector2, icon_pixel_size: int, is_sel
 	wrap.custom_minimum_size = size
 	wrap.mouse_filter = Control.MOUSE_FILTER_STOP
 
-	var circle := Panel.new()
-	# Rozetin içindekiler tamamen DEKORATİF — fare girdisini yutmasınlar.
-	circle.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	circle.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var style := StyleBoxFlat.new()
-	style.bg_color = party.get("bg_color", Color(0.3, 0.3, 0.3))
-	style.set_corner_radius_all(int(size.y / 2.0))
-	if is_self:
-		style.set_border_width_all(4)
-		style.border_color = Color(1.0, 0.82, 0.15, 1.0)
-		style.shadow_size = 10
-		style.shadow_color = Color(1.0, 0.82, 0.15, 0.45)
-		style.shadow_offset = Vector2.ZERO
-	else:
-		style.set_border_width_all(2)
-		style.border_color = Color(1, 1, 1, 0.5)
-		style.shadow_size = 6
-		style.shadow_color = SHADOW_COLOR
-		style.shadow_offset = Vector2(2, 3)
-	circle.add_theme_stylebox_override("panel", style)
-	wrap.add_child(circle)
+	# Dış çizgi: kendi partinde altın, diğerlerinde koyu mürekkep.
+	var outline := UiSkin.color_surface(UiTheme.GOLD if is_self else UiTheme.INK, UiSkin.FILL)
+	outline.set_anchors_preset(Control.PRESET_FULL_RECT)
+	wrap.add_child(outline)
+	# İçerideki düz parti rengi (çizgi kalınlığı kadar içeride).
+	var edge := 3.0 if is_self else 2.0
+	var body := UiSkin.color_surface(party.get("bg_color", UiTheme.PANEL_LIGHT), UiSkin.FILL)
+	body.set_anchors_preset(Control.PRESET_FULL_RECT)
+	body.offset_left = edge
+	body.offset_top = edge
+	body.offset_right = -edge
+	body.offset_bottom = -edge
+	wrap.add_child(body)
 
 	if party.has("icon_index"):
 		var icon := TextureRect.new()
@@ -182,7 +177,7 @@ static func _build_framed(party: Dictionary, icon_pixel_size: int, is_self: bool
 	frame.stretch_mode = TextureRect.STRETCH_SCALE
 	frame.size = frame_size
 	if is_self:
-		frame.modulate = Color(1.35, 1.12, 0.55, 1.0)
+		frame.modulate = Color(1.35, 1.12, 0.55, 1.0)  # kendi partin: çerçeve altına çalar
 	wrap.add_child(frame)
 
 	# Hedef seçerken (vekil çalma) yanan vurgu.

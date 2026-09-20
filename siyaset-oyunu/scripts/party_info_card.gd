@@ -5,7 +5,7 @@ extends RefCounted
 ## tablosu (her eksende -3..+3 arası 7 kutu, partinin konumu kendi renginde).
 
 const WIDTH := 330.0
-const DIM := Color(0.66, 0.7, 0.78)
+const DIM := UiTheme.TEXT_MUTED
 
 static func build(peer_id: int, my_id: int) -> PanelContainer:
 	var party: Dictionary = PartyManager.parties.get(peer_id, {})
@@ -13,20 +13,22 @@ static func build(peer_id: int, my_id: int) -> PanelContainer:
 	var card := PanelContainer.new()
 	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.custom_minimum_size = Vector2(WIDTH, 0)
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.07, 0.08, 0.11, 0.97)
-	style.set_corner_radius_all(10)
-	style.border_width_top = 5
-	style.border_color = color
-	style.set_content_margin_all(14)
-	style.shadow_color = Color(0, 0, 0, 0.45)
-	style.shadow_size = 10
+	var style := UiSkin.stylebox(UiSkin.PANEL)
+	style.set_content_margin_all(UiTheme.PAD_M)
 	card.add_theme_stylebox_override("panel", style)
+
+	var outer := HBoxContainer.new()
+	outer.add_theme_constant_override("separation", UiTheme.GAP_S)
+	outer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(outer)
+	# Solda parti renginde şerit.
+	outer.add_child(UiTheme.stripe(color))
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_child(box)
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	outer.add_child(box)
 
 	# Başlık: logo, parti adı, oyuncu adı.
 	var header := HBoxContainer.new()
@@ -58,14 +60,14 @@ static func build(peer_id: int, my_id: int) -> PanelContainer:
 	var has_seats: bool = CardManager.last_seats.has(peer_id)
 	stats.add_child(_stat(str(int(CardManager.last_seats.get(peer_id, 0))) if has_seats else "—", "vekil", Color.WHITE))
 	stats.add_child(_stat("%%%.1f" % float(CardManager.last_vote_shares[peer_id]) if has_seats else "—", "oy", Color.WHITE))
-	stats.add_child(_stat(str(GovernmentManager.score_of(peer_id)), "puan", Color(1.0, 0.85, 0.35)))
+	stats.add_child(_stat(str(GovernmentManager.score_of(peer_id)), "puan", UiTheme.GOLD))
 	var opinion := CardManager.national_of(peer_id)
 	stats.add_child(_stat("%+.1f" % opinion, "kamuoyu", ProvincePanel._opinion_color(opinion)))
 
 	var role := role_text(peer_id)
-	box.add_child(_label(role, 13, Color(0.55, 0.85, 0.6) if role.begins_with("Hükümet:") else DIM))
+	box.add_child(_label(role, UiTheme.FS_SMALL, UiTheme.GREEN if role.begins_with("Hükümet:") else DIM))
 
-	box.add_child(HSeparator.new())
+	box.add_child(UiTheme.rule())
 	box.add_child(_label("İDEOLOJİ", 11, DIM))
 	var ideology: Dictionary = party.get("ideology", IdeologyAxes.default_values())
 	for axis in IdeologyAxes.AXES:
@@ -130,15 +132,9 @@ static func _axis_row(axis: String, value: float, color: Color) -> Control:
 		cell.custom_minimum_size = Vector2(9, 12 if whole else 8)
 		cell.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var cell_style := StyleBoxFlat.new()
-		cell_style.set_corner_radius_all(2)
-		if is_equal_approx(v, value):
-			cell_style.bg_color = color
-			cell_style.set_border_width_all(1)
-			cell_style.border_color = Color(1, 1, 1, 0.85)
-		else:
-			cell_style.bg_color = Color(1, 1, 1, 0.2 if is_zero_approx(v) else (0.1 if whole else 0.05))
-		cell.add_theme_stylebox_override("panel", cell_style)
+		var cell_color := color if is_equal_approx(v, value) else (
+			UiTheme.PANEL_LIGHT if is_zero_approx(v) else (UiTheme.PANEL_DARK if whole else UiTheme.SLOT))
+		cell.add_theme_stylebox_override("panel", UiSkin.color_box(cell_color))
 		cells.add_child(cell)
 	var right := _label(String(info[2]), 11, DIM)
 	right.custom_minimum_size = Vector2(76, 0)

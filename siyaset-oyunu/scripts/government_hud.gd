@@ -6,8 +6,8 @@ extends RefCounted
 
 const BADGE_SIZE := Vector2(26, 26)
 const BADGE_ICON_PIXEL_SIZE := 48
-const TITLE_COLOR := Color(1, 1, 1, 0.6)
-const DIM_COLOR := Color(1, 1, 1, 0.55)
+const TITLE_COLOR := UiTheme.TEXT_MUTED
+const DIM_COLOR := UiTheme.TEXT_MUTED
 
 static func party_name_of(peer_id: int) -> String:
 	return PartyManager.parties.get(peer_id, {}).get("name", "?")
@@ -27,8 +27,9 @@ static func _label(text: String, font_size: int, modulate: Color = Color.WHITE) 
 	label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	return label
 
+## Bölüm başlığı: monospace, altın, "> " önekli (tarzın imzası).
 static func section_title(text: String) -> Label:
-	return _label(text, 12, TITLE_COLOR)
+	return UiTheme.section_label(text)
 
 static func _badge(peer_id: int) -> Control:
 	var badge := PartyBadge.build(PartyManager.parties.get(peer_id, {}), BADGE_SIZE, BADGE_ICON_PIXEL_SIZE)
@@ -65,7 +66,7 @@ static func fill_government_panel(box: VBoxContainer) -> void:
 		var title := section_title("%s\n%s teklifi" % [
 			"KOALİSYON GÖRÜŞMESİ" if GovernmentManager.is_coalition_stage() else "OYLANAN HÜKÜMET",
 			party_name_of(GovernmentManager.proposal_peer_id)])
-		title.modulate = Color(1.0, 0.85, 0.35)
+		title.modulate = UiTheme.GOLD
 		box.add_child(title)
 		_fill_cabinet(box, GovernmentManager.proposal_assignments)
 		return
@@ -137,7 +138,7 @@ static func _fill_cabinet(box: VBoxContainer, government: Dictionary) -> void:
 	var total := GovernmentManager.total_seats()
 	var majority: bool = seats * 2 > total
 	box.add_child(_label("%d/%d sandalye — %s" % [seats, total, "çoğunluk var" if majority else "AZINLIK"],
-		12, Color(1, 1, 1, 0.7) if majority else Color(1, 0.6, 0.5, 0.95)))
+		UiTheme.FS_TINY, UiTheme.TEXT_MUTED if majority else UiTheme.RED))
 
 ## Puan tablosu: logo, parti adı, oyuncu adı ve sağda puan. Her satır TEK
 ## satır yüksekliğinde — 8 oyuncuda da sol panele sığsın.
@@ -158,7 +159,7 @@ static func fill_score_panel(box: VBoxContainer, peer_ids: Array, my_id: int) ->
 		row.add_child(_badge(peer_id))
 
 		var party_label := _label(party_name_of(peer_id), 13,
-			Color(1.0, 0.85, 0.35) if peer_id == my_id else Color.WHITE)
+			UiTheme.GOLD if peer_id == my_id else UiTheme.TEXT)
 		row.add_child(party_label)
 
 		var leader_label := _label(leader_name_of(peer_id), 11, DIM_COLOR)

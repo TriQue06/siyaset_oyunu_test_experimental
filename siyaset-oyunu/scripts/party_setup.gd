@@ -131,7 +131,7 @@ func _on_name_changed(new_text: String) -> void:
 func _update_name_hint() -> void:
 	var valid := PartyManager.is_valid_name(_party_name)
 	name_hint_label.text = "%d-%d karakter" % [PartyManager.NAME_MIN_LENGTH, PartyManager.NAME_MAX_LENGTH]
-	name_hint_label.modulate = Color(1, 1, 1, 0.6) if valid else Color(1, 0.4, 0.4, 1)
+	name_hint_label.modulate = UiTheme.TEXT_MUTED if valid else UiTheme.RED
 
 ## İkon kategorisi sekmeleri (Kurgusal / Türkiye) ızgaranın üstünde.
 func _build_icon_tabs() -> void:
@@ -175,13 +175,13 @@ func _build_icon_grid() -> void:
 func _refresh_icon_grid_selection() -> void:
 	for i in icon_grid.get_child_count():
 		var btn: TextureButton = icon_grid.get_child(i)
-		btn.self_modulate = Color(1, 1, 0.4) if i == _selected_icon_index else Color.WHITE
+		btn.self_modulate = UiTheme.GOLD if i == _selected_icon_index else Color.WHITE
 		btn.visible = PartyPresets.icon_category(i) == _icon_category
 	if _icon_tabs != null:
 		for category in _icon_tabs.get_child_count():
 			var tab := _icon_tabs.get_child(category) as Button
 			tab.button_pressed = category == _icon_category
-			tab.modulate = Color.WHITE if category == _icon_category else Color(1, 1, 1, 0.5)
+			tab.modulate = Color.WHITE if category == _icon_category else Color(0.7, 0.7, 0.7, 1.0)
 
 ## Renk başka bir OYUNCUDA mı? (Botun rengi alınabilir, bot başka renge geçer.)
 func _is_taken_by_player(color: Color) -> bool:
@@ -243,10 +243,8 @@ func _build_players_panel() -> void:
 	panel.offset_top = 86
 	panel.offset_right = PLAYERS_PANEL_WIDTH - 6
 	panel.offset_bottom = -12
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.08, 0.09, 0.12, 0.92)
-	style.set_corner_radius_all(10)
-	style.set_content_margin_all(12)
+	var style := UiSkin.stylebox(UiSkin.PANEL_DARK)
+	style.set_content_margin_all(UiTheme.PAD_M)
 	panel.add_theme_stylebox_override("panel", style)
 	add_child(panel)
 	var box := VBoxContainer.new()
@@ -257,7 +255,7 @@ func _build_players_panel() -> void:
 	title.add_theme_font_size_override("font_size", 18)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
-	box.add_child(HSeparator.new())
+	box.add_child(UiTheme.rule())
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -301,7 +299,7 @@ func _refresh_players_panel() -> void:
 		var player_name := String(MultiplayerManager.players.get(peer_id, {}).get("name", "Sen"))
 		player_label.text = player_name + (" (sen)" if int(peer_id) == my_id else "") + ("  🤖" if MultiplayerManager.is_bot(peer_id) else "")
 		player_label.add_theme_font_size_override("font_size", 13)
-		player_label.modulate = Color(1, 1, 1, 0.65)
+		player_label.modulate = UiTheme.TEXT_MUTED
 		player_label.clip_text = true
 		texts.add_child(player_label)
 		var party_label := Label.new()
@@ -318,12 +316,12 @@ func _refresh_players_panel() -> void:
 			edit_button.text = "✎" if int(peer_id) != my_id else "Ben"
 			edit_button.tooltip_text = "Bu botun adını, logosunu ve rengini düzenle" if int(peer_id) != my_id else "Kendi partine dön"
 			edit_button.custom_minimum_size = Vector2(34, 30)
-			edit_button.modulate = Color(1, 0.85, 0.35) if editing else Color.WHITE
+			edit_button.modulate = UiTheme.GOLD if editing else Color.WHITE
 			edit_button.pressed.connect(_start_editing.bind(-1 if int(peer_id) == my_id else int(peer_id)))
 			row.add_child(edit_button)
 		var ready_label := Label.new()
 		ready_label.text = "✔" if PartyManager.is_ready(peer_id) else "…"
-		ready_label.modulate = Color(0.45, 1, 0.5) if PartyManager.is_ready(peer_id) else Color(1, 1, 1, 0.4)
+		ready_label.modulate = UiTheme.GREEN if PartyManager.is_ready(peer_id) else UiTheme.TEXT_DIM
 		ready_label.add_theme_font_size_override("font_size", 18)
 		row.add_child(ready_label)
 		_players_list.add_child(row)
@@ -342,19 +340,19 @@ func _build_color_row() -> void:
 		var btn := Button.new()
 		btn.custom_minimum_size = Vector2(SWATCH_SIZE, SWATCH_SIZE)
 		btn.disabled = not allowed or (_is_locked and not _editing_bot())
-		btn.modulate = Color(1, 1, 1, 1) if allowed else Color(1, 1, 1, 0.35)
+		btn.modulate = Color.WHITE if allowed else Color(0.55, 0.55, 0.55, 1.0)
 		if taken:
 			btn.text = "✕"
 			btn.tooltip_text = "Bu renk başka bir oyuncuda"
-		var style := StyleBoxFlat.new()
-		style.bg_color = color
-		style.set_corner_radius_all(4)
-		style.set_border_width_all(2)
-		style.border_color = Color(1, 1, 1, 0.9) if color.is_equal_approx(_selected_bg_color) else Color(0, 0, 0, 0.4)
-		btn.add_theme_stylebox_override("normal", style)
-		btn.add_theme_stylebox_override("hover", style)
-		btn.add_theme_stylebox_override("pressed", style)
-		btn.add_theme_stylebox_override("disabled", style)
+		# Seçili renk altın çerçeveyle ayrılır (pixel tarz: kare, kalın kenar).
+		var selected := color.is_equal_approx(_selected_bg_color)
+		var style := UiSkin.color_box(color, UiSkin.BUTTON_TINT_HOVER if selected else UiSkin.BUTTON_TINT_NORMAL)
+		for state in ["normal", "hover", "pressed", "disabled"]:
+			btn.add_theme_stylebox_override(state, style)
+		if selected:
+			var ring := UiSkin.color_surface(UiTheme.GOLD, UiSkin.TARGET)
+			ring.set_anchors_preset(Control.PRESET_FULL_RECT)
+			btn.add_child(ring)
 		if allowed:
 			btn.pressed.connect(_on_bg_color_selected.bind(i))
 		bg_color_row.add_child(btn)

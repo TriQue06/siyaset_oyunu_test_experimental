@@ -14,6 +14,15 @@ const BUTTON_NORMAL := "res://assets/ui/ui_button_normal.png"
 const BUTTON_HOVER := "res://assets/ui/ui_button_hover.png"
 const BUTTON_PRESSED := "res://assets/ui/ui_button_pressed.png"
 const BUTTON_DISABLED := "res://assets/ui/ui_button_disabled.png"
+## Düz beyaz dolgu ve ince çubuk yuvası (modulate ile renklendirilir).
+const FILL := "res://assets/ui/ui_fill.png"
+const TRACK := "res://assets/ui/ui_track.png"
+## Renklendirilebilir buton dokuları (gri gövde + modulate).
+const BUTTON_TINT_NORMAL := "res://assets/ui/ui_button_tint_normal.png"
+const BUTTON_TINT_HOVER := "res://assets/ui/ui_button_tint_hover.png"
+const BUTTON_TINT_PRESSED := "res://assets/ui/ui_button_tint_pressed.png"
+## Sadece çerçeve (içi saydam): seçili/hedef vurgusu.
+const TARGET := "res://assets/ui/target_highlight.png"
 
 ## 9-slice kenar payı: placeholder'lar 16x16 ve 1px çerçeveli üretiliyor,
 ## 5px pay köşeleri bozmadan her boyuta esnetir.
@@ -35,6 +44,14 @@ static func stylebox(path: String, margin: int = SLICE_MARGIN) -> StyleBoxTextur
 	box.axis_stretch_vertical = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
 	return box
 
+## PNG zeminli, istenen renge boyanmış bir StyleBox. Prosedürel StyleBoxFlat
+## yerine bunu kullanıyoruz: görünen şey yine bir PNG, rengi modulate ile
+## geliyor (parti renkleri, çubuk dolguları).
+static func color_box(color: Color, path: String = FILL, margin: int = SLICE_MARGIN) -> StyleBoxTexture:
+	var box := stylebox(path, margin)
+	box.modulate_color = color
+	return box
+
 ## Bir Panel/PanelContainer'a PNG zemin uygular.
 static func skin_panel(panel: Control, path: String = PANEL) -> void:
 	panel.add_theme_stylebox_override("panel", stylebox(path))
@@ -47,6 +64,22 @@ static func skin_button(button: Button) -> void:
 	button.add_theme_stylebox_override("pressed", stylebox(BUTTON_PRESSED))
 	button.add_theme_stylebox_override("focus", stylebox(BUTTON_HOVER))
 	button.add_theme_stylebox_override("disabled", stylebox(BUTTON_DISABLED))
+
+## İSTENEN RENKTE buton (katıl, oy ver, hamle butonları). Doku gri tonlarında
+## olduğu için modulate rengi doğrudan verir; koyu dış çizgi koyu kalır.
+static func skin_color_button(button: Button, color: Color) -> void:
+	button.add_theme_stylebox_override("normal", color_box(color, BUTTON_TINT_NORMAL))
+	button.add_theme_stylebox_override("hover", color_box(color, BUTTON_TINT_HOVER))
+	button.add_theme_stylebox_override("focus", color_box(color, BUTTON_TINT_HOVER))
+	button.add_theme_stylebox_override("pressed", color_box(color, BUTTON_TINT_PRESSED))
+	button.add_theme_stylebox_override("disabled", color_box(color.darkened(0.55), BUTTON_TINT_NORMAL))
+	var ink := color.get_luminance() > 0.55
+	button.add_theme_color_override("font_color", UiTheme.INK if ink else UiTheme.TEXT)
+	button.add_theme_color_override("font_hover_color", UiTheme.INK if ink else UiTheme.TEXT)
+	button.add_theme_color_override("font_pressed_color", UiTheme.INK if ink else UiTheme.TEXT)
+	button.add_theme_color_override("font_focus_color", UiTheme.INK if ink else UiTheme.TEXT)
+	button.add_theme_color_override("font_disabled_color", UiTheme.TEXT_DIM)
+	button.add_theme_font_override("font", UiTheme.mono())
 
 ## Renkli bir "yüzey" (parti rengi vb.) — ColorRect yerine BEYAZ bir PNG'yi
 ## modulate ederek renklendiriyoruz, böylece görünen şey yine bir PNG olur ve

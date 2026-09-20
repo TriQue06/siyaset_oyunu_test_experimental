@@ -139,7 +139,7 @@ func _build_partner_bar() -> void:
 		var btn := Button.new()
 		UiSkin.skin_button(btn)
 		btn.text = "%s (%d)" % [PartyManager.parties.get(peer_id, {}).get("name", "?"), GovernmentManager.seats_of(peer_id)]
-		btn.modulate = Color.WHITE if in_gov else Color(1, 1, 1, 0.5)
+		btn.modulate = Color.WHITE if in_gov else Color(0.78, 0.78, 0.78, 1.0)
 		btn.tooltip_text = "Görevli parti (sabit)" if peer_id == me else ("Hükümetten çıkar" if in_gov else "Hükümete ekle")
 		btn.disabled = peer_id == me
 		if peer_id != me:
@@ -192,7 +192,7 @@ func _build_partner_rows() -> void:
 		hbox.add_child(toggle)
 
 		if not _partners.has(peer_id):
-			row.modulate = Color(1, 1, 1, 0.55)
+			row.modulate = Color(0.8, 0.8, 0.8, 1.0)
 		post_list.add_child(row)
 
 func _on_partner_toggled(peer_id: int) -> void:

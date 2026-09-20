@@ -30,6 +30,9 @@ var _total_seats: int = 0
 var _layout_total: int = -1
 var _layout: Dictionary = {}
 var _min_gap_norm: float = 0.0 # en yakın iki koltuk merkezi arası (normalize)
+## Vekil sayısının oturduğu levha (kendi zemini olan ek katman).
+var _count_plate: PanelContainer
+var _count_label: Label
 
 ## entries: Array of {"seats": int, "color": Color} — sıra ÖNEMLİ, koltuklar
 ## bu sırayla soldan başlanarak dolduruluyor.
@@ -59,6 +62,7 @@ func set_results(entries: Array) -> void:
 			_dot_positions.append(positions[idx])
 			_dot_colors.append(color)
 			idx += 1
+	_refresh_count_plate()
 	queue_redraw()
 
 ## Koltuklar arası en küçük mesafe (satırlar içinde ve komşu satırlarda).
@@ -73,13 +77,54 @@ func _ready() -> void:
 	# Pencere ölçeği değişince kontrol boyutu aynı kalsa bile ekran piksel
 	# ızgarası değişir; kareler yeniden hizalanmalı.
 	get_viewport().size_changed.connect(queue_redraw)
+	_build_count_plate()
+	resized.connect(_place_count_plate)
+
+## VEKİL SAYISI LEVHASI: yayın altında, kendi zemini (ek UI katmanı) olan
+## monospace bir sayı. Eskiden doğrudan draw_string ile çizilen çıplak bir
+## yazıydı; artık diyagramın altına oturan küçük bir levha.
+func _build_count_plate() -> void:
+	_count_plate = PanelContainer.new()
+	_count_plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := UiSkin.stylebox(UiSkin.SLOT)
+	style.content_margin_left = 14
+	style.content_margin_right = 14
+	style.content_margin_top = 2
+	style.content_margin_bottom = 2
+	_count_plate.add_theme_stylebox_override("panel", style)
+	_count_label = Label.new()
+	_count_label.add_theme_font_override("font", UiTheme.mono(true))
+	_count_label.add_theme_font_size_override("font_size", COUNT_FONT_SIZE)
+	_count_label.add_theme_color_override("font_color", UiTheme.TEXT)
+	_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_count_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_count_plate.add_child(_count_label)
+	add_child(_count_plate)
+	_refresh_count_plate()
+
+func _refresh_count_plate() -> void:
+	if _count_plate == null:
+		return
+	_count_plate.visible = _total_seats > 0
+	_count_label.text = str(_total_seats)
+	_place_count_plate()
+
+func _place_count_plate() -> void:
+	if _count_plate == null:
+		return
+	var plate_size := _count_plate.get_combined_minimum_size()
+	_count_plate.size = plate_size
+	_count_plate.position = Vector2(size.x * 0.5 - plate_size.x * 0.5, size.y - plate_size.y)
 
 func _draw() -> void:
 	if _dot_positions.is_empty():
 		return
 	# x normalize [0,2] (merkez=1), y normalize [0,~1] — kontrol alanına sığdır.
-	var scale: float = minf(size.x * 0.5, size.y * 0.96)
-	var origin := Vector2(size.x * 0.5, size.y * 0.98)
+	# Yayın altında vekil sayısı levhası oturuyor: o kadar yer ayrılır.
+	var plate_h: float = (_count_plate.get_combined_minimum_size().y + 4.0) if (_count_plate != null and _count_plate.visible) else 0.0
+	var usable_h: float = maxf(10.0, size.y - plate_h)
+	var scale: float = minf(size.x * 0.5, usable_h * 0.96)
+	var origin := Vector2(size.x * 0.5, usable_h * 0.98)
 
 	# Daireler kesirli konumlarda antialiased çizilir: piksel ızgarasına yuvarlamak
 	# eşit aralıkları bozuyordu. Yarıçap, en yakın komşu mesafesinin %45'i ile
@@ -95,15 +140,7 @@ func _draw() -> void:
 		draw_circle(center, radius, outline_color, true, -1.0, true)
 		draw_circle(center, inner, _dot_colors[i], true, -1.0, true)
 
-	# eksen_projeksiyon'daki gibi, yayın altında ortalanmış toplam sandalye
-	# sayısı (createParliamentArch'taki <text>{total}</text> karşılığı).
-	if _total_seats > 0:
-		var font := get_theme_default_font()
-		# Sabit boyut: oyun ekranında ve seçim sonucunda aynı görünsün.
-		var font_size: int = COUNT_FONT_SIZE
-		var text := str(_total_seats)
-		var text_width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
-		draw_string(font, Vector2(size.x * 0.5 - text_width * 0.5, size.y - 4.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(1, 1, 1, 0.9))
+	# Toplam vekil sayısı artık _count_plate levhasında (bkz. _build_count_plate).
 
 # --- Koltuk yerleşim algoritması (createParliamentArch'ın birebir portu) ---
 

@@ -18,7 +18,7 @@ const MAP_FILL_RATIO := 0.98
 ## offset'leri bu genişliğe göre ayarlı.
 const RIGHT_COLUMN_WIDTH := 200.0
 ## Alt haznede meclisin (sol) aldığı pay; kalan sağ kısım el kartlarına.
-const PARLIAMENT_WIDTH_RATIO := 0.55
+const PARLIAMENT_WIDTH_RATIO := 0.66
 const AVATAR_SEPARATION := 6.0
 const AVATAR_SIZE := 56.0
 ## Parti logoları (çerçeve dahil) party_badge.gd'de; sol paneller government_hud.gd'de.
@@ -64,10 +64,8 @@ const PLAY_FLY_DURATION := 0.22   # el/avatar -> ekran ortası
 const PLAY_POP_DURATION := 0.18   # ortada küçülüp "puf" kaybolma
 
 @onready var map_holder: Node2D = %MapHolder
-@onready var deck_button: TextureButton = %DeckButton
-var _deck_shadow: TextureRect
 ## Kartı sürükleyip bırakınca atmaya yarayan çöp kutusu.
-var _trash_button: Button
+var _trash_panel: PanelContainer
 ## Anayasa paketi: oyuncunun seçtiği baraj ve seçim aralığı.
 var _constitution_threshold: float = 0.0
 var _constitution_interval: int = 4
@@ -153,13 +151,19 @@ var _drag_ghost: TextureRect
 ## Sürükleme sırasında el yeniden kurulmak istendi mi (bırakınca kurulur).
 var _hand_dirty: bool = false
 ## Hamle butonları ve mana göstergesi (sağ sütun, destenin yanında).
+## Mana levhası: sağ sütunun altında, hamle butonlarının hemen üstünde.
+const MANA_PLATE_LEFT := -196.0
+const MANA_PLATE_TOP := -264.0
+const MANA_PLATE_HEIGHT := 44.0
+const MANA_ICON_SIZE := 34.0
+var _mana_plate: PanelContainer
 var _mana_box: HBoxContainer
 var _mana_label: Label
 ## Hamle ızgarası ölçüleri (sağ altta, destenin üstünde).
 const ACTION_BUTTON_WIDTH := 88.0
 const ACTION_BUTTON_HEIGHT := 32.0
 const ACTION_BUTTON_GAP := 4
-const ACTION_GRID_BOTTOM := -188.0
+const ACTION_GRID_BOTTOM := -270.0
 var _action_grid: GridContainer
 var _law_button: Button
 var _org_button: Button
@@ -197,9 +201,6 @@ func _ready() -> void:
 	MultiplayerManager.settings_updated.connect(_refresh_game_settings_label)
 
 	_place_right_column_controls()
-	deck_button.texture_normal = CardPresets.get_closed_texture()
-	deck_button.pressed.connect(_on_deck_pressed)
-	_deck_shadow = _add_shadow_behind(deck_button, CardPresets.get_closed_texture())
 	pass_button.pressed.connect(_on_pass_pressed)
 
 	await get_tree().process_frame
@@ -229,6 +230,24 @@ func _ready() -> void:
 	CardManager.opinion_changed.connect(_on_opinion_changed)
 
 	UiSkin.skin_panel(left_panel, UiSkin.PANEL_DARK)
+	# Yıl / sonraki seçim / baraj kendi levhasında dursun (ek UI katmanı).
+	var info_plate := get_node_or_null("%InfoPlate") as PanelContainer
+	if info_plate != null:
+		var plate_style := UiSkin.stylebox(UiSkin.SLOT)
+		plate_style.set_content_margin_all(UiTheme.PAD_S)
+		info_plate.add_theme_stylebox_override("panel", plate_style)
+	game_settings_label.add_theme_font_override("font", UiTheme.mono())
+	game_settings_label.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
+	# Sıra göstergesi de aynı monospace ailede.
+	turn_indicator_label.add_theme_font_override("font", UiTheme.mono())
+	# Parlamento "tahtası": diyagram ekranın bir iki piksel üstünde duruyormuş
+	# gibi kendi zemini ve sert gölgesi olan bir panelin içinde.
+	var board := get_node_or_null("%ParliamentBoard") as PanelContainer
+	if board != null:
+		UiSkin.skin_panel(board, UiSkin.PANEL)
+	var stats_panel := get_node_or_null("%StatsPanel") as PanelContainer
+	if stats_panel != null:
+		UiSkin.skin_panel(stats_panel, UiSkin.PANEL_DARK)
 	# Monospace yazı geniş: panelin kendi genişliğini aşmasını engelle.
 	left_panel.clip_contents = true
 	left_panel.custom_minimum_size.x = LEFT_PANEL_WIDTH
@@ -411,7 +430,8 @@ func _refresh_results_panels() -> void:
 			"leader": _leader_name_of(peer_id),
 			"color": color,
 			"percent": CardManager.last_vote_shares[peer_id],
-			"seats": CardManager.last_seats.get(peer_id, 0),
+			"seats": CardManager.election_seats.get(peer_id, CardManager.last_seats.get(peer_id, 0)),
+			"seats_now": CardManager.last_seats.get(peer_id, 0),
 			"below": not CardManager.passed_threshold.has(peer_id),
 		})
 	vote_share_panel.set_data(vote_entries)
@@ -520,9 +540,6 @@ func _on_constitution_pressed() -> void:
 	CardManager.propose_constitution({"threshold": _constitution_threshold, "interval": _constitution_interval})
 	_law_designer.hide()
 
-func _on_deck_pressed() -> void:
-	CardManager.draw_card()
-
 func _on_pass_pressed() -> void:
 	CardManager.pass_turn()
 
@@ -560,10 +577,18 @@ func _rebuild_player_panel() -> void:
 		player_panel_list.remove_child(child)
 		child.queue_free()
 	var count: int = maxi(1, _ordered_peer_ids().size())
-	# Panel boyutu ilk karede henüz hesaplanmamış olabilir: pencereden hesaplanır.
+	# KARTLAR PANELİ PAYLAŞIR: ızgara paneli tamamen kaplar, her kart
+	# EXPAND_FILL ile eşit pay alır. Eskiden yükseklik offset'lerden elle
+	# hesaplanıyordu; düzen bir kez daha değişince hesap eskiyor ve 8 partide
+	# kartlar hamle butonlarının üstüne taşıyordu.
 	var panel := player_panel_list.get_parent() as Control
-	var available: float = get_viewport_rect().size.y - panel.offset_top + panel.offset_bottom
-	_avatar_height = clampf((available - AVATAR_SEPARATION * (count - 1)) / count, 26.0, 72.0) if available > 0.0 else 64.0
+	var available: float = panel.size.y
+	if available <= 0.0:
+		available = get_viewport_rect().size.y - panel.offset_top + panel.offset_bottom
+	var separation: float = AVATAR_SEPARATION if count <= 6 else 2.0
+	player_panel_list.add_theme_constant_override("v_separation", int(separation))
+	_avatar_height = clampf((available - separation * (count - 1)) / count, 16.0, 72.0) if available > 0.0 else 64.0
+	panel.clip_contents = true
 	player_panel_list.columns = 1
 
 	for peer_id in _ordered_peer_ids():
@@ -584,7 +609,6 @@ func _on_turn_changed(_peer_id: int) -> void:
 			_show_toast("Sıra sende: +%d mana (toplam %s)" % [CardManager.turn_income(current), CardManager.mana_text(CardManager.mana_of(current))])
 			AudioManager.play("turn_start")
 	_update_turn_indicator()
-	_refresh_deck_button()
 	_refresh_pass_button()
 	_refresh_hand_interactivity()
 	_refresh_action_buttons()
@@ -615,18 +639,12 @@ func _update_turn_indicator_text() -> void:
 	var timer := "" if CardManager.is_turn_blocked() else "\nSüre: %s" % GameRules.format_seconds(CardManager.turn_seconds_left())
 	turn_indicator_label.text = "Sıra: %s%s%s" % [pname, suffix, timer]
 
-## Çöp kutusu sadece sıra sendeyken ve elinde kart varken belirgin.
+## Kart bozdurma yuvası sadece sıra sendeyken ve elinde kart varken belirgin.
 func _refresh_trash_button() -> void:
-	if _trash_button == null:
+	if _trash_panel == null:
 		return
-	var me := multiplayer.get_unique_id()
 	var usable: bool = CardManager.can_act() and not CardManager.my_inventory().is_empty()
-	_trash_button.modulate.a = 1.0 if usable else 0.35
-
-func _refresh_deck_button() -> void:
-	deck_button.disabled = not CardManager.can_draw()
-	deck_button.modulate.a = 1.0 if not deck_button.disabled else 0.5
-	deck_button.tooltip_text = "Kart çek (bedava, dönemde 1). Her seçimden sonra herkese 1 kart hediye."
+	_trash_panel.modulate.a = 1.0 if usable else 0.35
 
 func _refresh_pass_button() -> void:
 	pass_button.disabled = not CardManager.can_act()
@@ -683,7 +701,6 @@ func _rebuild_hand() -> void:
 		hand_container.add_child(_build_hand_card(hand[i], i))
 	_fit_hand_width(hand.size())
 	_refresh_hand_interactivity()
-	_refresh_deck_button()
 
 ## Kartlar ayrılan alana (sağ yarı) sığmıyorsa aralarındaki boşluk negatife
 ## çekilip üst üste bindirilir; sıra göstergesine ve meclis butonlarına taşmaz.
@@ -866,7 +883,7 @@ func _card_title_banner(card_type: String) -> Control:
 	return banner
 
 ## Kartın sağ alt köşesindeki mana bedeli rozeti.
-## Kartın üst kısmında mana bedeli: mana simgesi + sayı (bedava kartta 0).
+## Kartın üst kısmında mana bedeli: mana simgesi + sayı (bedelsiz kartta 0).
 func _card_cost_badge(cost: int) -> Control:
 	var badge := PanelContainer.new()
 	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -993,10 +1010,10 @@ func _drop_target(card_type: String) -> Dictionary:
 	var result := {"valid": false, "peer": -1, "province": "", "label": "", "error": "",
 		"parliament": false, "discard": false}
 	# ÇÖP her kartı kabul eder (yasa tasarımı hariç): bedelin yarısı geri gelir.
-	if _trash_button != null and card_type != "" and not CardPresets.is_law_card(card_type) 			and _trash_button.get_global_rect().has_point(get_viewport().get_mouse_position()):
+	if _trash_panel != null and card_type != "" and not CardPresets.is_law_card(card_type) 			and _trash_panel.get_global_rect().has_point(get_viewport().get_mouse_position()):
 		result["valid"] = true
 		result["discard"] = true
-		result["label"] = "Bırak: kartı çöpe at (+%s mana)" % CardManager.mana_text(CardManager.discard_refund(card_type))
+		result["label"] = "Bırak: kartı bozdur (+%s mana)" % CardManager.mana_text(CardManager.discard_refund(card_type))
 		return result
 	if CardPresets.needs_party_target(card_type) and not CardPresets.needs_target(card_type):
 		# Kaset / parti içi isyan: hedef, kendisi dışında herhangi bir parti.
@@ -1060,7 +1077,7 @@ func _drop_target(card_type: String) -> Dictionary:
 			result["label"] = "%s: parlamento diyagramının üstüne bırak" % law["title"]
 		elif CardManager.can_propose_law(me, card_type):
 			result["valid"] = true
-			result["label"] = "Bırak: %s %s (bedava, dönemde 1)" % [law["title"],
+			result["label"] = "Bırak: %s %s (bedelsiz, dönemde 1)" % [law["title"],
 				"seçim vaadi olarak açıklanır" if CardManager.last_seats.is_empty() else "meclise sunulur"]
 		else:
 			result["label"] = _action_block_reason(GameRules.LAW_MANA_COST, true)
@@ -1364,7 +1381,8 @@ func _play_draw_animation(card_type: String, old_hand_size: int) -> void:
 	flying.modulate.a = 0.0
 	add_child(flying)
 
-	var deck_rect := deck_button.get_global_rect()
+	# Deste yok: kart sağ alttaki bozdurma kutusunun üstünden gelir.
+	var deck_rect := _trash_panel.get_global_rect() if _trash_panel != null else Rect2(get_viewport_rect().size - Vector2(180, 180), CARD_DISPLAY_SIZE)
 	flying.size = deck_rect.size
 	flying.global_position = deck_rect.position
 
@@ -1510,7 +1528,8 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 	var is_turn := not CardManager.turn_order.is_empty() and peer_id == CardManager.current_turn_peer_id()
 	var color: Color = party.get("bg_color", Color(0.5, 0.5, 0.5))
 	var card := PanelContainer.new()
-	card.custom_minimum_size = Vector2(RIGHT_COLUMN_WIDTH - 16.0, _avatar_height)
+	card.custom_minimum_size = Vector2(RIGHT_COLUMN_WIDTH - 16.0, 0)
+	card.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	# SIRA KİMDE: açık zemin + altın çerçeve + "SIRADA" etiketi (nabız gibi atar).
 	# BEN: altın rengi isim + "SEN" etiketi. İkisi birlikte olabilir.
@@ -1545,8 +1564,15 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 	if not compact:
 		info.add_child(_avatar_label(_leader_name_of(peer_id) + ("  (Sen)" if is_self else ""), UiTheme.FS_TINY, UiTheme.TEXT_MUTED))
 	if _avatar_height >= 58.0:
-		var seats_text := ("%d vekil · " % int(CardManager.last_seats[peer_id])) if CardManager.last_seats.has(peer_id) else ""
-		info.add_child(_avatar_label("%s%s mana" % [seats_text, CardManager.mana_text(CardManager.mana_of(peer_id))], UiTheme.FS_TINY, UiTheme.TEXT_MUTED))
+		# MANA GİZLİ: kimse rakibinin manasını göremez, sadece kendi manasını.
+		# Vekil sayısı herkese açık (meclis zaten görünür).
+		var parts: Array = []
+		if CardManager.last_seats.has(peer_id):
+			parts.append("%d vekil" % int(CardManager.last_seats[peer_id]))
+		if is_self:
+			parts.append("%s mana" % CardManager.mana_text(CardManager.mana_of(peer_id)))
+		if not parts.is_empty():
+			info.add_child(_avatar_label(" · ".join(parts), UiTheme.FS_TINY, UiTheme.TEXT_MUTED))
 
 	var populism_left := CardManager.populism_rounds_left(peer_id)
 	if is_self or is_turn or populism_left > 0:
@@ -1693,7 +1719,6 @@ func _on_government_phase_changed() -> void:
 	_refresh_action_buttons()
 	_refresh_government_panel()
 	_refresh_waiting_overlay()
-	_refresh_deck_button()
 	_refresh_pass_button()
 	_rebuild_hand()
 	if _leaving_for_results:
@@ -1817,18 +1842,13 @@ const LAW_AXIS_COLORS := {
 ## kalan alana sığar.
 func _place_right_column_controls() -> void:
 	# Alt sağ: 6 hamle butonu (2 sütun x 3 satır), altında küçük deste + mana + Turu Bitir.
-	deck_button.ignore_texture_size = true
-	deck_button.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-	deck_button.offset_left = -196.0
-	deck_button.offset_right = -140.0
-	deck_button.offset_top = -182.0
-	deck_button.offset_bottom = -106.0
-	_sync_shadow(_deck_shadow, deck_button)
-	if _trash_button != null:
-		_trash_button.offset_left = deck_button.offset_left - 62.0
-		_trash_button.offset_right = deck_button.offset_left - 8.0
-		_trash_button.offset_top = deck_button.offset_top + 20.0
-		_trash_button.offset_bottom = deck_button.offset_bottom
+	if _trash_panel != null:
+		# Sağ sütun aşağıdan yukarı: sıra göstergesi, Turu Bitir, kart
+		# bozdurma, mana levhası, hamle ızgarası. Hiçbiri üst üste binmez.
+		_trash_panel.offset_left = MANA_PLATE_LEFT
+		_trash_panel.offset_right = -16.0
+		_trash_panel.offset_top = -214.0
+		_trash_panel.offset_bottom = -156.0
 	pass_button.add_theme_font_size_override("font_size", 14)
 	var panel := player_panel_list.get_parent() as Control
 	if panel != null:
@@ -1840,61 +1860,105 @@ func _place_right_column_controls() -> void:
 		if _action_grid != null:
 			grid_height = maxf(grid_height, _action_grid.get_combined_minimum_size().y)
 		panel.offset_bottom = ACTION_GRID_BOTTOM - grid_height - 12.0
-	pass_button.offset_left = -134.0
-	pass_button.offset_top = -140.0
+	pass_button.offset_left = MANA_PLATE_LEFT
+	pass_button.offset_right = -16.0
+	pass_button.offset_top = -150.0
+	pass_button.offset_bottom = -104.0
+	# Panelin yüksekliği burada kesinleşti: kartlar bu yüksekliğe göre yeniden
+	# ölçülmeli, yoksa ilk karede hesaplanan boy taşıp kırpılıyordu.
+	if player_panel_list != null and not player_panel_list.get_children().is_empty():
+		_rebuild_player_panel()
 
-## ÇÖP KUTUSU: istemediğin kartı buraya sürükle, bedelinin yarısı mana olarak
-## geri gelir. Tıklanabilir bir buton değil, bırakma hedefi.
+## KART BOZDURMA: istemediğin kartı buraya sürükle, bedelinin yarısı mana
+## olarak geri gelir. Tıklanabilir bir buton değil, BIRAKMA HEDEFİ — bu yüzden
+## buton değil, kendi başlığı ve mana simgesi olan bir yuva paneli.
 func _build_trash_button() -> void:
-	_trash_button = Button.new()
-	_trash_button.text = "ÇÖP"
-	_trash_button.focus_mode = Control.FOCUS_NONE
-	_trash_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_trash_button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	_trash_button.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	_trash_button.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	_trash_button.add_theme_font_size_override("font_size", UiTheme.FS_TINY)
-	UiSkin.skin_color_button(_trash_button, UiTheme.PANEL_LIGHT)
-	_trash_button.tooltip_text = "Kartı buraya sürükle: at ve bedelinin yarısı kadar mana al."
-	add_child(_trash_button)
+	_trash_panel = PanelContainer.new()
+	_trash_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_trash_panel.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	_trash_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_trash_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_trash_panel.tooltip_text = "Kartı buraya sürükle: bozdur ve bedelinin yarısı kadar mana al."
+	var style := UiSkin.stylebox(UiSkin.SLOT)
+	style.set_content_margin_all(UiTheme.PAD_S)
+	_trash_panel.add_theme_stylebox_override("panel", style)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_trash_panel.add_child(row)
+	var icon := UiSkin.outlined_icon(MANA_ICON, 26.0, 2.0, MANA_COLOR)
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(icon)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 0)
+	box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(box)
+	box.add_child(_trash_label("KART BOZDURMA", UiTheme.FS_TINY, UiTheme.TEXT_MUTED))
+	box.add_child(_trash_label("kartı sürükle · bedelin ½'si", UiTheme.FS_TINY, UiTheme.TEXT_DIM))
+	add_child(_trash_panel)
+
+func _trash_label(text: String, size: int, color: Color) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_override("font", UiTheme.mono())
+	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_color_override("font_color", color)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return label
 
 func _build_action_buttons() -> void:
-	# Mana göstergesi: pas butonunun solunda simge + sayı. Dokununca kurallar.
+	# MANA LEVHASI: eskiden destenin yanında küçük bir simge+sayı ikilisiydi
+	# ve gözden kaçıyordu. Artık sağ sütunun tamamı kadar geniş, kendi zemini
+	# olan, hamle butonlarının hemen üstünde duran BÜYÜK bir gösterge.
+	_mana_plate = PanelContainer.new()
+	_mana_plate.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	_mana_plate.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_mana_plate.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_mana_plate.offset_left = MANA_PLATE_LEFT
+	_mana_plate.offset_right = -16.0
+	_mana_plate.offset_top = MANA_PLATE_TOP
+	_mana_plate.offset_bottom = MANA_PLATE_TOP + MANA_PLATE_HEIGHT
+	_mana_plate.mouse_filter = Control.MOUSE_FILTER_STOP
+	_mana_plate.tooltip_text = "Mana"
+	var mana_style := UiSkin.color_box(MANA_COLOR.darkened(0.62), UiSkin.SLOT)
+	mana_style.content_margin_left = UiTheme.PAD_S
+	mana_style.content_margin_right = UiTheme.PAD_S
+	mana_style.content_margin_top = 2
+	mana_style.content_margin_bottom = 2
+	_mana_plate.add_theme_stylebox_override("panel", mana_style)
+	add_child(_mana_plate)
 	_mana_box = HBoxContainer.new()
-	_mana_box.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	_mana_box.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	_mana_box.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	_mana_box.offset_left = -134.0
-	_mana_box.offset_right = -16.0
-	_mana_box.offset_top = -182.0
-	_mana_box.offset_bottom = -146.0
 	_mana_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	_mana_box.add_theme_constant_override("separation", 4)
-	_mana_box.mouse_filter = Control.MOUSE_FILTER_STOP
-	_mana_box.tooltip_text = "Mana"
-	var mana_icon := UiSkin.outlined_icon(MANA_ICON, 28.0, 2.0)
+	_mana_box.add_theme_constant_override("separation", 8)
+	_mana_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_mana_plate.add_child(_mana_box)
+	var mana_icon := UiSkin.outlined_icon(MANA_ICON, MANA_ICON_SIZE, 2.0)
 	mana_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_mana_box.add_child(mana_icon)
 	_mana_label = Label.new()
 	_mana_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_mana_label.add_theme_font_override("font", UiTheme.mono(true))
-	_mana_label.add_theme_font_size_override("font_size", 22)
+	_mana_label.add_theme_font_size_override("font_size", 30)
 	_mana_label.add_theme_color_override("font_color", MANA_COLOR)
 	_mana_label.add_theme_color_override("font_outline_color", UiTheme.INK)
-	_mana_label.add_theme_constant_override("outline_size", 5)
+	_mana_label.add_theme_constant_override("outline_size", 6)
 	_mana_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_mana_box.add_child(_mana_label)
-	_mana_box.gui_input.connect(func(event: InputEvent):
+	_mana_plate.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_show_toast(_mana_rules))
-	_mana_rules = "Sıran gelince +%d mana (hükümette görevin varsa +%d); manan yettikçe istediğin kadar hamle yap, biriken mana kalır.\nHamleler: yasa BEDAVA (dönemde 1), miting %d, teşkilat %d (seviye başına), yatırım %d, gensoru %d mana.\nKart çekmek bedava (dönemde 1), kart oynamak sınırsız. Kartlar bonus: karalama %d, vekil çalma %d/%d, kaset %d, isyan %d, popülizm %d, mana bonusu %d.\nTur kendiliğinden bitmez: \"Turu Bitir\"e bas. Seçimden sonra herkese +%d kart ve +%d mana, yeni hükümete +%d mana." % [
-		GameRules.MANA_PER_ROUND, GameRules.MANA_PER_ROUND_GOVERNMENT, GameRules.MITING_MANA_COST, GameRules.ORG_MANA_COST,
-		GameRules.INVEST_MANA_COST, GameRules.CENSURE_MANA_COST,
+	_mana_rules = "Sıran gelince +%d mana (hükümette görevin varsa +%d) ve 1 kart; manan yettikçe istediğin kadar hamle yap, biriken mana kalır.\nHamleler: yasa %s (dönemde 1), miting %s, teşkilat %s (seviye başına), yatırım %s, gensoru %s.\nKart oynamak sınırsız; istemediğin kartı bozdurup bedelinin yarısını mana olarak alabilirsin. Kart bedelleri: karalama %d, vekil çalma %d/%d, kaset %d, isyan %d, popülizm %d, mana bonusu %d.\nTur kendiliğinden bitmez: \"Turu Bitir\"e bas. Seçimden sonra herkese +%d kart ve +%d mana, yeni hükümete +%d mana." % [
+		GameRules.MANA_PER_ROUND, GameRules.MANA_PER_ROUND_GOVERNMENT,
+		GameRules.cost_text(GameRules.LAW_MANA_COST), GameRules.cost_text(GameRules.MITING_MANA_COST),
+		GameRules.cost_text(GameRules.ORG_MANA_COST), GameRules.cost_text(GameRules.INVEST_MANA_COST),
+		GameRules.cost_text(GameRules.CENSURE_MANA_COST),
 		CardPresets.card_cost("karalama"), CardPresets.card_cost("steal_weak"), CardPresets.card_cost("steal_strong"),
 		CardPresets.card_cost("kaset"), CardPresets.card_cost("isyan"),
 		CardPresets.card_cost("populizm"), CardPresets.card_cost("mana_bonusu"),
 		1, GameRules.ELECTION_MANA_BONUS, GameRules.GOVERNMENT_MANA_BONUS]
-	add_child(_mana_box)
 	# HAMLELER: 2 sütunlu IZGARA. Eskiden her buton tek tek mutlak konuma
 	# oturtuluyordu; uzun bir yazı (TEŞKİLATLANMA) butonun asgari genişliğini
 	# büyütünce komşusunun üstüne biniyordu. Izgara bunu yapısal olarak önler.
@@ -1908,15 +1972,15 @@ func _build_action_buttons() -> void:
 	_action_grid.offset_right = -16.0
 	_action_grid.offset_bottom = ACTION_GRID_BOTTOM
 	add_child(_action_grid)
-	_law_button = _action_button("YASA", "bedava", UiTheme.PURPLE)
+	_law_button = _action_button("YASA", GameRules.cost_text(GameRules.LAW_MANA_COST), UiTheme.PURPLE)
 	_law_button.pressed.connect(_on_law_button_pressed)
-	_miting_button = _action_button("MİTİNG", "%d mana" % GameRules.MITING_MANA_COST, UiTheme.RED)
+	_miting_button = _action_button("MİTİNG", GameRules.cost_text(GameRules.MITING_MANA_COST), UiTheme.RED)
 	_miting_button.pressed.connect(_on_miting_button_pressed)
-	_org_button = _action_button("TEŞKİLAT", "%d mana" % GameRules.ORG_MANA_COST, UiTheme.BLUE)
+	_org_button = _action_button("TEŞKİLAT", GameRules.cost_text(GameRules.ORG_MANA_COST), UiTheme.BLUE)
 	_org_button.pressed.connect(_on_org_button_pressed)
-	_invest_button = _action_button("YATIRIM", "%d mana" % GameRules.INVEST_MANA_COST, UiTheme.GREEN_DARK)
+	_invest_button = _action_button("YATIRIM", GameRules.cost_text(GameRules.INVEST_MANA_COST), UiTheme.GREEN_DARK)
 	_invest_button.pressed.connect(_on_invest_button_pressed)
-	_censure_button = _action_button("GENSORU", "%d mana" % GameRules.CENSURE_MANA_COST, UiTheme.RED_DARK)
+	_censure_button = _action_button("GENSORU", GameRules.cost_text(GameRules.CENSURE_MANA_COST), UiTheme.RED_DARK)
 	_censure_button.pressed.connect(_on_censure_button_pressed)
 
 ## Hamle butonu: ızgaraya eklenir, sabit kutu boyutunda kalır ve yazı taşarsa

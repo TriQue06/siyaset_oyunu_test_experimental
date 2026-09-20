@@ -149,7 +149,6 @@ const CARD_ART_ALIAS := {
 }
 
 var _card_textures: Dictionary = {}
-var _closed_texture: Texture2D
 
 func _ready() -> void:
 	for card_type in CARD_TYPES:
@@ -158,13 +157,9 @@ func _ready() -> void:
 			_card_textures[card_type] = load(path)
 		else:
 			push_warning("Kart görseli bulunamadı: %s" % path)
-	_closed_texture = load("res://assets/cards/closed_cards.png")
 
 func get_card_texture(card_type: String) -> Texture2D:
 	return _card_textures.get(card_type, _card_textures.get(MITING_CARD_TYPE))
-
-func get_closed_texture() -> Texture2D:
-	return _closed_texture
 
 ## Bu kart oynanırken hedef PARTİ seçilmesi gerekiyor mu? (vekil çalma)
 func needs_target(card_type: String) -> bool:

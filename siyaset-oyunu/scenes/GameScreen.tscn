@@ -43,22 +43,6 @@ color = Color(0.094, 0.078, 0.188, 1)
 [node name="MapHolder" parent="." unique_id=1009808577 instance=ExtResource("3")]
 unique_name_in_owner = true
 
-[node name="DeckButton" type="TextureButton" parent="." unique_id=3821004411]
-unique_name_in_owner = true
-layout_mode = 1
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -148.0
-offset_top = -276.0
-offset_right = -52.0
-offset_bottom = -148.0
-grow_horizontal = 0
-grow_vertical = 0
-ignore_texture_size = true
-stretch_mode = 5
-
 [node name="PassButton" type="Button" parent="." unique_id=3821004430]
 unique_name_in_owner = true
 layout_mode = 1
@@ -88,11 +72,9 @@ grow_vertical = 2
 [node name="PlayerPanelList" type="GridContainer" parent="PlayerPanel" unique_id=2066101759]
 unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/h_separation = 6
@@ -135,7 +117,13 @@ layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 4
 
-[node name="ParliamentDiagram" type="Control" parent="BottomArea/ChamberSplit/ParliamentChamber/ParliamentVBox" unique_id=3821004445]
+[node name="ParliamentBoard" type="PanelContainer" parent="BottomArea/ChamberSplit/ParliamentChamber/ParliamentVBox" unique_id=3821004480]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="ParliamentDiagram" type="Control" parent="BottomArea/ChamberSplit/ParliamentChamber/ParliamentVBox/ParliamentBoard" unique_id=3821004445]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
@@ -175,6 +163,44 @@ text = ""
 autowrap_mode = 2
 max_lines_visible = 3
 text_overrun_behavior = 3
+
+[node name="StatsPanel" type="PanelContainer" parent="BottomArea/ChamberSplit" unique_id=3821004481]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(220, 0)
+mouse_filter = 2
+
+[node name="StatsMargin" type="MarginContainer" parent="BottomArea/ChamberSplit/StatsPanel" unique_id=3821004482]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
+
+[node name="StatsVBox" type="VBoxContainer" parent="BottomArea/ChamberSplit/StatsPanel/StatsMargin" unique_id=3821004483]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="StatsTitle" type="Label" parent="BottomArea/ChamberSplit/StatsPanel/StatsMargin/StatsVBox" unique_id=3821004484]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "> PARTİLER"
+
+[node name="VoteScroll" type="ScrollContainer" parent="BottomArea/ChamberSplit/StatsPanel/StatsMargin/StatsVBox" unique_id=3821004447]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="VoteSharePanel" type="VBoxContainer" parent="BottomArea/ChamberSplit/StatsPanel/StatsMargin/StatsVBox/VoteScroll" unique_id=3821004449]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+script = ExtResource("5")
+compact = true
 
 [node name="TurnIndicator" type="PanelContainer" parent="." unique_id=3821004420]
 unique_name_in_owner = true
@@ -237,7 +263,12 @@ theme_override_constants/margin_bottom = 14
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="GameSettingsLabel" type="Label" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004450]
+[node name="InfoPlate" type="PanelContainer" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004485]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+
+[node name="GameSettingsLabel" type="Label" parent="LeftPanel/LeftMargin/LeftVBox/InfoPlate" unique_id=3821004450]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
@@ -253,27 +284,6 @@ layout_mode = 2
 theme_override_constants/separation = 6
 
 [node name="Separator2" type="HSeparator" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004475]
-layout_mode = 2
-
-[node name="VoteTitle" type="Label" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004448]
-layout_mode = 2
-theme_override_font_sizes/font_size = 13
-text = "> SON SEÇİM"
-
-[node name="VoteScroll" type="ScrollContainer" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004447]
-layout_mode = 2
-size_flags_vertical = 3
-horizontal_scroll_mode = 0
-
-[node name="VoteSharePanel" type="VBoxContainer" parent="LeftPanel/LeftMargin/LeftVBox/VoteScroll" unique_id=3821004449]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-mouse_filter = 2
-script = ExtResource("5")
-compact = true
-
-[node name="Separator3" type="HSeparator" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004446]
 layout_mode = 2
 
 [node name="ScoreVBox" type="VBoxContainer" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004476]

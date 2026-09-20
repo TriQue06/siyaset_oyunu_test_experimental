@@ -131,7 +131,7 @@ static func _mana_value(bot: int) -> float:
 
 ## Dönüş: {"type": "card"} | {"type": "law", "law"} | {"type": "organization",
 ## "province"} | {"type": "miting", "province"} | |
-## {"type": "draw"} | {"type": "pass"}
+## {"type": "pass"}
 static func choose_action(bot: int) -> Dictionary:
 	var known := _known_centers(bot)
 	var best := {"type": "pass"}
@@ -183,11 +183,6 @@ static func choose_action(bot: int) -> Dictionary:
 			best = {"type": "miting", "province": miting["province"]}
 			best_score = float(miting["score"]) - GameRules.MITING_MANA_COST * mana_value
 
-
-	if CardManager.can_draw_for(bot):
-		# Kart çekmek bedava (turda bir): el dolu değilse her zaman çek.
-		if hand.size() < CardManager.MAX_HAND_SIZE - 1:
-			best = {"type": "draw"}
 	return best
 
 ## Seçim desteğini en çok artıracak yasa: bilinen illerdeki etkiler (geçme

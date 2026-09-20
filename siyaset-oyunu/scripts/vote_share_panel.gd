@@ -113,11 +113,31 @@ func _build_compact_row(e: Dictionary, max_percent: float) -> Control:
 	name_label.clip_text = true
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(name_label)
-	top.add_child(_mono_label("baraj altı" if below else "%d mv" % int(e.get("seats", 0)), UiTheme.FS_TINY, UiTheme.TEXT_MUTED))
 	var percent_label := _mono_label("%%%.1f" % float(e["percent"]), UiTheme.FS_SMALL, UiTheme.TEXT)
-	percent_label.custom_minimum_size = Vector2(48, 0)
+	percent_label.custom_minimum_size = Vector2(52, 0)
 	percent_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	top.add_child(percent_label)
+
+	# Alt satır: SEÇİMDE kazandığı vekil ve ŞU AN elindeki vekil (vekil çalma
+	# ile değişebildiği için ikisi ayrı gösterilir).
+	var won: int = int(e.get("seats", 0))
+	var now: int = int(e.get("seats_now", won))
+	var foot := HBoxContainer.new()
+	foot.add_theme_constant_override("separation", 8)
+	foot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if below:
+		foot.add_child(_mono_label("baraj altı", UiTheme.FS_TINY, UiTheme.RED))
+	else:
+		foot.add_child(_mono_label("seçim: %d mv" % won, UiTheme.FS_TINY, UiTheme.TEXT_DIM))
+	var now_color := UiTheme.TEXT_MUTED
+	if now > won:
+		now_color = UiTheme.GREEN
+	elif now < won:
+		now_color = UiTheme.RED
+	var now_label := _mono_label("şu an: %d mv" % now, UiTheme.FS_TINY, now_color)
+	now_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	now_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	foot.add_child(now_label)
 
 	var track := Panel.new()
 	track.custom_minimum_size = Vector2(0, 10)
@@ -130,6 +150,7 @@ func _build_compact_row(e: Dictionary, max_percent: float) -> Control:
 	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	fill.add_theme_stylebox_override("panel", UiSkin.color_box(color))
 	track.add_child(fill)
+	box.add_child(foot)
 	return margin
 
 ## Parti verisi varsa logo + renk rozeti, yoksa renk noktası.

@@ -7,6 +7,9 @@ extends RefCounted
 const BADGE_SIZE := Vector2(26, 26)
 const BADGE_ICON_PIXEL_SIZE := 48
 const TITLE_COLOR := UiTheme.TEXT_MUTED
+## Puan tablosundaki iki sayı sütunu: ulusal puan ve toplam puan.
+const NATIONAL_COLUMN_WIDTH := 46.0
+const SCORE_COLUMN_WIDTH := 36.0
 const DIM_COLOR := UiTheme.TEXT_MUTED
 
 static func party_name_of(peer_id: int) -> String:
@@ -31,12 +34,49 @@ static func _label(text: String, font_size: int, modulate: Color = Color.WHITE) 
 static func section_title(text: String) -> Label:
 	return UiTheme.section_label(text)
 
+## Monospace etiket: tablodaki sayılar sütun sütun hizalansın.
+static func _mono_label(text: String, font_size: int, color: Color) -> Label:
+	var label := _label(text, font_size, Color.WHITE)
+	label.add_theme_font_override("font", UiTheme.mono())
+	label.add_theme_color_override("font_color", color)
+	return label
+
+## Sayı sütunlarının küçük başlığı.
+static func _column_head(text: String, width: float) -> Label:
+	var label := _mono_label(text, UiTheme.FS_TINY, UiTheme.TEXT_DIM)
+	label.custom_minimum_size = Vector2(width, 0)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	return label
+
 static func _badge(peer_id: int) -> Control:
 	var badge := PartyBadge.build(PartyManager.parties.get(peer_id, {}), BADGE_SIZE, BADGE_ICON_PIXEL_SIZE)
 	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	badge.tooltip_text = party_name_of(peer_id)
 	return badge
+
+## "Başbakan [logo] Parti  ·  Yrd. [logo] Parti" — tek satır.
+static func _leadership_row(pm: int, deputy: int) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	row.add_child(_label("Başbakan", 12, DIM_COLOR))
+	row.add_child(_party_chip(pm))
+	if deputy != -1:
+		row.add_child(_label("·  Yrd.", 12, DIM_COLOR))
+		row.add_child(_party_chip(deputy))
+	return row
+
+## Küçük "logo + parti adı" öbeği.
+static func _party_chip(peer_id: int) -> Control:
+	if peer_id == -1:
+		return _label("—", 13)
+	var chip := HBoxContainer.new()
+	chip.add_theme_constant_override("separation", 4)
+	chip.add_child(_badge(peer_id))
+	var name_label := _label(party_name_of(peer_id), 13)
+	name_label.clip_text = true
+	chip.add_child(name_label)
+	return chip
 
 ## "Başbakan: [logo] Parti" satırı.
 static func _post_row(title: String, peer_id: int) -> Control:
@@ -101,8 +141,11 @@ static func _fill_cabinet(box: VBoxContainer, government: Dictionary) -> void:
 		if not party_ids.has(owner):
 			party_ids.append(owner)
 
-	box.add_child(_post_row("Başbakan", int(government.get(GovernmentPresets.POST_PM, -1))))
-	box.add_child(_post_row("Başbakan Yrd.", int(government.get(GovernmentPresets.POST_DEPUTY_PM, -1))))
+	# BAŞBAKAN ve YARDIMCISI TEK SATIRDA: ikisini ayrı satıra yaymak paneli
+	# gereksiz uzatıyordu, üstelik yardımcı çoğu zaman boş kalıyor.
+	box.add_child(_leadership_row(
+		int(government.get(GovernmentPresets.POST_PM, -1)),
+		int(government.get(GovernmentPresets.POST_DEPUTY_PM, -1))))
 
 	# Bakanlık sayıları, hükümet partilerinin sırasıyla.
 	var ministries: Dictionary = {}
@@ -153,6 +196,17 @@ static func fill_score_panel(box: VBoxContainer, peer_ids: Array, my_id: int) ->
 			return sa > sb
 		return int(CardManager.last_seats.get(a, 0)) > int(CardManager.last_seats.get(b, 0))
 	)
+	# Başlık satırı: iki sayının ne olduğu bir kez yazılır, satırlarda tekrar
+	# etmez (her satırda etiket taşımak paneli kalabalıklaştırıyordu).
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 6)
+	var header_spacer := Control.new()
+	header_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(header_spacer)
+	header.add_child(_column_head("ULUSAL", NATIONAL_COLUMN_WIDTH))
+	header.add_child(_column_head("PUAN", SCORE_COLUMN_WIDTH))
+	box.add_child(header)
+
 	for peer_id in ids:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 6)
@@ -160,31 +214,26 @@ static func fill_score_panel(box: VBoxContainer, peer_ids: Array, my_id: int) ->
 
 		var party_label := _label(party_name_of(peer_id), 13,
 			UiTheme.GOLD if peer_id == my_id else UiTheme.TEXT)
+		party_label.clip_text = true
+		party_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(party_label)
 
-		var leader_label := _label(leader_name_of(peer_id), 11, DIM_COLOR)
-		leader_label.clip_text = true
-		leader_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(leader_label)
-
-		# Ulusal kamuoyu (seçime taşınan artı/eksi).
+		# ULUSAL PUAN: partinin ülke genelindeki durumu. Tur başına artabilir
+		# de azalabilir de; seçime bu değer taşınır. TOPLAM PUANIN hemen
+		# yanında durur, iki sayı birlikte okunur.
 		var opinion := CardManager.national_of(peer_id)
-		var opinion_label := _label("%+.1f" % opinion, 11, ProvincePanel._opinion_color(opinion))
-		opinion_label.tooltip_text = "Ulusal kamuoyu"
+		var opinion_label := _mono_label("%+.1f" % opinion, 13, ProvincePanel._opinion_color(opinion))
+		opinion_label.custom_minimum_size = Vector2(NATIONAL_COLUMN_WIDTH, 0)
+		opinion_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		opinion_label.tooltip_text = "Ulusal puan: partinin ülke genelindeki durumu (seçime taşınır)"
 		opinion_label.mouse_filter = Control.MOUSE_FILTER_PASS
 		row.add_child(opinion_label)
 
-		# Hükümetteki görevlerin puanı hükümet kurulduğunda TEK SEFER yazıldı;
-		# tabloda kimin makamdan kaç puan aldığı ipucu olarak gösteriliyor.
-		var from_posts := GovernmentManager.round_points_of(peer_id)
-		if from_posts > 0:
-			var post_label := _label("⚑%d" % from_posts, 11, UiTheme.GOLD)
-			post_label.tooltip_text = "Bu hükümetteki görevlerinden kazandığı puan (kurulurken bir kez yazıldı)"
-			post_label.mouse_filter = Control.MOUSE_FILTER_PASS
-			row.add_child(post_label)
-
-		var score_label := _label(str(GovernmentManager.score_of(peer_id)), 16)
+		var score_label := _mono_label(str(GovernmentManager.score_of(peer_id)), 16, UiTheme.TEXT)
+		score_label.custom_minimum_size = Vector2(SCORE_COLUMN_WIDTH, 0)
 		score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		score_label.tooltip_text = "Toplam puan"
+		score_label.mouse_filter = Control.MOUSE_FILTER_PASS
 		row.add_child(score_label)
 		box.add_child(row)
 

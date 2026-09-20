@@ -247,14 +247,12 @@ func _initialize() -> void:
 	cm._apply_pass(1)
 	check("turu bitirmek mana vermez: harcanan mana geri dolmaz", cm.mana_of(1) == 1, str(cm.mana))
 	check("sirasi gelen 2 gelirini aldi", cm.mana_of(2) == GameRules.MANA_START + GameRules.MANA_PER_ROUND)
+	var hand3_before: int = cm.inventories[3].size()
 	cm.tick(GameRules.TURN_TIMEOUT + 1.0)
 	check("sure dolunca sira devreder", cm.current_turn_peer_id() == 3)
-	var hand3: int = cm.inventories[3].size()
-	check("sira gelince kart otomatik verilmez", hand3 == 0, str(hand3))
-	cm._apply_draw(3)
-	check("kart cekmek bedava, sira devretmez", cm.inventories[3].size() == 1 and cm.current_turn_peer_id() == 3)
-	cm._apply_draw(3)
-	check("turda en fazla 1 kart cekilir", cm.inventories[3].size() == 1 and not cm.can_draw_for(3))
+	# KART ÇEKME HAMLESİ YOK: sıra gelince otomatik TAM 1 kart dağıtılır.
+	check("sira gelince otomatik 1 kart dagitildi", cm.inventories[3].size() == hand3_before + 1,
+		"%d -> %d" % [hand3_before, cm.inventories[3].size()])
 	cm.mana[3] = 0
 	check("mana yoksa teskilat yok", not cm.can_build_organization(3, "ankara"))
 	cm._apply_pass(3)
@@ -299,7 +297,6 @@ func _initialize() -> void:
 	check("anlik vekil tahmini ilin vekil sayisina esit", projected == cm.province_seat_count("ankara"), str(projection))
 	cm.mana[1] = GameRules.ORG_MANA_COST
 	cm.inventories[1] = []
-	cm.has_drawn_this_turn = true  # bedava kart hakkı duruyorsa sıra kendiliğinden geçmez
 	check("teskilat kurulabilir", cm.can_build_organization(1, "ankara"))
 	cm._apply_organization(1, "ankara")
 	check("teskilat kuruldu, mana harcandi; mana bitti -> sira devretmez", cm.organization_level("ankara", 1) == 1 		and cm.mana_of(1) == 0 and cm.current_turn_peer_id() == 1)
@@ -331,7 +328,6 @@ func _initialize() -> void:
 	check("miting hamlesi 2 mana, etki yazildi, mana kaldi -> sira devretmedi", cm.mana_of(1) == 1 and cm.current_turn_peer_id() == 1 \
 		and not near(cm.local_of("izmir", 1) + cm.national_of(1), izmir_before))
 	cm.inventories[1] = ["mana_bonusu"]
-	cm.has_drawn_this_turn = true
 	cm.mana[1] = 2
 	cm.organizations["konya"] = {1: 1}
 	cm._apply_miting_move(1, "konya")
@@ -339,12 +335,9 @@ func _initialize() -> void:
 	cm.inventories[1] = []
 	cm.mana[1] = 2
 	var next_peer: int = cm.turn_order[(cm.turn_order.find(1) + 1) % cm.turn_order.size()]
-	cm.has_drawn_this_turn = false
 	cm.organizations["sivas"] = {1: 1}
 	cm._apply_miting_move(1, "sivas")
-	check("mana bitti ama kart cekme hakki var -> sira devretmez", cm.current_turn_peer_id() == 1)
-	cm._apply_draw(1)
-	check("mana yok, kart cekildi -> yine de sira devretmez", cm.current_turn_peer_id() == 1)
+	check("mana bitse de sira kendiliginden devretmez", cm.current_turn_peer_id() == 1)
 	cm._apply_pass(1)
 	check("turu bitir -> sira devreder", cm.current_turn_peer_id() == next_peer)
 	cm.current_turn_index = cm.turn_order.find(1)

@@ -13,7 +13,7 @@ extends RefCounted
 ##     KURULDUĞU ANDA tek sefer yazılır, her tur tekrarlanmaz.
 ##   - HAMLE SINIRI YOK: sırası gelen oyuncu manası yettiğince hamle yapar,
 ##     "Turu Bitir" ile sırayı devreder. Mana birikir, üst sınır yok. Manası
-##     biten (ve elinde bedava kart olmayan) oyuncunun sırası kendiliğinden devreder.
+##     biten oyuncunun sırası kendiliğinden devreder.
 ##   - Her seçimden sonra herkes +ELECTION_MANA_BONUS, göreve başlayan hükümetin
 ##     partileri +GOVERNMENT_MANA_BONUS mana alır (gensoruyla düşen hükümetin
 ##     yerine kurulan hükümet dahil).
@@ -26,8 +26,9 @@ extends RefCounted
 ##   - TEŞKİLATLANMA (eski il başkanlığı + gözcü) il başına 2 seviye; her
 ##     seviye ORG_MANA_COST. 1: az oy bonusu + ilin görüşü (her eksende hangi uç),
 ##     2: yüksek bonus + isabetli anket.
-##     KART ÇEKMEK bedava, turda DRAWS_PER_TURN kez; kart oynamak sınırsız
-##     (kartların kendi bedeli var). Her seçimden sonra herkese 1 kart hediye.
+##     KART ÇEKME HAMLESİ YOK: sıra gelince otomatik olarak 1 kart dağıtılır
+##     (el doluysa verilmez); kart oynamak sınırsız (kartların kendi bedeli
+##     var). Her seçimden sonra da herkese 1 kart hediye.
 ##     Kartları oynamanın bedeli CardPresets.CARD_MANA_COSTS.
 ##   - Hükümet kurulamazsa (tüm görev hakları biterse) o turun sonunda ERKEN
 ##     SEÇİM yapılır.
@@ -74,11 +75,19 @@ const MANA_START := 0
 const MANA_PER_ROUND := 3
 ## Hükümette görevi olan partiler tur başına 1 fazla mana alır (iktidar avantajı).
 const MANA_PER_ROUND_GOVERNMENT := 4
-## Yasa sunmak BEDAVA (turda 1): meclis oyunun merkezi, mana engel olmasın.
+## BEDEL YAZISI: ücretsiz hamleler her yerde "bedelsiz" diye geçer ("bedava"
+## ya da "0 mana" değil). Mana 0,5 katlarıyla birikebildiği için ondalık da
+## gerekirse basılır.
+static func cost_text(cost: float) -> String:
+	if cost <= 0.0:
+		return "bedelsiz"
+	if is_equal_approx(cost, roundf(cost)):
+		return "%d mana" % int(roundf(cost))
+	return "%s mana" % String.num(cost, 1)
+
+## Yasa sunmak BEDELSİZ (turda 1): meclis oyunun merkezi, mana engel olmasın.
 const LAW_MANA_COST := 0
 const LAWS_PER_ROUND := 1
-const DRAW_MANA_COST := 0
-const DRAWS_PER_TURN := 1
 ## Teşkilat anketinin sapması (her partinin oyu en fazla bu oranda sapar):
 ## 2. seviye orta isabet, 3. seviye yüksek isabet.
 const POLL_ERROR_MEDIUM := 0.3
@@ -87,7 +96,7 @@ const MITING_MANA_COST := 2
 ## Yatırım (sadece hükümet partileri) ve gensoru (sadece muhalefet, hükümet
 ## azınlıktayken) hamleleri.
 const INVEST_MANA_COST := 2
-## Gensoru BEDAVA: muhalefetin elindeki tek gerçek silah engellenmemeli.
+## Gensoru BEDELSİZ: muhalefetin elindeki tek gerçek silah engellenmemeli.
 const CENSURE_MANA_COST := 0
 ## Popülizm bonusu kartı bu kadar tur sürer; mana bonusu kartı bu kadar mana verir.
 const POPULISM_ROUNDS := 3

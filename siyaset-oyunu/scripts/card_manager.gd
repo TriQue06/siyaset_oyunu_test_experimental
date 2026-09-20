@@ -13,7 +13,7 @@ extends Node
 ##   c) TEŞKİLATLANMA (GameRules.ORG_MANA_COST): bir ilde teşkilat kur / geliştir
 ##      (oy bonusu + ilin görüşü + 2. seviyeden itibaren anket).
 ##   d) PAS: hamle yapmadan geç, +GameRules.MANA_PASS_BONUS mana.
-##   KART ÇEKMEK: bedava, turda bir kez; kart oynamak sınırsız. Her seçimden sonra herkese 1 kart hediye.
+##   KART: sıra gelince otomatik 1 kart dağıtılır; kart oynamak sınırsız. Her seçimden sonra herkese 1 kart hediye.
 ##   Tur otomatik geçmez: oyuncu "Turu Bitir"e basar ya da süre dolar.
 ##   GameRules.TURN_TIMEOUT dolarsa otomatik pas geçilir (mana bonusu yok).
 ##   Hükümet kurulurken / meclis oylarken tur DURUR (is_turn_blocked).
@@ -85,8 +85,10 @@ var inventories: Dictionary = {}
 var turn_order: Array = []
 # turn_order içindeki index; sırası gelen oyuncu turn_order[current_turn_index].
 var current_turn_index: int = 0
-# Sırası gelen oyuncu bu turda kart çekti mi (turda bir çekiş).
-var has_drawn_this_turn: bool = false
+## Elin başında dağıtılan kart, bir sonraki state olayına iliştirilmek üzere
+## burada bekler: {"peer_id": int, "card": String}. İstemciler bunu görüp
+## kart dağıtma animasyonunu oynatır.
+var _pending_dealt: Dictionary = {}
 ## Oyuncunun en son yasa sunduğu tur: peer_id -> round_number (turda 1 yasa).
 var law_rounds: Dictionary = {}
 ## Popülizm bonusu: peer_id -> bittiği tur (o turdan önceki son tura kadar sürer).
@@ -233,14 +235,6 @@ func is_turn_blocked() -> bool:
 
 func is_my_turn() -> bool:
 	return current_turn_peer_id() == multiplayer.get_unique_id()
-
-func can_draw() -> bool:
-	return can_draw_for(multiplayer.get_unique_id())
-
-## Kart çekmek bedava, turda bir kez.
-func can_draw_for(peer_id: int) -> bool:
-	return can_choose_main_action(peer_id) and not has_drawn_this_turn and mana_of(peer_id) >= GameRules.DRAW_MANA_COST \
-		and inventories.get(peer_id, []).size() < MAX_HAND_SIZE
 
 ## Sıra bende VE tur akışı engellenmemiş mi? (UI bunu kullanmalı.)
 func can_act() -> bool:
@@ -660,7 +654,6 @@ func init_game() -> void:
 	turn_order.shuffle()
 	current_turn_index = 0
 	_grant_turn_income()
-	has_drawn_this_turn = false
 	law_rounds = {}
 	populism = {}
 	rebellion = {}
@@ -698,7 +691,6 @@ func abandon_game() -> void:
 	inventories = {}
 	turn_order = []
 	current_turn_index = 0
-	has_drawn_this_turn = false
 	round_number = 1
 	last_election_round = 0
 	last_election_was_early = false
@@ -722,27 +714,6 @@ func abandon_game() -> void:
 	_round_end_pending = false
 
 # --- Oyuncu eylemleri -------------------------------------------------------
-
-## Sırası gelen oyuncu, deste butonuna basınca çağırır.
-func draw_card() -> void:
-	if _is_local_only() and turn_order.is_empty():
-		# Aktif oyun yok (örn. sahne editörde tek başına test) — yerel önizleme.
-		var id := multiplayer.get_unique_id()
-		if not inventories.has(id):
-			inventories[id] = []
-		if inventories[id].size() >= MAX_HAND_SIZE:
-			return
-		var card_type := CardPresets.weighted_pick(_draw_weights(id), _rng)
-		card_drawn.emit(id, card_type)
-		inventories[id].insert(inventories[id].size() / 2, card_type)
-		inventories_updated.emit()
-		return
-	if not can_draw():
-		return
-	if _is_authority():
-		_apply_draw(multiplayer.get_unique_id())
-	else:
-		_request_draw.rpc_id(1)
 
 ## Bu oyuncu için desteden çekilebilecek kartlar ve ağırlıkları.
 ##   - karalama her zaman,
@@ -892,19 +863,6 @@ func request_full_sync() -> void:
 	_request_full_sync.rpc_id(1)
 
 # --- Host tarafı: uygulama --------------------------------------------------
-
-func _apply_draw(peer_id: int) -> void:
-	if not can_draw_for(peer_id):
-		return
-	if not inventories.has(peer_id):
-		inventories[peer_id] = []
-	mana[peer_id] = mana_of(peer_id) - GameRules.DRAW_MANA_COST
-	var card_type := CardPresets.weighted_pick(_draw_weights(peer_id), _rng)
-	card_drawn.emit(peer_id, card_type)
-	# Yeni kart elin ORTASINA yerleşir.
-	inventories[peer_id].insert(inventories[peer_id].size() / 2, card_type)
-	has_drawn_this_turn = true
-	_push_state({"type": "drawn", "peer_id": peer_id, "card": card_type})
 
 func _apply_play(peer_id: int, hand_index: int, target_peer_id: int = -1, target_province: String = "") -> void:
 	if is_turn_blocked() or peer_id != current_turn_peer_id():
@@ -1363,16 +1321,34 @@ func _advance_turn() -> bool:
 	var size: int = maxi(1, turn_order.size())
 	var wrapped: bool = (current_turn_index + 1) >= size
 	current_turn_index = (current_turn_index + 1) % size
-	has_drawn_this_turn = false
 	_turn_time_left = GameRules.TURN_TIMEOUT
 	_grant_turn_income()
 	return wrapped
 
-## Sırası gelen oyuncu mana gelirini alır.
+## Sırası gelen oyuncu mana gelirini VE bir kart alır.
+## KART ÇEKME HAMLESİ KALDIRILDI: deste butonu yerine her elin başında
+## otomatik olarak bir kart geliyor. Dağıtılan kart, bu hamleden sonra
+## gönderilecek state olayına iliştirilsin diye _pending_dealt'ta beklet.
 func _grant_turn_income() -> void:
 	var peer_id := current_turn_peer_id()
-	if peer_id != -1:
-		mana[peer_id] = mana_of(peer_id) + turn_income(peer_id)
+	if peer_id == -1:
+		return
+	mana[peer_id] = mana_of(peer_id) + turn_income(peer_id)
+	# Kart, ele girmeden ÖNCE duyurulur: animasyon eski el boyutunu kullanır.
+	var card_type := _peek_turn_card(peer_id)
+	if card_type == "":
+		return
+	card_drawn.emit(peer_id, card_type)
+	inventories[peer_id].insert(inventories[peer_id].size() / 2, card_type)
+	_pending_dealt = {"peer_id": peer_id, "card": card_type}
+
+## Elin başında verilecek kartı seçer (ele koymaz). El doluysa "" döner.
+func _peek_turn_card(peer_id: int) -> String:
+	if not inventories.has(peer_id):
+		inventories[peer_id] = []
+	if inventories[peer_id].size() >= MAX_HAND_SIZE:
+		return ""
+	return CardPresets.weighted_pick(_draw_weights(peer_id), _rng)
 
 ## Tur geliri: hükümette görevi olan partiler bir fazla mana alır.
 func turn_income(peer_id: int) -> int:
@@ -1380,14 +1356,16 @@ func turn_income(peer_id: int) -> int:
 		return GameRules.MANA_PER_ROUND_GOVERNMENT
 	return GameRules.MANA_PER_ROUND
 
-## Desteden bir kartı doğrudan ele verir (seçim hediyesi). El doluysa verilmez.
-func _deal_turn_card(peer_id: int) -> void:
+## Desteden bir kartı doğrudan ele verir. El doluysa verilmez.
+## Dönen değer: verilen kartın türü ("" = verilmedi).
+func _deal_turn_card(peer_id: int) -> String:
 	if not inventories.has(peer_id):
 		inventories[peer_id] = []
 	if inventories[peer_id].size() >= MAX_HAND_SIZE:
-		return
+		return ""
 	var card_type := CardPresets.weighted_pick(_draw_weights(peer_id), _rng)
 	inventories[peer_id].insert(inventories[peer_id].size() / 2, card_type)
+	return card_type
 
 # --- Tur sonu / seçim / oyun sonu -------------------------------------------
 
@@ -1579,7 +1557,6 @@ func remove_player(peer_id: int) -> void:
 	if idx < current_turn_index:
 		current_turn_index -= 1
 	elif was_current:
-		has_drawn_this_turn = false
 		_turn_time_left = GameRules.TURN_TIMEOUT
 		if current_turn_index >= turn_order.size():
 			current_turn_index = 0
@@ -1603,7 +1580,6 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"inventories": inventories,
 		"turn_order": turn_order,
 		"turn_index": current_turn_index,
-		"has_drawn": has_drawn_this_turn,
 		"law_rounds": law_rounds,
 		"populism": populism,
 		"rebellion": rebellion,
@@ -1639,7 +1615,6 @@ func _apply_state(state: Dictionary) -> void:
 	inventories = state["inventories"]
 	turn_order = state["turn_order"]
 	current_turn_index = int(state["turn_index"])
-	has_drawn_this_turn = bool(state["has_drawn"])
 	law_rounds = state.get("law_rounds", {})
 	populism = state.get("populism", {})
 	rebellion = state.get("rebellion", {})
@@ -1674,6 +1649,10 @@ func _apply_state(state: Dictionary) -> void:
 ## Host: durumu (sürümü artırarak) herkese yayınlar ve olayın sinyallerini
 ## kendi tarafında da doğrudan atar (.rpc() göndericide çalışmaz).
 func _push_state(event: Dictionary, include_results: bool = false) -> void:
+	if not _pending_dealt.is_empty():
+		event = event.duplicate()
+		event["dealt"] = _pending_dealt
+		_pending_dealt = {}
 	state_version += 1
 	if not _is_local_only():
 		_receive_state.rpc(_pack_state(include_results or event.get("type", "") in ["full", "election", "player_left"]), event)
@@ -1704,9 +1683,10 @@ func _emit_post_event(event: Dictionary) -> void:
 @rpc("authority", "reliable")
 func _receive_state(state: Dictionary, event: Dictionary) -> void:
 	# Animasyon sinyalleri ESKİ state üzerinden kurulsun diye önce bunlar.
+	if event.has("dealt"):
+		var dealt: Dictionary = event["dealt"]
+		card_drawn.emit(int(dealt["peer_id"]), str(dealt["card"]))
 	match str(event.get("type", "")):
-		"drawn":
-			card_drawn.emit(int(event["peer_id"]), str(event["card"]))
 		"played":
 			card_played.emit(int(event["peer_id"]), str(event["card"]))
 	_apply_state(state)
@@ -1726,12 +1706,6 @@ func _request_full_sync() -> void:
 	if not MultiplayerManager.is_host:
 		return
 	_receive_state.rpc_id(multiplayer.get_remote_sender_id(), _pack_state(true), {"type": "full"})
-
-@rpc("any_peer", "reliable")
-func _request_draw() -> void:
-	if not MultiplayerManager.is_host:
-		return
-	_apply_draw(multiplayer.get_remote_sender_id())
 
 @rpc("any_peer", "reliable")
 func _request_play(hand_index: int, target_peer_id: int = -1, target_province: String = "") -> void:

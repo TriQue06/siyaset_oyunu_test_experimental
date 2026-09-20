@@ -5,12 +5,14 @@ extends Node
 ## ve hükümet tekliflerini de rastgele birkaç saniye içinde verir. Kararlar
 ## BotBrain'de. Sadece yetkili tarafta (host ya da ağsız yerel oyun) çalışır.
 
-const THINK_SECONDS := Vector2(1.4, 1.6)   # sıra gelince -> ilk hamle
-const PLAY_SECONDS := Vector2(1.4, 1.6)    # hamleler arası
+## Botlar İNSAN HIZINDA ama beklemeli olmayacak kadar hızlı oynar: bu süreler
+## bilinçli olarak yarıya indirildi (eskiden 1.4-1.6 / 1.5-4.5 / 3.0-6.0).
+const THINK_SECONDS := Vector2(0.7, 0.8)   # sıra gelince -> ilk hamle
+const PLAY_SECONDS := Vector2(0.7, 0.8)    # hamleler arası
 ## Güvenlik sınırı: bir turda en çok bu kadar bot hamlesi.
 const MAX_ACTIONS_PER_TURN := 12
-const VOTE_SECONDS := Vector2(1.5, 4.5)    # oylama açılınca -> oy
-const FORM_SECONDS := Vector2(3.0, 6.0)    # görev gelince -> teklif
+const VOTE_SECONDS := Vector2(0.75, 2.25)  # oylama açılınca -> oy
+const FORM_SECONDS := Vector2(1.5, 3.0)    # görev gelince -> teklif
 
 var _rng := RandomNumberGenerator.new()
 var _turn_key := ""

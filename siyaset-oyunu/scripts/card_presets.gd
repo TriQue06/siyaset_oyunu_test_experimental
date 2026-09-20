@@ -340,8 +340,11 @@ func _card_effect_text(card_type: String) -> String:
 		var r: Dictionary = STEAL_RANGES[card_type]
 		var close: Dictionary = STEAL_RANGES_CLOSE[card_type]
 		var far: Dictionary = STEAL_RANGES_FAR[card_type]
-		return "Seçtiğin partiden vekil çal: %d-%d; görüşü sana yakınsa %d-%d'e kadar, zıt uçtaysa %d-%d.\nMeşru görünmez: ulusal desteğin biraz düşer, çalınan partininki artar.\nSağdaki bir parti kartına sürükle." % [
-			int(r["min"]), int(r["max"]), int(close["min"]), int(close["max"]), int(far["min"]), int(far["max"])]
+		var cost_line := "Güçlü varyantta ulusal desteğin biraz düşer; normalde bedel yok." if card_type == STEAL_STRONG_CARD_TYPE \
+			else "Bedeli yok; çalınan parti mağduriyetten biraz destek kazanır."
+		return "Seçtiğin partiden vekil çal: %d-%d; görüşü sana yakınsa %d-%d'e kadar, zıt uçtaysa %d-%d.\n%s\nSağdaki bir parti kartına sürükle." % [
+			int(r["min"]), int(r["max"]), int(close["min"]), int(close["max"]),
+			int(far["min"]), int(far["max"]), cost_line]
 	if is_agenda_card(card_type):
 		var agenda := agenda_data(card_type)
 		return "%s\n%d dönem boyunca gündem bu: %s.\nDokun, tekrar dokun: kullan." % [agenda["text"], GameRules.AGENDA_ROUNDS,

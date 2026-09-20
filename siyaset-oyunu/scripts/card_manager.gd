@@ -67,13 +67,13 @@ const PROVINCE_EVENT_LIMIT := 6
 ## kartın gelme olasılığı ağırlığının havuzdaki toplama bölümüdür. İlk seçimden
 ## önce isyan ve vekil çalma havuza girmez, kalanların payı kendiliğinden artar.
 const WEIGHT_PROPAGANDA := 15.0
+const WEIGHT_STEAL_WEAK := 15.0
 const WEIGHT_MANA_BONUS := 12.0
 const WEIGHT_POPULISM := 12.0
-const WEIGHT_STEAL_WEAK := 12.0
-const WEIGHT_REPUTATION := 9.0
-const WEIGHT_REBELLION := 9.0
 const WEIGHT_STEAL_STRONG := 9.0
-const WEIGHT_EARLY_ELECTION := 6.0
+const WEIGHT_EARLY_ELECTION := 9.0
+const WEIGHT_REPUTATION := 6.0
+const WEIGHT_REBELLION := 6.0
 
 ## Koltuk SAYILARI GERÇEK: TBMM'nin il bazlı milletvekili dağılımı (bkz.
 ## data/province_seats.json). Bu değer dosyadaki sayıların toplamıdır.
@@ -1287,7 +1287,9 @@ func _apply_steal(peer_id: int, target_peer_id: int, card_type: String) -> bool:
 	last_seats[peer_id] = int(last_seats.get(peer_id, 0)) + moved
 	# Transfer meşru görünmez: çalan küçük bir ulusal destek kaybeder, çalınan
 	# parti mağduriyetten küçük bir destek kazanır (ikisi de kısmi).
-	_add_national(peer_id, PublicOpinion.steal_thief_national(moved))
+	# NORMAL vekil çalmanın ulusal bedeli YOK; sadece güçlü varyant bedel öder.
+	if card_type == CardPresets.STEAL_STRONG_CARD_TYPE:
+		_add_national(peer_id, PublicOpinion.steal_thief_national(moved))
 	_add_national(target_peer_id, PublicOpinion.steal_victim_national(moved))
 	_event_message = "%s, %s'dan %d milletvekili transfer etti." % [_party_name(peer_id), _party_name(target_peer_id), moved]
 	return true

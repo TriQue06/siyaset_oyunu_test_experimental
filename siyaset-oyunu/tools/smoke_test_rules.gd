@@ -602,9 +602,15 @@ func _initialize() -> void:
 	var seats_before: int = int(cm.last_seats[victim])
 	cm._apply_steal(thief, victim, "steal_weak")
 	var moved: int = seats_before - int(cm.last_seats[victim])
-	check("calmada calan ulusal kaybeder, calinan kazanir", moved > 0 \
-		and cm.national_of(thief) < thief_nat and cm.national_of(victim) > victim_nat,
+	# NORMAL calma bedelsiz: calanin ulusal puani DEGISMEZ, magdur yine kazanir.
+	check("normal calmada calanin bedeli yok, calinan kazanir", moved > 0 \
+		and is_equal_approx(cm.national_of(thief), thief_nat) and cm.national_of(victim) > victim_nat,
 		"%d vekil, %.2f / %.2f" % [moved, cm.national_of(thief) - thief_nat, cm.national_of(victim) - victim_nat])
+	# GUCLU calma hala bedel oder.
+	var strong_nat: float = cm.national_of(thief)
+	cm._apply_steal(thief, victim, "steal_strong")
+	check("guclu calmada bedel var", cm.national_of(thief) < strong_nat,
+		"%.3f" % (cm.national_of(thief) - strong_nat))
 	check("bedeller kucuk (en fazla 1 puan)", absf(cm.national_of(thief) - thief_nat) <= 1.0 \
 		and absf(cm.national_of(victim) - victim_nat) <= 0.8)
 

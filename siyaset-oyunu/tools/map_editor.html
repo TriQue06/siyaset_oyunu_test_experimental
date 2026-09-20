@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Harita Editörü — milletvekili sayısı ve nokta konumu</title>
+<style>
+  :root {
+    --bg: #181430; --panel: #2b2352; --line: #4a3f7a; --ink: #100d22;
+    --text: #f2efff; --muted: #a79bd6; --gold: #ffc93c; --green: #4be08a; --red: #e8402a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); display: flex; height: 100vh; }
+  #sidebar { width: 340px; padding: 14px; background: var(--panel); border-right: 3px solid var(--ink); overflow-y: auto; }
+  #canvasWrap { flex: 1; overflow: auto; position: relative; background: var(--ink); }
+  canvas { image-rendering: pixelated; cursor: crosshair; display: block; }
+  h1 { font-size: 16px; margin: 0 0 4px; color: var(--gold); }
+  h2 { font-size: 11px; letter-spacing: 2px; opacity: .8; margin: 18px 0 6px; text-transform: uppercase; color: var(--gold); }
+  p.hint { font-size: 11px; color: var(--muted); margin: 4px 0 0; line-height: 1.45; }
+  label { display: block; font-size: 12px; margin: 8px 0 3px; color: var(--muted); }
+  input[type=number] { width: 72px; background: var(--ink); color: var(--text); border: 2px solid var(--line); padding: 4px; }
+  select { width: 100%; background: var(--ink); color: var(--text); border: 2px solid var(--line); padding: 5px; }
+  button { width: 100%; padding: 9px; margin-top: 6px; background: var(--line); color: var(--text);
+           border: 2px solid var(--ink); cursor: pointer; font-weight: 600; }
+  button:hover { background: #5e51a0; }
+  button.primary { background: var(--gold); color: var(--ink); }
+  button.small { width: auto; padding: 4px 12px; margin: 0; font-size: 16px; line-height: 1; }
+  #status { font-size: 11px; color: var(--muted); white-space: pre-wrap; margin-top: 12px; min-height: 34px; }
+  #provList { max-height: 260px; overflow-y: auto; font-size: 12px; border: 2px solid var(--line); margin-top: 6px; background: var(--ink); }
+  #provList div { padding: 4px 8px; cursor: pointer; display: flex; justify-content: space-between; }
+  #provList div:hover { background: #3a3163; }
+  #provList div.selected { background: var(--line); }
+  #provList div.moved span.name::after { content: " ★"; color: var(--gold); }
+  #provList span.count { color: var(--gold); font-variant-numeric: tabular-nums; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .total { font-size: 13px; margin-top: 8px; }
+  .total b { font-size: 18px; color: var(--gold); }
+  .warn { color: var(--red); }
+  .ok { color: var(--green); }
+  kbd { background: var(--ink); border: 1px solid var(--line); padding: 0 4px; font-size: 11px; }
+</style>
+</head>
+<body>
+<div id="sidebar">
+  <h1>Harita Editörü</h1>
+  <p class="hint">Bir ile tıkla: milletvekili sayısını değiştir, noktaları sürükleyerek yerleştir. Kaydedince oyun dosyaları doğrudan güncellenir.</p>
+
+  <h2>İl</h2>
+  <select id="provSelect"></select>
+  <div id="provList"></div>
+
+  <h2>Milletvekili sayısı</h2>
+  <div class="row">
+    <button class="small" id="btnMinus">−</button>
+    <input type="number" id="seatInput" min="0" max="120" value="0">
+    <button class="small" id="btnPlus">+</button>
+    <span class="hint">Tekerlek de çalışır</span>
+  </div>
+  <div class="total" id="totalLine">Toplam: <b>—</b></div>
+
+  <h2>Nokta konumu</h2>
+  <p class="hint">Haritada sürükle ya da <kbd>←↑↓→</kbd> ile ince ayar yap. ★ = elle taşınmış il.</p>
+  <button id="btnReset">Seçili ilin konumunu sıfırla</button>
+
+  <h2>Görünüm</h2>
+  <div class="row"><label style="width:120px;margin:0">Zoom (px/hücre)</label><input type="number" id="zoomInput" value="6" min="2" max="20"></div>
+
+  <h2>Kaydet</h2>
+  <button class="primary" id="btnSave">KAYDET (data/ içine yaz)</button>
+  <button id="btnDownload">Yedek olarak indir</button>
+
+  <div id="status"></div>
+</div>
+<div id="canvasWrap">
+  <canvas id="canvas"></canvas>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// VERİ. Sunucu (tools/map_editor.py) üzerinden açıldığında her şey kendiliğinden
+// yüklenir; dosyadan (file://) açılırsa yükleme yapılamaz ve uyarı verilir.
+// ---------------------------------------------------------------------------
+let mapImg = null;
+let gridData = null;    // {width,height,ids,grid,centers,pixel_counts}
+let seats = {};         // il -> milletvekili sayısı
+let centers = {};       // il -> [x,y] (ham grid-pixel, +0.5 YOK)
+let autoCenters = {};   // province_pixel_map.json'daki piksel merkezleri
+let selected = null;
+let dragging = false;
+let dirty = false;
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const statusEl = document.getElementById('status');
+
+function setStatus(text, cls) {
+  statusEl.textContent = text;
+  statusEl.className = cls || '';
+}
+
+function zoom() { return parseInt(document.getElementById('zoomInput').value) || 6; }
+
+async function loadAll() {
+  if (location.protocol === 'file:') {
+    setStatus('Bu sayfayı dosyadan açtın; veriler yüklenemez.\nProje klasöründe şunu çalıştır:\n    python tools/map_editor.py', 'warn');
+    return;
+  }
+  try {
+    const [grid, seatData, centerData] = await Promise.all([
+      fetch('../data/province_pixel_map.json').then(r => r.json()),
+      fetch('../data/province_seats.json').then(r => r.json()),
+      fetch('../data/province_seat_centers.json').then(r => r.json()).catch(() => ({})),
+    ]);
+    gridData = grid;
+    seats = seatData;
+    autoCenters = grid.centers || {};
+    centers = centerData || {};
+    await new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => { mapImg = img; resolve(); };
+      img.onerror = () => resolve();
+      img.src = '../assets/maps/turkey_map.png';
+    });
+    buildList();
+    selectProvince(gridData.ids.slice().sort()[0]);
+    setStatus('Yüklendi: ' + gridData.ids.length + ' il.', 'ok');
+  } catch (error) {
+    setStatus('Veriler yüklenemedi: ' + error, 'warn');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// İL LİSTESİ
+// ---------------------------------------------------------------------------
+function buildList() {
+  const sel = document.getElementById('provSelect');
+  const list = document.getElementById('provList');
+  sel.innerHTML = '';
+  list.innerHTML = '';
+  for (const id of gridData.ids.slice().sort()) {
+    const opt = document.createElement('option');
+    opt.value = id; opt.textContent = id;
+    sel.appendChild(opt);
+
+    const row = document.createElement('div');
+    row.dataset.id = id;
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = id;
+    const count = document.createElement('span');
+    count.className = 'count';
+    count.textContent = seats[id] ?? 0;
+    row.append(name, count);
+    if (isMoved(id)) row.classList.add('moved');
+    row.addEventListener('click', () => selectProvince(id));
+    list.appendChild(row);
+  }
+  sel.onchange = () => selectProvince(sel.value);
+  refreshTotal();
+}
+
+function refreshList() {
+  for (const row of document.querySelectorAll('#provList div')) {
+    const id = row.dataset.id;
+    row.querySelector('.count').textContent = seats[id] ?? 0;
+    row.classList.toggle('moved', isMoved(id));
+    row.classList.toggle('selected', id === selected);
+  }
+  refreshTotal();
+}
+
+function refreshTotal() {
+  let total = 0;
+  for (const id of gridData.ids) total += seats[id] || 0;
+  const el = document.getElementById('totalLine');
+  const national = 10;  // ELECTION_MODEL: 10 sandalye ulusal listeden gelir
+  el.innerHTML = 'Toplam: <b>' + total + '</b> il + ' + national + ' ulusal = ' + (total + national) + ' vekil'
+    + (dirty ? ' <span class="warn">(kaydedilmedi)</span>' : '');
+}
+
+function isMoved(id) {
+  const c = centers[id];
+  const a = autoCenters[id];
+  if (!c) return false;
+  if (!a) return true;
+  return Math.abs(c[0] - a[0]) > 0.05 || Math.abs(c[1] - a[1]) > 0.05;
+}
+
+function selectProvince(id) {
+  selected = id;
+  document.getElementById('provSelect').value = id;
+  document.getElementById('seatInput').value = seats[id] ?? 0;
+  refreshList();
+  render();
+}
+
+// ---------------------------------------------------------------------------
+// MİLLETVEKİLİ SAYISI
+// ---------------------------------------------------------------------------
+function setSeats(id, value) {
+  const n = Math.max(0, Math.min(120, Math.round(value)));
+  if (seats[id] === n) return;
+  seats[id] = n;
+  dirty = true;
+  document.getElementById('seatInput').value = n;
+  refreshList();
+  render();
+}
+
+document.getElementById('seatInput').addEventListener('input', e => {
+  if (selected) setSeats(selected, parseInt(e.target.value) || 0);
+});
+document.getElementById('btnPlus').addEventListener('click', () => { if (selected) setSeats(selected, (seats[selected] || 0) + 1); });
+document.getElementById('btnMinus').addEventListener('click', () => { if (selected) setSeats(selected, (seats[selected] || 0) - 1); });
+
+// ---------------------------------------------------------------------------
+// NOKTA YERLEŞİMİ — seat_markers.gd ile BİREBİR aynı mantık.
+// ---------------------------------------------------------------------------
+function currentPos(id) {
+  if (centers[id]) return centers[id];
+  if (autoCenters[id]) return autoCenters[id];
+  return [gridData.width / 2, gridData.height / 2];
+}
+
+function getDotLayout(n) {
+  if (n <= 0) return [];
+  const fixed = {1:[1],2:[2],3:[3],4:[2,2],5:[3,2],6:[3,3],7:[2,3,2],8:[3,3,2],9:[3,3,3]};
+  if (fixed[n]) return fixed[n];
+  let cols;
+  if (n > 20) cols = Math.min(Math.ceil(Math.sqrt(n * 1.2)), 7);
+  else cols = Math.min(Math.ceil(Math.sqrt(n * 1.5)), 8);
+  const rows = Math.ceil(n / cols);
+  const layout = [];
+  let remaining = n;
+  for (let i = 0; i < rows; i++) {
+    const r = Math.ceil(remaining / (rows - i));
+    layout.push(r);
+    remaining -= r;
+  }
+  return layout;
+}
+
+// seat_markers.gd sabitleri harita biriminde (MAP_UNIT_SCALE=4); burada
+// grid-pixel uzayında çalıştığımız için 4'e bölüyoruz.
+const MAP_UNIT_SCALE = 4;
+const DOT_RADIUS = 4.6 / MAP_UNIT_SCALE;
+const DOT_SPACING = 4.4 / MAP_UNIT_SCALE;
+
+// Godot ile aynı iki aşama: önce bounding-box ortalı ham konumlar, sonra
+// GERÇEK ağırlık merkezine göre kaydırma (son satır eksik dolduğu için ikisi
+// aynı değil).
+function drawGroup(cx, cy, seatCount, z, highlight) {
+  const cell = (DOT_RADIUS * 2 + DOT_SPACING) * z;
+  const layout = getDotLayout(seatCount);
+  const rows = layout.length;
+  const totalH = rows * cell - DOT_SPACING * z;
+  const startY = cy - totalH / 2 + DOT_RADIUS * z;
+  const raw = [];
+  let sumX = 0, sumY = 0;
+  for (let row = 0; row < rows; row++) {
+    const cols = layout[row];
+    const totalW = cols * cell - DOT_SPACING * z;
+    const startX = cx - totalW / 2 + DOT_RADIUS * z;
+    for (let col = 0; col < cols; col++) {
+      const x = startX + col * cell;
+      const y = startY + row * cell;
+      raw.push([x, y]);
+      sumX += x; sumY += y;
+    }
+  }
+  if (!raw.length) return;
+  const dx = cx - sumX / raw.length;
+  const dy = cy - sumY / raw.length;
+  const half = DOT_RADIUS * z;
+  ctx.fillStyle = highlight ? '#ffc93c' : 'rgba(255,255,255,0.6)';
+  for (const [x, y] of raw) ctx.fillRect(x + dx - half, y + dy - half, half * 2, half * 2);
+}
+
+function render() {
+  if (!gridData) return;
+  const z = zoom();
+  canvas.width = gridData.width * z;
+  canvas.height = gridData.height * z;
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = '#100d22';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (mapImg) ctx.drawImage(mapImg, 0, 0, canvas.width, canvas.height);
+
+  for (const id of gridData.ids) {
+    const pos = currentPos(id);
+    // +0.5: Godot her hücreyi (pos+0.5)*ölçek konumunda, yani hücrenin
+    // MERKEZİNDE çiziyor; aynı ofset olmazsa editör yarım hücre kayar.
+    const px = (pos[0] + 0.5) * z, py = (pos[1] + 0.5) * z;
+    drawGroup(px, py, seats[id] || 0, z, id === selected);
+    if (id === selected) {
+      ctx.strokeStyle = '#4ad3ff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(px, py, 10, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// FARE / KLAVYE
+// ---------------------------------------------------------------------------
+function provinceAt(e) {
+  const rect = canvas.getBoundingClientRect();
+  const z = zoom();
+  const gx = Math.floor((e.clientX - rect.left) / z);
+  const gy = Math.floor((e.clientY - rect.top) / z);
+  if (gx < 0 || gy < 0 || gx >= gridData.width || gy >= gridData.height) return null;
+  const cell = gridData.grid[gy * gridData.width + gx];
+  if (cell === undefined || cell === null || cell === -1) return null;
+  return typeof cell === 'string' ? cell : gridData.ids[cell];
+}
+
+canvas.addEventListener('mousedown', e => {
+  if (!gridData) return;
+  const hit = provinceAt(e);
+  if (hit && hit !== selected) { selectProvince(hit); return; }
+  if (!selected) return;
+  dragging = true;
+  moveTo(e);
+});
+canvas.addEventListener('mousemove', e => { if (dragging) moveTo(e); });
+window.addEventListener('mouseup', () => { dragging = false; });
+
+canvas.addEventListener('wheel', e => {
+  if (!selected) return;
+  e.preventDefault();
+  setSeats(selected, (seats[selected] || 0) + (e.deltaY < 0 ? 1 : -1));
+}, { passive: false });
+
+window.addEventListener('keydown', e => {
+  if (!selected || !gridData) return;
+  const step = e.shiftKey ? 1 : 0.2;
+  const pos = currentPos(selected).slice();
+  if (e.key === 'ArrowLeft') pos[0] -= step;
+  else if (e.key === 'ArrowRight') pos[0] += step;
+  else if (e.key === 'ArrowUp') pos[1] -= step;
+  else if (e.key === 'ArrowDown') pos[1] += step;
+  else return;
+  e.preventDefault();
+  centers[selected] = [Math.round(pos[0] * 10) / 10, Math.round(pos[1] * 10) / 10];
+  dirty = true;
+  refreshList();
+  render();
+});
+
+function moveTo(e) {
+  const rect = canvas.getBoundingClientRect();
+  const z = zoom();
+  // -0.5: render()'daki +0.5'in tersi — kaydedilen değer HAM birimdir.
+  const x = (e.clientX - rect.left) / z - 0.5;
+  const y = (e.clientY - rect.top) / z - 0.5;
+  centers[selected] = [Math.round(x * 10) / 10, Math.round(y * 10) / 10];
+  dirty = true;
+  refreshList();
+  render();
+}
+
+document.getElementById('zoomInput').addEventListener('input', render);
+document.getElementById('btnReset').addEventListener('click', () => {
+  if (!selected) return;
+  delete centers[selected];
+  dirty = true;
+  refreshList();
+  render();
+});
+
+// ---------------------------------------------------------------------------
+// KAYDETME
+// ---------------------------------------------------------------------------
+function seatsPayload() {
+  const out = {};
+  for (const id of gridData.ids.slice().sort()) out[id] = seats[id] || 0;
+  return out;
+}
+
+function centersPayload() {
+  // EKSİKSİZ belge: elle taşınmamış iller de piksel merkeziyle yazılır.
+  const out = {};
+  for (const id of gridData.ids.slice().sort()) {
+    const p = currentPos(id);
+    out[id] = [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10];
+  }
+  return out;
+}
+
+async function save(path, data) {
+  const response = await fetch('/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, data }),
+  });
+  if (!response.ok) throw new Error(path + ': ' + response.status + ' ' + (await response.text()));
+}
+
+document.getElementById('btnSave').addEventListener('click', async () => {
+  if (!gridData) return;
+  try {
+    await save('data/province_seats.json', seatsPayload());
+    await save('data/province_seat_centers.json', centersPayload());
+    dirty = false;
+    refreshTotal();
+    setStatus('Kaydedildi: data/province_seats.json + data/province_seat_centers.json\nOyunu yeniden başlatınca geçerli olur.', 'ok');
+  } catch (error) {
+    setStatus('Kaydedilemedi: ' + error + '\n(Sayfayı python tools/map_editor.py ile açtığından emin ol.)', 'warn');
+  }
+});
+
+document.getElementById('btnDownload').addEventListener('click', () => {
+  for (const [name, data] of [['province_seats.json', seatsPayload()], ['province_seat_centers.json', centersPayload()]]) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+  }
+});
+
+window.addEventListener('beforeunload', e => {
+  if (!dirty) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
+
+loadAll();
+</script>
+</body>
+</html>

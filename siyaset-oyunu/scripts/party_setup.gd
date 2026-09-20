@@ -25,6 +25,12 @@ const PREVIEW_ICON_PIXEL_SIZE := 480   # kocaman önizleme için raster boyutu
 const ICON_COLOR := Color.WHITE
 ## Soldaki oyuncu listesi paneli (herkesin adı ve kurduğu parti, anlık).
 const PLAYERS_PANEL_WIDTH := 330.0
+## Logo önizlemesi: kalan alana göre ölçeklenir, kenarlarda bu kadar boşluk kalır.
+const PREVIEW_MARGIN := 32.0
+const PREVIEW_MIN_SIDE := 160.0
+const PREVIEW_MAX_SIDE := 420.0
+## İkon, kare kenarının bu oranı kadar yer kaplar (0.68 = kenarda rahat pay).
+const PREVIEW_ICON_RATIO := 0.68
 
 # Eksen başına görünen başlık + uç etiketleri (- ve + yönü).
 const AXIS_LABELS := {
@@ -227,15 +233,8 @@ func _build_players_panel() -> void:
 	var left_preview := get_node_or_null("LeftPreview") as Control
 	if left_preview != null:
 		left_preview.offset_left = PLAYERS_PANEL_WIDTH
-		preview_bg.custom_minimum_size = Vector2(280, 280)
-		preview_bg.offset_left = -140
-		preview_bg.offset_top = -140
-		preview_bg.offset_right = 140
-		preview_bg.offset_bottom = 140
-		preview_icon.offset_left = -95
-		preview_icon.offset_top = -95
-		preview_icon.offset_right = 95
-		preview_icon.offset_bottom = 95
+		left_preview.resized.connect(_layout_preview)
+		_layout_preview()
 	var panel := PanelContainer.new()
 	panel.name = "PlayersPanel"
 	panel.anchor_bottom = 1.0
@@ -330,6 +329,30 @@ func _refresh_players_panel() -> void:
 		ready_label.add_theme_font_size_override("font_size", 18)
 		row.add_child(ready_label)
 		_players_list.add_child(row)
+
+## LOGO ÖNİZLEMESİ: eskiden 280x280 sabitti; oyuncu paneli ile ekranın
+## ortası arasındaki boşluk bundan darsa kare kenarlara yapışıp sıkışık
+## duruyordu. Artık kalan alana göre ölçekleniyor ve hep kare kalıyor.
+func _layout_preview() -> void:
+	var left_preview := get_node_or_null("LeftPreview") as Control
+	if left_preview == null or preview_bg == null:
+		return
+	var space := left_preview.size
+	if space.x <= 0.0 or space.y <= 0.0:
+		return
+	var side := clampf(minf(space.x - PREVIEW_MARGIN * 2.0, space.y - PREVIEW_MARGIN * 2.0),
+		PREVIEW_MIN_SIDE, PREVIEW_MAX_SIDE)
+	var half := side * 0.5
+	preview_bg.custom_minimum_size = Vector2(side, side)
+	preview_bg.offset_left = -half
+	preview_bg.offset_top = -half
+	preview_bg.offset_right = half
+	preview_bg.offset_bottom = half
+	var icon_half := half * PREVIEW_ICON_RATIO
+	preview_icon.offset_left = -icon_half
+	preview_icon.offset_top = -icon_half
+	preview_icon.offset_right = icon_half
+	preview_icon.offset_bottom = icon_half
 
 ## Arka plan rengi seçilebilir mi? İkonla aynı renk (beyaz) olamaz.
 static func _is_allowed_bg_color(color: Color) -> bool:

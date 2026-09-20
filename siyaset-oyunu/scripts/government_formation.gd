@@ -266,7 +266,9 @@ func _refresh_chip_states() -> void:
 			var halo: Control = chip.get_node_or_null("Halo")
 			if halo != null:
 				halo.visible = peer_id == selected
-			chip.modulate = Color.WHITE if peer_id == selected else Color(1, 1, 1, 0.5)
+			# Seçilmeyen çip soluklaşmaz, sadece biraz söner: parti rengi
+			# (özellikle koyu renkler) tanınmaz hâle gelmesin.
+			chip.modulate = Color.WHITE if peer_id == selected else Color(0.82, 0.82, 0.82, 0.95)
 
 # --- Ortak parçalar ---------------------------------------------------------
 
@@ -283,23 +285,12 @@ func _build_party_chip(peer_id: int) -> Control:
 		MultiplayerManager.players.get(peer_id, {}).get("name", "?"),
 	]
 
-	var bg := UiSkin.color_surface(party.get("bg_color", Color(0.4, 0.4, 0.4)), UiSkin.SLOT)
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	chip.add_child(bg)
-
-	if party.has("icon_index"):
-		var icon := TextureRect.new()
-		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		icon.texture = PartyPresets.get_icon_texture(party["icon_index"], 64)
-		icon.modulate = party.get("icon_color", Color.WHITE)
-		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon.set_anchors_preset(Control.PRESET_FULL_RECT)
-		icon.offset_left = 6
-		icon.offset_top = 6
-		icon.offset_right = -6
-		icon.offset_bottom = -6
-		chip.add_child(icon)
+	# Parti rengi olduğu gibi görünsün: koyu 9-slice zemin yerine rozet
+	# (renkli daire + beyaz logo) — oyunun geri kalanıyla da aynı görünüm.
+	var badge := PartyBadge.build(party, CHIP_SIZE, 64)
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.set_anchors_preset(Control.PRESET_FULL_RECT)
+	chip.add_child(badge)
 
 	var halo := TextureRect.new()
 	halo.name = "Halo"

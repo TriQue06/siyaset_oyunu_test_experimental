@@ -49,10 +49,61 @@ func _ready() -> void:
 	streamer_mode_check.button_pressed = GameSettings.streamer_mode
 	streamer_mode_check.toggled.connect(_on_streamer_mode_toggled)
 
+	_build_volume_rows()
+
 	close_button.pressed.connect(close)
 	open_settings_button.pressed.connect(_on_menu_button_pressed)
 	panel.hide()
 	_build_menu()
+
+## SES seviyeleri: ana ses, müzik, efekt. Sahneye elle node eklemek yerine
+## kod içinde kurulur (satırların hepsi aynı kalıpta).
+func _build_volume_rows() -> void:
+	var box := panel.get_node("CenterBox") as VBoxContainer
+	# "Kapat" butonu her zaman en altta kalsın: yeni satırlar onun ÜSTÜNE girer.
+	var title := Label.new()
+	title.text = "Ses"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_insert_before_close(box, title)
+	for row in [["master", "Ana ses"], ["music", "Müzik"], ["sfx", "Efektler"]]:
+		_volume_row(box, String(row[0]), String(row[1]))
+
+## Yeni satırı "Kapat" butonunun hemen üstüne yerleştirir.
+func _insert_before_close(box: VBoxContainer, node: Control) -> void:
+	box.add_child(node)
+	box.move_child(node, close_button.get_index())
+
+## Tek satır: solda ad + yüzde, sağda kaydırıcı (panel uzamasın diye yan yana).
+func _volume_row(box: VBoxContainer, kind: String, title: String) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	var label := Label.new()
+	label.custom_minimum_size.x = 150.0
+	row.add_child(label)
+	var slider := HSlider.new()
+	slider.min_value = 0.0
+	slider.max_value = 1.0
+	slider.step = 0.05
+	slider.value = _volume_of(kind)
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(slider)
+	_insert_before_close(box, row)
+	var refresh := func(value: float):
+		label.text = "%s  %%%d" % [title, int(round(value * 100.0))]
+	refresh.call(slider.value)
+	slider.value_changed.connect(func(value: float):
+		GameSettings.set_volume(kind, value)
+		refresh.call(value)
+		# Kaydırırken duyulsun: efekt ve ana ses için kısa bir örnek çal.
+		if kind != "music":
+			AudioManager.play("ui_click"))
+
+func _volume_of(kind: String) -> float:
+	match kind:
+		"master": return GameSettings.master_volume
+		"music": return GameSettings.music_volume
+		_: return GameSettings.sfx_volume
 
 func _build_menu() -> void:
 	_menu = Control.new()

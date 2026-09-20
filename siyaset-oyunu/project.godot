@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="Siyaset Oyunu"
-config/version="0.0.33"
+config/version="0.0.34"
 run/main_scene="res://scenes/Lobby.tscn"
 config/quit_on_go_back=false
 config/features=PackedStringArray("4.7", "Forward Plus")
@@ -21,6 +21,7 @@ config/icon="res://icon.svg"
 
 PlayerProfile="*res://scripts/player_profile.gd"
 GameSettings="*res://scripts/game_settings.gd"
+AudioManager="*res://scripts/audio_manager.gd"
 MultiplayerManager="*res://scripts/multiplayer_manager.gd"
 IdeologyAxes="*res://scripts/ideology_axes.gd"
 PartyPresets="*res://scripts/party_presets.gd"

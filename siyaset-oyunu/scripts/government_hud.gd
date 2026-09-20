@@ -174,6 +174,16 @@ static func fill_score_panel(box: VBoxContainer, peer_ids: Array, my_id: int) ->
 		opinion_label.mouse_filter = Control.MOUSE_FILTER_PASS
 		row.add_child(opinion_label)
 
+		# Makam puanı TUR SONUNDA yazılır; o yüzden "bu tur ne kazanacağı" ayrıca
+		# gösteriliyor — hükümete girip de tabloda hiçbir şey görmemek kafa
+		# karıştırıyordu.
+		var pending := GovernmentManager.round_points_of(peer_id)
+		if pending > 0:
+			var pending_label := _label("+%d" % pending, 11, UiTheme.GOLD)
+			pending_label.tooltip_text = "Hükümetteki görevlerinden bu tur sonunda kazanacağı puan"
+			pending_label.mouse_filter = Control.MOUSE_FILTER_PASS
+			row.add_child(pending_label)
+
 		var score_label := _label(str(GovernmentManager.score_of(peer_id)), 16)
 		score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		row.add_child(score_label)

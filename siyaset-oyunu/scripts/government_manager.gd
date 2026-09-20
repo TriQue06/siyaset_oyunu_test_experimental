@@ -350,7 +350,7 @@ func _fail_attempt() -> void:
 	_clear_proposal()
 	_set_phase(Phase.FORMING if mandate_index < mandate_order.size() else Phase.IDLE)
 	if phase == Phase.IDLE:
-		last_resolution_reason += " Hükümet kurulamadı — yıl sonunda erken seçim."
+		last_resolution_reason += " Hükümet kurulamadı — dönem sonunda erken seçim."
 
 ## Oyun bittiğinde CardManager çağırır: açık teklif kapanır, hükümet gösterim
 ## için korunur.

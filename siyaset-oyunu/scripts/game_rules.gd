@@ -35,22 +35,27 @@ extends RefCounted
 ##     kurulamazsa bu puan yazılmaz. En çok puanı olan kazanır (eşitlikte
 ##     milletvekili sayısı).
 
-## Oyun süresi LOBİ AYARIDIR (bkz. MultiplayerManager.election_interval /
-## election_count): seçimler ELECTION_INTERVAL turda bir, toplam ELECTION_COUNT
-## seçim; oyun MAX_ROUNDS = aralık × sayı tur sürer. Değerler configure() ile
-## (her cihazda, ayar senkronlanınca) güncellenir.
+## TAKVİM: BİR TUR ALTI AYDIR. Lobideki "seçimler kaç yılda bir" ayarı YIL
+## cinsindendir; tur cinsinden karşılığı ELECTION_INTERVAL = yıl × 2'dir.
+## Oyun MAX_ROUNDS = aralık × seçim sayısı tur (yani aralık_yıl × sayı × 2 tur)
+## sürer. Değerler configure() ile (her cihazda, ayar senkronlanınca) güncellenir.
+const ROUNDS_PER_YEAR := 2
 const DEFAULT_ELECTION_INTERVAL := 4
 const DEFAULT_ELECTION_COUNT := 8
 const ELECTION_INTERVAL_MIN := 2
 const ELECTION_INTERVAL_MAX := 8
 const ELECTION_COUNT_MIN := 2
 const ELECTION_COUNT_MAX := 12
-static var ELECTION_INTERVAL: int = DEFAULT_ELECTION_INTERVAL
-static var FIRST_ELECTION_ROUND: int = DEFAULT_ELECTION_INTERVAL
-static var MAX_ROUNDS: int = DEFAULT_ELECTION_INTERVAL * DEFAULT_ELECTION_COUNT
+## Seçim aralığı YIL cinsinden (lobi ayarı).
+static var ELECTION_INTERVAL_YEARS: int = DEFAULT_ELECTION_INTERVAL
+## Aynı aralığın TUR cinsinden karşılığı (oyun içi hesaplar bunu kullanır).
+static var ELECTION_INTERVAL: int = DEFAULT_ELECTION_INTERVAL * ROUNDS_PER_YEAR
+static var FIRST_ELECTION_ROUND: int = DEFAULT_ELECTION_INTERVAL * ROUNDS_PER_YEAR
+static var MAX_ROUNDS: int = DEFAULT_ELECTION_INTERVAL * ROUNDS_PER_YEAR * DEFAULT_ELECTION_COUNT
 
-static func configure(interval: int, count: int) -> void:
-	ELECTION_INTERVAL = clampi(interval, ELECTION_INTERVAL_MIN, ELECTION_INTERVAL_MAX)
+static func configure(interval_years: int, count: int) -> void:
+	ELECTION_INTERVAL_YEARS = clampi(interval_years, ELECTION_INTERVAL_MIN, ELECTION_INTERVAL_MAX)
+	ELECTION_INTERVAL = ELECTION_INTERVAL_YEARS * ROUNDS_PER_YEAR
 	FIRST_ELECTION_ROUND = ELECTION_INTERVAL
 	MAX_ROUNDS = ELECTION_INTERVAL * clampi(count, ELECTION_COUNT_MIN, ELECTION_COUNT_MAX)
 
@@ -71,13 +76,14 @@ const MITING_MANA_COST := 2
 ## Yatırım (sadece hükümet partileri) ve gensoru (sadece muhalefet, hükümet
 ## azınlıktayken) hamleleri.
 const INVEST_MANA_COST := 2
-const CENSURE_MANA_COST := 1
+## Gensoru BEDAVA: muhalefetin elindeki tek gerçek silah engellenmemeli.
+const CENSURE_MANA_COST := 0
 ## Popülizm bonusu kartı bu kadar tur sürer; mana bonusu kartı bu kadar mana verir.
 const POPULISM_ROUNDS := 3
 const MANA_BONUS_AMOUNT := 5
 const ELECTION_MANA_BONUS := 1
 ## GÜNDEM TAKVİMİ: ilk seçimden hemen sonraki turdan itibaren AGENDA_ROUNDS tur
-## gündem, AGENDA_GAP tur ara, yine AGENDA_ROUNDS tur gündem... Gündemli her tur
+## (6 ay) gündem, AGENDA_GAP tur (12 ay) ara, yine gündem... Gündemli her tur
 ## tek bir eksenin bir ucudur; bir gündem dönemindeki turlar farklı eksenlerdir
 ## (eksenler her dönemde rastgele). YASA sadece gündemdeki eksende sunulabilir.
 const AGENDA_ROUNDS := 1
@@ -86,8 +92,9 @@ const AGENDA_GAP := 2
 ## (hükümet partisinin yasası daha çok).
 ## Kabul edilen gensoru, getiren partiye puan tablosunda bu kadar puan yazar.
 const CENSURE_PASS_SCORE := 5
-const LAW_PASS_SCORE := 4
-const LAW_PASS_SCORE_GOV := 6
+## Yasa geçirmek artık sembolik bir puan: asıl puan iktidarda olmaktan gelir.
+const LAW_PASS_SCORE := 2
+const LAW_PASS_SCORE_GOV := 3
 const GOVERNMENT_MANA_BONUS := 1
 const ORG_MANA_COST := 2
 const ORG_MAX_LEVEL := 3
@@ -107,19 +114,28 @@ const ELECTION_NIGHT_HOLD := 5.0
 ## Oyun ortasında oyuncular ayrılıp bu sayının altına düşülürse oyun biter.
 const MIN_PLAYERS_TO_CONTINUE := 2
 
-## TAKVİM: bir tur bir YILDIR. Oyun START_YEAR'da başlar, seçimler
-## ELECTION_INTERVAL yılda bir yapılır. Tur sonunda sandıktan çıkan meclis bir
-## sonraki yılın meclisidir; bu yüzden seçim, biten turun DEĞİL onu izleyen
-## yılın adıyla anılır (varsayılanla 1954, 1958, 1962 ...).
+## TAKVİM: bir tur ALTI AYDIR. Oyun START_YEAR'ın ilk yarısında başlar.
+## Tur sonunda sandıktan çıkan meclis bir sonraki dönemin meclisidir; bu yüzden
+## seçim, biten turun DEĞİL onu izleyen yılın adıyla anılır (varsayılan 4 yıllık
+## aralıkla 1954, 1958, 1962 ...).
 const START_YEAR := 1950
 
 ## Bu turun takvim yılı.
 static func year_of_round(round_number: int) -> int:
-	return START_YEAR + maxi(1, round_number) - 1
+	return START_YEAR + (maxi(1, round_number) - 1) / ROUNDS_PER_YEAR
+
+## Yılın hangi yarısı: 0 = Ocak-Haziran, 1 = Temmuz-Aralık.
+static func half_of_round(round_number: int) -> int:
+	return (maxi(1, round_number) - 1) % ROUNDS_PER_YEAR
+
+## "1950 · Oca-Haz" gibi okunur dönem etiketi.
+static func period_label(round_number: int) -> String:
+	return "%d %s" % [year_of_round(round_number),
+		"Oca-Haz" if half_of_round(round_number) == 0 else "Tem-Ara"]
 
 ## round_number'uncu turun sonunda yapılan seçimin adı olan yıl.
 static func election_year(round_number: int) -> int:
-	return START_YEAR + maxi(1, round_number)
+	return START_YEAR + maxi(1, round_number) / ROUNDS_PER_YEAR
 
 
 static func is_election_round(round_number: int) -> bool:

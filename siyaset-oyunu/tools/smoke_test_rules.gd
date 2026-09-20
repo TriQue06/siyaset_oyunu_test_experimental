@@ -124,29 +124,29 @@ func _initialize() -> void:
 
 	print("")
 	print("=== 3) SECIM TAKVIMI ===")
-	check("varsayilan oyun suresi: 4 yilda bir, 8 secim = 32 yil", GameRules.ELECTION_INTERVAL == 4 and GameRules.MAX_ROUNDS == 32 \
-		and GameRules.is_election_round(4) and GameRules.is_election_round(32) and not GameRules.is_election_round(34))
-	# Bu testin geri kalanı 5 turda bir, 6 seçimlik (30 tur) takvimle yazıldı.
+	check("varsayilan: 4 yilda bir (8 tur), 8 secim = 64 tur", GameRules.ELECTION_INTERVAL == 8 and GameRules.MAX_ROUNDS == 64 \
+		and GameRules.is_election_round(8) and GameRules.is_election_round(64) and not GameRules.is_election_round(66))
+	# Bu testin geri kalanı 5 YILDA bir (10 tur), 6 seçimlik (60 tur) takvimle yazıldı.
 	GameRules.configure(5, 6)
-	check("secim turlari 5,10,15 (4,6,8 degil)", GameRules.is_election_round(5) and GameRules.is_election_round(10) \
-		and GameRules.is_election_round(15) and not GameRules.is_election_round(4) \
-		and not GameRules.is_election_round(6) and not GameRules.is_election_round(8))
-	check("sonraki secim 6 -> 10", GameRules.next_election_round(6) == 10)
-	check("toplam 30 tur, son turda da secim var", GameRules.MAX_ROUNDS == 30 and GameRules.is_election_round(30) \
-		and GameRules.next_election_round(26) == 30)
+	check("secim turlari 10,20,30 (5,15,25 degil)", GameRules.is_election_round(10) and GameRules.is_election_round(20) \
+		and GameRules.is_election_round(30) and not GameRules.is_election_round(5) \
+		and not GameRules.is_election_round(15) and not GameRules.is_election_round(25))
+	check("sonraki secim 11 -> 20", GameRules.next_election_round(11) == 20)
+	check("toplam 60 tur, son turda da secim var", GameRules.MAX_ROUNDS == 60 and GameRules.is_election_round(60) \
+		and GameRules.next_election_round(51) == 60)
 
 	print("")
 	print("=== 4) KAMPANYA DONEMI + ILK SECIM ===")
 	new_game({1: ideology(1, 1, 2), 2: ideology(-1, -1, 1), 3: ideology(2, 2, -1)})
 	check("tur 1, meclis yok", cm.round_number == 1 and cm.last_seats.is_empty())
 	var mana_before_election: Dictionary = {}
-	for i in 4:
+	for i in 9:
 		pass_round()
-	check("4 tur sonunda henuz secim yok", cm.last_seats.is_empty() and cm.round_number == 5)
+	check("9 tur sonunda henuz secim yok", cm.last_seats.is_empty() and cm.round_number == 10)
 	mana_before_election = cm.mana.duplicate()
 	pass_round()
-	check("5. tur sonunda ilk secim yapildi", cm.last_election_round == 5 and int(sum_values(cm.last_seats)) == 400, str(cm.last_seats))
-	check("tur 6'ya gecildi", cm.round_number == 6)
+	check("10. tur sonunda ilk secim yapildi", cm.last_election_round == 10 and int(sum_values(cm.last_seats)) == 400, str(cm.last_seats))
+	check("tur 11'e gecildi", cm.round_number == 11)
 	var election_bonus_ok := true
 	for id in cm.turn_order:
 		# Turdaki herkes sira gelirini (+3) aldi, ustune secim bonusu (+1).
@@ -189,16 +189,18 @@ func _initialize() -> void:
 	cm.current_turn_index = 0
 	var pts1: int = gm.round_points_of(1)
 	pass_round()
-	check("tur 6 sonunda secim YOK", cm.last_election_round == 5 and cm.round_number == 7)
+	check("tur 11 sonunda secim YOK", cm.last_election_round == 10 and cm.round_number == 12)
 	check("hukumet hala gorevde", gm.has_government())
 	check("puan eklendi", gm.score_of(1) == pts1, "%d vs %d" % [gm.score_of(1), pts1])
 	pass_round()
 	pass_round()
 	pass_round()
-	check("tur 7, 8, 9 sonunda da secim yok", cm.last_election_round == 5 and gm.score_of(1) == pts1 * 4)
-	pass_round()
-	check("tur 10 sonunda SECIM", cm.last_election_round == 10 and cm.round_number == 11)
-	check("secim oncesi puan yazildi", gm.score_of(1) == pts1 * 5)
+	check("tur 12, 13, 14 sonunda da secim yok", cm.last_election_round == 10 and gm.score_of(1) == pts1 * 4)
+	while cm.round_number <= 20:
+		pass_round()
+	check("tur 20 sonunda SECIM", cm.last_election_round == 20 and cm.round_number == 21)
+	# 11-20 arası 10 tur boyunca her tur makam puanı yazıldı.
+	check("secim oncesi puan yazildi", gm.score_of(1) == pts1 * 10, "%d vs %d" % [gm.score_of(1), pts1 * 10])
 
 	print("")
 	print("=== 7) GENSORU OYLAMASI SIRAYI DEVRETMEZ ===")
@@ -266,7 +268,7 @@ func _initialize() -> void:
 
 	check("gozcu destede yok", not cm._draw_pool(1).has("gozcu"))
 	check("miting hamle, destede yok, 2 mana", not cm._draw_pool(1).has("miting") and GameRules.MITING_MANA_COST == 2)
-	check("kart bedelleri: karalama 1, calma 1/3, kaset 2, isyan 2", cp.card_cost("karalama") == 1 		and cp.card_cost("steal_weak") == 1 and cp.card_cost("steal_strong") == 3 and cp.card_cost("kaset") == 2 and cp.card_cost("isyan") == 2)
+	check("kart bedelleri: karalama 1, calma 1/3, kaset 2, isyan 1", cp.card_cost("karalama") == 1 		and cp.card_cost("steal_weak") == 1 and cp.card_cost("steal_strong") == 3 and cp.card_cost("kaset") == 2 and cp.card_cost("isyan") == 1)
 
 	var law_type: String = cp.law_type("economic", 1)
 	check("yasa hamlesi turu okunur", cp.is_law_card(law_type) and int(cp.law_data(law_type)["dir"]) == 1 and not cp.is_law_card("miting"))
@@ -439,9 +441,9 @@ func _initialize() -> void:
 	print("=== 13b) TAKVIM: TURLAR YIL ===")
 	GameRules.configure(4, 7)
 	check("oyun 1950'de baslar", GameRules.year_of_round(1) == 1950)
-	check("her tur bir yil", GameRules.year_of_round(4) == 1953 and GameRules.year_of_round(5) == 1954)
-	check("ilk secim 4. turun sonunda: 1954", GameRules.is_election_round(4) and GameRules.election_year(4) == 1954)
-	check("secimler 4 yilda bir", GameRules.election_year(8) == 1958 and GameRules.election_year(12) == 1962)
+	check("iki tur bir yil", GameRules.year_of_round(2) == 1950 and GameRules.year_of_round(3) == 1951)
+	check("ilk secim 8. turun sonunda: 1954", GameRules.is_election_round(8) and GameRules.election_year(8) == 1954)
+	check("secimler 4 yilda bir", GameRules.election_year(16) == 1958 and GameRules.election_year(24) == 1962)
 
 	print("")
 	print("=== 14) KOALISYONDAN CEKILME ===")
@@ -535,21 +537,21 @@ func _initialize() -> void:
 	GameRules.configure(4, 7)
 	new_game({1: ideology(0, 0, 0), 2: ideology(0, 0, 0), 3: ideology(0, 0, 0)})
 	var calendar := {}
-	for rr in range(1, 16):
+	for rr in range(1, 20):
 		cm.round_number = rr
 		cm.last_seats = {} if rr <= GameRules.FIRST_ELECTION_ROUND else {1: 150, 2: 140, 3: 110}
 		cm._schedule_agenda()
 		calendar[rr] = cm.agenda_type()
 	var no_early := true
-	for rr in range(1, 5):
+	for rr in range(1, 9):
 		if calendar[rr] != "":
 			no_early = false
 	check("ilk secimden once gundem yok", no_early, str(calendar))
-	var pattern_ok: bool = calendar[5] != "" and calendar[6] == "" and calendar[7] == "" and calendar[8] != "" \
-		and calendar[9] == "" and calendar[10] == "" and calendar[11] != "" and calendar[12] == "" and calendar[13] == "" and calendar[14] != ""
+	var pattern_ok: bool = calendar[9] != "" and calendar[10] == "" and calendar[11] == "" and calendar[12] != "" \
+		and calendar[13] == "" and calendar[14] == "" and calendar[15] != "" and calendar[16] == "" and calendar[17] == "" and calendar[18] != ""
 	check("1 tur gundem, 2 tur ara", pattern_ok, str(calendar))
-	check("arka arkaya gelen gundemler farkli eksen", cp.agenda_data(calendar[5])["axis"] != cp.agenda_data(calendar[8])["axis"] \
-		and cp.agenda_data(calendar[8])["axis"] != cp.agenda_data(calendar[11])["axis"])
+	check("arka arkaya gelen gundemler farkli eksen", cp.agenda_data(calendar[9])["axis"] != cp.agenda_data(calendar[12])["axis"] \
+		and cp.agenda_data(calendar[12])["axis"] != cp.agenda_data(calendar[15])["axis"])
 
 	print("")
 	print("=== 14) IDEOLOJIYE BAGLI VEKIL CALMA, IL TAVANI, SECIM HEDIYESI ===")

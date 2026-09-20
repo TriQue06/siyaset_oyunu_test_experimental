@@ -227,7 +227,7 @@ func _initialize() -> void:
 	mods = cm.election_modifiers()
 	check("vekil calmanin secim momentumu kaldirildi", near(float(mods["national"][3]), 1.0),
 		"%.2f" % float(mods["national"][3]))
-	check("calma bedeli ulusal puana anlik yazilir", near(PublicOpinion.steal_thief_national(10), -0.3) and near(PublicOpinion.steal_victim_national(10), 0.25))
+	check("calma bedeli ulusal puana anlik ama cok kucuk yazilir", near(PublicOpinion.steal_thief_national(10), -0.08) and near(PublicOpinion.steal_victim_national(10), 0.12))
 	check("il baskanligi il carpanina girer", near(float(mods["local"]["konya"][3]), PublicOpinion.org_activity(2)))
 	cm.last_seats = {1: 200, 2: 100, 3: 90}
 	cm.election_seats = {}

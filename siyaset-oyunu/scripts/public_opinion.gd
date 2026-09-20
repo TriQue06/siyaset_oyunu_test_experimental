@@ -127,6 +127,9 @@ static func withdraw_ally_national(leaver_penalty: float) -> float:
 # --- Kaset / itibar suikastı ------------------------------------------------------
 ## Hedefin ULUSAL desteğinden doğrudan düşer (il puanlarına dokunmaz).
 const REPUTATION_NATIONAL_DAMAGE := 4.0
+## PARTİ İÇİ İSYAN: çekimser kalmaya zorlamanın yanında hedefin ulusal
+## desteğini de düşürür (bölünmüş parti oy kaybeder).
+const REBELLION_NATIONAL_DAMAGE := 1.5
 # --- Karalama -----------------------------------------------------------------
 ## Hedefin kaybı = DAMAGE / (1 + DEFENSE_FACTOR × hedefin il gücü)
 ## Karalayanın kazancı = GAIN × (1 + ATTACK_FACTOR × karalayanın il gücü)
@@ -150,10 +153,12 @@ const POLL_ERROR := 0.2
 ## Vekil transferi seçmene meşru görünmez: ÇALAN parti çalınan vekil başına
 ## küçük bir ulusal destek kaybeder, ÇALINAN parti "mağduriyet" olarak küçük bir
 ## destek kazanır. İkisi de kısmidir: hamleyi caydırmaz, bedava da bırakmaz.
-const STEAL_THIEF_NATIONAL_PER_SEAT := -0.03
-const STEAL_THIEF_NATIONAL_LIMIT := -1.0
-const STEAL_VICTIM_NATIONAL_PER_SEAT := 0.025
-const STEAL_VICTIM_NATIONAL_LIMIT := 0.8
+## Vekil çalmanın ulusal bedeli neredeyse simgesel: oyuncular çalmaktan
+## caymasın, sadece "bedava değil" hissi kalsın.
+const STEAL_THIEF_NATIONAL_PER_SEAT := -0.008
+const STEAL_THIEF_NATIONAL_LIMIT := -0.25
+const STEAL_VICTIM_NATIONAL_PER_SEAT := 0.012
+const STEAL_VICTIM_NATIONAL_LIMIT := 0.35
 
 const AXES := ["economic", "social", "administrative"]
 

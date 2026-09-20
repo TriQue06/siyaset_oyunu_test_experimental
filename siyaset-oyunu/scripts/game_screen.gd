@@ -66,6 +66,8 @@ const PLAY_POP_DURATION := 0.18   # ortada küçülüp "puf" kaybolma
 @onready var map_holder: Node2D = %MapHolder
 @onready var deck_button: TextureButton = %DeckButton
 var _deck_shadow: TextureRect
+## Kartı sürükleyip bırakınca atmaya yarayan çöp kutusu.
+var _trash_button: Button
 @onready var pass_button: Button = %PassButton
 @onready var player_panel_list: GridContainer = %PlayerPanelList
 @onready var hand_container: HBoxContainer = %HandContainer
@@ -222,6 +224,7 @@ func _ready() -> void:
 	_build_target_hint()
 	_build_card_info()
 	_build_action_buttons()
+	_build_trash_button()
 	_build_law_designer()
 	_build_agenda_banner()
 	_build_propaganda_menu()
@@ -324,7 +327,7 @@ func _on_round_advanced() -> void:
 	_refresh_game_settings_label()
 	_refresh_score_panel()
 	_refresh_government_panel()
-	_show_toast("%d başladı" % GameRules.year_of_round(CardManager.round_number))
+	_show_toast("%s başladı" % GameRules.period_label(CardManager.round_number))
 
 func _on_game_over() -> void:
 	_refresh_score_panel()
@@ -481,8 +484,8 @@ func _refresh_map_seat_markers() -> void:
 
 func _refresh_game_settings_label() -> void:
 	var next_election := GameRules.next_election_round(CardManager.round_number)
-	game_settings_label.text = "%d  ·  Baraj %%%s\n%s" % [
-		GameRules.year_of_round(mini(CardManager.round_number, GameRules.MAX_ROUNDS)),
+	game_settings_label.text = "%s  ·  Baraj %%%s\n%s" % [
+		GameRules.period_label(mini(CardManager.round_number, GameRules.MAX_ROUNDS)),
 		_format_threshold(MultiplayerManager.election_threshold),
 		("Sonraki seçim: %d" % GameRules.election_year(next_election)) if next_election != -1 else "Başka seçim yok",
 	]
@@ -553,13 +556,14 @@ func _on_turn_changed(_peer_id: int) -> void:
 	if current != _last_turn_peer:
 		_last_turn_peer = current
 		if current == multiplayer.get_unique_id() and not CardManager.game_finished:
-			_show_toast("Sıra sende: +%d mana (toplam %d)" % [CardManager.turn_income(current), CardManager.mana_of(current)])
+			_show_toast("Sıra sende: +%d mana (toplam %s)" % [CardManager.turn_income(current), CardManager.mana_text(CardManager.mana_of(current))])
 			AudioManager.play("turn_start")
 	_update_turn_indicator()
 	_refresh_deck_button()
 	_refresh_pass_button()
 	_refresh_hand_interactivity()
 	_refresh_action_buttons()
+	_refresh_trash_button()
 	# Oyuncu kartlarında mana yazıyor: her hamlede güncellenir.
 	_rebuild_player_panel()
 
@@ -586,10 +590,18 @@ func _update_turn_indicator_text() -> void:
 	var timer := "" if CardManager.is_turn_blocked() else "\nSüre: %s" % GameRules.format_seconds(CardManager.turn_seconds_left())
 	turn_indicator_label.text = "Sıra: %s%s%s" % [pname, suffix, timer]
 
+## Çöp kutusu sadece sıra sendeyken ve elinde kart varken belirgin.
+func _refresh_trash_button() -> void:
+	if _trash_button == null:
+		return
+	var me := multiplayer.get_unique_id()
+	var usable: bool = CardManager.can_act() and not CardManager.my_inventory().is_empty()
+	_trash_button.modulate.a = 1.0 if usable else 0.35
+
 func _refresh_deck_button() -> void:
 	deck_button.disabled = not CardManager.can_draw()
 	deck_button.modulate.a = 1.0 if not deck_button.disabled else 0.5
-	deck_button.tooltip_text = "Kart çek (bedava, yılda 1). Her seçimden sonra herkese 1 kart hediye."
+	deck_button.tooltip_text = "Kart çek (bedava, dönemde 1). Her seçimden sonra herkese 1 kart hediye."
 
 func _refresh_pass_button() -> void:
 	pass_button.disabled = not CardManager.can_act()
@@ -921,7 +933,9 @@ func _finish_drag() -> void:
 		if String(target["error"]) != "":
 			_show_toast(target["error"])
 		return
-	if hand_index == LAW_DRAG_INDEX:
+	if bool(target.get("discard", false)):
+		CardManager.discard_card(hand_index)
+	elif hand_index == LAW_DRAG_INDEX:
 		_law_designer.hide()
 		CardManager.propose_law(card_type)
 	elif card_type == CardPresets.PROPAGANDA_CARD_TYPE:
@@ -951,7 +965,14 @@ func _end_drag() -> void:
 ##   parliament: imleç parlamento diyagramının üstünde mi (meclis kartları)
 func _drop_target(card_type: String) -> Dictionary:
 	var me := multiplayer.get_unique_id()
-	var result := {"valid": false, "peer": -1, "province": "", "label": "", "error": "", "parliament": false}
+	var result := {"valid": false, "peer": -1, "province": "", "label": "", "error": "",
+		"parliament": false, "discard": false}
+	# ÇÖP her kartı kabul eder (yasa tasarımı hariç): bedelin yarısı geri gelir.
+	if _trash_button != null and card_type != "" and not CardPresets.is_law_card(card_type) 			and _trash_button.get_global_rect().has_point(get_viewport().get_mouse_position()):
+		result["valid"] = true
+		result["discard"] = true
+		result["label"] = "Bırak: kartı çöpe at (+%s mana)" % CardManager.mana_text(CardManager.discard_refund(card_type))
+		return result
 	if CardPresets.needs_party_target(card_type) and not CardPresets.needs_target(card_type):
 		# Kaset / parti içi isyan: hedef, kendisi dışında herhangi bir parti.
 		var other := _party_under_mouse()
@@ -1011,7 +1032,7 @@ func _drop_target(card_type: String) -> Dictionary:
 			result["label"] = "%s: parlamento diyagramının üstüne bırak" % law["title"]
 		elif CardManager.can_propose_law(me, card_type):
 			result["valid"] = true
-			result["label"] = "Bırak: %s %s (bedava, yılda 1)" % [law["title"],
+			result["label"] = "Bırak: %s %s (bedava, dönemde 1)" % [law["title"],
 				"seçim vaadi olarak açıklanır" if CardManager.last_seats.is_empty() else "meclise sunulur"]
 		else:
 			result["label"] = _action_block_reason(GameRules.LAW_MANA_COST, true)
@@ -1484,7 +1505,7 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 		info.add_child(_avatar_label(_leader_name_of(peer_id) + ("  (Sen)" if is_self else ""), UiTheme.FS_TINY, UiTheme.TEXT_MUTED))
 	if _avatar_height >= 58.0:
 		var seats_text := ("%d vekil · " % int(CardManager.last_seats[peer_id])) if CardManager.last_seats.has(peer_id) else ""
-		info.add_child(_avatar_label("%s%d mana" % [seats_text, CardManager.mana_of(peer_id)], UiTheme.FS_TINY, UiTheme.TEXT_MUTED))
+		info.add_child(_avatar_label("%s%s mana" % [seats_text, CardManager.mana_text(CardManager.mana_of(peer_id))], UiTheme.FS_TINY, UiTheme.TEXT_MUTED))
 
 	var populism_left := CardManager.populism_rounds_left(peer_id)
 	if is_self or is_turn or populism_left > 0:
@@ -1762,6 +1783,11 @@ func _place_right_column_controls() -> void:
 	deck_button.offset_top = -182.0
 	deck_button.offset_bottom = -106.0
 	_sync_shadow(_deck_shadow, deck_button)
+	if _trash_button != null:
+		_trash_button.offset_left = deck_button.offset_left - 62.0
+		_trash_button.offset_right = deck_button.offset_left - 8.0
+		_trash_button.offset_top = deck_button.offset_top + 20.0
+		_trash_button.offset_bottom = deck_button.offset_bottom
 	pass_button.add_theme_font_size_override("font_size", 14)
 	var panel := player_panel_list.get_parent() as Control
 	if panel != null:
@@ -1769,6 +1795,21 @@ func _place_right_column_controls() -> void:
 		panel.offset_bottom = -302.0  # altında deste ve hamle butonları
 	pass_button.offset_left = -134.0
 	pass_button.offset_top = -140.0
+
+## ÇÖP KUTUSU: istemediğin kartı buraya sürükle, bedelinin yarısı mana olarak
+## geri gelir. Tıklanabilir bir buton değil, bırakma hedefi.
+func _build_trash_button() -> void:
+	_trash_button = Button.new()
+	_trash_button.text = "ÇÖP"
+	_trash_button.focus_mode = Control.FOCUS_NONE
+	_trash_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_trash_button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	_trash_button.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_trash_button.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_trash_button.add_theme_font_size_override("font_size", UiTheme.FS_TINY)
+	UiSkin.skin_color_button(_trash_button, UiTheme.PANEL_LIGHT)
+	_trash_button.tooltip_text = "Kartı buraya sürükle: at ve bedelinin yarısı kadar mana al."
+	add_child(_trash_button)
 
 func _build_action_buttons() -> void:
 	# Mana göstergesi: pas butonunun solunda simge + sayı. Dokununca kurallar.
@@ -1799,7 +1840,7 @@ func _build_action_buttons() -> void:
 	_mana_box.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_show_toast(_mana_rules))
-	_mana_rules = "Sıran gelince +%d mana (hükümette görevin varsa +%d); manan yettikçe istediğin kadar hamle yap, biriken mana kalır.\nHamleler: yasa BEDAVA (yılda 1), miting %d, teşkilat %d (seviye başına), yatırım %d, gensoru %d mana.\nKart çekmek bedava (yılda 1), kart oynamak sınırsız. Kartlar bonus: karalama %d, vekil çalma %d/%d, kaset %d, isyan %d, popülizm %d, mana bonusu %d.\nTur kendiliğinden bitmez: \"Turu Bitir\"e bas. Seçimden sonra herkese +%d kart ve +%d mana, yeni hükümete +%d mana." % [
+	_mana_rules = "Sıran gelince +%d mana (hükümette görevin varsa +%d); manan yettikçe istediğin kadar hamle yap, biriken mana kalır.\nHamleler: yasa BEDAVA (dönemde 1), miting %d, teşkilat %d (seviye başına), yatırım %d, gensoru %d mana.\nKart çekmek bedava (dönemde 1), kart oynamak sınırsız. Kartlar bonus: karalama %d, vekil çalma %d/%d, kaset %d, isyan %d, popülizm %d, mana bonusu %d.\nTur kendiliğinden bitmez: \"Turu Bitir\"e bas. Seçimden sonra herkese +%d kart ve +%d mana, yeni hükümete +%d mana." % [
 		GameRules.MANA_PER_ROUND, GameRules.MANA_PER_ROUND_GOVERNMENT, GameRules.MITING_MANA_COST, GameRules.ORG_MANA_COST,
 		GameRules.INVEST_MANA_COST, GameRules.CENSURE_MANA_COST,
 		CardPresets.card_cost("karalama"), CardPresets.card_cost("steal_weak"), CardPresets.card_cost("steal_strong"),
@@ -1848,7 +1889,7 @@ func _action_block_reason(cost: int, is_law: bool = false) -> String:
 	if not CardManager.can_act():
 		return "Sıran değil."
 	if is_law and CardManager.has_proposed_law_this_round(me):
-		return "Bu yıl zaten bir yasa sundun (yılda 1 yasa)."
+		return "Bu dönem zaten bir yasa sundun (dönemde 1 yasa)."
 	if CardManager.mana_of(me) < cost:
 		return "Manan yetmiyor (%d gerekli)." % cost
 	return "Şu an yapılamaz."
@@ -1858,7 +1899,7 @@ func _refresh_action_buttons() -> void:
 		return
 	var me := multiplayer.get_unique_id()
 	var mana_now := CardManager.mana_of(me)
-	_mana_label.text = str(mana_now)
+	_mana_label.text = CardManager.mana_text(mana_now)
 	var law_ok := CardManager.can_propose_law(me)
 	var org_ok := CardManager.can_choose_main_action(me) and mana_now >= GameRules.ORG_MANA_COST
 	var miting_ok := CardManager.can_miting(me)
@@ -1967,7 +2008,7 @@ func _refresh_law_designer() -> void:
 		GameRules.LAW_MANA_COST]
 	var current := CardManager.agenda_type()
 	if current == "":
-		_law_agenda_label.text = "Gündem yok: bu yıl yasa sunulamaz."
+		_law_agenda_label.text = "Gündem yok: bu dönem yasa sunulamaz."
 	else:
 		var data := CardPresets.agenda_data(current)
 		_law_agenda_label.text = "Gündem: %s — sadece %s yasaları" % [data["title"], data["axis_title"]]
@@ -2072,7 +2113,7 @@ func _law_circle(axis: String, dir: int) -> Control:
 func _start_law_drag(law_type: String) -> void:
 	var current := CardManager.agenda_type()
 	if current != "" and CardPresets.law_data(law_type)["axis"] != CardPresets.agenda_data(current)["axis"]:
-		_show_toast("Bu eksen gündemde değil: bu yıl sadece %s yasaları sunulabilir." % CardPresets.agenda_data(current)["axis_title"])
+		_show_toast("Bu eksen gündemde değil: bu dönem sadece %s yasaları sunulabilir." % CardPresets.agenda_data(current)["axis_title"])
 		return
 	if not CardManager.can_propose_law(multiplayer.get_unique_id(), law_type):
 		_show_toast(_action_block_reason(GameRules.LAW_MANA_COST, true))

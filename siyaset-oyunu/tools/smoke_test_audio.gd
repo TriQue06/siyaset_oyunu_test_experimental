@@ -63,12 +63,25 @@ func _initialize() -> void:
 	gm.votes = {}
 	gm.proposal_changed.emit()
 	check("gensoru oylamasi acilinca ses caldi", heard.call("censure_open"))
-	gm.votes = {1: gm.VOTE_YES, 2: gm.VOTE_NO, 3: gm.VOTE_ABSTAIN}
+	var me: int = root.multiplayer.get_unique_id()
+	gm.votes = {me: gm.VOTE_YES}
 	gm.proposal_changed.emit()
-	check("evet/hayir/cekimser seslendi", heard.call("vote_yes") and heard.call("vote_no") and heard.call("vote_abstain"))
+	check("kendi EVET oyun seslendi", heard.call("vote_yes"))
 	am._last_played.erase("vote_yes")
 	gm.proposal_changed.emit()
 	check("ayni oy ikinci kez seslenmez", not heard.call("vote_yes"))
+	gm.votes[901] = gm.VOTE_NO
+	gm.votes[902] = gm.VOTE_ABSTAIN
+	gm.proposal_changed.emit()
+	check("baskalarinin oyu seslenmez", not heard.call("vote_no") and not heard.call("vote_abstain"))
+	am._last_played.clear()
+	gm.proposal_kind = gm.KIND_LAW
+	gm.votes = {}
+	gm.proposal_changed.emit()
+	gm.votes = {me: gm.VOTE_NO}
+	gm.proposal_changed.emit()
+	check("kendi HAYIR oyun seslendi", heard.call("vote_no"))
+	check("yasa oylamasinda gensoru cingili calmaz", not heard.call("censure_open"))
 	am._last_played.clear()
 	gm.proposal_resolved.emit(true, gm.KIND_LAW, 1)
 	check("yasa gecti sesi", heard.call("law_passed"))

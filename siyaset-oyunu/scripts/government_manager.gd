@@ -44,6 +44,8 @@ enum Phase { IDLE, FORMING, VOTING, GOVERNING }
 const KIND_GOVERNMENT := "government"
 const KIND_CENSURE := "censure"
 const KIND_LAW := "law"
+## Erken seçim önergesi: basit çoğunlukla kabul edilir.
+const KIND_EARLY := "early"
 ## Bir partinin hükümet kurma hakkı (3. teklif de geçmezse sıra devreder).
 const MAX_ATTEMPTS := 3
 ## Hükümet teklifinin oylama aşamaları (bkz. AKIŞ 4).
@@ -447,6 +449,23 @@ func _request_withdraw() -> void:
 func _notify_coalition(text: String) -> void:
 	coalition_changed.emit(text)
 
+## ERKEN SEÇİM ÖNERGESİ (erken seçim kartı oynanınca CardManager çağırır).
+## Yasalarla aynı akış: basit çoğunluk (EVET vekilleri HAYIR'dan fazla).
+func submit_early_election(peer_id: int) -> bool:
+	if not _is_authority() or not can_submit_law():
+		return false
+	_clear_proposal()
+	proposal_kind = KIND_EARLY
+	proposal_peer_id = peer_id
+	proposal_gov_ids = government_party_ids()
+	votes = {peer_id: VOTE_YES}
+	_set_phase(Phase.VOTING)
+	if _all_voted():
+		_begin_resolution()
+	else:
+		_push_state()
+	return true
+
 ## Yasa teklifi (yasa kartı oynanınca CardManager çağırır).
 func submit_law(peer_id: int, law_type: String) -> bool:
 	if not _is_authority() or not can_submit_law() or not CardPresets.is_law_card(law_type):
@@ -579,6 +598,21 @@ func _resolve_proposal() -> void:
 		if not _is_local_only():
 			_notify_resolved.rpc(passed, kind, proposer)
 		proposal_resolved.emit(passed, kind, proposer)
+		return
+
+	if kind == KIND_EARLY:
+		var early_passed: bool = totals.x > totals.y
+		_clear_proposal()
+		_set_phase(Phase.GOVERNING if has_government() else Phase.IDLE)
+		last_resolution_reason = "Erken seçim önergesi %s (EVET %d – HAYIR %d)." % [
+			"KABUL EDİLDİ" if early_passed else "reddedildi", totals.x, totals.y]
+		if early_passed:
+			CardManager.schedule_early_election()
+			last_resolution_reason += " Dönem sonunda sandığa gidiliyor."
+		_push_state()
+		if not _is_local_only():
+			_notify_resolved.rpc(early_passed, kind, proposer)
+		proposal_resolved.emit(early_passed, kind, proposer)
 		return
 
 	if kind == KIND_GOVERNMENT and proposal_stage == STAGE_COALITION:

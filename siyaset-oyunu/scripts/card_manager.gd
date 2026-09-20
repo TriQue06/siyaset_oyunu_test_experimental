@@ -73,6 +73,7 @@ const WEIGHT_STEAL_WEAK := 12.0
 const WEIGHT_REPUTATION := 9.0
 const WEIGHT_REBELLION := 9.0
 const WEIGHT_STEAL_STRONG := 9.0
+const WEIGHT_EARLY_ELECTION := 6.0
 
 ## Koltuk SAYILARI GERÇEK: TBMM'nin il bazlı milletvekili dağılımı (bkz.
 ## data/province_seats.json). Bu değer dosyadaki sayıların toplamıdır.
@@ -118,6 +119,10 @@ var last_province_results: Dictionary = {}
 var passed_threshold: Array = []
 ## peer_id -> int: son seçimde kazanılan vekil (vekil momentumu bununla ölçülür).
 var election_seats: Dictionary = {}
+## Meclis erken seçim önergesini kabul etti: bu dönemin sonunda sandık kurulur.
+var early_election_pending: bool = false
+## Seçim takviminin çıpası (erken seçimden sonra kayar; 0 = varsayılan).
+var election_anchor: int = 0
 ## Son seçimin girdileri (sadece host/yerel; denge analizi için, senkronlanmaz).
 var last_election_inputs: Dictionary = {}
 
@@ -333,16 +338,32 @@ func can_build_organization(peer_id: int, province_id: String) -> bool:
 func is_valid_steal_target(peer_id: int, target_peer_id: int) -> bool:
 	if target_peer_id == -1 or target_peer_id == peer_id:
 		return false
-	# Vekilsiz (meclis dışı / barajı geçemeyen) parti vekil çalamaz: yoksa baraj delinir.
-	if not has_seats(peer_id):
+	# Meclis dışı parti de vekil çalabilir (ilk seçimden sonra), ama etkisi
+	# YARI YARIYA (bkz. steal_efficiency) ve bu ceza sonraki seçime kadar sürer.
+	if last_seats.is_empty():
 		return false
 	# Hedefin vekili çalınacak sayıdan azsa hepsi gidebilir (0'a iner).
 	return has_seats(target_peer_id)
+
+## SEÇİMDE BARAJ ALTINDA KALAN parti çaldığı vekillerin yarısını alır. Kart
+## sayesinde meclise girse bile ceza sonraki seçime kadar devam eder — ölçüt
+## son SEÇİMDEKİ sonuç (election_seats), o anki vekil sayısı değil.
+func steal_efficiency(peer_id: int) -> float:
+	if int(election_seats.get(peer_id, 0)) > 0:
+		return 1.0
+	return PublicOpinion.STEAL_OUTSIDER_EFFICIENCY
+
+## Bu parti son seçimde meclis dışında mı kaldı?
+func is_outside_parliament(peer_id: int) -> bool:
+	return int(election_seats.get(peer_id, 0)) <= 0
 
 ## Bu kart şu an bu hedeflerle oynanabilir mi? (Host doğrulaması ve UI.)
 func can_play_card(peer_id: int, card_type: String, target_peer_id: int = -1, target_province: String = "") -> bool:
 	if mana_of(peer_id) < CardPresets.card_cost(card_type):
 		return false
+	if card_type == CardPresets.EARLY_ELECTION_CARD_TYPE:
+		# Meclis gerekir, oylama açık olmamalı, zaten erken seçim kararı yoksa.
+		return has_seats(peer_id) and not early_election_pending 			and GovernmentManager.can_submit_law()
 	if CardPresets.needs_target(card_type):
 		return is_valid_steal_target(peer_id, target_peer_id)
 	if card_type == CardPresets.REPUTATION_CARD_TYPE:
@@ -605,6 +626,9 @@ func init_game() -> void:
 	last_province_results = {}
 	passed_threshold = []
 	election_seats = {}
+	early_election_pending = false
+	election_anchor = 0
+	GameRules.set_election_anchor(0)
 	national_support = {}
 	local_support = {}
 	province_events = {}
@@ -633,6 +657,9 @@ func abandon_game() -> void:
 	last_province_results = {}
 	passed_threshold = []
 	election_seats = {}
+	early_election_pending = false
+	election_anchor = 0
+	GameRules.set_election_anchor(0)
 	national_support = {}
 	local_support = {}
 	province_events = {}
@@ -681,6 +708,9 @@ func _draw_weights(peer_id: int = -1) -> Dictionary:
 	if not last_seats.is_empty():
 		weights[CardPresets.STEAL_WEAK_CARD_TYPE] = WEIGHT_STEAL_WEAK
 		weights[CardPresets.STEAL_STRONG_CARD_TYPE] = WEIGHT_STEAL_STRONG
+	# Erken seçim ancak meclis varken anlamlı.
+	if not last_seats.is_empty():
+		weights[CardPresets.EARLY_ELECTION_CARD_TYPE] = WEIGHT_EARLY_ELECTION
 	weights[CardPresets.POPULISM_CARD_TYPE] = WEIGHT_POPULISM
 	weights[CardPresets.MANA_BONUS_CARD_TYPE] = WEIGHT_MANA_BONUS
 	return weights
@@ -919,6 +949,9 @@ func _apply_card_effect(peer_id: int, card_type: String, target_peer_id: int = -
 			# Bölünmüş parti sadece oylamada değil sandıkta da kaybeder.
 			_add_national(target_peer_id, -PublicOpinion.REBELLION_NATIONAL_DAMAGE)
 			_event_message = "%s'da parti içi isyan çıktı: sıradaki yasa oylamasında çekimser kalacak, ulusal desteği düştü." % _party_name(target_peer_id)
+		CardPresets.EARLY_ELECTION_CARD_TYPE:
+			GovernmentManager.submit_early_election(peer_id)
+			_event_message = "%s erken seçim önergesi verdi." % _party_name(peer_id)
 		CardPresets.POPULISM_CARD_TYPE:
 			populism[peer_id] = round_number + GameRules.POPULISM_ROUNDS
 			_event_message = "%s popülizme başladı: %d dönem boyunca hamleleri daha etkili." % [_party_name(peer_id), GameRules.POPULISM_ROUNDS]
@@ -1174,6 +1207,8 @@ func _apply_steal(peer_id: int, target_peer_id: int, card_type: String) -> bool:
 	var wanted: int = _rng.randi_range(int(range_info["min"]), int(range_info["max"]))
 	if populism_rounds_left(peer_id) > 0:
 		wanted = int(round(wanted * PublicOpinion.POPULISM_STEAL_MULT))
+	# Meclis dışı parti yarı verimle çalar.
+	wanted = maxi(1, int(round(wanted * steal_efficiency(peer_id))))
 	var amount: int = mini(wanted, int(last_seats[target_peer_id]))
 	if amount <= 0:
 		return false
@@ -1258,8 +1293,15 @@ func ideological_closeness(a: int, b: int) -> float:
 	return clampf(1.0 - IdeologyAxes.distance(ia, ib) / IdeologyAxes.max_distance(), 0.0, 1.0)
 
 ## Bu partinin hedeften bu kartla çalabileceği vekil aralığı (yakınlığa göre).
+## Kartın vereceği vekil aralığı. Meclis dışı partide yarıya iner (arayüzde de
+## bu aralık gösterilir, sürpriz olmasın).
 func steal_range(peer_id: int, target_peer_id: int, card_type: String) -> Dictionary:
-	return CardPresets.steal_range(card_type, ideological_closeness(peer_id, target_peer_id))
+	var base := CardPresets.steal_range(card_type, ideological_closeness(peer_id, target_peer_id))
+	var efficiency := steal_efficiency(peer_id)
+	if is_equal_approx(efficiency, 1.0):
+		return base
+	return {"min": maxi(1, int(round(int(base["min"]) * efficiency))),
+		"max": maxi(1, int(round(int(base["max"]) * efficiency)))}
 
 ## Sırayı bir sonrakine devreder; index başa sardıysa (tur bitti) true döner.
 func _advance_turn() -> bool:
@@ -1303,6 +1345,10 @@ func _finish_round_if_needed(wrapped: bool) -> void:
 		return
 	_finish_round()
 
+## Meclis erken seçimi kabul etti (GovernmentManager çağırır).
+func schedule_early_election() -> void:
+	early_election_pending = true
+
 func _finish_round() -> void:
 	_round_end_pending = false
 	# Biten turda görevde olan hükümet görev puanlarını KAZANIR (birikimli).
@@ -1318,6 +1364,16 @@ func _finish_round() -> void:
 		# SON SEÇİM: kurulan hükümet puanlarını alınca oyun biter (bkz. on_block_state_changed).
 		final_election_pending = true
 		_hold_election(finished_round, false)
+		return
+
+	# ERKEN SEÇİM: meclis karar verdiyse bu dönemin sonunda sandık kurulur ve
+	# takvim bu tura sabitlenir — sonraki seçimler buradan itibaren sayılır.
+	if early_election_pending:
+		early_election_pending = false
+		election_anchor = finished_round
+		GameRules.set_election_anchor(election_anchor)
+		_hold_election(finished_round, false)
+		_schedule_agenda()
 		return
 
 	var scheduled := GameRules.is_election_round(finished_round)
@@ -1499,6 +1555,8 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"vote_shares": last_vote_shares,
 		"seats": last_seats,
 		"election_seats": election_seats,
+		"early_election_pending": early_election_pending,
+		"election_anchor": election_anchor,
 		"passed": passed_threshold,
 		"national": national_support,
 		"local": local_support,
@@ -1533,6 +1591,10 @@ func _apply_state(state: Dictionary) -> void:
 	last_vote_shares = state["vote_shares"]
 	last_seats = state["seats"]
 	election_seats = state.get("election_seats", {})
+	early_election_pending = bool(state.get("early_election_pending", false))
+	election_anchor = int(state.get("election_anchor", 0))
+	# Takvim çıpası her istemcide aynı olmalı (erken seçim sonrası).
+	GameRules.set_election_anchor(election_anchor)
 	passed_threshold = state["passed"]
 	national_support = state["national"]
 	local_support = state["local"]

@@ -39,6 +39,10 @@ const INVEST_CARD_TYPE := "yatirim"
 const POLL_CARD_TYPE := "anket"
 const SCOUT_CARD_TYPE := "gozcu"
 const PROPAGANDA_CARD_TYPE := "karalama"
+## ERKEN SEÇİM: meclise getirilir, kabul edilirse dönem sonunda sandığa gidilir
+## ve seçim takvimi o tarihten itibaren yeniden işler.
+const EARLY_ELECTION_CARD_TYPE := "erken_secim"
+
 ## Hedefsiz bonus kartlar: seçip tekrar dokununca (ya da yukarı sürükleyince) oynanır.
 const POPULISM_CARD_TYPE := "populizm"
 const MANA_BONUS_CARD_TYPE := "mana_bonusu"
@@ -134,12 +138,14 @@ const CARD_MANA_COSTS := {
 	"steal_strong": 3,
 	"kaset": 2,
 	"isyan": 1,
+	"erken_secim": 3,
 }
 
 ## Kendi görseli olmayan kartlar geçici olarak başka bir kartın görselini kullanır.
 const CARD_ART_ALIAS := {
 	"kaset": "steal_medium",
 	"isyan": "gensoru",
+	"erken_secim": "gensoru",
 }
 
 var _card_textures: Dictionary = {}
@@ -175,7 +181,11 @@ func needs_province_target(card_type: String) -> bool:
 
 ## Hedef gerektirmeyen bonus kart mı? (popülizm, mana bonusu)
 func is_self_card(card_type: String) -> bool:
-	return card_type in [POPULISM_CARD_TYPE, MANA_BONUS_CARD_TYPE] or is_agenda_card(card_type)
+	return card_type in [POPULISM_CARD_TYPE, MANA_BONUS_CARD_TYPE, EARLY_ELECTION_CARD_TYPE] 		or is_agenda_card(card_type)
+
+## Meclise sunulan (oylanan) kart mı?
+func is_parliament_card(card_type: String) -> bool:
+	return card_type == EARLY_ELECTION_CARD_TYPE or is_law_card(card_type)
 
 func is_agenda_card(card_type: String) -> bool:
 	return AGENDAS.has(card_type)
@@ -244,6 +254,8 @@ func card_short_title(card_type: String) -> String:
 			return "POPÜLİZM\nBONUSU"
 		"mana_bonusu":
 			return "MANA\nBONUSU"
+		"erken_secim":
+			return "ERKEN\nSEÇİM"
 		"steal_weak":
 			return "VEKİL ÇALMA\nZAYIF"
 		"steal_medium":
@@ -284,6 +296,8 @@ func card_title(card_type: String) -> String:
 			return "Popülizm Bonusu"
 		"mana_bonusu":
 			return "Mana Bonusu"
+		"erken_secim":
+			return "Erken Seçim"
 	return card_type
 
 ## Yasanın yönünü okunur yazar: "Ekonomi → Piyasacı".
@@ -341,6 +355,11 @@ func _card_effect_text(card_type: String) -> String:
 			return ("Seçtiğin partide isyan çıkar: sıradaki İLK yasa" + "\n"
 				+ "oylamasında çekimser kalmak zorunda kalır." + "\n"
 				+ "Sağdaki bir parti kartına sürükle.")
+		EARLY_ELECTION_CARD_TYPE:
+			return ("Meclise erken seçim önerisi sunarsın." + "\n"
+				+ "Kabul edilirse dönem sonunda sandığa gidilir ve" + "\n"
+				+ "seçim takvimi o tarihten itibaren yeniden işler." + "\n"
+				+ "Meclis diyagramına sürükle.")
 		CENSURE_CARD_TYPE:
 			return "Hükümeti düşürmek için gensoru ver.\nMeclis diyagramına sürükle."
 		MITING_CARD_TYPE:

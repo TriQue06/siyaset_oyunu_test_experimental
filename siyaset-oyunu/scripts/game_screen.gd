@@ -1037,6 +1037,17 @@ func _drop_target(card_type: String) -> Dictionary:
 		else:
 			result["label"] = _action_block_reason(GameRules.LAW_MANA_COST, true)
 			result["error"] = result["label"]
+	elif card_type == CardPresets.EARLY_ELECTION_CARD_TYPE:
+		var over_parliament := parliament_diagram.get_global_rect().has_point(get_viewport().get_mouse_position())
+		result["parliament"] = over_parliament
+		if not over_parliament:
+			result["label"] = "Erken seçim önergesi: parlamento diyagramının üstüne bırak"
+		elif CardManager.can_play_card(me, card_type):
+			result["valid"] = true
+			result["label"] = "Bırak: erken seçim önergesi sun (meclis oylar)"
+		else:
+			result["label"] = _unplayable_reason(card_type)
+			result["error"] = result["label"]
 	elif CardPresets.is_self_card(card_type):
 		var above_hand := get_viewport().get_mouse_position().y < hand_area.get_global_rect().position.y
 		if not above_hand:

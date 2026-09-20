@@ -113,7 +113,15 @@ func _initialize() -> void:
 	check("gecerli hedef", cm.is_valid_steal_target(1, 3))
 	var seats1: int = cm.last_seats[1]
 	cm.last_seats[1] = 0
-	check("vekilsiz (meclis disi) parti vekil calamaz", not cm.is_valid_steal_target(1, 3))
+	# Meclis dışı parti de çalabilir ama YARI verimle (son seçimde baraj altı).
+	cm.election_seats = {1: 0, 3: 110}
+	check("meclis disi parti de calabilir", cm.is_valid_steal_target(1, 3))
+	check("meclis disi yari verim", is_equal_approx(cm.steal_efficiency(1), 0.5), str(cm.steal_efficiency(1)))
+	var full: Dictionary = cp.steal_range("steal_strong", cm.ideological_closeness(1, 3))
+	var halved: Dictionary = cm.steal_range(1, 3, "steal_strong")
+	check("araliklar yariya indi", int(halved["max"]) <= int(full["max"]) / 2 + 1, "%s vs %s" % [halved, full])
+	cm.election_seats = {1: 150, 3: 110}
+	check("mecliste tam verim", is_equal_approx(cm.steal_efficiency(1), 1.0))
 	cm.last_seats[1] = seats1
 	cm._apply_steal(1, 2, "steal_strong")
 	check("toplam sandalye DEGISMEDI (sifir toplamli)", gm.total_seats() == before_total,

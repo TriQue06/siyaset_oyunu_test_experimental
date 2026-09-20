@@ -31,6 +31,8 @@ const LAW_BASE_SCORE := 1.0
 const LAW_EVERY_ROUNDS := 2
 ## Muhalefetteki bot, hükümete bu mesafeden yakınsa gensoruda çekimser kalır.
 const CENSURE_LOYALTY_DISTANCE := 1.2
+## Erken seçime EVET demek için gereken ulusal kamuoyu eşiği.
+const EARLY_ELECTION_SUPPORT := 1.0
 ## Koalisyon ortağı, sandalye payına düşen makam puanının en az bu oranını ister.
 const COALITION_FAIR_SHARE := 0.75
 ## Ortak olacak parti en az bu kadar makam puanı ister (1 bakanlık yetmez).
@@ -583,6 +585,22 @@ static func choose_vote(bot: int) -> int:
 				return GovernmentManager.VOTE_YES
 			return _best_law_vote(bot, GovernmentManager.proposal_law, GovernmentManager.proposal_peer_id,
 				GovernmentManager.proposal_gov_ids, _known_centers(bot))
+		GovernmentManager.KIND_EARLY:
+			if bot == GovernmentManager.proposal_peer_id:
+				return GovernmentManager.VOTE_YES
+			return _early_election_vote(bot)
+	return GovernmentManager.VOTE_ABSTAIN
+
+## ERKEN SEÇİM ÖNERGESİ: iktidardaki bot sandığa gitmek istemez; muhalefetteki
+## bot ancak kamuoyu kendisine yarıyorsa evet der (yoksa meclisini kaybeder).
+static func _early_election_vote(bot: int) -> int:
+	if CardManager.is_government_party(bot):
+		return GovernmentManager.VOTE_NO
+	var support := CardManager.national_of(bot)
+	if support > EARLY_ELECTION_SUPPORT:
+		return GovernmentManager.VOTE_YES
+	if support < -EARLY_ELECTION_SUPPORT:
+		return GovernmentManager.VOTE_NO
 	return GovernmentManager.VOTE_ABSTAIN
 
 ## ORTAK OLARAK ÇAĞRILAN BOT (koalisyon görüşmesi): teklif edilen makamların

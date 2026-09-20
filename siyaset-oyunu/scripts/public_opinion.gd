@@ -153,6 +153,10 @@ const POLL_ERROR := 0.2
 ## Vekil transferi seçmene meşru görünmez: ÇALAN parti çalınan vekil başına
 ## küçük bir ulusal destek kaybeder, ÇALINAN parti "mağduriyet" olarak küçük bir
 ## destek kazanır. İkisi de kısmidir: hamleyi caydırmaz, bedava da bırakmaz.
+## MECLİS DIŞI PARTİ (son seçimde baraj altı) vekil çalarken yarı verimlidir.
+## Kartla meclise girse bile ceza sonraki seçime kadar sürer.
+const STEAL_OUTSIDER_EFFICIENCY := 0.5
+
 ## Vekil çalmanın ulusal bedeli neredeyse simgesel: oyuncular çalmaktan
 ## caymasın, sadece "bedava değil" hissi kalsın.
 const STEAL_THIEF_NATIONAL_PER_SEAT := -0.008

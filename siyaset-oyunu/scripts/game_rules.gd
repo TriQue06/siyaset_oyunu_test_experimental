@@ -53,11 +53,22 @@ static var ELECTION_INTERVAL: int = DEFAULT_ELECTION_INTERVAL * ROUNDS_PER_YEAR
 static var FIRST_ELECTION_ROUND: int = DEFAULT_ELECTION_INTERVAL * ROUNDS_PER_YEAR
 static var MAX_ROUNDS: int = DEFAULT_ELECTION_INTERVAL * ROUNDS_PER_YEAR * DEFAULT_ELECTION_COUNT
 
+## Seçim takviminin ÇIPASI: seçimler bu turdan itibaren ELECTION_INTERVAL'de
+## bir yapılır. Normalde ilk seçim turudur; ERKEN SEÇİM kabul edilince o tura
+## kayar ve takvim oradan devam eder.
+static var ELECTION_ANCHOR: int = DEFAULT_ELECTION_INTERVAL * ROUNDS_PER_YEAR
+
 static func configure(interval_years: int, count: int) -> void:
 	ELECTION_INTERVAL_YEARS = clampi(interval_years, ELECTION_INTERVAL_MIN, ELECTION_INTERVAL_MAX)
 	ELECTION_INTERVAL = ELECTION_INTERVAL_YEARS * ROUNDS_PER_YEAR
 	FIRST_ELECTION_ROUND = ELECTION_INTERVAL
+	ELECTION_ANCHOR = FIRST_ELECTION_ROUND
 	MAX_ROUNDS = ELECTION_INTERVAL * clampi(count, ELECTION_COUNT_MIN, ELECTION_COUNT_MAX)
+
+## Erken seçim yapıldı: takvim bu tura sabitlenir, sonraki seçimler buradan
+## itibaren aynı aralıkla gelir. 0 = varsayılan takvim.
+static func set_election_anchor(round_number: int) -> void:
+	ELECTION_ANCHOR = FIRST_ELECTION_ROUND if round_number <= 0 else round_number
 
 const MANA_START := 0
 const MANA_PER_ROUND := 3
@@ -140,8 +151,13 @@ static func election_year(round_number: int) -> int:
 
 static func is_election_round(round_number: int) -> bool:
 	# Son turun sonunda da seçim yapılır (son seçim); oyun hükümet kurulunca biter.
-	return round_number >= FIRST_ELECTION_ROUND and round_number <= MAX_ROUNDS \
-		and (round_number - FIRST_ELECTION_ROUND) % ELECTION_INTERVAL == 0
+	if round_number > MAX_ROUNDS:
+		return false
+	if round_number == MAX_ROUNDS:
+		return true
+	# Takvim ELECTION_ANCHOR turundan itibaren işler (erken seçim çıpayı kaydırır).
+	return round_number >= ELECTION_ANCHOR \
+		and (round_number - ELECTION_ANCHOR) % ELECTION_INTERVAL == 0
 
 ## round_number'dan (dahil) itibaren seçimin yapılacağı ilk tur; oyun
 ## bitmeden seçim kalmadıysa -1.

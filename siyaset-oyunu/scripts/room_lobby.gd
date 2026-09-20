@@ -196,16 +196,26 @@ func _build_player_card(peer_id: int, index: int, am_owner: bool, local_id: int)
 	row.add_child(info)
 
 	if am_owner and peer_id != local_id:
+		var actions := VBoxContainer.new()
+		actions.add_theme_constant_override("separation", UiTheme.GAP_S)
+		actions.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		var action := Button.new()
 		UiSkin.skin_button(action)
-		action.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		if is_bot:
 			action.text = "Çıkar"
 			action.pressed.connect(func(): MultiplayerManager.remove_bot(peer_id))
 		else:
 			action.text = "Sahipliği Devret"
 			action.pressed.connect(func(): MultiplayerManager.transfer_ownership(peer_id))
-		row.add_child(action)
+		actions.add_child(action)
+		if not is_bot:
+			# Oyuncu atma: sadece lobi sahibinde ve kendisi dışındakiler için.
+			var kick := Button.new()
+			UiSkin.skin_color_button(kick, UiTheme.RED)
+			kick.text = "Lobiden At"
+			kick.pressed.connect(func(): MultiplayerManager.kick_player(peer_id))
+			actions.add_child(kick)
+		row.add_child(actions)
 	return card
 
 ## Kartı sabit boyutlu bir slota yerleştirir; istenirse sağ üst köşesine

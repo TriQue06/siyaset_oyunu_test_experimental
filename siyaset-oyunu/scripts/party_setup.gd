@@ -16,8 +16,8 @@ extends Control
 ## ikon/renk butonları ile eksen satırları, veri kataloğuna bağlı olduğundan
 ## çalışma zamanında üretilir.
 
-const SWATCH_SIZE := 24.0
-const ICON_BUTTON_SIZE := 30.0
+const SWATCH_SIZE := 36.0
+const ICON_BUTTON_SIZE := 44.0
 const GRID_ICON_PIXEL_SIZE := 60       # ızgaradaki küçük ikonlar için raster boyutu
 const PREVIEW_ICON_PIXEL_SIZE := 480   # kocaman önizleme için raster boyutu
 ## Parti ikonları her zaman beyaz. Beyaz arka plan bu yüzden seçilemez
@@ -315,7 +315,7 @@ func _refresh_players_panel() -> void:
 			var edit_button := Button.new()
 			edit_button.text = "✎" if int(peer_id) != my_id else "Ben"
 			edit_button.tooltip_text = "Bu botun adını, logosunu ve rengini düzenle" if int(peer_id) != my_id else "Kendi partine dön"
-			edit_button.custom_minimum_size = Vector2(34, 30)
+			edit_button.custom_minimum_size = Vector2(UiTheme.TOUCH_MIN, UiTheme.TOUCH_MIN)
 			edit_button.modulate = UiTheme.GOLD if editing else Color.WHITE
 			edit_button.pressed.connect(_start_editing.bind(-1 if int(peer_id) == my_id else int(peer_id)))
 			row.add_child(edit_button)

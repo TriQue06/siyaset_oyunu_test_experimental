@@ -100,7 +100,7 @@ func _initialize() -> void:
 	rng.seed = 42
 	var parties := {1: ideology(1, 1, 2), 2: ideology(0, -1, 1), 3: ideology(-2, -2, -2)}
 	var r := ElectionModel.compute(parties, seat_file, voters, 0.0, 1.0, rng)
-	check("toplam 400 vekil (390 il + 10 ulusal liste)", int(sum_values(r["seats"])) == 400, str(r["seats"]))
+	check("toplam %d vekil (%d il + %d ulusal liste)" % [cm.TOTAL_SEATS, cm.TOTAL_SEATS - ElectionModel.NATIONAL_LIST_SEATS, ElectionModel.NATIONAL_LIST_SEATS], int(sum_values(r["seats"])) == cm.TOTAL_SEATS, str(r["seats"]))
 	check("oy oranlari toplami 100", absf(sum_values(r["vote_shares"]) - 100.0) < 0.01, str(sum_values(r["vote_shares"])))
 	check("secmene yakin parti daha cok oy aldi", float(r["vote_shares"][1]) > float(r["vote_shares"][3]), str(r["vote_shares"]))
 	var per_province_ok := true
@@ -116,9 +116,9 @@ func _initialize() -> void:
 	var share3: float = float(r["vote_shares"][3])
 	var rt := ElectionModel.compute(parties, seat_file, voters, share3 + 0.5, 1.0, rng)
 	check("baraj alti parti 0 vekil", int(rt["seats"][3]) == 0 and not rt["passed_threshold"].has(3), str(rt["seats"]))
-	check("baraj sonrasi yine 400", int(sum_values(rt["seats"])) == 400)
+	check("baraj sonrasi vekil sayisi ayni", int(sum_values(rt["seats"])) == cm.TOTAL_SEATS)
 	var r100 := ElectionModel.compute(parties, seat_file, voters, 100.0, 1.0, rng)
-	check("kimse gecemezse baraj uygulanmaz", int(sum_values(r100["seats"])) == 400 and r100["passed_threshold"].size() == 3)
+	check("kimse gecemezse baraj uygulanmaz", int(sum_values(r100["seats"])) == cm.TOTAL_SEATS and r100["passed_threshold"].size() == 3)
 	var expected := ElectionModel.expected_shares(parties, voters["konya"], 1.0)
 	check("beklenen paylar (anket) toplami 100", absf(sum_values(expected) - 100.0) < 0.01, str(expected))
 
@@ -145,7 +145,7 @@ func _initialize() -> void:
 	check("9 tur sonunda henuz secim yok", cm.last_seats.is_empty() and cm.round_number == 10)
 	mana_before_election = cm.mana.duplicate()
 	pass_round()
-	check("10. tur sonunda ilk secim yapildi", cm.last_election_round == 10 and int(sum_values(cm.last_seats)) == 400, str(cm.last_seats))
+	check("10. tur sonunda ilk secim yapildi", cm.last_election_round == 10 and int(sum_values(cm.last_seats)) == cm.TOTAL_SEATS, str(cm.last_seats))
 	check("tur 11'e gecildi", cm.round_number == 11)
 	var election_bonus_ok := true
 	for id in cm.turn_order:
@@ -297,12 +297,12 @@ func _initialize() -> void:
 	for id in projection.keys():
 		projected += int(projection[id]["seats"])
 	check("anlik vekil tahmini ilin vekil sayisina esit", projected == cm.province_seat_count("ankara"), str(projection))
-	cm.mana[1] = 2
+	cm.mana[1] = GameRules.ORG_MANA_COST
 	cm.inventories[1] = []
 	cm.has_drawn_this_turn = true  # bedava kart hakkı duruyorsa sıra kendiliğinden geçmez
-	check("2 mana ile il baskanligi kurulabilir", cm.can_build_organization(1, "ankara"))
+	check("teskilat kurulabilir", cm.can_build_organization(1, "ankara"))
 	cm._apply_organization(1, "ankara")
-	check("il baskanligi kuruldu, 2 mana harcandi; mana bitti -> sira devretmez", cm.organization_level("ankara", 1) == 1 		and cm.mana_of(1) == 0 and cm.current_turn_peer_id() == 1)
+	check("teskilat kuruldu, mana harcandi; mana bitti -> sira devretmez", cm.organization_level("ankara", 1) == 1 		and cm.mana_of(1) == 0 and cm.current_turn_peer_id() == 1)
 	cm.current_turn_index = cm.turn_order.find(1)
 	check("teskilat 1: az oy bonusu + il gorusu, anket yok", near(cm.activity_of("ankara", 1) - cm.local_of("ankara", 1), PublicOpinion.org_activity(1)) \
 		and cm.knows_leaning(1, "ankara") and cm.province_poll(1, "ankara").is_empty() and not cm.knows_leaning(2, "ankara"))
@@ -310,19 +310,19 @@ func _initialize() -> void:
 	cm.mana[1] = 20
 	for i in 5:
 		cm._apply_organization(1, "izmir")
-	check("en fazla seviye 3", cm.organization_level("izmir", 1) == GameRules.ORG_MAX_LEVEL and cm.mana_of(1) == 20 - 3 * GameRules.ORG_MANA_COST,
+	check("en fazla ORG_MAX_LEVEL", cm.organization_level("izmir", 1) == GameRules.ORG_MAX_LEVEL and cm.mana_of(1) == 20 - GameRules.ORG_MAX_LEVEL * GameRules.ORG_MANA_COST,
 		"seviye %d, mana %d" % [cm.organization_level("izmir", 1), cm.mana_of(1)])
-	check("seviye arttikca oy bonusu artar", PublicOpinion.org_activity(1) < PublicOpinion.org_activity(2) and PublicOpinion.org_activity(2) < PublicOpinion.org_activity(3))
+	check("seviye arttikca oy bonusu artar", PublicOpinion.org_activity(1) < PublicOpinion.org_activity(2))
 	var poll3: Dictionary = cm.province_poll(1, "izmir")
 	var poll_seats := 0
 	for id in poll3.keys():
 		poll_seats += int(poll3[id]["seats"])
-	check("teskilat 3: yuksek isabetli anket, ilin vekilleri dagitildi", cm.poll_error(1, "izmir") == GameRules.POLL_ERROR_HIGH \
+	check("teskilat 2: yuksek isabetli anket, ilin vekilleri dagitildi", cm.poll_error(1, "izmir") == GameRules.POLL_ERROR_HIGH \
 		and poll_seats == cm.province_seat_count("izmir"), str(poll3))
 	check("anket ayni turda degismez", str(cm.province_poll(1, "izmir")) == str(poll3))
-	cm.organizations["izmir"][1] = 2
-	check("teskilat 2: orta isabetli anket", cm.poll_error(1, "izmir") == GameRules.POLL_ERROR_MEDIUM and not cm.province_poll(1, "izmir").is_empty())
-	cm.organizations["izmir"][1] = 3
+	cm.organizations["izmir"][1] = 1
+	check("teskilat 1: anket yok", cm.poll_error(1, "izmir") < 0.0 and cm.province_poll(1, "izmir").is_empty())
+	cm.organizations["izmir"][1] = GameRules.ORG_MAX_LEVEL
 	cm.mana[1] = 1
 	check("mana yetmezse miting yapilamaz", not cm.can_miting(1, "izmir"))
 	cm.mana[1] = 3
@@ -333,12 +333,14 @@ func _initialize() -> void:
 	cm.inventories[1] = ["mana_bonusu"]
 	cm.has_drawn_this_turn = true
 	cm.mana[1] = 2
+	cm.organizations["konya"] = {1: 1}
 	cm._apply_miting_move(1, "konya")
 	check("mana bitti -> sira devretmez", cm.mana_of(1) == 0 and cm.current_turn_peer_id() == 1)
 	cm.inventories[1] = []
 	cm.mana[1] = 2
 	var next_peer: int = cm.turn_order[(cm.turn_order.find(1) + 1) % cm.turn_order.size()]
 	cm.has_drawn_this_turn = false
+	cm.organizations["sivas"] = {1: 1}
 	cm._apply_miting_move(1, "sivas")
 	check("mana bitti ama kart cekme hakki var -> sira devretmez", cm.current_turn_peer_id() == 1)
 	cm._apply_draw(1)

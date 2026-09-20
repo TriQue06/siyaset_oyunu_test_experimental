@@ -3,7 +3,7 @@ extends PanelContainer
 ## Haritada bir ile TIKLAYINCA açılan il detay paneli:
 ##   - milletvekili sayısı,
 ##   - TEŞKİLAT RAPORU (sadece bu oyuncu): 1. seviyede ilin görüşü (her eksende
-##     hangi uç), 2. seviyede orta, 3. seviyede yüksek isabetli ANKET ("şimdi
+##     hangi uç), 2. seviyede isabetli ANKET ("şimdi
 ##     seçim olsa" oy ve vekil tahmini, daireler). Teşkilat yoksa bilgi yok.
 ##   - son seçimin il sonucu (herkese açık),
 ##   - kendi partinin burada gücü, miting riski ve il başkanlığı durumu,
@@ -83,7 +83,7 @@ func _build_intel() -> void:
 	var level := CardManager.organization_level(province_id, me)
 	_section("TEŞKİLAT RAPORU  ·  seviye %d/%d  (sadece sen görürsün)" % [level, GameRules.ORG_MAX_LEVEL])
 	if level == 0:
-		_body.add_child(_label("Bu ilde teşkilatın yok. Teşkilatlanma (%d mana): 1. seviye ilin görüşünü, 2. seviye orta, 3. seviye yüksek isabetli anketi açar; her seviye oy bonusu da verir." % GameRules.ORG_MANA_COST, 12, DIM))
+		_body.add_child(_label("Bu ilde teşkilatın yok. Teşkilatlanma (%d mana): 1. seviye ilin görüşünü, 2. seviye isabetli anketi açar; her seviye oy bonusu da verir. Miting ve karalama da teşkilat ister." % GameRules.ORG_MANA_COST, 12, DIM))
 		return
 	var center := CardManager.province_center(province_id)
 	for axis in IdeologyAxes.AXES:
@@ -163,12 +163,18 @@ func _build_own() -> void:
 	if not PartyManager.parties.has(me):
 		return
 	_section("SEN BU İLDE")
-	var risk := CardManager.miting_risk(me, province_id)
-	var color := UiTheme.GREEN if risk < 0.15 else (UiTheme.GOLD if risk < 0.3 else UiTheme.RED)
-	_body.add_child(_label("Miting provokasyon riski: %%%d" % int(round(risk * 100.0)), 13, color))
+	var level := CardManager.organization_level(province_id, me)
+	if level < 1:
+		# Miting ve karalama artık teşkilat ister.
+		_body.add_child(_label("Miting ve karalama için önce teşkilatlanmalısın.", 13, UiTheme.RED))
+	else:
+		var risk := CardManager.miting_risk(me, province_id)
+		var color := UiTheme.GREEN if risk < 0.15 else (UiTheme.GOLD if risk < 0.3 else UiTheme.RED)
+		var mult := PublicOpinion.org_action_mult(level)
+		var mult_text := "" if is_equal_approx(mult, 1.0) else "  ·  miting/karalama etkisi ×%.1f" % mult
+		_body.add_child(_label("Miting provokasyon riski: %%%d%s" % [int(round(risk * 100.0)), mult_text], 13, color))
 	var power := CardManager.activity_of(province_id, me)
 	_body.add_child(_label("Buradaki gücün: %+.1f" % power, 12, _opinion_color(power)))
-	var level := CardManager.organization_level(province_id, me)
 	var org_text := "Teşkilat yok" if level == 0 else "Teşkilat: seviye %d/%d (oy bonusu %+.1f)" % [level, GameRules.ORG_MAX_LEVEL,
 		CardManager.org_bonus(province_id, me)]
 	if level < GameRules.ORG_MAX_LEVEL:

@@ -22,9 +22,9 @@ texture_margin_top = 5.0
 texture_margin_right = 5.0
 texture_margin_bottom = 5.0
 content_margin_left = 18.0
-content_margin_top = 10.0
+content_margin_top = 14.0
 content_margin_right = 18.0
-content_margin_bottom = 10.0
+content_margin_bottom = 14.0
 
 [sub_resource type="StyleBoxTexture" id="SB_hover"]
 texture = ExtResource("2")
@@ -33,9 +33,9 @@ texture_margin_top = 5.0
 texture_margin_right = 5.0
 texture_margin_bottom = 5.0
 content_margin_left = 18.0
-content_margin_top = 10.0
+content_margin_top = 14.0
 content_margin_right = 18.0
-content_margin_bottom = 10.0
+content_margin_bottom = 14.0
 
 [sub_resource type="StyleBoxTexture" id="SB_pressed"]
 texture = ExtResource("3")
@@ -44,9 +44,9 @@ texture_margin_top = 5.0
 texture_margin_right = 5.0
 texture_margin_bottom = 5.0
 content_margin_left = 18.0
-content_margin_top = 11.0
+content_margin_top = 15.0
 content_margin_right = 18.0
-content_margin_bottom = 9.0
+content_margin_bottom = 13.0
 
 [sub_resource type="StyleBoxTexture" id="SB_disabled"]
 texture = ExtResource("4")
@@ -55,9 +55,9 @@ texture_margin_top = 5.0
 texture_margin_right = 5.0
 texture_margin_bottom = 5.0
 content_margin_left = 18.0
-content_margin_top = 10.0
+content_margin_top = 14.0
 content_margin_right = 18.0
-content_margin_bottom = 10.0
+content_margin_bottom = 14.0
 
 [sub_resource type="StyleBoxTexture" id="SB_panel"]
 texture = ExtResource("5")
@@ -77,9 +77,9 @@ texture_margin_top = 5.0
 texture_margin_right = 5.0
 texture_margin_bottom = 5.0
 content_margin_left = 12.0
-content_margin_top = 8.0
+content_margin_top = 12.0
 content_margin_right = 12.0
-content_margin_bottom = 8.0
+content_margin_bottom = 12.0
 
 [sub_resource type="StyleBoxTexture" id="SB_rule"]
 texture = ExtResource("8")

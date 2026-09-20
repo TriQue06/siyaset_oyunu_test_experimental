@@ -23,9 +23,9 @@ extends RefCounted
 ##   - YASA ilk seçimden önce yapılamaz: meclis yok, saf propaganda dönemi.
 ##     HAMLELER: miting MITING_MANA_COST, il başkanlığı ORG_MANA_COST, gözcü
 ##     yasa oyuncu başına turda LAWS_PER_ROUND kez.
-##   - TEŞKİLATLANMA (eski il başkanlığı + gözcü) il başına 3 seviye; her
+##   - TEŞKİLATLANMA (eski il başkanlığı + gözcü) il başına 2 seviye; her
 ##     seviye ORG_MANA_COST. 1: az oy bonusu + ilin görüşü (her eksende hangi uç),
-##     2: orta bonus + orta isabetli anket, 3: yüksek bonus + yüksek isabetli anket.
+##     2: yüksek bonus + isabetli anket.
 ##     KART ÇEKMEK bedava, turda DRAWS_PER_TURN kez; kart oynamak sınırsız
 ##     (kartların kendi bedeli var). Her seçimden sonra herkese 1 kart hediye.
 ##     Kartları oynamanın bedeli CardPresets.CARD_MANA_COSTS.
@@ -107,8 +107,9 @@ const CENSURE_PASS_SCORE := 5
 const LAW_PASS_SCORE := 2
 const LAW_PASS_SCORE_GOV := 3
 const GOVERNMENT_MANA_BONUS := 1
-const ORG_MANA_COST := 2
-const ORG_MAX_LEVEL := 3
+const ORG_MANA_COST := 1
+## En fazla 2 seviye: 1 = ilin görüşü + az bonus, 2 = isabetli anket + yüksek bonus.
+const ORG_MAX_LEVEL := 2
 
 ## Süre sınırları (saniye). AFK kalan tek bir oyuncu oyunu kilitleyemesin diye.
 ## Tur süresi dolarsa sıra otomatik devredilir; hükümet kurma süresi dolarsa o teklif

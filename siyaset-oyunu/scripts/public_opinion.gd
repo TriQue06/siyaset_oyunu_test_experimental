@@ -74,9 +74,16 @@ const CENSURE_REJECTED_NATIONAL := -2.0
 
 # --- Teşkilat ------------------------------------------------------------------
 ## Seviyeye göre KALICI aktivite (sönmez): 1 az, 2 orta, 3 yüksek oy bonusu.
-const ORG_ACTIVITY_BY_LEVEL := [0.0, 1.5, 3.5, 6.0]
+## Seviye 0, 1, 2 (2 = tavan; eski 3. seviyenin bonusu buraya taşındı).
+const ORG_ACTIVITY_BY_LEVEL := [0.0, 2.0, 6.0]
+## MİTİNG ve KARALAMA artık teşkilat ister; izin kontrolü CardManager'da
+## (can_miting / can_play_card) yapılır. Buradaki çarpan sadece ETKİ içindir:
+## 2. seviye teşkilatın olduğu ilde miting ve karalama biraz daha vurur.
+## (Seviye 0 zaten hamle yapamaz; çarpanı 1.0 bırakıyoruz ki kural tek yerde
+## dursun ve yanlışlıkla "etkisiz miting" oluşmasın.)
+const ORG_ACTION_MULT := [1.0, 1.0, 1.3]
 ## Seviye başına miting provokasyon riskinin azalma oranı.
-const ORG_RISK_REDUCTION_PER_LEVEL := 0.25
+const ORG_RISK_REDUCTION_PER_LEVEL := 0.35
 
 # --- Yasalar ------------------------------------------------------------------
 ## UYUM: ilin yasa eksenindeki değeri × yasanın yönü / 3  (−1..+1).
@@ -165,6 +172,9 @@ const STEAL_VICTIM_NATIONAL_PER_SEAT := 0.012
 const STEAL_VICTIM_NATIONAL_LIMIT := 0.35
 
 const AXES := ["economic", "social", "administrative"]
+
+static func org_action_mult(level: int) -> float:
+	return float(ORG_ACTION_MULT[clampi(level, 0, ORG_ACTION_MULT.size() - 1)])
 
 static func org_activity(level: int) -> float:
 	return float(ORG_ACTIVITY_BY_LEVEL[clampi(level, 0, ORG_ACTIVITY_BY_LEVEL.size() - 1)])

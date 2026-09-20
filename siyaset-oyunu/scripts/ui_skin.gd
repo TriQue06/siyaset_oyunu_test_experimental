@@ -59,20 +59,39 @@ static func skin_panel(panel: Control, path: String = PANEL) -> void:
 ## Bir Button'a dört durumun PNG zeminini uygular. Yazı font ile çizilir
 ## (metin kaçınılmaz olarak yazı tipinden gelir), zeminlerin hepsi PNG.
 static func skin_button(button: Button) -> void:
-	button.add_theme_stylebox_override("normal", stylebox(BUTTON_NORMAL))
-	button.add_theme_stylebox_override("hover", stylebox(BUTTON_HOVER))
-	button.add_theme_stylebox_override("pressed", stylebox(BUTTON_PRESSED))
-	button.add_theme_stylebox_override("focus", stylebox(BUTTON_HOVER))
-	button.add_theme_stylebox_override("disabled", stylebox(BUTTON_DISABLED))
+	button.add_theme_stylebox_override("normal", _button_box(BUTTON_NORMAL))
+	button.add_theme_stylebox_override("hover", _button_box(BUTTON_HOVER))
+	button.add_theme_stylebox_override("pressed", _button_box(BUTTON_PRESSED, true))
+	button.add_theme_stylebox_override("focus", _button_box(BUTTON_HOVER))
+	button.add_theme_stylebox_override("disabled", _button_box(BUTTON_DISABLED))
+	touch_size(button)
+
+## DOKUNMA HEDEFİ: tablette parmakla basılacak her buton en az TOUCH_MIN
+## yüksekliğinde olsun. Daha büyük istenmişse küçültülmez.
+static func touch_size(control: Control, min_width: float = 0.0) -> void:
+	control.custom_minimum_size.y = maxf(control.custom_minimum_size.y, float(UiTheme.TOUCH_MIN))
+	if min_width > 0.0:
+		control.custom_minimum_size.x = maxf(control.custom_minimum_size.x, min_width)
+
+## Buton zemini: 9-slice PNG + parmak dostu iç boşluk. Basılıyken içerik
+## bir piksel aşağı kayar (tuş gerçekten batmış gibi görünsün).
+static func _button_box(path: String, pressed: bool = false) -> StyleBoxTexture:
+	var box := stylebox(path)
+	box.content_margin_left = UiTheme.PAD_L
+	box.content_margin_right = UiTheme.PAD_L
+	box.content_margin_top = float(UiTheme.PAD_M) + (1.0 if pressed else 0.0)
+	box.content_margin_bottom = float(UiTheme.PAD_M) - (1.0 if pressed else 0.0)
+	return box
 
 ## İSTENEN RENKTE buton (katıl, oy ver, hamle butonları). Doku gri tonlarında
 ## olduğu için modulate rengi doğrudan verir; koyu dış çizgi koyu kalır.
 static func skin_color_button(button: Button, color: Color) -> void:
-	button.add_theme_stylebox_override("normal", color_box(color, BUTTON_TINT_NORMAL))
-	button.add_theme_stylebox_override("hover", color_box(color, BUTTON_TINT_HOVER))
-	button.add_theme_stylebox_override("focus", color_box(color, BUTTON_TINT_HOVER))
-	button.add_theme_stylebox_override("pressed", color_box(color, BUTTON_TINT_PRESSED))
-	button.add_theme_stylebox_override("disabled", color_box(color.darkened(0.55), BUTTON_TINT_NORMAL))
+	button.add_theme_stylebox_override("normal", _tint_box(color, BUTTON_TINT_NORMAL))
+	button.add_theme_stylebox_override("hover", _tint_box(color, BUTTON_TINT_HOVER))
+	button.add_theme_stylebox_override("focus", _tint_box(color, BUTTON_TINT_HOVER))
+	button.add_theme_stylebox_override("pressed", _tint_box(color, BUTTON_TINT_PRESSED, true))
+	button.add_theme_stylebox_override("disabled", _tint_box(color.darkened(0.55), BUTTON_TINT_NORMAL))
+	touch_size(button)
 	var ink := color.get_luminance() > 0.55
 	button.add_theme_color_override("font_color", UiTheme.INK if ink else UiTheme.TEXT)
 	button.add_theme_color_override("font_hover_color", UiTheme.INK if ink else UiTheme.TEXT)
@@ -80,6 +99,12 @@ static func skin_color_button(button: Button, color: Color) -> void:
 	button.add_theme_color_override("font_focus_color", UiTheme.INK if ink else UiTheme.TEXT)
 	button.add_theme_color_override("font_disabled_color", UiTheme.TEXT_DIM)
 	button.add_theme_font_override("font", UiTheme.mono())
+
+## Renkli buton zemini: _button_box ile aynı iç boşluk, üstüne renk.
+static func _tint_box(color: Color, path: String, pressed: bool = false) -> StyleBoxTexture:
+	var box := _button_box(path, pressed)
+	box.modulate_color = color
+	return box
 
 ## Renkli bir "yüzey" (parti rengi vb.) — ColorRect yerine BEYAZ bir PNG'yi
 ## modulate ederek renklendiriyoruz, böylece görünen şey yine bir PNG olur ve

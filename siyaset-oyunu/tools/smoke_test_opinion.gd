@@ -287,7 +287,9 @@ func _initialize() -> void:
 	check("il secilmeden karalama oynanamaz (kart elde)", cm.inventories[3].size() == 1 and cm.current_turn_peer_id() == 3)
 	cm._apply_organization(3, "ankara")
 	check("teskilat: il gorusu (sadece kurana)", cm.knows_leaning(3, "ankara") and not cm.knows_leaning(1, "ankara"))
-	cm.organizations = {}
+	# Karalama artık teşkilat ister; 3 numaranın Ankara teşkilatı dursun.
+	cm.organizations = {"ankara": {3: 1}}
+	check("teskilatsiz ilde karalama oynanamaz", not cm.can_play_card(3, "karalama", 1, "izmir"))
 	check("karalama kendine oynanamaz", not cm.can_play_card(3, "karalama", 3, "ankara"))
 	check("karalama gecersiz partiye oynanamaz", not cm.can_play_card(3, "karalama", 99, "ankara"))
 	cm.current_turn_index = 0
@@ -308,7 +310,7 @@ func _initialize() -> void:
 	check("ilde guclu partiye karalama daha az isler", PublicOpinion.propaganda_damage(6.0) < PublicOpinion.propaganda_damage(1.0))
 	check("ilde guclu karalayan daha cok kazanir", PublicOpinion.propaganda_gain(6.0) > PublicOpinion.propaganda_gain(1.0))
 	var weak: float = cm.party_strength("ankara", 2)
-	cm.organizations = {"ankara": {2: 3}}
+	cm.organizations = {"ankara": {2: GameRules.ORG_MAX_LEVEL}}
 	check("il baskanligi ildeki gucu artirir", cm.party_strength("ankara", 2) > weak)
 
 	cm.current_turn_index = 0

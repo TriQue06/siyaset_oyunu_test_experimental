@@ -42,7 +42,7 @@ const VOTE_COLORS := {1: UiTheme.GREEN, 0: UiTheme.GOLD, -1: UiTheme.RED}
 ## HARİTA KATMANLARI: aynı Türkiye haritasının üç ayrı görünümü; butonlarla
 ## geçilir, harita yan yana dizilmiş sayfalar gibi yana kayar.
 ##   SEATS        : son seçim (il kazananları + vekil daireleri)
-##   ORGANIZATION : teşkilat seviyem (0 beyaz → 3 parti rengi)
+##   ORGANIZATION : teşkilat seviyem (0 beyaz → en üst seviyede parti rengi)
 ##   STRENGTH     : tüm faktörlerle (ilin görüşü, bütün partilerin gücü) şimdi
 ##                  seçim olsa bu ilde durumum; her ilde, ilk turdan itibaren
 enum MapLayer { SEATS, ORGANIZATION, STRENGTH }
@@ -1029,6 +1029,9 @@ func _drop_target(card_type: String) -> Dictionary:
 		elif card_type == CardPresets.INVEST_CARD_TYPE and not CardManager.is_government_party(me):
 			result["label"] = "Yatırımı sadece hükümet partileri yapabilir"
 			result["error"] = result["label"]
+		elif card_type != CardPresets.INVEST_CARD_TYPE and CardManager.organization_level(province_id, me) < 1:
+			result["label"] = "%s'da teşkilatın yok — önce teşkilatlan" % pname
+			result["error"] = result["label"]
 		else:
 			result["valid"] = true
 			if card_type == CardPresets.MITING_CARD_TYPE:
@@ -1162,6 +1165,8 @@ func _on_province_clicked(province_id: String) -> void:
 		_cancel_targeting()
 		if CardManager.can_miting(me, province_id):
 			CardManager.miting(province_id)
+		elif CardManager.organization_level(province_id, me) < 1:
+			_show_toast("Bu ilde teşkilatın yok. Önce teşkilatlanmalısın.")
 		else:
 			_show_toast(_action_block_reason(GameRules.MITING_MANA_COST))
 		return
@@ -1925,7 +1930,7 @@ func _refresh_action_buttons() -> void:
 	var me := multiplayer.get_unique_id()
 	var mana_now := CardManager.mana_of(me)
 	_mana_label.text = CardManager.mana_text(mana_now)
-	var law_ok := CardManager.can_propose_law(me)
+	var law_ok := CardManager.can_propose_law(me) or CardManager.can_propose_constitution(me)
 	var org_ok := CardManager.can_choose_main_action(me) and mana_now >= GameRules.ORG_MANA_COST
 	var miting_ok := CardManager.can_miting(me)
 	_miting_button.modulate.a = 1.0 if miting_ok or _pending_miting else 0.45
@@ -2072,8 +2077,9 @@ func _build_constitution_section(box: VBoxContainer) -> void:
 func _stepper_button(text: String, action: Callable) -> Button:
 	var button := Button.new()
 	button.text = text
-	button.custom_minimum_size = Vector2(28, 24)
-	button.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
+	# Tablette parmakla basılıyor: dokunma hedefi TOUCH_MIN'in altına inmez.
+	button.custom_minimum_size = Vector2(UiTheme.TOUCH_MIN, UiTheme.TOUCH_MIN)
+	button.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
 	button.focus_mode = Control.FOCUS_NONE
 	button.pressed.connect(action)
 	return button
@@ -2244,7 +2250,8 @@ func _circle_texture(color: Color) -> Texture2D:
 
 func _on_law_button_pressed() -> void:
 	_deselect_hand_card()
-	if not _law_designer.visible and not CardManager.can_propose_law(multiplayer.get_unique_id()):
+	var law_me := multiplayer.get_unique_id()
+	if not _law_designer.visible and not CardManager.can_propose_law(law_me) and not CardManager.can_propose_constitution(law_me):
 		_show_toast(_action_block_reason(GameRules.LAW_MANA_COST, true) + " (Panel yine de açılır: yasaları incele.)")
 	if _law_designer.visible:
 		_law_designer.hide()
@@ -2358,9 +2365,9 @@ func _build_layer_bar() -> void:
 	for i in MAP_LAYER_TITLES.size():
 		var button := Button.new()
 		button.text = MAP_LAYER_TITLES[i]
-		button.custom_minimum_size = Vector2(84, 34)
+		button.custom_minimum_size = Vector2(96, UiTheme.TOUCH_MIN)
 		button.focus_mode = Control.FOCUS_NONE
-		button.add_theme_font_size_override("font_size", 13)
+		button.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 		button.pressed.connect(_on_layer_button_pressed.bind(i))
 		_layer_bar.add_child(button)
 		_layer_buttons.append(button)

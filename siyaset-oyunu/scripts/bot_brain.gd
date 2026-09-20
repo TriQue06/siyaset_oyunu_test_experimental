@@ -430,14 +430,19 @@ static func _eval_miting(bot: int, known: Dictionary) -> Dictionary:
 	var best_province := ""
 	var best_value := -INF
 	for province_id in _seats().keys():
+		# Miting teşkilat ister; örgütsüz iller elenir.
+		var org_level := CardManager.organization_level(String(province_id), bot)
+		if org_level < 1:
+			continue
+		var org_mult := PublicOpinion.org_action_mult(org_level)
 		var risk := CardManager.miting_risk(bot, province_id)
 		var seats := float(CardManager.province_seat_count(province_id))
 		var closeness := ElectionModel.support(ideology, known.get(province_id, {}))
 		var expected := (1.0 - risk) * PublicOpinion.MITING_LOCAL + risk * PublicOpinion.PROVOCATION_LOCAL
 		# İl başkanlığıyla aynı ölçek (vekil/30). Zaten güçlü olduğu ilde getirisi azalır.
 		var diminish := 1.0 / (1.0 + maxf(0.0, CardManager.activity_of(province_id, bot)) / 2.0)
-		var value := expected / PublicOpinion.MITING_LOCAL * seats / 30.0 * (0.5 + closeness) * diminish \
-			+ (1.0 - risk) * PublicOpinion.MITING_NATIONAL + risk * PublicOpinion.PROVOCATION_NATIONAL
+		var value := (expected / PublicOpinion.MITING_LOCAL * seats / 30.0 * (0.5 + closeness) * diminish \
+			+ (1.0 - risk) * PublicOpinion.MITING_NATIONAL + risk * PublicOpinion.PROVOCATION_NATIONAL) * org_mult
 		if value > best_value:
 			best_value = value
 			best_province = province_id
@@ -466,7 +471,11 @@ static func _eval_propaganda(bot: int, known: Dictionary) -> Dictionary:
 	var best := {}
 	var best_value := -INF
 	for province_id in _seats().keys():
-		var seats := float(CardManager.province_seat_count(province_id))
+		# Karalama da teşkilat ister.
+		var org_level := CardManager.organization_level(String(province_id), bot)
+		if org_level < 1:
+			continue
+		var seats := float(CardManager.province_seat_count(province_id)) * PublicOpinion.org_action_mult(org_level)
 		var center: Dictionary = known.get(province_id, {})
 		var gain := PublicOpinion.propaganda_gain(PublicOpinion.party_strength(
 			_ideology(bot), center, CardManager.activity_of(province_id, bot)))

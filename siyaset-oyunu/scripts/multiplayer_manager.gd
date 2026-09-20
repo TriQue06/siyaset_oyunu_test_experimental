@@ -337,6 +337,47 @@ func _apply_remove_bot(peer_id: int) -> void:
 	players.erase(peer_id)
 	_broadcast_player_list()
 
+## Lobiden oyuncu atma: sadece lobi sahibi, sadece LOBİ aşamasında ve kendisi
+## dışında birini atabilir. Bot ise sadece listeden silinir; insan oyuncuya
+## önce sebep bildirilir, sonra ağ bağlantısı kesilir.
+func kick_player(peer_id: int) -> void:
+	if not is_local_owner() or peer_id == owner_id or stage != Stage.LOBBY:
+		return
+	if is_bot(peer_id):
+		remove_bot(peer_id)
+		return
+	if is_host:
+		_apply_kick(peer_id)
+	else:
+		_request_kick.rpc_id(1, peer_id)
+
+func _apply_kick(peer_id: int) -> void:
+	if stage != Stage.LOBBY or peer_id == owner_id or not players.has(peer_id):
+		return
+	if is_bot(peer_id):
+		_apply_remove_bot(peer_id)
+		return
+	players.erase(peer_id)
+	_broadcast_player_list()
+	if multiplayer.multiplayer_peer == null:
+		return
+	_notify_kicked.rpc_id(peer_id)
+	# Bildirimin ağa çıkması için birkaç kare bekleyip bağlantıyı kesiyoruz.
+	for i in 3:
+		await get_tree().process_frame
+	if multiplayer.multiplayer_peer != null:
+		multiplayer.multiplayer_peer.disconnect_peer(peer_id)
+
+@rpc("any_peer", "reliable")
+func _request_kick(peer_id: int) -> void:
+	if is_host and multiplayer.get_remote_sender_id() == owner_id:
+		_apply_kick(peer_id)
+
+@rpc("authority", "reliable")
+func _notify_kicked() -> void:
+	_reset_state()
+	room_closed.emit("Oda sahibi seni lobiden çıkardı.")
+
 func _broadcast_player_list() -> void:
 	if room_code != "" and multiplayer.multiplayer_peer != null:
 		_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)

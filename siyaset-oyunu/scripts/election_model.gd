@@ -122,7 +122,10 @@ static func expected_shares(parties: Dictionary, center: Dictionary, sharpness: 
 ##              — KAMUOYU (bkz. PublicOpinion.multiplier). Boşsa etkisiz.
 ## ULUSAL LİSTE: bu kadar milletvekili illerden değil, barajı geçen partiler
 ## arasında ULUSAL oy oranına göre (D'Hondt) dağıtılır.
-const NATIONAL_LIST_SEATS := 10
+## ULUSAL LİSTE: il seçim çevrelerinin dışında, ülke geneli oy oranına göre
+## D'Hondt ile dağıtılan vekiller. Vekil çalma bunlara da erişir
+## (bkz. CardManager._apply_steal — torbada "" ulusal listeyi temsil eder).
+const NATIONAL_LIST_SEATS := 75
 ## Bir partinin bir ildeki oy payı en fazla bu kadar olabilir: keskinlik
 ## arttıkça iller %90'ları görmesin. Fazlası diğer partilere oranla dağılır.
 const PROVINCE_MAX_SHARE := 0.68

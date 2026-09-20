@@ -362,8 +362,19 @@ func populism_rounds_left(peer_id: int) -> int:
 
 ## Miting hamlesi: seçilen ilde güç (provokasyon riskiyle).
 func can_miting(peer_id: int, province_id: String = "") -> bool:
-	return can_choose_main_action(peer_id) and mana_of(peer_id) >= GameRules.MITING_MANA_COST \
-		and (province_id == "" or has_province(province_id))
+	if not can_choose_main_action(peer_id) or mana_of(peer_id) < GameRules.MITING_MANA_COST:
+		return false
+	if province_id == "":
+		return has_organization_anywhere(peer_id)
+	# Miting artik teskilat ister: once ilde orgutlenmis olmak gerekir.
+	return has_province(province_id) and organization_level(province_id, peer_id) > 0
+
+## Partinin herhangi bir ilde teskilati var mi? (miting/karalama on sarti)
+func has_organization_anywhere(peer_id: int) -> bool:
+	for province_id in organizations.keys():
+		if organization_level(String(province_id), peer_id) > 0:
+			return true
+	return false
 
 func can_build_organization(peer_id: int, province_id: String) -> bool:
 	return can_choose_main_action(peer_id) and mana_of(peer_id) >= GameRules.ORG_MANA_COST \
@@ -407,12 +418,17 @@ func can_play_card(peer_id: int, card_type: String, target_peer_id: int = -1, ta
 	if card_type == CardPresets.REBELLION_CARD_TYPE:
 		return turn_order.has(target_peer_id) and target_peer_id != peer_id and has_seats(target_peer_id)
 	if card_type == CardPresets.PROPAGANDA_CARD_TYPE:
-		return has_province(target_province) and turn_order.has(target_peer_id) and target_peer_id != peer_id
+		# Karalama da teskilat ister: ilde orgutlu olmayan parti kampanya yapamaz.
+		return has_province(target_province) and turn_order.has(target_peer_id) \
+			and target_peer_id != peer_id and organization_level(target_province, peer_id) > 0
 	if card_type == CardPresets.SCOUT_CARD_TYPE:
 		return false  # gözcü artık teşkilatın parçası
 	if CardPresets.needs_province_target(card_type):
 		if not has_province(target_province):
 			return false
+		if card_type == CardPresets.MITING_CARD_TYPE:
+			# Miting kartı da teşkilat ister.
+			return organization_level(target_province, peer_id) > 0
 		return true
 	if card_type == CardPresets.INVEST_CARD_TYPE or CardPresets.is_censure_card(card_type):
 		return false  # artık hamle (bkz. invest / censure)
@@ -482,8 +498,6 @@ func knows_leaning(peer_id: int, province_id: String) -> bool:
 func poll_error(peer_id: int, province_id: String) -> float:
 	match organization_level(province_id, peer_id):
 		2:
-			return GameRules.POLL_ERROR_MEDIUM
-		3:
 			return GameRules.POLL_ERROR_HIGH
 	return -1.0
 
@@ -1015,9 +1029,10 @@ func _apply_miting(peer_id: int, province_id: String) -> void:
 		_event_message = "%s'da %s mitinginde provokasyon çıktı! (risk %%%d)" % [
 			_province_name(province_id), _party_name(peer_id), int(round(risk * 100.0))]
 	else:
-		_add_local(province_id, peer_id, PublicOpinion.MITING_LOCAL, true)
-		_add_national(peer_id, PublicOpinion.MITING_NATIONAL, true)
-		_log_province(province_id, "%s miting yaptı (+%.1f)" % [_party_name(peer_id), PublicOpinion.MITING_LOCAL])
+		var org_mult := PublicOpinion.org_action_mult(organization_level(province_id, peer_id))
+		_add_local(province_id, peer_id, PublicOpinion.MITING_LOCAL * org_mult, true)
+		_add_national(peer_id, PublicOpinion.MITING_NATIONAL * org_mult, true)
+		_log_province(province_id, "%s miting yaptı (+%.1f)" % [_party_name(peer_id), PublicOpinion.MITING_LOCAL * org_mult])
 		_event_message = "%s, %s'da miting yaptı." % [_party_name(peer_id), _province_name(province_id)]
 
 ## Yatırım: getiren parti daha çok, hükümet ortakları daha az kazanır.
@@ -1037,7 +1052,9 @@ func _apply_propaganda(peer_id: int, target_peer_id: int, province_id: String) -
 	var damage := PublicOpinion.propaganda_damage(party_strength(province_id, target_peer_id))
 	if populism_rounds_left(peer_id) > 0:
 		damage *= PublicOpinion.POPULISM_GOOD_MULT
-	var gain := PublicOpinion.propaganda_gain(party_strength(province_id, peer_id))
+	var org_mult := PublicOpinion.org_action_mult(organization_level(province_id, peer_id))
+	damage *= org_mult
+	var gain := PublicOpinion.propaganda_gain(party_strength(province_id, peer_id)) * org_mult
 	# Taban: karalama il puanını PROPAGANDA_FLOOR'un altına itemez.
 	var current := local_of(province_id, target_peer_id)
 	damage = clampf(damage, 0.0, maxf(0.0, current - PublicOpinion.PROPAGANDA_FLOOR))

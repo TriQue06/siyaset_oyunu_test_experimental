@@ -120,7 +120,7 @@ func _initialize() -> void:
 	mm.election_interval = 4
 	check("anayasa gundem sarti aramaz", cm.can_propose_constitution(1))
 	var needed: int = gm.constitution_threshold_seats()
-	check("gereken cogunluk meclisin 2/3'u", needed == int(ceil(400 * 2.0 / 3.0)), str(needed))
+	check("gereken cogunluk meclisin 2/3'u", needed == int(ceil(gm.total_seats() * 2.0 / 3.0)), str(needed))
 	cm._apply_constitution_proposal(1, {"threshold": 3.0, "interval": 6})
 	gm._apply_vote(1, gm.VOTE_YES)
 	gm._apply_vote(2, gm.VOTE_NO)

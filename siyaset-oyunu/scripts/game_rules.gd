@@ -54,7 +54,8 @@ static func configure(interval: int, count: int) -> void:
 
 const MANA_START := 0
 const MANA_PER_ROUND := 3
-const LAW_MANA_COST := 1
+## Yasa sunmak BEDAVA (turda 1): meclis oyunun merkezi, mana engel olmasın.
+const LAW_MANA_COST := 0
 const LAWS_PER_ROUND := 1
 const DRAW_MANA_COST := 0
 const DRAWS_PER_TURN := 1

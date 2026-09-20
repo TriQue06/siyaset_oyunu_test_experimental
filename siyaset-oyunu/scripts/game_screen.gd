@@ -1013,8 +1013,8 @@ func _drop_target(card_type: String) -> Dictionary:
 			result["label"] = "%s: parlamento diyagramının üstüne bırak" % law["title"]
 		elif CardManager.can_propose_law(me, card_type):
 			result["valid"] = true
-			result["label"] = "Bırak: %s %s (%d mana)" % [law["title"],
-				"seçim vaadi olarak açıklanır" if CardManager.last_seats.is_empty() else "meclise sunulur", GameRules.LAW_MANA_COST]
+			result["label"] = "Bırak: %s %s (bedava, turda 1)" % [law["title"],
+				"seçim vaadi olarak açıklanır" if CardManager.last_seats.is_empty() else "meclise sunulur"]
 		else:
 			result["label"] = _action_block_reason(GameRules.LAW_MANA_COST, true)
 			result["error"] = result["label"]
@@ -1820,15 +1820,16 @@ func _build_action_buttons() -> void:
 	_mana_box.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_show_toast(_mana_rules))
-	_mana_rules = "Sıran gelince +%d mana; manan yettikçe istediğin kadar hamle yap, biriken mana kalır.\nHamleler: yasa %d (turda 1), miting %d, teşkilat %d (seviye başına), yatırım %d, gensoru %d mana.\nKart çekmek bedava (turda 1), kart oynamak sınırsız. Kartlar bonus: karalama %d, vekil çalma %d/%d/%d, popülizm %d, mana bonusu %d.\nManan bitince sıra kendiliğinden geçer. Seçimden sonra herkese +%d, yeni hükümete +%d mana." % [
-		GameRules.MANA_PER_ROUND, GameRules.LAW_MANA_COST, GameRules.MITING_MANA_COST, GameRules.ORG_MANA_COST,
+	_mana_rules = "Sıran gelince +%d mana; manan yettikçe istediğin kadar hamle yap, biriken mana kalır.\nHamleler: yasa BEDAVA (turda 1), miting %d, teşkilat %d (seviye başına), yatırım %d, gensoru %d mana.\nKart çekmek bedava (turda 1), kart oynamak sınırsız. Kartlar bonus: karalama %d, vekil çalma %d/%d, kaset %d, isyan %d, popülizm %d, mana bonusu %d.\nTur kendiliğinden bitmez: \"Turu Bitir\"e bas. Seçimden sonra herkese +%d kart ve +%d mana, yeni hükümete +%d mana." % [
+		GameRules.MANA_PER_ROUND, GameRules.MITING_MANA_COST, GameRules.ORG_MANA_COST,
 		GameRules.INVEST_MANA_COST, GameRules.CENSURE_MANA_COST,
-		CardPresets.card_cost("karalama"), CardPresets.card_cost("steal_weak"), CardPresets.card_cost("steal_medium"),
-		CardPresets.card_cost("steal_strong"), CardPresets.card_cost("populizm"), CardPresets.card_cost("mana_bonusu"),
-		GameRules.ELECTION_MANA_BONUS, GameRules.GOVERNMENT_MANA_BONUS]
+		CardPresets.card_cost("karalama"), CardPresets.card_cost("steal_weak"), CardPresets.card_cost("steal_strong"),
+		CardPresets.card_cost("kaset"), CardPresets.card_cost("isyan"),
+		CardPresets.card_cost("populizm"), CardPresets.card_cost("mana_bonusu"),
+		1, GameRules.ELECTION_MANA_BONUS, GameRules.GOVERNMENT_MANA_BONUS]
 	add_child(_mana_box)
 	# HAMLELER (sağ sütun, destenin yanında alt alta). Kartlar bonus niteliğinde.
-	_law_button = _action_button("YASA", "%d mana" % GameRules.LAW_MANA_COST, Color(0.42, 0.26, 0.62), -292.0, 0)
+	_law_button = _action_button("YASA", "bedava", Color(0.42, 0.26, 0.62), -292.0, 0)
 	_law_button.pressed.connect(_on_law_button_pressed)
 	_miting_button = _action_button("MİTİNG", "%d mana" % GameRules.MITING_MANA_COST, Color(0.72, 0.3, 0.14), -292.0, 1)
 	_miting_button.pressed.connect(_on_miting_button_pressed)

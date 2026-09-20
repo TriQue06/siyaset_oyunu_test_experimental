@@ -275,7 +275,7 @@ func _initialize() -> void:
 	cm.agenda = {"type": "gundem_economic_n", "until": cm.round_number + 1}
 	check("meclis ve gundem varken gundemdeki eksende yasa sunulabilir", cm.can_propose_law(1, law_type))
 	cm._apply_law(1, law_type)
-	check("yasa 1 mana, meclis oylamasi acildi, sira devretmedi", cm.mana_of(1) == 10 - GameRules.LAW_MANA_COST and gm.phase == gm.Phase.VOTING 		and cm.current_turn_peer_id() == 1)
+	check("yasa bedava, meclis oylamasi acildi, sira devretmedi", cm.mana_of(1) == 10 - GameRules.LAW_MANA_COST and gm.phase == gm.Phase.VOTING 		and cm.current_turn_peer_id() == 1)
 	for id in [1, 2, 3]:
 		gm._apply_vote(id, gm.VOTE_ABSTAIN)
 	check("turda ikinci yasa yok", not cm.can_propose_law(1))

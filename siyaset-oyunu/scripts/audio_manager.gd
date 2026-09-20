@@ -19,6 +19,8 @@ const BUS_SFX := "Efekt"
 ## Ses adı -> dosya. Yeni ses eklemek için buraya bir satır yeter.
 const SOUNDS := {
 	"ui_click": "res://assets/audio/ui/ui_click.ogg",
+	## Sıra sana geldiğinde çalar (tabletten oynarken dikkat çeksin diye cıngıl).
+	"turn_start": "res://assets/audio/ui/turn_start.ogg",
 }
 
 const POOL_SIZE := 8

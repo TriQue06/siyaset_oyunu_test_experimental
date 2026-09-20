@@ -548,6 +548,7 @@ func _on_turn_changed(_peer_id: int) -> void:
 		_last_turn_peer = current
 		if current == multiplayer.get_unique_id() and not CardManager.game_finished:
 			_show_toast("Sıra sende: +%d mana (toplam %d)" % [CardManager.turn_income(current), CardManager.mana_of(current)])
+			AudioManager.play("turn_start")
 	_update_turn_indicator()
 	_refresh_deck_button()
 	_refresh_pass_button()

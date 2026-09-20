@@ -257,6 +257,13 @@ func _initialize() -> void:
 	check("mana yoksa teskilat yok", not cm.can_build_organization(3, "ankara"))
 	cm._apply_pass(3)
 	check("tur bitti: 1 birikmis manasina gelir ekledi (1 + gelir)", cm.round_number == 2 and cm.mana_of(1) == 1 + GameRules.MANA_PER_ROUND 		and cm.mana_of(3) == 0, str(cm.mana))
+	var gov_before: Dictionary = gm.government.duplicate()
+	gm.government = {"pm": 1, "ministry_health": 2}
+	check("hukumetteki parti tur basina MANA_PER_ROUND_GOVERNMENT alir", cm.turn_income(1) == GameRules.MANA_PER_ROUND_GOVERNMENT 		and cm.turn_income(2) == GameRules.MANA_PER_ROUND_GOVERNMENT)
+	check("muhalefet normal gelir alir", cm.turn_income(3) == GameRules.MANA_PER_ROUND)
+	check("hukumet geliri 1 fazla", GameRules.MANA_PER_ROUND_GOVERNMENT == GameRules.MANA_PER_ROUND + 1)
+	gm.government = gov_before
+
 	check("gozcu destede yok", not cm._draw_pool(1).has("gozcu"))
 	check("miting hamle, destede yok, 2 mana", not cm._draw_pool(1).has("miting") and GameRules.MITING_MANA_COST == 2)
 	check("kart bedelleri: karalama 1, calma 1/3, kaset 2, isyan 2", cp.card_cost("karalama") == 1 		and cp.card_cost("steal_weak") == 1 and cp.card_cost("steal_strong") == 3 and cp.card_cost("kaset") == 2 and cp.card_cost("isyan") == 2)

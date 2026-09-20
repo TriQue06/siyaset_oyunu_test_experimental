@@ -547,7 +547,7 @@ func _on_turn_changed(_peer_id: int) -> void:
 	if current != _last_turn_peer:
 		_last_turn_peer = current
 		if current == multiplayer.get_unique_id() and not CardManager.game_finished:
-			_show_toast("Sıra sende: +%d mana (toplam %d)" % [GameRules.MANA_PER_ROUND, CardManager.mana_of(current)])
+			_show_toast("Sıra sende: +%d mana (toplam %d)" % [CardManager.turn_income(current), CardManager.mana_of(current)])
 	_update_turn_indicator()
 	_refresh_deck_button()
 	_refresh_pass_button()
@@ -1820,8 +1820,8 @@ func _build_action_buttons() -> void:
 	_mana_box.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_show_toast(_mana_rules))
-	_mana_rules = "Sıran gelince +%d mana; manan yettikçe istediğin kadar hamle yap, biriken mana kalır.\nHamleler: yasa BEDAVA (turda 1), miting %d, teşkilat %d (seviye başına), yatırım %d, gensoru %d mana.\nKart çekmek bedava (turda 1), kart oynamak sınırsız. Kartlar bonus: karalama %d, vekil çalma %d/%d, kaset %d, isyan %d, popülizm %d, mana bonusu %d.\nTur kendiliğinden bitmez: \"Turu Bitir\"e bas. Seçimden sonra herkese +%d kart ve +%d mana, yeni hükümete +%d mana." % [
-		GameRules.MANA_PER_ROUND, GameRules.MITING_MANA_COST, GameRules.ORG_MANA_COST,
+	_mana_rules = "Sıran gelince +%d mana (hükümette görevin varsa +%d); manan yettikçe istediğin kadar hamle yap, biriken mana kalır.\nHamleler: yasa BEDAVA (turda 1), miting %d, teşkilat %d (seviye başına), yatırım %d, gensoru %d mana.\nKart çekmek bedava (turda 1), kart oynamak sınırsız. Kartlar bonus: karalama %d, vekil çalma %d/%d, kaset %d, isyan %d, popülizm %d, mana bonusu %d.\nTur kendiliğinden bitmez: \"Turu Bitir\"e bas. Seçimden sonra herkese +%d kart ve +%d mana, yeni hükümete +%d mana." % [
+		GameRules.MANA_PER_ROUND, GameRules.MANA_PER_ROUND_GOVERNMENT, GameRules.MITING_MANA_COST, GameRules.ORG_MANA_COST,
 		GameRules.INVEST_MANA_COST, GameRules.CENSURE_MANA_COST,
 		CardPresets.card_cost("karalama"), CardPresets.card_cost("steal_weak"), CardPresets.card_cost("steal_strong"),
 		CardPresets.card_cost("kaset"), CardPresets.card_cost("isyan"),

@@ -17,6 +17,7 @@ extends RefCounted
 ##     yerine kurulan hükümet dahil).
 ##   - MANA: herkes MANA_START ile başlar; SIRASI GELDİĞİNDE +MANA_PER_ROUND alır
 ##     (tur sonunda değil: harcadığın mana turu bitirince geri dolmuş görünmez).
+##     Hükümette görevi olan partiler bunun yerine +MANA_PER_ROUND_GOVERNMENT.
 ##   - YASA ilk seçimden önce yapılamaz: meclis yok, saf propaganda dönemi.
 ##     HAMLELER: miting MITING_MANA_COST, il başkanlığı ORG_MANA_COST, gözcü
 ##     yasa oyuncu başına turda LAWS_PER_ROUND kez.
@@ -54,6 +55,8 @@ static func configure(interval: int, count: int) -> void:
 
 const MANA_START := 0
 const MANA_PER_ROUND := 3
+## Hükümette görevi olan partiler tur başına 1 fazla mana alır (iktidar avantajı).
+const MANA_PER_ROUND_GOVERNMENT := 4
 ## Yasa sunmak BEDAVA (turda 1): meclis oyunun merkezi, mana engel olmasın.
 const LAW_MANA_COST := 0
 const LAWS_PER_ROUND := 1

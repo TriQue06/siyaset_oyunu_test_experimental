@@ -1222,7 +1222,13 @@ func _advance_turn() -> bool:
 func _grant_turn_income() -> void:
 	var peer_id := current_turn_peer_id()
 	if peer_id != -1:
-		mana[peer_id] = mana_of(peer_id) + GameRules.MANA_PER_ROUND
+		mana[peer_id] = mana_of(peer_id) + turn_income(peer_id)
+
+## Tur geliri: hükümette görevi olan partiler bir fazla mana alır.
+func turn_income(peer_id: int) -> int:
+	if GovernmentManager.government_party_ids().has(peer_id):
+		return GameRules.MANA_PER_ROUND_GOVERNMENT
+	return GameRules.MANA_PER_ROUND
 
 ## Desteden bir kartı doğrudan ele verir (seçim hediyesi). El doluysa verilmez.
 func _deal_turn_card(peer_id: int) -> void:

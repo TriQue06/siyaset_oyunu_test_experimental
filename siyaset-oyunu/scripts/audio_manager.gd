@@ -53,6 +53,11 @@ const MUSIC_FADE_OUT := {"game": 3.0, "election": 0.4}
 const MUSIC_START := {"game": 1.0, "election": 1.0}
 const MUSIC_SILENT_DB := -60.0
 
+## %100'ün karşılığı: kaydırıcı sonuna geldiğinde bus'a uygulanan gerçek
+## seviye. Oyunun dengeli sesi bu; oyuncular Discord'da konuşarak oynadığı
+## için tavan kasıtlı olarak 1.0'ın altında.
+const VOLUME_CEILING := {"master": 0.8, "music": 0.5, "sfx": 0.8}
+
 const POOL_SIZE := 8
 const REPEAT_GUARD := 0.05
 
@@ -214,9 +219,9 @@ func play(sound: String) -> void:
 
 ## GameSettings'teki seviyeleri bus'lara uygular.
 func apply_volumes() -> void:
-	_set_bus_volume("Master", GameSettings.master_volume)
-	_set_bus_volume(BUS_MUSIC, GameSettings.music_volume)
-	_set_bus_volume(BUS_SFX, GameSettings.sfx_volume)
+	_set_bus_volume("Master", GameSettings.master_volume * float(VOLUME_CEILING["master"]))
+	_set_bus_volume(BUS_MUSIC, GameSettings.music_volume * float(VOLUME_CEILING["music"]))
+	_set_bus_volume(BUS_SFX, GameSettings.sfx_volume * float(VOLUME_CEILING["sfx"]))
 
 func _set_bus_volume(bus_name: String, linear: float) -> void:
 	var index := AudioServer.get_bus_index(bus_name)

@@ -49,14 +49,14 @@ func _initialize() -> void:
 	check("baslat butonu ekranda", start.visible and bottom <= root.get_visible_rect().size.y, "alt kenar %.0f / %.0f" % [bottom, root.get_visible_rect().size.y])
 
 	# Lobi ayarları: oyun süresi (4 turda bir, 7 seçim) ve artırma.
-	check("varsayilan: 4 turda bir, 7 secim, 28 tur", mm.election_interval == 4 and mm.election_count == 7 and GameRules.MAX_ROUNDS == 28)
+	check("varsayilan: 4 yilda bir, 8 secim, 32 yil", mm.election_interval == 4 and mm.election_count == 8 and GameRules.MAX_ROUNDS == 32)
 	scene._on_settings_pressed()
 	for i in 20:
 		await process_frame
 	scene.count_plus.pressed.emit()
 	await process_frame
-	check("secim sayisi +1 -> 8 secim, 32 tur", mm.election_count == 8 and GameRules.MAX_ROUNDS == 32 and GameRules.is_election_round(32))
-	check("ozet yaziyor", String(scene.game_length_summary.text).find("32") != -1, scene.game_length_summary.text)
+	check("secim sayisi +1 -> 9 secim, 36 yil", mm.election_count == 9 and GameRules.MAX_ROUNDS == 36 and GameRules.is_election_round(36))
+	check("ozet yaziyor", String(scene.game_length_summary.text).find("36") != -1, scene.game_length_summary.text)
 	root.get_texture().get_image().save_png("%s/lobby_settings.png" % OS.get_user_data_dir())
 	scene.count_minus.pressed.emit()
 	# Doldur: 8 kart dolunca buton kalmamalı; başlat yine ekranda.

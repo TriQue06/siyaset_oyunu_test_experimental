@@ -40,7 +40,7 @@ extends RefCounted
 ## seçim; oyun MAX_ROUNDS = aralık × sayı tur sürer. Değerler configure() ile
 ## (her cihazda, ayar senkronlanınca) güncellenir.
 const DEFAULT_ELECTION_INTERVAL := 4
-const DEFAULT_ELECTION_COUNT := 7
+const DEFAULT_ELECTION_COUNT := 8
 const ELECTION_INTERVAL_MIN := 2
 const ELECTION_INTERVAL_MAX := 8
 const ELECTION_COUNT_MIN := 2
@@ -73,7 +73,7 @@ const MITING_MANA_COST := 2
 const INVEST_MANA_COST := 2
 const CENSURE_MANA_COST := 1
 ## Popülizm bonusu kartı bu kadar tur sürer; mana bonusu kartı bu kadar mana verir.
-const POPULISM_ROUNDS := 4
+const POPULISM_ROUNDS := 3
 const MANA_BONUS_AMOUNT := 5
 const ELECTION_MANA_BONUS := 1
 ## GÜNDEM TAKVİMİ: ilk seçimden hemen sonraki turdan itibaren AGENDA_ROUNDS tur

@@ -54,9 +54,13 @@ func _initialize() -> void:
 
 	print("")
 	print("=== 4) SES SEVIYESI AYARI ===")
-	gs.set_volume("sfx", 0.5)
+	gs.set_volume("sfx", 1.0)
 	var sfx_index := AudioServer.get_bus_index(am.BUS_SFX)
-	check("seviye bus'a uygulandi", is_equal_approx(db_to_linear(AudioServer.get_bus_volume_db(sfx_index)), 0.5),
+	var ceiling: float = float(am.VOLUME_CEILING["sfx"])
+	check("%100 = oyunun dengeli sesi (tavan)", is_equal_approx(db_to_linear(AudioServer.get_bus_volume_db(sfx_index)), ceiling),
+		str(db_to_linear(AudioServer.get_bus_volume_db(sfx_index))))
+	gs.set_volume("sfx", 0.5)
+	check("yarim seviye tavanin yarisi", is_equal_approx(db_to_linear(AudioServer.get_bus_volume_db(sfx_index)), ceiling * 0.5),
 		str(db_to_linear(AudioServer.get_bus_volume_db(sfx_index))))
 	gs.set_volume("sfx", 0.0)
 	check("sifir seviye = susturur", AudioServer.is_bus_mute(sfx_index))

@@ -14,10 +14,12 @@ const DEFAULT_FPS_LIMIT := 144
 const DEFAULT_VSYNC := true
 const DEFAULT_DISPLAY_MODE := DisplayMode.WINDOWED
 const DEFAULT_STREAMER_MODE := false
-## Ses seviyeleri 0.0 - 1.0 (0 = kapalı). AudioManager bunları bus'lara uygular.
-const DEFAULT_MASTER_VOLUME := 0.8
-const DEFAULT_MUSIC_VOLUME := 0.5
-const DEFAULT_SFX_VOLUME := 0.8
+## Ses seviyeleri 0.0 - 1.0. %100 = oyunun DENGELİ sesi; kaydırıcılar bu
+## noktanın üstüne çıkmaz (bkz. AudioManager.VOLUME_CEILING). Varsayılan da
+## %100'dür: oyun kutudan çıktığı gibi doğru seviyede.
+const DEFAULT_MASTER_VOLUME := 1.0
+const DEFAULT_MUSIC_VOLUME := 1.0
+const DEFAULT_SFX_VOLUME := 1.0
 
 var fps_limit: int = DEFAULT_FPS_LIMIT
 var vsync_enabled: bool = DEFAULT_VSYNC

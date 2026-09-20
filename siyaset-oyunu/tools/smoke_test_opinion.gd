@@ -333,7 +333,7 @@ func _initialize() -> void:
 	check("populizm ve mana bonusu destede", cm._draw_weights(3).has("populizm") and cm._draw_weights(3).has("mana_bonusu"))
 	cm.inventories[3] = ["populizm", "mana_bonusu"]
 	cm._apply_play(3, 0)
-	check("populizm 1 mana, 4 tur", cm.mana_of(3) == 9 and cm.populism_rounds_left(3) == GameRules.POPULISM_ROUNDS)
+	check("populizm 1 mana, 3 yil", cm.mana_of(3) == 9 and cm.populism_rounds_left(3) == GameRules.POPULISM_ROUNDS)
 	check("populizmde sira devretmez", cm.current_turn_peer_id() == 3)
 	cm._apply_miting(3, "konya")
 	var pop_gain: float = cm.local_of("konya", 3)

@@ -843,14 +843,7 @@ func _card_cost_badge(cost: int) -> Control:
 	row.add_theme_constant_override("separation", 2)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	badge.add_child(row)
-	var icon := TextureRect.new()
-	icon.texture = MANA_ICON
-	icon.custom_minimum_size = Vector2(22, 22)
-	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_child(icon)
+	row.add_child(UiSkin.outlined_icon(MANA_ICON, 22.0, 1.5))
 	var label := Label.new()
 	label.text = str(cost)
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -1791,14 +1784,8 @@ func _build_action_buttons() -> void:
 	_mana_box.add_theme_constant_override("separation", 4)
 	_mana_box.mouse_filter = Control.MOUSE_FILTER_STOP
 	_mana_box.tooltip_text = "Mana"
-	var mana_icon := TextureRect.new()
-	mana_icon.texture = MANA_ICON
-	mana_icon.custom_minimum_size = Vector2(28, 28)
-	mana_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	mana_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	mana_icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	var mana_icon := UiSkin.outlined_icon(MANA_ICON, 28.0, 2.0)
 	mana_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	mana_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_mana_box.add_child(mana_icon)
 	_mana_label = Label.new()
 	_mana_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER

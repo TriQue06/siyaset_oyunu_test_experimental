@@ -96,6 +96,39 @@ static func color_surface(color: Color, path: String = PANEL) -> NinePatchRect:
 	rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	return rect
 
+## KONTURLU İKON: ikonun arkasına aynı ikonun koyu kopyaları kaydırılarak
+## çizilir, böylece PNG'ye dokunmadan yeni tarzın kalın dış çizgisi olur.
+## Büyük bir ikon küçük gösterilirken kenarlar kırılmasın diye mipmap'li
+## LINEAR süzgeç kullanılır (bkz. mana_icon.png.import).
+static func outlined_icon(texture: Texture2D, size: float, outline: float = 2.0,
+		tint: Color = Color.WHITE, outline_color: Color = UiTheme.INK) -> Control:
+	var wrap := Control.new()
+	wrap.custom_minimum_size = Vector2(size, size)
+	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var offsets: Array[Vector2] = [
+		Vector2(-outline, 0), Vector2(outline, 0), Vector2(0, -outline), Vector2(0, outline),
+		Vector2(-outline, -outline), Vector2(outline, -outline),
+		Vector2(-outline, outline), Vector2(outline, outline)]
+	for offset in offsets:
+		wrap.add_child(_icon_layer(texture, offset, outline_color))
+	wrap.add_child(_icon_layer(texture, Vector2.ZERO, tint))
+	return wrap
+
+static func _icon_layer(texture: Texture2D, offset: Vector2, color: Color) -> TextureRect:
+	var rect := TextureRect.new()
+	rect.texture = texture
+	rect.modulate = color
+	rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	rect.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rect.offset_left = offset.x
+	rect.offset_right = offset.x
+	rect.offset_top = offset.y
+	rect.offset_bottom = offset.y
+	return rect
+
 ## Ekrana yayılan 9-slice bir panel zemini (arka plan katmanı olarak eklenir).
 static func panel_background(path: String = PANEL) -> NinePatchRect:
 	var rect := color_surface(Color.WHITE, path)

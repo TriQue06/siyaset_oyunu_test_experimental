@@ -19,9 +19,11 @@ extends Node
 ## Hangi kartın ne olasılıkla çekileceği CardManager._draw_weights'te.
 
 ## Bir başka partiden milletvekili çalar. Kullanılırken HEDEF parti seçilir.
+const STEAL_WEAK_CARD_TYPE := "steal_weak"
+const STEAL_STRONG_CARD_TYPE := "steal_strong"
 const STEAL_CARD_TYPES: Array[String] = [
-	"steal_weak",
-	"steal_strong",
+	STEAL_WEAK_CARD_TYPE,
+	STEAL_STRONG_CARD_TYPE,
 ]
 
 ## Hedef PARTİ seçilen diğer saldırı kartları.

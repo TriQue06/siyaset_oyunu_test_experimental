@@ -63,16 +63,16 @@ const PROVINCE_SEATS_PATH := "res://data/province_seats.json"
 ## İl başına saklanan son olay sayısı (il detay panelinde gösterilir).
 const PROVINCE_EVENT_LIMIT := 6
 
-## Deste ağırlıkları (bkz. _draw_weights).
-const WEIGHT_STEAL := 1.0
-const WEIGHT_PROPAGANDA := 1.6
-const WEIGHT_REPUTATION := 1.2
-const WEIGHT_REBELLION := 1.0
-const WEIGHT_POPULISM := 1.0
-const WEIGHT_MANA_BONUS := 1.2
-## Azınlık hükümeti varken gensorunun ağırlığı, diğer TÜM kartların toplamının
-## bu katı — yani ~%67 olasılıkla gensoru gelir.
-const CENSURE_WEIGHT_FACTOR := 2.0
+## KART NADİRLİĞİ (bkz. _draw_weights). Değerler mutlak değil, oransal: bir
+## kartın gelme olasılığı ağırlığının havuzdaki toplama bölümüdür. İlk seçimden
+## önce isyan ve vekil çalma havuza girmez, kalanların payı kendiliğinden artar.
+const WEIGHT_PROPAGANDA := 15.0
+const WEIGHT_MANA_BONUS := 12.0
+const WEIGHT_POPULISM := 12.0
+const WEIGHT_STEAL_WEAK := 12.0
+const WEIGHT_REPUTATION := 9.0
+const WEIGHT_REBELLION := 9.0
+const WEIGHT_STEAL_STRONG := 9.0
 
 ## Koltuk SAYILARI GERÇEK: TBMM'nin il bazlı milletvekili dağılımı (bkz.
 ## data/province_seats.json). Bu değer dosyadaki sayıların toplamıdır.
@@ -671,8 +671,8 @@ func _draw_weights(peer_id: int = -1) -> Dictionary:
 	if not last_seats.is_empty():
 		weights[CardPresets.REBELLION_CARD_TYPE] = WEIGHT_REBELLION
 	if not last_seats.is_empty():
-		for card_type in CardPresets.STEAL_CARD_TYPES:
-			weights[card_type] = WEIGHT_STEAL
+		weights[CardPresets.STEAL_WEAK_CARD_TYPE] = WEIGHT_STEAL_WEAK
+		weights[CardPresets.STEAL_STRONG_CARD_TYPE] = WEIGHT_STEAL_STRONG
 	weights[CardPresets.POPULISM_CARD_TYPE] = WEIGHT_POPULISM
 	weights[CardPresets.MANA_BONUS_CARD_TYPE] = WEIGHT_MANA_BONUS
 	return weights

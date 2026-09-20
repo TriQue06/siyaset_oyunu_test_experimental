@@ -47,6 +47,9 @@ const MUSIC := {
 const MUSIC_GAIN := {"game": -10.0, "election": -3.0}
 const MUSIC_FADE_IN := {"game": 3.0, "election": 0.35}
 const MUSIC_FADE_OUT := {"game": 3.0, "election": 0.4}
+## Parçaların ilk saniyesi atlanır (giriş vuruşu/sessizliği istenmiyor).
+## Dosyayı kesmiyoruz: çalma bu saniyeden başlıyor, döngüde de öyle.
+const MUSIC_START := {"game": 1.0, "election": 1.0}
 const MUSIC_SILENT_DB := -60.0
 
 const POOL_SIZE := 8
@@ -137,14 +140,14 @@ func _build_music() -> void:
 func _start_music(generation: int) -> void:
 	_music_player.stream = _music_streams[_music_name]
 	_music_player.volume_db = MUSIC_SILENT_DB
-	_music_player.play()
+	_music_player.play(float(MUSIC_START.get(_music_name, 0.0)))
 	_fade_music(float(MUSIC_GAIN.get(_music_name, -6.0)), float(MUSIC_FADE_IN.get(_music_name, 1.0)))
 	_schedule_fade_out(generation)
 
 ## Parça bitmeden fade_out kadar önce kısmaya başla.
 func _schedule_fade_out(generation: int) -> void:
 	var fade_out := float(MUSIC_FADE_OUT.get(_music_name, 1.0))
-	var length := _music_player.stream.get_length()
+	var length := _music_player.stream.get_length() - float(MUSIC_START.get(_music_name, 0.0))
 	var wait := maxf(0.1, length - fade_out)
 	await get_tree().create_timer(wait).timeout
 	if generation != _music_generation or not _music_player.playing:

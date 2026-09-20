@@ -116,6 +116,8 @@ func _initialize() -> void:
 	await process_frame
 	check("muzik calmaya basladi", am._music_name == "game" and am._music_player.playing)
 	check("sessizden acilir (fade in)", am._music_player.volume_db < float(am.MUSIC_GAIN["game"]))
+	check("ilk saniye atlanir", am._music_player.get_playback_position() >= 1.0,
+		str(am._music_player.get_playback_position()))
 	am._music_player.stop()
 	am._on_music_finished()
 	check("parca bitince bastan baslar (dongu)", am._music_player.playing)

@@ -35,6 +35,7 @@ var _assignments: Dictionary = {}
 var _chips: Dictionary = {}
 
 func _ready() -> void:
+	AudioManager.play_music("game")
 	var backdrop := UiSkin.panel_background(UiSkin.PANEL_DARK)
 	add_child(backdrop)
 	move_child(backdrop, 0)

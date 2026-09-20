@@ -18,6 +18,7 @@ var join_button: Button
 var status_label: Label
 
 func _ready() -> void:
+	AudioManager.stop_music()  # menüler sessiz
 	_build_background()
 	_build_card()
 	_build_footer()

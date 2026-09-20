@@ -103,5 +103,23 @@ func _initialize() -> void:
 	gm.votes = {}
 
 	print("")
+	print("=== 6) MUZIK ===")
+	check("iki parca da yuklendi", am._music_streams.has("game") and am._music_streams.has("election"))
+	for track in am._music_streams:
+		var stream = am._music_streams[track]
+		check("%s: motor dongusu kapali (fade ile donduruyoruz)" % track, not ("loop" in stream) or not stream.loop)
+	check("arka plan muzigi secim muziginden kisik",
+		float(am.MUSIC_GAIN["game"]) < float(am.MUSIC_GAIN["election"]), "%s dB / %s dB" % [am.MUSIC_GAIN["game"], am.MUSIC_GAIN["election"]])
+	check("arka plan fade'i uzun", float(am.MUSIC_FADE_IN["game"]) >= 2.0 and float(am.MUSIC_FADE_OUT["game"]) >= 2.0)
+	check("secim fade'i cok kisa", float(am.MUSIC_FADE_IN["election"]) <= 0.5 and float(am.MUSIC_FADE_OUT["election"]) <= 0.5)
+	am.play_music("game")
+	await process_frame
+	check("muzik calmaya basladi", am._music_name == "game" and am._music_player.playing)
+	check("sessizden acilir (fade in)", am._music_player.volume_db < float(am.MUSIC_GAIN["game"]))
+	am._music_player.stop()
+	am._on_music_finished()
+	check("parca bitince bastan baslar (dongu)", am._music_player.playing)
+
+	print("")
 	print("=== TUM TESTLER GECTI ===" if _failed == 0 else "=== %d TEST BASARISIZ ===" % _failed)
 	quit(1 if _failed > 0 else 0)

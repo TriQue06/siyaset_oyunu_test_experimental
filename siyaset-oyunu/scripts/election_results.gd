@@ -97,6 +97,7 @@ var _ticker_label: Label
 var _final_stamp: Label
 
 func _ready() -> void:
+	AudioManager.play_music("election")
 	_sim.setup(CardManager.last_province_results, CardManager.last_vote_shares, CardManager.last_seats,
 		CardManager.passed_threshold, MultiplayerManager.election_threshold, _seed(), DURATION)
 	_party_order = _sim.peer_ids.duplicate()

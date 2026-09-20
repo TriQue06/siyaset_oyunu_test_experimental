@@ -176,6 +176,7 @@ var _agenda_banner: PanelContainer
 var _agenda_label: Label
 
 func _ready() -> void:
+	AudioManager.play_music("game")
 	map_holder.province_clicked.connect(_on_province_clicked)
 	_refresh_game_settings_label()
 	MultiplayerManager.settings_updated.connect(_refresh_game_settings_label)

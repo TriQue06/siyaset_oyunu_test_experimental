@@ -442,7 +442,6 @@ func _initialize() -> void:
 	check("her tur bir yil", GameRules.year_of_round(4) == 1953 and GameRules.year_of_round(5) == 1954)
 	check("ilk secim 4. turun sonunda: 1954", GameRules.is_election_round(4) and GameRules.election_year(4) == 1954)
 	check("secimler 4 yilda bir", GameRules.election_year(8) == 1958 and GameRules.election_year(12) == 1962)
-	check("son yil", GameRules.final_year() == 1950 + GameRules.MAX_ROUNDS - 1)
 
 	print("")
 	print("=== 14) KOALISYONDAN CEKILME ===")

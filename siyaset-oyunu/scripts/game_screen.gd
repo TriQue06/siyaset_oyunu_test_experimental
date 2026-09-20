@@ -320,7 +320,7 @@ func _on_round_advanced() -> void:
 	_refresh_game_settings_label()
 	_refresh_score_panel()
 	_refresh_government_panel()
-	_show_toast("%d yılı başladı" % GameRules.year_of_round(CardManager.round_number))
+	_show_toast("%d başladı" % GameRules.year_of_round(CardManager.round_number))
 
 func _on_game_over() -> void:
 	_refresh_score_panel()
@@ -475,8 +475,8 @@ func _refresh_map_seat_markers() -> void:
 
 func _refresh_game_settings_label() -> void:
 	var next_election := GameRules.next_election_round(CardManager.round_number)
-	game_settings_label.text = "%d yılı  ·  son yıl %d  ·  Baraj %%%s\n%s" % [
-		GameRules.year_of_round(mini(CardManager.round_number, GameRules.MAX_ROUNDS)), GameRules.final_year(),
+	game_settings_label.text = "%d  ·  Baraj %%%s\n%s" % [
+		GameRules.year_of_round(mini(CardManager.round_number, GameRules.MAX_ROUNDS)),
 		_format_threshold(MultiplayerManager.election_threshold),
 		("Sonraki seçim: %d" % GameRules.election_year(next_election)) if next_election != -1 else "Başka seçim yok",
 	]

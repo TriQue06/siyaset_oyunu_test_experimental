@@ -121,9 +121,6 @@ static func year_of_round(round_number: int) -> int:
 static func election_year(round_number: int) -> int:
 	return START_YEAR + maxi(1, round_number)
 
-## Oyunun son yılı.
-static func final_year() -> int:
-	return year_of_round(MAX_ROUNDS)
 
 static func is_election_round(round_number: int) -> bool:
 	# Son turun sonunda da seçim yapılır (son seçim); oyun hükümet kurulunca biter.

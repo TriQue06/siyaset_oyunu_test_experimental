@@ -367,11 +367,18 @@ func _build_color_row() -> void:
 		var allowed := _is_allowed_bg_color(color) and not taken
 		var btn := Button.new()
 		btn.custom_minimum_size = Vector2(SWATCH_SIZE, SWATCH_SIZE)
-		btn.disabled = not allowed or (_is_locked and not _editing_bot())
-		btn.modulate = Color.WHITE if allowed else Color(0.55, 0.55, 0.55, 1.0)
+		# KARE KALSIN: HFlowContainer çocukları satırın yüksekliğine geriyordu;
+		# "✕" yazılı bir kutu satırı yükseltince bütün renkler dikdörtgen
+		# oluyordu. Shrink ile her kutu kendi kare ölçüsünde kalır.
+		btn.size_flags_horizontal = SIZE_SHRINK_CENTER
+		btn.size_flags_vertical = SIZE_SHRINK_CENTER
+		btn.clip_text = true
 		if taken:
 			btn.text = "✕"
+			btn.add_theme_font_size_override("font_size", 12)
 			btn.tooltip_text = "Bu renk başka bir oyuncuda"
+		btn.disabled = not allowed or (_is_locked and not _editing_bot())
+		btn.modulate = Color.WHITE if allowed else Color(0.55, 0.55, 0.55, 1.0)
 		# Seçili renk altın çerçeveyle ayrılır (pixel tarz: kare, kalın kenar).
 		var selected := color.is_equal_approx(_selected_bg_color)
 		var style := UiSkin.color_box(color, UiSkin.BUTTON_TINT_HOVER if selected else UiSkin.BUTTON_TINT_NORMAL)

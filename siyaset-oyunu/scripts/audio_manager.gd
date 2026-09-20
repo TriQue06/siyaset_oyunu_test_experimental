@@ -23,7 +23,7 @@ const SOUNDS := {
 	"turn_start": "res://assets/audio/ui/turn_start.ogg",
 	## Gensoru oylaması açıldı — herkes duyar.
 	"censure_open": "res://assets/audio/ui/censure_open.ogg",
-	## Kendi oyunun sesi (başkalarının oyu seslenmez).
+	## Verilen oylar: açık oylama, her oy HERKESTE seslenir.
 	"vote_yes": "res://assets/audio/ui/vote_yes.ogg",
 	"vote_no": "res://assets/audio/ui/vote_no.ogg",
 	"vote_abstain": "res://assets/audio/ui/vote_abstain.ogg",
@@ -169,9 +169,9 @@ func _on_card_drawn(peer_id: int, _card_type: String) -> void:
 	if peer_id == multiplayer.get_unique_id():
 		play("card_drawn")
 
-## Yeni bir oylama açıldığında ve SEN oy verdiğinde çalar. Başkalarının oyu
-## seslenmez (kalabalık oyunda ses yığılmasın). Oylar durum senkronuyla geldiği
-## için istemcide de aynı yerden yakalanır.
+## Yeni bir oylama açıldığında ve her yeni oy geldiğinde çalar — kimin oyu
+## olursa olsun herkes duyar. Oylar durum senkronuyla geldiği için istemcide de
+## aynı yerden yakalanır.
 func _on_proposal_changed() -> void:
 	var key := "%s:%d:%d" % [GovernmentManager.proposal_kind, GovernmentManager.proposal_peer_id,
 		GovernmentManager.phase]
@@ -185,8 +185,6 @@ func _on_proposal_changed() -> void:
 		if _heard_votes.has(id):
 			continue
 		_heard_votes[id] = true
-		if id != multiplayer.get_unique_id():
-			continue
 		match int(GovernmentManager.votes[voter]):
 			GovernmentManager.VOTE_YES: play("vote_yes")
 			GovernmentManager.VOTE_NO: play("vote_no")

@@ -73,14 +73,14 @@ func _initialize() -> void:
 	gm.votes[901] = gm.VOTE_NO
 	gm.votes[902] = gm.VOTE_ABSTAIN
 	gm.proposal_changed.emit()
-	check("baskalarinin oyu seslenmez", not heard.call("vote_no") and not heard.call("vote_abstain"))
+	check("baskalarinin oyu da duyulur", heard.call("vote_no") and heard.call("vote_abstain"))
 	am._last_played.clear()
 	gm.proposal_kind = gm.KIND_LAW
 	gm.votes = {}
 	gm.proposal_changed.emit()
-	gm.votes = {me: gm.VOTE_NO}
+	gm.votes = {901: gm.VOTE_NO}
 	gm.proposal_changed.emit()
-	check("kendi HAYIR oyun seslendi", heard.call("vote_no"))
+	check("yasa oylamasinda baskasinin HAYIR'i duyulur", heard.call("vote_no"))
 	check("yasa oylamasinda gensoru cingili calmaz", not heard.call("censure_open"))
 	am._last_played.clear()
 	gm.proposal_resolved.emit(true, gm.KIND_LAW, 1)

@@ -183,7 +183,7 @@ func _build_events() -> void:
 		return
 	for i in range(events.size() - 1, -1, -1):
 		var event: Dictionary = events[i]
-		_body.add_child(_label("Tur %d: %s" % [int(event.get("round", 0)), event.get("text", "")], 11))
+		_body.add_child(_label("%d: %s" % [GameRules.year_of_round(int(event.get("round", 1))), event.get("text", "")], 11))
 
 static func _opinion_color(value: float) -> Color:
 	if value > 0.05:

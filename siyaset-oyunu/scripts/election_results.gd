@@ -436,7 +436,7 @@ func _build_ui() -> void:
 	_live_badge.add_child(_live_label)
 	_title = _label("SEÇİM GECESİ  ·  ÖZEL YAYIN", 26, Color.WHITE)
 	_top_bar.add_child(_title)
-	_subtitle = _label("%d. Tur  ·  %s" % [maxi(1, CardManager.last_election_round),
+	_subtitle = _label("%d  ·  %s" % [GameRules.election_year(CardManager.last_election_round),
 		"ERKEN SEÇİM" if CardManager.last_election_was_early else "GENEL SEÇİM"], 14, GOLD)
 	_top_bar.add_child(_subtitle)
 	_clock = _label("21:00", 34, Color.WHITE)

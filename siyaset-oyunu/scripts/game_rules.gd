@@ -4,7 +4,8 @@ extends RefCounted
 ## buradaki sabitleri düzenlemek yeterli.
 ##
 ## DÖNGÜ
-##   - Bir TUR: turn_order'daki herkesin sırayla bir kez oynaması.
+##   - Bir TUR: turn_order'daki herkesin sırayla bir kez oynaması. Bir tur
+##     oyunun takviminde BİR YILDIR (bkz. START_YEAR / year_of_round).
 ##   - İlk FIRST_ELECTION_ROUND tur KAMPANYA DÖNEMİDİR (meclis yok: il
 ##     başkanlıkları, mitingler, gözcü, seçim vaatleri). İlk seçim o turun
 ##     sonunda, sonra her ELECTION_INTERVAL turda bir (5, 10, 15 ... 30). Arada
@@ -105,6 +106,24 @@ const ELECTION_NIGHT_HOLD := 5.0
 
 ## Oyun ortasında oyuncular ayrılıp bu sayının altına düşülürse oyun biter.
 const MIN_PLAYERS_TO_CONTINUE := 2
+
+## TAKVİM: bir tur bir YILDIR. Oyun START_YEAR'da başlar, seçimler
+## ELECTION_INTERVAL yılda bir yapılır. Tur sonunda sandıktan çıkan meclis bir
+## sonraki yılın meclisidir; bu yüzden seçim, biten turun DEĞİL onu izleyen
+## yılın adıyla anılır (varsayılanla 1954, 1958, 1962 ...).
+const START_YEAR := 1950
+
+## Bu turun takvim yılı.
+static func year_of_round(round_number: int) -> int:
+	return START_YEAR + maxi(1, round_number) - 1
+
+## round_number'uncu turun sonunda yapılan seçimin adı olan yıl.
+static func election_year(round_number: int) -> int:
+	return START_YEAR + maxi(1, round_number)
+
+## Oyunun son yılı.
+static func final_year() -> int:
+	return year_of_round(MAX_ROUNDS)
 
 static func is_election_round(round_number: int) -> bool:
 	# Son turun sonunda da seçim yapılır (son seçim); oyun hükümet kurulunca biter.

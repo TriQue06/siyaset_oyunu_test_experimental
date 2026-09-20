@@ -872,7 +872,7 @@ func _apply_card_effect(peer_id: int, card_type: String, target_peer_id: int = -
 			_event_message = "%s'da parti içi isyan çıktı: sıradaki yasa oylamasında çekimser kalacak." % _party_name(target_peer_id)
 		CardPresets.POPULISM_CARD_TYPE:
 			populism[peer_id] = round_number + GameRules.POPULISM_ROUNDS
-			_event_message = "%s popülizme başladı: %d tur boyunca hamleleri daha etkili." % [_party_name(peer_id), GameRules.POPULISM_ROUNDS]
+			_event_message = "%s popülizme başladı: %d yıl boyunca hamleleri daha etkili." % [_party_name(peer_id), GameRules.POPULISM_ROUNDS]
 		CardPresets.MANA_BONUS_CARD_TYPE:
 			mana[peer_id] = mana_of(peer_id) + GameRules.MANA_BONUS_AMOUNT
 			_event_message = "%s mana bonusu kullandı (+%d mana)." % [_party_name(peer_id), GameRules.MANA_BONUS_AMOUNT]
@@ -1030,7 +1030,7 @@ func _schedule_agenda() -> void:
 		var was_active := not agenda.is_empty()
 		agenda = {}
 		if was_active and pos == GameRules.AGENDA_ROUNDS:
-			_push_state({"type": "agenda", "message": "Gündem arası: %d tur yasa yok, sonra yeni gündemler." % GameRules.AGENDA_GAP})
+			_push_state({"type": "agenda", "message": "Gündem arası: %d yıl yasa yok, sonra yeni gündemler." % GameRules.AGENDA_GAP})
 		return
 	# Eksenler karıştırılmış bir sıradan tüketilir: arka arkaya gelen iki gündem
 	# (aynı dönemde ya da iki dönem arasında) hep farklı eksenden olur.
@@ -1048,7 +1048,7 @@ func _schedule_agenda() -> void:
 	var type := "gundem_%s_%s" % [axis, "p" if _rng.randf() < 0.5 else "n"]
 	agenda = {"type": type, "until": round_number + 1, "index": pos + 1}
 	var data := CardPresets.agenda_data(type)
-	_push_state({"type": "agenda", "message": "GÜNDEM (%d/%d): %s — bu tur %s." % [pos + 1, GameRules.AGENDA_ROUNDS,
+	_push_state({"type": "agenda", "message": "GÜNDEM (%d/%d): %s — bu yıl %s." % [pos + 1, GameRules.AGENDA_ROUNDS,
 		data["title"], CardPresets.agenda_effect_text(type)]})
 
 ## GovernmentManager, reddedilen gensorudan sonra (host) çağırır: getiren parti
@@ -1333,10 +1333,10 @@ func _finish_final_election() -> void:
 	final_election_pending = false
 	if GovernmentManager.has_government():
 		GovernmentManager.award_round_scores()
-		_end_game("%d tur tamamlandı. Son seçimle kurulan %s hükümeti makam puanlarını aldı." % [
+		_end_game("%d yıl tamamlandı. Son seçimle kurulan %s hükümeti makam puanlarını aldı." % [
 			GameRules.MAX_ROUNDS, _party_name(GovernmentManager.main_gov_peer_id)])
 	else:
-		_end_game("%d tur tamamlandı. Son seçimden sonra hükümet kurulamadı." % GameRules.MAX_ROUNDS)
+		_end_game("%d yıl tamamlandı. Son seçimden sonra hükümet kurulamadı." % GameRules.MAX_ROUNDS)
 
 func _end_game(reason: String) -> void:
 	game_finished = true

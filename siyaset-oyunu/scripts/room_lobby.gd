@@ -287,15 +287,16 @@ func _refresh_settings_display() -> void:
 	var t := MultiplayerManager.election_threshold
 	var interval := MultiplayerManager.election_interval
 	var count := MultiplayerManager.election_count
-	threshold_label.text = "Baraj %%%s  ·  %d seçim, %d turda bir (%d tur)" % [_format_threshold(t), count, interval, interval * count]
+	threshold_label.text = "Baraj %%%s  ·  %d seçim, %d yılda bir (%d'den %d yıl)" % [_format_threshold(t), count, interval, GameRules.START_YEAR, interval * count]
 	interval_value_label.text = str(interval)
 	count_value_label.text = str(count)
-	var rounds: Array = []
+	var years: Array = []
 	for i in range(1, count + 1):
-		rounds.append(str(interval * i))
-	if rounds.size() > 5:
-		rounds = rounds.slice(0, 3) + ["…"] + rounds.slice(rounds.size() - 1)
-	game_length_summary.text = "Toplam %d tur. Seçimler: %s. turlarda." % [interval * count, ", ".join(PackedStringArray(rounds))]
+		years.append(str(GameRules.START_YEAR + interval * i))
+	if years.size() > 5:
+		years = years.slice(0, 3) + ["…"] + years.slice(years.size() - 1)
+	game_length_summary.text = "%d'de başlar, %d yıl sürer. Seçimler: %s." % [GameRules.START_YEAR,
+		interval * count, ", ".join(PackedStringArray(years))]
 	if MultiplayerManager.is_local_owner():
 		interval_minus.disabled = interval <= GameRules.ELECTION_INTERVAL_MIN
 		interval_plus.disabled = interval >= GameRules.ELECTION_INTERVAL_MAX
@@ -352,7 +353,7 @@ func _build_settings_panel() -> void:
 	title.add_theme_font_size_override("font_size", 20)
 
 	var length := _section("OYUN SÜRESİ", "")
-	var interval_row := _stepper_row(length, "Seçimler kaç turda bir")
+	var interval_row := _stepper_row(length, "Seçimler kaç yılda bir")
 	interval_minus = interval_row[0]
 	interval_value_label = interval_row[1]
 	interval_plus = interval_row[2]
@@ -373,7 +374,7 @@ func _build_settings_panel() -> void:
 	axis_start_value_label = _value_row(axis, "Başlangıç")
 	axis_start_slider = HSlider.new()
 	axis.add_child(axis_start_slider)
-	axis_increment_value_label = _value_row(axis, "Tur başına artış")
+	axis_increment_value_label = _value_row(axis, "Yıl başına artış")
 	axis_increment_slider = HSlider.new()
 	axis.add_child(axis_increment_slider)
 	var cap_row := HBoxContainer.new()

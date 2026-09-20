@@ -330,7 +330,7 @@ func _card_effect_text(card_type: String) -> String:
 			int(r["min"]), int(r["max"]), int(close["min"]), int(close["max"]), int(far["min"]), int(far["max"])]
 	if is_agenda_card(card_type):
 		var agenda := agenda_data(card_type)
-		return "%s\n%d tur boyunca gündem bu: %s.\nDokun, tekrar dokun: kullan." % [agenda["text"], GameRules.AGENDA_ROUNDS,
+		return "%s\n%d yıl boyunca gündem bu: %s.\nDokun, tekrar dokun: kullan." % [agenda["text"], GameRules.AGENDA_ROUNDS,
 			agenda_effect_text(card_type)]
 	match card_type:
 		REPUTATION_CARD_TYPE:
@@ -354,7 +354,7 @@ func _card_effect_text(card_type: String) -> String:
 		PROPAGANDA_CARD_TYPE:
 			return "Bir ilde bir partiyi karala: ona eksi, sana artı.\nİlde güçlü olan partiye az işler."
 		POPULISM_CARD_TYPE:
-			return "%d tur boyunca her şey güçlenir: miting, yasa, karalama\nhasarı ve teşkilat bonusu %d kat, vekil çalma %.1f kat; kötü sonuçlar\n%%%d azalır; bu sürede seçim olursa ulusal +%.1f. Dokun, tekrar dokun: kullan." % [
+			return "%d yıl boyunca her şey güçlenir: miting, yasa, karalama\nhasarı ve teşkilat bonusu %d kat, vekil çalma %.1f kat; kötü sonuçlar\n%%%d azalır; bu sürede seçim olursa ulusal +%.1f. Dokun, tekrar dokun: kullan." % [
 				GameRules.POPULISM_ROUNDS, int(PublicOpinion.POPULISM_GOOD_MULT), PublicOpinion.POPULISM_STEAL_MULT,
 				int(round((1.0 - PublicOpinion.POPULISM_BAD_MULT) * 100)), PublicOpinion.POPULISM_ELECTION_NATIONAL]
 		MANA_BONUS_CARD_TYPE:

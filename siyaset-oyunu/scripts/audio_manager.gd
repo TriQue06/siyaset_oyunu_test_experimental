@@ -9,9 +9,10 @@ extends Node
 ##   - Aynı ses REPEAT_GUARD saniye içinde ikinci kez çalmaz: botlar arka arkaya
 ##     hamle yaptığında sesler üst üste binmesin.
 ##
-## BUTON SESİ EVRENSELDİR: tek tek butonlara bağlanmaz. Sahneye giren her Button
-## otomatik yakalanır (bkz. _on_node_added), böylece sonradan eklenen butonlar
-## da kendiliğinden seslenir.
+## BUTON SESİ EVRENSELDİR: tek tek butonlara bağlanmaz. Sahneye giren her
+## BaseButton otomatik yakalanır (bkz. _on_node_added) — Button'ın yanı sıra
+## TextureButton (parti ikonları), CheckBox, CheckButton da dahil. Böylece
+## sonradan eklenen butonlar da kendiliğinden seslenir.
 
 const BUS_MUSIC := "Muzik"
 const BUS_SFX := "Efekt"
@@ -250,18 +251,18 @@ func _build_pool() -> void:
 		_players.append(player)
 
 func _on_node_added(node: Node) -> void:
-	if node is Button:
+	if node is BaseButton:
 		_hook_button(node)
 
 func _hook_existing(node: Node) -> void:
-	if node is Button:
+	if node is BaseButton:
 		_hook_button(node)
 	for child in node.get_children():
 		_hook_existing(child)
 
 ## Butonun kendi sinyaline bağlanır. İki kez bağlanmaz; ses istemeyen bir buton
 ## olursa node'a "sessiz" meta'sı konarak muaf tutulabilir.
-func _hook_button(button: Button) -> void:
+func _hook_button(button: BaseButton) -> void:
 	if bool(button.get_meta("sessiz", false)):
 		return
 	if button.pressed.is_connected(_on_button_pressed):

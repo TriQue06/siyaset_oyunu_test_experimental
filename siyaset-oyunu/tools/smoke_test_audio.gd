@@ -34,6 +34,18 @@ func _initialize() -> void:
 	check("sahneye giren buton otomatik baglandi", button.pressed.is_connected(am._on_button_pressed))
 	button.emit_signal("pressed")
 	check("basinca ses caldi", am._last_played.has("ui_click"))
+	am._last_played.clear()
+	var texture_button := TextureButton.new()
+	root.add_child(texture_button)
+	await process_frame
+	texture_button.emit_signal("pressed")
+	check("TextureButton (parti ikonu) da seslenir", am._last_played.has("ui_click"))
+	am._last_played.clear()
+	var check_box := CheckBox.new()
+	root.add_child(check_box)
+	await process_frame
+	check_box.emit_signal("pressed")
+	check("CheckBox da seslenir", am._last_played.has("ui_click"))
 	var muted := Button.new()
 	muted.set_meta("sessiz", true)
 	root.add_child(muted)

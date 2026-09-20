@@ -58,11 +58,11 @@ func _initialize() -> void:
 	check("bakanlik alan parti hukumette", gm.government_party_ids().has(1), str(gm.government_party_ids()))
 	var expected_human: int = 2 * gp.MINISTRY_POINTS
 	check("tur puani = 2 bakanlik", gm.round_points_of(1) == expected_human, str(gm.round_points_of(1)))
-	gm.scores = {}
+	check("puan hukumet KURULURKEN yazildi", gm.score_of(1) == expected_human,
+		"puan %d, beklenen %d" % [gm.score_of(1), expected_human])
 	cm._finish_round()
-	check("tur sonunda puan YAZILDI", gm.score_of(1) == expected_human, "puan %d, beklenen %d" % [gm.score_of(1), expected_human])
 	cm._finish_round()
-	check("puan birikiyor", gm.score_of(1) == expected_human * 2, str(gm.score_of(1)))
+	check("tur sonlari puan EKLEMEZ (tek seferlik)", gm.score_of(1) == expected_human, str(gm.score_of(1)))
 	var pm_party_points: int = gm.round_points_of(2)
 	check("basbakanlik + kalan gorevler daha fazla", pm_party_points > expected_human, str(pm_party_points))
 

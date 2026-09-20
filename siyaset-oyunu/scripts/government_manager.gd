@@ -226,7 +226,8 @@ func has_majority() -> bool:
 func has_government() -> bool:
 	return not government.is_empty()
 
-## Bu partinin hükümetteki görevlerinden gelen TUR BAŞINA puanı.
+## Bu partinin hükümetteki görevlerinden gelen puan. TEK SEFERLİKTİR: hükümet
+## kurulduğu anda yazılır (bkz. award_formation_scores), her tur tekrarlanmaz.
 func round_points_of(peer_id: int) -> int:
 	var points := 0
 	for post_id in government.keys():
@@ -311,14 +312,21 @@ func start_formation(extra_seconds: float = 0.0) -> void:
 		_phase_time_left += extra_seconds
 	_push_state()
 
-## Tur bitiminde host çağırır: görevdeki partilere görev puanlarını yazar.
-## Puan BİRİKİR — iktidarda kalmak kazandırır, düşürmek engeller.
-func award_round_scores() -> void:
+## HÜKÜMET KURULUNCA host çağırır: görev alan partilere makam puanları TEK
+## SEFER yazılır. Her tur tekrar yazılmaz — iktidarda kalmanın kendisi değil,
+## hükümeti kurabilmiş olmak puan kazandırır.
+func award_formation_scores() -> void:
 	if not _is_authority() or government.is_empty():
 		return
+	var notes: Array[String] = []
 	for peer_id in government_party_ids():
-		scores[peer_id] = score_of(peer_id) + round_points_of(peer_id)
-	_push_state()
+		var points := round_points_of(peer_id)
+		if points <= 0:
+			continue
+		scores[peer_id] = score_of(peer_id) + points
+		notes.append("%s +%d" % [_party_name(peer_id), points])
+	if not notes.is_empty():
+		last_resolution_reason += " Makam puanları: %s." % ", ".join(notes)
 
 func _build_mandate_order() -> void:
 	mandate_order = voter_ids()
@@ -687,6 +695,8 @@ func _resolve_proposal() -> void:
 			last_resolution_reason = "%s hükümeti güvenoyu aldı. Hükümet partileri +%d mana." % [
 				_party_name(main_gov_peer_id), GameRules.GOVERNMENT_MANA_BONUS]
 			CardManager.grant_government_mana(government_party_ids())
+			# Makam puanları TEK SEFER, hükümetin kurulduğu anda yazılır.
+			award_formation_scores()
 		else:
 			last_resolution_reason = "Hükümet teklifi reddedildi: " + reason
 			_fail_attempt()

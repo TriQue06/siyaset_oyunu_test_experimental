@@ -20,7 +20,7 @@ extends Node
 ##
 ## TUR SONU (herkes birer kez oynayınca) — bkz. GameRules
 ##   - (mana geliri tur sonunda değil, her oyuncunun sırası geldiğinde verilir),
-##   - görevdeki hükümet makam puanlarını alır, eksen keskinliği artar,
+##   - eksen keskinliği artar (makam puanları hükümet kurulurken yazılır),
 ##   - il/ulusal puanlar sıfıra doğru söner (il başkanlığı sönmez),
 ##   - son tursa oyun biter; seçim turuysa (ya da hükümet kurulamadıysa
 ##     ERKEN SEÇİM) seçim yapılır ve hükümet kurma aşaması başlar,
@@ -1395,8 +1395,8 @@ func schedule_early_election() -> void:
 
 func _finish_round() -> void:
 	_round_end_pending = false
-	# Biten turda görevde olan hükümet görev puanlarını KAZANIR (birikimli).
-	GovernmentManager.award_round_scores()
+	# Makam puanları TUR SONUNDA DEĞİL, hükümet kurulduğu anda yazılır
+	# (bkz. GovernmentManager.award_formation_scores).
 	var finished_round := round_number
 	round_number += 1
 	current_axis_sharpness = minf(current_axis_sharpness + MultiplayerManager.axis_sharpness_increment,
@@ -1476,13 +1476,12 @@ func _hold_election(finished_round: int, early: bool) -> void:
 	# Seçim gecesi yayını herkesin ekranında oynarken kurma süresi yanmasın.
 	GovernmentManager.start_formation(GameRules.ELECTION_NIGHT_SECONDS + GameRules.ELECTION_NIGHT_HOLD + 2.0)
 
-## Son seçimin ardından hükümet kurma bitti: kurulduysa hükümet partileri makam
-## puanlarını son kez alır, puan tablosu kesinleşir.
+## Son seçimin ardından hükümet kurma bitti: puan tablosu kesinleşir. Makam
+## puanları hükümet kurulurken zaten yazıldı, burada tekrar yazılmaz.
 func _finish_final_election() -> void:
 	final_election_pending = false
 	if GovernmentManager.has_government():
-		GovernmentManager.award_round_scores()
-		_end_game("%d dönem tamamlandı. Son seçimle kurulan %s hükümeti makam puanlarını aldı." % [
+		_end_game("%d dönem tamamlandı. Son hükümeti %s kurdu." % [
 			GameRules.MAX_ROUNDS, _party_name(GovernmentManager.main_gov_peer_id)])
 	else:
 		_end_game("%d dönem tamamlandı. Son seçimden sonra hükümet kurulamadı." % GameRules.MAX_ROUNDS)

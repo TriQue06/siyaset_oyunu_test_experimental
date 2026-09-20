@@ -191,16 +191,16 @@ func _initialize() -> void:
 	pass_round()
 	check("tur 11 sonunda secim YOK", cm.last_election_round == 10 and cm.round_number == 12)
 	check("hukumet hala gorevde", gm.has_government())
-	check("puan eklendi", gm.score_of(1) == pts1, "%d vs %d" % [gm.score_of(1), pts1])
+	check("makam puani kurulusta yazildi, tur sonu eklemez", gm.score_of(1) == pts1, "%d vs %d" % [gm.score_of(1), pts1])
 	pass_round()
 	pass_round()
 	pass_round()
-	check("tur 12, 13, 14 sonunda da secim yok", cm.last_election_round == 10 and gm.score_of(1) == pts1 * 4)
+	check("tur 12, 13, 14 sonunda da secim yok", cm.last_election_round == 10 and gm.score_of(1) == pts1)
 	while cm.round_number <= 20:
 		pass_round()
 	check("tur 20 sonunda SECIM", cm.last_election_round == 20 and cm.round_number == 21)
-	# 11-20 arası 10 tur boyunca her tur makam puanı yazıldı.
-	check("secim oncesi puan yazildi", gm.score_of(1) == pts1 * 10, "%d vs %d" % [gm.score_of(1), pts1 * 10])
+	# Makam puanı hükümet kurulurken TEK SEFER yazıldı; turlar eklemedi.
+	check("puan tek seferlik kaldi", gm.score_of(1) == pts1, "%d vs %d" % [gm.score_of(1), pts1])
 
 	print("")
 	print("=== 7) GENSORU OYLAMASI SIRAYI DEVRETMEZ ===")

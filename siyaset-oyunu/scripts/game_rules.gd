@@ -9,7 +9,8 @@ extends RefCounted
 ##   - İlk FIRST_ELECTION_ROUND tur KAMPANYA DÖNEMİDİR (meclis yok: il
 ##     başkanlıkları, mitingler, gözcü, seçim vaatleri). İlk seçim o turun
 ##     sonunda, sonra her ELECTION_INTERVAL turda bir (5, 10, 15 ... 30). Arada
-##     kalan turlarda kurulu hükümet görevde kalır ve makam puanlarını toplar.
+##     kalan turlarda kurulu hükümet görevde kalır. MAKAM PUANLARI hükümet
+##     KURULDUĞU ANDA tek sefer yazılır, her tur tekrarlanmaz.
 ##   - HAMLE SINIRI YOK: sırası gelen oyuncu manası yettiğince hamle yapar,
 ##     "Turu Bitir" ile sırayı devreder. Mana birikir, üst sınır yok. Manası
 ##     biten (ve elinde bedava kart olmayan) oyuncunun sırası kendiliğinden devreder.
@@ -30,10 +31,9 @@ extends RefCounted
 ##     Kartları oynamanın bedeli CardPresets.CARD_MANA_COSTS.
 ##   - Hükümet kurulamazsa (tüm görev hakları biterse) o turun sonunda ERKEN
 ##     SEÇİM yapılır.
-##   - MAX_ROUNDS'uncu turun sonunda SON SEÇİM yapılır; kurulan hükümet
-##     makam puanlarını bir kez daha alır ve puan tablosu kesinleşir. Hükümet
-##     kurulamazsa bu puan yazılmaz. En çok puanı olan kazanır (eşitlikte
-##     milletvekili sayısı).
+##   - MAX_ROUNDS'uncu turun sonunda SON SEÇİM yapılır; kurulan hükümet makam
+##     puanlarını kurulurken alır ve puan tablosu kesinleşir. En çok puanı olan
+##     kazanır (eşitlikte milletvekili sayısı).
 
 ## TAKVİM: BİR TUR ALTI AYDIR. Lobideki "seçimler kaç yılda bir" ayarı YIL
 ## cinsindendir; tur cinsinden karşılığı ELECTION_INTERVAL = yıl × 2'dir.

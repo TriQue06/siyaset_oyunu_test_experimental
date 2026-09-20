@@ -16,15 +16,15 @@ extends Control
 ## ikon/renk butonları ile eksen satırları, veri kataloğuna bağlı olduğundan
 ## çalışma zamanında üretilir.
 
-const SWATCH_SIZE := 36.0
-const ICON_BUTTON_SIZE := 44.0
+const SWATCH_SIZE := 24.0
+const ICON_BUTTON_SIZE := 30.0
 const GRID_ICON_PIXEL_SIZE := 60       # ızgaradaki küçük ikonlar için raster boyutu
 const PREVIEW_ICON_PIXEL_SIZE := 480   # kocaman önizleme için raster boyutu
 ## Parti ikonları her zaman beyaz. Beyaz arka plan bu yüzden seçilemez
 ## (ikon görünmez olurdu).
 const ICON_COLOR := Color.WHITE
 ## Soldaki oyuncu listesi paneli (herkesin adı ve kurduğu parti, anlık).
-const PLAYERS_PANEL_WIDTH := 270.0
+const PLAYERS_PANEL_WIDTH := 330.0
 
 # Eksen başına görünen başlık + uç etiketleri (- ve + yönü).
 const AXIS_LABELS := {
@@ -315,7 +315,12 @@ func _refresh_players_panel() -> void:
 			var edit_button := Button.new()
 			edit_button.text = "✎" if int(peer_id) != my_id else "Ben"
 			edit_button.tooltip_text = "Bu botun adını, logosunu ve rengini düzenle" if int(peer_id) != my_id else "Kendi partine dön"
-			edit_button.custom_minimum_size = Vector2(UiTheme.TOUCH_MIN, UiTheme.TOUCH_MIN)
+			# Tema butonu 18px iç boşlukla gelir ve dar satırda adı eziyordu;
+			# UiSkin zemini iç boşluksuz olduğu için burada kompakt kalıyor.
+			UiSkin.skin_button(edit_button)
+			edit_button.add_theme_font_size_override("font_size", 14)
+			edit_button.custom_minimum_size = Vector2(38, 32)
+			edit_button.size_flags_vertical = SIZE_SHRINK_CENTER
 			edit_button.modulate = UiTheme.GOLD if editing else Color.WHITE
 			edit_button.pressed.connect(_start_editing.bind(-1 if int(peer_id) == my_id else int(peer_id)))
 			row.add_child(edit_button)

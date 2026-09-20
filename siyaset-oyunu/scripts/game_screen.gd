@@ -155,6 +155,12 @@ var _hand_dirty: bool = false
 ## Hamle butonları ve mana göstergesi (sağ sütun, destenin yanında).
 var _mana_box: HBoxContainer
 var _mana_label: Label
+## Hamle ızgarası ölçüleri (sağ altta, destenin üstünde).
+const ACTION_BUTTON_WIDTH := 88.0
+const ACTION_BUTTON_HEIGHT := 32.0
+const ACTION_BUTTON_GAP := 4
+const ACTION_GRID_BOTTOM := -188.0
+var _action_grid: GridContainer
 var _law_button: Button
 var _org_button: Button
 var _miting_button: Button
@@ -351,9 +357,14 @@ func _on_proposal_resolved(_accepted: bool, _kind: String, _proposer_id: int) ->
 
 func _build_toast() -> void:
 	_toast = Label.new()
-	_toast.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	_toast.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	# Uyarı yazısı ORTA SÜTUNDA kalır: eskiden ekranın ortasından iki yana
+	# büyüdüğü için uzun mesajlar sol paneldeki tarihin ve sağdaki Menü
+	# butonunun üstüne biniyordu.
+	_toast.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_toast.offset_left = LEFT_PANEL_WIDTH + 16.0
+	_toast.offset_right = -(RIGHT_COLUMN_WIDTH + 16.0)
 	_toast.offset_top = 16.0
+	_toast.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_toast.add_theme_font_override("font", UiTheme.mono())
 	_toast.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
@@ -1822,7 +1833,13 @@ func _place_right_column_controls() -> void:
 	var panel := player_panel_list.get_parent() as Control
 	if panel != null:
 		panel.offset_top = 72.0  # sağ üstte Menü butonu var
-		panel.offset_bottom = -302.0  # altında deste ve hamle butonları
+		# Parti kartları hamle ızgarasının üstünde biter. Izgaranın yüksekliği
+		# yazı boyutuna göre değişebildiği için sabit sayı yerine ölçüyü
+		# ızgaranın kendisinden alıyoruz; böylece kartlar butonlara binmez.
+		var grid_height := ACTION_BUTTON_HEIGHT * 3.0 + ACTION_BUTTON_GAP * 2.0
+		if _action_grid != null:
+			grid_height = maxf(grid_height, _action_grid.get_combined_minimum_size().y)
+		panel.offset_bottom = ACTION_GRID_BOTTOM - grid_height - 12.0
 	pass_button.offset_left = -134.0
 	pass_button.offset_top = -140.0
 
@@ -1878,33 +1895,42 @@ func _build_action_buttons() -> void:
 		CardPresets.card_cost("populizm"), CardPresets.card_cost("mana_bonusu"),
 		1, GameRules.ELECTION_MANA_BONUS, GameRules.GOVERNMENT_MANA_BONUS]
 	add_child(_mana_box)
-	# HAMLELER (sağ sütun, destenin yanında alt alta). Kartlar bonus niteliğinde.
-	_law_button = _action_button("YASA", "bedava", UiTheme.PURPLE, -292.0, 0)
+	# HAMLELER: 2 sütunlu IZGARA. Eskiden her buton tek tek mutlak konuma
+	# oturtuluyordu; uzun bir yazı (TEŞKİLATLANMA) butonun asgari genişliğini
+	# büyütünce komşusunun üstüne biniyordu. Izgara bunu yapısal olarak önler.
+	_action_grid = GridContainer.new()
+	_action_grid.columns = 2
+	_action_grid.add_theme_constant_override("h_separation", ACTION_BUTTON_GAP)
+	_action_grid.add_theme_constant_override("v_separation", ACTION_BUTTON_GAP)
+	_action_grid.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	_action_grid.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_action_grid.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_action_grid.offset_right = -16.0
+	_action_grid.offset_bottom = ACTION_GRID_BOTTOM
+	add_child(_action_grid)
+	_law_button = _action_button("YASA", "bedava", UiTheme.PURPLE)
 	_law_button.pressed.connect(_on_law_button_pressed)
-	_miting_button = _action_button("MİTİNG", "%d mana" % GameRules.MITING_MANA_COST, UiTheme.RED, -292.0, 1)
+	_miting_button = _action_button("MİTİNG", "%d mana" % GameRules.MITING_MANA_COST, UiTheme.RED)
 	_miting_button.pressed.connect(_on_miting_button_pressed)
-	_org_button = _action_button("TEŞKİLATLANMA", "%d mana" % GameRules.ORG_MANA_COST, UiTheme.BLUE, -256.0, 0)
+	_org_button = _action_button("TEŞKİLAT", "%d mana" % GameRules.ORG_MANA_COST, UiTheme.BLUE)
 	_org_button.pressed.connect(_on_org_button_pressed)
-	_invest_button = _action_button("YATIRIM", "%d mana" % GameRules.INVEST_MANA_COST, UiTheme.GREEN_DARK, -256.0, 1)
+	_invest_button = _action_button("YATIRIM", "%d mana" % GameRules.INVEST_MANA_COST, UiTheme.GREEN_DARK)
 	_invest_button.pressed.connect(_on_invest_button_pressed)
-	_censure_button = _action_button("GENSORU", "%d mana" % GameRules.CENSURE_MANA_COST, UiTheme.RED_DARK, -220.0, 0)
+	_censure_button = _action_button("GENSORU", "%d mana" % GameRules.CENSURE_MANA_COST, UiTheme.RED_DARK)
 	_censure_button.pressed.connect(_on_censure_button_pressed)
 
-## column: 0 sol, 1 sağ (sağ sütunda iki sütunlu ızgara).
-func _action_button(title: String, cost_text: String, color: Color, top: float, column: int) -> Button:
+## Hamle butonu: ızgaraya eklenir, sabit kutu boyutunda kalır ve yazı taşarsa
+## kırpılır — böylece hiçbir buton komşusunu itemez.
+func _action_button(title: String, cost_text: String, color: Color) -> Button:
 	var button := Button.new()
-	button.text = "%s\n%s" % [title, cost_text]
-	button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	button.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	button.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	button.offset_left = -196.0 if column == 0 else -104.0
-	button.offset_right = -108.0 if column == 0 else -16.0
-	button.offset_top = top
-	button.offset_bottom = top + 32.0
+	button.text = "%s
+%s" % [title, cost_text]
+	button.custom_minimum_size = Vector2(ACTION_BUTTON_WIDTH, ACTION_BUTTON_HEIGHT)
+	button.clip_text = true
 	button.add_theme_font_size_override("font_size", UiTheme.FS_TINY)
 	button.add_theme_constant_override("line_spacing", -1)
 	UiSkin.skin_color_button(button, color)
-	add_child(button)
+	_action_grid.add_child(button)
 	return button
 
 ## Neden şu an bu hamle yapılamıyor? (Buton ipucu ve uyarı yazısı.)
@@ -2077,9 +2103,8 @@ func _build_constitution_section(box: VBoxContainer) -> void:
 func _stepper_button(text: String, action: Callable) -> Button:
 	var button := Button.new()
 	button.text = text
-	# Tablette parmakla basılıyor: dokunma hedefi TOUCH_MIN'in altına inmez.
-	button.custom_minimum_size = Vector2(UiTheme.TOUCH_MIN, UiTheme.TOUCH_MIN)
-	button.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
+	button.custom_minimum_size = Vector2(28, 24)
+	button.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 	button.focus_mode = Control.FOCUS_NONE
 	button.pressed.connect(action)
 	return button
@@ -2365,9 +2390,9 @@ func _build_layer_bar() -> void:
 	for i in MAP_LAYER_TITLES.size():
 		var button := Button.new()
 		button.text = MAP_LAYER_TITLES[i]
-		button.custom_minimum_size = Vector2(96, UiTheme.TOUCH_MIN)
+		button.custom_minimum_size = Vector2(84, 34)
 		button.focus_mode = Control.FOCUS_NONE
-		button.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
+		button.add_theme_font_size_override("font_size", 13)
 		button.pressed.connect(_on_layer_button_pressed.bind(i))
 		_layer_bar.add_child(button)
 		_layer_buttons.append(button)

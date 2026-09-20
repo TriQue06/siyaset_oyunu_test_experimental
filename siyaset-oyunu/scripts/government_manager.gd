@@ -394,8 +394,9 @@ func submit_censure(peer_id: int) -> void:
 func can_withdraw(peer_id: int) -> bool:
 	return phase == Phase.GOVERNING and peer_id != main_gov_peer_id and government_party_ids().has(peer_id)
 
-## Küçük ortak koalisyondan çekilir: görevleri ana iktidar partisine geçer,
-## kendisi WITHDRAW_SCORE_PENALTY puan kaybeder. Hükümet salt çoğunluğu
+## Küçük ortak koalisyondan çekilir: görevleri ana iktidar partisine geçer.
+## PUAN TABLOSUNA dokunulmaz; sadece sonraki seçime yansıyan ulusal puan düşer
+## (bıraktığı görev sayısına bağlı). Hükümet salt çoğunluğu
 ## kaybederse gensoru desteye girer; ana parti yalnız kalıp gensoruyla düşerse
 ## ağır ceza alır (bkz. _resolve_proposal).
 func withdraw_from_coalition() -> void:
@@ -407,14 +408,27 @@ func withdraw_from_coalition() -> void:
 func _apply_withdraw(peer_id: int) -> void:
 	if not can_withdraw(peer_id):
 		return
+	var gov_seats_before := government_seats()
+	var leaver_seats := seats_of(peer_id)
+	var posts_left := 0
 	for post_id in government.keys():
 		if int(government[post_id]) == peer_id:
 			government[post_id] = main_gov_peer_id
-	scores[peer_id] = score_of(peer_id) - GovernmentPresets.WITHDRAW_SCORE_PENALTY
+			posts_left += 1
+	var penalty := PublicOpinion.withdraw_national(posts_left)
+	CardManager.add_national_points(peer_id, penalty)
+	# Büyük ortak (hükümet sandalyelerinin yarısı ya da fazlası) çekildiyse
+	# koalisyon çökmüş sayılır: kalan ortaklar da daha küçük bir kayıp yaşar.
+	var ally_penalty := 0.0
+	if gov_seats_before > 0 and float(leaver_seats) / float(gov_seats_before) >= PublicOpinion.WITHDRAW_BIG_PARTNER_SEAT_SHARE:
+		ally_penalty = PublicOpinion.withdraw_ally_national(penalty)
+		for ally in government_party_ids():
+			CardManager.add_national_points(int(ally), ally_penalty)
 	abandoned = true
 	var alone := government_party_ids().size() == 1
-	var text := "%s koalisyondan çekildi (−%d puan).%s%s" % [
-		_party_name(peer_id), GovernmentPresets.WITHDRAW_SCORE_PENALTY,
+	var text := "%s koalisyondan çekildi (ulusal %.1f puan).%s%s%s" % [
+		_party_name(peer_id), penalty,
+		(" Büyük ortak gitti: kalan hükümet ortakları da %.1f puan kaybetti." % ally_penalty) if ally_penalty < 0.0 else "",
 		(" %s hükümeti tek başına kaldı." % _party_name(main_gov_peer_id)) if alone else "",
 		" Hükümet salt çoğunluğu kaybetti!" if not has_majority() else ""]
 	last_resolution_reason = text

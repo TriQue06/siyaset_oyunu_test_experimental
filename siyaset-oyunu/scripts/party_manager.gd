@@ -14,8 +14,8 @@ extends Node
 
 signal parties_updated
 
-const NAME_MIN_LENGTH := 2
-const NAME_MAX_LENGTH := 11
+const NAME_MIN_LENGTH := 1
+const NAME_MAX_LENGTH := 12
 
 # peer_id -> {
 #   "name": String, "icon_index": int, "icon_color": Color, "bg_color": Color,

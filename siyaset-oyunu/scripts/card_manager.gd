@@ -1065,6 +1065,10 @@ func _own_effect(peer_id: int, amount: float) -> float:
 		return amount
 	return amount * (PublicOpinion.POPULISM_GOOD_MULT if amount > 0.0 else PublicOpinion.POPULISM_BAD_MULT)
 
+## Başka bir sistemin (ör. GovernmentManager) ulusal puan uygulaması için.
+func add_national_points(peer_id: int, amount: float) -> void:
+	_add_national(peer_id, amount)
+
 ## own=true: parti bu etkiyi KENDİ hamlesiyle aldı (popülizm uygulanır).
 func _add_national(peer_id: int, amount: float, own: bool = false) -> void:
 	if own:

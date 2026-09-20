@@ -439,7 +439,7 @@ func _initialize() -> void:
 	print("=== 14) KOALISYONDAN CEKILME ===")
 	new_game({1: ideology(1, 1, 2), 2: ideology(-1, -1, 1), 3: ideology(2, 2, -1)})
 	pass_round()
-	cm.last_seats = {1: 150, 2: 140, 3: 100}
+	cm.last_seats = {1: 150, 2: 60, 3: 140}
 	gm.start_formation()
 	var c4 := all_posts_to(1)
 	c4[gp.POST_DEPUTY_PM] = 2
@@ -451,7 +451,9 @@ func _initialize() -> void:
 	check("koalisyon kuruldu", gm.has_government() and gm.government_party_ids().size() == 2)
 	check("kucuk ortak cekilebilir, ana parti ve muhalefet cekilemez", gm.can_withdraw(2) and not gm.can_withdraw(1) and not gm.can_withdraw(3))
 	gm._apply_withdraw(2)
-	check("cekilen ortak puan kaybetti", gm.score_of(2) == -gp.WITHDRAW_SCORE_PENALTY, str(gm.score_of(2)))
+	check("cekilmek puan tablosuna dokunmaz", gm.score_of(2) == 0, str(gm.score_of(2)))
+	check("cekilen ortak ulusal puan kaybetti (kismi)", cm.national_of(2) < 0.0 and cm.national_of(2) >= -2.0, str(cm.national_of(2)))
+	check("kucuk ortak cekilince kalanlar etkilenmez", cm.national_of(1) == 0.0, str(cm.national_of(1)))
 	check("gorevleri ana partiye gecti, hukumet tek basina", gm.government_party_ids() == [1], str(gm.government_party_ids()))
 	check("hukumet cogunlugu kaybetti -> gensoru verilebilir", not gm.has_majority())
 	gm.submit_censure(3)
@@ -460,6 +462,25 @@ func _initialize() -> void:
 	gm._apply_vote(3, gm.VOTE_YES)
 	check("gensoruyla dustu", not gm.has_government(), gm.last_resolution_reason)
 	check("yalniz kalan ana parti agir puan kaybetti", gm.score_of(1) == -gp.ABANDONED_FALL_PENALTY, str(gm.score_of(1)))
+
+	# Buyuk ortak (hukumet sandalyelerinin yarisindan fazlasi) cekilirse kalanlar da kaybeder.
+	new_game({1: ideology(1, 1, 2), 2: ideology(-1, -1, 1), 3: ideology(2, 2, -1)})
+	pass_round()
+	cm.last_seats = {1: 150, 2: 140, 3: 100}
+	gm.start_formation()
+	var c5 := all_posts_to(1)
+	c5[gp.POST_DEPUTY_PM] = 2
+	c5["ministry_health"] = 2
+	gm._apply_government_proposal(1, c5)
+	gm._apply_vote(1, gm.VOTE_YES)
+	gm._apply_vote(2, gm.VOTE_YES)
+	gm._apply_vote(3, gm.VOTE_NO)
+	gm.scores = {}
+	cm.national_support = {}
+	gm._apply_withdraw(2)
+	check("buyuk ortak cekilince kendi kaybi daha buyuk", cm.national_of(2) <= -1.0, str(cm.national_of(2)))
+	check("buyuk ortak cekilince kalan ortak da kaybeder (daha az)", cm.national_of(1) < 0.0 		and cm.national_of(1) > cm.national_of(2), "%.2f / %.2f" % [cm.national_of(1), cm.national_of(2)])
+	check("muhalefet etkilenmez", cm.national_of(3) == 0.0, str(cm.national_of(3)))
 
 	print("")
 	print("=== 15) ILLERIN GORUSU VE NOTR PARTILER ===")

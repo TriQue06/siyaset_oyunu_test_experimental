@@ -13,8 +13,8 @@ const PM_POINTS := 3
 const DEPUTY_PM_POINTS := 2
 const MINISTRY_POINTS := 1
 
-## Koalisyondan çekilen küçük ortağın puan cezası.
-const WITHDRAW_SCORE_PENALTY := 3
+## Koalisyondan çekilmenin PUAN cezası yok: etki sadece ulusal puanda
+## (bkz. PublicOpinion.WITHDRAW_NATIONAL_*).
 ## Ortağı çekildiği için TEK BAŞINA kalan ana iktidar partisi gensoruyla
 ## düşerse: çok daha büyük puan cezası.
 const ABANDONED_FALL_PENALTY := 8

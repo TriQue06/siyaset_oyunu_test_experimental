@@ -62,7 +62,7 @@ var _players_list: VBoxContainer
 ## sahibiysem) bir bot. Bot düzenlenirken kendi seçimlerim burada saklanır.
 var _edit_target: int = -1
 var _own_backup: Dictionary = {}
-@onready var title_label: Label = $RightPanel/Margin/Scroll/VBox/TitleLabel
+@onready var title_label: Label = $TopBar/TitleLabel
 
 func _ready() -> void:
 	# Parti kurma süresi her zaman sınırsız (lobi ayarı kaldırıldı).

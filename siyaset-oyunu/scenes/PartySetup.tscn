@@ -39,6 +39,21 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.13, 0.14, 0.19, 1)
 
+[node name="TitleLabel" type="Label" parent="TopBar" unique_id=1439790902]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 32.0
+offset_top = -18.0
+offset_right = 432.0
+offset_bottom = 18.0
+grow_vertical = 2
+theme_override_font_sizes/font_size = 26
+text = "PARTİNİ KUR"
+vertical_alignment = 1
+
 [node name="TopBarBox" type="VBoxContainer" parent="TopBar" unique_id=2073647285]
 layout_mode = 1
 anchors_preset = 8
@@ -150,15 +165,6 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 10
 
-[node name="TitleLabel" type="Label" parent="RightPanel/Margin/Scroll/VBox" unique_id=1439790902]
-layout_mode = 2
-theme_override_font_sizes/font_size = 26
-text = "PARTİNİ KUR"
-horizontal_alignment = 1
-
-[node name="HSeparator0" type="HSeparator" parent="RightPanel/Margin/Scroll/VBox" unique_id=695007347]
-layout_mode = 2
-
 [node name="NameLabel" type="Label" parent="RightPanel/Margin/Scroll/VBox" unique_id=2090511481]
 layout_mode = 2
 text = "Parti Adı"
@@ -174,7 +180,7 @@ alignment = 1
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
-text = "2-11 karakter"
+text = "1-12 karakter"
 horizontal_alignment = 1
 
 [node name="HSeparator1" type="HSeparator" parent="RightPanel/Margin/Scroll/VBox" unique_id=1380766236]

@@ -102,6 +102,28 @@ const LAW_PARTNER_YES_NATIONAL := 0.5
 const LAW_PARTNER_NO_NATIONAL := -0.4
 const LAW_PM_PARTNER_NO_NATIONAL := -0.8
 
+# --- Koalisyondan çekilme ---------------------------------------------------
+## Çekilmek PUAN TABLOSUNA dokunmaz; sadece sonraki seçime yansıyan ulusal
+## puanı düşürür. Etki kısmî: taban + bıraktığın bakanlık başına küçük bir ek
+## (ne kadar çok görev aldıysan sözünden dönmen o kadar göze batar).
+const WITHDRAW_NATIONAL_BASE := -0.5
+const WITHDRAW_NATIONAL_PER_POST := -0.25
+const WITHDRAW_NATIONAL_LIMIT := -2.0
+## Hükümetin sandalyelerinin en az bu kadarını taşıyan ortak çekilirse koalisyon
+## fiilen çöker: kalan ortaklar da dağınık görünür ve çekilenin cezasının bu
+## oranı kadar (daha az) ulusal puan kaybeder.
+const WITHDRAW_BIG_PARTNER_SEAT_SHARE := 0.4
+const WITHDRAW_ALLY_SHARE := 0.4
+
+## Koalisyondan çekilen ortağın ulusal puan kaybı (bıraktığı görev sayısına bağlı).
+static func withdraw_national(posts: int) -> float:
+	var posts_f := float(maxi(posts, 0))
+	return maxf(WITHDRAW_NATIONAL_LIMIT, WITHDRAW_NATIONAL_BASE + WITHDRAW_NATIONAL_PER_POST * posts_f)
+
+## Büyük ortak çekilince koalisyonda KALAN ortakların kaybı (daha küçük).
+static func withdraw_ally_national(leaver_penalty: float) -> float:
+	return leaver_penalty * WITHDRAW_ALLY_SHARE
+
 # --- Kaset / itibar suikastı ------------------------------------------------------
 ## Hedefin ULUSAL desteğinden doğrudan düşer (il puanlarına dokunmaz).
 const REPUTATION_NATIONAL_DAMAGE := 4.0

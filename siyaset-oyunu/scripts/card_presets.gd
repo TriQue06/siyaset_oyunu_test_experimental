@@ -193,8 +193,8 @@ func agenda_effect_text(card_type: String) -> String:
 	var data := agenda_data(card_type)
 	if data.is_empty():
 		return ""
-	return "sadece %s yasaları: %s %d kat, %s %d kat etkili" % [data["axis_title"],data["side"], int(PublicOpinion.AGENDA_MATCH_MULT),
-		String(AXIS_TITLES[data["axis"]]["pos" if int(data["dir"]) < 0 else "neg"]), int(PublicOpinion.AGENDA_AXIS_MULT)]
+	return "sadece %s ekseninde yasa sunulabilir (%s ya da %s)" % [data["axis_title"], data["side"],
+		String(AXIS_TITLES[data["axis"]]["pos" if int(data["dir"]) < 0 else "neg"])]
 
 func is_censure_card(card_type: String) -> bool:
 	return card_type == CENSURE_CARD_TYPE

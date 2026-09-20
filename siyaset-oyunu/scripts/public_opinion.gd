@@ -83,10 +83,11 @@ const ORG_RISK_REDUCTION_PER_LEVEL := 0.25
 ## Getiren parti, il başına: PROPOSER_POINTS × uyum; kabul edilirse × PASSED_MULT.
 ## (Meclis yokken sunulan yasa = seçim vaadi: kabul edilmemiş gibi.)
 const LAW_PROPOSER_POINTS := 2.0
-## Gündemdeki eksende yasaların il etkileri bu çarpanla büyür; yasa gündemin
-## ucuyla aynı yöndeyse AGENDA_MATCH_MULT.
-const AGENDA_AXIS_MULT := 2.0
-const AGENDA_MATCH_MULT := 3.0
+## GÜNDEM ARTIK ETKİYİ BÜYÜTMEZ: sadece hangi eksende yasa sunulabileceğini
+## belirler. Yasanın il etkisi her zaman tek kat (1.0). Partilerin ideolojisi
+## zaten her yasada oylarla (sunan 1, evet/hayır 0.5 adım) kayıyor.
+const AGENDA_AXIS_MULT := 1.0
+const AGENDA_MATCH_MULT := 1.0
 const LAW_PASSED_MULT := 2.0
 ## Oy veren parti (EVET +1 / HAYIR −1, çekimser etkisiz), il başına:
 ##   VOTE_IDEOLOGY × uyum × oy  (+ aşağıdaki duruş etkisi, sadece EVET'te)

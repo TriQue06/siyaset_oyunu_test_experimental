@@ -977,8 +977,6 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 			shifts.append({"peer": int(voter), "axis": axis, "delta": IdeologyAxes.LAW_VOTE_SHIFT * dir * choice})
 	PartyManager.apply_ideology_deltas(shifts)
 	var notes := ""
-	if agenda_mult > 1.0:
-		notes += " Gündemde: etkiler %d kat." % int(agenda_mult)
 	if passed:
 		notes += " %s +%d puan." % [_party_name(proposer), law_pass_score(proposer_in_gov)]
 	_push_state({"type": "opinion", "message": "%s %s — %s bu görüşe yakın illerde güçlendi%s. Partisi %s yönüne kaydı.%s" % [
@@ -1000,8 +998,16 @@ func agenda_type() -> String:
 func agenda_rounds_left() -> int:
 	return maxi(0, int(agenda.get("until", 0)) - round_number) if agenda_type() != "" else 0
 
-## Bu yasanın gündem çarpanı: gündemdeki eksendeyse AGENDA_AXIS_MULT, gündemin
-## ucuyla aynı yöndeyse AGENDA_MATCH_MULT, değilse 1.
+## Bu yasa gündemdeki eksende mi? (Sadece gündemdeki eksende yasa sunulabilir.)
+func law_on_agenda(law_type: String) -> bool:
+	var current := agenda_type()
+	if current == "":
+		return false
+	var law := CardPresets.law_data(law_type)
+	var data := CardPresets.agenda_data(current)
+	return not law.is_empty() and not data.is_empty() and law["axis"] == data["axis"]
+
+## Gündem çarpanı artık hep 1: gündem etkileri büyütmez (bkz. PublicOpinion).
 func agenda_law_mult(law_type: String) -> float:
 	var current := agenda_type()
 	if current == "":

@@ -2077,14 +2077,14 @@ func _law_circle(axis: String, dir: int) -> Control:
 	var law := CardPresets.law_data(law_type)
 	var circle := Panel.new()
 	circle.custom_minimum_size = Vector2(54, 54)
-	var mult := CardManager.agenda_law_mult(law_type)
-	if mult <= 1.0:
+	var on_agenda := CardManager.law_on_agenda(law_type)
+	if not on_agenda:
 		circle.modulate = Color(1, 1, 1, 0.3)  # gündemde değil: sunulamaz
 	var style := StyleBoxFlat.new()
 	style.bg_color = _law_color(axis, dir)
 	style.set_corner_radius_all(27)
-	style.set_border_width_all(3 if mult > 1.0 else 2)
-	style.border_color = Color(1.0, 0.72, 0.3) if mult > 1.0 else Color(1, 1, 1, 0.55)
+	style.set_border_width_all(3 if on_agenda else 2)
+	style.border_color = Color(1.0, 0.72, 0.3) if on_agenda else Color(1, 1, 1, 0.55)
 	circle.add_theme_stylebox_override("panel", style)
 	circle.mouse_filter = Control.MOUSE_FILTER_STOP
 	circle.mouse_default_cursor_shape = Control.CURSOR_DRAG
@@ -2098,15 +2098,13 @@ func _law_circle(axis: String, dir: int) -> Control:
 	label.add_theme_constant_override("outline_size", 3)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	circle.add_child(label)
-	if mult > 1.0:
-		label.text = "%s
-×%d" % [law["side"], int(mult)]
+	if on_agenda:
 		label.add_theme_color_override("font_color", Color(1.0, 0.92, 0.7))
 	circle.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
 				_law_info.text = "%s (%s)%s" % [law["title"], CardPresets.law_direction_text(law_type),
-					("  ·  gündemde: il etkileri %d kat" % int(mult)) if mult > 1.0 else ""]
+					"  ·  gündemde: sunulabilir" if on_agenda else "  ·  gündemde değil"]
 				_start_law_drag(law_type)
 			elif _drag_hand_index == LAW_DRAG_INDEX:
 				_finish_drag()

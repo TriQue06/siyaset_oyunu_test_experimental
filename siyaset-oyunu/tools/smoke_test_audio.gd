@@ -51,5 +51,44 @@ func _initialize() -> void:
 	gs.set_volume("sfx", gs.DEFAULT_SFX_VOLUME)
 
 	print("")
+	print("=== 5) OYUN OLAYLARI ===")
+	var gm = root.get_node("GovernmentManager")
+	var cm = root.get_node("CardManager")
+	var heard := func(sound: String) -> bool:
+		return am._last_played.has(sound)
+	am._last_played.clear()
+	gm.proposal_kind = gm.KIND_CENSURE
+	gm.proposal_peer_id = 1
+	gm.phase = gm.Phase.VOTING
+	gm.votes = {}
+	gm.proposal_changed.emit()
+	check("gensoru oylamasi acilinca ses caldi", heard.call("censure_open"))
+	gm.votes = {1: gm.VOTE_YES, 2: gm.VOTE_NO, 3: gm.VOTE_ABSTAIN}
+	gm.proposal_changed.emit()
+	check("evet/hayir/cekimser seslendi", heard.call("vote_yes") and heard.call("vote_no") and heard.call("vote_abstain"))
+	am._last_played.erase("vote_yes")
+	gm.proposal_changed.emit()
+	check("ayni oy ikinci kez seslenmez", not heard.call("vote_yes"))
+	am._last_played.clear()
+	gm.proposal_resolved.emit(true, gm.KIND_LAW, 1)
+	check("yasa gecti sesi", heard.call("law_passed"))
+	am._last_played.clear()
+	gm.proposal_resolved.emit(false, gm.KIND_LAW, 1)
+	check("yasa reddedildi sesi", heard.call("law_rejected"))
+	am._last_played.clear()
+	gm.proposal_resolved.emit(true, gm.KIND_CENSURE, 1)
+	check("gensoru sonucu yasa sesi calmaz", not heard.call("law_passed"))
+	am._last_played.clear()
+	cm.card_played.emit(999, "karalama")
+	check("baskasinin oynadigi karti da duyariz", heard.call("card_played"))
+	am._last_played.clear()
+	cm.card_drawn.emit(999, "karalama")
+	check("baskasinin kart cekmesi duyulmaz", not heard.call("card_drawn"))
+	cm.card_drawn.emit(root.multiplayer.get_unique_id(), "karalama")
+	check("kendi kart cekisimiz duyulur", heard.call("card_drawn"))
+	gm.proposal_kind = ""
+	gm.votes = {}
+
+	print("")
 	print("=== TUM TESTLER GECTI ===" if _failed == 0 else "=== %d TEST BASARISIZ ===" % _failed)
 	quit(1 if _failed > 0 else 0)

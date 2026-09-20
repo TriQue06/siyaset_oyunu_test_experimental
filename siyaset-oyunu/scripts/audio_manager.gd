@@ -21,6 +21,18 @@ const SOUNDS := {
 	"ui_click": "res://assets/audio/ui/ui_click.ogg",
 	## Sıra sana geldiğinde çalar (tabletten oynarken dikkat çeksin diye cıngıl).
 	"turn_start": "res://assets/audio/ui/turn_start.ogg",
+	## Gensoru oylaması açıldı — herkes duyar.
+	"censure_open": "res://assets/audio/ui/censure_open.ogg",
+	## Verilen oylar (açık oylama: her oy herkeste seslenir).
+	"vote_yes": "res://assets/audio/ui/vote_yes.ogg",
+	"vote_no": "res://assets/audio/ui/vote_no.ogg",
+	"vote_abstain": "res://assets/audio/ui/vote_abstain.ogg",
+	## Yasa sonucu.
+	"law_passed": "res://assets/audio/ui/law_passed.ogg",
+	"law_rejected": "res://assets/audio/ui/law_rejected.ogg",
+	## Kartlar: oynanan kartı herkes duyar, çekme sesi sadece çekene çalar.
+	"card_played": "res://assets/audio/ui/card_played.ogg",
+	"card_drawn": "res://assets/audio/ui/card_drawn.ogg",
 }
 
 const POOL_SIZE := 8
@@ -30,6 +42,9 @@ var _streams: Dictionary = {}
 var _players: Array[AudioStreamPlayer] = []
 var _next_player := 0
 var _last_played: Dictionary = {}
+## Hangi oylamayı ve hangi oyları seslendirdik (tekrar çalmamak için).
+var _proposal_key := ""
+var _heard_votes: Dictionary = {}
 
 func _ready() -> void:
 	# Menü/duraklama sırasında da ses çalsın.
@@ -39,8 +54,48 @@ func _ready() -> void:
 	_build_pool()
 	apply_volumes()
 	get_tree().node_added.connect(_on_node_added)
+	# Diğer autoload'lar bu node'dan SONRA hazırlanıyor; sinyallere bir kare
+	# sonra bağlanıyoruz.
+	_connect_game_signals.call_deferred()
 	# Autoload sırası yüzünden zaten sahnede olan butonlar varsa onları da bağla.
 	_hook_existing(get_tree().root)
+
+## OYUN OLAYLARI: sesi tek tek ekran kodlarına serpiştirmek yerine merkezi
+## sinyallere bağlıyoruz. Böylece host ve istemci aynı anda aynı sesi duyar.
+func _connect_game_signals() -> void:
+	CardManager.card_played.connect(func(_peer_id: int, _card: String): play("card_played"))
+	CardManager.card_drawn.connect(_on_card_drawn)
+	GovernmentManager.proposal_changed.connect(_on_proposal_changed)
+	GovernmentManager.proposal_resolved.connect(_on_proposal_resolved)
+
+func _on_card_drawn(peer_id: int, _card_type: String) -> void:
+	# Kart çekme sesi sadece çeken oyuncuya.
+	if peer_id == multiplayer.get_unique_id():
+		play("card_drawn")
+
+## Yeni bir oylama açıldığında ve her yeni oy geldiğinde çalar. Oylar durum
+## senkronuyla geldiği için istemcide de aynı yerden yakalanır.
+func _on_proposal_changed() -> void:
+	var key := "%s:%d:%d" % [GovernmentManager.proposal_kind, GovernmentManager.proposal_peer_id,
+		GovernmentManager.phase]
+	if key != _proposal_key:
+		_proposal_key = key
+		_heard_votes.clear()
+		if GovernmentManager.phase == GovernmentManager.Phase.VOTING 				and GovernmentManager.proposal_kind == GovernmentManager.KIND_CENSURE:
+			play("censure_open")
+	for voter in GovernmentManager.votes:
+		var id := int(voter)
+		if _heard_votes.has(id):
+			continue
+		_heard_votes[id] = true
+		match int(GovernmentManager.votes[voter]):
+			GovernmentManager.VOTE_YES: play("vote_yes")
+			GovernmentManager.VOTE_NO: play("vote_no")
+			_: play("vote_abstain")
+
+func _on_proposal_resolved(accepted: bool, kind: String, _proposer_id: int) -> void:
+	if kind == GovernmentManager.KIND_LAW:
+		play("law_passed" if accepted else "law_rejected")
 
 ## Bir ses efekti çalar. Bilinmeyen ad sessizce yok sayılır (ses dosyası
 ## eksikken oyun çalışmaya devam etsin).

@@ -16,6 +16,14 @@ var create_button: Button
 var code_edit: LineEdit
 var join_button: Button
 var status_label: Label
+## ÇEVRİM İÇİ / ÇEVRİM DIŞI ayrımı: çevrim dışında röle sunucusu, oda kodu ve
+## katılma yoktur; oyun bu cihazda döner ve sadece bot eklenebilir.
+var _online_mode: bool = true
+var _online_tab: Button
+var _offline_tab: Button
+var _online_box: VBoxContainer
+var _offline_box: VBoxContainer
+var _offline_button: Button
 
 func _ready() -> void:
 	AudioManager.stop_music()  # menüler sessiz
@@ -147,9 +155,41 @@ func _build_card() -> void:
 	box.add_theme_constant_override("separation", 10)
 	card.add_child(box)
 
+	# MOD SEÇİCİ: iki sekme. Seçili olan altın, diğeri sönük.
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 6)
+	box.add_child(tabs)
+	_online_tab = _button("Çevrim İçi", ACCENT, 38.0)
+	_online_tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_online_tab.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
+	_online_tab.pressed.connect(_set_mode.bind(true))
+	tabs.add_child(_online_tab)
+	_offline_tab = _button("Çevrim Dışı", UiTheme.PANEL_LIGHT, 38.0)
+	_offline_tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_offline_tab.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
+	_offline_tab.pressed.connect(_set_mode.bind(false))
+	tabs.add_child(_offline_tab)
+
+	# ÇEVRİM DIŞI: tek buton, kod alanı ve katılma yok.
+	_offline_box = VBoxContainer.new()
+	_offline_box.add_theme_constant_override("separation", 8)
+	box.add_child(_offline_box)
+	var offline_hint := _small_label("Sunucu yok, oda kodu yok.
+Sadece sen ve eklediğin botlar.")
+	offline_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	offline_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_offline_box.add_child(offline_hint)
+	_offline_button = _button("Botlarla Oyna", UiTheme.GREEN_DARK, 42.0)
+	_offline_button.pressed.connect(_on_offline_pressed)
+	_offline_box.add_child(_offline_button)
+
+	_online_box = VBoxContainer.new()
+	_online_box.add_theme_constant_override("separation", 10)
+	box.add_child(_online_box)
+
 	create_button = _button("Oda Kur", ACCENT, 42.0)
 	create_button.pressed.connect(_on_create_pressed)
-	box.add_child(create_button)
+	_online_box.add_child(create_button)
 
 	var divider := HBoxContainer.new()
 	divider.add_theme_constant_override("separation", 8)
@@ -162,7 +202,7 @@ func _build_card() -> void:
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	right.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	divider.add_child(right)
-	box.add_child(divider)
+	_online_box.add_child(divider)
 
 	var join_row := HBoxContainer.new()
 	join_row.add_theme_constant_override("separation", 8)
@@ -179,7 +219,7 @@ func _build_card() -> void:
 	join_button.custom_minimum_size.x = 96
 	join_button.pressed.connect(_on_join_pressed)
 	join_row.add_child(join_button)
-	box.add_child(join_row)
+	_online_box.add_child(join_row)
 
 	status_label = Label.new()
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -187,6 +227,16 @@ func _build_card() -> void:
 	status_label.custom_minimum_size = Vector2(CARD_WIDTH - 36.0, 18)
 	status_label.add_theme_font_size_override("font_size", 12)
 	box.add_child(status_label)
+	_set_mode(true)
+
+## Mod sekmesi değişti: ilgili kutu görünür, diğeri gizlenir.
+func _set_mode(online: bool) -> void:
+	_online_mode = online
+	_online_box.visible = online
+	_offline_box.visible = not online
+	UiSkin.skin_color_button(_online_tab, ACCENT if online else UiTheme.PANEL_LIGHT)
+	UiSkin.skin_color_button(_offline_tab, UiTheme.PANEL_LIGHT if online else UiTheme.GREEN_DARK)
+	_set_status("")
 
 func _build_footer() -> void:
 	var version := Label.new()
@@ -241,6 +291,11 @@ func _player_name() -> String:
 	var trimmed := name_edit.text.strip_edges()
 	return trimmed if trimmed != "" else PlayerProfile.player_name
 
+## ÇEVRİM DIŞI: ağa hiç çıkılmaz, doğrudan lobiye geçilir.
+func _on_offline_pressed() -> void:
+	_offline_button.disabled = true
+	MultiplayerManager.start_offline(_player_name())
+
 func _on_create_pressed() -> void:
 	create_button.disabled = true
 	join_button.disabled = true
@@ -270,8 +325,10 @@ func _on_connection_error(reason: String) -> void:
 	_set_status(reason, true)
 	create_button.disabled = false
 	join_button.disabled = false
+	_offline_button.disabled = false
 
 func _on_join_failed(reason: String) -> void:
 	_set_status(reason, true)
 	create_button.disabled = false
 	join_button.disabled = false
+	_offline_button.disabled = false

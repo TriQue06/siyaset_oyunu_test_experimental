@@ -111,9 +111,14 @@ func _refresh() -> void:
 			player_list_box.add_child(_build_slot(_build_empty_card(i), am_owner, i == order.size()))
 
 	var count := MultiplayerManager.players.size()
-	info_label.text = "Oyuncular: %d / %d  (başlamak için en az %d gerekir)" % [
-		count, MultiplayerManager.MAX_PLAYERS, MultiplayerManager.MIN_PLAYERS_TO_START
-	]
+	if MultiplayerManager.offline_mode:
+		# Çevrim dışında katılan olmaz: boş yuvalar "bot ekle" demektir.
+		info_label.text = "Sen + %d bot  ·  en az %d oyuncu gerekir" % [
+			count - 1, MultiplayerManager.MIN_PLAYERS_TO_START]
+	else:
+		info_label.text = "Oyuncular: %d / %d  (başlamak için en az %d gerekir)" % [
+			count, MultiplayerManager.MAX_PLAYERS, MultiplayerManager.MIN_PLAYERS_TO_START
+		]
 
 	settings_button.visible = am_owner
 	start_button.visible = am_owner
@@ -253,7 +258,7 @@ func _build_empty_card(index: int) -> Control:
 	UiSkin.skin_panel(card, UiSkin.PANEL)
 	card.modulate = Color(0.75, 0.75, 0.75, 1.0)
 	var label := Label.new()
-	label.text = "%d · Boş" % (index + 1)
+	label.text = "%d · %s" % [index + 1, "Bot ekle" if MultiplayerManager.offline_mode else "Boş"]
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.add_theme_font_size_override("font_size", 15)
@@ -464,6 +469,17 @@ func _stepper_row(parent: Control, text: String) -> Array:
 	return [minus, value, plus]
 
 func _refresh_code_display() -> void:
+	# ÇEVRİM DIŞI modda oda kodu diye bir şey yok: kod ve kopyala butonu gizlenir.
+	var hint := get_node_or_null("CenterBox/HintLabel") as Label
+	if MultiplayerManager.offline_mode:
+		code_label.text = "ÇEVRİM DIŞI OYUN"
+		copy_code_button.hide()
+		if hint != null:
+			hint.text = "Ağ yok: sadece sen ve eklediğin botlar oynar."
+		return
+	copy_code_button.show()
+	if hint != null:
+		hint.text = "Bu kodu arkadaşına gönder, o da 'Odaya Katıl' ekranına girsin."
 	var shown := "•••••" if GameSettings.streamer_mode else MultiplayerManager.room_code
 	code_label.text = "ODA KODU: %s" % shown
 

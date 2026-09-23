@@ -86,6 +86,8 @@ const AXIS_SHARPNESS_MAX_VALUE_DEFAULT := 2.0
 
 var room_code: String = ""
 var is_host: bool = false
+## ÇEVRİM DIŞI: ağ yok, oda kodu yok, sadece bu cihaz ve botlar.
+var offline_mode: bool = false
 var owner_id: int = 1
 var local_player_name: String = "Oyuncu"
 # peer_id -> {"name": String}
@@ -185,10 +187,38 @@ static func snap_axis_sharpness_max_value(value: float) -> float:
 			closest = option
 	return closest
 
+## ÇEVRİM DIŞI MOD: röle sunucusu, oda kodu ve katılma yok. Ağ peer'i hiç
+## kurulmaz; oyun tamamen bu cihazda döner (CardManager._is_local_only()
+## zaten room_code == "" olduğunda yerel çalışır). Sadece bot eklenebilir.
+func start_offline(player_name: String) -> void:
+	_reset_state()
+	offline_mode = true
+	local_player_name = player_name if player_name != "" else "Oyuncu"
+	# OfflineMultiplayerPeer: ağ yok ama bu instance "sunucu" sayılır, unique_id
+	# 1 olur ve RPC'ler kimseye gitmez. Böylece host tarafındaki tüm yerel
+	# mantık (bot ekleme, oyunu başlatma, CardManager) olduğu gibi çalışır.
+	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
+	is_host = true
+	room_code = ""
+	election_threshold = THRESHOLD_DEFAULT
+	election_interval = GameRules.DEFAULT_ELECTION_INTERVAL
+	election_count = GameRules.DEFAULT_ELECTION_COUNT
+	GameRules.configure(election_interval, election_count)
+	axis_sharpness_start = AXIS_SHARPNESS_START_DEFAULT
+	axis_sharpness_increment = AXIS_SHARPNESS_INCREMENT_DEFAULT
+	axis_sharpness_max_enabled = AXIS_SHARPNESS_MAX_ENABLED_DEFAULT
+	axis_sharpness_max_value = AXIS_SHARPNESS_MAX_VALUE_DEFAULT
+	players.clear()
+	owner_id = multiplayer.get_unique_id()
+	players[owner_id] = {"name": local_player_name}
+	player_list_updated.emit()
+	room_created.emit("")
+
 ## Röle sunucusu üzerinden bir oda kurar (bu oyuncu host + lobi sahibi olur).
 ## Sonuç asenkrondur: başarılı olursa room_created(code), olmazsa
 ## connection_error(reason) sinyali yayınlanır.
 func create_room(player_name: String) -> void:
+	offline_mode = false
 	local_player_name = player_name if player_name != "" else "Host"
 	is_host = true
 	room_code = ""
@@ -237,6 +267,7 @@ func _on_relay_error(reason: String) -> void:
 
 ## Röle sunucusu üzerinden, verilen 5 haneli oda koduna katılmayı dener.
 func join_room(code: String, player_name: String) -> void:
+	offline_mode = false
 	local_player_name = player_name if player_name != "" else "Oyuncu"
 	_pending_code = code.to_upper()
 	room_code = _pending_code
@@ -283,7 +314,6 @@ func leave_game() -> void:
 
 ## Gerçek peer id'leriyle çakışmasın diye çok büyük sayılardan geriye doğru.
 const BOT_ID_BASE := 2000000000
-var _next_bot_index: int = 0
 
 func is_bot(peer_id: int) -> bool:
 	return bool(players.get(peer_id, {}).get("bot", false))
@@ -327,15 +357,38 @@ func remove_bot(peer_id: int) -> void:
 func _apply_add_bot() -> void:
 	if players.size() >= MAX_PLAYERS or stage != Stage.LOBBY:
 		return
-	_next_bot_index += 1
-	players[BOT_ID_BASE - _next_bot_index] = {"name": "Bot %d" % _next_bot_index, "bot": true}
+	players[_free_bot_id()] = {"name": "", "bot": true}
+	_renumber_bots()
 	_broadcast_player_list()
 
 func _apply_remove_bot(peer_id: int) -> void:
 	if not is_bot(peer_id) or stage != Stage.LOBBY:
 		return
 	players.erase(peer_id)
+	_renumber_bots()
 	_broadcast_player_list()
+
+## Kullanılmayan en küçük bot id'si. Id'ler sabit kalır; görünen AD adaptiftir.
+func _free_bot_id() -> int:
+	var index := 1
+	while players.has(BOT_ID_BASE - index):
+		index += 1
+	return BOT_ID_BASE - index
+
+## BOT ADLARI ADAPTİF: botlar her zaman 1..N diye numaralanır. Bot 5 varken
+## Bot 3 ve Bot 4 silinirse Bot 5, Bot 3 olur — arada boşluk kalmaz.
+## Kullanıcının elle verdiği ad (parti kurma ekranı) varsa dokunulmaz.
+func _renumber_bots() -> void:
+	var index := 0
+	for peer_id in players.keys():
+		if not is_bot(peer_id):
+			continue
+		index += 1
+		var entry: Dictionary = players[peer_id]
+		var current := String(entry.get("name", ""))
+		if current == "" or current.begins_with("Bot "):
+			entry["name"] = "Bot %d" % index
+			players[peer_id] = entry
 
 ## Lobiden oyuncu atma: sadece lobi sahibi, sadece LOBİ aşamasında ve kendisi
 ## dışında birini atabilir. Bot ise sadece listeden silinir; insan oyuncuya
@@ -522,6 +575,7 @@ func _reset_state() -> void:
 	players.clear()
 	room_code = ""
 	is_host = false
+	offline_mode = false
 	owner_id = 1
 	election_threshold = THRESHOLD_DEFAULT
 	election_interval = GameRules.DEFAULT_ELECTION_INTERVAL
@@ -534,7 +588,6 @@ func _reset_state() -> void:
 	_has_synced_once = false
 	_closing = false
 	stage = Stage.LOBBY
-	_next_bot_index = 0
 
 # --- Bağlantı olayları -------------------------------------------------
 

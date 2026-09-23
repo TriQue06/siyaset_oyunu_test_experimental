@@ -33,12 +33,16 @@ func _delay(range_seconds: Vector2) -> float:
 	return _rng.randf_range(range_seconds.x, range_seconds.y)
 
 func _process(_delta: float) -> void:
+	step(Time.get_ticks_msec() / 1000.0)
+
+## Botların tek bir karelik islemi. _process gercek saati verir; testler
+## SANAL SAAT verip tum oyunu hizlandirilmis sekilde oynatabilir.
+func step(now: float) -> void:
 	if not _is_authority() or CardManager.turn_order.is_empty() or CardManager.game_finished:
 		_turn_key = ""
 		_vote_key = ""
 		_form_key = ""
 		return
-	var now := Time.get_ticks_msec() / 1000.0
 	if GovernmentManager.phase == GovernmentManager.Phase.VOTING:
 		_handle_votes(now)
 	else:
@@ -124,8 +128,10 @@ func _handle_votes(now: float) -> void:
 		if not _vote_due.has(bot):
 			_vote_due[bot] = now + _delay(VOTE_SECONDS)
 		elif now >= float(_vote_due[bot]):
-			_vote_due[bot] = INF
 			GovernmentManager._apply_vote(bot, BotBrain.choose_vote(bot))
+			# OY GERÇEKTEN İŞLENDİ Mİ? Reddedilen oyu "verilmiş" sayarsak bot bir
+			# daha hiç oy vermez ve oylama boşuna süre dolana kadar bekler.
+			_vote_due[bot] = INF if GovernmentManager.has_voted(bot) else now + _delay(VOTE_SECONDS)
 			return  # oylama çözülmüş olabilir; kalanlar sonraki karede
 
 func _handle_formation(now: float) -> void:
@@ -142,5 +148,8 @@ func _handle_formation(now: float) -> void:
 		_form_key = key
 		_form_due = now + _delay(FORM_SECONDS)
 	elif now >= _form_due:
-		_form_due = INF
 		GovernmentManager._apply_government_proposal(bot, BotBrain.build_government(bot))
+		# TEKLİF GERÇEKTEN VERİLDİ Mİ? Geçersiz bir kabine sessizce reddedilirse
+		# bot bir daha denemez ve kurma süresi boşuna yanar.
+		_form_due = INF if GovernmentManager.phase == GovernmentManager.Phase.VOTING \
+			else now + _delay(FORM_SECONDS)

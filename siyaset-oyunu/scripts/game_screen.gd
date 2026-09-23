@@ -36,7 +36,10 @@ const PLAYER_TAB_HEIGHT := 30.0
 const PLAYER_HEADER_HEIGHT := 20.0
 const COMPACT_ROW_HEIGHT := 56.0
 ## Alt haznede meclisin (sol) aldığı pay; kalan sağ kısım el kartlarına.
-const PARLIAMENT_WIDTH_RATIO := 0.66
+## Alt haznenin (parlamento + hamleler) kullandığı genişlik payı. Kalanı
+## el kartlarına gider. Hazne içeriğinden dar kalırsa HBox taşar; bu yüzden
+## ChamberSplit yalnızca sağa büyüyecek şekilde ayarlıdır (bkz. sahne).
+const PARLIAMENT_WIDTH_RATIO := 0.74
 const AVATAR_SEPARATION := 6.0
 const AVATAR_SIZE := 56.0
 ## Parti logoları (çerçeve dahil) party_badge.gd'de; sol paneller government_hud.gd'de.
@@ -188,8 +191,8 @@ var _mana_box: HBoxContainer
 var _mana_label: Label
 ## Hamle ızgarası: artık parlamento diyagramının SAĞINDAKİ panelde, iki
 ## sütunlu. Butonlar paneli paylaşır, bu yüzden asgari ölçü küçük tutulur.
-const ACTION_BUTTON_WIDTH := 96.0
-const ACTION_BUTTON_HEIGHT := 40.0
+const ACTION_BUTTON_WIDTH := 72.0
+const ACTION_BUTTON_HEIGHT := 48.0
 const ACTION_BUTTON_GAP := 6
 var _action_grid: GridContainer
 var _law_button: Button
@@ -294,7 +297,7 @@ func _ready() -> void:
 	vote_no_button.pressed.connect(_on_vote_pressed.bind(GovernmentManager.VOTE_NO))
 	_abstain_button = Button.new()
 	_abstain_button.text = "Çekimser"
-	_abstain_button.custom_minimum_size = Vector2(96, 48)
+	_abstain_button.custom_minimum_size = Vector2(84, 42)
 	UiSkin.skin_button(_abstain_button)
 	_abstain_button.pressed.connect(_on_vote_pressed.bind(GovernmentManager.VOTE_ABSTAIN))
 	vote_yes_button.get_parent().add_child(_abstain_button)
@@ -2079,15 +2082,21 @@ func _build_action_buttons() -> void:
 		CardPresets.card_cost("kaset"), CardPresets.card_cost("isyan"),
 		CardPresets.card_cost("populizm"), CardPresets.card_cost("mana_bonusu"),
 		1, GameRules.ELECTION_MANA_BONUS, GameRules.GOVERNMENT_MANA_BONUS]
-	# HAMLELER: 2 sütunlu IZGARA. Eskiden her buton tek tek mutlak konuma
-	# oturtuluyordu; uzun bir yazı (TEŞKİLATLANMA) butonun asgari genişliğini
-	# büyütünce komşusunun üstüne biniyordu. Izgara bunu yapısal olarak önler.
+	# HAMLELER: 3 sütun x 2 satır IZGARA. Eskiden her buton tek tek mutlak
+	# konuma oturtuluyordu; uzun bir yazı (TEŞKİLATLANMA) butonun asgari
+	# genişliğini büyütünce komşusunun üstüne biniyordu. Izgara bunu yapısal
+	# olarak önler.
 	_action_grid = GridContainer.new()
-	_action_grid.columns = 2
+	_action_grid.columns = 3
 	_action_grid.add_theme_constant_override("h_separation", ACTION_BUTTON_GAP)
 	_action_grid.add_theme_constant_override("v_separation", ACTION_BUTTON_GAP)
-	_action_grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	# Izgara panelin ÜSTÜNE oturur; altındaki boşluğu esnek bir ayraç doldurur.
+	# Dikey olarak esnetilince butonlar upuzun dikdörtgenlere dönüşüyordu.
 	actions_vbox.add_child(_action_grid)
+	var filler := Control.new()
+	filler.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	filler.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	actions_vbox.add_child(filler)
 	_law_button = _action_button("YASA", GameRules.cost_text(GameRules.LAW_MANA_COST), UiTheme.PURPLE)
 	_law_button.pressed.connect(_on_law_button_pressed)
 	_miting_button = _action_button("MİTİNG", GameRules.cost_text(GameRules.MITING_MANA_COST), UiTheme.RED)
@@ -2107,7 +2116,6 @@ func _action_button(title: String, cost_text: String, color: Color) -> Button:
 %s" % [title, cost_text]
 	button.custom_minimum_size = Vector2(ACTION_BUTTON_WIDTH, ACTION_BUTTON_HEIGHT)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	button.clip_text = true
 	button.add_theme_font_size_override("font_size", UiTheme.FS_TINY)
 	button.add_theme_constant_override("line_spacing", -1)

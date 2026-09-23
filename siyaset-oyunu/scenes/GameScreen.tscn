@@ -110,7 +110,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 offset_top = 8.0
 offset_bottom = -6.0
-grow_horizontal = 2
+grow_horizontal = 1
 grow_vertical = 2
 mouse_filter = 2
 theme_override_constants/separation = 4
@@ -150,7 +150,7 @@ theme_override_constants/separation = 14
 
 [node name="VoteYesButton" type="TextureButton" parent="BottomArea/ChamberSplit/ParliamentChamber/ParliamentVBox/VoteButtonRow" unique_id=3821004462]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(48, 48)
+custom_minimum_size = Vector2(42, 42)
 layout_mode = 2
 ignore_texture_size = true
 stretch_mode = 0
@@ -158,7 +158,7 @@ texture_filter = 1
 
 [node name="VoteNoButton" type="TextureButton" parent="BottomArea/ChamberSplit/ParliamentChamber/ParliamentVBox/VoteButtonRow" unique_id=3821004463]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(48, 48)
+custom_minimum_size = Vector2(42, 42)
 layout_mode = 2
 ignore_texture_size = true
 stretch_mode = 0
@@ -179,7 +179,6 @@ text_overrun_behavior = 3
 [node name="ActionsPanel" type="PanelContainer" parent="BottomArea/ChamberSplit" unique_id=3821004481]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(240, 0)
 
 [node name="ActionsMargin" type="MarginContainer" parent="BottomArea/ChamberSplit/ActionsPanel" unique_id=3821004482]
 layout_mode = 2

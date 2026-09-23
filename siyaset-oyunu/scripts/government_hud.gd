@@ -45,27 +45,37 @@ static func _badge(peer_id: int) -> Control:
 	badge.tooltip_text = party_name_of(peer_id)
 	return badge
 
-## "Başbakan [logo] Parti  ·  Yrd. [logo] Parti" — tek satır.
+## "Başbakan [logo] Parti  ·  Yrd. [logo]" — TEK SATIR.
+## Dar sol panelde iki parti adı yan yana sığmıyor, ikisi de kırpılıyordu;
+## bu yüzden yardımcının partisi sadece LOGOSUYLA gösterilir (adı ipucunda).
 static func _leadership_row(pm: int, deputy: int) -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
 	row.add_child(_label("Başbakan", 12, DIM_COLOR))
-	row.add_child(_party_chip(pm))
+	row.add_child(_party_chip(pm, true))
 	if deputy != -1:
 		row.add_child(_label("·  Yrd.", 12, DIM_COLOR))
-		row.add_child(_party_chip(deputy))
+		row.add_child(_party_chip(deputy, false))
 	return row
 
-## Küçük "logo + parti adı" öbeği.
-static func _party_chip(peer_id: int) -> Control:
+## Küçük "logo (+ parti adı)" öbeği. Ad gösterilmese de ipucunda durur.
+static func _party_chip(peer_id: int, show_name: bool) -> Control:
 	if peer_id == -1:
 		return _label("—", 13)
 	var chip := HBoxContainer.new()
 	chip.add_theme_constant_override("separation", 4)
+	chip.tooltip_text = party_name_of(peer_id)
+	# Kalan genişliği ADI GÖSTEREN öbek alır; sadece logo olan öbek büzülür.
+	if show_name:
+		chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	else:
+		chip.size_flags_horizontal = Control.SIZE_SHRINK_END
 	chip.add_child(_badge(peer_id))
-	var name_label := _label(party_name_of(peer_id), 13)
-	name_label.clip_text = true
-	chip.add_child(name_label)
+	if show_name:
+		var name_label := _label(party_name_of(peer_id), 13)
+		name_label.clip_text = true
+		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		chip.add_child(name_label)
 	return chip
 
 ## "Başbakan: [logo] Parti" satırı.

@@ -353,7 +353,9 @@ func _apply_layout() -> void:
 	# solda meclis diyagramı + oylama (PARLIAMENT_WIDTH_RATIO), sağında el
 	# kartları. Kartlar böylece butonların ve teklif yazısının üstüne binmez.
 	var parliament_right: float = LEFT_PANEL_WIDTH + available_width * PARLIAMENT_WIDTH_RATIO
-	bottom_area.offset_left = LEFT_PANEL_WIDTH
+	# EMNİYET: sol panel bir sebeple genişlerse alt hazne de sağa kayar,
+	# diyagram panelin altında kalmaz.
+	bottom_area.offset_left = maxf(LEFT_PANEL_WIDTH, left_panel.size.x)
 	bottom_area.offset_right = parliament_right - viewport_size.x
 	hand_area.offset_left = parliament_right
 	hand_area.offset_right = -RIGHT_COLUMN_WIDTH
@@ -1350,6 +1352,8 @@ func _on_province_clicked(province_id: String) -> void:
 		return
 	_province_panel.position = Vector2(LEFT_PANEL_WIDTH + 12, 12)
 	_province_panel.show_province(province_id)
+	# HARİTA BÖLGESİNDEN AŞAĞI TAŞMASIN: aşağıda parlamento diyagramı var.
+	_province_panel.clamp_to_height(get_viewport_rect().size.y * TOP_AREA_HEIGHT_RATIO - 24.0)
 
 ## Hedef seçme modunda dokunulan il: vurgulanır, üstte ne olacağı yazar.
 func _select_target_province(province_id: String) -> void:

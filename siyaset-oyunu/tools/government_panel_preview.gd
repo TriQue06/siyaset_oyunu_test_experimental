@@ -21,6 +21,15 @@ func _frames(n: int) -> void:
 	for i in n:
 		await process_frame
 
+func _measure(left: Control, board: Control, label: String) -> void:
+	await _frames(4)
+	var lr := left.get_global_rect()
+	var br := board.get_global_rect()
+	print("OLCUM [%s]  sol=%.0f..%.0f (min %.0f)  tahta=%.0f..%.0f  -> %s" % [
+		label, lr.position.x, lr.end.x, left.get_combined_minimum_size().x,
+		br.position.x, br.end.x,
+		"CAKISMA VAR" if lr.intersects(br) else "temiz"])
+
 func _initialize() -> void:
 	await process_frame
 	var mm = root.get_node("MultiplayerManager")
@@ -67,9 +76,40 @@ func _initialize() -> void:
 	_shot("government_panel")
 	var left: Control = scene.get_node("LeftPanel")
 	var board: Control = scene.get_node("%ParliamentBoard")
-	print("left panel rect=", left.get_global_rect())
-	print("parliament board rect=", board.get_global_rect())
-	var overlap: bool = left.get_global_rect().intersects(board.get_global_rect())
-	print("CAKISMA: ", "VAR" if overlap else "YOK")
+	# EN-BOY ORANI ÖNEMLİ: stretch "expand" olduğu için mantıksal genişlik
+	# pencerenin oranına göre değişiyor (16:9 -> 1152, 4:3 -> 864 gibi).
+	# Tablet 4:3/16:10 olduğunda ekran BELİRGİN ŞEKİLDE DARALIYOR.
+	# Sol panelin BÜYÜYEBİLDİĞİ durumları tek tek dene.
+	await _measure(left, board, "normal")
+
+	# 1) İL PANELİ AÇIK: eskiden içerik uzadıkça panel boyu büyüyüp
+	# parlamento diyagramının üstünü kapatıyordu.
+	scene._on_province_clicked("ankara")
+	await _frames(10)
+	var prov: Control = scene._province_panel
+	var pr := prov.get_global_rect()
+	var br2 := board.get_global_rect()
+	print("OLCUM [il paneli]  panel y=%.0f..%.0f  tahta y=%.0f..%.0f  -> %s" % [
+		pr.position.y, pr.end.y, br2.position.y, br2.end.y,
+		"CAKISMA VAR" if pr.intersects(br2) else "temiz"])
+	_shot("province_panel_open")
+	prov.hide()
+	await _frames(4)
+
+	# 2) UZUN PARTİ ADLARI
+	for peer_id in pm.parties.keys():
+		pm.parties[peer_id]["name"] = "Cumhuriyetçi Kalkınma"
+	pm.parties_updated.emit()
+	scene._refresh_government_panel()
+	await _frames(6)
+	await _measure(left, board, "uzun parti adlari")
+
+	# 3) KOALİSYONDAN ÇEKİL onay yazısı (butona bir kez basılmış hâli)
+	var gov_box: VBoxContainer = scene.get_node("%GovernmentVBox")
+	for child in gov_box.get_children():
+		if child is Button:
+			(child as Button).text = "Emin misin? Tekrar dokun (ortağın yalnız düşerse −5)"
+	await _frames(6)
+	await _measure(left, board, "cekilme onayi")
 	print("=== GOVERNMENT PANEL PREVIEW: PASS ===")
 	quit()

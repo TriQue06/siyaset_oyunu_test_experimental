@@ -20,6 +20,7 @@ const INTEL_COLOR := UiTheme.BLUE
 
 var province_id: String = ""
 var _body: VBoxContainer
+var _scroll: ScrollContainer
 
 func _ready() -> void:
 	UiSkin.skin_panel(self, UiSkin.PANEL_DARK)
@@ -30,10 +31,24 @@ func _ready() -> void:
 	for side in ["left", "right", "top", "bottom"]:
 		margin.add_theme_constant_override("margin_" + side, 12)
 	add_child(margin)
+	# İçerik KAYDIRILABİLİR: uzun il raporu paneli boyuna büyütüp parlamento
+	# diyagramının üstünü kapatıyordu. Artık panelin boyunu GameScreen
+	# sınırlıyor (bkz. clamp_to_height), taşan kısım kaydırılıyor.
+	_scroll = ScrollContainer.new()
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	margin.add_child(_scroll)
 	_body = VBoxContainer.new()
 	_body.add_theme_constant_override("separation", 6)
-	margin.add_child(_body)
+	_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_scroll.add_child(_body)
 	refresh()
+
+## Panel en fazla bu kadar uzar; içerik daha uzunsa kaydırılır.
+func clamp_to_height(max_height: float) -> void:
+	await get_tree().process_frame
+	var wanted: float = _body.get_combined_minimum_size().y + 24.0
+	size = Vector2(PANEL_WIDTH, minf(wanted, maxf(120.0, max_height)))
 
 func show_province(id: String) -> void:
 	province_id = id

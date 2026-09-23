@@ -65,18 +65,30 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = -200.0
 offset_top = 76.0
+offset_right = -16.0
 offset_bottom = -286.0
 grow_horizontal = 0
 grow_vertical = 2
 
-[node name="PlayerPanelList" type="GridContainer" parent="PlayerPanel" unique_id=2066101759]
+[node name="PlayerPanelBox" type="VBoxContainer" parent="PlayerPanel" unique_id=2066101760]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
+grow_horizontal = 0
+grow_vertical = 1
+theme_override_constants/separation = 6
+
+[node name="PlayerTabs" type="HBoxContainer" parent="PlayerPanel/PlayerPanelBox" unique_id=2066101761]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="PlayerPanelList" type="GridContainer" parent="PlayerPanel/PlayerPanelBox" unique_id=2066101759]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
 theme_override_constants/h_separation = 6
 theme_override_constants/v_separation = 6
 
@@ -164,43 +176,27 @@ autowrap_mode = 2
 max_lines_visible = 3
 text_overrun_behavior = 3
 
-[node name="StatsPanel" type="PanelContainer" parent="BottomArea/ChamberSplit" unique_id=3821004481]
+[node name="ActionsPanel" type="PanelContainer" parent="BottomArea/ChamberSplit" unique_id=3821004481]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(220, 0)
-mouse_filter = 2
+custom_minimum_size = Vector2(240, 0)
 
-[node name="StatsMargin" type="MarginContainer" parent="BottomArea/ChamberSplit/StatsPanel" unique_id=3821004482]
+[node name="ActionsMargin" type="MarginContainer" parent="BottomArea/ChamberSplit/ActionsPanel" unique_id=3821004482]
 layout_mode = 2
-mouse_filter = 2
 theme_override_constants/margin_left = 10
 theme_override_constants/margin_top = 8
 theme_override_constants/margin_right = 10
 theme_override_constants/margin_bottom = 8
 
-[node name="StatsVBox" type="VBoxContainer" parent="BottomArea/ChamberSplit/StatsPanel/StatsMargin" unique_id=3821004483]
+[node name="ActionsVBox" type="VBoxContainer" parent="BottomArea/ChamberSplit/ActionsPanel/ActionsMargin" unique_id=3821004483]
+unique_name_in_owner = true
 layout_mode = 2
-mouse_filter = 2
 theme_override_constants/separation = 6
 
-[node name="StatsTitle" type="Label" parent="BottomArea/ChamberSplit/StatsPanel/StatsMargin/StatsVBox" unique_id=3821004484]
-unique_name_in_owner = true
+[node name="ActionsTitle" type="Label" parent="BottomArea/ChamberSplit/ActionsPanel/ActionsMargin/ActionsVBox" unique_id=3821004484]
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
-text = "> PARTİLER"
-
-[node name="VoteScroll" type="ScrollContainer" parent="BottomArea/ChamberSplit/StatsPanel/StatsMargin/StatsVBox" unique_id=3821004447]
-layout_mode = 2
-size_flags_vertical = 3
-horizontal_scroll_mode = 0
-
-[node name="VoteSharePanel" type="VBoxContainer" parent="BottomArea/ChamberSplit/StatsPanel/StatsMargin/StatsVBox/VoteScroll" unique_id=3821004449]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-mouse_filter = 2
-script = ExtResource("5")
-compact = true
+text = "> HAMLELER"
 
 [node name="TurnIndicator" type="PanelContainer" parent="." unique_id=3821004420]
 unique_name_in_owner = true
@@ -279,14 +275,6 @@ autowrap_mode = 2
 layout_mode = 2
 
 [node name="GovernmentVBox" type="VBoxContainer" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004473]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="Separator2" type="HSeparator" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004475]
-layout_mode = 2
-
-[node name="ScoreVBox" type="VBoxContainer" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004476]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 6

@@ -26,6 +26,10 @@ func _initialize() -> void:
 	var brain = load("res://scripts/bot_brain.gd")
 	var bm = root.get_node("BotManager")
 	bm.set_process(false)  # zamanlamasız sürüyoruz
+	# SABİT TOHUM: testin rastgele bir oyunda değil HER ZAMAN AYNI oyunda
+	# koşması için. Tohumsuzken "en az bir hükümet kuruldu" arada bir
+	# tutmuyordu ve hata tekrar üretilemiyordu.
+	cm.set_rng_seed(20260923)
 	mm.room_code = ""
 	gm.result_hold_seconds = 0.0
 	mm.election_threshold = 3.0

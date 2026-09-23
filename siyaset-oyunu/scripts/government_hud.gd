@@ -7,9 +7,6 @@ extends RefCounted
 const BADGE_SIZE := Vector2(26, 26)
 const BADGE_ICON_PIXEL_SIZE := 48
 const TITLE_COLOR := UiTheme.TEXT_MUTED
-## Puan tablosundaki iki sayı sütunu: ulusal puan ve toplam puan.
-const NATIONAL_COLUMN_WIDTH := 46.0
-const SCORE_COLUMN_WIDTH := 36.0
 const DIM_COLOR := UiTheme.TEXT_MUTED
 
 static func party_name_of(peer_id: int) -> String:
@@ -39,13 +36,6 @@ static func _mono_label(text: String, font_size: int, color: Color) -> Label:
 	var label := _label(text, font_size, Color.WHITE)
 	label.add_theme_font_override("font", UiTheme.mono())
 	label.add_theme_color_override("font_color", color)
-	return label
-
-## Sayı sütunlarının küçük başlığı.
-static func _column_head(text: String, width: float) -> Label:
-	var label := _mono_label(text, UiTheme.FS_TINY, UiTheme.TEXT_DIM)
-	label.custom_minimum_size = Vector2(width, 0)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	return label
 
 static func _badge(peer_id: int) -> Control:
@@ -182,60 +172,6 @@ static func _fill_cabinet(box: VBoxContainer, government: Dictionary) -> void:
 	var majority: bool = seats * 2 > total
 	box.add_child(_label("%d/%d sandalye — %s" % [seats, total, "çoğunluk var" if majority else "AZINLIK"],
 		UiTheme.FS_TINY, UiTheme.TEXT_MUTED if majority else UiTheme.RED))
-
-## Puan tablosu: logo, parti adı, oyuncu adı ve sağda puan. Her satır TEK
-## satır yüksekliğinde — 8 oyuncuda da sol panele sığsın.
-static func fill_score_panel(box: VBoxContainer, peer_ids: Array, my_id: int) -> void:
-	_clear(box)
-	box.add_child(section_title("Puan tablosu"))
-	var ids: Array = peer_ids.duplicate()
-	ids.sort_custom(func(a, b):
-		var sa := GovernmentManager.score_of(a)
-		var sb := GovernmentManager.score_of(b)
-		if sa != sb:
-			return sa > sb
-		return int(CardManager.last_seats.get(a, 0)) > int(CardManager.last_seats.get(b, 0))
-	)
-	# Başlık satırı: iki sayının ne olduğu bir kez yazılır, satırlarda tekrar
-	# etmez (her satırda etiket taşımak paneli kalabalıklaştırıyordu).
-	var header := HBoxContainer.new()
-	header.add_theme_constant_override("separation", 6)
-	var header_spacer := Control.new()
-	header_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header.add_child(header_spacer)
-	header.add_child(_column_head("ULUSAL", NATIONAL_COLUMN_WIDTH))
-	header.add_child(_column_head("PUAN", SCORE_COLUMN_WIDTH))
-	box.add_child(header)
-
-	for peer_id in ids:
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 6)
-		row.add_child(_badge(peer_id))
-
-		var party_label := _label(party_name_of(peer_id), 13,
-			UiTheme.GOLD if peer_id == my_id else UiTheme.TEXT)
-		party_label.clip_text = true
-		party_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(party_label)
-
-		# ULUSAL PUAN: partinin ülke genelindeki durumu. Tur başına artabilir
-		# de azalabilir de; seçime bu değer taşınır. TOPLAM PUANIN hemen
-		# yanında durur, iki sayı birlikte okunur.
-		var opinion := CardManager.national_of(peer_id)
-		var opinion_label := _mono_label("%+.1f" % opinion, 13, ProvincePanel._opinion_color(opinion))
-		opinion_label.custom_minimum_size = Vector2(NATIONAL_COLUMN_WIDTH, 0)
-		opinion_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		opinion_label.tooltip_text = "Ulusal puan: partinin ülke genelindeki durumu (seçime taşınır)"
-		opinion_label.mouse_filter = Control.MOUSE_FILTER_PASS
-		row.add_child(opinion_label)
-
-		var score_label := _mono_label(str(GovernmentManager.score_of(peer_id)), 16, UiTheme.TEXT)
-		score_label.custom_minimum_size = Vector2(SCORE_COLUMN_WIDTH, 0)
-		score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		score_label.tooltip_text = "Toplam puan"
-		score_label.mouse_filter = Control.MOUSE_FILTER_PASS
-		row.add_child(score_label)
-		box.add_child(row)
 
 ## Yasa oylaması: 1. satır yasa ve oy durumu, 2. satır bu oyuncu için oyların
 ## genel etkisi (il il değişir; illerin görüşü gizli olduğu için sayı verilmez).

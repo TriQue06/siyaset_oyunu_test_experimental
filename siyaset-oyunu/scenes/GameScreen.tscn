@@ -239,16 +239,23 @@ text = "Sıra: -"
 theme_override_font_sizes/font_size = 13
 autowrap_mode = 2
 
-[node name="LeftPanel" type="PanelContainer" parent="." unique_id=3821004470]
+[node name="LeftPanel" type="Panel" parent="." unique_id=3821004470]
 unique_name_in_owner = true
+clip_contents = true
 layout_mode = 1
 anchors_preset = 9
 anchor_bottom = 1.0
 offset_right = 260.0
+grow_horizontal = 0
 grow_vertical = 2
 
 [node name="LeftMargin" type="MarginContainer" parent="LeftPanel" unique_id=3821004472]
-layout_mode = 2
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 theme_override_constants/margin_left = 14
 theme_override_constants/margin_top = 14
 theme_override_constants/margin_right = 14

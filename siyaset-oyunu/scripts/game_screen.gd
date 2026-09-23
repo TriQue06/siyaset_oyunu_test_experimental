@@ -111,7 +111,9 @@ var _constitution_info: Label
 @onready var vote_yes_button: TextureButton = %VoteYesButton
 @onready var vote_no_button: TextureButton = %VoteNoButton
 @onready var proposal_label: Label = %ProposalLabel
-@onready var left_panel: PanelContainer = %LeftPanel
+## DÜZ Panel (PanelContainer değil): içeriği ne kadar büyürse büyüsün
+## genişliği 260'ta SABİT kalsın, parlamento diyagramının üstüne binmesin.
+@onready var left_panel: Panel = %LeftPanel
 @onready var government_vbox: VBoxContainer = %GovernmentVBox
 
 ## Hedef seçmeyi bekleyen "vekil çalma" kartının el içindeki sırası (-1 = yok).
@@ -280,7 +282,10 @@ func _ready() -> void:
 		UiSkin.skin_panel(actions_panel, UiSkin.PANEL_DARK)
 	# Monospace yazı geniş: panelin kendi genişliğini aşmasını engelle.
 	left_panel.clip_contents = true
-	left_panel.custom_minimum_size.x = LEFT_PANEL_WIDTH
+	# custom_minimum_size ASGARİ ölçüdür, azami değil: eskiden panel içeriği
+	# 260'ı aşınca sağa doğru büyüyüp diyagramın üstüne biniyordu. Artık düz
+	# Panel olduğu için genişlik çapalarla sabit; burada bir şey zorlamıyoruz.
+	left_panel.custom_minimum_size.x = 0.0
 	_build_waiting_overlay()
 	_build_toast()
 	_build_target_hint()

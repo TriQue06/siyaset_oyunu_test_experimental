@@ -168,7 +168,10 @@ func _ready() -> void:
 	_load_province_seat_counts()
 
 func _process(delta: float) -> void:
-	if MultiplayerManager.room_code == "" or not MultiplayerManager.is_host:
+	# ÇEVRİM DIŞI OYUNDA DA İŞLEMELİ: eskiden room_code == "" kontrolü vardı,
+	# çevrim dışında oda kodu boş olduğu için tur süresi hiç ilerlemiyordu.
+	# Sadece gerçek bir oyun yokken (sahne önizlemesi) duruyor.
+	if MultiplayerManager.is_standalone_preview() or not MultiplayerManager.is_host:
 		return
 	tick(delta)
 

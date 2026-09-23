@@ -124,8 +124,8 @@ func _initialize() -> void:
 
 	print("")
 	print("=== 3) SECIM TAKVIMI ===")
-	check("varsayilan: 4 yilda bir (8 tur), 8 secim = 64 tur", GameRules.ELECTION_INTERVAL == 8 and GameRules.MAX_ROUNDS == 64 \
-		and GameRules.is_election_round(8) and GameRules.is_election_round(64) and not GameRules.is_election_round(66))
+	check("varsayilan: 2 yilda bir (4 tur), 8 secim = 32 tur", GameRules.ELECTION_INTERVAL == 4 and GameRules.MAX_ROUNDS == 32 \
+		and GameRules.is_election_round(4) and GameRules.is_election_round(32) and not GameRules.is_election_round(34))
 	# Bu testin geri kalanı 5 YILDA bir (10 tur), 6 seçimlik (60 tur) takvimle yazıldı.
 	GameRules.configure(5, 6)
 	check("secim turlari 10,20,30 (5,15,25 degil)", GameRules.is_election_round(10) and GameRules.is_election_round(20) \

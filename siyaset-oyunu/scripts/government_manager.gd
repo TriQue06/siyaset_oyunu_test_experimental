@@ -117,7 +117,10 @@ var _resolving: bool = false
 var _resolve_left: float = 0.0
 
 func _process(delta: float) -> void:
-	if MultiplayerManager.room_code == "" or not MultiplayerManager.is_host:
+	# ÇEVRİM DIŞI OYUNDA DA İŞLEMELİ: eskiden room_code == "" kontrolü vardı,
+	# çevrim dışında oda kodu boş olduğu için kurma/oylama süreleri hiç ilerlemiyordu.
+	# Sadece gerçek bir oyun yokken (sahne önizlemesi) duruyor.
+	if MultiplayerManager.is_standalone_preview() or not MultiplayerManager.is_host:
 		return
 	tick(delta)
 

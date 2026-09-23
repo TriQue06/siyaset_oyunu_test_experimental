@@ -41,7 +41,8 @@ extends RefCounted
 ## Oyun MAX_ROUNDS = aralık × seçim sayısı tur (yani aralık_yıl × sayı × 2 tur)
 ## sürer. Değerler configure() ile (her cihazda, ayar senkronlanınca) güncellenir.
 const ROUNDS_PER_YEAR := 2
-const DEFAULT_ELECTION_INTERVAL := 4
+## VARSAYILAN: seçimler 2 YILDA BİR, yani 4 dönemde bir (tur = 6 ay).
+const DEFAULT_ELECTION_INTERVAL := 2
 const DEFAULT_ELECTION_COUNT := 8
 const ELECTION_INTERVAL_MIN := 2
 const ELECTION_INTERVAL_MAX := 8

@@ -87,5 +87,26 @@ func _initialize() -> void:
 	check("kartlar dagitildi", not cm.turn_order.is_empty(), str(cm.turn_order))
 
 	print("")
+	print("=== 7) ZAMANLAYICILAR CEVRIM DISINDA DA ISLER ===")
+	# Kullanıcının şikâyeti: botlar oynarken "Süre: 1:30" donuyordu. Sebebi
+	# _process'in room_code == "" görünce hiç tick etmemesiydi.
+	check("cevrim disi oyun 'sahne onizlemesi' sayilmaz", not mm.is_standalone_preview())
+	var gm = root.get_node("GovernmentManager")
+	var turn_before: float = cm.turn_seconds_left()
+	cm._process(1.0)
+	check("tur sayaci azaldi", cm.turn_seconds_left() < turn_before,
+		"%.1f -> %.1f" % [turn_before, cm.turn_seconds_left()])
+	# Hükümet kurma sayacı için önce bir kurma aşaması başlat.
+	cm.last_seats = {}
+	for peer_id in cm.turn_order:
+		cm.last_seats[peer_id] = 100
+	gm.start_formation()
+	var phase_before: float = gm.phase_seconds_left()
+	check("kurma asamasi basladi", phase_before > 0.0, "%.1f" % phase_before)
+	gm._process(1.0)
+	check("hukumet kurma sayaci azaldi", gm.phase_seconds_left() < phase_before,
+		"%.1f -> %.1f" % [phase_before, gm.phase_seconds_left()])
+
+	print("")
 	print("=== TUM TESTLER GECTI ===" if _failed == 0 else "=== %d TEST BASARISIZ ===" % _failed)
 	quit(1 if _failed > 0 else 0)

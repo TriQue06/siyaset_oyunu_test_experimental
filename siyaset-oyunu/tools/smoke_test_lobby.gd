@@ -4,6 +4,7 @@ extends SceneTree
 
 var _failed := 0
 var mm
+var cm
 
 func check(label: String, ok: bool, detail: String = "") -> void:
 	if not ok:
@@ -26,6 +27,7 @@ func bot_id_of(name: String) -> int:
 func _initialize() -> void:
 	await process_frame
 	mm = root.get_node("MultiplayerManager")
+	cm = root.get_node("CardManager")
 
 	print("=== 1) CEVRIM DISI MOD ===")
 	mm.start_offline("Barış")
@@ -68,6 +70,21 @@ func _initialize() -> void:
 		mm.add_bot()
 	mm.start_game()
 	check("cevrim disi oyun basladi", mm.stage == mm.Stage.PARTY_SETUP, str(mm.stage))
+
+	print("")
+	print("=== 6) PARTI KURULUMU: HAZIR VERINCE OYUN BASLAR ===")
+	var pm = root.get_node("PartyManager")
+	check("botlara parti verildi", pm.parties.size() == mm.players.size() - 1, str(pm.parties.keys()))
+	for bot_id in mm.bot_ids():
+		check("bot %d hazir" % bot_id, pm.is_ready(bot_id))
+	check("oyuncu henuz hazir degil", not pm.all_ready())
+	# Kullanıcının şikâyeti: çevrim dışında "Kilitle ve Hazır Ver" oyunu
+	# başlatmıyordu (hazır bayrağı sadece yerelde işaretleniyordu).
+	pm.set_party_and_ready("Deneme", 0, Color.WHITE, Color.RED,
+		{"economic": 0, "social": 0, "administrative": 0}, true)
+	check("herkes hazir", pm.all_ready(), str(pm.parties))
+	check("OYUN BASLADI", mm.stage == mm.Stage.IN_GAME, str(mm.stage))
+	check("kartlar dagitildi", not cm.turn_order.is_empty(), str(cm.turn_order))
 
 	print("")
 	print("=== TUM TESTLER GECTI ===" if _failed == 0 else "=== %d TEST BASARISIZ ===" % _failed)

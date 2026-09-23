@@ -187,6 +187,13 @@ static func snap_axis_sharpness_max_value(value: float) -> float:
 			closest = option
 	return closest
 
+## AKTİF BİR OYUN YOK MU? (örn. bir sahne editörde tek başına çalıştırılıyor)
+## DİKKAT: çevrim dışı oyun AKTİF bir oyundur — oda kodu boş olsa da burada
+## false döner. "RPC atma" kararı için room_code == "" bakmaya devam edilir;
+## bu fonksiyon "oyun mantığını hiç çalıştırma" kararı içindir.
+func is_standalone_preview() -> bool:
+	return room_code == "" and not offline_mode
+
 ## ÇEVRİM DIŞI MOD: röle sunucusu, oda kodu ve katılma yok. Ağ peer'i hiç
 ## kurulmaz; oyun tamamen bu cihazda döner (CardManager._is_local_only()
 ## zaten room_code == "" olduğunda yerel çalışır). Sadece bot eklenebilir.

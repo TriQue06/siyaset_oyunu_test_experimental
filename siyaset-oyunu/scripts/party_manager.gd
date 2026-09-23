@@ -92,9 +92,9 @@ func set_my_party(party_name: String, icon_index: int, icon_color: Color, bg_col
 		return
 	if not IdeologyAxes.is_valid_start_ideology(ideology):
 		return
-	if MultiplayerManager.room_code == "":
-		# Aktif bir oda/bağlantı yok (örn. sahne editörde tek başına
-		# çalıştırılıyor) — RPC atmadan sadece yerel önizlemeye izin ver.
+	if MultiplayerManager.is_standalone_preview():
+		# Aktif bir oyun yok (örn. sahne editörde tek başına çalıştırılıyor)
+		# — RPC atmadan sadece yerel önizlemeye izin ver.
 		_apply_party_local_only(party_name, icon_index, icon_color, bg_color, ideology)
 		return
 	var my_id := multiplayer.get_unique_id()
@@ -116,7 +116,10 @@ func set_party_and_ready(party_name: String, icon_index: int, icon_color: Color,
 		return
 	if not IdeologyAxes.is_valid_start_ideology(ideology):
 		return
-	if MultiplayerManager.room_code == "":
+	# ÇEVRİM DIŞI OYUN BURAYA GİRMEZ: girdiğinde "hazır" bayrağı sadece
+	# yerelde işaretlenip finish_party_setup() hiç çağrılmıyordu, yani
+	# hazır verince oyun başlamıyordu.
+	if MultiplayerManager.is_standalone_preview():
 		_apply_party_local_only(party_name, icon_index, icon_color, bg_color, ideology)
 		var id := multiplayer.get_unique_id()
 		if parties.has(id):
@@ -131,7 +134,7 @@ func set_party_and_ready(party_name: String, icon_index: int, icon_color: Color,
 
 ## Bu oyuncunun hazır durumunu ayarlar ("Kilitle ve Hazır Ver" / iptal).
 func set_ready(is_ready_value: bool) -> void:
-	if MultiplayerManager.room_code == "":
+	if MultiplayerManager.is_standalone_preview():
 		var id := multiplayer.get_unique_id()
 		if not parties.has(id):
 			parties[id] = {}

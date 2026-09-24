@@ -70,7 +70,7 @@ const GOVERNMENT_FATIGUE := 1.1
 
 # --- Gensoru ------------------------------------------------------------------
 ## Reddedilen gensoruyu getiren parti bu kadar ulusal destek kaybeder.
-const CENSURE_REJECTED_NATIONAL := -2.0
+const CENSURE_REJECTED_NATIONAL := -1.0
 
 # --- Teşkilat ------------------------------------------------------------------
 ## Seviyeye göre KALICI aktivite (sönmez): 1 az, 2 orta, 3 yüksek oy bonusu.

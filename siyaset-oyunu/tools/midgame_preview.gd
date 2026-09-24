@@ -37,6 +37,11 @@ func _initialize() -> void:
 	print("tur=%d hukumet=%s elde kart=%d" % [cm.round_number, str(gm.has_government()),
 		cm.inventories.get(mm.owner_id, []).size()])
 
+	# YASA OYLAMASI AÇIK: teklifi veren parti rozeti bu sırada görünür.
+	gm.result_hold_seconds = 999.0
+	gm.submit_law(mm.owner_id, "law:economic:1")
+	print("yasa oylamasi: %s / teklif veren %d" % [gm.proposal_kind, gm.proposal_peer_id])
+
 	var scene: Node = (load("res://scenes/GameScreen.tscn") as PackedScene).instantiate()
 	root.add_child(scene)
 	await _frames(30)

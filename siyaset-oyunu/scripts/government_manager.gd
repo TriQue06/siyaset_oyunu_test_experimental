@@ -321,15 +321,13 @@ func start_formation(extra_seconds: float = 0.0) -> void:
 func award_formation_scores() -> void:
 	if not _is_authority() or government.is_empty():
 		return
-	var notes: Array[String] = []
+	# PUANLAR SESSİZCE YAZILIR: makam puanı dökümü meclis yazısını
+	# şişiriyordu, puanlar zaten parti tablosunda görünüyor.
 	for peer_id in government_party_ids():
 		var points := round_points_of(peer_id)
 		if points <= 0:
 			continue
 		scores[peer_id] = score_of(peer_id) + points
-		notes.append("%s +%d" % [_party_name(peer_id), points])
-	if not notes.is_empty():
-		last_resolution_reason += " Makam puanları: %s." % ", ".join(notes)
 
 func _build_mandate_order() -> void:
 	mandate_order = voter_ids()
@@ -367,7 +365,11 @@ func _fail_attempt() -> void:
 	_clear_proposal()
 	_set_phase(Phase.FORMING if mandate_index < mandate_order.size() else Phase.IDLE)
 	if phase == Phase.IDLE:
-		last_resolution_reason += " Hükümet kurulamadı — dönem sonunda erken seçim."
+		# Meclisteki HER parti sırayla denedi ve kuramadı: son çare sandık.
+		last_resolution_reason += " Hiçbir parti hükümet kuramadı — dönem sonunda sandığa gidiliyor."
+	elif mandate_peer_id() != -1:
+		# Görev bir SONRAKİ EN BÜYÜK partiye geçer; son partiye kadar sürer.
+		last_resolution_reason += " Görev sıradaki partiye geçti: %s." % _party_name(mandate_peer_id())
 
 ## Oyun bittiğinde CardManager çağırır: açık teklif kapanır, hükümet gösterim
 ## için korunur.
@@ -695,8 +697,7 @@ func _resolve_proposal() -> void:
 			_clear_proposal()
 			_set_phase(Phase.GOVERNING)
 			formed_round = CardManager.round_number
-			last_resolution_reason = "%s hükümeti güvenoyu aldı. Hükümet partileri +%d mana." % [
-				_party_name(main_gov_peer_id), GameRules.GOVERNMENT_MANA_BONUS]
+			last_resolution_reason = "%s hükümeti güvenoyu aldı." % _party_name(main_gov_peer_id)
 			CardManager.grant_government_mana(government_party_ids())
 			# Makam puanları TEK SEFER, hükümetin kurulduğu anda yazılır.
 			award_formation_scores()

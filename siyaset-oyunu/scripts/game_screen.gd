@@ -205,6 +205,9 @@ const PASS_TOP := RIGHT_STACK_BOTTOM - BOTTOM_BUTTON_HEIGHT
 const TRASH_TOP := PASS_TOP - BOTTOM_BUTTON_HEIGHT - 6.0
 const MANA_PLATE_TOP := TRASH_TOP - MANA_PLATE_HEIGHT - 6.0
 const MANA_ICON_SIZE := 34.0
+## Parlamento diyagramının köşesinde duran "teklifi veren parti" rozeti.
+var _proposer_chip: PanelContainer
+var _proposer_row: HBoxContainer
 ## Kart barının zemini (ekranın altındaki tam genişlik şeridi).
 var _card_bar_panel: Panel
 var _mana_plate: PanelContainer
@@ -2020,6 +2023,55 @@ func _refresh_vote_ui() -> void:
 		vote_no_button.texture_pressed = null
 
 	proposal_label.text = GovernmentHud.proposal_status_text(multiplayer.get_unique_id())
+	_refresh_proposer_chip()
+
+## TEKLİFİ VEREN PARTİ: yasa/gensoru/hükümet oylamasında meclis diyagramının
+## köşesinde logosu ve adıyla durur. Eskiden bu bilgi diyagramın altındaki
+## uzun ipucu satırındaydı.
+func _refresh_proposer_chip() -> void:
+	if _proposer_chip == null:
+		_proposer_chip = PanelContainer.new()
+		_proposer_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var style := UiSkin.stylebox(UiSkin.SLOT)
+		style.set_content_margin_all(6)
+		_proposer_chip.add_theme_stylebox_override("panel", style)
+		_proposer_row = HBoxContainer.new()
+		_proposer_row.add_theme_constant_override("separation", 6)
+		_proposer_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_proposer_chip.add_child(_proposer_row)
+		_proposer_chip.position = Vector2(6, 6)
+		parliament_diagram.add_child(_proposer_chip)
+	var peer_id := GovernmentManager.proposal_peer_id
+	var active: bool = GovernmentManager.is_voting() and peer_id != -1
+	_proposer_chip.visible = active
+	if not active:
+		return
+	for child in _proposer_row.get_children():
+		_proposer_row.remove_child(child)
+		child.queue_free()
+	# TEK SATIR ve DAR: yarım dairenin üstünde kalan boş şerit ancak bu kadar
+	# yer bırakıyor, daha yükseği koltukların üstüne biniyor.
+	_proposer_row.add_child(PartyBadge.build(PartyManager.parties.get(peer_id, {}),
+		Vector2(22, 22), BADGE_ICON_PIXEL_SIZE))
+	var who := Label.new()
+	who.text = _party_name_of(peer_id)
+	who.add_theme_font_size_override("font_size", 11)
+	who.clip_text = true
+	who.custom_minimum_size = Vector2(72, 22)
+	who.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_proposer_row.add_child(who)
+	_proposer_chip.tooltip_text = "%s: %s" % [_proposal_kind_title(), _party_name_of(peer_id)]
+	_proposer_chip.reset_size()
+
+## Oylanan teklifin kısa türü (rozetin üst satırı).
+func _proposal_kind_title() -> String:
+	match GovernmentManager.proposal_kind:
+		GovernmentManager.KIND_LAW: return "YASAYI GETİREN"
+		GovernmentManager.KIND_GOVERNMENT: return "HÜKÜMETİ KURAN"
+		GovernmentManager.KIND_CENSURE: return "GENSORUYU VEREN"
+		GovernmentManager.KIND_EARLY: return "ÖNERGEYİ VEREN"
+		GovernmentManager.KIND_CONSTITUTION: return "DEĞİŞİKLİĞİ GETİREN"
+	return "TEKLİFİ VEREN"
 
 func _party_name_of(peer_id: int) -> String:
 	return GovernmentHud.party_name_of(peer_id)

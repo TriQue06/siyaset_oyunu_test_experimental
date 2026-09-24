@@ -194,9 +194,9 @@ static func _law_status_text(my_id: int, time_text: String) -> String:
 	]
 	if GovernmentManager.has_voted(my_id):
 		return first + "\nOyun: %s · diğer partilerin oyu bekleniyor" % GovernmentManager.vote_text(GovernmentManager.my_vote())
-	if not GovernmentManager.voter_ids().has(my_id):
-		return first
-	return first + "\n" + String(law_vote_hint(my_id)["short"])
+	# IPUCU SATIRI KALDIRILDI: teklifi veren parti artik parlamento
+	# diyagraminin yaninda logosuyla gosteriliyor (bkz. game_screen.gd).
+	return first
 
 ## Bu oyuncunun oylamadaki yeri için EVET / HAYIR ipuçları.
 static func law_vote_hint(my_id: int) -> Dictionary:

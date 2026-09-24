@@ -41,8 +41,12 @@ const COMPACT_ROW_HEIGHT := 56.0
 ## ChamberSplit yalnızca sağa büyüyecek şekilde ayarlıdır (bkz. sahne).
 ## KART BARI: ekranın en altında, TAM GENİŞLİKTE duran kart şeridi. Kartlar
 ## burada yan yana (bitişik değil) dizilir. Diğer her şey bunun üstünde kalır.
-const CARD_BAR_HEIGHT := 160.0
+const CARD_BAR_HEIGHT := 80.0
 const CARD_BAR_PADDING := 8.0
+## Kartın barda görünen ÜST kısmı. Kalanı ekranın altında bekler; fare
+## üstüne gelince (ya da dokunulup seçilince) kart bu kadar yukarı kalkıp
+## tamamen görünür.
+const CARD_PEEK_HEIGHT := CARD_BAR_HEIGHT - CARD_BAR_PADDING
 ## Haritanın altındaki katman düğmelerine (Vekiller/Teşkilat/Güç) ayrılan yer.
 const LAYER_BAR_RESERVE := 40.0
 const AVATAR_SEPARATION := 6.0
@@ -63,6 +67,7 @@ const CARD_DISPLAY_SCALE := 1.5
 ## hepsi bu oranla küçülüyor ki kartla orantılı kalsınlar.
 const CARD_ART_RATIO := CARD_DISPLAY_SCALE / 2.0
 const CARD_DISPLAY_SIZE := Vector2(72, 96) * CARD_DISPLAY_SCALE
+const CARD_LIFT := -(CARD_DISPLAY_SIZE.y - CARD_PEEK_HEIGHT)
 const CARD_HOVER_LIFT_SPEED := 12.0
 const HAND_CARD_SEPARATION := 8
 ## Fare bu kadar kaydırılırsa tık değil SÜRÜKLEME başlar.
@@ -370,9 +375,9 @@ func _place_card_bar() -> void:
 	hand_area.offset_right = 0.0
 	hand_area.offset_top = viewport_size.y - CARD_BAR_HEIGHT
 	hand_area.offset_bottom = 0.0
-	# Kartlar barın içinde, tamamı görünür halde.
-	hand_container.offset_top = -(CARD_BAR_HEIGHT - CARD_BAR_PADDING)
-	hand_container.offset_bottom = -CARD_BAR_PADDING
+	# Kartların ÜST KISMI barda durur, gerisi ekranın altında bekler.
+	hand_container.offset_top = -CARD_PEEK_HEIGHT
+	hand_container.offset_bottom = -CARD_PEEK_HEIGHT + CARD_DISPLAY_SIZE.y
 	_fit_hand_width(CardManager.my_inventory().size())
 
 ## Viewport boyutuna bağlı TÜM mutlak-piksel yerleşim hesapları burada — hem
@@ -969,6 +974,19 @@ func _build_hand_card(card_type: String, hand_index: int) -> Control:
 				_start_drag(hand_index, card_type, holder)
 	)
 
+	# FARE ÜSTÜNE GELİNCE kart tamamen görünür (dokunmatikte aynısını tek
+	# dokunuş yapar: kart seçilince kalkar, tekrar dokununca çalışır).
+	card.mouse_entered.connect(func():
+		if _selected_hand_index != hand_index:
+			holder.set_meta("lift_target", CARD_LIFT)
+			holder.z_index = 3
+	)
+	card.mouse_exited.connect(func():
+		if _selected_hand_index != hand_index:
+			holder.set_meta("lift_target", 0.0)
+			holder.z_index = 0
+	)
+
 	wrapper.add_child(holder)
 	_hand_holders.append(holder)
 	return wrapper
@@ -1019,7 +1037,7 @@ func _select_hand_card(hand_index: int) -> void:
 		if not is_instance_valid(holder):
 			continue
 		var selected: bool = int(holder.get_meta("hand_index", -1)) == hand_index
-		holder.set_meta("lift_target", -CARD_DISPLAY_SIZE.y * 0.5 if selected else 0.0)
+		holder.set_meta("lift_target", CARD_LIFT if selected else 0.0)
 		holder.z_index = 5 if selected else 0
 		if selected:
 			_show_card_info(String(CardManager.my_inventory()[hand_index]), holder)
@@ -1509,7 +1527,7 @@ func _show_card_info(card_type: String, holder: Control) -> void:
 	_card_info.position = Vector2(
 		clampf(holder.global_position.x + CARD_DISPLAY_SIZE.x * 0.5 - info_size.x * 0.5,
 			LEFT_PANEL_WIDTH, viewport_size.x - RIGHT_COLUMN_WIDTH - info_size.x),
-		viewport_size.y - CARD_BAR_HEIGHT - 8.0 - info_size.y
+		viewport_size.y - CARD_PEEK_HEIGHT + CARD_LIFT - 8.0 - info_size.y
 	)
 
 ## Hedef seçme modunda, çalınabilecek partileri vurgular; geçersiz olanları

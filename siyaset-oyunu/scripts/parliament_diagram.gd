@@ -25,7 +25,7 @@ var _dot_positions: Array = [] # Array[Vector2], normalize (x: 0..2, merkez=1 / 
 var _dot_colors: Array = []    # Array[Color], _dot_positions ile aynı sırada
 var _seat_radius_norm: float = 0.0 # normalize koltuk yarıçapı (tüm noktalar için sabit)
 ## Levhanın taban çizgisine uzaklığı.
-const BASELINE_GAP := 6.0
+const BASELINE_GAP := 0.0
 ## Ortadaki toplam vekil sayısının yazı boyutu (diyagram boyutundan bağımsız).
 ## Yayın ortasındaki boşluğa sığsın diye küçük: 24 punto bazı koltukların
 ## üstüne biniyordu.

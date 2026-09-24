@@ -24,6 +24,8 @@ const SEAT_RADIUS_FACTOR := 0.8  # orijinal JS: SRF
 var _dot_positions: Array = [] # Array[Vector2], normalize (x: 0..2, merkez=1 / y: 0..~1)
 var _dot_colors: Array = []    # Array[Color], _dot_positions ile aynı sırada
 var _seat_radius_norm: float = 0.0 # normalize koltuk yarıçapı (tüm noktalar için sabit)
+## Levhanın taban çizgisine uzaklığı.
+const BASELINE_GAP := 6.0
 ## Ortadaki toplam vekil sayısının yazı boyutu (diyagram boyutundan bağımsız).
 const COUNT_FONT_SIZE := 24
 var _total_seats: int = 0
@@ -80,9 +82,10 @@ func _ready() -> void:
 	_build_count_plate()
 	resized.connect(_place_count_plate)
 
-## VEKİL SAYISI LEVHASI: yayın altında, kendi zemini (ek UI katmanı) olan
-## monospace bir sayı. Eskiden doğrudan draw_string ile çizilen çıplak bir
-## yazıydı; artık diyagramın altına oturan küçük bir levha.
+## VEKİL SAYISI LEVHASI: yarım dairenin ORTASINDAKİ boş alanda duran, kendi
+## zemini (ek UI katmanı) olan monospace bir sayı. Önce çıplak draw_string,
+## sonra yayın ALTINDA bir levhaydı; altta hem yer yiyordu hem de diyagramı
+## küçültüyordu.
 func _build_count_plate() -> void:
 	_count_plate = PanelContainer.new()
 	_count_plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -109,22 +112,30 @@ func _refresh_count_plate() -> void:
 	_count_label.text = str(_total_seats)
 	_place_count_plate()
 
+## Levha yayın merkezine, taban çizgisinin hemen üstüne oturur — en içteki
+## koltuk sırasının içinde kalan boşluğa.
 func _place_count_plate() -> void:
 	if _count_plate == null:
 		return
 	var plate_size := _count_plate.get_combined_minimum_size()
 	_count_plate.size = plate_size
-	_count_plate.position = Vector2(size.x * 0.5 - plate_size.x * 0.5, size.y - plate_size.y)
+	var origin := _arc_origin()
+	_count_plate.position = Vector2(origin.x - plate_size.x * 0.5,
+		origin.y - plate_size.y - BASELINE_GAP)
+
+## Yayın taban çizgisinin orta noktası. _draw ve levha yerleşimi aynı yeri
+## kullanmalı, yoksa sayı yayın ortasından kayar.
+func _arc_origin() -> Vector2:
+	return Vector2(size.x * 0.5, size.y * 0.98)
 
 func _draw() -> void:
 	if _dot_positions.is_empty():
 		return
 	# x normalize [0,2] (merkez=1), y normalize [0,~1] — kontrol alanına sığdır.
-	# Yayın altında vekil sayısı levhası oturuyor: o kadar yer ayrılır.
-	var plate_h: float = (_count_plate.get_combined_minimum_size().y + 4.0) if (_count_plate != null and _count_plate.visible) else 0.0
-	var usable_h: float = maxf(10.0, size.y - plate_h)
-	var scale: float = minf(size.x * 0.5, usable_h * 0.96)
-	var origin := Vector2(size.x * 0.5, usable_h * 0.98)
+	# Vekil sayısı levhası artık yayın İÇİNDE durduğu için altta yer ayrılmıyor;
+	# diyagram kontrolün tamamını kullanıyor.
+	var scale: float = minf(size.x * 0.5, size.y * 0.96)
+	var origin := _arc_origin()
 
 	# Daireler kesirli konumlarda antialiased çizilir: piksel ızgarasına yuvarlamak
 	# eşit aralıkları bozuyordu. Yarıçap, en yakın komşu mesafesinin %45'i ile

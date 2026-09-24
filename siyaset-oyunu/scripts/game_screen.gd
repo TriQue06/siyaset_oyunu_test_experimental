@@ -39,7 +39,7 @@ const COMPACT_ROW_HEIGHT := 56.0
 ## Alt haznenin (parlamento + hamleler) kullandığı genişlik payı. Kalanı
 ## el kartlarına gider. Hazne içeriğinden dar kalırsa HBox taşar; bu yüzden
 ## ChamberSplit yalnızca sağa büyüyecek şekilde ayarlıdır (bkz. sahne).
-const PARLIAMENT_WIDTH_RATIO := 0.80
+const PARLIAMENT_WIDTH_RATIO := 0.84
 const AVATAR_SEPARATION := 6.0
 const AVATAR_SIZE := 56.0
 ## Parti logoları (çerçeve dahil) party_badge.gd'de; sol paneller government_hud.gd'de.
@@ -193,7 +193,7 @@ var _mana_box: HBoxContainer
 var _mana_label: Label
 ## Hamle ızgarası: artık parlamento diyagramının SAĞINDAKİ panelde, iki
 ## sütunlu. Butonlar paneli paylaşır, bu yüzden asgari ölçü küçük tutulur.
-const ACTION_BUTTON_WIDTH := 72.0
+const ACTION_BUTTON_WIDTH := 64.0
 const ACTION_BUTTON_HEIGHT := 48.0
 const ACTION_BUTTON_GAP := 6
 var _action_grid: GridContainer
@@ -2133,7 +2133,8 @@ func _action_button(title: String, cost_text: String, color: Color) -> Button:
 	button.custom_minimum_size = Vector2(ACTION_BUTTON_WIDTH, ACTION_BUTTON_HEIGHT)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.clip_text = true
-	button.add_theme_font_size_override("font_size", UiTheme.FS_TINY)
+	# DAR KUTUYA SIĞSIN: "TEŞKİLAT"/"bedelsiz" 12 puntoda kırpılıyordu.
+	button.add_theme_font_size_override("font_size", UiTheme.FS_TINY - 2)
 	button.add_theme_constant_override("line_spacing", -1)
 	UiSkin.skin_color_button(button, color)
 	_action_grid.add_child(button)

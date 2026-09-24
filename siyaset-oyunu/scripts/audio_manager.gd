@@ -41,8 +41,8 @@ const SOUNDS := {
 ## hazırlanmadığından döngüyü fade ile kuruyoruz: parça biterken kısılır,
 ## baştan açılırken yükselir.
 const MUSIC := {
-	"game": "res://assets/audio/music/game_loop.mp3",
-	"election": "res://assets/audio/music/election.mp3",
+	"game": "res://assets/audio/music/game_loop.ogg",
+	"election": "res://assets/audio/music/election.ogg",
 }
 ## Parça başına ses kazancı (dB) ve fade süreleri (saniye).
 const MUSIC_GAIN := {"game": -10.0, "election": -3.0}

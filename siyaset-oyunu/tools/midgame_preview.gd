@@ -46,6 +46,13 @@ func _initialize() -> void:
 	var br := board.get_global_rect()
 	print("OLCUM sol=%.0f..%.0f tahta=%.0f..%.0f -> %s" % [lr.position.x, lr.end.x,
 		br.position.x, br.end.x, "CAKISMA VAR" if lr.intersects(br) else "temiz"])
+	# OY SIRASI SÜTUNA SIĞIYOR MU? Taşarsa sol panelin altına kayıyor.
+	var row: Control = scene.get_node("%VoteButtonRow")
+	var chamber: Control = scene.get_node("BottomArea/ChamberSplit/ParliamentChamber")
+	var rr := row.get_global_rect()
+	print("OY SIRASI  asgari=%.0f  sutun=%.0f  satir=%.0f..%.0f  -> %s" % [
+		row.get_combined_minimum_size().x, chamber.size.x, rr.position.x, rr.end.x,
+		"SOL PANELIN ALTINDA" if rr.position.x < lr.end.x else "temiz"])
 	if DisplayServer.get_name() != "headless":
 		root.get_texture().get_image().save_png("%s/midgame.png" % OS.get_user_data_dir())
 		print("screenshot: midgame")

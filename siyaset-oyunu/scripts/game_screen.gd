@@ -39,7 +39,7 @@ const COMPACT_ROW_HEIGHT := 56.0
 ## Alt haznenin (parlamento + hamleler) kullandığı genişlik payı. Kalanı
 ## el kartlarına gider. Hazne içeriğinden dar kalırsa HBox taşar; bu yüzden
 ## ChamberSplit yalnızca sağa büyüyecek şekilde ayarlıdır (bkz. sahne).
-const PARLIAMENT_WIDTH_RATIO := 0.74
+const PARLIAMENT_WIDTH_RATIO := 0.80
 const AVATAR_SEPARATION := 6.0
 const AVATAR_SIZE := 56.0
 ## Parti logoları (çerçeve dahil) party_badge.gd'de; sol paneller government_hud.gd'de.
@@ -302,7 +302,14 @@ func _ready() -> void:
 	vote_no_button.pressed.connect(_on_vote_pressed.bind(GovernmentManager.VOTE_NO))
 	_abstain_button = Button.new()
 	_abstain_button.text = "Çekimser"
-	_abstain_button.custom_minimum_size = Vector2(84, 42)
+	# DAR SÜTUNDA DA SIĞSIN: oy sırası eskiden satır genişliğinden taşıp sol
+	# panelin altına kayıyordu (EVET butonu panelin arkasında kalıyordu).
+	# Satır artık sütunu FILL ediyor, çekimser butonu da kalan yeri alıp
+	# gerekirse yazısını kırpıyor.
+	_abstain_button.custom_minimum_size = Vector2(44, 42)
+	_abstain_button.add_theme_font_size_override("font_size", 10)
+	_abstain_button.clip_text = true
+	_abstain_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	UiSkin.skin_button(_abstain_button)
 	_abstain_button.pressed.connect(_on_vote_pressed.bind(GovernmentManager.VOTE_ABSTAIN))
 	vote_yes_button.get_parent().add_child(_abstain_button)

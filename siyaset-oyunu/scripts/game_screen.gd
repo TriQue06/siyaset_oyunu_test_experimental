@@ -39,7 +39,12 @@ const COMPACT_ROW_HEIGHT := 56.0
 ## Alt haznenin (parlamento + hamleler) kullandığı genişlik payı. Kalanı
 ## el kartlarına gider. Hazne içeriğinden dar kalırsa HBox taşar; bu yüzden
 ## ChamberSplit yalnızca sağa büyüyecek şekilde ayarlıdır (bkz. sahne).
-const PARLIAMENT_WIDTH_RATIO := 0.84
+## KART BARI: ekranın en altında, TAM GENİŞLİKTE duran kart şeridi. Kartlar
+## burada yan yana (bitişik değil) dizilir. Diğer her şey bunun üstünde kalır.
+const CARD_BAR_HEIGHT := 160.0
+const CARD_BAR_PADDING := 8.0
+## Haritanın altındaki katman düğmelerine (Vekiller/Teşkilat/Güç) ayrılan yer.
+const LAYER_BAR_RESERVE := 40.0
 const AVATAR_SEPARATION := 6.0
 const AVATAR_SIZE := 56.0
 ## Parti logoları (çerçeve dahil) party_badge.gd'de; sol paneller government_hud.gd'de.
@@ -51,7 +56,12 @@ const BADGE_ICON_PIXEL_SIZE := 64
 
 # Kartlar 72x96 piksel native boyutta; Nearest filtre ile piksel-sanat
 # görünümü bozulmasın diye tam sayı katıyla büyütülüyor.
-const CARD_DISPLAY_SCALE := 2.0
+## Kartlar kart barında TAMAMEN görünür: eskiden 2 kat büyüktüler ve yarıları
+## ekranın altından taşıyordu.
+const CARD_DISPLAY_SCALE := 1.5
+## Kart üstündeki bant/rozet ölçüleri 2 kat büyük karta göre yazılmıştı;
+## hepsi bu oranla küçülüyor ki kartla orantılı kalsınlar.
+const CARD_ART_RATIO := CARD_DISPLAY_SCALE / 2.0
 const CARD_DISPLAY_SIZE := Vector2(72, 96) * CARD_DISPLAY_SCALE
 const CARD_HOVER_LIFT_SPEED := 12.0
 const HAND_CARD_SEPARATION := 8
@@ -181,13 +191,17 @@ var _hand_dirty: bool = false
 ## Sağ sütun aşağıdan yukarı: sıra göstergesi, Turu Bitir, kart bozdurma,
 ## mana levhası. Hamle butonları buradan parlamentonun yanına taşındı.
 const MANA_PLATE_LEFT := -(RIGHT_COLUMN_WIDTH - 16.0)
-const MANA_PLATE_TOP := -250.0
 const MANA_PLATE_HEIGHT := 44.0
 ## Kart bozdurma ve Turu Bitir AYNI ÖLÇÜDE, alt alta.
 const BOTTOM_BUTTON_HEIGHT := 46.0
-const TRASH_TOP := -200.0
-const PASS_TOP := -148.0
+## Sağ sütun aşağıdan yukarı dizilir ve KART BARININ ÜSTÜNDE biter.
+const RIGHT_STACK_BOTTOM := -(CARD_BAR_HEIGHT + 12.0)
+const PASS_TOP := RIGHT_STACK_BOTTOM - BOTTOM_BUTTON_HEIGHT
+const TRASH_TOP := PASS_TOP - BOTTOM_BUTTON_HEIGHT - 6.0
+const MANA_PLATE_TOP := TRASH_TOP - MANA_PLATE_HEIGHT - 6.0
 const MANA_ICON_SIZE := 34.0
+## Kart barının zemini (ekranın altındaki tam genişlik şeridi).
+var _card_bar_panel: Panel
 var _mana_plate: PanelContainer
 var _mana_box: HBoxContainer
 var _mana_label: Label
@@ -331,6 +345,36 @@ func _ready() -> void:
 	if CardManager.game_finished:
 		_on_game_over()
 
+## Ekranın kart barı DIŞINDA kalan yüksekliği. Harita, alt hazne ve sağ
+## sütun hep bunun içinde yerleşir.
+func _usable_height() -> float:
+	return maxf(120.0, get_viewport_rect().size.y - CARD_BAR_HEIGHT)
+
+## Üst bölgenin (harita + katman düğmeleri) yüksekliği.
+func _top_area_height() -> float:
+	return _usable_height() * TOP_AREA_HEIGHT_RATIO
+
+## KART BARI: ekranın en altında tam genişlikte bir şerit. Kendi zemini var,
+## kartlar içinde yan yana durur.
+func _place_card_bar() -> void:
+	if _card_bar_panel == null:
+		_card_bar_panel = Panel.new()
+		_card_bar_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		UiSkin.skin_panel(_card_bar_panel, UiSkin.PANEL_DARK)
+		add_child(_card_bar_panel)
+		move_child(_card_bar_panel, hand_area.get_index())
+	var viewport_size := get_viewport_rect().size
+	_card_bar_panel.position = Vector2(0.0, viewport_size.y - CARD_BAR_HEIGHT)
+	_card_bar_panel.size = Vector2(viewport_size.x, CARD_BAR_HEIGHT)
+	hand_area.offset_left = 0.0
+	hand_area.offset_right = 0.0
+	hand_area.offset_top = viewport_size.y - CARD_BAR_HEIGHT
+	hand_area.offset_bottom = 0.0
+	# Kartlar barın içinde, tamamı görünür halde.
+	hand_container.offset_top = -(CARD_BAR_HEIGHT - CARD_BAR_PADDING)
+	hand_container.offset_bottom = -CARD_BAR_PADDING
+	_fit_hand_width(CardManager.my_inventory().size())
+
 ## Viewport boyutuna bağlı TÜM mutlak-piksel yerleşim hesapları burada — hem
 ## açılışta hem her yeniden boyutlanmada (tam ekran vb.) çağrılır.
 func _apply_layout() -> void:
@@ -341,17 +385,19 @@ func _apply_layout() -> void:
 	# oyuncu şeridi hariç kalan genişliğe sığacak şekilde ölçekleniyor —
 	# geniş, dikdörtgen bir alanı doldurması hedefleniyor.
 	var available_width := viewport_size.x - RIGHT_COLUMN_WIDTH - LEFT_PANEL_WIDTH
-	var available_height := viewport_size.y * TOP_AREA_HEIGHT_RATIO
+	var available_height := _top_area_height()
+	# Haritanın ALTINDA katman düğmeleri duruyor: o kadar yer haritaya kapalı.
+	var map_area_height: float = maxf(80.0, available_height - LAYER_BAR_RESERVE)
 	# Haritanın "doğal" (native) piksel boyutu sabit bir const DEĞİL —
 	# pixel-art asset (assets/maps/turkey_map.png) her değiştiğinde boyutu
 	# değişebiliyor, o yüzden province_map.gd'nin YÜKLEDİĞİ gerçek ızgara
 	# boyutundan (grid_width/height * MAP_UNIT_SCALE) runtime'da hesaplanıyor.
 	var map_native_size: Vector2 = Vector2(map_holder.grid_width, map_holder.grid_height) * map_holder.MAP_UNIT_SCALE
-	var fit_scale: float = minf(available_width / map_native_size.x, available_height / map_native_size.y) * MAP_FILL_RATIO
+	var fit_scale: float = minf(available_width / map_native_size.x, map_area_height / map_native_size.y) * MAP_FILL_RATIO
 	map_holder.scale = Vector2(fit_scale, fit_scale)
 	var map_position := Vector2(
 		LEFT_PANEL_WIDTH + available_width * 0.5 - map_native_size.x * 0.5 * fit_scale,
-		available_height * 0.5 - map_native_size.y * 0.5 * fit_scale
+		map_area_height * 0.5 - map_native_size.y * 0.5 * fit_scale
 	)
 	# Harita, katman geçişinde yana kayabilsin diye kırpan bir kutunun içinde.
 	_ensure_map_clip()
@@ -361,23 +407,21 @@ func _apply_layout() -> void:
 		map_holder.position = Vector2.ZERO
 	_place_layer_bar()
 
-	# Alt hazne, sol panel ile sağ sütun arasındaki TÜM genişliği kullanır:
-	# solda meclis diyagramı + oylama (PARLIAMENT_WIDTH_RATIO), sağında el
-	# kartları. Kartlar böylece butonların ve teklif yazısının üstüne binmez.
-	var parliament_right: float = LEFT_PANEL_WIDTH + available_width * PARLIAMENT_WIDTH_RATIO
+	# Alt hazne (meclis + hamleler) artık sol panel ile sağ sütun arasındaki
+	# TÜM genişliği kullanıyor: el kartları buradan kart barına taşındı.
 	# EMNİYET: sol panel bir sebeple genişlerse alt hazne de sağa kayar,
 	# diyagram panelin altında kalmaz.
 	bottom_area.offset_left = maxf(LEFT_PANEL_WIDTH, left_panel.size.x)
-	bottom_area.offset_right = parliament_right - viewport_size.x
-	hand_area.offset_left = parliament_right
-	hand_area.offset_right = -RIGHT_COLUMN_WIDTH
-	_fit_hand_width(CardManager.my_inventory().size())
+	bottom_area.offset_right = -RIGHT_COLUMN_WIDTH
+	bottom_area.offset_top = available_height
+	bottom_area.offset_bottom = -CARD_BAR_HEIGHT
 
-	# Elde bekleyen kartların satırı, yarısı ekranın altından taşacak şekilde
-	# aşağı kaydırılıyor; hover eden tek kart kendi içinde yukarı çıkıp
-	# tamamı görünür (bkz. _build_hand_card).
-	hand_container.offset_top = CARD_DISPLAY_SIZE.y * 0.5
-	hand_container.offset_bottom = CARD_DISPLAY_SIZE.y * 0.5
+	# SOL PANEL KART BARININ ÜSTÜNDE BİTER: en altındaki sıra göstergesi
+	# barın arkasında kalmasın.
+	left_panel.offset_bottom = -CARD_BAR_HEIGHT
+
+	# KART BARI: ekranın en altında, tam genişlikte.
+	_place_card_bar()
 
 	# Harita ölçeği değişti => vekil kareleri yeni ölçeğe göre yeniden piksel
 	# hizalanmalı (bkz. seat_markers.gd _draw).
@@ -705,8 +749,13 @@ func _rebuild_player_panel() -> void:
 	var panel := get_node_or_null("PlayerPanel") as Control
 	# Başlık satırı da ızgaranın içinde: payı düşülmeli.
 	var available: float = player_panel_list.size.y - PLAYER_HEADER_HEIGHT
-	if available <= 0.0 and panel != null:
-		available = get_viewport_rect().size.y - panel.offset_top + panel.offset_bottom - PLAYER_TAB_HEIGHT
+	if panel != null:
+		# ÖLÇÜLEN BOY BAYAT OLABİLİR: düzen değiştiği karede liste hâlâ eski
+		# boyunu bildiriyor ve satırlar panelden taşıp kırpılıyordu. Panelin
+		# ÇAPALARINDAN hesaplanan boy üst sınır olarak alınır.
+		var panel_height: float = get_viewport_rect().size.y + panel.offset_bottom - panel.offset_top
+		var by_offsets: float = panel_height - PLAYER_TAB_HEIGHT - 6.0 - PLAYER_HEADER_HEIGHT
+		available = by_offsets if available <= 0.0 else minf(available, by_offsets)
 	var separation: float = AVATAR_SEPARATION if count <= 6 else 2.0
 	player_panel_list.add_theme_constant_override("v_separation", int(separation))
 	_avatar_height = clampf((available - separation * (count - 1)) / count, 16.0, 72.0) if available > 0.0 else 64.0
@@ -829,7 +878,7 @@ func _rebuild_hand() -> void:
 ## çekilip üst üste bindirilir; sıra göstergesine ve meclis butonlarına taşmaz.
 func _fit_hand_width(count: int) -> void:
 	var separation := HAND_CARD_SEPARATION
-	var available: float = hand_area.size.x - 16.0
+	var available: float = hand_area.size.x - CARD_BAR_PADDING * 2.0
 	if count > 1 and available > 0.0:
 		var needed: float = count * CARD_DISPLAY_SIZE.x + (count - 1) * HAND_CARD_SEPARATION
 		if needed > available:
@@ -988,8 +1037,8 @@ func _deselect_hand_card() -> void:
 ## Kart görselinin üstündeki isim bandı.
 func _card_title_banner(card_type: String) -> Control:
 	var banner := PanelContainer.new()
-	banner.position = Vector2(6, 8)
-	banner.size = Vector2(CARD_DISPLAY_SIZE.x - 12, 44)
+	banner.position = Vector2(6.0 * CARD_ART_RATIO, 8.0 * CARD_ART_RATIO)
+	banner.size = Vector2(CARD_DISPLAY_SIZE.x - 12.0 * CARD_ART_RATIO, 44.0 * CARD_ART_RATIO)
 	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var style := UiSkin.stylebox(UiSkin.PANEL_DARK)
 	style.set_content_margin_all(4)
@@ -999,7 +1048,7 @@ func _card_title_banner(card_type: String) -> Control:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	title.add_theme_font_size_override("font_size", 14)
+	title.add_theme_font_size_override("font_size", int(roundf(14.0 * CARD_ART_RATIO)))
 	title.add_theme_color_override("font_color", Color.WHITE)
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	banner.add_child(title)
@@ -1020,11 +1069,11 @@ func _card_cost_badge(cost: int) -> Control:
 	row.add_theme_constant_override("separation", 2)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	badge.add_child(row)
-	row.add_child(UiSkin.outlined_icon(MANA_ICON, 22.0, 1.5))
+	row.add_child(UiSkin.outlined_icon(MANA_ICON, 22.0 * CARD_ART_RATIO, 1.5))
 	var label := Label.new()
 	label.text = str(cost)
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 18)
+	label.add_theme_font_size_override("font_size", int(roundf(18.0 * CARD_ART_RATIO)))
 	label.add_theme_color_override("font_color", MANA_COLOR)
 	label.add_theme_color_override("font_outline_color", Color.BLACK)
 	label.add_theme_constant_override("outline_size", 4)
@@ -1032,7 +1081,8 @@ func _card_cost_badge(cost: int) -> Control:
 	row.add_child(label)
 	badge.reset_size()
 	# Başlık bandının hemen altında, sağda: el kartlarının yarısı ekran dışında kaldığı için üstte.
-	badge.position = Vector2(CARD_DISPLAY_SIZE.x - badge.get_combined_minimum_size().x - 8, 56)
+	badge.position = Vector2(CARD_DISPLAY_SIZE.x - badge.get_combined_minimum_size().x - 6.0 * CARD_ART_RATIO,
+		56.0 * CARD_ART_RATIO)
 	return badge
 
 ## Oynanamayan bir karta tıklanınca neden oynanamadığı.
@@ -1365,7 +1415,7 @@ func _on_province_clicked(province_id: String) -> void:
 	_province_panel.position = Vector2(LEFT_PANEL_WIDTH + 12, 12)
 	_province_panel.show_province(province_id)
 	# HARİTA BÖLGESİNDEN AŞAĞI TAŞMASIN: aşağıda parlamento diyagramı var.
-	_province_panel.clamp_to_height(get_viewport_rect().size.y * TOP_AREA_HEIGHT_RATIO - 24.0)
+	_province_panel.clamp_to_height(_top_area_height() - 24.0)
 
 ## Hedef seçme modunda dokunulan il: vurgulanır, üstte ne olacağı yazar.
 func _select_target_province(province_id: String) -> void:
@@ -1459,7 +1509,7 @@ func _show_card_info(card_type: String, holder: Control) -> void:
 	_card_info.position = Vector2(
 		clampf(holder.global_position.x + CARD_DISPLAY_SIZE.x * 0.5 - info_size.x * 0.5,
 			LEFT_PANEL_WIDTH, viewport_size.x - RIGHT_COLUMN_WIDTH - info_size.x),
-		viewport_size.y - CARD_DISPLAY_SIZE.y - 12.0 - info_size.y
+		viewport_size.y - CARD_BAR_HEIGHT - 8.0 - info_size.y
 	)
 
 ## Hedef seçme modunda, çalınabilecek partileri vurgular; geçersiz olanları
@@ -2495,7 +2545,7 @@ func _on_law_button_pressed() -> void:
 	var viewport_size := get_viewport_rect().size
 	_law_designer.position = Vector2(
 		viewport_size.x - RIGHT_COLUMN_WIDTH - _law_designer.size.x - 12.0,
-		maxf(12.0, viewport_size.y * TOP_AREA_HEIGHT_RATIO - _law_designer.size.y))
+		maxf(12.0, _top_area_height() - _law_designer.size.y))
 
 func _invest_block_reason() -> String:
 	if CardManager.can_act() and not CardManager.is_government_party(multiplayer.get_unique_id()):
@@ -2615,9 +2665,12 @@ func _place_layer_bar() -> void:
 		return
 	_layer_bar.reset_size()
 	var rect := Rect2(_map_clip.position, _map_clip.size)
-	_layer_bar.position = Vector2(rect.position.x + 18.0, rect.end.y - _layer_bar.size.y - 16.0)
+	# HARİTANIN ÜSTÜNDE DEĞİL, HEMEN ALTINDA: harita görüntüsünü kapatmasın.
+	_layer_bar.position = Vector2(rect.position.x, rect.end.y + 8.0)
 	_layer_legend.reset_size()
-	_layer_legend.position = Vector2(_layer_bar.position.x + 4.0, _layer_bar.position.y - _layer_legend.size.y - 6.0)
+	# Gösterge düğmelerin sağında, aynı satırda ortalı.
+	_layer_legend.position = Vector2(_layer_bar.position.x + _layer_bar.size.x + 12.0,
+		_layer_bar.position.y + _layer_bar.size.y * 0.5 - _layer_legend.size.y * 0.5)
 
 ## Harita katman düğmesi (Vekiller / Teşkilat / Güç). Köşe yarıçapı yok:
 ## pixel tarzda hepsi kare, seçili olan altın.

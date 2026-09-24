@@ -96,7 +96,6 @@ theme_override_constants/v_separation = 6
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15
-anchor_top = 0.54
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
@@ -198,48 +197,6 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 13
 text = "> HAMLELER"
 
-[node name="TurnIndicator" type="PanelContainer" parent="." unique_id=3821004420]
-unique_name_in_owner = true
-theme_override_styles/panel = SubResource("StyleBoxFlat_turnindicator")
-layout_mode = 1
-anchors_preset = 3
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -200.0
-offset_top = -96.0
-offset_right = -16.0
-offset_bottom = -16.0
-grow_horizontal = 0
-grow_vertical = 0
-
-[node name="TurnIndicatorMargin" type="MarginContainer" parent="TurnIndicator" unique_id=3821004421]
-layout_mode = 2
-theme_override_constants/margin_left = 8
-theme_override_constants/margin_top = 8
-theme_override_constants/margin_right = 10
-theme_override_constants/margin_bottom = 8
-
-[node name="TurnIndicatorRow" type="HBoxContainer" parent="TurnIndicator/TurnIndicatorMargin" unique_id=3821004422]
-layout_mode = 2
-alignment = 0
-theme_override_constants/separation = 8
-
-[node name="TurnIndicatorBadgeSlot" type="Control" parent="TurnIndicator/TurnIndicatorMargin/TurnIndicatorRow" unique_id=3821004423]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(32, 32)
-layout_mode = 2
-
-[node name="TurnIndicatorLabel" type="Label" parent="TurnIndicator/TurnIndicatorMargin/TurnIndicatorRow" unique_id=3821004424]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 4
-text = "Sıra: -"
-theme_override_font_sizes/font_size = 13
-autowrap_mode = 2
-
 [node name="LeftPanel" type="Panel" parent="." unique_id=3821004470]
 unique_name_in_owner = true
 clip_contents = true
@@ -285,6 +242,42 @@ layout_mode = 2
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 6
+
+[node name="TurnSpacer" type="Control" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004486]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="TurnIndicator" type="PanelContainer" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004420]
+unique_name_in_owner = true
+theme_override_styles/panel = SubResource("StyleBoxFlat_turnindicator")
+layout_mode = 2
+
+[node name="TurnIndicatorMargin" type="MarginContainer" parent="LeftPanel/LeftMargin/LeftVBox/TurnIndicator" unique_id=3821004421]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
+
+[node name="TurnIndicatorRow" type="HBoxContainer" parent="LeftPanel/LeftMargin/LeftVBox/TurnIndicator/TurnIndicatorMargin" unique_id=3821004422]
+layout_mode = 2
+alignment = 0
+theme_override_constants/separation = 8
+
+[node name="TurnIndicatorBadgeSlot" type="Control" parent="LeftPanel/LeftMargin/LeftVBox/TurnIndicator/TurnIndicatorMargin/TurnIndicatorRow" unique_id=3821004423]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(32, 32)
+layout_mode = 2
+
+[node name="TurnIndicatorLabel" type="Label" parent="LeftPanel/LeftMargin/LeftVBox/TurnIndicator/TurnIndicatorMargin/TurnIndicatorRow" unique_id=3821004424]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+text = "Sıra: -"
+theme_override_font_sizes/font_size = 13
+autowrap_mode = 2
 
 [node name="HandArea" type="Control" parent="." unique_id=3821004412]
 unique_name_in_owner = true

@@ -27,7 +27,9 @@ var _seat_radius_norm: float = 0.0 # normalize koltuk yarıçapı (tüm noktalar
 ## Levhanın taban çizgisine uzaklığı.
 const BASELINE_GAP := 6.0
 ## Ortadaki toplam vekil sayısının yazı boyutu (diyagram boyutundan bağımsız).
-const COUNT_FONT_SIZE := 24
+## Yayın ortasındaki boşluğa sığsın diye küçük: 24 punto bazı koltukların
+## üstüne biniyordu.
+const COUNT_FONT_SIZE := 18
 var _total_seats: int = 0
 var _layout_total: int = -1
 var _layout: Dictionary = {}
@@ -90,8 +92,8 @@ func _build_count_plate() -> void:
 	_count_plate = PanelContainer.new()
 	_count_plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var style := UiSkin.stylebox(UiSkin.SLOT)
-	style.content_margin_left = 14
-	style.content_margin_right = 14
+	style.content_margin_left = 10
+	style.content_margin_right = 10
 	style.content_margin_top = 2
 	style.content_margin_bottom = 2
 	_count_plate.add_theme_stylebox_override("panel", style)

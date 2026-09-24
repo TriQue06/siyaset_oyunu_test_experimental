@@ -1,3 +1,6 @@
 node_modules/
 .godot/
 *.translation
+
+# Web (ve diger) disa aktarim ciktilari — 48 MB, depoya girmez.
+build/

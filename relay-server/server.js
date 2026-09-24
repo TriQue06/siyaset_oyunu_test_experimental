@@ -216,7 +216,13 @@ function handleClose(ws) {
 }
 
 const server = http.createServer((req, res) => {
-  res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+  // TARAYICI SURUMU: web build'i bu adrese uyandirma istegi atiyor ve
+  // tarayici CORS istiyor. WebSocket baglantisi CORS'a tabi degil,
+  // bu header sadece o HTTP ping icin gerekli.
+  res.writeHead(200, {
+    "Content-Type": "text/plain; charset=utf-8",
+    "Access-Control-Allow-Origin": "*",
+  });
   res.end(`ok rooms=${rooms.size}\n`);
 });
 

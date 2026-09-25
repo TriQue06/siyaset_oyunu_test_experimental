@@ -38,6 +38,18 @@ var _min_gap_norm: float = 0.0 # en yakın iki koltuk merkezi arası (normalize)
 var _count_plate: PanelContainer
 var _count_label: Label
 
+## KOLTUKLAR İKİ MultiMesh İLE ÇİZİLİR (kontur + iç dolgu), her biri TEK
+## çizim çağrısı. Eskiden koltuk başına iki draw_circle vardı: 500 koltuk =
+## ~2000 çizim çağrısı/kare. Masaüstünde native GL bunu yutuyordu ama WebGL2'de
+## her çağrı tarayıcı katmanından geçtiği için seçim gecesi 1-2 FPS'e düşüyordu.
+var _outline_mmi: MultiMeshInstance2D
+var _seat_mmi: MultiMeshInstance2D
+## Koltuk dokusu: kenarı yumuşatılmış dolu beyaz daire (renk modulate ile).
+static var _circle_texture: Texture2D = null
+## Yerleşim (konum/yarıçap) sadece boyut değişince kurulur; renkler her
+## set_results'ta güncellenir.
+var _instances_built_for := Vector2.ZERO
+
 ## entries: Array of {"seats": int, "color": Color} — sıra ÖNEMLİ, koltuklar
 ## bu sırayla soldan başlanarak dolduruluyor.
 func set_results(entries: Array) -> void:
@@ -67,7 +79,12 @@ func set_results(entries: Array) -> void:
 			_dot_colors.append(color)
 			idx += 1
 	_refresh_count_plate()
-	queue_redraw()
+	# Konumlar sadece boyut ya da koltuk sayısı değişince yeniden kurulur;
+	# seçim gecesinde her karede gelen çağrıda sadece renkler güncellenir.
+	if _instances_built_for != size or _seat_mmi == null 			or _seat_mmi.multimesh == null or _seat_mmi.multimesh.instance_count != _dot_positions.size():
+		_rebuild_instances()
+	else:
+		_update_instance_colors()
 
 ## Koltuklar arası en küçük mesafe (satırlar içinde ve komşu satırlarda).
 static func _nearest_distance(positions: Array) -> float:
@@ -80,9 +97,11 @@ static func _nearest_distance(positions: Array) -> float:
 func _ready() -> void:
 	# Pencere ölçeği değişince kontrol boyutu aynı kalsa bile ekran piksel
 	# ızgarası değişir; kareler yeniden hizalanmalı.
-	get_viewport().size_changed.connect(queue_redraw)
+	get_viewport().size_changed.connect(_rebuild_instances)
 	_build_count_plate()
 	resized.connect(_place_count_plate)
+	resized.connect(_rebuild_instances)
+	_rebuild_instances()
 
 ## VEKİL SAYISI LEVHASI: yarım dairenin ORTASINDAKİ boş alanda duran, kendi
 ## zemini (ek UI katmanı) olan monospace bir sayı. Önce çıplak draw_string,
@@ -130,30 +149,86 @@ func _place_count_plate() -> void:
 func _arc_origin() -> Vector2:
 	return Vector2(size.x * 0.5, size.y * 0.98)
 
-func _draw() -> void:
-	if _dot_positions.is_empty():
-		return
-	# x normalize [0,2] (merkez=1), y normalize [0,~1] — kontrol alanına sığdır.
-	# Vekil sayısı levhası artık yayın İÇİNDE durduğu için altta yer ayrılmıyor;
-	# diyagram kontrolün tamamını kullanıyor.
-	var scale: float = minf(size.x * 0.5, size.y * 0.96)
-	var origin := _arc_origin()
-
-	# Daireler kesirli konumlarda antialiased çizilir: piksel ızgarasına yuvarlamak
-	# eşit aralıkları bozuyordu. Yarıçap, en yakın komşu mesafesinin %45'i ile
-	# sınırlı: kontur dahil hiçbir daire komşusuna değmez.
+## Koltuk yarıçapı (piksel). Yarıçap, en yakın komşu mesafesinin %45'i ile
+## sınırlı: kontur dahil hiçbir daire komşusuna değmez.
+func _seat_radius_px(scale: float) -> float:
 	var radius: float = _seat_radius_norm * scale
 	if _min_gap_norm > 0.0:
 		radius = minf(radius, _min_gap_norm * scale * 0.45)
-	radius = maxf(1.5, radius)
+	return maxf(1.5, radius)
+
+## Kenarı yumuşatılmış dolu daire dokusu — tüm koltuklar bunu kullanır.
+static func _ensure_circle_texture() -> Texture2D:
+	if _circle_texture != null:
+		return _circle_texture
+	var res := 64
+	var image := Image.create(res, res, false, Image.FORMAT_RGBA8)
+	var center := float(res) * 0.5 - 0.5
+	var radius := float(res) * 0.5 - 1.0
+	for y in res:
+		for x in res:
+			var d := Vector2(float(x) - center, float(y) - center).length()
+			# 1 piksellik yumuşak kenar: draw_circle'ın antialias'ıyla aynı his.
+			var a: float = clampf(radius - d + 0.5, 0.0, 1.0)
+			image.set_pixel(x, y, Color(1.0, 1.0, 1.0, a))
+	_circle_texture = ImageTexture.create_from_image(image)
+	return _circle_texture
+
+func _ensure_multimeshes() -> void:
+	if _outline_mmi != null:
+		return
+	var texture := _ensure_circle_texture()
+	for is_outline in [true, false]:
+		var mmi := MultiMeshInstance2D.new()
+		mmi.texture = texture
+		# Daireler kesirli konumlarda duruyor: yakınsama için doğrusal filtre.
+		mmi.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		add_child(mmi)
+		if is_outline:
+			_outline_mmi = mmi
+		else:
+			_seat_mmi = mmi
+
+## Koltuk konumları ve yarıçapları — sadece kontrol boyutu değişince.
+func _rebuild_instances() -> void:
+	_ensure_multimeshes()
+	var count := _dot_positions.size()
+	for mmi in [_outline_mmi, _seat_mmi]:
+		if mmi.multimesh == null:
+			var mm := MultiMesh.new()
+			mm.transform_format = MultiMesh.TRANSFORM_2D
+			mm.use_colors = mmi == _seat_mmi
+			var quad := QuadMesh.new()
+			quad.size = Vector2.ONE
+			mm.mesh = quad
+			mmi.multimesh = mm
+		mmi.multimesh.instance_count = count
+	_outline_mmi.visible = count > 0
+	_seat_mmi.visible = count > 0
+	if count == 0:
+		return
+	var scale: float = minf(size.x * 0.5, size.y * 0.96)
+	var origin := _arc_origin()
+	var radius := _seat_radius_px(scale)
 	var inner: float = radius * (1.0 - outline_ratio)
-	for i in _dot_positions.size():
+	for i in count:
 		var p: Vector2 = _dot_positions[i]
 		var center := origin + Vector2(p.x - 1.0, -p.y) * scale
-		draw_circle(center, radius, outline_color, true, -1.0, true)
-		draw_circle(center, inner, _dot_colors[i], true, -1.0, true)
+		_outline_mmi.multimesh.set_instance_transform_2d(i,
+			Transform2D(0.0, Vector2(radius * 2.0, radius * 2.0), 0.0, center))
+		_seat_mmi.multimesh.set_instance_transform_2d(i,
+			Transform2D(0.0, Vector2(inner * 2.0, inner * 2.0), 0.0, center))
+	_outline_mmi.modulate = outline_color
+	_instances_built_for = size
+	_update_instance_colors()
 
-	# Toplam vekil sayısı artık _count_plate levhasında (bkz. _build_count_plate).
+## Parti renkleri — her set_results'ta (seçim gecesinde sık sık) çağrılır.
+func _update_instance_colors() -> void:
+	if _seat_mmi == null or _seat_mmi.multimesh == null:
+		return
+	var count: int = mini(_dot_colors.size(), _seat_mmi.multimesh.instance_count)
+	for i in count:
+		_seat_mmi.multimesh.set_instance_color(i, _dot_colors[i])
 
 # --- Koltuk yerleşim algoritması (createParliamentArch'ın birebir portu) ---
 

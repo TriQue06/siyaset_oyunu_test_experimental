@@ -32,22 +32,13 @@ const COLORS: Array[Color] = [
 	Color("A6325A"), # bordo
 ]
 
-## İKON KATEGORİLERİ: 0 kurgusal (assets/icons/*.svgdata), 1 Türkiye
-## (assets/icons/turkiye/, gerçek parti amblemleri). icon_index tek bir
-## listede: önce kurgusallar, sonra Türkiye ikonları.
-const CATEGORY_FICTIONAL := 0
-const CATEGORY_TURKIYE := 1
-const CATEGORY_TITLES := ["Kurgusal", "Türkiye"]
-const TURKIYE_DIR := "res://assets/icons/turkiye"
-## Dizin taraması paketli oyunda güvenilmez olabildiği için dosya adları sabit.
-const TURKIYE_ICONS := ["a_parti", "ak_parti", "anap", "ap", "btp", "buyuk_birlik", "chp", "dem_parti",
-	"deva_partisi", "dp", "dsp", "gelecek_partisi", "genc_parti", "hdp", "huda_par", "iyi_parti", "ldp",
-	"memleket", "mhp", "saadet", "sol_parti", "tip", "tkp", "yeni_parti", "yeni_yol", "yeniden_refah",
-	"zafer_partisi"]
+## İkon dosyaları DÜZ .svg: her görüntüleyici/editör açabilsin diye. Godot
+## bunları dokuya çevirmesin diye her birinin .import dosyası importer="keep"
+## ("olduğu gibi dışa aktar") — oyun onları çalışma anında SvgRaster ile
+## ihtiyaç duyulan boyutta kendisi rasterize ediyor.
+const ICON_EXTENSION := "svg"
 
 var icon_paths: Array[String] = []
-## Kurgusal ikon sayısı (bu indeksten sonrası Türkiye kategorisi).
-var fictional_count: int = 0
 # "<index>_<pixel_size>" -> ImageTexture (aynı boyut tekrar istenirse yeniden
 # rasterize etmeyelim diye önbellek).
 var _texture_cache: Dictionary = {}
@@ -62,7 +53,10 @@ func _scan_icons() -> void:
 		dir.list_dir_begin()
 		var file_name := dir.get_next()
 		while file_name != "":
-			if not dir.current_is_dir() and file_name.get_extension().to_lower() == "svgdata":
+			# Sadece icon_NN.svg: klasördeki başka SVG'ler (ör. mana.svg) parti
+			# logosu olarak listelenmesin.
+			if not dir.current_is_dir() and file_name.begins_with("icon_") \
+					and file_name.get_extension().to_lower() == ICON_EXTENSION:
 				icon_paths.append(ICONS_DIR.path_join(file_name))
 			file_name = dir.get_next()
 		dir.list_dir_end()
@@ -76,7 +70,7 @@ func _scan_icons() -> void:
 		# bir yedek liste oluşturuyoruz.
 		var i := 1
 		while true:
-			var candidate := ICONS_DIR.path_join("icon_%02d.svgdata" % i)
+			var candidate := ICONS_DIR.path_join("icon_%02d.%s" % [i, ICON_EXTENSION])
 			if not FileAccess.file_exists(candidate):
 				break
 			icon_paths.append(candidate)
@@ -85,18 +79,6 @@ func _scan_icons() -> void:
 			push_warning("İkon dizini taranamadı, %d ikon yedek listeyle bulundu." % icon_paths.size())
 		else:
 			push_warning("İkon klasörü bulunamadı: %s" % ICONS_DIR)
-	fictional_count = icon_paths.size()
-	for icon_name in TURKIYE_ICONS:
-		var path := TURKIYE_DIR.path_join("%s.svgdata" % icon_name)
-		if FileAccess.file_exists(path):
-			icon_paths.append(path)
-
-func icon_category(index: int) -> int:
-	return CATEGORY_TURKIYE if index >= fictional_count else CATEGORY_FICTIONAL
-
-## Bir kategorideki ikonların indeksleri.
-func icon_indices(category: int) -> Array:
-	return range(fictional_count, icon_paths.size()) if category == CATEGORY_TURKIYE else range(0, fictional_count)
 
 func icon_count() -> int:
 	return icon_paths.size()
@@ -117,9 +99,12 @@ func get_icon_texture(index: int, target_pixel_size: int = 128) -> Texture2D:
 		_texture_cache[key] = tex
 	return tex
 
-## Botlar ve rastgele parti kurgusal ikonlardan seçer.
 func random_icon_index() -> int:
-	return randi_range(0, maxi(0, fictional_count - 1))
+	return randi_range(0, maxi(0, icon_paths.size() - 1))
+
+## Geçersiz (ör. eski sürümde kaydedilmiş, artık olmayan) ikon indeksini ilk ikona çeker.
+func clamp_icon_index(index: int) -> int:
+	return index if index >= 0 and index < icon_paths.size() else 0
 
 func random_color() -> Color:
 	return COLORS[randi_range(0, COLORS.size() - 1)]

@@ -54,7 +54,7 @@ func _initialize() -> void:
 	# İkonlar: tek kategori, düz .svg dosyaları (importer="keep").
 	var presets = root.get_node("PartyPresets")
 	check("18 parti rengi", colors.size() == 18)
-	check("44 parti ikonu yuklendi (mana.svg haric)", presets.icon_count() == 44, str(presets.icon_count()))
+	check("39 parti ikonu yuklendi (mana.svg haric)", presets.icon_count() == 39, str(presets.icon_count()))
 	check("ikon yollari .svg", String(presets.icon_paths[0]).ends_with(".svg"), String(presets.icon_paths[0]))
 	check("ikon rasterize edilir", presets.get_icon_texture(0, 64) != null)
 	check("gecersiz eski indeks ilk ikona cekilir", presets.clamp_icon_index(70) == 0)

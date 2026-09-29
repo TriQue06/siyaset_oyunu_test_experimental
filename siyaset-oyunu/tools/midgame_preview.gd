@@ -61,6 +61,12 @@ func _initialize() -> void:
 	if DisplayServer.get_name() != "headless":
 		root.get_texture().get_image().save_png("%s/midgame.png" % OS.get_user_data_dir())
 		print("screenshot: midgame")
+		scene._set_map_layer(1, false)
+		await create_timer(0.3).timeout
+		root.get_texture().get_image().save_png("%s/midgame_org.png" % OS.get_user_data_dir())
+		print("screenshot: midgame_org")
+		scene._set_map_layer(0, false)
+		await create_timer(0.3).timeout
 		# Olay logundaki odak düğmesi: ili olan son kaydı haritada göster.
 
 		var focus_entry := {}

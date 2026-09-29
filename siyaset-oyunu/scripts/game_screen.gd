@@ -2871,6 +2871,7 @@ func _apply_map_layer_colors() -> void:
 	var mine: Color = PartyManager.parties.get(me, {}).get("bg_color", Color(0.5, 0.5, 0.5))
 	mine.a = 1.0
 	var colors := {}
+	map_holder.set_dark_borders(_map_layer == MapLayer.ORGANIZATION)
 	if _map_layer == MapLayer.SEATS:
 		colors = _seat_layer_colors.duplicate()
 	else:

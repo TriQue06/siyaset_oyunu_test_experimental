@@ -20,6 +20,9 @@ const CELL_INSET := 1.0
 const LAND_COLOR := Color(0.27, 0.30, 0.40)
 const SEA_COLOR := Color(0.14, 0.17, 0.27, 0.55)
 const REGION_BORDER_COLOR := Color(0.94, 0.95, 0.98, 0.9)
+## Açık zeminli katmanlarda (ör. teşkilat: seviye 0 = neredeyse beyaz) beyaz
+## sınır kaybolur; o zaman koyu sınır kullanılır (bkz. set_dark_borders).
+const REGION_BORDER_DARK := Color(0.10, 0.11, 0.18, 0.95)
 const REGION_BORDER_WIDTH := 1.7
 const COAST_COLOR := Color(0.62, 0.72, 0.92, 0.8)
 const COAST_WIDTH := 1.4
@@ -44,6 +47,7 @@ var _colors_dirty := true
 var _pulse: Dictionary = {}
 ## Siyasi kaleler: province_id -> sahibinin rengi.
 var _strongholds: Dictionary = {}
+var _dark_borders := false
 
 func _ready() -> void:
 	for child in get_children():
@@ -102,7 +106,7 @@ func _build_geometry() -> void:
 			if other >= 0 and other < region:
 				continue  # ortak sınırı bir kez çiz
 			var width := COAST_WIDTH if other < 0 else REGION_BORDER_WIDTH
-			var color := COAST_COLOR if other < 0 else REGION_BORDER_COLOR
+			var color := COAST_COLOR if other < 0 else (REGION_BORDER_DARK if _dark_borders else REGION_BORDER_COLOR)
 			_append_segment(a, b, width, color)
 	_land_mesh = ArrayMesh.new()
 	_border_mesh = ArrayMesh.new()
@@ -182,6 +186,15 @@ func _draw() -> void:
 func _draw_region_outline(province_id: String, color: Color, width: float) -> void:
 	for edge in _edges.get(province_id, []):
 		draw_line(edge[0], edge[1], color, width, true)
+
+## Açık renkli katmanlar için koyu il sınırları (geometri bir kez yeniden kurulur).
+func set_dark_borders(dark: bool) -> void:
+	if dark == _dark_borders:
+		return
+	_dark_borders = dark
+	_build_geometry()
+	_colors_dirty = true
+	queue_redraw()
 
 # --- Siyasi kale simgesi ----------------------------------------------------------
 

@@ -59,7 +59,6 @@ signal game_over
 
 const MAX_HAND_SIZE := 9
 const HEARTBEAT_INTERVAL := 5.0
-const PROVINCE_SEATS_PATH := "res://data/province_seats.json"
 ## İl başına saklanan son olay sayısı (il detay panelinde gösterilir).
 const PROVINCE_EVENT_LIMIT := 6
 
@@ -75,9 +74,9 @@ const WEIGHT_EARLY_ELECTION := 9.0
 const WEIGHT_REPUTATION := 6.0
 const WEIGHT_REBELLION := 6.0
 
-## Koltuk SAYILARI GERÇEK: TBMM'nin il bazlı milletvekili dağılımı (bkz.
-## data/province_seats.json). Bu değer dosyadaki sayıların toplamıdır.
-var TOTAL_SEATS := 390
+## Meclis: haritadaki bölgelerin vekilleri (HexGridGenerator.PROVINCE_SEATS)
+## + ulusal liste. Harita yüklenince yeniden hesaplanır.
+var TOTAL_SEATS := 500
 
 # peer_id -> Array[String] (her biri CardPresets.CARD_TYPES'tan biri)
 var inventories: Dictionary = {}
@@ -149,7 +148,7 @@ var game_end_reason: String = ""
 
 var state_version: int = 0
 
-# Seçim hesabına giren iller ve koltuk sayıları (yetkili kaynak province_seats.json).
+# Seçim hesabına giren iller ve koltuk sayıları (yetkili kaynak GameMap).
 var _province_ids: Array = []
 var _province_seat_counts: Dictionary = {}
 
@@ -200,25 +199,13 @@ func tick(delta: float) -> void:
 			_heartbeat_timer = 0.0
 			_heartbeat.rpc(state_version, GovernmentManager.state_version, PartyManager.state_version)
 
-## Gerçek il bazlı milletvekili sayılarını yükler.
+## Seçim bölgeleri ve vekil sayıları haritadan (GameMap) okunur.
 func _load_province_seat_counts() -> void:
-	_province_seat_counts.clear()
-	_province_ids.clear()
-	if not FileAccess.file_exists(PROVINCE_SEATS_PATH):
-		push_warning("data/province_seats.json bulunamadı — il bazlı seçim sonucu üretilemeyecek.")
-		return
-	var parsed = JSON.parse_string(FileAccess.get_file_as_string(PROVINCE_SEATS_PATH))
-	if not (parsed is Dictionary):
-		push_warning("data/province_seats.json okunamadı — il bazlı seçim sonucu üretilemeyecek.")
-		return
+	_province_seat_counts = GameMap.seat_counts()
+	_province_ids = GameMap.province_ids()
 	var sum := 0
-	for province_id in parsed.keys():
-		var seats := int(parsed[province_id])
-		if seats <= 0:
-			continue
-		_province_seat_counts[province_id] = seats
-		_province_ids.append(province_id)
-		sum += seats
+	for province_id in _province_ids:
+		sum += int(_province_seat_counts[province_id])
 	if sum > 0:
 		TOTAL_SEATS = sum + ElectionModel.NATIONAL_LIST_SEATS
 
@@ -678,6 +665,9 @@ func init_game() -> void:
 	national_support = {}
 	local_support = {}
 	province_events = {}
+	# YENİ ÜLKE: her oyunda rastgele altıgen harita (herkese tam durumla gider).
+	GameMap.generate_new(_rng.randi())
+	_load_province_seat_counts()
 	province_ideology = ProvinceIdeology.generate(_rng, _province_ids)
 	organizations = {}
 	game_finished = false
@@ -977,7 +967,7 @@ func _party_name(peer_id: int) -> String:
 	return PartyManager.parties.get(peer_id, {}).get("name", "?")
 
 func _province_name(province_id: String) -> String:
-	return ElectionNightSim.province_name(province_id)
+	return GameMap.name_of(province_id)
 
 ## Miting: riski ilin mevcut siyasi dengesine göre hesaplanır, zar atılır.
 func _apply_miting(peer_id: int, province_id: String) -> void:
@@ -1609,6 +1599,7 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"end_reason": game_end_reason,
 	}
 	if include_results:
+		state["map"] = GameMap.data
 		state["province_results"] = last_province_results
 		state["province_ideology"] = province_ideology
 	return state
@@ -1644,6 +1635,9 @@ func _apply_state(state: Dictionary) -> void:
 	game_finished = bool(state["game_finished"])
 	final_ranking = state["final_ranking"]
 	game_end_reason = str(state["end_reason"])
+	if state.has("map") and int((state["map"] as Dictionary).get("seed", -1)) != GameMap.seed_value():
+		GameMap.set_data(state["map"])
+		_load_province_seat_counts()
 	if state.has("province_results"):
 		last_province_results = state["province_results"]
 	if state.has("province_ideology"):

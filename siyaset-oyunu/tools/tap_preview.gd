@@ -56,13 +56,13 @@ func _initialize() -> void:
 	check("kart aciklamasi gorunuyor", scene._card_info.visible)
 	_shot("tap_card_selected")
 
-	scene._on_province_clicked("ankara")
+	scene._on_province_clicked(TestProvinces.id("ankara"))
 	await _frames(5)
-	check("ile ilk dokunus: sadece secildi, kart oynanmadi", scene._selected_province == "ankara" and cm.inventories[me].size() == 3)
+	check("ile ilk dokunus: sadece secildi, kart oynanmadi", scene._selected_province == TestProvinces.id("ankara") and cm.inventories[me].size() == 3)
 	check("ust yazida il ayrintisi var", String(scene._target_hint.text).find("Ankara") != -1, String(scene._target_hint.text))
 	_shot("tap_province_selected")
 
-	scene._on_province_clicked("ankara")
+	scene._on_province_clicked(TestProvinces.id("ankara"))
 	await _frames(10)
 	check("ayni ile ikinci dokunus: karalama hedef menusu acildi", scene._propaganda_menu.visible)
 	scene._propaganda_menu.hide()

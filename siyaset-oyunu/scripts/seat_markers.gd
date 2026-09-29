@@ -7,15 +7,8 @@ extends Node2D
 ## gösterilsin (ne kadar büyütülürse büyütülsün) her zaman keskin/pürüzsüz
 ## kalır, pikselleşmez.
 ##
-## Yerleşim algoritması, geliştiricinin "projeksiyon_hesaplayici" web
-## uygulamasındaki getDotLayout()'un GDScript'e taşınmış halidir: her il bir
-## "dot grubu" oluşturur (n sandalye için satır/sütun grid'i), grup HER ZAMAN
-## tam olarak ilin (manuel override varsa onun, yoksa piksel-ızgaranın)
-## merkezinde durur — dinamik çarpışma-önleyici fizik YOK (bkz. aşağıdaki not:
-## kaldırıldı, çünkü tools/seat_marker_editor.html'de simüle edilemiyordu ve
-## editör/oyun arasında sürekli tutarsızlığa yol açıyordu). Komşu illerin
-## grupları görsel olarak çakışıyorsa, bunu tools/seat_marker_editor.html ile
-## elle düzeltmek gerekir.
+## Yerleşim: her il bir "nokta grubu" (n sandalye için satır/sütun ızgarası)
+## oluşturur ve grup ilin merkezine (GameMap.center_of) oturur.
 
 @export var dot_radius: float = 4.6     # nokta yarıçapı (harita/viewBox birimi)
 @export var dot_outline_width: float = 2.0  # siyah kontur kalınlığı
@@ -30,15 +23,7 @@ extends Node2D
 ## en az bu kadar gerçek piksel boşluk kalmasını garanti eder.
 @export var min_screen_gap_px: int = 1
 
-## Bu haritaya ÖZGÜ, STATİK milletvekili konum belgesi: il -> [x, y] MERKEZ
-## noktası (province_pixel_map.json ile AYNI birim: ham piksel-ızgara
-## koordinatı). Her ilin nokta grubu TAM OLARAK burada yazan merkeze çizilir;
-## çalışma zamanında hiçbir otomatik kaydırma/çakışma çözme YOKTUR — böylece
-## tools/seat_marker_editor.html'de gördüğünle oyunda gördüğün her zaman
-## birebir aynıdır. Belge normalde illerin TAMAMINI içerir; bir il eksik
-## kalırsa (ör. haritaya yeni il eklenip belge güncellenmediyse) o il için
-## ilin piksel-merkezi yedek olarak kullanılır.
-@export var seat_centers_path: String = "res://data/province_seat_centers.json"
+## Nokta grupları bölgenin merkezine (GameMap.center_of) çizilir.
 var _seat_centers: Dictionary = {}  # province_id -> Vector2 (harita/local birimi)
 
 # province_id -> Array[Color] (o ildeki her sandalye için bir renk, parti rengi)
@@ -54,23 +39,9 @@ var _groups: Array = []
 func _ready() -> void:
 	_load_seat_centers()
 
+## Altıgen haritada merkezler GameMap'ten gelir (bölgenin iç hücresi).
 func _load_seat_centers() -> void:
 	_seat_centers.clear()
-	if not FileAccess.file_exists(seat_centers_path):
-		push_warning("Seat centers file not found: %s" % seat_centers_path)
-		return
-	var file := FileAccess.open(seat_centers_path, FileAccess.READ)
-	var parsed = JSON.parse_string(file.get_as_text())
-	if parsed == null:
-		push_warning("Seat centers file could not be parsed: %s" % seat_centers_path)
-		return
-	var unit_scale: float = _province_map.MAP_UNIT_SCALE if _province_map != null else 4.0
-	for province_id in parsed.keys():
-		var p: Array = parsed[province_id]
-		# editor, ham piksel-ızgara koordinatını yazıyor (province_pixel_map.json
-		# "centers" ile birebir aynı birim/hizalama: +0.5 piksel merkezi, sonra
-		# harita birimine çevirmek için MAP_UNIT_SCALE ile çarpılıyor).
-		_seat_centers[province_id] = (Vector2(p[0], p[1]) + Vector2(0.5, 0.5)) * unit_scale
 
 ## O ilin sandalye/renk listesini ayarlar ve tüm noktaları yeniden hesaplar.
 ## seat_colors: her eleman bir Color (o koltuktaki partinin rengi).
@@ -153,14 +124,6 @@ func _rebuild() -> void:
 			"half_w": grid_w * 0.5,
 			"half_h": grid_h * 0.5,
 		})
-
-	# ÖNEMLİ: Burada hiçbir otomatik yerleştirme/çakışma çözme YOK. Grup konumu
-	# HER ZAMAN doğrudan seat_centers_path belgesindeki merkez. Vaktiyle burada
-	# canlı bir çarpışma-önleyici fizik vardı; tools/seat_marker_editor.html
-	# onu simüle edemediği için editörde "gayet güzel" görünen yerleşim oyunda
-	# bambaşka çıkıyordu. Tek doğruluk kaynağı statik belge olunca editör ile
-	# oyun matematiksel olarak birebir aynı sonucu veriyor. Çakışan/kötü duran
-	# iller SADECE editörden elle düzeltilir.
 
 	# Sınır kelepçesi: büyük illerde (ör. çok sandalyeli İstanbul) nokta
 	# kümesi, ilin kendi küçük piksel alanına göre ÇOK daha büyük olabiliyor

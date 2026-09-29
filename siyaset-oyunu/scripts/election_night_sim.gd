@@ -25,23 +25,6 @@ const SETTLE := 0.95
 const WOBBLE := 0.28
 const BIAS := 0.32
 
-const PROVINCE_NAMES := {
-	"adana": "Adana", "adiyaman": "Adıyaman", "afyonkarahisar": "Afyonkarahisar", "agri": "Ağrı",
-	"amasya": "Amasya", "ankara": "Ankara", "antalya": "Antalya", "artvin": "Artvin", "aydin": "Aydın",
-	"balikesir": "Balıkesir", "bilecik": "Bilecik", "bingol": "Bingöl", "bitlis": "Bitlis", "bolu": "Bolu",
-	"burdur": "Burdur", "bursa": "Bursa", "canakkale": "Çanakkale", "cankiri": "Çankırı", "corum": "Çorum",
-	"denizli": "Denizli", "diyarbakir": "Diyarbakır", "edirne": "Edirne", "elazig": "Elazığ",
-	"erzincan": "Erzincan", "erzurum": "Erzurum", "eskisehir": "Eskişehir", "gaziantep": "Gaziantep",
-	"giresun": "Giresun", "gumushane": "Gümüşhane", "hakkari": "Hakkari", "hatay": "Hatay",
-	"isparta": "Isparta", "istanbul": "İstanbul", "izmir": "İzmir", "kahramanmaras": "Kahramanmaraş",
-	"kars": "Kars", "kastamonu": "Kastamonu", "kayseri": "Kayseri", "kirklareli": "Kırklareli",
-	"kirsehir": "Kırşehir", "kocaeli": "Kocaeli", "konya": "Konya", "kutahya": "Kütahya",
-	"malatya": "Malatya", "manisa": "Manisa", "mardin": "Mardin", "mersin": "Mersin", "mugla": "Muğla",
-	"mus": "Muş", "nevsehir": "Nevşehir", "nigde": "Niğde", "ordu": "Ordu", "rize": "Rize",
-	"sakarya": "Sakarya", "samsun": "Samsun", "sanliurfa": "Şanlıurfa", "siirt": "Siirt", "sinop": "Sinop",
-	"sivas": "Sivas", "tekirdag": "Tekirdağ", "tokat": "Tokat", "trabzon": "Trabzon", "tunceli": "Tunceli",
-	"usak": "Uşak", "van": "Van", "yozgat": "Yozgat", "zonguldak": "Zonguldak",
-}
 
 var duration: float = 45.0
 var threshold: float = 0.0
@@ -64,7 +47,8 @@ var _bias: Dictionary = {}    # province_id -> {peer_id: -1..1}
 var _wave: Dictionary = {}    # province_id -> {peer_id: [frekans1, faz1, frekans2, faz2]}
 
 static func province_name(province_id: String) -> String:
-	return String(PROVINCE_NAMES.get(province_id, province_id.capitalize()))
+	var map = Engine.get_main_loop().root.get_node_or_null("GameMap") if Engine.get_main_loop() is SceneTree else null
+	return map.name_of(province_id) if map != null else province_id
 
 func setup(province_results: Dictionary, vote_shares: Dictionary, seats: Dictionary, passed: Array,
 		threshold_percent: float, seed_value: int, duration_seconds: float) -> void:

@@ -396,10 +396,8 @@ func _apply_layout() -> void:
 	var available_height := _top_area_height()
 	# Haritanın ALTINDA katman düğmeleri duruyor: o kadar yer haritaya kapalı.
 	var map_area_height: float = maxf(80.0, available_height - LAYER_BAR_RESERVE)
-	# Haritanın "doğal" (native) piksel boyutu sabit bir const DEĞİL —
-	# pixel-art asset (assets/maps/turkey_map.png) her değiştiğinde boyutu
-	# değişebiliyor, o yüzden province_map.gd'nin YÜKLEDİĞİ gerçek ızgara
-	# boyutundan (grid_width/height * MAP_UNIT_SCALE) runtime'da hesaplanıyor.
+	# Haritanın doğal boyutu her oyunda üretilen altıgen haritadan gelir
+	# (grid_width/height * MAP_UNIT_SCALE), sabit değildir.
 	var map_native_size: Vector2 = Vector2(map_holder.grid_width, map_holder.grid_height) * map_holder.MAP_UNIT_SCALE
 	var fit_scale: float = minf(available_width / map_native_size.x, map_area_height / map_native_size.y) * MAP_FILL_RATIO
 	map_holder.scale = Vector2(fit_scale, fit_scale)
@@ -574,11 +572,7 @@ func _refresh_province_winner_colors() -> void:
 		if winner_id == -1:
 			continue
 		# İlin rengi, salt çoğunluk olsun olmasın, DOĞRUDAN o ilde en çok
-		# koltuğu alan partinin kendi rengi — TAM OPAK (alfa 1.0). Önceden
-		# 0.85 alfa kullanılıyordu; pixel-art haritada bu, ilin ORİJİNAL
-		# (varsayılan) piksel-art renginin %15'inin altından sızıp "kısmen
-		# boyanmış" gibi görünmesine yol açıyordu — kullanıcı isteğiyle o
-		# ilin pikselleri artık TAMAMEN parti rengi oluyor, karışım yok.
+		# koltuğu alan partinin kendi rengi, tam opak.
 		var party_color: Color = PartyManager.parties.get(winner_id, {}).get("bg_color", Color(0.5, 0.5, 0.5))
 		party_color.a = 1.0
 		_seat_layer_colors[province_id] = party_color

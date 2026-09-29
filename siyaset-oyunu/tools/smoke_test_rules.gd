@@ -93,7 +93,7 @@ func _initialize() -> void:
 
 	print("")
 	print("=== 2) SECIM MODELI ===")
-	var seat_file = JSON.parse_string(FileAccess.get_file_as_string("res://data/province_seats.json"))
+	var seat_file = root.get_node("GameMap").seat_counts()
 	var voters := ElectionModel.load_province_voters()
 	check("ornek secmen verisi her il icin var", voters.size() == seat_file.size(), "%d/%d" % [voters.size(), seat_file.size()])
 	var rng := RandomNumberGenerator.new()
@@ -119,7 +119,7 @@ func _initialize() -> void:
 	check("baraj sonrasi vekil sayisi ayni", int(sum_values(rt["seats"])) == cm.TOTAL_SEATS)
 	var r100 := ElectionModel.compute(parties, seat_file, voters, 100.0, 1.0, rng)
 	check("kimse gecemezse baraj uygulanmaz", int(sum_values(r100["seats"])) == cm.TOTAL_SEATS and r100["passed_threshold"].size() == 3)
-	var expected := ElectionModel.expected_shares(parties, voters["konya"], 1.0)
+	var expected := ElectionModel.expected_shares(parties, voters[TestProvinces.id("konya")], 1.0)
 	check("beklenen paylar (anket) toplami 100", absf(sum_values(expected) - 100.0) < 0.01, str(expected))
 
 	print("")
@@ -254,7 +254,7 @@ func _initialize() -> void:
 	check("sira gelince otomatik 1 kart dagitildi", cm.inventories[3].size() == hand3_before + 1,
 		"%d -> %d" % [hand3_before, cm.inventories[3].size()])
 	cm.mana[3] = 0
-	check("mana yoksa teskilat yok", not cm.can_build_organization(3, "ankara"))
+	check("mana yoksa teskilat yok", not cm.can_build_organization(3, TestProvinces.id("ankara")))
 	cm._apply_pass(3)
 	check("tur bitti: 1 birikmis manasina gelir ekledi (1 + gelir)", cm.round_number == 2 and cm.mana_of(1) == 1 + GameRules.MANA_PER_ROUND 		and cm.mana_of(3) == 0, str(cm.mana))
 	var gov_before: Dictionary = gm.government.duplicate()
@@ -289,54 +289,54 @@ func _initialize() -> void:
 	cm.last_seats = {}
 	var mana1: int = cm.mana_of(1)
 
-	check("teskilat yokken il gorusu ve anket yok", not cm.knows_leaning(1, "ankara") and cm.province_poll(1, "ankara").is_empty())
-	var projection: Dictionary = cm.province_projection("ankara")
+	check("teskilat yokken il gorusu ve anket yok", not cm.knows_leaning(1, TestProvinces.id("ankara")) and cm.province_poll(1, TestProvinces.id("ankara")).is_empty())
+	var projection: Dictionary = cm.province_projection(TestProvinces.id("ankara"))
 	var projected := 0
 	for id in projection.keys():
 		projected += int(projection[id]["seats"])
-	check("anlik vekil tahmini ilin vekil sayisina esit", projected == cm.province_seat_count("ankara"), str(projection))
+	check("anlik vekil tahmini ilin vekil sayisina esit", projected == cm.province_seat_count(TestProvinces.id("ankara")), str(projection))
 	cm.mana[1] = GameRules.ORG_MANA_COST
 	cm.inventories[1] = []
-	check("teskilat kurulabilir", cm.can_build_organization(1, "ankara"))
-	cm._apply_organization(1, "ankara")
-	check("teskilat kuruldu, mana harcandi; mana bitti -> sira devretmez", cm.organization_level("ankara", 1) == 1 		and cm.mana_of(1) == 0 and cm.current_turn_peer_id() == 1)
+	check("teskilat kurulabilir", cm.can_build_organization(1, TestProvinces.id("ankara")))
+	cm._apply_organization(1, TestProvinces.id("ankara"))
+	check("teskilat kuruldu, mana harcandi; mana bitti -> sira devretmez", cm.organization_level(TestProvinces.id("ankara"), 1) == 1 		and cm.mana_of(1) == 0 and cm.current_turn_peer_id() == 1)
 	cm.current_turn_index = cm.turn_order.find(1)
-	check("teskilat 1: az oy bonusu + il gorusu, anket yok", near(cm.activity_of("ankara", 1) - cm.local_of("ankara", 1), PublicOpinion.org_activity(1)) \
-		and cm.knows_leaning(1, "ankara") and cm.province_poll(1, "ankara").is_empty() and not cm.knows_leaning(2, "ankara"))
-	check("mana yetmezse kurulamaz", not cm.can_build_organization(1, "izmir"))
+	check("teskilat 1: az oy bonusu + il gorusu, anket yok", near(cm.activity_of(TestProvinces.id("ankara"), 1) - cm.local_of(TestProvinces.id("ankara"), 1), PublicOpinion.org_activity(1)) \
+		and cm.knows_leaning(1, TestProvinces.id("ankara")) and cm.province_poll(1, TestProvinces.id("ankara")).is_empty() and not cm.knows_leaning(2, TestProvinces.id("ankara")))
+	check("mana yetmezse kurulamaz", not cm.can_build_organization(1, TestProvinces.id("izmir")))
 	cm.mana[1] = 20
 	for i in 5:
-		cm._apply_organization(1, "izmir")
-	check("en fazla ORG_MAX_LEVEL", cm.organization_level("izmir", 1) == GameRules.ORG_MAX_LEVEL and cm.mana_of(1) == 20 - GameRules.ORG_MAX_LEVEL * GameRules.ORG_MANA_COST,
-		"seviye %d, mana %d" % [cm.organization_level("izmir", 1), cm.mana_of(1)])
+		cm._apply_organization(1, TestProvinces.id("izmir"))
+	check("en fazla ORG_MAX_LEVEL", cm.organization_level(TestProvinces.id("izmir"), 1) == GameRules.ORG_MAX_LEVEL and cm.mana_of(1) == 20 - GameRules.ORG_MAX_LEVEL * GameRules.ORG_MANA_COST,
+		"seviye %d, mana %d" % [cm.organization_level(TestProvinces.id("izmir"), 1), cm.mana_of(1)])
 	check("seviye arttikca oy bonusu artar", PublicOpinion.org_activity(1) < PublicOpinion.org_activity(2))
-	var poll3: Dictionary = cm.province_poll(1, "izmir")
+	var poll3: Dictionary = cm.province_poll(1, TestProvinces.id("izmir"))
 	var poll_seats := 0
 	for id in poll3.keys():
 		poll_seats += int(poll3[id]["seats"])
-	check("teskilat 2: yuksek isabetli anket, ilin vekilleri dagitildi", cm.poll_error(1, "izmir") == GameRules.POLL_ERROR_HIGH \
-		and poll_seats == cm.province_seat_count("izmir"), str(poll3))
-	check("anket ayni turda degismez", str(cm.province_poll(1, "izmir")) == str(poll3))
-	cm.organizations["izmir"][1] = 1
-	check("teskilat 1: anket yok", cm.poll_error(1, "izmir") < 0.0 and cm.province_poll(1, "izmir").is_empty())
-	cm.organizations["izmir"][1] = GameRules.ORG_MAX_LEVEL
+	check("teskilat 2: yuksek isabetli anket, ilin vekilleri dagitildi", cm.poll_error(1, TestProvinces.id("izmir")) == GameRules.POLL_ERROR_HIGH \
+		and poll_seats == cm.province_seat_count(TestProvinces.id("izmir")), str(poll3))
+	check("anket ayni turda degismez", str(cm.province_poll(1, TestProvinces.id("izmir"))) == str(poll3))
+	cm.organizations[TestProvinces.id("izmir")][1] = 1
+	check("teskilat 1: anket yok", cm.poll_error(1, TestProvinces.id("izmir")) < 0.0 and cm.province_poll(1, TestProvinces.id("izmir")).is_empty())
+	cm.organizations[TestProvinces.id("izmir")][1] = GameRules.ORG_MAX_LEVEL
 	cm.mana[1] = 1
-	check("mana yetmezse miting yapilamaz", not cm.can_miting(1, "izmir"))
+	check("mana yetmezse miting yapilamaz", not cm.can_miting(1, TestProvinces.id("izmir")))
 	cm.mana[1] = 3
-	var izmir_before: float = cm.local_of("izmir", 1) + cm.national_of(1)
-	cm._apply_miting_move(1, "izmir")
+	var izmir_before: float = cm.local_of(TestProvinces.id("izmir"), 1) + cm.national_of(1)
+	cm._apply_miting_move(1, TestProvinces.id("izmir"))
 	check("miting hamlesi 2 mana, etki yazildi, mana kaldi -> sira devretmedi", cm.mana_of(1) == 1 and cm.current_turn_peer_id() == 1 \
-		and not near(cm.local_of("izmir", 1) + cm.national_of(1), izmir_before))
+		and not near(cm.local_of(TestProvinces.id("izmir"), 1) + cm.national_of(1), izmir_before))
 	cm.inventories[1] = ["mana_bonusu"]
 	cm.mana[1] = 2
-	cm.organizations["konya"] = {1: 1}
-	cm._apply_miting_move(1, "konya")
+	cm.organizations[TestProvinces.id("konya")] = {1: 1}
+	cm._apply_miting_move(1, TestProvinces.id("konya"))
 	check("mana bitti -> sira devretmez", cm.mana_of(1) == 0 and cm.current_turn_peer_id() == 1)
 	cm.inventories[1] = []
 	cm.mana[1] = 2
 	var next_peer: int = cm.turn_order[(cm.turn_order.find(1) + 1) % cm.turn_order.size()]
-	cm.organizations["sivas"] = {1: 1}
-	cm._apply_miting_move(1, "sivas")
+	cm.organizations[TestProvinces.id("sivas")] = {1: 1}
+	cm._apply_miting_move(1, TestProvinces.id("sivas"))
 	check("mana bitse de sira kendiliginden devretmez", cm.current_turn_peer_id() == 1)
 	cm._apply_pass(1)
 	check("turu bitir -> sira devreder", cm.current_turn_peer_id() == next_peer)
@@ -491,7 +491,7 @@ func _initialize() -> void:
 	print("=== 15) ILLERIN GORUSU VE NOTR PARTILER ===")
 	new_game({1: ideology(0, 0, 0), 2: ideology(0, 0, 0), 3: ideology(0, 0, 0)})
 	var ideo: Dictionary = cm.province_ideology
-	check("67 ilin gorusu uretildi", ideo.size() == 67, str(ideo.size()))
+	check("haritadaki her bolgenin gorusu uretildi", ideo.size() == root.get_node("GameMap").ids.size() and ideo.size() >= 30, str(ideo.size()))
 	var in_range := true
 	for province_id in ideo.keys():
 		for axis in ["economic", "social", "administrative"]:
@@ -500,7 +500,7 @@ func _initialize() -> void:
 				in_range = false
 	check("degerler -3..+3 tam sayi", in_range)
 	var nb: Dictionary = ProvinceIdeology.neighbors()
-	check("komsuluk bulundu", nb.size() >= 60 and (nb.get("ankara", []) as Array).size() >= 3, str(nb.get("ankara", [])))
+	check("komsuluk bulundu", nb.size() == root.get_node("GameMap").ids.size() and (nb.get(TestProvinces.id("ankara"), []) as Array).size() >= 3, str(nb.get(TestProvinces.id("ankara"), [])))
 	var near_sum := 0.0
 	var near_n := 0
 	for province_id in nb.keys():

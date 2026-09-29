@@ -10,9 +10,10 @@ func _check(ok: bool, text: String) -> void:
 		_fails += 1
 
 func _initialize() -> void:
+	await process_frame
 	var sim_script = load("res://scripts/election_night_sim.gd")
 	var model = load("res://scripts/election_model.gd")
-	var seats: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/province_seats.json"))
+	var seats: Dictionary = root.get_node("GameMap").seat_counts()
 	var parties := {
 		1: {"economic": 1, "social": 1, "administrative": 2},
 		2: {"economic": -2, "social": -1, "administrative": 1},

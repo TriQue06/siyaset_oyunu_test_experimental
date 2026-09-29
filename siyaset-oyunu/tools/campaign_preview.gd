@@ -49,12 +49,12 @@ func _initialize() -> void:
 	cm.turn_order = ids.duplicate()
 	cm.current_turn_index = 0
 	# Biraz geçmiş: rakip il başkanlıkları, bir vaat, benim istihbaratım.
-	cm.organizations = {"istanbul": {2: 2, me: 1}, "ankara": {3: 1}, "izmir": {4: 3}}
-	cm._add_local("istanbul", me, 3.0)
+	cm.organizations = {TestProvinces.id("istanbul"): {2: 2, me: 1}, TestProvinces.id("ankara"): {3: 1}, TestProvinces.id("izmir"): {4: 3}}
+	cm._add_local(TestProvinces.id("istanbul"), me, 3.0)
 	cm.mana[me] = 4
 	cm.inventories[me] = ["miting", "anket", "gozcu", "karalama"]
-	cm._apply_poll(me, "istanbul")
-	cm._apply_scout(me, "istanbul")
+	cm._apply_poll(me, TestProvinces.id("istanbul"))
+	cm._apply_scout(me, TestProvinces.id("istanbul"))
 	cm._push_state({"type": "full"}, true)
 
 	var scene: Node = (load("res://scenes/GameScreen.tscn") as PackedScene).instantiate()
@@ -65,10 +65,10 @@ func _initialize() -> void:
 	await _frames(10)
 	_shot("campaign_law_designer")
 	scene._law_designer.hide()
-	var pixel_center: Vector2 = scene.map_holder.get_province_centroid("istanbul")
-	scene._on_province_clicked("istanbul")
+	var pixel_center: Vector2 = scene.map_holder.get_province_centroid(TestProvinces.id("istanbul"))
+	scene._on_province_clicked(TestProvinces.id("istanbul"))
 	await _frames(10)
 	_shot("campaign_province_panel")
-	print("scout istanbul: ", cm.has_scouted(me, "istanbul"), " center ", pixel_center)
+	print("scout istanbul: ", cm.has_scouted(me, TestProvinces.id("istanbul")), " center ", pixel_center)
 	print("=== PREVIEW DONE ===")
 	quit()

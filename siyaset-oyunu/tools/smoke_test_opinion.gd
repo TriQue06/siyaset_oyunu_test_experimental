@@ -82,7 +82,7 @@ func _initialize() -> void:
 	voters = ElectionModel.load_province_voters()
 
 	print("=== 1) GUC SECIMI ETKILER ===")
-	var seats = JSON.parse_string(FileAccess.get_file_as_string("res://data/province_seats.json"))
+	var seats = root.get_node("GameMap").seat_counts()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 	var same := {1: ideology(0, 0, 0), 2: ideology(0, 0, 0)}
@@ -94,43 +94,43 @@ func _initialize() -> void:
 
 	print("")
 	print("=== 2) PROVOKASYON RISKI ===")
-	var konya: Dictionary = voters["konya"]
-	check("secmene yakin parti: risk yok", near(PublicOpinion.provocation_risk(ideology(0, 2, 2), konya), 0.0))
+	var konya: Dictionary = voters[TestProvinces.id("konya")]
+	check("secmene yakin parti: risk yok", near(PublicOpinion.provocation_risk(konya, konya), 0.0))
 	var far_risk := PublicOpinion.provocation_risk(ideology(-3, -3, -3), konya)
 	check("zit uc parti: belirgin risk", far_risk > 0.25 and far_risk <= 0.5, "%.2f" % far_risk)
 	check("il baskanligi riski azaltir", PublicOpinion.provocation_risk(ideology(-3, -3, -3), konya, 2) < far_risk * 0.6)
 	check("tam zit uclar: risk %50'de durur",
 		near(PublicOpinion.provocation_risk(ideology(-3, -3, -3), ideology(3, 3, 3)), 0.5))
 	new_game({1: ideology(3, 3, 3), 2: ideology(-3, -3, -3)})
-	var before: float = cm.miting_risk(2, "konya")
-	cm._add_local("konya", 1, 8.0)
-	var after: float = cm.miting_risk(2, "konya")
+	var before: float = cm.miting_risk(2, TestProvinces.id("konya"))
+	cm._add_local(TestProvinces.id("konya"), 1, 8.0)
+	var after: float = cm.miting_risk(2, TestProvinces.id("konya"))
 	check("uc sag parti ilde guclenince uc solun riski artar", after > before and after <= 0.5,
 		"%.2f -> %.2f" % [before, after])
 
 	print("")
 	print("=== 3) MITING ===")
 	new_game({1: ideology(0, 2, 2), 2: ideology(0, 2, 2)})
-	check("dengeye yakin partinin riski 0", near(cm.miting_risk(1, "konya"), 0.0), "%.2f" % cm.miting_risk(1, "konya"))
-	cm._apply_miting(1, "konya")
-	check("basarili miting: il +3", near(cm.local_of("konya", 1), PublicOpinion.MITING_LOCAL))
+	check("dengeye yakin partinin riski 0", near(cm.miting_risk(1, TestProvinces.id("konya")), 0.0), "%.2f" % cm.miting_risk(1, TestProvinces.id("konya")))
+	cm._apply_miting(1, TestProvinces.id("konya"))
+	check("basarili miting: il +3", near(cm.local_of(TestProvinces.id("konya"), 1), PublicOpinion.MITING_LOCAL))
 	check("basarili miting: ulusal +0.5", near(cm.national_of(1), PublicOpinion.MITING_NATIONAL))
-	check("ilde olay kaydi var", cm.province_events.get("konya", []).size() == 1)
+	check("ilde olay kaydi var", cm.province_events.get(TestProvinces.id("konya"), []).size() == 1)
 	new_game({1: ideology(3, 3, 3), 2: ideology(-3, -3, -3)})
-	cm._add_local("konya", 1, 10.0)
+	cm._add_local(TestProvinces.id("konya"), 1, 10.0)
 	var provoked := 0
 	var succeeded := 0
 	for i in 40:
-		cm.local_support["konya"][2] = 0.0
-		cm._apply_miting(2, "konya")
-		var value: float = cm.local_of("konya", 2)
+		cm.local_support[TestProvinces.id("konya")][2] = 0.0
+		cm._apply_miting(2, TestProvinces.id("konya"))
+		var value: float = cm.local_of(TestProvinces.id("konya"), 2)
 		if near(value, PublicOpinion.PROVOCATION_LOCAL):
 			provoked += 1
 		elif near(value, PublicOpinion.MITING_LOCAL):
 			succeeded += 1
 	check("riskli ilde hem provokasyon hem basari gorulur", provoked > 0 and succeeded > 0 and provoked + succeeded == 40,
 		"provokasyon %d, basari %d" % [provoked, succeeded])
-	check("olay kaydi sinirli", cm.province_events["konya"].size() == cm.PROVINCE_EVENT_LIMIT)
+	check("olay kaydi sinirli", cm.province_events[TestProvinces.id("konya")].size() == cm.PROVINCE_EVENT_LIMIT)
 
 	print("")
 	print("=== 4) YATIRIM ===")
@@ -147,17 +147,17 @@ func _initialize() -> void:
 	cm.mana = {1: 10, 2: 10, 3: 10}
 	cm.turn_order = [3, 1, 2]
 	cm.current_turn_index = 0
-	check("muhalefet yatirim yapamaz", not cm.can_invest(3, "izmir"))
+	check("muhalefet yatirim yapamaz", not cm.can_invest(3, TestProvinces.id("izmir")))
 	cm.current_turn_index = 1
-	check("hukumet partisi yatirim yapabilir", cm.can_invest(1, "izmir"))
+	check("hukumet partisi yatirim yapabilir", cm.can_invest(1, TestProvinces.id("izmir")))
 	check("gecersiz il reddedilir", not cm.can_invest(1, "atlantis"))
 	cm.local_support = {}
 	cm.national_support = {}
-	cm._apply_invest_move(1, "izmir")
+	cm._apply_invest_move(1, TestProvinces.id("izmir"))
 	check("yatirim hamlesi 3 mana", cm.mana_of(1) == 10 - GameRules.INVEST_MANA_COST)
-	check("getiren parti il +3", near(cm.local_of("izmir", 1), PublicOpinion.INVEST_LOCAL))
-	check("ortak il +1.5", near(cm.local_of("izmir", 2), PublicOpinion.INVEST_PARTNER_LOCAL))
-	check("muhalefet etkilenmez", near(cm.local_of("izmir", 3), 0.0))
+	check("getiren parti il +3", near(cm.local_of(TestProvinces.id("izmir"), 1), PublicOpinion.INVEST_LOCAL))
+	check("ortak il +1.5", near(cm.local_of(TestProvinces.id("izmir"), 2), PublicOpinion.INVEST_PARTNER_LOCAL))
+	check("muhalefet etkilenmez", near(cm.local_of(TestProvinces.id("izmir"), 3), 0.0))
 	check("getiren parti ulusal +0.5", near(cm.national_of(1), PublicOpinion.INVEST_NATIONAL))
 	check("yatirim destede degil (hamle)", not cm._draw_weights(1).has("yatirim"))
 
@@ -222,13 +222,13 @@ func _initialize() -> void:
 	check("gercek puan degismedi", near(cm.national_of(1), 2.0))
 	cm.election_seats = {1: 200, 2: 100, 3: 90}
 	cm.last_seats = {1: 190, 2: 100, 3: 100}
-	cm.organizations = {"konya": {3: 2}}
+	cm.organizations = {TestProvinces.id("konya"): {3: 2}}
 	cm.local_support = {}
 	mods = cm.election_modifiers()
 	check("vekil calmanin secim momentumu kaldirildi", near(float(mods["national"][3]), 1.0),
 		"%.2f" % float(mods["national"][3]))
 	check("calma bedeli ulusal puana anlik ama cok kucuk yazilir", near(PublicOpinion.steal_thief_national(10), -0.08) and near(PublicOpinion.steal_victim_national(10), 0.12))
-	check("il baskanligi il carpanina girer", near(float(mods["local"]["konya"][3]), PublicOpinion.org_activity(2)))
+	check("il baskanligi il carpanina girer", near(float(mods["local"][TestProvinces.id("konya")][3]), PublicOpinion.org_activity(2)))
 	cm.last_seats = {1: 200, 2: 100, 3: 90}
 	cm.election_seats = {}
 	cm.organizations = {}
@@ -263,15 +263,15 @@ func _initialize() -> void:
 	cm.last_seats = {1: 200, 2: 100, 3: 90}
 	cm.inventories[3] = []
 	cm.national_support = {3: 4.0}
-	cm.local_support = {"konya": {3: 2.0}}
-	cm.organizations = {"konya": {3: 1}}
+	cm.local_support = {TestProvinces.id("konya"): {3: 2.0}}
+	cm.organizations = {TestProvinces.id("konya"): {3: 1}}
 	var round_before: int = cm.round_number
 	cm.current_turn_index = 0
 	pass_round()
 	check("secimsiz tur gecti", cm.round_number == round_before + 1 and gm.has_government(), "tur %d" % cm.round_number)
 	check("ulusal puan %10 sondu", near(cm.national_of(3), 4.0 * PublicOpinion.NATIONAL_DECAY), "%.3f" % cm.national_of(3))
-	check("il puani %15 sondu", near(cm.local_of("konya", 3), 2.0 * PublicOpinion.LOCAL_DECAY), "%.3f" % cm.local_of("konya", 3))
-	check("teskilat sonmedi", near(cm.activity_of("konya", 3), 2.0 * PublicOpinion.LOCAL_DECAY + PublicOpinion.org_activity(1)))
+	check("il puani %15 sondu", near(cm.local_of(TestProvinces.id("konya"), 3), 2.0 * PublicOpinion.LOCAL_DECAY), "%.3f" % cm.local_of(TestProvinces.id("konya"), 3))
+	check("teskilat sonmedi", near(cm.activity_of(TestProvinces.id("konya"), 3), 2.0 * PublicOpinion.LOCAL_DECAY + PublicOpinion.org_activity(1)))
 
 	print("")
 	print("=== 9) TESKILAT BILGISI, KARALAMA ===")
@@ -285,33 +285,33 @@ func _initialize() -> void:
 	cm.inventories[3] = ["karalama"]
 	cm._apply_play(3, 0, -1, "")
 	check("il secilmeden karalama oynanamaz (kart elde)", cm.inventories[3].size() == 1 and cm.current_turn_peer_id() == 3)
-	cm._apply_organization(3, "ankara")
-	check("teskilat: il gorusu (sadece kurana)", cm.knows_leaning(3, "ankara") and not cm.knows_leaning(1, "ankara"))
+	cm._apply_organization(3, TestProvinces.id("ankara"))
+	check("teskilat: il gorusu (sadece kurana)", cm.knows_leaning(3, TestProvinces.id("ankara")) and not cm.knows_leaning(1, TestProvinces.id("ankara")))
 	# Karalama artık teşkilat ister; 3 numaranın Ankara teşkilatı dursun.
-	cm.organizations = {"ankara": {3: 1}}
-	check("teskilatsiz ilde karalama oynanamaz", not cm.can_play_card(3, "karalama", 1, "izmir"))
-	check("karalama kendine oynanamaz", not cm.can_play_card(3, "karalama", 3, "ankara"))
-	check("karalama gecersiz partiye oynanamaz", not cm.can_play_card(3, "karalama", 99, "ankara"))
+	cm.organizations = {TestProvinces.id("ankara"): {3: 1}}
+	check("teskilatsiz ilde karalama oynanamaz", not cm.can_play_card(3, "karalama", 1, TestProvinces.id("izmir")))
+	check("karalama kendine oynanamaz", not cm.can_play_card(3, "karalama", 3, TestProvinces.id("ankara")))
+	check("karalama gecersiz partiye oynanamaz", not cm.can_play_card(3, "karalama", 99, TestProvinces.id("ankara")))
 	cm.current_turn_index = 0
-	var damage: float = minf(PublicOpinion.propaganda_damage(cm.party_strength("ankara", 1)), -PublicOpinion.PROPAGANDA_FLOOR)
-	cm._apply_play(3, 0, 1, "ankara")
-	check("karalama: hedefe eksi, yapana arti", near(cm.local_of("ankara", 1), -damage) and cm.local_of("ankara", 3) > 0.0,
-		"hedef %.2f, yapan %.2f" % [cm.local_of("ankara", 1), cm.local_of("ankara", 3)])
-	cm.local_support["ankara"][1] = -2.5
+	var damage: float = minf(PublicOpinion.propaganda_damage(cm.party_strength(TestProvinces.id("ankara"), 1)), -PublicOpinion.PROPAGANDA_FLOOR)
+	cm._apply_play(3, 0, 1, TestProvinces.id("ankara"))
+	check("karalama: hedefe eksi, yapana arti", near(cm.local_of(TestProvinces.id("ankara"), 1), -damage) and cm.local_of(TestProvinces.id("ankara"), 3) > 0.0,
+		"hedef %.2f, yapan %.2f" % [cm.local_of(TestProvinces.id("ankara"), 1), cm.local_of(TestProvinces.id("ankara"), 3)])
+	cm.local_support[TestProvinces.id("ankara")][1] = -2.5
 	cm.inventories[3] = ["karalama"]
 	cm.current_turn_index = 0
-	cm._apply_play(3, 0, 1, "ankara")
-	check("karalama il puanini tabanin altina itemez", near(cm.local_of("ankara", 1), PublicOpinion.PROPAGANDA_FLOOR),
-		"%.2f" % cm.local_of("ankara", 1))
+	cm._apply_play(3, 0, 1, TestProvinces.id("ankara"))
+	check("karalama il puanini tabanin altina itemez", near(cm.local_of(TestProvinces.id("ankara"), 1), PublicOpinion.PROPAGANDA_FLOOR),
+		"%.2f" % cm.local_of(TestProvinces.id("ankara"), 1))
 	cm.inventories[3] = ["karalama"]
 	cm.current_turn_index = 0
-	cm._apply_play(3, 0, 1, "ankara")
-	check("tabandaki partiye karalama artik eksi yazmaz", near(cm.local_of("ankara", 1), PublicOpinion.PROPAGANDA_FLOOR))
+	cm._apply_play(3, 0, 1, TestProvinces.id("ankara"))
+	check("tabandaki partiye karalama artik eksi yazmaz", near(cm.local_of(TestProvinces.id("ankara"), 1), PublicOpinion.PROPAGANDA_FLOOR))
 	check("ilde guclu partiye karalama daha az isler", PublicOpinion.propaganda_damage(6.0) < PublicOpinion.propaganda_damage(1.0))
 	check("ilde guclu karalayan daha cok kazanir", PublicOpinion.propaganda_gain(6.0) > PublicOpinion.propaganda_gain(1.0))
-	var weak: float = cm.party_strength("ankara", 2)
-	cm.organizations = {"ankara": {2: GameRules.ORG_MAX_LEVEL}}
-	check("il baskanligi ildeki gucu artirir", cm.party_strength("ankara", 2) > weak)
+	var weak: float = cm.party_strength(TestProvinces.id("ankara"), 2)
+	cm.organizations = {TestProvinces.id("ankara"): {2: GameRules.ORG_MAX_LEVEL}}
+	check("il baskanligi ildeki gucu artirir", cm.party_strength(TestProvinces.id("ankara"), 2) > weak)
 
 	cm.current_turn_index = 0
 	cm.mana[3] = 3
@@ -337,15 +337,15 @@ func _initialize() -> void:
 	cm._apply_play(3, 0)
 	check("populizm 1 mana, 3 yil", cm.mana_of(3) == 9 and cm.populism_rounds_left(3) == GameRules.POPULISM_ROUNDS)
 	check("populizmde sira devretmez", cm.current_turn_peer_id() == 3)
-	cm._apply_miting(3, "konya")
-	var pop_gain: float = cm.local_of("konya", 3)
+	cm._apply_miting(3, TestProvinces.id("konya"))
+	var pop_gain: float = cm.local_of(TestProvinces.id("konya"), 3)
 	check("populizm: iyi etki buyur", pop_gain > PublicOpinion.MITING_LOCAL + 0.001 or near(pop_gain, PublicOpinion.PROVOCATION_LOCAL * PublicOpinion.POPULISM_BAD_MULT),
 		"%.2f" % pop_gain)
 	cm.local_support = {}
-	cm._add_local("konya", 3, -2.0, true)
-	check("populizm: kendi hamlesinin kotu etkisi kuculur", near(cm.local_of("konya", 3), -2.0 * PublicOpinion.POPULISM_BAD_MULT))
-	cm._add_local("konya", 3, -2.0)
-	check("populizm: baskasinin karalamasi etkilenmez", near(cm.local_of("konya", 3), -2.0 * PublicOpinion.POPULISM_BAD_MULT - 2.0))
+	cm._add_local(TestProvinces.id("konya"), 3, -2.0, true)
+	check("populizm: kendi hamlesinin kotu etkisi kuculur", near(cm.local_of(TestProvinces.id("konya"), 3), -2.0 * PublicOpinion.POPULISM_BAD_MULT))
+	cm._add_local(TestProvinces.id("konya"), 3, -2.0)
+	check("populizm: baskasinin karalamasi etkilenmez", near(cm.local_of(TestProvinces.id("konya"), 3), -2.0 * PublicOpinion.POPULISM_BAD_MULT - 2.0))
 	cm._apply_play(3, 0)
 	check("mana bonusu +5 mana", cm.mana_of(3) == 9 + GameRules.MANA_BONUS_AMOUNT and GameRules.MANA_BONUS_AMOUNT == 5)
 	check("mana bonusu sirayi devretmez", cm.current_turn_peer_id() == 3)

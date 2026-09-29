@@ -84,7 +84,7 @@ func _initialize() -> void:
 
 	# 1) İL PANELİ AÇIK: eskiden içerik uzadıkça panel boyu büyüyüp
 	# parlamento diyagramının üstünü kapatıyordu.
-	scene._on_province_clicked("ankara")
+	scene._on_province_clicked(TestProvinces.id("ankara"))
 	await _frames(10)
 	var prov: Control = scene._province_panel
 	var pr := prov.get_global_rect()

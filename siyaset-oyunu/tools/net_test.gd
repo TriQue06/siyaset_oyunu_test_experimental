@@ -155,8 +155,8 @@ func run_client() -> void:
 		return
 	var card: String = cm.my_inventory()[0]
 	# Hamle sınırı yok: önce teşkilat (2 mana), sonra manası yeterse çekilen kart.
-	cm.build_organization("izmir")
-	if not await wait_until(func(): return cm.organization_level("izmir", me) == 1 and cm.knows_leaning(me, "izmir"), "teşkilat hamlesi RPC'si"):
+	cm.build_organization(TestProvinces.id("izmir"))
+	if not await wait_until(func(): return cm.organization_level(TestProvinces.id("izmir"), me) == 1 and cm.knows_leaning(me, TestProvinces.id("izmir")), "teşkilat hamlesi RPC'si"):
 		return
 	if cm.mana_of(me) < root.get_node("CardPresets").card_cost(card):
 		log_line("kart için mana yetmiyor (%s), tur bitiriliyor" % card)
@@ -164,14 +164,14 @@ func run_client() -> void:
 		card = "atlandi"
 	else:
 		# Deste ilk seçimden önce karalama, popülizm ya da mana bonusu verir.
-		cm.play_card(0, 1, "ankara")
+		cm.play_card(0, 1, TestProvinces.id("ankara"))
 	# Mana bonusu sırayı devreder; sıra geri dönünce yeni kart gelebilir.
 	var round_before: int = cm.round_number
 	if card != "atlandi" and not await wait_until(func(): return cm.my_inventory().is_empty() or not cm.is_my_turn() 			or cm.round_number != round_before or cm.last_election_round > 0,
 			"kart oynama RPC'si (%s)" % card):
 		return
 	if card == "karalama":
-		if not await wait_until(func(): return cm.province_events.has("ankara"), "karalama sonucu (il olayı) senkronlandı"):
+		if not await wait_until(func(): return cm.province_events.has(TestProvinces.id("ankara")), "karalama sonucu (il olayı) senkronlandı"):
 			return
 	elif card == "populizm":
 		if not await wait_until(func(): return cm.populism_rounds_left(me) > 0, "popülizm senkronlandı"):

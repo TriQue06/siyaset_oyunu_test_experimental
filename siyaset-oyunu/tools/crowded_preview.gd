@@ -131,11 +131,11 @@ func _initialize() -> void:
 	check("sonra onceki katmana doner", scene._map_layer == 2)
 	_shot("my_turn")
 	scene._on_miting_button_pressed()
-	scene._on_province_clicked("konya")
+	scene._on_province_clicked(TestProvinces.id("konya"))
 	await _frames(3)
 	_shot("miting_pending")
 	check("miting: ilk dokunus riski gosterir", String(scene._target_hint.text).find("provokasyon") != -1)
-	scene._on_province_clicked("konya")
+	scene._on_province_clicked(TestProvinces.id("konya"))
 	check("miting hamlesi yapildi (2 mana)", cm.mana_of(me) == 3 - GameRules.MITING_MANA_COST)
 	cm.mana[me] = 10
 	cm.inventories[me] = ["populizm", "mana_bonusu", "karalama"]
@@ -154,7 +154,7 @@ func _initialize() -> void:
 	cm.inventories[me] = ["karalama"]
 	cm._push_state({"type": "timer"})
 	await _frames(3)
-	scene._ask_propaganda_target(0, "ankara")
+	scene._ask_propaganda_target(0, TestProvinces.id("ankara"))
 	await _frames(5)
 	_shot("propaganda_menu")
 	var badges := 0

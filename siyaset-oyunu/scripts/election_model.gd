@@ -5,8 +5,7 @@ extends RefCounted
 ##
 ## MODEL
 ##   1. Her ilin bir SEÇMEN MERKEZİ var: 3 eksende ortalama eğilim
-##      (data/province_voters.json — oyun tasarımı soyutlamasıdır, gerçek
-##      anket verisi değildir; dengeyi ayarlamak için dosyayı düzenlemek yeter).
+##      (her oyunda ProvinceIdeology üretir; komşu bölgeler benzer düşünür).
 ##   2. Bir partinin o ildeki desteği, ideolojisinin seçmen merkezine
 ##      MESAFESİYLE düşer: exp(-d² / 2σ²). Seçmene yakın parti oy toplar;
 ##      aynı noktada duran iki parti oyu BÖLER — konumlanma stratejisi buradan
@@ -24,7 +23,6 @@ extends RefCounted
 ##      çıkaramaz (hiçbir parti geçemezse baraj uygulanmaz).
 ##   7. Vekiller her ilde, barajı geçenler arasında D'HONDT ile dağıtılır.
 
-const VOTERS_PATH := "res://data/province_voters.json"
 const AXES := ["economic", "social", "administrative"]
 
 const SUPPORT_SIGMA := 2.0
@@ -35,18 +33,21 @@ const PROVINCE_NOISE := 0.07
 const NATIONAL_SWING := 0.04
 
 static var _voters_cache: Dictionary = {}
+static var _voters_cache_seed: int = -1
 
+## Oyun kurulmamışken (menü, testler) kullanılan ÖRNEK il görüşleri: o anki
+## haritanın bölgeleri için sabit tohumla üretilir. Oyunda asıl görüşler
+## CardManager.province_ideology'dedir.
 static func load_province_voters() -> Dictionary:
-	if not _voters_cache.is_empty():
-		return _voters_cache
-	if not FileAccess.file_exists(VOTERS_PATH):
-		push_warning("%s bulunamadı — tüm iller merkezde (0,0,0) varsayılacak." % VOTERS_PATH)
+	var map = Engine.get_main_loop().root.get_node_or_null("GameMap") if Engine.get_main_loop() is SceneTree else null
+	if map == null:
 		return {}
-	var parsed = JSON.parse_string(FileAccess.get_file_as_string(VOTERS_PATH))
-	if parsed is Dictionary:
-		_voters_cache = parsed
-	else:
-		push_warning("%s okunamadı." % VOTERS_PATH)
+	if _voters_cache_seed == map.seed_value() and not _voters_cache.is_empty():
+		return _voters_cache
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1950
+	_voters_cache = ProvinceIdeology.generate(rng, map.province_ids())
+	_voters_cache_seed = map.seed_value()
 	return _voters_cache
 
 static func distance(a: Dictionary, b: Dictionary) -> float:

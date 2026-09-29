@@ -1,135 +1,270 @@
 extends Node2D
-## PIXEL-ART harita: artık vektör SVG/poligon YOK. Türkiye, elle çizilmiş
-## düşük çözünürlüklü (data/province_pixel_map.json'daki "width"x"height",
-## bkz. tools/pixel_art_province_colors.csv ile üretilen renk paleti) bir
-## piksel ızgarası olarak temsil ediliyor: her piksel hangi ile aitse o ilin
-## indeksini tutuyor (-1 = deniz/il dışı). Arka plan görseli
-## (assets/maps/turkey_map_pixelart.png) NEAREST filtre ile büyütülüyor ki
-## piksel blokları netliğini korusun, bulanıklaşmasın.
+## ALTIGEN HARİTA — vektörel, düz (flat) stil. Veri GameMap'ten gelir; harita
+## değişince (yeni oyun) kendini yeniden kurar.
 ##
-## Tıklama/hover algılama artık point-in-polygon DEĞİL, doğrudan ızgara
-## lookup (O(1)); il boyama da polygon triangulation DEĞİL, ızgaraya göre
-## piksel piksel yeniden boyanan bir ImageTexture (bkz. province_overlay.gd).
+## ÇİZİM MALİYETİ: yüzlerce altıgen tek tek draw_polygon ile çizilmez (web'de
+## çağrı başına maliyet yüksek). Kara altıgenleri tek bir ArrayMesh (köşe
+## renkli), sınırlar ikinci bir ArrayMesh; renk değişince sadece renk dizisi
+## yeniden yazılır. Hover ve odak parıltısı küçük ek çizimlerdir.
+##
+## Arayüz eski piksel haritayla aynıdır (grid_width/grid_height × MAP_UNIT_SCALE
+## = harita boyutu, get_province_id_at, set_province_colors ...), böylece oyun
+## ekranı ve seçim gecesi değişmeden kullanır.
 
 signal province_clicked(province_id: String)
-signal province_hovered(province_id: String)  # "" = hover left every province
+signal province_hovered(province_id: String)  # "" = hiçbir il
 
-@export var pixel_map_path: String = "res://data/province_pixel_map.json"
-@export var pixel_texture_path: String = "res://assets/maps/turkey_map.png"
-## 1 piksel-ızgara hücresi = bu kadar "harita/local" birimi. Diğer tüm
-## bileşenler (seat_markers.gd'deki dot_radius/dot_spacing, game_screen.gd'deki
-## MAP_NATIVE_SIZE) bu birimle uyumlu olacak şekilde ayarlanmalı.
-const MAP_UNIT_SCALE := 4.0
+const MAP_UNIT_SCALE := 1.0
+## Altıgenler arası ince boşluk (1 = boşluk yok).
+const CELL_INSET := 0.93
+const LAND_COLOR := Color(0.27, 0.30, 0.40)
+const SEA_COLOR := Color(0.14, 0.17, 0.27, 0.55)
+const REGION_BORDER_COLOR := Color(0.94, 0.95, 0.98, 0.9)
+const REGION_BORDER_WIDTH := 1.7
+const COAST_COLOR := Color(0.62, 0.72, 0.92, 0.8)
+const COAST_WIDTH := 1.4
+const HOVER_COLOR := Color(1, 1, 1, 0.85)
 
 var grid_width: int = 0
 var grid_height: int = 0
-var ids: Array = []              # index -> province_id
-var _id_to_index: Dictionary = {}  # province_id -> index
-var _grid: PackedInt32Array = PackedInt32Array()  # index -> province index (-1 = deniz)
-var _centers: Dictionary = {}    # province_id -> Vector2 (harita/local birimi)
+var ids: Array = []
 
+var _colors: Dictionary = {}       # province_id -> Color
 var _hovered_id: String = ""
-
-@onready var background: Sprite2D = $Background
-@onready var overlay = $Overlay
+var _land_mesh: ArrayMesh = null
+var _border_mesh: ArrayMesh = null
+var _land_vertices := PackedVector2Array()
+var _land_vertex_region := PackedInt32Array()  # köşe -> bölge indeksi
+var _sea_mesh: ArrayMesh = null
+var _border_vertices := PackedVector2Array()
+var _border_colors := PackedColorArray()
+var _edges: Dictionary = {}        # province_id -> Array[[a, b]] (bölge dış sınırı)
+var _colors_dirty := true
+## Odak parıltısı: {"id", "color", "time", "duration", "icon"}; boşsa yok.
+var _pulse: Dictionary = {}
 
 func _ready() -> void:
-	_load_pixel_map()
-	_apply_background()
-	overlay.setup(self)
+	for child in get_children():
+		if child.name in ["Background", "Overlay"]:
+			child.queue_free()
+	GameMap.map_changed.connect(_rebuild)
+	_rebuild()
 	set_process_unhandled_input(true)
+	set_process(false)
 
-func _load_pixel_map() -> void:
-	if not FileAccess.file_exists(pixel_map_path):
-		push_warning("Pixel map data file not found: %s" % pixel_map_path)
+func _rebuild() -> void:
+	ids = GameMap.province_ids()
+	var size := GameMap.map_size()
+	grid_width = int(ceil(size.x))
+	grid_height = int(ceil(size.y))
+	_build_geometry()
+	_colors_dirty = true
+	queue_redraw()
+	var markers := get_node_or_null("SeatMarkers")
+	if markers != null and markers.has_method("clear_all"):
+		markers.clear_all()
+
+func _build_geometry() -> void:
+	_land_vertices = PackedVector2Array()
+	_land_vertex_region = PackedInt32Array()
+	_edges.clear()
+	var sea_vertices := PackedVector2Array()
+	var sea_colors := PackedColorArray()
+	_border_vertices = PackedVector2Array()
+	_border_colors = PackedColorArray()
+	for id in ids:
+		_edges[id] = []
+	for cell in GameMap.cells.size():
+		var region: int = GameMap.cells[cell]
+		var inner := GameMap.cell_corners(cell, CELL_INSET)
+		if region < 0:
+			var sea_center := GameMap.cell_center(cell)
+			for k in 6:
+				sea_vertices.append_array([sea_center, inner[k], inner[(k + 1) % 6]])
+				sea_colors.append_array([SEA_COLOR, SEA_COLOR, SEA_COLOR])
+			continue
+		var center := GameMap.cell_center(cell)
+		for k in 6:
+			_land_vertices.append_array([center, inner[k], inner[(k + 1) % 6]])
+			_land_vertex_region.append_array([region, region, region])
+		# Kenarlar: komşu başka bölgeyse bölge sınırı, denizse kıyı.
+		var outer := GameMap.cell_corners(cell, 1.0)
+		for k in 6:
+			var n := _neighbor_in_direction(cell, k)
+			var other: int = GameMap.cells[n] if n >= 0 else -1
+			if other == region:
+				continue
+			var a: Vector2 = outer[k]
+			var b: Vector2 = outer[(k + 1) % 6]
+			_edges[ids[region]].append([a, b])
+			if other >= 0 and other < region:
+				continue  # ortak sınırı bir kez çiz
+			var width := COAST_WIDTH if other < 0 else REGION_BORDER_WIDTH
+			var color := COAST_COLOR if other < 0 else REGION_BORDER_COLOR
+			_append_segment(a, b, width, color)
+	_land_mesh = ArrayMesh.new()
+	_border_mesh = ArrayMesh.new()
+	_sea_mesh = ArrayMesh.new()
+	if not sea_vertices.is_empty():
+		var sea_arrays := []
+		sea_arrays.resize(Mesh.ARRAY_MAX)
+		sea_arrays[Mesh.ARRAY_VERTEX] = sea_vertices
+		sea_arrays[Mesh.ARRAY_COLOR] = sea_colors
+		_sea_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, sea_arrays)
+	if not _border_vertices.is_empty():
+		var arrays := []
+		arrays.resize(Mesh.ARRAY_MAX)
+		arrays[Mesh.ARRAY_VERTEX] = _border_vertices
+		arrays[Mesh.ARRAY_COLOR] = _border_colors
+		_border_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+
+## Kenar k: köşe k ile k+1 arası; yönü 60k derece (0 = doğu, saat yönünde).
+func _neighbor_in_direction(cell: int, k: int) -> int:
+	var col := cell % GameMap.cols
+	var row := cell / GameMap.cols
+	var even := [Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 1), Vector2i(-1, 0), Vector2i(-1, -1), Vector2i(0, -1)]
+	var odd := [Vector2i(1, 0), Vector2i(1, 1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1), Vector2i(1, -1)]
+	var o: Vector2i = (odd if row % 2 == 1 else even)[k]
+	var c: int = col + o.x
+	var r: int = row + o.y
+	if c < 0 or r < 0 or c >= GameMap.cols or r >= GameMap.rows:
+		return -1
+	return r * GameMap.cols + c
+
+## (Packed diziler GDScript'te değerle geçer: parametreye eklemek kaybolur,
+## bu yüzden üye dizilere yazılır.)
+func _append_segment(a: Vector2, b: Vector2, width: float, color: Color) -> void:
+	var dir := (b - a).normalized()
+	var normal := Vector2(-dir.y, dir.x) * width * 0.5
+	# Uçları biraz uzat: köşelerde boşluk kalmasın.
+	var a2 := a - dir * width * 0.35
+	var b2 := b + dir * width * 0.35
+	_border_vertices.append_array([a2 + normal, b2 + normal, b2 - normal, a2 + normal, b2 - normal, a2 - normal])
+	for _i in 6:
+		_border_colors.append(color)
+
+func _update_land_colors() -> void:
+	_colors_dirty = false
+	if _land_vertices.is_empty():
 		return
-	var file := FileAccess.open(pixel_map_path, FileAccess.READ)
-	var parsed = JSON.parse_string(file.get_as_text())
-	if parsed == null:
-		push_warning("Pixel map data could not be parsed: %s" % pixel_map_path)
+	var palette: Array = []
+	for id in ids:
+		palette.append(_colors.get(id, LAND_COLOR))
+	var colors := PackedColorArray()
+	colors.resize(_land_vertices.size())
+	for i in _land_vertices.size():
+		colors[i] = palette[_land_vertex_region[i]]
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = _land_vertices
+	arrays[Mesh.ARRAY_COLOR] = colors
+	_land_mesh.clear_surfaces()
+	_land_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+
+func _draw() -> void:
+	if _colors_dirty:
+		_update_land_colors()
+	if _sea_mesh != null and _sea_mesh.get_surface_count() > 0:
+		draw_mesh(_sea_mesh, null)
+	if _land_mesh != null and _land_mesh.get_surface_count() > 0:
+		draw_mesh(_land_mesh, null)
+	if _border_mesh != null and _border_mesh.get_surface_count() > 0:
+		draw_mesh(_border_mesh, null)
+	if _hovered_id != "":
+		_draw_region_outline(_hovered_id, HOVER_COLOR, 1.8)
+	if not _pulse.is_empty():
+		_draw_pulse()
+
+func _draw_region_outline(province_id: String, color: Color, width: float) -> void:
+	for edge in _edges.get(province_id, []):
+		draw_line(edge[0], edge[1], color, width, true)
+
+# --- Odak parıltısı (olay logundaki 🎯 düğmesi) -----------------------------------
+
+## Bölgeyi duration saniye boyunca verilen renkte parlatır; icon (kısa metin/emoji)
+## bölgenin üstünde yükselir.
+func pulse_province(province_id: String, color: Color, icon: String = "", duration: float = 0.9) -> void:
+	if not GameMap.ids.has(province_id):
 		return
+	_pulse = {"id": province_id, "color": color, "time": 0.0, "duration": duration, "icon": icon}
+	set_process(true)
+	queue_redraw()
 
-	grid_width = int(parsed["width"])
-	grid_height = int(parsed["height"])
-	ids = parsed["ids"]
-	_id_to_index.clear()
-	for i in ids.size():
-		_id_to_index[ids[i]] = i
-
-	var raw_grid: Array = parsed["grid"]
-	_grid = PackedInt32Array()
-	_grid.resize(raw_grid.size())
-	for i in raw_grid.size():
-		_grid[i] = int(raw_grid[i])
-
-	var raw_centers: Dictionary = parsed["centers"]
-	_centers.clear()
-	for province_id in raw_centers.keys():
-		var c: Array = raw_centers[province_id]
-		# +0.5: piksel hücresinin KÖŞESİ değil MERKEZİ (dot layout/centroid
-		# hesapları için daha doğru).
-		_centers[province_id] = (Vector2(c[0], c[1]) + Vector2(0.5, 0.5)) * MAP_UNIT_SCALE
-
-func _apply_background() -> void:
-	if not background:
+func _process(delta: float) -> void:
+	if _pulse.is_empty():
+		set_process(false)
 		return
-	background.centered = false
-	background.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	background.texture = load(pixel_texture_path)
-	background.scale = Vector2(MAP_UNIT_SCALE, MAP_UNIT_SCALE)
+	_pulse["time"] = float(_pulse["time"]) + delta
+	if float(_pulse["time"]) >= float(_pulse["duration"]):
+		_pulse = {}
+		set_process(false)
+	queue_redraw()
+
+func _draw_pulse() -> void:
+	var t: float = clampf(float(_pulse["time"]) / float(_pulse["duration"]), 0.0, 1.0)
+	var glow: float = sin(t * PI * 3.0) * 0.5 + 0.5  # 1,5 nabız
+	var fade: float = 1.0 - smoothstep(0.75, 1.0, t)
+	var color: Color = _pulse["color"]
+	var id: String = _pulse["id"]
+	var fill := color
+	fill.a = 0.45 * glow * fade
+	for cell in GameMap.region_cells(id):
+		draw_colored_polygon(GameMap.cell_corners(cell, CELL_INSET), fill)
+	var outline := color.lightened(0.35)
+	outline.a = (0.55 + 0.45 * glow) * fade
+	_draw_region_outline(id, outline, 2.4 + 1.6 * glow)
+	var icon: String = _pulse["icon"]
+	if icon != "":
+		var font := ThemeDB.fallback_font
+		var font_size := 18
+		var rise := 14.0 * t
+		var pos := GameMap.center_of(id) - Vector2(font_size * 0.5, 6.0 + rise)
+		draw_string(font, pos, icon, HORIZONTAL_ALIGNMENT_CENTER, font_size, font_size, Color(1, 1, 1, fade))
+
+# --- Eski arayüz ----------------------------------------------------------------
 
 func get_province_centroid(province_id: String) -> Vector2:
-	return _centers.get(province_id, Vector2.ZERO)
+	return GameMap.center_of(province_id)
 
 func get_all_province_ids() -> Array:
 	return ids.duplicate()
 
-## local_pos: bu Node2D'nin (Map'in) local koordinat uzayında bir nokta.
 func get_province_id_at(local_pos: Vector2) -> String:
-	if grid_width <= 0 or grid_height <= 0:
-		return ""
-	var px := int(floor(local_pos.x / MAP_UNIT_SCALE))
-	var py := int(floor(local_pos.y / MAP_UNIT_SCALE))
-	if px < 0 or py < 0 or px >= grid_width or py >= grid_height:
-		return ""
-	var idx: int = _grid[py * grid_width + px]
-	if idx < 0 or idx >= ids.size():
-		return ""
-	return ids[idx]
+	return GameMap.province_at(local_pos)
 
 func _unhandled_input(event: InputEvent) -> void:
-	if ids.is_empty():
+	if ids.is_empty() or not is_visible_in_tree():
 		return
 	if event is InputEventMouseMotion:
-		var local := to_local(event.global_position)
-		var id := get_province_id_at(local)
+		var id := get_province_id_at(to_local(event.global_position))
 		if id != _hovered_id:
 			_hovered_id = id
 			province_hovered.emit(id)
+			queue_redraw()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		var local := to_local(event.global_position)
-		var id := get_province_id_at(local)
+		var id := get_province_id_at(to_local(event.global_position))
 		if id != "":
 			province_clicked.emit(id)
 
-## Paints a single province. Pass an alpha-0 color (or call clear) to unpaint it.
 func set_province_color(province_id: String, color: Color) -> void:
 	if color.a <= 0.0:
-		overlay.colors.erase(province_id)
+		_colors.erase(province_id)
 	else:
-		overlay.colors[province_id] = color
-	overlay.mark_dirty()
+		_colors[province_id] = color
+	_colors_dirty = true
+	queue_redraw()
 
-## Paints several provinces at once and redraws only once (performance).
 func set_province_colors(id_to_color: Dictionary) -> void:
 	for province_id in id_to_color.keys():
 		var color: Color = id_to_color[province_id]
 		if color.a <= 0.0:
-			overlay.colors.erase(province_id)
+			_colors.erase(province_id)
 		else:
-			overlay.colors[province_id] = color
-	overlay.mark_dirty()
+			_colors[province_id] = color
+	_colors_dirty = true
+	queue_redraw()
 
 func clear_overlay() -> void:
-	overlay.colors.clear()
-	overlay.mark_dirty()
+	_colors.clear()
+	_colors_dirty = true
+	queue_redraw()

@@ -56,8 +56,13 @@ signal opinion_changed
 signal opinion_event(text: String)
 ## Oyun bitti (bkz. final_ranking, game_end_reason).
 signal game_over
+## OLAY LOGU: yeni bir kayıt eklendi (bkz. event_log). Oyun ekranının sol
+## panelindeki log bunu dinler.
+signal event_logged(entry: Dictionary)
 
 const MAX_HAND_SIZE := 9
+## Olay logunda tutulan en fazla kayıt.
+const EVENT_LOG_LIMIT := 80
 const HEARTBEAT_INTERVAL := 5.0
 ## İl başına saklanan son olay sayısı (il detay panelinde gösterilir).
 const PROVINCE_EVENT_LIMIT := 6
@@ -147,6 +152,9 @@ var final_ranking: Array = []
 var game_end_reason: String = ""
 
 var state_version: int = 0
+## OLAY LOGU (her cihaz kendi tutar, ağda gitmez; sahne değişse de kalır):
+## Array[{"text", "peer_id", "province", "kind", "round"}]. En yeni sonda.
+var event_log: Array = []
 
 # Seçim hesabına giren iller ve koltuk sayıları (yetkili kaynak GameMap).
 var _province_ids: Array = []
@@ -163,6 +171,7 @@ var _event_message: String = ""
 var _rng := RandomNumberGenerator.new()
 
 func _ready() -> void:
+	call_deferred("_connect_log_sources")
 	_rng.randomize()
 	_load_province_seat_counts()
 
@@ -627,6 +636,37 @@ func miting_risk(peer_id: int, province_id: String) -> float:
 	var ideology: Dictionary = PartyManager.parties.get(peer_id, {}).get("ideology", IdeologyAxes.default_values())
 	return PublicOpinion.provocation_risk(ideology, province_balance(province_id), organization_level(province_id, peer_id))
 
+# --- Olay logu -----------------------------------------------------------------
+
+## Loga kayıt ekler. peer_id: hamleyi yapan parti (-1: sistem), province:
+## olayın geçtiği il ("" = yok), kind: olay türü (odak simgesi seçilir).
+func log_event(text: String, peer_id: int = -1, province: String = "", kind: String = "system") -> void:
+	if text.strip_edges() == "":
+		return
+	var entry := {"text": text, "peer_id": peer_id, "province": province, "kind": kind, "round": round_number}
+	event_log.append(entry)
+	while event_log.size() > EVENT_LOG_LIMIT:
+		event_log.pop_front()
+	event_logged.emit(entry)
+
+func clear_event_log() -> void:
+	event_log.clear()
+
+## Meclis sonuçları ve koalisyon olayları da loga düşer (GovernmentManager
+## CardManager'dan sonra yüklendiği için bağlantı ertelenir).
+func _connect_log_sources() -> void:
+	GovernmentManager.proposal_resolved.connect(func(_accepted: bool, kind: String, proposer: int):
+		log_event(GovernmentManager.last_resolution_reason, proposer, "", "vote_" + kind))
+	GovernmentManager.coalition_changed.connect(func(text: String):
+		log_event(text, -1, "", "coalition"))
+
+## Olay türünden log türü: kart oynandıysa kartın türü.
+static func _log_kind(event: Dictionary) -> String:
+	var type := String(event.get("type", ""))
+	if type == "played":
+		return String(event.get("card", "played"))
+	return type
+
 # --- Oyun başlangıcı --------------------------------------------------------
 
 ## Sadece host çağırır (Parti Kurulum bitip GameScreen'e geçilirken): tüm oyun
@@ -636,6 +676,7 @@ func init_game() -> void:
 	if not _is_authority():
 		return
 	inventories.clear()
+	event_log.clear()
 	mana = {}
 	for peer_id in MultiplayerManager.players.keys():
 		inventories[peer_id] = []
@@ -682,6 +723,7 @@ func init_game() -> void:
 ## Oyundan ayrılınca YEREL oyun durumunu temizler (ağ yayını yok).
 func abandon_game() -> void:
 	inventories = {}
+	event_log = []
 	turn_order = []
 	current_turn_index = 0
 	round_number = 1
@@ -1065,7 +1107,7 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 	var notes := ""
 	if passed:
 		notes += " %s +%d puan." % [_party_name(proposer), law_pass_score(proposer_in_gov)]
-	_push_state({"type": "opinion", "message": "%s %s — %s bu görüşe yakın illerde güçlendi%s. Partisi %s yönüne kaydı.%s" % [
+	_push_state({"type": "opinion", "peer_id": proposer, "message": "%s %s — %s bu görüşe yakın illerde güçlendi%s. Partisi %s yönüne kaydı.%s" % [
 		law["title"], "KABUL EDİLDİ" if passed else "reddedildi", _party_name(proposer),
 		" (2 kat)" if passed else "", law["side"], notes]})
 
@@ -1674,8 +1716,16 @@ func _emit_post_event(event: Dictionary) -> void:
 		"played":
 			if bool(event.get("seats_changed", false)):
 				seats_changed.emit()
+	if type == "full" and round_number == 1 and last_election_round == 0:
+		event_log.clear()  # yeni oyun (istemci tarafı)
 	if event.has("message"):
 		opinion_event.emit(str(event["message"]))
+		log_event(str(event["message"]), int(event.get("peer_id", -1)), String(event.get("province", "")), _log_kind(event))
+	match type:
+		"round":
+			log_event("%s başladı." % GameRules.period_label(round_number), -1, "", "round")
+		"election":
+			log_event("%d genel seçimi yapıldı." % GameRules.election_year(last_election_round), -1, "", "election")
 
 @rpc("authority", "reliable")
 func _receive_state(state: Dictionary, event: Dictionary) -> void:

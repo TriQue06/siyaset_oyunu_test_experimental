@@ -61,4 +61,17 @@ func _initialize() -> void:
 	if DisplayServer.get_name() != "headless":
 		root.get_texture().get_image().save_png("%s/midgame.png" % OS.get_user_data_dir())
 		print("screenshot: midgame")
+		# Olay logundaki odak düğmesi: ili olan son kaydı haritada göster.
+
+		var focus_entry := {}
+		for entry in root.get_node("CardManager").event_log:
+			if String(entry.get("province", "")) != "":
+				focus_entry = entry
+		if not focus_entry.is_empty():
+			scene._focus_log_entry(focus_entry)
+			await create_timer(0.75).timeout
+			root.get_texture().get_image().save_png("%s/midgame_focus.png" % OS.get_user_data_dir())
+			print("screenshot: midgame_focus -> %s" % focus_entry["text"])
+			await create_timer(1.0).timeout
+			print("odak sonrasi harita olcegi geri dondu: %s" % str(scene.map_holder.scale.is_equal_approx(Vector2(scene._map_fit_scale, scene._map_fit_scale))))
 	quit()

@@ -181,8 +181,8 @@ func _draw_region_outline(province_id: String, color: Color, width: float) -> vo
 
 # --- Odak parıltısı (olay logundaki 🎯 düğmesi) -----------------------------------
 
-## Bölgeyi duration saniye boyunca verilen renkte parlatır; icon (kısa metin/emoji)
-## bölgenin üstünde yükselir.
+## Bölgeyi duration saniye boyunca verilen renkte parlatır; icon (bkz.
+## _draw_micro_icon) bölgenin üstünde yükselir.
 func pulse_province(province_id: String, color: Color, icon: String = "", duration: float = 0.9) -> void:
 	if not GameMap.ids.has(province_id):
 		return
@@ -215,11 +215,40 @@ func _draw_pulse() -> void:
 	_draw_region_outline(id, outline, 2.4 + 1.6 * glow)
 	var icon: String = _pulse["icon"]
 	if icon != "":
-		var font := ThemeDB.fallback_font
-		var font_size := 18
-		var rise := 14.0 * t
-		var pos := GameMap.center_of(id) - Vector2(font_size * 0.5, 6.0 + rise)
-		draw_string(font, pos, icon, HORIZONTAL_ALIGNMENT_CENTER, font_size, font_size, Color(1, 1, 1, fade))
+		var rise := 10.0 * smoothstep(0.0, 0.6, t)
+		var pos := GameMap.center_of(id) - Vector2(0.0, 12.0 + rise)
+		_draw_micro_icon(icon, pos, color, fade)
+
+## Olay türüne göre küçük vektör simge (yazı tipi emojisine güvenmez):
+## mic 🎤 miting, megaphone 📢 karalama, tape 📼 kaset, factory 🏭 yatırım,
+## flag teşkilat, pin diğerleri.
+func _draw_micro_icon(icon: String, pos: Vector2, color: Color, alpha: float) -> void:
+	var bg := Color(UiTheme.INK, 0.85 * alpha)
+	var fg := Color(1, 1, 1, alpha)
+	draw_circle(pos, 9.0, bg)
+	draw_arc(pos, 9.0, 0.0, TAU, 24, Color(color.lightened(0.3), alpha), 1.5, true)
+	match icon:
+		"mic":
+			draw_rect(Rect2(pos + Vector2(-2.0, -6.0), Vector2(4.0, 7.0)), fg)
+			draw_arc(pos + Vector2(0, -1.0), 4.0, 0.0, PI, 10, fg, 1.2, true)
+			draw_line(pos + Vector2(0, 3.0), pos + Vector2(0, 6.0), fg, 1.2)
+			draw_line(pos + Vector2(-3, 6.0), pos + Vector2(3, 6.0), fg, 1.2)
+		"megaphone":
+			draw_colored_polygon(PackedVector2Array([pos + Vector2(-5, -2), pos + Vector2(4, -6), pos + Vector2(4, 6), pos + Vector2(-5, 2)]), fg)
+			draw_rect(Rect2(pos + Vector2(-7, -2), Vector2(2, 4)), fg)
+		"tape":
+			draw_rect(Rect2(pos + Vector2(-6, -4), Vector2(12, 8)), fg, false, 1.2)
+			draw_circle(pos + Vector2(-2.5, 0), 1.6, fg)
+			draw_circle(pos + Vector2(2.5, 0), 1.6, fg)
+		"factory":
+			draw_colored_polygon(PackedVector2Array([pos + Vector2(-6, 6), pos + Vector2(-6, -1), pos + Vector2(-2, 1),
+				pos + Vector2(-2, -1), pos + Vector2(2, 1), pos + Vector2(2, -6), pos + Vector2(5, -6), pos + Vector2(5, 6)]), fg)
+		"flag":
+			draw_line(pos + Vector2(-4, -6), pos + Vector2(-4, 6), fg, 1.4)
+			draw_colored_polygon(PackedVector2Array([pos + Vector2(-4, -6), pos + Vector2(5, -3), pos + Vector2(-4, 0)]), fg)
+		_:
+			draw_circle(pos + Vector2(0, -1.5), 3.5, fg)
+			draw_colored_polygon(PackedVector2Array([pos + Vector2(-3, 0), pos + Vector2(3, 0), pos + Vector2(0, 6)]), fg)
 
 # --- Eski arayüz ----------------------------------------------------------------
 

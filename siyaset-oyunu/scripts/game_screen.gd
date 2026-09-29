@@ -85,6 +85,10 @@ enum MapLayer { SEATS, ORGANIZATION, STRENGTH }
 const MAP_LAYER_TITLES := ["Vekiller", "Teşkilat", "Güç"]
 const MAP_UNKNOWN_COLOR := Color(0.62, 0.62, 0.64)
 const MAP_SLIDE_DURATION := 0.38
+## Olay logundan odaklanma: yakınlaşma, bekleme (parıltı) ve dönüş süreleri.
+const FOCUS_MOVE := 0.3
+const FOCUS_HOLD := 0.9
+const FOCUS_ZOOM := 2.2
 ## Güç haritasında bu kadar il puanı en koyu renge denk gelir.
 const STRENGTH_STOPS := [Color(0.42, 0.04, 0.05), Color(0.88, 0.2, 0.14), Color(0.96, 0.84, 0.24), Color(0.36, 0.76, 0.3), Color(0.04, 0.36, 0.13)]
 const MAP_BLANK_COLOR := Color(0.97, 0.97, 0.95)
@@ -166,8 +170,10 @@ var _layer_bar: HBoxContainer
 var _layer_buttons: Array = []
 var _layer_legend: Control
 var _game_over_overlay: Control
-## Ekranın üstünde kısa süre görünen bilgi yazısı (teklif sonucu, yeni tur…).
-var _toast: Label
+## Sol paneldeki canlı olay logu ve harita odak animasyonu.
+var _event_log: EventLogPanel
+var _focus_tween: Tween
+var _map_fit_scale: float = 1.0
 ## Sayaç yazıları sadece gösterilen saniye değişince yenilensin diye.
 var _last_countdown_key: int = -1
 ## Sağ sütundaki oyuncu kartlarının o anki yüksekliği (sütuna sığacak kadar).
@@ -279,8 +285,6 @@ func _ready() -> void:
 	CardManager.game_over.connect(_on_game_over)
 	CardManager.seats_changed.connect(_on_seats_changed)
 	GovernmentManager.proposal_resolved.connect(_on_proposal_resolved)
-	CardManager.opinion_event.connect(_show_toast)
-	GovernmentManager.coalition_changed.connect(_show_toast)
 	CardManager.opinion_changed.connect(_on_opinion_changed)
 
 	UiSkin.skin_panel(left_panel, UiSkin.PANEL_DARK)
@@ -309,7 +313,7 @@ func _ready() -> void:
 	# Panel olduğu için genişlik çapalarla sabit; burada bir şey zorlamıyoruz.
 	left_panel.custom_minimum_size.x = 0.0
 	_build_waiting_overlay()
-	_build_toast()
+	_build_event_log()
 	_build_target_hint()
 	_build_card_info()
 	_build_action_buttons()
@@ -400,7 +404,9 @@ func _apply_layout() -> void:
 	# (grid_width/height * MAP_UNIT_SCALE), sabit değildir.
 	var map_native_size: Vector2 = Vector2(map_holder.grid_width, map_holder.grid_height) * map_holder.MAP_UNIT_SCALE
 	var fit_scale: float = minf(available_width / map_native_size.x, map_area_height / map_native_size.y) * MAP_FILL_RATIO
-	map_holder.scale = Vector2(fit_scale, fit_scale)
+	_map_fit_scale = fit_scale
+	if _focus_tween == null or not _focus_tween.is_running():
+		map_holder.scale = Vector2(fit_scale, fit_scale)
 	var map_position := Vector2(
 		LEFT_PANEL_WIDTH + available_width * 0.5 - map_native_size.x * 0.5 * fit_scale,
 		map_area_height * 0.5 - map_native_size.y * 0.5 * fit_scale
@@ -409,7 +415,7 @@ func _apply_layout() -> void:
 	_ensure_map_clip()
 	_map_clip.position = map_position
 	_map_clip.size = map_native_size * fit_scale
-	if _map_slide_tween == null or not _map_slide_tween.is_running():
+	if (_map_slide_tween == null or not _map_slide_tween.is_running()) and (_focus_tween == null or not _focus_tween.is_running()):
 		map_holder.position = Vector2.ZERO
 	_place_layer_bar()
 
@@ -456,7 +462,6 @@ func _on_round_advanced() -> void:
 	_refresh_game_settings_label()
 	_refresh_score_panel()
 	_refresh_government_panel()
-	_show_toast("%s başladı" % GameRules.period_label(CardManager.round_number))
 
 func _on_game_over() -> void:
 	_refresh_score_panel()
@@ -466,38 +471,65 @@ func _on_game_over() -> void:
 	add_child(_game_over_overlay)
 
 func _on_proposal_resolved(_accepted: bool, _kind: String, _proposer_id: int) -> void:
-	if GovernmentManager.last_resolution_reason != "":
-		_show_toast(GovernmentManager.last_resolution_reason)
+	pass  # sonuç metni olay loguna CardManager üzerinden düşer
 
-func _build_toast() -> void:
-	_toast = Label.new()
-	# Uyarı yazısı ORTA SÜTUNDA kalır: eskiden ekranın ortasından iki yana
-	# büyüdüğü için uzun mesajlar sol paneldeki tarihin ve sağdaki Menü
-	# butonunun üstüne biniyordu.
-	_toast.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	_toast.offset_left = LEFT_PANEL_WIDTH + 16.0
-	_toast.offset_right = -(RIGHT_COLUMN_WIDTH + 16.0)
-	_toast.offset_top = 16.0
-	_toast.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_toast.add_theme_font_override("font", UiTheme.mono())
-	_toast.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
-	_toast.add_theme_color_override("font_color", UiTheme.GOLD)
-	_toast.add_theme_color_override("font_outline_color", UiTheme.INK)
-	_toast.add_theme_constant_override("outline_size", 6)
-	_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_toast.z_index = 110
-	_toast.modulate.a = 0.0
-	add_child(_toast)
+## OLAY LOGU: sol panelde hükümet bilgisi ile sıra göstergesi arasındaki boşluk.
+## (Eski üst bant yazısı kaldırıldı; her olay ve uyarı buraya düşer.)
+func _build_event_log() -> void:
+	_event_log = EventLogPanel.new()
+	_event_log.name = "EventLog"
+	_event_log.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var spacer := left_panel.get_node_or_null("LeftMargin/LeftVBox/TurnSpacer")
+	if spacer != null:
+		spacer.get_parent().add_child(_event_log)
+		spacer.get_parent().move_child(_event_log, spacer.get_index())
+		spacer.hide()
+	else:
+		add_child(_event_log)
+	_event_log.focus_requested.connect(_focus_log_entry)
 
+## Oyuncuya kişisel uyarı/ipucu: log'a sistem satırı olarak düşer.
 func _show_toast(text: String) -> void:
-	if _toast == null:
+	CardManager.log_event(text, -1, "", "hint")
+
+## Log satırındaki odak düğmesi: harita ile yakınlaşır (FOCUS_MOVE), bölge
+## hamleyi yapanın renginde parlar (FOCUS_HOLD), sonra harita eski yerine döner.
+func _focus_log_entry(entry: Dictionary) -> void:
+	var province_id := String(entry.get("province", ""))
+	if province_id == "" or _map_clip == null or _layer_switching:
 		return
-	_toast.text = text
-	var tw := create_tween()
-	tw.tween_property(_toast, "modulate:a", 1.0, 0.2)
-	tw.tween_interval(2.5)
-	tw.tween_property(_toast, "modulate:a", 0.0, 0.4)
+	if _focus_tween != null and _focus_tween.is_running():
+		_focus_tween.kill()
+	var base_scale := _map_fit_scale
+	var zoom := base_scale * FOCUS_ZOOM
+	var target := _map_clip.size * 0.5 - GameMap.center_of(province_id) * zoom
+	# Harita kutusunun dışına fazla taşmasın.
+	var min_pos := _map_clip.size - GameMap.map_size() * zoom
+	target = Vector2(clampf(target.x, min_pos.x, 0.0), clampf(target.y, min_pos.y, 0.0))
+	var color: Color = PartyManager.parties.get(int(entry.get("peer_id", -1)), {}).get("bg_color", UiTheme.GOLD)
+	_focus_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	_focus_tween.set_parallel(true)
+	_focus_tween.tween_property(map_holder, "scale", Vector2(zoom, zoom), FOCUS_MOVE)
+	_focus_tween.tween_property(map_holder, "position", target, FOCUS_MOVE)
+	_focus_tween.chain().tween_callback(func():
+		map_holder.pulse_province(province_id, color, _focus_icon(String(entry.get("kind", ""))), FOCUS_HOLD))
+	_focus_tween.chain().tween_interval(FOCUS_HOLD)
+	_focus_tween.chain().tween_property(map_holder, "scale", Vector2(base_scale, base_scale), FOCUS_MOVE)
+	_focus_tween.parallel().tween_property(map_holder, "position", Vector2.ZERO, FOCUS_MOVE)
+
+static func _focus_icon(kind: String) -> String:
+	match kind:
+		"miting":
+			return "mic"
+		"karalama":
+			return "megaphone"
+		"kaset":
+			return "tape"
+		"invest":
+			return "factory"
+		"organization":
+			return "flag"
+	return "pin"
 
 ## Tur / kurma / oylama sayaçları. Yazılar sadece gösterilen saniye değişince
 ## yenilenir (her karede label yeniden yazılmasın).

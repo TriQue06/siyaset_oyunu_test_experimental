@@ -2325,18 +2325,23 @@ func _build_agenda_banner() -> void:
 	var style := UiSkin.color_box(UiTheme.GOLD.darkened(0.45), UiSkin.BUTTON_TINT_NORMAL)
 	style.set_content_margin_all(UiTheme.PAD_S)
 	_agenda_banner.add_theme_stylebox_override("panel", style)
-	_agenda_banner.z_index = 6
 	_agenda_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_agenda_label = Label.new()
 	_agenda_label.add_theme_font_override("font", UiTheme.mono())
 	_agenda_label.add_theme_font_size_override("font_size", UiTheme.FS_TINY)
 	_agenda_label.add_theme_color_override("font_color", UiTheme.TEXT)
-	_agenda_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_agenda_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_agenda_banner.add_child(_agenda_label)
-	add_child(_agenda_banner)
+	# Haritayı kapatmasın: sol panelde tarih/baraj levhasının hemen altında durur.
+	var plate := get_node_or_null("%InfoPlate")
+	if plate != null:
+		plate.get_parent().add_child(_agenda_banner)
+		plate.get_parent().move_child(_agenda_banner, plate.get_index() + 1)
+	else:
+		add_child(_agenda_banner)
 	_refresh_agenda_banner()
 
-## Gündem varken haritanın sağ üstünde konu, etkisi ve kalan tur yazar.
+## Gündem varken sol panelde konu ve etkisi yazar.
 func _refresh_agenda_banner() -> void:
 	if _agenda_banner == null:
 		return
@@ -2345,11 +2350,8 @@ func _refresh_agenda_banner() -> void:
 	if current == "":
 		return
 	var data := CardPresets.agenda_data(current)
-	_agenda_label.text = "GÜNDEM %d/%d  ·  %s\n%s" % [int(CardManager.agenda.get("index", 1)), GameRules.AGENDA_ROUNDS,
-		data["title"], CardPresets.agenda_effect_text(current)]
-	_agenda_banner.reset_size()
-	var viewport_size := get_viewport_rect().size
-	_agenda_banner.position = Vector2(viewport_size.x - RIGHT_COLUMN_WIDTH - _agenda_banner.size.x - 24.0, 16.0)
+	# Kısa tut: sol panelde olay loguna yer kalsın.
+	_agenda_label.text = "GÜNDEM: %s\nYasa: sadece %s ekseni" % [data["title"], data["axis_title"]]
 
 func _build_law_designer() -> void:
 	_law_designer = PanelContainer.new()

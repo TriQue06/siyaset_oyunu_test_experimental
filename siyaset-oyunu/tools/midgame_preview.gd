@@ -61,6 +61,15 @@ func _initialize() -> void:
 	if DisplayServer.get_name() != "headless":
 		root.get_texture().get_image().save_png("%s/midgame.png" % OS.get_user_data_dir())
 		print("screenshot: midgame")
+		var cmx = root.get_node("CardManager")
+		var saved_agenda: Dictionary = cmx.agenda
+		cmx.agenda = {"type": "gundem_social_p", "until": cmx.round_number + 1, "index": 1}
+		scene._refresh_agenda_banner()
+		await create_timer(0.2).timeout
+		root.get_texture().get_image().save_png("%s/midgame_agenda.png" % OS.get_user_data_dir())
+		print("screenshot: midgame_agenda")
+		cmx.agenda = saved_agenda
+		scene._refresh_agenda_banner()
 		scene._set_map_layer(1, false)
 		await create_timer(0.3).timeout
 		root.get_texture().get_image().save_png("%s/midgame_org.png" % OS.get_user_data_dir())

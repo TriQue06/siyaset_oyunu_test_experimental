@@ -648,8 +648,12 @@ func _resolve_proposal() -> void:
 		var votes_copy := votes.duplicate()
 		_clear_proposal()
 		_set_phase(Phase.GOVERNING if has_government() else Phase.IDLE)
-		last_resolution_reason = "%s %s (EVET %d – HAYIR %d)." % [
-			CardPresets.card_title(law_type), "kabul edildi" if passed else "reddedildi", totals.x, totals.y]
+		# Yasa geçiş oranı anayasayla değiştiyse gereken oran da yazsın: yoksa
+		# "EVET 251 – HAYIR 249 reddedildi" gibi sonuçlar anlaşılmaz görünür.
+		var law_rule := "" if MultiplayerManager.law_pass_percent == MultiplayerManager.DEFAULT_LAW_PASS \
+			else ", gereken EVET payı %%%d üstü" % MultiplayerManager.law_pass_percent
+		last_resolution_reason = "%s %s (EVET %d – HAYIR %d%s)." % [
+			CardPresets.card_title(law_type), "kabul edildi" if passed else "reddedildi", totals.x, totals.y, law_rule]
 		if passed:
 			# Kabul edilen yasa getirene ciddi puan yazar; hükümetinki daha çok.
 			var points: int = CardManager.law_pass_score(gov_ids.has(proposer))

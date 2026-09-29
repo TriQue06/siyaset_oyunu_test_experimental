@@ -156,6 +156,7 @@ func _initialize() -> void:
 	mm.reset_constitution_rules()
 	check("varsayilan: D'Hondt, yasa %50, anayasa %67, referandum %50", ElectionModel.seat_method == "dhondt" 		and mm.law_pass_percent == 50 and mm.constitution_percent == 67 and mm.referendum_percent == 50)
 	check("yasa %50 = basit cogunluk", gm.law_passes(51, 49) and not gm.law_passes(50, 50))
+	check("varsayilanda 251-249 gecer", gm.law_passes(251, 249))
 	mm.law_pass_percent = 67
 	check("yasa %67: 2/3 EVET ister", not gm.law_passes(60, 40) and gm.law_passes(70, 30))
 	mm.law_pass_percent = 33

@@ -8,6 +8,6 @@ script = ExtResource("1")
 
 [node name="SeatMarkers" type="Node2D" parent="."]
 script = ExtResource("3")
-dot_radius = 2.2
-dot_outline_width = 0.8
-dot_spacing = 1.1
+dot_radius = 3.3
+dot_outline_width = 1.2
+dot_spacing = 1.65

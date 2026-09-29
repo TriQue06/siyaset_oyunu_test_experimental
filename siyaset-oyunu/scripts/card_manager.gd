@@ -729,7 +729,13 @@ func init_game() -> void:
 	local_support = {}
 	province_events = {}
 	# YENİ ÜLKE: her oyunda rastgele altıgen harita (herkese tam durumla gider).
-	GameMap.generate_new(fixed_map_seed if fixed_map_seed != 0 else _rng.randi())
+	# Lobide tohum girildiyse o ülke, yoksa rastgele (1..999 999 999) bir tohum.
+	var map_seed := fixed_map_seed
+	if map_seed == 0 and MultiplayerManager.map_seed != "":
+		map_seed = int(MultiplayerManager.map_seed)
+	if map_seed == 0:
+		map_seed = _rng.randi_range(1, 999999999)
+	GameMap.generate_new(map_seed)
 	_load_province_seat_counts()
 	province_ideology = ProvinceIdeology.generate(_rng, _province_ids)
 	_province_origin = province_ideology.duplicate(true)

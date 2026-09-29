@@ -102,6 +102,10 @@ var axis_sharpness_start: float = AXIS_SHARPNESS_START_DEFAULT
 var axis_sharpness_increment: float = AXIS_SHARPNESS_INCREMENT_DEFAULT
 var axis_sharpness_max_enabled: bool = AXIS_SHARPNESS_MAX_ENABLED_DEFAULT
 var axis_sharpness_max_value: float = AXIS_SHARPNESS_MAX_VALUE_DEFAULT
+## HARİTA TOHUMU (lobi ayarı): "" = her oyunda rastgele. Aynı tohum her zaman
+## aynı ülkeyi üretir. Oyundaki tohum ESC menüsünde görünür ve kopyalanabilir.
+const MAP_SEED_MAX_DIGITS := 9
+var map_seed: String = ""
 
 var _pending_code: String = ""
 var _has_synced_once: bool = false
@@ -207,6 +211,7 @@ func start_offline(player_name: String) -> void:
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
 	is_host = true
 	room_code = ""
+	map_seed = ""
 	election_threshold = THRESHOLD_DEFAULT
 	election_interval = GameRules.DEFAULT_ELECTION_INTERVAL
 	election_count = GameRules.DEFAULT_ELECTION_COUNT
@@ -230,6 +235,7 @@ func create_room(player_name: String) -> void:
 	is_host = true
 	room_code = ""
 	_closing = false
+	map_seed = ""
 	election_threshold = THRESHOLD_DEFAULT
 	election_interval = GameRules.DEFAULT_ELECTION_INTERVAL
 	election_count = GameRules.DEFAULT_ELECTION_COUNT
@@ -441,6 +447,7 @@ func _notify_kicked() -> void:
 func _broadcast_player_list() -> void:
 	if room_code != "" and multiplayer.multiplayer_peer != null:
 		_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+		_sync_map_seed.rpc(map_seed)
 	player_list_updated.emit()
 
 @rpc("any_peer", "reliable")
@@ -467,6 +474,7 @@ func transfer_ownership(new_owner_id: int) -> void:
 	if is_host:
 		owner_id = new_owner_id
 		_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+		_sync_map_seed.rpc(map_seed)
 		player_list_updated.emit()
 	else:
 		_request_transfer_ownership.rpc_id(1, new_owner_id)
@@ -584,6 +592,7 @@ func _reset_state() -> void:
 	is_host = false
 	offline_mode = false
 	owner_id = 1
+	map_seed = ""
 	election_threshold = THRESHOLD_DEFAULT
 	election_interval = GameRules.DEFAULT_ELECTION_INTERVAL
 	election_count = GameRules.DEFAULT_ELECTION_COUNT
@@ -640,6 +649,7 @@ func _on_peer_disconnected(id: int) -> void:
 		# Host olmayan lobi sahibi ayrıldı: oda kapanmaz, sahiplik host'a geçer.
 		owner_id = multiplayer.get_unique_id()
 	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+	_sync_map_seed.rpc(map_seed)
 	player_list_updated.emit()
 	if not was_player:
 		return
@@ -719,6 +729,7 @@ func _request_join(code: String, player_name: String, signature: String) -> void
 		players.erase(bot_ids().back())
 	players[sender_id] = {"name": player_name}
 	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+	_sync_map_seed.rpc(map_seed)
 	player_list_updated.emit()
 
 @rpc("authority", "reliable")
@@ -753,6 +764,7 @@ func _request_transfer_ownership(new_owner_id: int) -> void:
 		return
 	owner_id = new_owner_id
 	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+	_sync_map_seed.rpc(map_seed)
 	player_list_updated.emit()
 
 ## Host-olmayan mevcut sahip, baraj değiştirmek istediğinde host'a istek yollar.
@@ -832,6 +844,40 @@ func _sync_settings(threshold: float, interval: int, count: int, axis_start: flo
 	axis_sharpness_increment = axis_increment
 	axis_sharpness_max_enabled = axis_max_enabled
 	axis_sharpness_max_value = axis_max_value
+	settings_updated.emit()
+
+## Harita tohumunu ayarlar (sadece rakam; boş = rastgele). Sadece lobi sahibi.
+func set_map_seed(text: String) -> void:
+	if not is_local_owner():
+		return
+	var clean := clean_map_seed(text)
+	if is_host:
+		map_seed = clean
+		if room_code != "":
+			_sync_map_seed.rpc(map_seed)
+		settings_updated.emit()
+	else:
+		_request_set_map_seed.rpc_id(1, clean)
+
+static func clean_map_seed(text: String) -> String:
+	var digits := ""
+	for ch in text.strip_edges():
+		if ch >= "0" and ch <= "9":
+			digits += ch
+	digits = digits.left(MAP_SEED_MAX_DIGITS)
+	return "" if digits == "" or int(digits) == 0 else str(int(digits))
+
+@rpc("any_peer", "reliable")
+func _request_set_map_seed(text: String) -> void:
+	if not is_host or multiplayer.get_remote_sender_id() != owner_id:
+		return
+	map_seed = clean_map_seed(text)
+	_sync_map_seed.rpc(map_seed)
+	settings_updated.emit()
+
+@rpc("authority", "reliable")
+func _sync_map_seed(value: String) -> void:
+	map_seed = value
 	settings_updated.emit()
 
 ## Host-olmayan mevcut sahip, oyunu başlatmak istediğinde host'a istek yollar.

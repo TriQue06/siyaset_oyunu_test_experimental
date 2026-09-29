@@ -15,8 +15,8 @@ signal province_clicked(province_id: String)
 signal province_hovered(province_id: String)  # "" = hiçbir il
 
 const MAP_UNIT_SCALE := 1.0
-## Altıgenler arası ince boşluk (1 = boşluk yok).
-const CELL_INSET := 0.93
+## 1 = altıgenler arası boşluk yok: sadece il sınırları görünür.
+const CELL_INSET := 1.0
 const LAND_COLOR := Color(0.27, 0.30, 0.40)
 const SEA_COLOR := Color(0.14, 0.17, 0.27, 0.55)
 const REGION_BORDER_COLOR := Color(0.94, 0.95, 0.98, 0.9)

@@ -80,6 +80,17 @@ func _initialize() -> void:
 	var cell: int = game_map.region_cells(probe)[0]
 	check("noktadan bolge bulunur", game_map.province_at(game_map.cell_center(cell)) == probe)
 
+	cm.fixed_map_seed = 0
+	mm.map_seed = mm.clean_map_seed(" 00123-45 ")
+	check("tohum temizlenir (sadece rakam)", mm.map_seed == "12345", mm.map_seed)
+	new_game({1: ideology(1.5, 1.5, 1.5), 2: ideology(-1.5, -1.5, -1.5)})
+	check("lobi tohumu oyunun haritasini belirler", game_map.seed_value() == 12345 		and str(game_map.data["cells"]) == str(HexGridGenerator.generate(12345)["cells"]))
+	mm.map_seed = ""
+	new_game({1: ideology(1.5, 1.5, 1.5), 2: ideology(-1.5, -1.5, -1.5)})
+	check("tohum bossa rastgele tohum atanir", game_map.seed_value() > 0 and game_map.seed_value() != 12345)
+	check("bos tohum temizlenince bos kalir", mm.clean_map_seed("abc") == "" and mm.clean_map_seed("0") == "")
+	cm.fixed_map_seed = 1950
+
 	print("")
 	print("=== 2) PARTI GORUSU DEGISIMININ BEDELI ===")
 	check("merkezde kaymak bedava", near(PublicOpinion.ideology_shift_national(0.0, 0.5), 0.0) \

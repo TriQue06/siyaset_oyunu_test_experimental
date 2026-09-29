@@ -26,6 +26,10 @@ const FPS_DEFAULT_INDEX := 4  # 144
 
 var _menu: Control
 var _leave_button: Button
+## Oyundaki haritanın tohumu: görülür ve tek tuşla kopyalanır.
+var _seed_row: HBoxContainer
+var _seed_label: Label
+var _seed_copy: Button
 var _leave_note: Label
 ## "Oyundan Ayrıl" iki adımlı: ilk basış onay ister.
 var _leave_armed: bool = false
@@ -156,6 +160,20 @@ func _build_menu() -> void:
 		close_menu()
 		open()
 	))
+	_seed_row = HBoxContainer.new()
+	_seed_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_seed_row.add_theme_constant_override("separation", 8)
+	_seed_label = Label.new()
+	_seed_label.add_theme_font_size_override("font_size", 16)
+	_seed_row.add_child(_seed_label)
+	_seed_copy = Button.new()
+	_seed_copy.text = "Kopyala"
+	_seed_copy.custom_minimum_size = Vector2(96, 36)
+	_seed_copy.pressed.connect(func():
+		DisplayServer.clipboard_set(str(GameMap.seed_value()))
+		_seed_copy.text = "Kopyalandı!")
+	_seed_row.add_child(_seed_copy)
+	box.add_child(_seed_row)
 	_leave_button = _menu_button("Oyundan Ayrıl", _on_leave_pressed)
 	box.add_child(_leave_button)
 
@@ -200,6 +218,10 @@ func open_menu() -> void:
 	_leave_button.visible = MultiplayerManager.room_code != "" or in_game_scene
 	_leave_button.text = "Oyundan Ayrıl"
 	_leave_note.text = ""
+	_seed_row.visible = scene_path in ["res://scenes/GameScreen.tscn", "res://scenes/GovernmentFormation.tscn",
+		"res://scenes/ElectionResults.tscn"]
+	_seed_label.text = "Harita tohumu: %d" % GameMap.seed_value()
+	_seed_copy.text = "Kopyala"
 	_menu.show()
 
 func close_menu() -> void:

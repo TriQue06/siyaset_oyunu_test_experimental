@@ -31,6 +31,7 @@ var count_minus: Button
 var count_plus: Button
 var game_length_summary: Label
 var threshold_slider: HSlider
+var map_seed_edit: LineEdit
 var threshold_value_label: Label
 var axis_start_slider: HSlider
 var axis_start_value_label: Label
@@ -128,6 +129,7 @@ func _refresh() -> void:
 		_close_settings_panel()
 
 	threshold_slider.editable = am_owner
+	map_seed_edit.editable = am_owner
 	for button in [interval_minus, interval_plus, count_minus, count_plus]:
 		button.disabled = not am_owner
 	axis_start_slider.editable = am_owner
@@ -288,6 +290,8 @@ class RobotIcon extends Control:
 		draw_rect(Rect2(c + Vector2(0.29, -0.06) * s, Vector2(0.07, 0.14) * s), color)
 
 func _refresh_settings_display() -> void:
+	if map_seed_edit != null and not map_seed_edit.has_focus():
+		map_seed_edit.text = MultiplayerManager.map_seed
 	var t := MultiplayerManager.election_threshold
 	var interval := MultiplayerManager.election_interval
 	var count := MultiplayerManager.election_count
@@ -374,11 +378,20 @@ func _build_settings_panel() -> void:
 	threshold_slider = HSlider.new()
 	election.add_child(threshold_slider)
 
+	var map_box := _section("HARİTA", "Aynı tohum her zaman aynı ülkeyi üretir. Boş bırakırsan her oyunda rastgele.")
+	map_seed_edit = LineEdit.new()
+	map_seed_edit.placeholder_text = "Rastgele"
+	map_seed_edit.max_length = MultiplayerManager.MAP_SEED_MAX_DIGITS
+	map_seed_edit.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_NUMBER
+	map_seed_edit.text_submitted.connect(func(text: String): MultiplayerManager.set_map_seed(text))
+	map_seed_edit.focus_exited.connect(func(): MultiplayerManager.set_map_seed(map_seed_edit.text))
+	map_box.add_child(map_seed_edit)
+
 	var axis := _section("GELİŞMİŞ · EKSEN KESKİNLİĞİ", "İller görüşüne en yakın partiye ne kadar yönelir.")
 	axis_start_value_label = _value_row(axis, "Başlangıç")
 	axis_start_slider = HSlider.new()
 	axis.add_child(axis_start_slider)
-	axis_increment_value_label = _value_row(axis, "Yıl başına artış")
+	axis_increment_value_label = _value_row(axis, "Tur başına artış")
 	axis_increment_slider = HSlider.new()
 	axis.add_child(axis_increment_slider)
 	var cap_row := HBoxContainer.new()

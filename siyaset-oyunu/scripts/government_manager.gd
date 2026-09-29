@@ -669,8 +669,9 @@ func _resolve_proposal() -> void:
 			MultiplayerManager.apply_constitution(payload)
 			# Takvim son seçimden itibaren yeni aralıkla işlesin.
 			CardManager.rebase_election_calendar()
-			last_resolution_reason += " Yeni baraj %%%s, seçimler %d yılda bir." % [
-				String.num(MultiplayerManager.election_threshold, 1), MultiplayerManager.election_interval]
+			last_resolution_reason += " Yeni baraj %%%s, seçimler %d yılda bir, sayım: %s." % [
+				String.num(MultiplayerManager.election_threshold, 1), MultiplayerManager.election_interval,
+				ElectionModel.method_title(MultiplayerManager.seat_method)]
 		_push_state()
 		if not _is_local_only():
 			_notify_resolved.rpc(const_passed, kind, proposer)

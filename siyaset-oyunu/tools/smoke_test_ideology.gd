@@ -147,6 +147,14 @@ func _initialize() -> void:
 
 	print("")
 	print("=== 5) ANAYASA VE REFERANDUM ===")
+	var votes3 := {1: 0.47, 2: 0.33, 3: 0.20}
+	check("D'Hondt", str(ElectionModel.dhondt(votes3, [1, 2, 3], 7)) == str({1: 4, 2: 2, 3: 1}))
+	check("Hare kotasi + en buyuk kalan", str(ElectionModel.hare(votes3, [1, 2, 3], 7)) == str({1: 3, 2: 2, 3: 2}))
+	check("kazanan hepsini alir", str(ElectionModel.winner_takes_all(votes3, [1, 2, 3], 7)) == str({1: 7, 2: 0, 3: 0}))
+	ElectionModel.seat_method = "wta"
+	check("wta'da ulusal liste D'Hondt kalir", str(ElectionModel.allocate(votes3, [1, 2, 3], 7, true)) == str({1: 4, 2: 2, 3: 1}))
+	mm.reset_seat_method()
+	check("varsayilan sayim D'Hondt", ElectionModel.seat_method == "dhondt")
 	check("yasa: basit cogunluk (251-249 gecer, 250-250 gecmez)", gm.law_passes(251, 249) and not gm.law_passes(250, 250))
 	new_game({1: ideology(1.5, 1.5, 1.5), 2: ideology(-1.5, -1.5, -1.5), 3: ideology(1.5, -1.5, 1.5)})
 	cm.last_seats = {1: 150, 2: 200, 3: 150}
@@ -155,7 +163,7 @@ func _initialize() -> void:
 	cm.last_election_round = 4
 	cm.current_turn_index = 0
 	check("anayasa %67, referandum esigi salt cogunluk", gm.constitution_threshold_seats() == 334 and gm.referendum_threshold_seats() == 251)
-	var change := {"threshold": 5.0, "interval": 3}
+	var change := {"threshold": 5.0, "interval": 3, "seat_method": "hare"}
 	cm._apply_constitution_proposal(1, change)
 	gm._apply_vote(2, gm.VOTE_NO)
 	gm._apply_vote(3, gm.VOTE_NO)
@@ -205,6 +213,7 @@ func _initialize() -> void:
 	cm.referendum["local"] = {}
 	cm._finish_round()
 	check("2. turun sonunda referandum sonuclanir", not cm.is_referendum_active())
+	check("referandumla sayim yontemi de degisir", mm.seat_method == "hare" and ElectionModel.seat_method == "hare")
 	check("halk kabul edince anayasa yururluge girer", is_equal_approx(mm.election_threshold, 5.0) and mm.election_interval == 3,
 		str(mm.election_threshold))
 	check("ertelenen secim referandumdan hemen sonra yapilir", cm.last_election_round == cm.round_number - 1,
@@ -229,6 +238,21 @@ func _initialize() -> void:
 	cm._finish_round()
 	cm._finish_round()
 	check("halk reddederse kurallar degismez", not cm.is_referendum_active() and is_equal_approx(mm.election_threshold, 0.0))
+	cm.law_rounds = {}
+	cm.referendum = {}
+	gm._clear_proposal()
+	gm._set_phase(gm.Phase.IDLE)  # önceki turlarda seçim/kurma açılmış olabilir
+	cm.last_seats = {1: 150, 2: 200, 3: 150}
+	cm.current_turn_index = 0
+	cm._apply_constitution_proposal(1, {"threshold": 0.0, "interval": 2, "seat_method": "wta"})
+	gm._apply_vote(2, gm.VOTE_YES)
+	gm._apply_vote(3, gm.VOTE_YES)
+	check("2/3 ile sayim 'kazanan hepsini alir' olur", mm.seat_method == "wta" and ElectionModel.seat_method == "wta", gm.last_resolution_reason)
+	cm.law_rounds = {}
+	cm._apply_constitution_proposal(1, {"threshold": 0.0, "interval": 2, "seat_method": "yok"})
+	check("gecersiz sayim yontemi reddedilir", gm.proposal_kind == "")
+	new_game({1: ideology(1.5, 1.5, 1.5), 2: ideology(-1.5, -1.5, -1.5)})
+	check("yeni oyunda sayim D'Hondt'a doner", mm.seat_method == "dhondt" and ElectionModel.seat_method == "dhondt")
 
 	print("")
 	print("=== 4) OLAY LOGU ===")

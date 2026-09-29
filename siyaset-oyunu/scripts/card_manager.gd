@@ -350,6 +350,8 @@ func propose_constitution(payload: Dictionary) -> void:
 func _apply_constitution_proposal(peer_id: int, payload: Dictionary) -> void:
 	if not can_propose_constitution(peer_id):
 		return
+	if payload.has("seat_method") and not ElectionModel.SEAT_METHODS.has(String(payload["seat_method"])):
+		return
 	_event_message = ""
 	if not GovernmentManager.submit_constitution(peer_id, payload):
 		return
@@ -554,7 +556,7 @@ func _noisy_poll(projection: Dictionary, error: float, seed_text: String, seat_c
 	if total > 0.0:
 		for peer_id in ids:
 			shares[peer_id] = float(shares[peer_id]) / total * 100.0
-	var alloc := ElectionModel.dhondt(shares, eligible, seat_count)
+	var alloc := ElectionModel.allocate(shares, eligible, seat_count)
 	var result := {}
 	for peer_id in ids:
 		result[peer_id] = {"percent": float(shares[peer_id]), "seats": int(alloc.get(peer_id, 0))}
@@ -609,7 +611,7 @@ func province_projection(province_id: String) -> Dictionary:
 	var local_mods: Dictionary = mods["local"]
 	var shares := ElectionModel.expected_shares(_ideologies(), province_center(province_id), current_axis_sharpness,
 		mods["national"], local_mods.get(province_id, {}), _expected_national(mods))
-	var alloc := ElectionModel.dhondt(shares, projected_eligible(mods), province_seat_count(province_id))
+	var alloc := ElectionModel.allocate(shares, projected_eligible(mods), province_seat_count(province_id))
 	var result := {}
 	for peer_id in turn_order:
 		result[peer_id] = {"percent": float(shares.get(peer_id, 0.0)), "seats": int(alloc.get(peer_id, 0))}
@@ -639,7 +641,7 @@ func projection_all(viewer: int = -1) -> Dictionary:
 			noisy = _noisy_poll(noisy, error, "%s:%d:%d" % [province_id, viewer, round_number], seat_count, eligible)
 			for peer_id in noisy.keys():
 				shares[peer_id] = float(noisy[peer_id]["percent"])
-		var alloc := ElectionModel.dhondt(shares, eligible, seat_count)
+		var alloc := ElectionModel.allocate(shares, eligible, seat_count)
 		var last_quotient := INF
 		for peer_id in turn_order:
 			var won := int(alloc.get(peer_id, 0))
@@ -763,6 +765,10 @@ func init_game() -> void:
 	_round_end_pending = false
 	final_election_pending = false
 	GovernmentManager.reset()
+	# Yeni oyun: sayım yöntemi D'Hondt'a döner.
+	MultiplayerManager.reset_seat_method()
+	if not _is_local_only():
+		MultiplayerManager._sync_seat_method.rpc(MultiplayerManager.seat_method)
 	_push_state({"type": "full"}, true)
 
 ## Oyundan ayrılınca YEREL oyun durumunu temizler (ağ yayını yok).
@@ -1476,8 +1482,9 @@ func _resolve_referendum() -> void:
 	if passed:
 		MultiplayerManager.apply_constitution(payload)
 		rebase_election_calendar()
-		text += " Yeni baraj %%%s, seçimler %d yılda bir." % [
-			String.num(MultiplayerManager.election_threshold, 1), MultiplayerManager.election_interval]
+		text += " Yeni baraj %%%s, seçimler %d yılda bir, sayım: %s." % [
+			String.num(MultiplayerManager.election_threshold, 1), MultiplayerManager.election_interval,
+			ElectionModel.method_title(MultiplayerManager.seat_method)]
 	_push_state({"type": "referendum_end", "peer_id": proposer, "message": text})
 
 # --- Siyasi kale -------------------------------------------------------------------

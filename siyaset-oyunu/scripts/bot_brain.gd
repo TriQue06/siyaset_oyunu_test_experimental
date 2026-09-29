@@ -664,6 +664,19 @@ static func _constitution_vote(bot: int) -> int:
 		score -= threshold_delta   # baraj düşerse iyi
 	else:
 		score += threshold_delta * 0.5   # büyük parti: baraj yükselsin
+	# SAYIM: en büyük parti "kazanan hepsini alır"ı sever, küçük partiler Hare'yi.
+	var new_method := String(payload.get("seat_method", MultiplayerManager.seat_method))
+	if new_method != MultiplayerManager.seat_method:
+		var biggest := true
+		for peer_id in GovernmentManager.voter_ids():
+			if GovernmentManager.seats_of(peer_id) > GovernmentManager.seats_of(bot):
+				biggest = false
+		var method_rank := {"hare": 0.0, "dhondt": 1.0, "wta": 2.0}
+		var shift := float(method_rank.get(new_method, 1.0)) - float(method_rank.get(MultiplayerManager.seat_method, 1.0))
+		if biggest:
+			score += shift * 1.0
+		elif share < 20.0:
+			score -= shift * 1.2
 	var interval_delta := float(new_interval - MultiplayerManager.election_interval)
 	score += interval_delta * (1.0 if CardManager.is_government_party(bot) else -1.0)
 	if score > 0.4:

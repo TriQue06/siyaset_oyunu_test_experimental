@@ -112,6 +112,8 @@ var _constitution_interval: int = 4
 var _constitution_threshold_label: Label
 var _constitution_interval_label: Label
 var _constitution_button: Button
+var _constitution_method: String = "dhondt"
+var _constitution_method_label: Label
 
 var _constitution_info: Label
 @onready var pass_button: Button = %PassButton
@@ -642,6 +644,8 @@ func _refresh_game_settings_label() -> void:
 		_format_threshold(MultiplayerManager.election_threshold),
 		("Sonraki seçim: %d" % GameRules.election_year(next_election)) if next_election != -1 else "Başka seçim yok",
 	]
+	if MultiplayerManager.seat_method != MultiplayerManager.DEFAULT_SEAT_METHOD:
+		game_settings_label.text += "\nSayım: " + ElectionModel.method_title(MultiplayerManager.seat_method)
 
 func _format_threshold(value: float) -> String:
 	if is_equal_approx(value, round(value)):
@@ -650,7 +654,8 @@ func _format_threshold(value: float) -> String:
 
 ## Anayasa paketi meclise sunulur (2/3 gerekir).
 func _on_constitution_pressed() -> void:
-	CardManager.propose_constitution({"threshold": _constitution_threshold, "interval": _constitution_interval})
+	CardManager.propose_constitution({"threshold": _constitution_threshold, "interval": _constitution_interval,
+		"seat_method": _constitution_method})
 	_law_designer.hide()
 
 func _on_pass_pressed() -> void:
@@ -2493,6 +2498,21 @@ func _build_constitution_section(box: VBoxContainer) -> void:
 	interval_row.add_child(_stepper_button("+", func(): _change_constitution(0.0, 1)))
 	grid.add_child(interval_row)
 
+	# Sayım yöntemi: D'Hondt / Hare / Kazanan hepsini alır.
+	_constitution_method = MultiplayerManager.seat_method
+	var method_row := HBoxContainer.new()
+	method_row.add_theme_constant_override("separation", 6)
+	var method_title := UiTheme.body_label("Sayım", UiTheme.FS_TINY, UiTheme.TEXT_MUTED)
+	method_title.custom_minimum_size.x = 58
+	method_row.add_child(method_title)
+	_constitution_method_label = UiTheme.mono_label("", UiTheme.FS_TINY)
+	_constitution_method_label.custom_minimum_size.x = 150
+	_constitution_method_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	method_row.add_child(_stepper_button("−", func(): _change_constitution_method(-1)))
+	method_row.add_child(_constitution_method_label)
+	method_row.add_child(_stepper_button("+", func(): _change_constitution_method(1)))
+	box.add_child(method_row)
+
 	_constitution_button = Button.new()
 	_constitution_button.text = "ANAYASAYI DEĞİŞTİR"
 	_constitution_button.add_theme_font_size_override("font_size", UiTheme.FS_TINY)
@@ -2506,6 +2526,12 @@ func _build_constitution_section(box: VBoxContainer) -> void:
 	_constitution_info.add_theme_font_size_override("font_size", 10)
 	_constitution_info.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
 	box.add_child(_constitution_info)
+
+func _change_constitution_method(step: int) -> void:
+	var methods: Array = ElectionModel.SEAT_METHODS
+	var i := methods.find(_constitution_method)
+	_constitution_method = methods[clampi(i + step, 0, methods.size() - 1)]
+	_refresh_constitution_section()
 
 func _stepper_button(text: String, action: Callable) -> Button:
 	var button := Button.new()
@@ -2527,11 +2553,13 @@ func _refresh_constitution_section() -> void:
 		return
 	_constitution_threshold_label.text = "%%%s" % String.num(_constitution_threshold, 1)
 	_constitution_interval_label.text = "%d yıl" % _constitution_interval
+	_constitution_method_label.text = ElectionModel.method_title(_constitution_method)
 	var me := multiplayer.get_unique_id()
 	var can := CardManager.can_propose_constitution(me)
 	_constitution_button.disabled = not can
 	var needed := GovernmentManager.constitution_threshold_seats()
-	var changed: bool = not is_equal_approx(_constitution_threshold, MultiplayerManager.election_threshold) 		or _constitution_interval != MultiplayerManager.election_interval
+	var changed: bool = not is_equal_approx(_constitution_threshold, MultiplayerManager.election_threshold) 		or _constitution_interval != MultiplayerManager.election_interval \
+		or _constitution_method != MultiplayerManager.seat_method
 	if not changed:
 		_constitution_info.text = "Şu anki kuralları değiştirmiyor. Bir ayarı değiştir."
 		_constitution_button.disabled = true

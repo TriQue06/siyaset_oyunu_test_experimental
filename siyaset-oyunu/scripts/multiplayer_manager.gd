@@ -106,6 +106,24 @@ var axis_sharpness_max_value: float = AXIS_SHARPNESS_MAX_VALUE_DEFAULT
 ## aynı ülkeyi üretir. Oyundaki tohum ESC menüsünde görünür ve kopyalanabilir.
 const MAP_SEED_MAX_DIGITS := 9
 var map_seed: String = ""
+## SAYIM YÖNTEMİ (anayasa değişikliğiyle değişir; yeni oyunda D'Hondt).
+const DEFAULT_SEAT_METHOD := "dhondt"
+var seat_method: String = DEFAULT_SEAT_METHOD
+
+func reset_seat_method() -> void:
+	seat_method = DEFAULT_SEAT_METHOD
+	ElectionModel.seat_method = seat_method
+
+func _set_seat_method(method: String) -> void:
+	if not ElectionModel.SEAT_METHODS.has(method):
+		return
+	seat_method = method
+	ElectionModel.seat_method = method
+
+@rpc("authority", "reliable")
+func _sync_seat_method(method: String) -> void:
+	_set_seat_method(method)
+	settings_updated.emit()
 
 
 var _pending_code: String = ""
@@ -213,6 +231,7 @@ func start_offline(player_name: String) -> void:
 	is_host = true
 	room_code = ""
 	map_seed = ""
+	reset_seat_method()
 	election_threshold = THRESHOLD_DEFAULT
 	election_interval = GameRules.DEFAULT_ELECTION_INTERVAL
 	election_count = GameRules.DEFAULT_ELECTION_COUNT
@@ -237,6 +256,7 @@ func create_room(player_name: String) -> void:
 	room_code = ""
 	_closing = false
 	map_seed = ""
+	reset_seat_method()
 	election_threshold = THRESHOLD_DEFAULT
 	election_interval = GameRules.DEFAULT_ELECTION_INTERVAL
 	election_count = GameRules.DEFAULT_ELECTION_COUNT
@@ -490,8 +510,10 @@ func apply_constitution(payload: Dictionary) -> void:
 	election_threshold = snap_threshold(float(payload.get("threshold", election_threshold)))
 	election_interval = clampi(int(payload.get("interval", election_interval)), GameRules.ELECTION_INTERVAL_MIN, GameRules.ELECTION_INTERVAL_MAX)
 	GameRules.configure(election_interval, election_count)
+	_set_seat_method(String(payload.get("seat_method", seat_method)))
 	if not local_only:
 		_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+		_sync_seat_method.rpc(seat_method)
 	settings_updated.emit()
 
 ## Seçim barajını (%) ayarlar. Sadece mevcut lobi sahibi çağırabilir.
@@ -594,6 +616,7 @@ func _reset_state() -> void:
 	offline_mode = false
 	owner_id = 1
 	map_seed = ""
+	reset_seat_method()
 	election_threshold = THRESHOLD_DEFAULT
 	election_interval = GameRules.DEFAULT_ELECTION_INTERVAL
 	election_count = GameRules.DEFAULT_ELECTION_COUNT

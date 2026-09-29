@@ -28,7 +28,7 @@ const ROWS := 23
 const LAND_FRACTION := 0.56
 const HEXES_PER_REGION := 11.0
 const MIN_REGION_HEXES := 4
-const PROVINCE_SEATS := 425
+const PROVINCE_SEATS := 300
 const MIN_SEATS := 2
 const METRO_COUNT := 5
 ## TIKIZ BÜYÜME: bölge her adımda birkaç aday hücreye bakar ve kendi

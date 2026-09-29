@@ -68,7 +68,7 @@ func _initialize() -> void:
 	for id in game_map.ids:
 		total += game_map.seats_of(id)
 		min_seats = mini(min_seats, game_map.seats_of(id))
-	check("il vekilleri toplami 425, her bolgede en az 2", total == 425 and min_seats >= 2, "%d / min %d" % [total, min_seats])
+	check("il vekilleri toplami 300, her bolgede en az 2", total == HexGridGenerator.PROVINCE_SEATS and total == 300 and min_seats >= 2, "%d / min %d" % [total, min_seats])
 	var names := {}
 	for id in game_map.ids:
 		names[game_map.name_of(id)] = true

@@ -188,11 +188,14 @@ func _initialize() -> void:
 	check("%60 EVET (%67 alti, %50 ustu): halkoyuna gider", gm.last_resolution_reason.find("HALKOYUNA") != -1, gm.last_resolution_reason)
 	check("halk kabul edince kurallar degisir", mm.seat_method == "hare" and ElectionModel.seat_method == "hare" 		and mm.law_pass_percent == 60 and mm.constitution_percent == 75 and mm.referendum_percent == 33, gm.last_resolution_reason)
 	cm.law_rounds = {}
-	cm.national_support = {1: -8.0, 3: -8.0, 2: 8.0}
+	# Tek parti EVET (200 ≥ %33), halkın desteği HAYIR tarafında: kesin red.
+	cm.last_seats = {1: 200, 2: 150, 3: 150}
+	pm.parties[2]["ideology"] = pm.parties[1]["ideology"].duplicate()
+	cm.national_support = {1: -10.0, 2: 10.0}
 	cm._apply_constitution_proposal(1, {"threshold": mm.election_threshold, "interval": mm.election_interval,
 		"seat_method": "wta", "law_pass": 60, "constitution": 75, "referendum": 33})
 	gm._apply_vote(2, gm.VOTE_NO)
-	gm._apply_vote(3, gm.VOTE_YES)
+	gm._apply_vote(3, gm.VOTE_ABSTAIN)
 	check("halk reddederse kurallar degismez", mm.seat_method == "hare" and gm.last_resolution_reason.find("reddetti") != -1,
 		gm.last_resolution_reason)
 	new_game({1: ideology(1.5, 1.5, 1.5), 2: ideology(-1.5, -1.5, -1.5)})

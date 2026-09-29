@@ -112,6 +112,15 @@ var _constitution_interval: int = 4
 var _constitution_threshold_label: Label
 var _constitution_interval_label: Label
 var _constitution_button: Button
+## Anayasa paketinin sayım/oran ayarları ve etiketleri.
+var _constitution_method: String = "dhondt"
+var _constitution_law: int = 50
+var _constitution_const: int = 67
+var _constitution_ref: int = 50
+var _constitution_method_label: Label
+var _constitution_law_label: Label
+var _constitution_const_label: Label
+var _constitution_ref_label: Label
 var _constitution_info: Label
 @onready var pass_button: Button = %PassButton
 @onready var player_panel_list: GridContainer = %PlayerPanelList
@@ -637,6 +646,17 @@ func _refresh_game_settings_label() -> void:
 		_format_threshold(MultiplayerManager.election_threshold),
 		("Sonraki seçim: %d" % GameRules.election_year(next_election)) if next_election != -1 else "Başka seçim yok",
 	]
+	# Varsayılandan farklı anayasal kurallar da levhada görünsün.
+	var rules: Array = []
+	if MultiplayerManager.seat_method != MultiplayerManager.DEFAULT_SEAT_METHOD:
+		rules.append(ElectionModel.method_title(MultiplayerManager.seat_method))
+	if MultiplayerManager.law_pass_percent != MultiplayerManager.DEFAULT_LAW_PASS:
+		rules.append("Yasa %%%d" % MultiplayerManager.law_pass_percent)
+	if MultiplayerManager.constitution_percent != MultiplayerManager.DEFAULT_CONSTITUTION 			or MultiplayerManager.referendum_percent != MultiplayerManager.DEFAULT_REFERENDUM:
+		rules.append("Anayasa %%%d/%d" % [MultiplayerManager.constitution_percent, MultiplayerManager.referendum_percent])
+	if not rules.is_empty():
+		game_settings_label.text += "
+" + "  ·  ".join(PackedStringArray(rules))
 
 func _format_threshold(value: float) -> String:
 	if is_equal_approx(value, round(value)):
@@ -645,7 +665,9 @@ func _format_threshold(value: float) -> String:
 
 ## Anayasa paketi meclise sunulur (2/3 gerekir).
 func _on_constitution_pressed() -> void:
-	CardManager.propose_constitution({"threshold": _constitution_threshold, "interval": _constitution_interval})
+	CardManager.propose_constitution({"threshold": _constitution_threshold, "interval": _constitution_interval,
+		"seat_method": _constitution_method, "law_pass": _constitution_law,
+		"constitution": _constitution_const, "referendum": _constitution_ref})
 	_law_designer.hide()
 
 func _on_pass_pressed() -> void:
@@ -2419,28 +2441,55 @@ func _build_constitution_section(box: VBoxContainer) -> void:
 	box.add_child(UiTheme.section_label("Anayasa değişikliği"))
 	_constitution_threshold = MultiplayerManager.election_threshold
 	_constitution_interval = MultiplayerManager.election_interval
+	# Altı ayar iki sütunlu ızgarada: panel ekrandan taşmasın.
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 14)
+	grid.add_theme_constant_override("v_separation", 4)
+	box.add_child(grid)
 
 	var threshold_row := HBoxContainer.new()
 	threshold_row.add_theme_constant_override("separation", 6)
-	threshold_row.add_child(UiTheme.body_label("Baraj", UiTheme.FS_TINY, UiTheme.TEXT_MUTED))
+	var threshold_row_title := UiTheme.body_label("Baraj", UiTheme.FS_TINY, UiTheme.TEXT_MUTED)
+	threshold_row_title.custom_minimum_size.x = 58
+	threshold_row.add_child(threshold_row_title)
 	_constitution_threshold_label = UiTheme.mono_label("", UiTheme.FS_SMALL)
 	_constitution_threshold_label.custom_minimum_size.x = 48
 	_constitution_threshold_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	threshold_row.add_child(_stepper_button("−", func(): _change_constitution(-0.5, 0)))
 	threshold_row.add_child(_constitution_threshold_label)
 	threshold_row.add_child(_stepper_button("+", func(): _change_constitution(0.5, 0)))
-	box.add_child(threshold_row)
+	grid.add_child(threshold_row)
 
 	var interval_row := HBoxContainer.new()
 	interval_row.add_theme_constant_override("separation", 6)
-	interval_row.add_child(UiTheme.body_label("Seçim", UiTheme.FS_TINY, UiTheme.TEXT_MUTED))
+	var interval_row_title := UiTheme.body_label("Seçim", UiTheme.FS_TINY, UiTheme.TEXT_MUTED)
+	interval_row_title.custom_minimum_size.x = 58
+	interval_row.add_child(interval_row_title)
 	_constitution_interval_label = UiTheme.mono_label("", UiTheme.FS_SMALL)
 	_constitution_interval_label.custom_minimum_size.x = 48
 	_constitution_interval_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	interval_row.add_child(_stepper_button("−", func(): _change_constitution(0.0, -1)))
 	interval_row.add_child(_constitution_interval_label)
 	interval_row.add_child(_stepper_button("+", func(): _change_constitution(0.0, 1)))
-	box.add_child(interval_row)
+	grid.add_child(interval_row)
+
+	_constitution_method = MultiplayerManager.seat_method
+	_constitution_law = MultiplayerManager.law_pass_percent
+	_constitution_const = MultiplayerManager.constitution_percent
+	_constitution_ref = MultiplayerManager.referendum_percent
+	_constitution_method_label = _constitution_cycle_row(grid, "Sayım", func(step: int):
+		_constitution_method = _cycle(ElectionModel.SEAT_METHODS, _constitution_method, step))
+	_constitution_law_label = _constitution_cycle_row(grid, "Yasa", func(step: int):
+		_constitution_law = _cycle(MultiplayerManager.LAW_PASS_OPTIONS, _constitution_law, step))
+	_constitution_const_label = _constitution_cycle_row(grid, "Anayasa", func(step: int):
+		_constitution_const = _cycle(MultiplayerManager.CONSTITUTION_OPTIONS, _constitution_const, step)
+		# Referandum eşiği kabul oranının altında kalmalı.
+		while _constitution_ref >= _constitution_const:
+			_constitution_ref = _cycle(MultiplayerManager.REFERENDUM_OPTIONS, _constitution_ref, -1))
+	_constitution_ref_label = _constitution_cycle_row(grid, "Referandum", func(step: int):
+		var options: Array = MultiplayerManager.REFERENDUM_OPTIONS.filter(func(v): return v < _constitution_const)
+		_constitution_ref = _cycle(options, _constitution_ref, step))
 
 	_constitution_button = Button.new()
 	_constitution_button.text = "ANAYASAYI DEĞİŞTİR"
@@ -2455,6 +2504,35 @@ func _build_constitution_section(box: VBoxContainer) -> void:
 	_constitution_info.add_theme_font_size_override("font_size", 10)
 	_constitution_info.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
 	box.add_child(_constitution_info)
+
+## "Etiket  [−] değer [+]" satırı; action(step) değeri değiştirir. Değer etiketini döner.
+func _constitution_cycle_row(box: Container, title: String, action: Callable) -> Label:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	var name_label := UiTheme.body_label(title, UiTheme.FS_TINY, UiTheme.TEXT_MUTED)
+	name_label.custom_minimum_size.x = 58
+	row.add_child(name_label)
+	var value := UiTheme.mono_label("", UiTheme.FS_TINY)
+	value.custom_minimum_size.x = 52
+	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	row.add_child(_stepper_button("−", func():
+		action.call(-1)
+		_refresh_constitution_section()))
+	row.add_child(value)
+	row.add_child(_stepper_button("+", func():
+		action.call(1)
+		_refresh_constitution_section()))
+	box.add_child(row)
+	return value
+
+## Listede bir sonraki / önceki seçenek (uçlarda durur).
+static func _cycle(options: Array, current, step: int):
+	if options.is_empty():
+		return current
+	var i := options.find(current)
+	if i == -1:
+		return options[0]
+	return options[clampi(i + step, 0, options.size() - 1)]
 
 func _stepper_button(text: String, action: Callable) -> Button:
 	var button := Button.new()
@@ -2476,16 +2554,24 @@ func _refresh_constitution_section() -> void:
 		return
 	_constitution_threshold_label.text = "%%%s" % String.num(_constitution_threshold, 1)
 	_constitution_interval_label.text = "%d yıl" % _constitution_interval
+	_constitution_method_label.text = {"dhondt": "D'Hondt", "hare": "Hare", "wta": "Kazanan"}.get(_constitution_method, "?")
+	_constitution_method_label.tooltip_text = ElectionModel.method_title(_constitution_method)
+	_constitution_law_label.text = "%%%d" % _constitution_law
+	_constitution_const_label.text = "%%%d" % _constitution_const
+	_constitution_ref_label.text = "%%%d" % _constitution_ref
 	var me := multiplayer.get_unique_id()
 	var can := CardManager.can_propose_constitution(me)
 	_constitution_button.disabled = not can
 	var needed := GovernmentManager.constitution_threshold_seats()
-	var changed: bool = not is_equal_approx(_constitution_threshold, MultiplayerManager.election_threshold) 		or _constitution_interval != MultiplayerManager.election_interval
+	var changed: bool = not is_equal_approx(_constitution_threshold, MultiplayerManager.election_threshold) 		or _constitution_interval != MultiplayerManager.election_interval \
+		or _constitution_method != MultiplayerManager.seat_method or _constitution_law != MultiplayerManager.law_pass_percent \
+		or _constitution_const != MultiplayerManager.constitution_percent or _constitution_ref != MultiplayerManager.referendum_percent
 	if not changed:
-		_constitution_info.text = "Şu anki kuralları değiştirmiyor. Baraj ya da seçim aralığını değiştir."
+		_constitution_info.text = "Şu anki kuralları değiştirmiyor. Bir ayarı değiştir."
 		_constitution_button.disabled = true
 	elif can:
-		_constitution_info.text = "Meclisin 2/3'ü (%d vekil) EVET derse yürürlüğe girer. Gündem şartı yok, ama dönemdeki yasa hakkını kullanır." % needed
+		_constitution_info.text = "Meclisin %%%d'i (%d vekil) EVET derse yürürlüğe girer; %d–%d EVET'te halkoyuna gider. Gündem şartı yok, dönemdeki yasa hakkını kullanır." % [
+			MultiplayerManager.constitution_percent, needed, GovernmentManager.referendum_threshold_seats(), needed - 1]
 	else:
 		_constitution_info.text = _action_block_reason(0, true)
 

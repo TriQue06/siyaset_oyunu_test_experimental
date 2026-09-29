@@ -70,6 +70,11 @@ func _initialize() -> void:
 		print("screenshot: midgame_agenda")
 		cmx.agenda = saved_agenda
 		scene._refresh_agenda_banner()
+		scene._on_law_button_pressed()
+		await create_timer(0.3).timeout
+		root.get_texture().get_image().save_png("%s/midgame_law.png" % OS.get_user_data_dir())
+		print("screenshot: midgame_law")
+		scene._on_law_button_pressed()
 		scene._set_map_layer(1, false)
 		await create_timer(0.3).timeout
 		root.get_texture().get_image().save_png("%s/midgame_org.png" % OS.get_user_data_dir())

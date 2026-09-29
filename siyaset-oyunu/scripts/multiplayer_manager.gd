@@ -107,6 +107,68 @@ var axis_sharpness_max_value: float = AXIS_SHARPNESS_MAX_VALUE_DEFAULT
 const MAP_SEED_MAX_DIGITS := 9
 var map_seed: String = ""
 
+## ANAYASAL KURALLAR (oyun başında varsayılan; meclis anayasa değişikliğiyle
+## değiştirir, bkz. apply_constitution):
+##   seat_method          : sayım yöntemi (ElectionModel.SEAT_METHODS)
+##   law_pass_percent     : yasanın geçmesi için EVET'in (EVET+HAYIR) içindeki payı
+##                          bunun ÜSTÜNDE olmalı (50 = basit çoğunluk)
+##   constitution_percent : anayasa için meclisin bu kadarı EVET demeli
+##   referendum_percent   : EVET bunun üstünde ama kabul oranının altındaysa
+##                          değişiklik HALKOYUNA gider
+const LAW_PASS_OPTIONS := [20, 25, 33, 40, 50, 60, 67, 75, 80]
+const CONSTITUTION_OPTIONS := [50, 67, 75]
+const REFERENDUM_OPTIONS := [25, 33, 50, 67]
+const DEFAULT_SEAT_METHOD := "dhondt"
+const DEFAULT_LAW_PASS := 50
+const DEFAULT_CONSTITUTION := 67
+const DEFAULT_REFERENDUM := 50
+var seat_method: String = DEFAULT_SEAT_METHOD
+var law_pass_percent: int = DEFAULT_LAW_PASS
+var constitution_percent: int = DEFAULT_CONSTITUTION
+var referendum_percent: int = DEFAULT_REFERENDUM
+
+## 33 ve 67 aslında üçte bir / üçte iki.
+static func percent_fraction(percent: int) -> float:
+	match percent:
+		33:
+			return 1.0 / 3.0
+		67:
+			return 2.0 / 3.0
+	return percent / 100.0
+
+func reset_constitution_rules() -> void:
+	seat_method = DEFAULT_SEAT_METHOD
+	law_pass_percent = DEFAULT_LAW_PASS
+	constitution_percent = DEFAULT_CONSTITUTION
+	referendum_percent = DEFAULT_REFERENDUM
+	ElectionModel.seat_method = seat_method
+
+func constitution_rules() -> Dictionary:
+	return {"seat_method": seat_method, "law_pass": law_pass_percent,
+		"constitution": constitution_percent, "referendum": referendum_percent}
+
+## Geçerli bir kural paketi mi? (Referandum eşiği kabul oranının altında olmalı.)
+static func valid_constitution_rules(rules: Dictionary) -> bool:
+	return ElectionModel.SEAT_METHODS.has(String(rules.get("seat_method", ""))) \
+		and LAW_PASS_OPTIONS.has(int(rules.get("law_pass", -1))) \
+		and CONSTITUTION_OPTIONS.has(int(rules.get("constitution", -1))) \
+		and REFERENDUM_OPTIONS.has(int(rules.get("referendum", -1))) \
+		and int(rules.get("referendum", 0)) < int(rules.get("constitution", 0))
+
+func _set_constitution_rules(rules: Dictionary) -> void:
+	if not valid_constitution_rules(rules):
+		return
+	seat_method = String(rules["seat_method"])
+	law_pass_percent = int(rules["law_pass"])
+	constitution_percent = int(rules["constitution"])
+	referendum_percent = int(rules["referendum"])
+	ElectionModel.seat_method = seat_method
+
+@rpc("authority", "reliable")
+func _sync_constitution_rules(rules: Dictionary) -> void:
+	_set_constitution_rules(rules)
+	settings_updated.emit()
+
 var _pending_code: String = ""
 var _has_synced_once: bool = false
 var _closing: bool = false
@@ -212,6 +274,7 @@ func start_offline(player_name: String) -> void:
 	is_host = true
 	room_code = ""
 	map_seed = ""
+	reset_constitution_rules()
 	election_threshold = THRESHOLD_DEFAULT
 	election_interval = GameRules.DEFAULT_ELECTION_INTERVAL
 	election_count = GameRules.DEFAULT_ELECTION_COUNT
@@ -236,6 +299,7 @@ func create_room(player_name: String) -> void:
 	room_code = ""
 	_closing = false
 	map_seed = ""
+	reset_constitution_rules()
 	election_threshold = THRESHOLD_DEFAULT
 	election_interval = GameRules.DEFAULT_ELECTION_INTERVAL
 	election_count = GameRules.DEFAULT_ELECTION_COUNT
@@ -482,15 +546,21 @@ func transfer_ownership(new_owner_id: int) -> void:
 ## ANAYASA DEĞİŞİKLİĞİ: meclis 2/3 çoğunlukla kabul ettiyse oyunun kuralları
 ## değişir. Lobi ayarından farkı: oyun İÇİNDE, oylamayla ve sahiplik aranmadan
 ## uygulanır (host yazar, herkese senkronlanır).
-func apply_constitution(threshold: float, interval_years: int) -> void:
+func apply_constitution(payload: Dictionary) -> void:
 	var local_only := room_code == ""
 	if not is_host and not local_only:
 		return
-	election_threshold = snap_threshold(threshold)
-	election_interval = clampi(interval_years, GameRules.ELECTION_INTERVAL_MIN, GameRules.ELECTION_INTERVAL_MAX)
+	election_threshold = snap_threshold(float(payload.get("threshold", election_threshold)))
+	election_interval = clampi(int(payload.get("interval", election_interval)), GameRules.ELECTION_INTERVAL_MIN, GameRules.ELECTION_INTERVAL_MAX)
 	GameRules.configure(election_interval, election_count)
+	var rules := constitution_rules()
+	for key in rules.keys():
+		if payload.has(key):
+			rules[key] = payload[key]
+	_set_constitution_rules(rules)
 	if not local_only:
 		_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+		_sync_constitution_rules.rpc(constitution_rules())
 	settings_updated.emit()
 
 ## Seçim barajını (%) ayarlar. Sadece mevcut lobi sahibi çağırabilir.
@@ -593,6 +663,7 @@ func _reset_state() -> void:
 	offline_mode = false
 	owner_id = 1
 	map_seed = ""
+	reset_constitution_rules()
 	election_threshold = THRESHOLD_DEFAULT
 	election_interval = GameRules.DEFAULT_ELECTION_INTERVAL
 	election_count = GameRules.DEFAULT_ELECTION_COUNT

@@ -48,8 +48,6 @@ const KIND_LAW := "law"
 const KIND_EARLY := "early"
 ## Anayasa değişikliği: 2/3 çoğunluk ister, oyunun kurallarını değiştirir.
 const KIND_CONSTITUTION := "constitution"
-## Kabul için gereken pay (meclisin tamamına göre).
-const CONSTITUTION_MAJORITY := 2.0 / 3.0
 ## Bir partinin hükümet kurma hakkı (3. teklif de geçmezse sıra devreder).
 const MAX_ATTEMPTS := 3
 ## Hükümet teklifinin oylama aşamaları (bkz. AKIŞ 4).
@@ -486,7 +484,34 @@ func submit_constitution(peer_id: int, payload: Dictionary) -> bool:
 
 ## Anayasa değişikliği için gereken EVET vekil sayısı (meclisin 2/3'ü).
 func constitution_threshold_seats() -> int:
-	return int(ceil(total_seats() * CONSTITUTION_MAJORITY))
+	return int(ceil(total_seats() * MultiplayerManager.percent_fraction(MultiplayerManager.constitution_percent) - 0.0001))
+
+## Bu kadar EVET (ama kabul oranının altında) -> değişiklik halkoyuna gider.
+func referendum_threshold_seats() -> int:
+	return int(ceil(total_seats() * MultiplayerManager.percent_fraction(MultiplayerManager.referendum_percent) - 0.0001))
+
+## Yasa geçer mi? EVET'in (EVET+HAYIR) içindeki payı yasa geçiş oranının ÜSTÜNDE
+## olmalı (50 = basit çoğunluk: EVET > HAYIR). Çekimserler sayılmaz.
+static func law_passes(yes: int, no: int) -> bool:
+	if yes <= 0:
+		return false
+	return float(yes) > MultiplayerManager.percent_fraction(MultiplayerManager.law_pass_percent) * float(yes + no) + 0.0001
+
+## REFERANDUM: halk, EVET ve HAYIR diyen partilerin ŞU ANKİ ülke geneli
+## desteğine göre karar verir (çekimserlerin seçmeni sayılmaz).
+func _referendum_result(votes_copy: Dictionary) -> Dictionary:
+	var support: Dictionary = CardManager._expected_national(CardManager.election_modifiers())
+	var yes := 0.0
+	var no := 0.0
+	for peer_id in votes_copy.keys():
+		var share := float(support.get(peer_id, 0.0))
+		match int(votes_copy[peer_id]):
+			VOTE_YES:
+				yes += share
+			VOTE_NO:
+				no += share
+	var total := maxf(0.0001, yes + no)
+	return {"passed": yes > no, "yes": yes / total * 100.0, "no": no / total * 100.0}
 
 ## ERKEN SEÇİM ÖNERGESİ (erken seçim kartı oynanınca CardManager çağırır).
 ## Yasalarla aynı akış: basit çoğunluk (EVET vekilleri HAYIR'dan fazla).
@@ -616,8 +641,8 @@ func _resolve_proposal() -> void:
 	var totals := vote_seat_totals()
 
 	if kind == KIND_LAW:
-		# Çekimserler sayılmaz: EVET milletvekili HAYIR'dan fazlaysa geçer.
-		var passed: bool = totals.x > totals.y
+		# Çekimserler sayılmaz; EVET'in payı yasa geçiş oranını aşmalı (anayasayla değişir).
+		var passed: bool = law_passes(totals.x, totals.y)
 		var law_type := proposal_law
 		var gov_ids := proposal_gov_ids.duplicate()
 		var votes_copy := votes.duplicate()
@@ -641,19 +666,29 @@ func _resolve_proposal() -> void:
 
 	if kind == KIND_CONSTITUTION:
 		var needed := constitution_threshold_seats()
+		var referendum_needed := referendum_threshold_seats()
 		var const_passed: bool = totals.x >= needed
 		var payload := proposal_assignments.duplicate()
+		var votes_for_referendum := votes.duplicate()
 		_clear_proposal()
 		_set_phase(Phase.GOVERNING if has_government() else Phase.IDLE)
 		last_resolution_reason = "Anayasa değişikliği %s (EVET %d / gereken %d)." % [
-			"KABUL EDİLDİ" if const_passed else "reddedildi", totals.x, needed]
+			"KABUL EDİLDİ" if const_passed else "mecliste yetmedi", totals.x, needed]
+		if not const_passed and totals.x >= referendum_needed:
+			# Kabul oranına ulaşamadı ama referandum eşiğini geçti: HALKOYU.
+			var referendum := _referendum_result(votes_for_referendum)
+			const_passed = bool(referendum["passed"])
+			last_resolution_reason += " EVET %d, referandum eşiğini (%d) geçti: HALKOYUNA gidildi — EVET %%%d, HAYIR %%%d: %s." % [
+				totals.x, referendum_needed, int(round(float(referendum["yes"]))), int(round(float(referendum["no"]))),
+				"halk KABUL ETTİ" if const_passed else "halk reddetti"]
 		if const_passed:
-			MultiplayerManager.apply_constitution(float(payload.get("threshold", MultiplayerManager.election_threshold)),
-				int(payload.get("interval", MultiplayerManager.election_interval)))
+			MultiplayerManager.apply_constitution(payload)
 			# Takvim son seçimden itibaren yeni aralıkla işlesin.
 			CardManager.rebase_election_calendar()
-			last_resolution_reason += " Yeni baraj %%%s, seçimler %d yılda bir." % [
-				String.num(MultiplayerManager.election_threshold, 1), MultiplayerManager.election_interval]
+			last_resolution_reason += " Yeni kurallar: baraj %%%s, seçimler %d yılda bir, %s, yasa %%%d, anayasa %%%d, referandum %%%d." % [
+				String.num(MultiplayerManager.election_threshold, 1), MultiplayerManager.election_interval,
+				ElectionModel.method_title(MultiplayerManager.seat_method), MultiplayerManager.law_pass_percent,
+				MultiplayerManager.constitution_percent, MultiplayerManager.referendum_percent]
 		_push_state()
 		if not _is_local_only():
 			_notify_resolved.rpc(const_passed, kind, proposer)

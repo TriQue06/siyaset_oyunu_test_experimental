@@ -2496,7 +2496,7 @@ func _refresh_law_designer() -> void:
 		middle.add_child(axis_label)
 		middle.add_child(_ideology_bar(axis, float(ideology.get(axis, 0))))
 		var pos_label := Label.new()
-		pos_label.text = "partin: %s" % IdeologyAxes.format_value(float(ideology.get(axis, 0)))
+		pos_label.text = "partin: %s" % IdeologyAxes.position_text(axis, float(ideology.get(axis, 0)))
 		pos_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		pos_label.add_theme_font_size_override("font_size", 9)
 		pos_label.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)

@@ -52,7 +52,7 @@ func play(seed_value: int, human_votes: bool) -> Dictionary:
 		mm.add_bot()
 	mm.start_game()
 	pm.set_party_and_ready("Yeni Yol", 3, Color.WHITE, Color("F20C1F"),
-		{"economic": 0, "social": 0, "administrative": 0}, true)
+		{"economic": 1.5, "social": -1.5, "administrative": 1.5}, true)
 	if mm.stage != mm.Stage.IN_GAME:
 		return {"stall": true, "where": "oyun hic baslamadi", "seconds": 0.0, "elections": 0}
 	cm.set_rng_seed(seed_value)

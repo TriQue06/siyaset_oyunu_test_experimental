@@ -20,7 +20,7 @@ func check(label: String, ok: bool, detail: String = "") -> void:
 func near(a: float, b: float) -> bool:
 	return absf(a - b) < 0.001
 
-func ideology(e: int, s: int, a: int) -> Dictionary:
+func ideology(e: float, s: float, a: float) -> Dictionary:
 	return {"economic": e, "social": s, "administrative": a}
 
 ## 3 oyunculu yeni bir oyun başlatır; turn_order deterministik [1, 2, 3].
@@ -523,8 +523,11 @@ func _initialize() -> void:
 	r2.seed = 5
 	check("ayni tohum ayni harita", str(ProvinceIdeology.generate(r1, ids)) == str(ProvinceIdeology.generate(r2, ids)))
 	var axes = root.get_node("IdeologyAxes")
-	check("partiler notr baslar", axes.is_valid_start_ideology(axes.default_values()) \
-		and not axes.is_valid_start_ideology(ideology(1, 0, 0)))
+	check("baslangic gorusu her eksende iki uctan biri", axes.is_valid_start_ideology(ideology(1.5, -1.5, 1.5)) \
+		and not axes.is_valid_start_ideology(axes.default_values()) and not axes.is_valid_start_ideology(ideology(1, 0, 0)))
+	check("rastgele baslangic gecerli", axes.is_valid_start_ideology(axes.random_start_ideology()))
+	check("oyuncu sayi gormez", axes.position_text("economic", 1.5) == "Piyasacı" and axes.position_text("social", -0.5) == "Ilımlı İlerici" \
+		and axes.position_text("administrative", 3.0) == "Radikal Üniter" and axes.position_text("economic", 0.0) == "Merkez")
 	check("desteden yasa ve ideoloji karti gelmez", not cm._draw_pool(1).has("capitalist") and not cm._draw_pool(1).has("law_privatization"))
 
 	print("")

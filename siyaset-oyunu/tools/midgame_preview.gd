@@ -20,7 +20,7 @@ func _initialize() -> void:
 		mm.add_bot()
 	mm.start_game()
 	pm.set_party_and_ready("Yeni Yol", 0, Color.WHITE, Color("F20C1F"),
-		{"economic": 0, "social": 0, "administrative": 0}, true)
+		{"economic": 1.5, "social": -1.5, "administrative": 1.5}, true)
 	cm.set_rng_seed(4242)
 	bm._rng.seed = 4242
 	gm.result_hold_seconds = 0.2

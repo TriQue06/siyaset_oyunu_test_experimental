@@ -29,7 +29,7 @@ func _initialize() -> void:
 		mm.add_bot()
 	mm.start_game()
 	pm.set_party_and_ready("Yeni Yol", 0, Color.WHITE, Color("F20C1F"),
-		{"economic": 0, "social": 0, "administrative": 0}, true)
+		{"economic": 1.5, "social": -1.5, "administrative": 1.5}, true)
 	# İLK SEÇİMDEN ÖNCE: mecliste hiç vekil yok, hükümet yok.
 	cm.last_seats = {}
 	cm.last_vote_shares = {}

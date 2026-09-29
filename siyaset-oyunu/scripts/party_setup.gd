@@ -54,8 +54,7 @@ var _party_name: String = ""
 var _selected_icon_index: int = 0
 var _selected_bg_color: Color = PartyPresets.COLORS[0]     # kırmızı
 var _ideology: Dictionary = {}
-var _ideology_sliders: Dictionary = {}   # axis -> HSlider
-var _ideology_value_labels: Dictionary = {}  # axis -> Label
+var _ideology_buttons: Dictionary = {}   # axis -> [sol düğme, sağ düğme]
 
 var _time_left: float = 60.0
 var _unlimited_time: bool = false
@@ -72,7 +71,7 @@ func _ready() -> void:
 	_unlimited_time = true
 	_time_left = 0.0
 	_party_name = "Parti%d" % randi_range(1, 99)
-	_ideology = IdeologyAxes.default_values()
+	_ideology = IdeologyAxes.random_start_ideology()
 
 	name_edit.text = _party_name
 	name_edit.max_length = PartyManager.NAME_MAX_LENGTH
@@ -82,12 +81,11 @@ func _ready() -> void:
 	_build_players_panel()
 	_build_icon_grid()
 	_build_color_row()
-	# İdeoloji seçimi yok: sahnedeki başlık, kaydırıcı kutusu ve ayırıcı gizlenir.
-	ideology_container.hide()
-	for node_name in ["IdeologyLabel", "HSeparator3b"]:
-		var node := ideology_container.get_parent().get_node_or_null(node_name)
-		if node != null:
-			node.hide()
+	# Başlangıç görüşü: her eksende iki uçtan biri (sayı gösterilmez).
+	var ideology_title := ideology_container.get_parent().get_node_or_null("IdeologyLabel")
+	if ideology_title is Label:
+		ideology_title.text = "Parti görüşü"
+	_build_ideology_rows()
 	ready_button.pressed.connect(_on_ready_pressed)
 	MultiplayerManager.party_setup_finished.connect(_on_party_setup_finished)
 	PartyManager.parties_updated.connect(_refresh_ready_count)
@@ -372,59 +370,43 @@ func _on_bg_color_selected(index: int) -> void:
 	_update_preview()
 	_push_party()
 
-## Her eksen için: başlık + (sol uç etiketi - kaydırıcı - sağ uç etiketi) +
-## anlık değer. Kaydırıcı 0-3 İNDEKS tutar; gerçek değer her zaman
-## IdeologyAxes.ALLOWED_START_VALUES[indeks] üzerinden okunur, böylece uç/nötr
-## seçimi arayüz seviyesinde imkansız kalır.
+## Her eksen için: başlık + iki uç düğmesi (ör. "Devletçi" | "Piyasacı").
+## Oyuncu SADECE kelimeleri görür; arkadaki değer ±IdeologyAxes.START_MAGNITUDE.
 func _build_ideology_rows() -> void:
+	for child in ideology_container.get_children():
+		child.queue_free()
+	_ideology_buttons.clear()
 	for axis in IdeologyAxes.AXES:
-		var info: Dictionary = AXIS_LABELS.get(axis, {"title": axis, "neg": "-", "pos": "+"})
-
+		var info: Dictionary = IdeologyAxes.AXIS_SIDES[axis]
 		var title := Label.new()
 		title.text = info["title"]
 		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		title.add_theme_font_size_override("font_size", 11)
+		title.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
 		ideology_container.add_child(title)
-
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 6)
-
-		var neg_label := Label.new()
-		neg_label.text = info["neg"]
-		neg_label.custom_minimum_size = Vector2(90, 0)
-		row.add_child(neg_label)
-
-		var slider := HSlider.new()
-		slider.min_value = 0
-		slider.max_value = IdeologyAxes.ALLOWED_START_VALUES.size() - 1
-		slider.step = 1
-		slider.tick_count = IdeologyAxes.ALLOWED_START_VALUES.size()
-		slider.ticks_on_borders = true
-		slider.size_flags_horizontal = SIZE_EXPAND_FILL
-		var start_value: int = _ideology.get(axis, IdeologyAxes.ALLOWED_START_VALUES[0])
-		slider.value = IdeologyAxes.ALLOWED_START_VALUES.find(start_value)
-		slider.value_changed.connect(_on_ideology_slider_changed.bind(axis))
-		row.add_child(slider)
-
-		var pos_label := Label.new()
-		pos_label.text = info["pos"]
-		pos_label.custom_minimum_size = Vector2(90, 0)
-		pos_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		row.add_child(pos_label)
-
-		var value_label := Label.new()
-		value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		value_label.text = "%+d" % start_value
-		row.add_child(value_label)
-
+		row.add_theme_constant_override("separation", 4)
+		var group := ButtonGroup.new()
+		var pair: Array = []
+		for dir in [-1, 1]:
+			var button := Button.new()
+			button.text = info["neg"] if dir < 0 else info["pos"]
+			button.toggle_mode = true
+			button.button_group = group
+			button.focus_mode = Control.FOCUS_NONE
+			button.size_flags_horizontal = SIZE_EXPAND_FILL
+			button.custom_minimum_size = Vector2(0, 26)
+			button.add_theme_font_size_override("font_size", 11)
+			button.button_pressed = (float(_ideology.get(axis, 0.0)) > 0.0) == (dir > 0)
+			button.disabled = _is_locked and not _editing_bot()
+			button.pressed.connect(_on_ideology_side_pressed.bind(axis, dir))
+			row.add_child(button)
+			pair.append(button)
 		ideology_container.add_child(row)
+		_ideology_buttons[axis] = pair
 
-		_ideology_sliders[axis] = slider
-		_ideology_value_labels[axis] = value_label
-
-func _on_ideology_slider_changed(index: float, axis: String) -> void:
-	var value: int = IdeologyAxes.ALLOWED_START_VALUES[int(index)]
-	_ideology[axis] = value
-	_ideology_value_labels[axis].text = "%+d" % value
+func _on_ideology_side_pressed(axis: String, dir: int) -> void:
+	_ideology[axis] = IdeologyAxes.START_MAGNITUDE * dir
 	_push_party()
 
 func _update_preview() -> void:
@@ -437,7 +419,7 @@ func _push_party() -> void:
 	if not PartyManager.is_valid_name(_party_name):
 		return
 	if _editing_bot():
-		PartyManager.set_bot_party(_edit_target, _party_name, _selected_icon_index, _selected_bg_color)
+		PartyManager.set_bot_party(_edit_target, _party_name, _selected_icon_index, _selected_bg_color, _ideology)
 		return
 	PartyManager.set_my_party(_party_name, _selected_icon_index, ICON_COLOR, _selected_bg_color, _ideology)
 
@@ -448,12 +430,14 @@ func _start_editing(bot_id: int) -> void:
 	if bot_id != -1 and (not MultiplayerManager.is_local_owner() or not MultiplayerManager.is_bot(bot_id)):
 		return
 	if not _editing_bot():
-		_own_backup = {"name": _party_name, "icon": _selected_icon_index, "color": _selected_bg_color}
+		_own_backup = {"name": _party_name, "icon": _selected_icon_index, "color": _selected_bg_color,
+			"ideology": _ideology.duplicate()}
 	if bot_id == -1 or bot_id == me:
 		_edit_target = -1
 		_party_name = String(_own_backup.get("name", _party_name))
 		_selected_icon_index = int(_own_backup.get("icon", _selected_icon_index))
 		_selected_bg_color = _own_backup.get("color", _selected_bg_color)
+		_ideology = (_own_backup.get("ideology", _ideology) as Dictionary).duplicate()
 		title_label.text = "PARTİNİ KUR"
 		_set_controls_disabled(_is_locked)
 		ready_button.disabled = false
@@ -463,6 +447,7 @@ func _start_editing(bot_id: int) -> void:
 		_party_name = String(party.get("name", ""))
 		_selected_icon_index = int(party.get("icon_index", 0))
 		_selected_bg_color = party.get("bg_color", _selected_bg_color)
+		_ideology = (party.get("ideology", IdeologyAxes.random_start_ideology()) as Dictionary).duplicate()
 		title_label.text = "BOT PARTİSİ: %s" % MultiplayerManager.players.get(bot_id, {}).get("name", "Bot")
 		_set_controls_disabled(false)
 		ready_button.disabled = true  # hazır butonu sadece kendi partin için
@@ -471,6 +456,7 @@ func _start_editing(bot_id: int) -> void:
 	_selected_icon_index = PartyPresets.clamp_icon_index(_selected_icon_index)
 	_refresh_icon_grid_selection()
 	_build_color_row()
+	_build_ideology_rows()
 	_update_preview()
 	_refresh_players_panel()
 
@@ -498,8 +484,9 @@ func _set_controls_disabled(disabled: bool) -> void:
 	for btn in icon_grid.get_children():
 		btn.disabled = disabled
 	_build_color_row()
-	for axis in _ideology_sliders.keys():
-		_ideology_sliders[axis].editable = not disabled
+	for axis in _ideology_buttons.keys():
+		for button in _ideology_buttons[axis]:
+			button.disabled = disabled
 
 func _on_party_setup_finished() -> void:
 	SceneTransition.fade_to_scene("res://scenes/GameScreen.tscn")

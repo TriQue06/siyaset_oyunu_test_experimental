@@ -311,17 +311,20 @@ func _request_set_party_and_ready(party_name: String, icon_index: int, icon_colo
 
 ## Oda sahibi bir botun partisinin adını, logosunu ve rengini değiştirir
 ## (ideolojisi ve hazır durumu korunur). Renk başka bir partideyse reddedilir.
-func set_bot_party(bot_id: int, party_name: String, icon_index: int, bg_color: Color) -> void:
+## ideology boş verilirse botun görüşü değişmez.
+func set_bot_party(bot_id: int, party_name: String, icon_index: int, bg_color: Color, ideology: Dictionary = {}) -> void:
 	if not MultiplayerManager.is_local_owner() or not MultiplayerManager.is_bot(bot_id):
 		return
 	if not is_valid_name(party_name) or not is_valid_colors(Color.WHITE, bg_color):
 		return
+	if not ideology.is_empty() and not IdeologyAxes.is_valid_start_ideology(ideology):
+		return
 	if MultiplayerManager.room_code == "" or MultiplayerManager.is_host:
-		_apply_bot_party(bot_id, party_name, icon_index, bg_color)
+		_apply_bot_party(bot_id, party_name, icon_index, bg_color, ideology)
 	else:
-		_request_set_bot_party.rpc_id(1, bot_id, party_name, icon_index, bg_color)
+		_request_set_bot_party.rpc_id(1, bot_id, party_name, icon_index, bg_color, ideology)
 
-func _apply_bot_party(bot_id: int, party_name: String, icon_index: int, bg_color: Color) -> void:
+func _apply_bot_party(bot_id: int, party_name: String, icon_index: int, bg_color: Color, ideology: Dictionary = {}) -> void:
 	if not parties.has(bot_id) or icon_index < 0 or icon_index >= PartyPresets.icon_count():
 		return
 	if color_owner(bg_color, bot_id) != -1:
@@ -332,19 +335,23 @@ func _apply_bot_party(bot_id: int, party_name: String, icon_index: int, bg_color
 	parties[bot_id]["name"] = party_name
 	parties[bot_id]["icon_index"] = icon_index
 	parties[bot_id]["bg_color"] = bg_color
+	if not ideology.is_empty():
+		parties[bot_id]["ideology"] = ideology.duplicate()
 	if MultiplayerManager.room_code != "":
 		_broadcast_parties()
 	parties_updated.emit()
 
 @rpc("any_peer", "reliable")
-func _request_set_bot_party(bot_id: int, party_name: String, icon_index: int, bg_color: Color) -> void:
+func _request_set_bot_party(bot_id: int, party_name: String, icon_index: int, bg_color: Color, ideology: Dictionary = {}) -> void:
 	if not MultiplayerManager.is_host:
 		return
 	if multiplayer.get_remote_sender_id() != MultiplayerManager.owner_id or not MultiplayerManager.is_bot(bot_id):
 		return
 	if not is_valid_name(party_name) or not is_valid_colors(Color.WHITE, bg_color):
 		return
-	_apply_bot_party(bot_id, party_name, icon_index, bg_color)
+	if not ideology.is_empty() and not IdeologyAxes.is_valid_start_ideology(ideology):
+		return
+	_apply_bot_party(bot_id, party_name, icon_index, bg_color, ideology)
 
 func _broadcast_parties() -> void:
 	state_version += 1

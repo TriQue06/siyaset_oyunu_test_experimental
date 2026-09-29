@@ -109,7 +109,7 @@ static func _axis_row(axis: String, value: float, color: Color) -> Control:
 	var title := _label(String(info[0]), 13, Color.WHITE)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(title)
-	top.add_child(_label(IdeologyAxes.format_value(value), 13, color.lightened(0.25)))
+	top.add_child(_label(IdeologyAxes.position_text(axis, value), 13, color.lightened(0.25)))
 
 	var scale := HBoxContainer.new()
 	scale.add_theme_constant_override("separation", 6)

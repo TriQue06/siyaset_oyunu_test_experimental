@@ -31,6 +31,13 @@ const MIN_REGION_HEXES := 4
 const PROVINCE_SEATS := 425
 const MIN_SEATS := 2
 const METRO_COUNT := 5
+## TIKIZ BÜYÜME: bölge her adımda birkaç aday hücreye bakar ve kendi
+## hücreleriyle en çok komşu olanı alır (ince kollar/çıkıntılar oluşmasın).
+const GROWTH_SAMPLES := 8
+## TÖRPÜLEME: büyüme bitince, komşularının çoğu başka bir bölgede olan
+## "çıkıntı" hücreler o bölgeye devredilir (bölgeler bitişik kalır).
+const SMOOTH_PASSES := 4
+const SMOOTH_MIN_FOREIGN := 4
 
 const ADJECTIVES := ["Taşlı", "Yeşil", "Kızıl", "Ak", "Kara", "Gök", "Sarı", "Ulu", "Derin", "Eski",
 	"Yeni", "Kuru", "Serin", "Uzun", "Yüce", "Çamlı", "Kayalı", "Güneşli", "Rüzgârlı", "Sisli", "Karlı",
@@ -232,8 +239,10 @@ static func _grow_regions(land: Array, rng: RandomNumberGenerator) -> Array:
 		if pick == -1:
 			break
 		var frontier: Array = frontiers[pick]
-		var grown := false
-		while not frontier.is_empty() and not grown:
+		var cell := -1
+		var cell_score := -INF
+		var tries := 0
+		while not frontier.is_empty() and tries < GROWTH_SAMPLES:
 			var k := rng.randi_range(0, frontier.size() - 1)
 			var from: int = frontier[k]
 			var options: Array = []
@@ -243,14 +252,73 @@ static func _grow_regions(land: Array, rng: RandomNumberGenerator) -> Array:
 			if options.is_empty():
 				frontier.remove_at(k)
 				continue
-			var cell: int = options[rng.randi_range(0, options.size() - 1)]
+			tries += 1
+			var candidate: int = options[rng.randi_range(0, options.size() - 1)]
+			var own := 0
+			for n in neighbor_cells(candidate):
+				if int(cells[n]) == pick:
+					own += 1
+			var score := own + rng.randf() * 0.9
+			if score > cell_score:
+				cell_score = score
+				cell = candidate
+		var grown := cell != -1
+		if grown:
 			cells[cell] = pick
 			sizes[pick] = int(sizes[pick]) + 1
 			frontier.append(cell)
 			remaining -= 1
-			grown = true
+	_smooth_regions(cells)
 	_merge_tiny(cells, seeds.size())
 	return cells
+
+## Çıkıntı törpüleme: bir hücrenin en az SMOOTH_MIN_FOREIGN komşusu aynı başka
+## bölgedeyse hücre o bölgeye geçer — ama sadece kendi bölgesi bölünmüyorsa ve
+## küçülüp MIN_REGION_HEXES'in altına inmiyorsa.
+static func _smooth_regions(cells: Array) -> void:
+	for _pass in SMOOTH_PASSES:
+		var changed := false
+		var sizes := {}
+		for v in cells:
+			if int(v) >= 0:
+				sizes[int(v)] = int(sizes.get(int(v), 0)) + 1
+		for i in cells.size():
+			var own := int(cells[i])
+			if own < 0 or int(sizes[own]) <= MIN_REGION_HEXES:
+				continue
+			var counts := {}
+			for n in neighbor_cells(i):
+				var o := int(cells[n])
+				if o >= 0 and o != own:
+					counts[o] = int(counts.get(o, 0)) + 1
+			var target := -1
+			for o in counts.keys():
+				if int(counts[o]) >= SMOOTH_MIN_FOREIGN and (target == -1 or int(counts[o]) > int(counts[target])):
+					target = o
+			if target == -1:
+				continue
+			cells[i] = target
+			if not _region_connected(cells, own):
+				cells[i] = own
+				continue
+			sizes[own] = int(sizes[own]) - 1
+			sizes[target] = int(sizes[target]) + 1
+			changed = true
+		if not changed:
+			break
+
+static func _region_connected(cells: Array, region: int) -> bool:
+	var start := -1
+	var total := 0
+	for i in cells.size():
+		if int(cells[i]) == region:
+			total += 1
+			if start == -1:
+				start = i
+	if start == -1:
+		return true
+	var seen := {}
+	return _flood(start, func(j): return int(cells[j]) == region, seen).size() == total
 
 ## MIN_REGION_HEXES'ten küçük bölgeler en çok sınır paylaştıkları komşuya katılır,
 ## sonra indeksler 0..n-1 olacak şekilde sıkıştırılır.

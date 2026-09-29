@@ -84,24 +84,62 @@ func _derive() -> void:
 				sets[id][ids[o]] = true
 	for id in ids:
 		_neighbors[id] = (sets[id] as Dictionary).keys()
-		# Merkez: ağırlık merkezine en yakın KENDİ hücresi (U biçimli bölgede
-		# nokta başka bölgeye düşmesin).
-		var region_cells: Array = _region_cells[id]
-		var sum := Vector2.ZERO
-		for c in region_cells:
-			sum += cell_center(c)
-		var mean := sum / maxf(1.0, float(region_cells.size()))
-		var best := mean
-		var best_d := INF
-		for c in region_cells:
-			var d := cell_center(c).distance_squared_to(mean)
-			# İç hücreler (tüm komşuları aynı bölge) tercih edilir.
-			if _is_interior(c):
-				d *= 0.5
-			if d < best_d:
-				best_d = d
-				best = cell_center(c)
-		_centers[id] = best
+		_centers[id] = _widest_center(id)
+
+## VEKİL NOKTALARININ YERİ: ilin EN GENİŞ ve en merkezi yeri. Her hücrenin
+## "derinliği" (il sınırına kaç hücre uzak) ölçülür; en derin hücreler ilin
+## en geniş kısmıdır. Bunlar arasından ilin ağırlık merkezine en yakın olan
+## seçilir; en derin hücreler bitişikse noktalar onların ortasına oturur.
+func _widest_center(id: String) -> Vector2:
+	var region_cells: Array = _region_cells[id]
+	if region_cells.is_empty():
+		return Vector2.ZERO
+	var r: int = _index_of[id]
+	var depth := {}
+	var queue: Array = []
+	for c in region_cells:
+		var around := HexGridGenerator.neighbor_cells(c, cols, rows)
+		var edge := around.size() < 6
+		for n in around:
+			if cells[n] != r:
+				edge = true
+				break
+		if edge:
+			depth[c] = 0
+			queue.append(c)
+	var head := 0
+	while head < queue.size():
+		var cur: int = queue[head]
+		head += 1
+		for n in HexGridGenerator.neighbor_cells(cur, cols, rows):
+			if cells[n] == r and not depth.has(n):
+				depth[n] = int(depth[cur]) + 1
+				queue.append(n)
+	var max_depth := 0
+	var sum := Vector2.ZERO
+	for c in region_cells:
+		max_depth = maxi(max_depth, int(depth.get(c, 0)))
+		sum += cell_center(c)
+	var mean := sum / float(region_cells.size())
+	var deepest: Array = []
+	for c in region_cells:
+		if int(depth.get(c, 0)) == max_depth:
+			deepest.append(c)
+	# En derin hücrelerden merkeze en yakını.
+	var best: int = deepest[0]
+	for c in deepest:
+		if cell_center(c).distance_squared_to(mean) < cell_center(best).distance_squared_to(mean):
+			best = c
+	# Birbirine komşu en derin hücreler varsa ortalarına (hâlâ il içinde kalır).
+	var cluster: Array = [best]
+	for c in deepest:
+		if c != best and HexGridGenerator.hex_distance(c, best, cols) == 1:
+			cluster.append(c)
+	var point := Vector2.ZERO
+	for c in cluster:
+		point += cell_center(c)
+	point /= float(cluster.size())
+	return point if province_at(point) == id else cell_center(best)
 
 func _is_interior(cell: int) -> bool:
 	var r: int = cells[cell]

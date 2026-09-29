@@ -115,6 +115,15 @@ func play(seed_value: int, human_votes: bool) -> Dictionary:
 	return {"stall": not cm.game_finished, "where": "sure doldu: " + _diagnose(),
 		"seconds": now, "elections": elections}
 
+## Oyun sonu SİYASİ KALE dağılımı (bilgi amaçlı): parti -> kale sayısı.
+func _kale_summary() -> String:
+	var counts := {}
+	for province_id in cm.strongholds.keys():
+		var owner := int(cm.strongholds[province_id])
+		var name: String = pm.parties.get(owner, {}).get("name", "?")
+		counts[name] = int(counts.get(name, 0)) + 1
+	return "kale %d/%d %s" % [cm.strongholds.size(), cm._province_ids.size(), str(counts)]
+
 func _initialize() -> void:
 	await process_frame
 	mm = root.get_node("MultiplayerManager")
@@ -129,6 +138,7 @@ func _initialize() -> void:
 		var result := play(seed_value, true)
 		check("seed %d: oyun takilmadan bitti" % seed_value, not result["stall"],
 			"%s (%.0f sn, %d secim)" % [result["where"], result["seconds"], result["elections"]])
+		print("        " + _kale_summary())
 
 	print("")
 	print("=== CEVRIM DISI TAM OYUN (insan HIC OY VERMIYOR / AFK) ===")

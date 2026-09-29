@@ -102,7 +102,9 @@ static func _known_centers(bot: int) -> Dictionary:
 		var center := CardManager.province_center(province_id)
 		var estimate := {}
 		for axis in IdeologyAxes.AXES:
-			estimate[axis] = signf(float(center.get(axis, 0.0))) * LEANING_ESTIMATE
+			# Teşkilat raporu gibi: uç ya da "orta" (il görüşü artık kesirli, kayabilir).
+			var v := float(center.get(axis, 0.0))
+			estimate[axis] = 0.0 if absf(v) < 0.5 else signf(v) * LEANING_ESTIMATE
 		result[province_id] = estimate
 	return result
 
@@ -153,9 +155,10 @@ static func choose_action(bot: int) -> Dictionary:
 		var rested: bool = CardManager.round_number - int(CardManager.law_rounds.get(bot, -99)) >= LAW_EVERY_ROUNDS
 		if not rested:
 			law = {}
-		if not law.is_empty() and float(law["score"]) - GameRules.LAW_MANA_COST * mana_value > best_score:
+		var law_cost: int = CardManager.law_mana_cost(bot, String(law.get("law", "")))
+		if not law.is_empty() and CardManager.can_propose_law(bot, String(law["law"])) and float(law["score"]) - law_cost * mana_value > best_score:
 			best = {"type": "law", "law": law["law"]}
-			best_score = float(law["score"]) - GameRules.LAW_MANA_COST * mana_value
+			best_score = float(law["score"]) - law_cost * mana_value
 
 	var org := _best_organization(bot, known)
 	if not org.is_empty() and float(org["score"]) - GameRules.ORG_MANA_COST * mana_value > best_score:

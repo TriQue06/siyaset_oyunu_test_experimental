@@ -42,6 +42,8 @@ var _edges: Dictionary = {}        # province_id -> Array[[a, b]] (bölge dış 
 var _colors_dirty := true
 ## Odak parıltısı: {"id", "color", "time", "duration", "icon"}; boşsa yok.
 var _pulse: Dictionary = {}
+## Siyasi kaleler: province_id -> sahibinin rengi.
+var _strongholds: Dictionary = {}
 
 func _ready() -> void:
 	for child in get_children():
@@ -170,6 +172,8 @@ func _draw() -> void:
 		draw_mesh(_land_mesh, null)
 	if _border_mesh != null and _border_mesh.get_surface_count() > 0:
 		draw_mesh(_border_mesh, null)
+	for province_id in _strongholds.keys():
+		_draw_castle(_castle_anchor(province_id), _strongholds[province_id])
 	if _hovered_id != "":
 		_draw_region_outline(_hovered_id, HOVER_COLOR, 1.8)
 	if not _pulse.is_empty():
@@ -178,6 +182,37 @@ func _draw() -> void:
 func _draw_region_outline(province_id: String, color: Color, width: float) -> void:
 	for edge in _edges.get(province_id, []):
 		draw_line(edge[0], edge[1], color, width, true)
+
+# --- Siyasi kale simgesi ----------------------------------------------------------
+
+func set_strongholds(marks: Dictionary) -> void:
+	if marks.hash() == _strongholds.hash():
+		return
+	_strongholds = marks.duplicate()
+	queue_redraw()
+
+## Simge bölgenin en üstteki hücresine oturur (merkezdeki vekil noktalarına binmesin).
+func _castle_anchor(province_id: String) -> Vector2:
+	var best := GameMap.center_of(province_id)
+	var best_y := INF
+	for cell in GameMap.region_cells(province_id):
+		var c := GameMap.cell_center(cell)
+		if c.y < best_y - 0.1 or (absf(c.y - best_y) <= 0.1 and absf(c.x - GameMap.center_of(province_id).x) < absf(best.x - GameMap.center_of(province_id).x)):
+			best_y = c.y
+			best = c
+	return best
+
+func _draw_castle(pos: Vector2, color: Color) -> void:
+	var ink := Color(0.06, 0.06, 0.1, 0.95)
+	var body := PackedVector2Array([
+		pos + Vector2(-5.5, 5), pos + Vector2(-5.5, -4), pos + Vector2(-3.5, -4), pos + Vector2(-3.5, -2),
+		pos + Vector2(-1, -2), pos + Vector2(-1, -4), pos + Vector2(1, -4), pos + Vector2(1, -2),
+		pos + Vector2(3.5, -2), pos + Vector2(3.5, -4), pos + Vector2(5.5, -4), pos + Vector2(5.5, 5)])
+	var outline := body.duplicate()
+	outline.append(body[0])
+	draw_colored_polygon(body, color.lightened(0.15))
+	draw_polyline(outline, ink, 1.2, true)
+	draw_rect(Rect2(pos + Vector2(-1.2, 1.5), Vector2(2.4, 3.5)), ink)
 
 # --- Odak parıltısı (olay logundaki 🎯 düğmesi) -----------------------------------
 

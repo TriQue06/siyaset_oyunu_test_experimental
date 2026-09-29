@@ -171,6 +171,66 @@ const STEAL_THIEF_NATIONAL_LIMIT := -0.25
 const STEAL_VICTIM_NATIONAL_PER_SEAT := 0.012
 const STEAL_VICTIM_NATIONAL_LIMIT := 0.35
 
+# --- İllerin ideolojik dönüşümü (Siyasi Kale) ---------------------------------
+## Miting, yatırım ve yasa artık ilin SEÇMEN MERKEZİNİ de hamleyi yapan partinin
+## görüşüne doğru çeker: merkez += (parti − merkez) × oran (eksen başına).
+const MITING_PULL := 0.06
+const INVEST_PULL := 0.05
+## Yasa bütün illerde SADECE kendi ekseninde, sunanın o eksendeki görüşüne çeker.
+const LAW_PULL_PASSED := 0.04
+const LAW_PULL_REJECTED := 0.015
+## GERİ DÖNÜŞ: çekilmeyen il her tur sonunda kendi DOĞAL görüşüne (oyun
+## başındaki merkez) bu oranda geri döner. Dönüşümü kalıcı kılmak sürekli
+## emek ister; yoksa tek bir iktidar partisi bütün ülkeyi kendine çekerdi.
+const PROVINCE_REVERSION := 0.06
+
+## Kale yakınlığı = 1 − mesafe / STRONGHOLD_DISTANCE_SCALE (0..1).
+## %75 yakınlık (mesafe ≤ 1,5) + o ilde teşkilat = SİYASİ KALE.
+const STRONGHOLD_DISTANCE_SCALE := 6.0
+const STRONGHOLD_THRESHOLD := 0.75
+## Kale hemen yıkılmaz: sahibi ancak yakınlık bunun altına düşerse kaybeder
+## (parti kendi görüşünü değiştirip kalesinden uzaklaşırsa).
+const STRONGHOLD_LOSS_THRESHOLD := 0.6
+## İdeolojik değişim kalkanı: RAKİPLERİN bir kale ili çekme hızı %70 yavaşlar.
+const STRONGHOLD_RESISTANCE := 0.7
+
+## İlin merkezinin partiye yakınlığı (kale ölçüsü, 0..1).
+static func stronghold_closeness(party_ideology: Dictionary, center: Dictionary) -> float:
+	return clampf(1.0 - ElectionModel.distance(party_ideology, center) / STRONGHOLD_DISTANCE_SCALE, 0.0, 1.0)
+
+## Bir çekim adımı: yeni merkez (eksen −3..+3 içinde kalır). axis_only verilirse
+## sadece o eksen çekilir. Kalesi başkasına ait ilde oran kalkan kadar azalır.
+static func pull_center(center: Dictionary, target: Dictionary, rate: float, shielded: bool, axis_only: String = "") -> Dictionary:
+	var effective := rate * ((1.0 - STRONGHOLD_RESISTANCE) if shielded else 1.0)
+	var result := center.duplicate()
+	for axis in AXES:
+		if axis_only != "" and axis != axis_only:
+			continue
+		var c := float(center.get(axis, 0.0))
+		result[axis] = clampf(c + (float(target.get(axis, 0.0)) - c) * effective, -3.0, 3.0)
+	return result
+
+# --- Parti ideolojisinin esnekliği ---------------------------------------------------
+## Merkeze yakın kaymak serbesttir. Radikalleşmek (|görüş| RADICAL_FREE'yi aşınca)
+## ve yerleşik bir görüşten ZIT YÖNE dönmek taban güvenini sarsar (ulusal puan).
+const RADICAL_FREE := 1.5
+const RADICAL_STEP_COST := 0.3     # RADICAL_FREE'nin ötesindeki her yarım adım
+const REVERSAL_FREE := 0.5         # bu kadar merkezdeyken dönmek bedava
+const REVERSAL_BASE_COST := 0.2
+const REVERSAL_PER_POINT_COST := 0.15
+
+## Bir eksendeki kaymanın ulusal puan bedeli (≤ 0).
+static func ideology_shift_national(old_value: float, new_value: float) -> float:
+	var delta := new_value - old_value
+	if is_zero_approx(delta):
+		return 0.0
+	var penalty := 0.0
+	if absf(new_value) > absf(old_value) and absf(new_value) > RADICAL_FREE:
+		penalty += RADICAL_STEP_COST * (absf(new_value) - maxf(absf(old_value), RADICAL_FREE)) / 0.5
+	if absf(old_value) > REVERSAL_FREE and signf(delta) != signf(old_value):
+		penalty += REVERSAL_BASE_COST + REVERSAL_PER_POINT_COST * absf(old_value)
+	return -penalty
+
 const AXES := ["economic", "social", "administrative"]
 
 static func org_action_mult(level: int) -> float:

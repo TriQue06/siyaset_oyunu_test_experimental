@@ -33,6 +33,7 @@ func new_game(ideologies: Dictionary) -> void:
 		}
 	cm.init_game()
 	cm.province_ideology = voters.duplicate(true)
+	cm._province_origin = voters.duplicate(true)
 	cm.turn_order = ideologies.keys()
 	cm.current_turn_index = 0
 
@@ -70,6 +71,7 @@ func _initialize() -> void:
 	mm = root.get_node("MultiplayerManager")
 	pm = root.get_node("PartyManager")
 	cm = root.get_node("CardManager")
+	cm.fixed_map_seed = 1950
 	gm = root.get_node("GovernmentManager")
 	gp = root.get_node("GovernmentPresets")
 	cp = root.get_node("CardPresets")
@@ -110,7 +112,7 @@ func _initialize() -> void:
 
 	print("")
 	print("=== 3) MITING ===")
-	new_game({1: ideology(0, 2, 2), 2: ideology(0, 2, 2)})
+	new_game({1: konya.duplicate(), 2: konya.duplicate()})
 	check("dengeye yakin partinin riski 0", near(cm.miting_risk(1, TestProvinces.id("konya")), 0.0), "%.2f" % cm.miting_risk(1, TestProvinces.id("konya")))
 	cm._apply_miting(1, TestProvinces.id("konya"))
 	check("basarili miting: il +3", near(cm.local_of(TestProvinces.id("konya"), 1), PublicOpinion.MITING_LOCAL))
@@ -183,7 +185,7 @@ func _initialize() -> void:
 	check("iktidar muhalefete EVET: yakin ilde nötr/arti", cm.local_of(eco_pos, 1) >= -0.001 or a_pos < 0.67,
 		"%.2f (uyum %.2f)" % [cm.local_of(eco_pos, 1), a_pos])
 	check("HAYIR: yakin ilde eksi, zit ilde arti", cm.local_of(eco_pos, 2) < 0.0 and cm.local_of(eco_neg, 2) > 0.0)
-	check("yasa ulusal puana yazilmaz", cm.national_support.is_empty(), str(cm.national_support))
+	check("yasa ulusal puana sadece gorus degisimi bedeli yazar", cm.national_support.values().all(func(v): return float(v) <= 0.0), str(cm.national_support))
 	check("getirenin gorusu yasa yonune kaydi", int(pm.parties[3]["ideology"]["economic"]) == 2)
 
 	cm.local_support = {}

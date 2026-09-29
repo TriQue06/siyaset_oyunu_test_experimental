@@ -1491,6 +1491,7 @@ func _select_target_province(province_id: String) -> void:
 	_set_target_hint("%s  ·  Onaylamak için tekrar dokun" % detail)
 
 func _on_opinion_changed() -> void:
+	_refresh_strongholds()
 	_refresh_score_panel()
 	_refresh_agenda_banner()
 	if _map_layer != MapLayer.SEATS:
@@ -2577,7 +2578,9 @@ func _law_circle(axis: String, dir: int) -> Control:
 	circle.mouse_filter = Control.MOUSE_FILTER_STOP
 	circle.mouse_default_cursor_shape = Control.CURSOR_DRAG
 	var label := Label.new()
-	label.text = String(law["side"])
+	# Görüşüne ZIT yasa ek mana ister: bedel dairenin üstünde yazar.
+	var law_cost := CardManager.law_mana_cost(multiplayer.get_unique_id(), law_type)
+	label.text = String(law["side"]) + ("\n+%d mana" % law_cost if law_cost > 0 else "")
 	label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -2591,8 +2594,9 @@ func _law_circle(axis: String, dir: int) -> Control:
 	circle.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
-				_law_info.text = "%s (%s)%s" % [law["title"], CardPresets.law_direction_text(law_type),
-					"  ·  gündemde: sunulabilir" if on_agenda else "  ·  gündemde değil"]
+				_law_info.text = "%s (%s)%s%s" % [law["title"], CardPresets.law_direction_text(law_type),
+					"  ·  gündemde: sunulabilir" if on_agenda else "  ·  gündemde değil",
+					("  ·  görüşüne aykırı: %s" % GameRules.cost_text(law_cost)) if law_cost > 0 else ""]
 				_start_law_drag(law_type)
 			elif _drag_hand_index == LAW_DRAG_INDEX:
 				_finish_drag()
@@ -2605,7 +2609,7 @@ func _start_law_drag(law_type: String) -> void:
 		_show_toast("Bu eksen gündemde değil: bu dönem sadece %s yasaları sunulabilir." % CardPresets.agenda_data(current)["axis_title"])
 		return
 	if not CardManager.can_propose_law(multiplayer.get_unique_id(), law_type):
-		_show_toast(_action_block_reason(GameRules.LAW_MANA_COST, true))
+		_show_toast(_action_block_reason(CardManager.law_mana_cost(multiplayer.get_unique_id(), law_type), true))
 		return
 	_start_drag(LAW_DRAG_INDEX, law_type, null)
 
@@ -2849,9 +2853,20 @@ func _on_layer_button_pressed(layer: int) -> void:
 	_set_map_layer(layer)
 
 ## Katmana göre il renkleri. Vurgulu il (seçim modu) koyulaştırılmış kalır.
+## Siyasi kaleler haritada sahibinin renginde küçük bir kale simgesiyle durur.
+func _refresh_strongholds() -> void:
+	if map_holder == null:
+		return
+	var marks := {}
+	for province_id in CardManager.strongholds.keys():
+		var owner := int(CardManager.strongholds[province_id])
+		marks[province_id] = PartyManager.parties.get(owner, {}).get("bg_color", UiTheme.GOLD)
+	map_holder.set_strongholds(marks)
+
 func _apply_map_layer_colors() -> void:
 	if map_holder == null:
 		return
+	_refresh_strongholds()
 	var me := multiplayer.get_unique_id()
 	var mine: Color = PartyManager.parties.get(me, {}).get("bg_color", Color(0.5, 0.5, 0.5))
 	mine.a = 1.0

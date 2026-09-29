@@ -83,6 +83,13 @@ func refresh() -> void:
 	header.add_child(close_button)
 	_body.add_child(header)
 	_body.add_child(_label("%d milletvekili" % CardManager.province_seat_count(province_id), 12, DIM))
+	# SİYASİ KALE herkese açık bilgi: rakiplerin burada seçmeni çevirmesi yavaş.
+	var owner := CardManager.stronghold_of(province_id)
+	if owner != -1:
+		var party: Dictionary = PartyManager.parties.get(owner, {})
+		_body.add_child(_label("%s'nın SİYASİ KALESİ — rakipler seçmeni %%%d daha yavaş çevirir." % [
+			party.get("name", "?"), int(round(PublicOpinion.STRONGHOLD_RESISTANCE * 100.0))], 12,
+			(party.get("bg_color", UiTheme.GOLD) as Color).lightened(0.3)))
 
 	_build_intel()
 	_build_parties()
@@ -102,7 +109,12 @@ func _build_intel() -> void:
 		return
 	var center := CardManager.province_center(province_id)
 	for axis in IdeologyAxes.AXES:
-		_body.add_child(_label(CardPresets.leaning_text(axis, int(center.get(axis, 0))), 12, INTEL_COLOR))
+		_body.add_child(_label(CardPresets.leaning_text(axis, roundi(float(center.get(axis, 0.0)))), 12, INTEL_COLOR))
+	# Seçmene ne kadar yakınsın (kale %75'te kurulur); sayı değil kelime.
+	var closeness := CardManager.stronghold_closeness(province_id, me)
+	var closeness_text := "çok yakın" if closeness >= PublicOpinion.STRONGHOLD_THRESHOLD else ("yakın" if closeness >= 0.55 \
+		else ("uzak" if closeness >= 0.3 else "çok uzak"))
+	_body.add_child(_label("Seçmen sana %s." % closeness_text, 12, INTEL_COLOR))
 	var poll := CardManager.province_poll(me, province_id)
 	if poll.is_empty():
 		_body.add_child(_label("Anket için teşkilatı 2. seviyeye çıkar (%d mana)." % GameRules.ORG_MANA_COST, 12, DIM))

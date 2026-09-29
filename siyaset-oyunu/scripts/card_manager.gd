@@ -143,6 +143,10 @@ var province_events: Dictionary = {}
 var province_ideology: Dictionary = {}
 ## province_id -> { peer_id -> seviye (1..GameRules.ORG_MAX_LEVEL) }
 var organizations: Dictionary = {}
+## SİYASİ KALE: province_id -> peer_id (bkz. PublicOpinion.STRONGHOLD_*).
+var strongholds: Dictionary = {}
+## Sadece host: illerin oyun başındaki DOĞAL görüşü (geri dönüş hedefi).
+var _province_origin: Dictionary = {}
 ## peer_id -> int
 var mana: Dictionary = {}
 
@@ -155,6 +159,8 @@ var state_version: int = 0
 ## OLAY LOGU (her cihaz kendi tutar, ağda gitmez; sahne değişse de kalır):
 ## Array[{"text", "peer_id", "province", "kind", "round"}]. En yeni sonda.
 var event_log: Array = []
+## Testler için: 0 değilse init_game her seferinde bu tohumla aynı haritayı kurar.
+var fixed_map_seed: int = 0
 
 # Seçim hesabına giren iller ve koltuk sayıları (yetkili kaynak GameMap).
 var _province_ids: Array = []
@@ -168,6 +174,8 @@ var final_election_pending: bool = false
 var _heartbeat_timer: float = 0.0
 ## Son hamlenin herkese duyurulacak mesajı.
 var _event_message: String = ""
+## Kale kazanma/kaybetme gibi ek log kayıtları: bir sonraki state olayına iliştirilir.
+var _pending_log: Array = []
 var _rng := RandomNumberGenerator.new()
 
 func _ready() -> void:
@@ -277,7 +285,7 @@ func can_choose_main_action(peer_id: int) -> bool:
 
 ## Bu oyuncu şu an bir yasa sunabilir mi? (law_type verilirse o yasa geçerli mi.)
 func can_propose_law(peer_id: int, law_type: String = "") -> bool:
-	if not can_choose_main_action(peer_id) or mana_of(peer_id) < GameRules.LAW_MANA_COST:
+	if not can_choose_main_action(peer_id) or mana_of(peer_id) < law_mana_cost(peer_id, law_type):
 		return false
 	if not has_seats(peer_id):
 		return false  # meclis dışı parti yasa teklif edemez
@@ -293,6 +301,20 @@ func can_propose_law(peer_id: int, law_type: String = "") -> bool:
 		return false
 	# İlk seçime kadar meclis yok: yasa yapılamaz (saf propaganda dönemi).
 	return not last_seats.is_empty() and GovernmentManager.can_submit_law()
+
+## Yasanın bu partiye bedeli: partinin yerleşik görüşüne ZIT yasa ek mana ister
+## (bkz. GameRules.LAW_AGAINST_*). law_type boşsa taban bedel.
+func law_mana_cost(peer_id: int, law_type: String = "") -> int:
+	var law := CardPresets.law_data(law_type)
+	if law.is_empty():
+		return GameRules.LAW_MANA_COST
+	var value := float(PartyManager.parties.get(peer_id, {}).get("ideology", {}).get(law["axis"], 0.0))
+	if signf(value) == float(-int(law["dir"])):
+		if absf(value) >= GameRules.LAW_AGAINST_LEVEL_2:
+			return GameRules.LAW_MANA_COST + 2
+		if absf(value) >= GameRules.LAW_AGAINST_LEVEL_1:
+			return GameRules.LAW_MANA_COST + 1
+	return GameRules.LAW_MANA_COST
 
 ## ANAYASA DEĞİŞİKLİĞİ sunulabilir mi? Yasadan farkı: GÜNDEM ŞARTI YOK
 ## (anayasa her dönem gündeme bakılmaksızın önerilebilir). Yasa hakkını
@@ -707,10 +729,12 @@ func init_game() -> void:
 	local_support = {}
 	province_events = {}
 	# YENİ ÜLKE: her oyunda rastgele altıgen harita (herkese tam durumla gider).
-	GameMap.generate_new(_rng.randi())
+	GameMap.generate_new(fixed_map_seed if fixed_map_seed != 0 else _rng.randi())
 	_load_province_seat_counts()
 	province_ideology = ProvinceIdeology.generate(_rng, _province_ids)
+	_province_origin = province_ideology.duplicate(true)
 	organizations = {}
+	strongholds = {}
 	game_finished = false
 	final_ranking = []
 	game_end_reason = ""
@@ -742,6 +766,7 @@ func abandon_game() -> void:
 	province_events = {}
 	province_ideology = {}
 	organizations = {}
+	strongholds = {}
 	mana = {}
 	game_finished = false
 	final_ranking = []
@@ -935,7 +960,7 @@ func _apply_law(peer_id: int, law_type: String) -> void:
 	_event_message = ""
 	if not GovernmentManager.submit_law(peer_id, law_type):
 		return
-	mana[peer_id] = mana_of(peer_id) - GameRules.LAW_MANA_COST
+	mana[peer_id] = mana_of(peer_id) - law_mana_cost(peer_id, law_type)
 	law_rounds[peer_id] = round_number
 	var event := {"type": "law", "peer_id": peer_id, "law": law_type}
 	if _event_message != "":
@@ -952,6 +977,7 @@ func _apply_organization(peer_id: int, province_id: String) -> void:
 	organizations[province_id] = entry
 	var verb := "kurdu" if level == 1 else "geliştirdi"
 	_log_province(province_id, "%s teşkilat %s (seviye %d)" % [_party_name(peer_id), verb, level])
+	_update_stronghold(province_id)
 	_push_state({"type": "organization", "peer_id": peer_id, "province": province_id,
 		"message": "%s, %s'da teşkilat %s (seviye %d)." % [_party_name(peer_id), _province_name(province_id), verb, level]})
 
@@ -1026,6 +1052,7 @@ func _apply_miting(peer_id: int, province_id: String) -> void:
 		_add_local(province_id, peer_id, PublicOpinion.MITING_LOCAL * org_mult, true)
 		_add_national(peer_id, PublicOpinion.MITING_NATIONAL * org_mult, true)
 		_log_province(province_id, "%s miting yaptı (+%.1f)" % [_party_name(peer_id), PublicOpinion.MITING_LOCAL * org_mult])
+		_pull_province(province_id, peer_id, PublicOpinion.MITING_PULL)
 		_event_message = "%s, %s'da miting yaptı." % [_party_name(peer_id), _province_name(province_id)]
 
 ## Yatırım: getiren parti daha çok, hükümet ortakları daha az kazanır.
@@ -1036,6 +1063,7 @@ func _apply_investment(peer_id: int, province_id: String) -> void:
 	for partner in GovernmentManager.government_party_ids():
 		if partner != peer_id:
 			_add_local(province_id, partner, PublicOpinion.INVEST_PARTNER_LOCAL)
+	_pull_province(province_id, peer_id, PublicOpinion.INVEST_PULL)
 	_log_province(province_id, "Hükümet yatırımı — %s getirdi (+%.1f, ortaklar +%.1f)" % [
 		_party_name(peer_id), PublicOpinion.INVEST_LOCAL, PublicOpinion.INVEST_PARTNER_LOCAL])
 	_event_message = "%s, %s'a hükümet yatırımı getirdi." % [_party_name(peer_id), _province_name(province_id)]
@@ -1103,8 +1131,28 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 		var choice := GovernmentManager.normalize_vote(votes[voter])
 		if choice != GovernmentManager.VOTE_ABSTAIN:
 			shifts.append({"peer": int(voter), "axis": axis, "delta": IdeologyAxes.LAW_VOTE_SHIFT * dir * choice})
+	var before := {}
+	for change in shifts:
+		before[change["peer"]] = float(PartyManager.parties.get(change["peer"], {}).get("ideology", {}).get(axis, 0.0))
 	PartyManager.apply_ideology_deltas(shifts)
 	var notes := ""
+	# TABAN GÜVENİ: radikalleşen ya da yerleşik görüşünden dönen parti ulusal
+	# destek kaybeder (bkz. PublicOpinion.ideology_shift_national).
+	var shaken: Array = []
+	for peer in before.keys():
+		var after := float(PartyManager.parties.get(peer, {}).get("ideology", {}).get(axis, 0.0))
+		var penalty := PublicOpinion.ideology_shift_national(float(before[peer]), after)
+		if penalty < 0.0:
+			_add_national(int(peer), penalty, true)
+			shaken.append(_party_name(int(peer)))
+	if not shaken.is_empty():
+		notes += " Görüş değişimi tabanı sarstı: %s." % ", ".join(PackedStringArray(shaken))
+	# Yasa, illerin seçmenini kendi ekseninde sunanın görüşüne doğru çeker.
+	var proposer_ideology: Dictionary = PartyManager.parties.get(proposer, {}).get("ideology", {})
+	for province_id in _province_ids:
+		_pull_province(province_id, proposer, PublicOpinion.LAW_PULL_PASSED if passed else PublicOpinion.LAW_PULL_REJECTED,
+			axis, proposer_ideology, false)
+	_refresh_all_strongholds()
 	if passed:
 		notes += " %s +%d puan." % [_party_name(proposer), law_pass_score(proposer_in_gov)]
 	_push_state({"type": "opinion", "peer_id": proposer, "message": "%s %s — %s bu görüşe yakın illerde güçlendi%s. Partisi %s yönüne kaydı.%s" % [
@@ -1221,9 +1269,80 @@ func _log_province(province_id: String, text: String) -> void:
 		events.pop_front()
 	province_events[province_id] = events
 
+# --- Siyasi kale -------------------------------------------------------------------
+
+## İlin seçmen merkezini partinin görüşüne doğru çeker (kaledeyse rakip yavaş).
+func _pull_province(province_id: String, peer_id: int, rate: float, axis_only: String = "",
+		target: Dictionary = {}, update: bool = true) -> void:
+	if not province_ideology.has(province_id):
+		return
+	if target.is_empty():
+		target = PartyManager.parties.get(peer_id, {}).get("ideology", {})
+	var owner := int(strongholds.get(province_id, -1))
+	var shielded := owner != -1 and owner != peer_id
+	province_ideology[province_id] = PublicOpinion.pull_center(province_ideology[province_id], target, rate, shielded, axis_only)
+	if update:
+		_update_stronghold(province_id)
+
+func stronghold_of(province_id: String) -> int:
+	return int(strongholds.get(province_id, -1))
+
+func stronghold_closeness(province_id: String, peer_id: int) -> float:
+	var ideology: Dictionary = PartyManager.parties.get(peer_id, {}).get("ideology", {})
+	return PublicOpinion.stronghold_closeness(ideology, province_center(province_id))
+
+## Kale kazanılır: teşkilatı olan ve ile %75+ yakın parti (en yakını). Kale
+## hemen yıkılmaz: sahibi ancak yakınlığı STRONGHOLD_LOSS_THRESHOLD'un altına
+## düşerse ya da eşiği geçen başka bir parti ondan daha yakınsa el değiştirir.
+func _update_stronghold(province_id: String) -> void:
+	var owner := stronghold_of(province_id)
+	var best := -1
+	var best_closeness := 0.0
+	for peer_id in turn_order:
+		if organization_level(province_id, int(peer_id)) <= 0:
+			continue
+		var c := stronghold_closeness(province_id, int(peer_id))
+		if c >= PublicOpinion.STRONGHOLD_THRESHOLD and c > best_closeness:
+			best = int(peer_id)
+			best_closeness = c
+	var owner_closeness := stronghold_closeness(province_id, owner) if owner != -1 else 0.0
+	var new_owner := owner
+	if owner == -1 or owner_closeness < PublicOpinion.STRONGHOLD_LOSS_THRESHOLD or not turn_order.has(owner):
+		new_owner = best
+	elif best != -1 and best != owner and best_closeness > owner_closeness:
+		new_owner = best
+	if new_owner == owner:
+		return
+	if owner != -1:
+		_log_province(province_id, "%s bu ildeki siyasi kalesini kaybetti" % _party_name(owner))
+		_pending_log.append({"text": "%s, %s'daki siyasi kalesini kaybetti." % [_party_name(owner), _province_name(province_id)],
+			"peer_id": owner, "province": province_id, "kind": "stronghold_lost"})
+	if new_owner == -1:
+		strongholds.erase(province_id)
+	else:
+		strongholds[province_id] = new_owner
+		_log_province(province_id, "%s bu ili SİYASİ KALESİ yaptı" % _party_name(new_owner))
+		_pending_log.append({"text": "%s, %s bölgesini siyasi kalesi yaptı." % [_party_name(new_owner), _province_name(province_id)],
+			"peer_id": new_owner, "province": province_id, "kind": "stronghold"})
+
+## Tur sonu: her il doğal görüşüne biraz geri döner (bkz. PROVINCE_REVERSION).
+func _revert_provinces() -> void:
+	for province_id in province_ideology.keys():
+		var origin: Dictionary = _province_origin.get(province_id, {})
+		if origin.is_empty():
+			continue
+		province_ideology[province_id] = PublicOpinion.pull_center(province_ideology[province_id], origin,
+			PublicOpinion.PROVINCE_REVERSION, false)
+	_refresh_all_strongholds()
+
+func _refresh_all_strongholds() -> void:
+	for province_id in _province_ids:
+		_update_stronghold(province_id)
+
 ## Tur sonu: puanlar sıfıra doğru söner; neredeyse sıfır olanlar silinir.
 ## (İl başkanlıkları sönmez.)
 func _decay_opinion() -> void:
+	_revert_provinces()
 	for peer_id in national_support.keys():
 		var value: float = national_of(peer_id) * PublicOpinion.NATIONAL_DECAY
 		if absf(value) < 0.05:
@@ -1635,6 +1754,8 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"local": local_support,
 		"events": province_events,
 		"organizations": organizations,
+		"strongholds": strongholds,
+		"province_ideology": province_ideology,
 		"mana": mana,
 		"game_finished": game_finished,
 		"final_ranking": final_ranking,
@@ -1643,7 +1764,6 @@ func _pack_state(include_results: bool) -> Dictionary:
 	if include_results:
 		state["map"] = GameMap.data
 		state["province_results"] = last_province_results
-		state["province_ideology"] = province_ideology
 	return state
 
 func _apply_state(state: Dictionary) -> void:
@@ -1673,6 +1793,7 @@ func _apply_state(state: Dictionary) -> void:
 	local_support = state["local"]
 	province_events = state["events"]
 	organizations = state.get("organizations", {})
+	strongholds = state.get("strongholds", {})
 	mana = state.get("mana", {})
 	game_finished = bool(state["game_finished"])
 	final_ranking = state["final_ranking"]
@@ -1688,6 +1809,10 @@ func _apply_state(state: Dictionary) -> void:
 ## Host: durumu (sürümü artırarak) herkese yayınlar ve olayın sinyallerini
 ## kendi tarafında da doğrudan atar (.rpc() göndericide çalışmaz).
 func _push_state(event: Dictionary, include_results: bool = false) -> void:
+	if not _pending_log.is_empty():
+		event = event.duplicate()
+		event["extra_log"] = _pending_log
+		_pending_log = []
 	if not _pending_dealt.is_empty():
 		event = event.duplicate()
 		event["dealt"] = _pending_dealt
@@ -1721,6 +1846,8 @@ func _emit_post_event(event: Dictionary) -> void:
 	if event.has("message"):
 		opinion_event.emit(str(event["message"]))
 		log_event(str(event["message"]), int(event.get("peer_id", -1)), String(event.get("province", "")), _log_kind(event))
+	for extra in event.get("extra_log", []):
+		log_event(String(extra["text"]), int(extra["peer_id"]), String(extra["province"]), String(extra["kind"]))
 	match type:
 		"round":
 			log_event("%s başladı." % GameRules.period_label(round_number), -1, "", "round")

@@ -88,6 +88,10 @@ static func cost_text(cost: float) -> String:
 
 ## Yasa sunmak BEDELSİZ (turda 1): meclis oyunun merkezi, mana engel olmasın.
 const LAW_MANA_COST := 0
+## Partinin yerleşik görüşüne ZIT bir yasa sunmak ek mana ister: o eksende
+## |görüş| ≥ LAW_AGAINST_LEVEL_1 ise +1, ≥ LAW_AGAINST_LEVEL_2 ise +2 mana.
+const LAW_AGAINST_LEVEL_1 := 1.0
+const LAW_AGAINST_LEVEL_2 := 2.0
 const LAWS_PER_ROUND := 1
 ## Teşkilat anketinin sapması (her partinin oyu en fazla bu oranda sapar):
 ## 2. seviye orta isabet, 3. seviye yüksek isabet.

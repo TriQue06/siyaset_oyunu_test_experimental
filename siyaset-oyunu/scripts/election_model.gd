@@ -247,95 +247,20 @@ static func compute(parties: Dictionary, province_seats: Dictionary, voters: Dic
 
 	for province_id in province_ids:
 		var shares: Dictionary = province_shares[province_id]
-		var alloc := allocate(shares, eligible, int(province_seats[province_id]))
+		var alloc := dhondt(shares, eligible, int(province_seats[province_id]))
 		var entry: Dictionary = {}
 		for peer_id in peer_ids:
 			var won: int = int(alloc.get(peer_id, 0))
 			entry[peer_id] = {"percent": float(shares[peer_id]) * 100.0, "seats": won}
 			seats[peer_id] = int(seats[peer_id]) + won
 		province_results[province_id] = entry
-	var list_alloc := allocate(vote_shares, eligible, NATIONAL_LIST_SEATS, true)
+	var list_alloc := dhondt(vote_shares, eligible, NATIONAL_LIST_SEATS)
 	var national_list := {}
 	for peer_id in peer_ids:
 		national_list[peer_id] = int(list_alloc.get(peer_id, 0))
 		seats[peer_id] = int(seats[peer_id]) + int(national_list[peer_id])
 	result["national_list"] = national_list
 	return result
-
-## SAYIM YÖNTEMİ (anayasayla değişir, bkz. MultiplayerManager.seat_method):
-##   "dhondt" : D'Hondt (büyük partiye hafif avantaj)
-##   "hare"   : Hare kotası + en büyük kalan (en orantılı, küçük partiye iyi)
-##   "wta"    : Kazanan hepsini alır (ildeki birinci bütün vekilleri alır)
-## Ulusal liste "wta"da D'Hondt ile dağılır (200 vekilin tek partiye gitmesi
-## meclisi anlamsızlaştırırdı).
-const METHOD_DHONDT := "dhondt"
-const METHOD_HARE := "hare"
-const METHOD_WTA := "wta"
-const SEAT_METHODS := [METHOD_DHONDT, METHOD_HARE, METHOD_WTA]
-static var seat_method: String = METHOD_DHONDT
-
-static func method_title(method: String) -> String:
-	match method:
-		METHOD_HARE:
-			return "Hare kotası"
-		METHOD_WTA:
-			return "Kazanan hepsini alır"
-	return "D'Hondt"
-
-## Geçerli sayım yöntemiyle vekil dağıtımı. national_list=true: ulusal liste.
-static func allocate(votes: Dictionary, eligible: Array, seat_count: int, national_list: bool = false) -> Dictionary:
-	match seat_method:
-		METHOD_HARE:
-			return hare(votes, eligible, seat_count)
-		METHOD_WTA:
-			return dhondt(votes, eligible, seat_count) if national_list else winner_takes_all(votes, eligible, seat_count)
-	return dhondt(votes, eligible, seat_count)
-
-## Hare kotası + en büyük kalan: kota = toplam oy / koltuk; herkes kotası kadar
-## tam koltuk alır, kalan koltuklar en büyük kalana gider (eşitlikte küçük peer_id).
-static func hare(votes: Dictionary, eligible: Array, seat_count: int) -> Dictionary:
-	var alloc: Dictionary = {}
-	for peer_id in eligible:
-		alloc[peer_id] = 0
-	if eligible.is_empty() or seat_count <= 0:
-		return alloc
-	var total := 0.0
-	for peer_id in eligible:
-		total += maxf(0.0, float(votes.get(peer_id, 0.0)))
-	if total <= 0.0:
-		return dhondt(votes, eligible, seat_count)
-	var given := 0
-	var remainders: Array = []
-	for peer_id in eligible:
-		var exact: float = maxf(0.0, float(votes.get(peer_id, 0.0))) / total * seat_count
-		var whole := int(floor(exact))
-		alloc[peer_id] = whole
-		given += whole
-		remainders.append([exact - whole, peer_id])
-	remainders.sort_custom(func(a, b): return a[0] > b[0] + 1e-12 or (absf(a[0] - b[0]) <= 1e-12 and a[1] < b[1]))
-	var k := 0
-	while given < seat_count:
-		var peer_id = remainders[k % remainders.size()][1]
-		alloc[peer_id] = int(alloc[peer_id]) + 1
-		given += 1
-		k += 1
-	return alloc
-
-## Kazanan hepsini alır: en çok oyu alan bütün koltukları alır (eşitlikte küçük peer_id).
-static func winner_takes_all(votes: Dictionary, eligible: Array, seat_count: int) -> Dictionary:
-	var alloc: Dictionary = {}
-	for peer_id in eligible:
-		alloc[peer_id] = 0
-	if eligible.is_empty():
-		return alloc
-	var best = eligible[0]
-	for peer_id in eligible:
-		var v := float(votes.get(peer_id, 0.0))
-		var b := float(votes.get(best, 0.0))
-		if v > b + 1e-12 or (absf(v - b) <= 1e-12 and peer_id < best):
-			best = peer_id
-	alloc[best] = seat_count
-	return alloc
 
 ## D'Hondt: her koltuk, oy / (aldığı koltuk + 1) oranı en yüksek partiye gider.
 ## Eşitlikte küçük peer_id kazanır (her istemcide aynı sonuç).

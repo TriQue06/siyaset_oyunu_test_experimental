@@ -70,6 +70,19 @@ func _initialize() -> void:
 		print("screenshot: midgame_agenda")
 		cmx.agenda = saved_agenda
 		scene._refresh_agenda_banner()
+		var cmr = root.get_node("CardManager")
+		var sides := {}
+		var k := 0
+		for peer_id in cmr.turn_order:
+			sides[peer_id] = 1 if k % 2 == 0 else -1
+			k += 1
+		cmr.start_referendum(cmr.turn_order[0], {"threshold": 5.0, "interval": 3}, sides)
+		scene._refresh_referendum_banner()
+		await create_timer(0.3).timeout
+		root.get_texture().get_image().save_png("%s/midgame_referendum.png" % OS.get_user_data_dir())
+		print("screenshot: midgame_referendum")
+		cmr.referendum = {}
+		scene._refresh_referendum_banner()
 		scene._on_law_button_pressed()
 		await create_timer(0.3).timeout
 		root.get_texture().get_image().save_png("%s/midgame_law.png" % OS.get_user_data_dir())

@@ -231,6 +231,21 @@ static func ideology_shift_national(old_value: float, new_value: float) -> float
 		penalty += REVERSAL_BASE_COST + REVERSAL_PER_POINT_COST * absf(old_value)
 	return -penalty
 
+# --- Referandum kampanyası ---------------------------------------------------------
+## Referandum sırasında miting/karalama/kaset genel seçimi değil, partinin ve
+## kararının (EVET/HAYIR) halktaki inandırıcılığını etkiler. Bir partinin bir
+## ildeki kampanya gücü = 1 + REFERENDUM_EFFECT × (ulusal + il kampanya puanı),
+## REFERENDUM_MIN..REFERENDUM_MAX arası. Partinin seçmeni bu güçle kendi
+## kararına oy verir; çekimser kalan partinin seçmeni ikiye bölünür.
+const REFERENDUM_EFFECT := 0.12
+const REFERENDUM_MIN := 0.3
+const REFERENDUM_MAX := 2.5
+## Sonuçtaki küçük sürpriz payı (± yüzde puan): anket kesin değildir.
+const REFERENDUM_NOISE := 2.0
+
+static func referendum_multiplier(national: float, local: float) -> float:
+	return clampf(1.0 + REFERENDUM_EFFECT * (national + local), REFERENDUM_MIN, REFERENDUM_MAX)
+
 const AXES := ["economic", "social", "administrative"]
 
 static func org_action_mult(level: int) -> float:

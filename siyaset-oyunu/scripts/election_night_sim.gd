@@ -190,7 +190,7 @@ func sample(t: float) -> Dictionary:
 		var p: Dictionary = provinces[province_id]
 		if float(p["c"]) <= 0.0:
 			continue
-		var alloc := ElectionModel.allocate(p["shares"], eligible, int(province_seats[province_id]))
+		var alloc := ElectionModel.dhondt(p["shares"], eligible, int(province_seats[province_id]))
 		p["seats"] = alloc
 		for peer_id in alloc.keys():
 			seats[peer_id] = int(seats[peer_id]) + int(alloc[peer_id])

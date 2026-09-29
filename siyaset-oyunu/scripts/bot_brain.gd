@@ -391,6 +391,9 @@ static func _evaluate(bot: int, card_type: String, known: Dictionary) -> Diction
 
 ## Kaset: en büyük rakibin (blok varsa insan hükümetinin) ulusal desteğini vurur.
 static func _eval_reputation(bot: int) -> Dictionary:
+	if CardManager.is_referendum_active():
+		var rival := _referendum_opponent(bot)
+		return {} if rival == -1 else {"score": 2.8, "peer": rival, "province": ""}
 	var target := _attack_target(bot)
 	if target == -1:
 		return {}
@@ -424,6 +427,8 @@ static func _attack_target(bot: int) -> int:
 
 ## Beklenen il gücü kazancı × ilin vekil sayısı × partinin o ildeki (bilinen) şansı.
 static func _eval_miting(bot: int, known: Dictionary) -> Dictionary:
+	if CardManager.is_referendum_active():
+		return _eval_referendum_miting(bot)
 	var ideology := _ideology(bot)
 	var best_province := ""
 	var best_value := -INF
@@ -449,6 +454,39 @@ static func _eval_miting(bot: int, known: Dictionary) -> Dictionary:
 	var score := best_value * 1.4 * (1.4 if _election_soon() else 1.0)
 	return {"score": score, "peer": -1, "province": best_province}
 
+# --- Referandum kampanyası -------------------------------------------------------------
+
+## Referandumda kararını (EVET/HAYIR) savunan bot: kendi kampanyasının en zayıf
+## olduğu büyük illerde miting yapar. Çekimser bot kampanyaya katılmaz.
+static func _eval_referendum_miting(bot: int) -> Dictionary:
+	if CardManager.referendum_side(bot) == GovernmentManager.VOTE_ABSTAIN:
+		return {}
+	var best := ""
+	var best_value := -INF
+	for province_id in _seats().keys():
+		var seats := float(CardManager.province_seat_count(province_id))
+		var risk := CardManager.miting_risk(bot, province_id)
+		var value := seats * (1.0 - risk * 1.5) / (1.0 + maxf(0.0, CardManager.ref_local_of(province_id, bot)) / 3.0)
+		if value > best_value:
+			best_value = value
+			best = province_id
+	if best == "":
+		return {}
+	return {"score": 1.6 + best_value / 8.0, "peer": -1, "province": best}
+
+## Referandumda karşı taraftaki en büyük parti (karalama/kaset hedefi).
+static func _referendum_opponent(bot: int) -> int:
+	var side := CardManager.referendum_side(bot)
+	if side == GovernmentManager.VOTE_ABSTAIN:
+		return -1
+	var target := -1
+	for peer_id in CardManager.turn_order:
+		if peer_id == bot or CardManager.referendum_side(peer_id) != -side:
+			continue
+		if target == -1 or GovernmentManager.seats_of(peer_id) > GovernmentManager.seats_of(target):
+			target = peer_id
+	return target
+
 static func _eval_investment(bot: int, known: Dictionary) -> Dictionary:
 	if not CardManager.is_government_party(bot):
 		return {}
@@ -466,6 +504,16 @@ static func _eval_investment(bot: int, known: Dictionary) -> Dictionary:
 
 ## En büyük rakibi, en çok vekilli ve onun zayıf, botun güçlü olduğu ilde karala.
 static func _eval_propaganda(bot: int, known: Dictionary) -> Dictionary:
+	if CardManager.is_referendum_active():
+		# Referandumda karşı kampanyayı en kalabalık ilde karala.
+		var rival := _referendum_opponent(bot)
+		if rival == -1:
+			return {}
+		var biggest := ""
+		for province_id in _seats().keys():
+			if biggest == "" or CardManager.province_seat_count(province_id) > CardManager.province_seat_count(biggest):
+				biggest = province_id
+		return {"score": 2.2, "peer": rival, "province": biggest}
 	var best := {}
 	var best_value := -INF
 	for province_id in _seats().keys():
@@ -616,22 +664,6 @@ static func _constitution_vote(bot: int) -> int:
 		score -= threshold_delta   # baraj düşerse iyi
 	else:
 		score += threshold_delta * 0.5   # büyük parti: baraj yükselsin
-	# SAYIM: en büyük parti "kazanan hepsini alır"ı sever, küçük partiler Hare'yi.
-	var new_method := String(payload.get("seat_method", MultiplayerManager.seat_method))
-	if new_method != MultiplayerManager.seat_method:
-		var biggest := true
-		for peer_id in GovernmentManager.voter_ids():
-			if GovernmentManager.seats_of(peer_id) > GovernmentManager.seats_of(bot):
-				biggest = false
-		var method_rank := {"hare": 0.0, "dhondt": 1.0, "wta": 2.0}
-		var shift := float(method_rank.get(new_method, 1.0)) - float(method_rank.get(MultiplayerManager.seat_method, 1.0))
-		if biggest:
-			score += shift * 1.0
-		elif share < 20.0:
-			score -= shift * 1.2
-	# İktidar yasaların kolay geçmesini, muhalefet zor geçmesini ister.
-	var law_delta := float(int(payload.get("law_pass", MultiplayerManager.law_pass_percent)) - MultiplayerManager.law_pass_percent)
-	score += law_delta / 25.0 * (-0.6 if CardManager.is_government_party(bot) else 0.6)
 	var interval_delta := float(new_interval - MultiplayerManager.election_interval)
 	score += interval_delta * (1.0 if CardManager.is_government_party(bot) else -1.0)
 	if score > 0.4:

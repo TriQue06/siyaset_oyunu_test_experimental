@@ -709,9 +709,12 @@ static func choose_vote(bot: int) -> int:
 ## ANAYASA TEKLİFİ: bot kendi çıkarına bir paket arar.
 ##   - Barajda zorlanıyorsa (oyu baraja yakın ya da altında) barajı düşürmek;
 ##     barajla zor durumdaki BAŞKA partileri de yanına alabilir.
-##   - En büyük partiyse ve baraja yakın küçük rakipler varsa barajı onların
-##     hemen üstüne çıkarmak (meclisten atmak).
-##   - Sayım yöntemi: en büyük parti "kazanan hepsini alır", küçük parti Hare.
+##   - DÜŞMANCA BARAJ: barajı aşmakta zorlanan (ya da zorlanmaya başlayan)
+##     bir rakip varsa, kendisi rahatça üstünde kalacaksa barajı o rakibin
+##     hemen üstüne çıkarmak (rakibi meclisten atmak, vekillerini paylaşmak).
+##   - KAZANAN HEPSİNİ ALIR: bot çok ilde birinciyse ve bu sayım ona vekil
+##     kazandıracaksa (kalesi olmayan, az ilde birinci rakipler ezilir).
+##   - Hare: küçük parti (%20 altı) daha orantılı sayım ister.
 ## Teklif ancak meclisin salt çoğunluğunun (referandum yolu) EVET demesi
 ## bekleniyorsa yapılır; insanların oyu bilinmez, sayılmaz.
 const CONSTITUTION_EVERY_ROUNDS := 4
@@ -724,10 +727,6 @@ static func _best_constitution(bot: int) -> Dictionary:
 		return {}
 	var threshold := MultiplayerManager.election_threshold
 	var share := float(CardManager.last_vote_shares.get(bot, 0.0))
-	var biggest := true
-	for peer_id in GovernmentManager.voter_ids():
-		if GovernmentManager.seats_of(peer_id) > GovernmentManager.seats_of(bot):
-			biggest = false
 	var candidates: Array = []
 	# 1) Barajda zorlanan bot: barajı oyunun belirgin altına indir.
 	if threshold > 0.0 and share < threshold + 2.0:
@@ -738,22 +737,31 @@ static func _best_constitution(bot: int) -> Dictionary:
 		var other := float(CardManager.last_vote_shares.get(peer_id, 0.0))
 		if peer_id != bot and threshold > 0.0 and other < threshold + 2.0:
 			struggling += 1
-	# 3) En büyük parti: baraja yakın küçük rakipleri dışarıda bırak.
-	if biggest:
-		var target := -1.0
-		for peer_id in CardManager.turn_order:
-			var other := float(CardManager.last_vote_shares.get(peer_id, 0.0))
-			if peer_id != bot and other >= threshold and other < threshold + 3.0 and other + 0.5 <= MultiplayerManager.THRESHOLD_MAX:
-				target = maxf(target, other)
-		if target > 0.0:
-			candidates.append({"threshold": MultiplayerManager.snap_threshold(target + 0.5), "urgency": 1.2})
-	var wanted_method := ""
-	if biggest and share >= 30.0:
-		wanted_method = ElectionModel.METHOD_WTA
-	elif share < 20.0:
-		wanted_method = ElectionModel.METHOD_HARE
-	if wanted_method != "" and wanted_method != MultiplayerManager.seat_method:
-		candidates.append({"threshold": threshold, "urgency": 0.8, "seat_method": wanted_method})
+	# 3) DÜŞMANCA BARAJ: barajda zorlanan rakibi dışarıda bırak (kendisi güvendeyse).
+	var victim := -1
+	var victim_share := 0.0
+	for peer_id in CardManager.turn_order:
+		var other := float(CardManager.last_vote_shares.get(peer_id, 0.0))
+		# Zorlanan: baraja 2 puan yakın ya da zaten çok küçük (%4 altı).
+		if peer_id == bot or other <= 0.0 or other >= maxf(threshold + 2.0, 4.0) or other + 0.5 > MultiplayerManager.THRESHOLD_MAX:
+			continue
+		if share < other + 0.5 + 3.0:
+			continue  # yeni baraj kendini de tehlikeye atar
+		if victim == -1 or GovernmentManager.seats_of(peer_id) > GovernmentManager.seats_of(victim):
+			victim = peer_id
+			victim_share = other
+	if victim != -1:
+		var new_threshold := MultiplayerManager.snap_threshold(victim_share + 0.5)
+		if new_threshold > threshold:
+			candidates.append({"threshold": new_threshold, "urgency": 1.3
+				+ float(GovernmentManager.seats_of(victim)) / _total_seats() * 4.0})
+	# 4) Sayım yöntemi: kazanan hepsini alır vekil kazandırıyorsa; küçük parti Hare.
+	var wta_gain := wta_seat_gain(bot)
+	if MultiplayerManager.seat_method != ElectionModel.METHOD_WTA and wta_gain >= 10:
+		candidates.append({"threshold": threshold, "urgency": 0.8 + minf(2.0, float(wta_gain) / 40.0),
+			"seat_method": ElectionModel.METHOD_WTA})
+	elif share < 20.0 and MultiplayerManager.seat_method != ElectionModel.METHOD_HARE:
+		candidates.append({"threshold": threshold, "urgency": 0.8, "seat_method": ElectionModel.METHOD_HARE})
 	var best := {}
 	for option in candidates:
 		var payload := {"threshold": float(option["threshold"]), "interval": MultiplayerManager.election_interval,
@@ -775,6 +783,28 @@ static func _best_constitution(bot: int) -> Dictionary:
 			best = {"payload": payload, "score": score}
 	return best
 
+## "Kazanan hepsini alır" olsaydı son seçimin il sonuçlarıyla bu parti kaç
+## il vekili KAZANIR (+) ya da KAYBEDERDİ (−): birinci olduğu illerin bütün
+## vekilleri eksi şu anki il vekilleri. Kalesi olmayan, az ilde birinci
+## partiler bu sayımda ezilir.
+static func wta_seat_gain(peer_id: int) -> int:
+	var now := 0
+	var wta := 0
+	for province_id in CardManager.last_province_results.keys():
+		var entry: Dictionary = CardManager.last_province_results[province_id]
+		var first := -1
+		var best := -1.0
+		var seats := 0
+		for id in entry.keys():
+			seats += int(entry[id].get("seats", 0))
+			if float(entry[id].get("percent", 0.0)) > best:
+				best = float(entry[id].get("percent", 0.0))
+				first = int(id)
+		now += int(entry.get(peer_id, {}).get("seats", 0))
+		if first == peer_id:
+			wta += seats
+	return wta - now
+
 static func note_constitution(bot: int) -> void:
 	_constitution_rounds[bot] = CardManager.round_number
 
@@ -789,23 +819,22 @@ static func _constitution_vote(bot: int, payload: Dictionary = {}) -> int:
 	# Oy oranı barajın altına yakınsa baraj düşmesi hayat kurtarır.
 	var share := float(CardManager.last_vote_shares.get(bot, 0.0))
 	var threshold_delta := new_threshold - MultiplayerManager.election_threshold
-	if share < MultiplayerManager.election_threshold + 5.0:
+	if threshold_delta > 0.0 and share < new_threshold + 2.0:
+		score -= 3.0   # yeni baraj beni meclisten atabilir
+	elif share < MultiplayerManager.election_threshold + 5.0:
 		score -= threshold_delta   # baraj düşerse iyi
 	else:
-		score += threshold_delta * 0.5   # büyük parti: baraj yükselsin
+		score += threshold_delta * 0.5   # güvendeki parti: baraj yükselsin, rakip elensin
 	# SAYIM: en büyük parti "kazanan hepsini alır"ı sever, küçük partiler Hare'yi.
 	var new_method := String(payload.get("seat_method", MultiplayerManager.seat_method))
 	if new_method != MultiplayerManager.seat_method:
-		var biggest := true
-		for peer_id in GovernmentManager.voter_ids():
-			if GovernmentManager.seats_of(peer_id) > GovernmentManager.seats_of(bot):
-				biggest = false
-		var method_rank := {"hare": 0.0, "dhondt": 1.0, "wta": 2.0}
-		var shift := float(method_rank.get(new_method, 1.0)) - float(method_rank.get(MultiplayerManager.seat_method, 1.0))
-		if biggest:
-			score += shift * 1.0
+		if new_method == ElectionModel.METHOD_WTA or MultiplayerManager.seat_method == ElectionModel.METHOD_WTA:
+			# Kazanan hepsini alır: kendi il birinciliklerine göre kazanır mı kaybeder mi?
+			var gain := float(wta_seat_gain(bot)) * (1.0 if new_method == ElectionModel.METHOD_WTA else -1.0)
+			score += clampf(gain / 15.0, -3.0, 3.0)
 		elif share < 20.0:
-			score -= shift * 1.2
+			var method_rank := {"hare": 0.0, "dhondt": 1.0}
+			score -= (float(method_rank.get(new_method, 1.0)) - float(method_rank.get(MultiplayerManager.seat_method, 1.0))) * 1.2
 	var interval_delta := float(new_interval - MultiplayerManager.election_interval)
 	score += interval_delta * (1.0 if CardManager.is_government_party(bot) else -1.0)
 	if score > 0.4:

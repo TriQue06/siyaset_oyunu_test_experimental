@@ -145,8 +145,8 @@ func _kale_summary() -> String:
 		for axis in IdeologyAxes.AXES:
 			spread += absf(float(cm.province_ideology[province_id][axis]))
 	spread /= maxf(1.0, cm.province_ideology.size() * 3.0)
-	return "kale %d/%d %s · bolunme %d, donus %d · il birincisi bantlari %s · illerin ort. |eksen| %.2f" % [
-		cm.strongholds.size(), cm._province_ids.size(), str(counts), splits, merges, str(bands), spread]
+	return "kale %d/%d %s · bolunme %d, donus %d · il birincisi bantlari %s · illerin ort. |eksen| %.2f · baraj %%%s, sayim %s" % [
+		cm.strongholds.size(), cm._province_ids.size(), str(counts), splits, merges, str(bands), spread, String.num(mm.election_threshold, 1), mm.seat_method]
 
 func _initialize() -> void:
 	await process_frame

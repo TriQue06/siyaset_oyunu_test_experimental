@@ -482,6 +482,41 @@ func _initialize() -> void:
 	mm.election_threshold = 0.0
 
 	print("")
+	print("=== 12) DUSMANCA BARAJ VE KAZANAN HEPSINI ALIR ===")
+	new_game({1: ideology(1.5, 1.5, 1.5), 2: ideology(-1.5, -1.5, -1.5), 3: ideology(1.5, -1.5, 1.5)})
+	for id in [1, 2, 3]:
+		mm.players[id]["bot"] = true
+	gm._clear_proposal()
+	gm._set_phase(gm.Phase.IDLE)
+	mm.election_threshold = 0.0
+	cm.last_seats = {1: 260, 2: 230, 3: 10}
+	cm.last_vote_shares = {1: 50.0, 2: 47.5, 3: 2.5}
+	cm.last_province_results = {}
+	brain._constitution_rounds = {}
+	var hostile: Dictionary = brain._best_constitution(1)
+	check("barajda zorlanan rakibi gorunce bot barajı yukseltmeyi onerir", not hostile.is_empty()
+		and float(hostile["payload"]["threshold"]) >= 3.0, str(hostile))
+	check("zorlanan parti yukselen baraja HAYIR der", brain._constitution_vote(3, {"threshold": 3.0}) == gm.VOTE_NO)
+	check("guvendeki buyuk parti yukselen baraja EVET der", brain._constitution_vote(2, {"threshold": 3.0}) == gm.VOTE_YES)
+	# Kazanan hepsini alır: 1 birçok ilde birinci, 2 hiçbirinde.
+	var ids: Array = game_map.ids
+	for i in ids.size():
+		var n: int = game_map.seats_of(ids[i])
+		var a_seats: int = n / 2 + 1 if i % 4 != 0 else n / 2
+		cm.last_province_results[ids[i]] = {1: {"percent": 52.0 if i % 4 != 0 else 40.0, "seats": a_seats},
+			2: {"percent": 45.0 if i % 4 != 0 else 55.0, "seats": n - a_seats}}
+	check("cok ilde birinci partiye WTA vekil kazandirir", brain.wta_seat_gain(1) > 10 and brain.wta_seat_gain(2) < 0,
+		"%d / %d" % [brain.wta_seat_gain(1), brain.wta_seat_gain(2)])
+	mm.election_threshold = 3.0  # baraj zaten rakibi disarida birakiyor
+	brain._constitution_rounds = {}
+	var wta_plan: Dictionary = brain._best_constitution(1)
+	check("bot kazanan hepsini alir sayimini onerir", not wta_plan.is_empty()
+		and String(wta_plan["payload"]["seat_method"]) == "wta", str(wta_plan))
+	check("az ilde birinci rakip WTA'ya HAYIR der", brain._constitution_vote(2, {"seat_method": "wta"}) == gm.VOTE_NO)
+	mm.election_threshold = 0.0
+	cm.last_province_results = {}
+
+	print("")
 	if fails == 0:
 		print("=== TUM TESTLER GECTI ===")
 	else:

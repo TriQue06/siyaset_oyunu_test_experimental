@@ -44,8 +44,11 @@ var _count_label: Label
 ## her çağrı tarayıcı katmanından geçtiği için seçim gecesi 1-2 FPS'e düşüyordu.
 var _outline_mmi: MultiMeshInstance2D
 var _seat_mmi: MultiMeshInstance2D
-## Koltuk dokusu: kenarı yumuşatılmış dolu beyaz daire (renk modulate ile).
-static var _circle_texture: Texture2D = null
+## Koltuk dokuları: kenarı yumuşatılmış dolu beyaz daire (renk modulate ile).
+## NET GÖRÜNSÜN diye her doku EKRANDAKİ piksel çapında üretilir (çap -> doku)
+## ve koltuklar piksel ızgarasına oturtulur: büyük bir dokuyu küçültüp kesirli
+## konumlara koymak koltukları bulanıklaştırıyordu.
+static var _circle_textures: Dictionary = {}
 ## Yerleşim (konum/yarıçap) sadece boyut değişince kurulur; renkler her
 ## set_results'ta güncellenir.
 var _instances_built_for := Vector2.ZERO
@@ -101,7 +104,13 @@ func _ready() -> void:
 	_build_count_plate()
 	resized.connect(_place_count_plate)
 	resized.connect(_rebuild_instances)
+	# Ekranda kayarsa (yerleşim, pencere) koltuklar piksel ızgarasına yeniden otursun.
+	set_notify_transform(true)
 	_rebuild_instances()
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSFORM_CHANGED and is_inside_tree() and _outline_mmi != null:
+		_rebuild_instances()
 
 ## VEKİL SAYISI LEVHASI: yarım dairenin ORTASINDAKİ boş alanda duran, kendi
 ## zemini (ek UI katmanı) olan monospace bir sayı. Önce çıplak draw_string,
@@ -157,32 +166,31 @@ func _seat_radius_px(scale: float) -> float:
 		radius = minf(radius, _min_gap_norm * scale * 0.45)
 	return maxf(1.5, radius)
 
-## Kenarı yumuşatılmış dolu daire dokusu — tüm koltuklar bunu kullanır.
-static func _ensure_circle_texture() -> Texture2D:
-	if _circle_texture != null:
-		return _circle_texture
-	var res := 64
-	var image := Image.create(res, res, false, Image.FORMAT_RGBA8)
-	var center := float(res) * 0.5 - 0.5
-	var radius := float(res) * 0.5 - 1.0
-	for y in res:
-		for x in res:
-			var d := Vector2(float(x) - center, float(y) - center).length()
-			# 1 piksellik yumuşak kenar: draw_circle'ın antialias'ıyla aynı his.
+## diameter piksel çapında, kenarı 1 piksel yumuşatılmış dolu daire dokusu.
+static func _circle_texture(diameter: int) -> Texture2D:
+	diameter = maxi(2, diameter)
+	if _circle_textures.has(diameter):
+		return _circle_textures[diameter]
+	var image := Image.create(diameter, diameter, false, Image.FORMAT_RGBA8)
+	var center := float(diameter) * 0.5
+	var radius := float(diameter) * 0.5
+	for y in diameter:
+		for x in diameter:
+			# Piksel merkezinin daireye uzaklığı: kenar tam 1 piksellik geçiş.
+			var d := Vector2(float(x) + 0.5 - center, float(y) + 0.5 - center).length()
 			var a: float = clampf(radius - d + 0.5, 0.0, 1.0)
 			image.set_pixel(x, y, Color(1.0, 1.0, 1.0, a))
-	_circle_texture = ImageTexture.create_from_image(image)
-	return _circle_texture
+	var texture := ImageTexture.create_from_image(image)
+	_circle_textures[diameter] = texture
+	return texture
 
 func _ensure_multimeshes() -> void:
 	if _outline_mmi != null:
 		return
-	var texture := _ensure_circle_texture()
 	for is_outline in [true, false]:
 		var mmi := MultiMeshInstance2D.new()
-		mmi.texture = texture
-		# Daireler kesirli konumlarda duruyor: yakınsama için doğrusal filtre.
-		mmi.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		# Doku ekran pikseliyle birebir: en yakın piksel, bulanıklık yok.
+		mmi.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		add_child(mmi)
 		if is_outline:
 			_outline_mmi = mmi
@@ -210,14 +218,30 @@ func _rebuild_instances() -> void:
 	var scale: float = minf(size.x * 0.5, size.y * 0.96)
 	var origin := _arc_origin()
 	var radius := _seat_radius_px(scale)
-	var inner: float = radius * (1.0 - outline_ratio)
+	# Ekran pikseline çevir: çaplar tam sayı, konumlar piksel ızgarasında.
+	var to_screen := get_global_transform_with_canvas()
+	var pixel_scale: float = maxf(0.01, to_screen.get_scale().x)
+	var outer_px := maxi(2, roundi(radius * 2.0 * pixel_scale))
+	var inner_px := maxi(1, roundi(radius * 2.0 * (1.0 - outline_ratio) * pixel_scale))
+	# Kontur her yandan eşit kalınlıkta olsun: iki çapın farkı çift sayı.
+	if (outer_px - inner_px) % 2 != 0:
+		inner_px -= 1
+	_outline_mmi.texture = _circle_texture(outer_px)
+	_seat_mmi.texture = _circle_texture(inner_px)
+	var outer_local := float(outer_px) / pixel_scale
+	var inner_local := float(inner_px) / pixel_scale
+	var from_screen := to_screen.affine_inverse()
 	for i in count:
 		var p: Vector2 = _dot_positions[i]
-		var center := origin + Vector2(p.x - 1.0, -p.y) * scale
+		var screen_center: Vector2 = to_screen * (origin + Vector2(p.x - 1.0, -p.y) * scale)
+		# Çift çaplı dairenin merkezi piksel köşesinde, tek çaplınınki piksel ortasında.
+		var snapped := (screen_center - Vector2(0.5, 0.5) * float(outer_px % 2)).round() \
+			+ Vector2(0.5, 0.5) * float(outer_px % 2)
+		var center: Vector2 = from_screen * snapped
 		_outline_mmi.multimesh.set_instance_transform_2d(i,
-			Transform2D(0.0, Vector2(radius * 2.0, radius * 2.0), 0.0, center))
+			Transform2D(0.0, Vector2(outer_local, outer_local), 0.0, center))
 		_seat_mmi.multimesh.set_instance_transform_2d(i,
-			Transform2D(0.0, Vector2(inner * 2.0, inner * 2.0), 0.0, center))
+			Transform2D(0.0, Vector2(inner_local, inner_local), 0.0, center))
 	_outline_mmi.modulate = outline_color
 	_instances_built_for = size
 	_update_instance_colors()

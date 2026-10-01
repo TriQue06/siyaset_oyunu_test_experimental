@@ -453,6 +453,35 @@ func _initialize() -> void:
 		pm.color_distance(Color(pm.parties[11]["bg_color"]), colors[1]) >= pm.BOT_COLOR_MIN_DISTANCE)
 
 	print("")
+	print("=== 11) BOTLAR ANAYASA DEGISIKLIGI ONERIR ===")
+	var brain = load("res://scripts/bot_brain.gd")
+	new_game({1: ideology(1.5, 1.5, 1.5), 2: ideology(-1.5, -1.5, -1.5), 3: ideology(1.5, -1.5, 1.5)})
+	for id in [1, 2, 3]:
+		mm.players[id]["bot"] = true
+	gm._clear_proposal()
+	gm._set_phase(gm.Phase.IDLE)
+	mm.election_threshold = 7.0
+	cm.last_seats = {1: 30, 2: 300, 3: 170}
+	cm.last_vote_shares = {1: 6.0, 2: 60.0, 3: 8.0}
+	cm.current_turn_index = 0
+	cm.round_number = 9
+	brain._constitution_rounds = {}
+	var plan: Dictionary = brain._best_constitution(1)
+	check("buyukler istemezse baraj teklifi cogunluk bulamaz, teklif yok", plan.is_empty(), str(plan))
+	cm.last_seats = {1: 120, 2: 200, 3: 180}
+	plan = brain._best_constitution(1)
+	check("barajda zorlanan bot (ve zorlanan ortagi) barajin dusmesini onerir", not plan.is_empty()
+		and float(plan["payload"]["threshold"]) < 7.0, str(plan))
+	var action: Dictionary = brain.choose_action(1)
+	check("bot hamlesi anayasa teklifi", String(action.get("type", "")) == "constitution", str(action))
+	root.get_node("BotManager").do_action(1)
+	check("teklif meclise geldi, bot not aldi", gm.proposal_kind == gm.KIND_CONSTITUTION
+		and brain._best_constitution(1).is_empty())
+	gm._clear_proposal()
+	gm._set_phase(gm.Phase.IDLE)
+	mm.election_threshold = 0.0
+
+	print("")
 	if fails == 0:
 		print("=== TUM TESTLER GECTI ===")
 	else:

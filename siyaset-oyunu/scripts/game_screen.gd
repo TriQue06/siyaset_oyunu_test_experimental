@@ -260,9 +260,10 @@ var _referendum_label: Label
 var _agenda_label: Label
 
 ## MECLİS KONUŞMASI paneli (sıra gelince, hamleden önce zorunlu).
-const SPEECH_PANEL_WIDTH := 380.0
+## Eksen sütunu genişliği (panel = 3 sütun).
+const SPEECH_COLUMN_WIDTH := 118.0
 var _speech_panel: PanelContainer
-var _speech_rows: VBoxContainer
+var _speech_rows: HBoxContainer
 var _speech_key: String = ""
 ## GÜÇ HARİTASI: potansiyel oy oranı bantları (%) ve renkleri.
 const VOTE_BANDS := [5.0, 15.0, 40.0, 80.0]
@@ -3107,31 +3108,25 @@ static func _org_level_text(level: int) -> String:
 
 # --- Meclis konuşması ----------------------------------------------------------------
 
-## Sıra gelince hamleden önce ZORUNLU konuşma paneli: 3 eksen × 2 uç.
+## Sıra gelince hamleden önce ZORUNLU konuşma paneli: KOMPAKT bir şerit,
+## haritanın üst kenarında. 3 sütun (eksen) × 2 küçük düğme (uç).
 func _build_speech_panel() -> void:
 	_speech_panel = PanelContainer.new()
 	var style := UiSkin.stylebox(UiSkin.PANEL)
-	style.set_content_margin_all(UiTheme.PAD_M)
+	style.set_content_margin_all(UiTheme.PAD_S)
 	_speech_panel.add_theme_stylebox_override("panel", style)
 	_speech_panel.z_index = 109
 	_speech_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 6)
+	box.add_theme_constant_override("separation", 4)
 	_speech_panel.add_child(box)
 	var title := Label.new()
-	title.text = "MECLİS KONUŞMASI"
+	title.text = "MECLİS KONUŞMASI · bir görüşü savun (partin yarım adım kayar)"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 16)
+	title.add_theme_font_size_override("font_size", 11)
 	title.add_theme_color_override("font_color", UiTheme.GOLD)
 	box.add_child(title)
-	var hint := Label.new()
-	hint.text = "Hamle yapmadan önce kürsüye çık: bir görüşü savun. Partin o yöne yarım adım kayar; güçlü olduğun iller seni kısmen takip eder."
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hint.custom_minimum_size = Vector2(SPEECH_PANEL_WIDTH, 0)
-	hint.add_theme_font_size_override("font_size", 11)
-	hint.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
-	box.add_child(hint)
-	_speech_rows = VBoxContainer.new()
+	_speech_rows = HBoxContainer.new()
 	_speech_rows.add_theme_constant_override("separation", 6)
 	box.add_child(_speech_rows)
 	_speech_panel.hide()
@@ -3168,36 +3163,37 @@ func _place_speech_panel() -> void:
 	var viewport_size := get_viewport_rect().size
 	var left := LEFT_PANEL_WIDTH
 	var right := viewport_size.x - RIGHT_COLUMN_WIDTH
-	_speech_panel.position = Vector2((left + right - _speech_panel.size.x) * 0.5,
-		maxf(12.0, (_top_area_height() - _speech_panel.size.y) * 0.5))
+	# Haritanın üst kenarı: harita görünür kalsın.
+	_speech_panel.position = Vector2((left + right - _speech_panel.size.x) * 0.5, 8.0)
 
-## Bir eksen satırı: eksenin adı ve şu anki konumun, iki ucun düğmesi.
+## Bir eksen sütunu: eksen ve şu anki konum, altında iki ucun küçük düğmesi.
+## Düğmenin üstüne gelince konuşmanın sonucu ("→ Ilımlı Devletçi") görünür.
 func _speech_row(axis: String, value: float) -> Control:
-	var row := VBoxContainer.new()
-	row.add_theme_constant_override("separation", 2)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 2)
+	column.custom_minimum_size = Vector2(SPEECH_COLUMN_WIDTH, 0)
 	var info: Dictionary = IdeologyAxes.AXIS_SIDES[axis]
 	var caption := Label.new()
-	caption.text = "%s  ·  şu an: %s" % [info["title"], IdeologyAxes.position_text(axis, value)]
-	caption.add_theme_font_size_override("font_size", 12)
-	row.add_child(caption)
-	var buttons := HBoxContainer.new()
-	buttons.add_theme_constant_override("separation", 6)
-	row.add_child(buttons)
+	caption.text = "%s: %s" % [info["title"], IdeologyAxes.position_text(axis, value)]
+	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	caption.clip_text = true
+	caption.add_theme_font_size_override("font_size", 10)
+	caption.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
+	column.add_child(caption)
 	for dir in [-1, 1]:
 		var after := IdeologyAxes.clamp_value(value + IdeologyAxes.SPEECH_SHIFT * dir)
 		var button := Button.new()
-		var result := "(zaten en uçta)" if is_equal_approx(after, value) else "→ " + IdeologyAxes.position_text(axis, after)
-		button.text = "%s\n%s" % [IdeologyAxes.speech_title(axis, dir), result]
-		button.custom_minimum_size = Vector2(SPEECH_PANEL_WIDTH * 0.5 - 3.0, 46)
-		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.text = IdeologyAxes.speech_title(axis, dir)
+		button.tooltip_text = "zaten en uçta" if is_equal_approx(after, value) else "→ " + IdeologyAxes.position_text(axis, after)
+		button.custom_minimum_size = Vector2(SPEECH_COLUMN_WIDTH, 26)
 		button.clip_text = true
-		button.add_theme_font_size_override("font_size", 12)
+		button.add_theme_font_size_override("font_size", 11)
 		UiSkin.skin_color_button(button, _law_color(axis, dir))
 		button.pressed.connect(func():
 			_speech_panel.hide()
 			CardManager.make_speech(axis, dir))
-		buttons.add_child(button)
-	return row
+		column.add_child(button)
+	return column
 
 func _build_propaganda_menu() -> void:
 	_propaganda_menu = PanelContainer.new()

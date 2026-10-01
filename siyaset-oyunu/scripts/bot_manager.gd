@@ -93,6 +93,10 @@ static func do_action(bot: int) -> Dictionary:
 			CardManager._apply_law(bot, String(action["law"]))
 			if CardManager.has_proposed_law_this_round(bot):
 				BotBrain.note_law(bot, String(action["law"]))
+		"constitution":
+			CardManager._apply_constitution_proposal(bot, action["payload"])
+			if CardManager.has_proposed_law_this_round(bot):
+				BotBrain.note_constitution(bot)
 		"organization":
 			CardManager._apply_organization(bot, String(action["province"]))
 		"miting":

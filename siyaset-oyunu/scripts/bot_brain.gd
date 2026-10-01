@@ -162,6 +162,12 @@ static func choose_action(bot: int) -> Dictionary:
 			best = {"type": "law", "law": law["law"]}
 			best_score = float(law["score"]) - law_cost * mana_value
 
+	# Anayasa teklifi yasa hakkını kullanır; o yüzden yasayla yarışır.
+	var constitution := _best_constitution(bot)
+	if not constitution.is_empty() and float(constitution["score"]) > best_score:
+		best = {"type": "constitution", "payload": constitution["payload"]}
+		best_score = float(constitution["score"])
+
 	var org := _best_organization(bot, known)
 	if not org.is_empty() and float(org["score"]) - GameRules.ORG_MANA_COST * mana_value > best_score:
 		best = {"type": "organization", "province": org["province"]}
@@ -700,10 +706,83 @@ static func choose_vote(bot: int) -> int:
 			return _constitution_vote(bot)
 	return GovernmentManager.VOTE_ABSTAIN
 
+## ANAYASA TEKLİFİ: bot kendi çıkarına bir paket arar.
+##   - Barajda zorlanıyorsa (oyu baraja yakın ya da altında) barajı düşürmek;
+##     barajla zor durumdaki BAŞKA partileri de yanına alabilir.
+##   - En büyük partiyse ve baraja yakın küçük rakipler varsa barajı onların
+##     hemen üstüne çıkarmak (meclisten atmak).
+##   - Sayım yöntemi: en büyük parti "kazanan hepsini alır", küçük parti Hare.
+## Teklif ancak meclisin salt çoğunluğunun (referandum yolu) EVET demesi
+## bekleniyorsa yapılır; insanların oyu bilinmez, sayılmaz.
+const CONSTITUTION_EVERY_ROUNDS := 4
+static var _constitution_rounds: Dictionary = {}
+
+static func _best_constitution(bot: int) -> Dictionary:
+	if not CardManager.can_propose_constitution(bot):
+		return {}
+	if CardManager.round_number - int(_constitution_rounds.get(bot, -99)) < CONSTITUTION_EVERY_ROUNDS:
+		return {}
+	var threshold := MultiplayerManager.election_threshold
+	var share := float(CardManager.last_vote_shares.get(bot, 0.0))
+	var biggest := true
+	for peer_id in GovernmentManager.voter_ids():
+		if GovernmentManager.seats_of(peer_id) > GovernmentManager.seats_of(bot):
+			biggest = false
+	var candidates: Array = []
+	# 1) Barajda zorlanan bot: barajı oyunun belirgin altına indir.
+	if threshold > 0.0 and share < threshold + 2.0:
+		candidates.append({"threshold": MultiplayerManager.snap_threshold(maxf(0.0, share - 2.0)), "urgency": 2.5})
+	# 2) Barajda zorlanan başkaları da varsa (ortak çıkar) aynı paket değerlidir.
+	var struggling := 0
+	for peer_id in CardManager.turn_order:
+		var other := float(CardManager.last_vote_shares.get(peer_id, 0.0))
+		if peer_id != bot and threshold > 0.0 and other < threshold + 2.0:
+			struggling += 1
+	# 3) En büyük parti: baraja yakın küçük rakipleri dışarıda bırak.
+	if biggest:
+		var target := -1.0
+		for peer_id in CardManager.turn_order:
+			var other := float(CardManager.last_vote_shares.get(peer_id, 0.0))
+			if peer_id != bot and other >= threshold and other < threshold + 3.0 and other + 0.5 <= MultiplayerManager.THRESHOLD_MAX:
+				target = maxf(target, other)
+		if target > 0.0:
+			candidates.append({"threshold": MultiplayerManager.snap_threshold(target + 0.5), "urgency": 1.2})
+	var wanted_method := ""
+	if biggest and share >= 30.0:
+		wanted_method = ElectionModel.METHOD_WTA
+	elif share < 20.0:
+		wanted_method = ElectionModel.METHOD_HARE
+	if wanted_method != "" and wanted_method != MultiplayerManager.seat_method:
+		candidates.append({"threshold": threshold, "urgency": 0.8, "seat_method": wanted_method})
+	var best := {}
+	for option in candidates:
+		var payload := {"threshold": float(option["threshold"]), "interval": MultiplayerManager.election_interval,
+			"seat_method": String(option.get("seat_method", MultiplayerManager.seat_method))}
+		if is_equal_approx(float(payload["threshold"]), threshold) and payload["seat_method"] == MultiplayerManager.seat_method:
+			continue
+		# Destekçileri say: teklif sahibi EVET, diğer botlar kendi çıkarına göre.
+		var yes := GovernmentManager.seats_of(bot)
+		for peer_id in GovernmentManager.voter_ids():
+			if peer_id != bot and MultiplayerManager.is_bot(peer_id) \
+					and _constitution_vote(peer_id, payload) == GovernmentManager.VOTE_YES:
+				yes += GovernmentManager.seats_of(peer_id)
+		if yes < GovernmentManager.referendum_threshold_seats():
+			continue
+		var score := 1.6 + float(option["urgency"]) + float(struggling) * 0.2
+		if yes >= GovernmentManager.constitution_threshold_seats():
+			score += 0.5  # referandumsuz geçer
+		if best.is_empty() or score > float(best["score"]):
+			best = {"payload": payload, "score": score}
+	return best
+
+static func note_constitution(bot: int) -> void:
+	_constitution_rounds[bot] = CardManager.round_number
+
 ## ANAYASA DEĞİŞİKLİĞİ: küçük parti barajın DÜŞMESİNİ ister, büyük parti
 ## yükselmesini. Seçim aralığının uzaması iktidardakinin işine gelir.
-static func _constitution_vote(bot: int) -> int:
-	var payload: Dictionary = GovernmentManager.proposal_assignments
+static func _constitution_vote(bot: int, payload: Dictionary = {}) -> int:
+	if payload.is_empty():
+		payload = GovernmentManager.proposal_assignments
 	var new_threshold := float(payload.get("threshold", MultiplayerManager.election_threshold))
 	var new_interval := int(payload.get("interval", MultiplayerManager.election_interval))
 	var score := 0.0

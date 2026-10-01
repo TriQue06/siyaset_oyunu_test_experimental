@@ -139,7 +139,7 @@ const CARD_MANA_COSTS := {
 	"populizm": 1,
 	"mana_bonusu": 0,
 	"mana_bonusu_guclu": 0,
-	"bonus_kart": 1,
+	"bonus_kart": 0,
 	"kart_calma": 1,
 	"gundem_economic_n": 1,
 	"gundem_economic_p": 1,

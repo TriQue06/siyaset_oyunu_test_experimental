@@ -73,17 +73,17 @@ const PROVINCE_EVENT_LIMIT := 6
 ## KART NADİRLİĞİ (bkz. _draw_weights). Değerler mutlak değil, oransal: bir
 ## kartın gelme olasılığı ağırlığının havuzdaki toplama bölümüdür. İlk seçimden
 ## önce isyan ve vekil çalma havuza girmez, kalanların payı kendiliğinden artar.
-const WEIGHT_PROPAGANDA := 15.0
-const WEIGHT_STEAL_WEAK := 15.0
+const WEIGHT_PROPAGANDA := 12.0
+const WEIGHT_STEAL_WEAK := 12.0
 const WEIGHT_MANA_BONUS := 12.0
-const WEIGHT_MANA_BONUS_STRONG := 5.0
-const WEIGHT_BONUS_CARD := 7.0
-const WEIGHT_CARD_THEFT := 7.0
+const WEIGHT_MANA_BONUS_STRONG := 6.0
+const WEIGHT_BONUS_CARD := 9.0
+const WEIGHT_CARD_THEFT := 6.0
 const WEIGHT_POPULISM := 12.0
-const WEIGHT_STEAL_STRONG := 9.0
-const WEIGHT_EARLY_ELECTION := 9.0
+const WEIGHT_STEAL_STRONG := 6.0
+const WEIGHT_EARLY_ELECTION := 6.0
 const WEIGHT_REPUTATION := 6.0
-const WEIGHT_REBELLION := 8.0
+const WEIGHT_REBELLION := 9.0
 
 ## Meclis: haritadaki bölgelerin vekilleri (HexGridGenerator.PROVINCE_SEATS)
 ## + ulusal liste. Harita yüklenince yeniden hesaplanır.

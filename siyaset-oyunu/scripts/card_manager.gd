@@ -1680,7 +1680,8 @@ func _update_stronghold(province_id: String) -> void:
 	var owner := stronghold_of(province_id)
 	var new_owner := owner
 	if owner != -1 and (not turn_order.has(owner) \
-			or stronghold_closeness(province_id, owner) < PublicOpinion.STRONGHOLD_LOSS_THRESHOLD):
+			or stronghold_closeness(province_id, owner) < PublicOpinion.STRONGHOLD_LOSS_THRESHOLD \
+			or kale_effort_of(province_id, owner) < PublicOpinion.STRONGHOLD_KEEP_EFFORT):
 		new_owner = -1
 	if new_owner == -1:
 		var best_effort := 0.0
@@ -1727,6 +1728,40 @@ func _org_pressure() -> void:
 			var level := int(orgs[peer_id])
 			if level > 0 and turn_order.has(int(peer_id)):
 				_pull_province(String(province_id), int(peer_id), PublicOpinion.ORG_ROUND_PULL * level, "", {}, false)
+
+## Tur sonu KALE BAKIMI: kale emeği azalır (ihmal edilen kale düşer) ve ilde
+## beklenen oyda sahibini geçen bir parti varsa kale düşer.
+func _check_stronghold_upkeep() -> void:
+	for province_id in kale_effort.keys():
+		var entry: Dictionary = kale_effort[province_id]
+		for peer_id in entry.keys():
+			var value := float(entry[peer_id]) - PublicOpinion.STRONGHOLD_EFFORT_DECAY
+			if value <= 0.0:
+				entry.erase(peer_id)
+			else:
+				entry[peer_id] = value
+	if strongholds.is_empty():
+		return
+	var shares := _province_share_map()
+	for province_id in strongholds.keys():
+		var owner := stronghold_of(String(province_id))
+		var here: Dictionary = shares.get(province_id, {})
+		var mine := float(here.get(owner, 0.0))
+		var overtaken := -1
+		for peer_id in here.keys():
+			if int(peer_id) != owner and float(here[peer_id]) > mine:
+				overtaken = int(peer_id)
+		if overtaken != -1:
+			strongholds.erase(province_id)
+			siege.erase(province_id)
+			# Emek sıfırlanır: kale aynı anda geri verilmesin, yeniden kurulması gereksin.
+			(kale_effort.get(province_id, {}) as Dictionary).erase(owner)
+			_log_province(String(province_id), "%s oyda %s'nın gerisine düştü, kale elden gitti" % [
+				_party_name(owner), _party_name(overtaken)])
+			_pending_log.append({"text": "%s, %s'daki kalesini kaybetti: %s oyda öne geçti." % [_party_name(owner),
+				_province_name(String(province_id)), _party_name(overtaken)], "peer_id": owner,
+				"province": String(province_id), "kind": "stronghold_lost"})
+	_refresh_all_strongholds()
 
 ## Tur sonu: kuşatmalar zamanla dağılır.
 func _decay_siege() -> void:
@@ -1988,6 +2023,7 @@ func _decay_opinion() -> void:
 	_org_pressure()
 	_revert_provinces()
 	_decay_siege()
+	_check_stronghold_upkeep()
 	for peer_id in national_support.keys():
 		var value: float = national_of(peer_id) * PublicOpinion.NATIONAL_DECAY
 		if absf(value) < 0.05:

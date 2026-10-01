@@ -517,6 +517,33 @@ func _initialize() -> void:
 	cm.last_province_results = {}
 
 	print("")
+	print("=== 13) KALE DUSEBILIR (ihmal ve oyda geriye dusme) ===")
+	new_game({1: ideology(1.5, 1.5, 1.5), 2: ideology(-1.5, -1.5, -1.5)})
+	var uid: String = game_map.ids[6]
+	cm.province_ideology[uid] = ideology(1.5, 1.5, 1.5)
+	cm.organizations[uid] = {1: GameRules.ORG_MAX_LEVEL}
+	cm.kale_effort[uid] = {1: PublicOpinion.STRONGHOLD_EFFORT}
+	cm._update_stronghold(uid)
+	check("kale kuruldu", cm.stronghold_of(uid) == 1)
+	var rounds := 0
+	while cm.stronghold_of(uid) == 1 and rounds < 40:
+		cm.province_ideology[uid] = ideology(1.5, 1.5, 1.5)
+		cm._check_stronghold_upkeep()
+		rounds += 1
+	check("ihmal edilen kale (hic miting yok) zamanla duser", cm.stronghold_of(uid) == -1 and rounds > 4, "%d tur" % rounds)
+	cm.kale_effort[uid] = {1: PublicOpinion.STRONGHOLD_EFFORT}
+	cm._update_stronghold(uid)
+	cm._check_stronghold_upkeep()
+	check("bakimli kale tur sonunu atlatir", cm.stronghold_of(uid) == 1)
+	# Rakip ilde oyda öne geçer.
+	cm.local_support[uid] = {2: 10.0}
+	cm.national_support = {2: 10.0}
+	pm.parties[2]["ideology"] = ideology(1.5, 1.5, 1.5)
+	cm._check_stronghold_upkeep()
+	check("rakip oyda one gecince kale duser ve hemen geri gelmez", cm.stronghold_of(uid) != 1 \
+		and cm.kale_effort_of(uid, 1) == 0.0)
+
+	print("")
 	if fails == 0:
 		print("=== TUM TESTLER GECTI ===")
 	else:

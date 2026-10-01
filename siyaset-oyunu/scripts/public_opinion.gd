@@ -201,6 +201,11 @@ const PROVINCE_REVERSION := 0.03
 const STRONGHOLD_DISTANCE_SCALE := 6.0
 const STRONGHOLD_THRESHOLD := 0.6
 const STRONGHOLD_EFFORT := 6.0
+## KALE BAKIM İSTER: kale emeği her tur EFFORT_DECAY azalır; sahibinin emeği
+## STRONGHOLD_KEEP_EFFORT'un altına inerse (uzun süre o ile uğramadıysa) kale
+## düşer. Tur sonunda ilde beklenen oyda sahibini GEÇEN bir parti varsa da düşer.
+const STRONGHOLD_EFFORT_DECAY := 0.25
+const STRONGHOLD_KEEP_EFFORT := 3.0
 ## Kale sahibi görüşünü ilden çok uzaklaştırırsa kaleyi kendiliğinden kaybeder.
 const STRONGHOLD_LOSS_THRESHOLD := 0.4
 ## İdeolojik değişim kalkanı: RAKİPLERİN bir kale ili çekme hızı %70 yavaşlar.

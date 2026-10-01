@@ -85,7 +85,10 @@ static func do_action(bot: int) -> Dictionary:
 	var hand_before: int = CardManager.inventories.get(bot, []).size()
 	var laws_before := CardManager.has_proposed_law_this_round(bot)
 	var blocked_before := CardManager.is_turn_blocked()
+	var speech_before := CardManager.speech_done
 	match String(action["type"]):
+		"speech":
+			CardManager._apply_speech(bot, String(action["axis"]), int(action["dir"]))
 		"law":
 			CardManager._apply_law(bot, String(action["law"]))
 			if CardManager.has_proposed_law_this_round(bot):
@@ -112,7 +115,7 @@ static func do_action(bot: int) -> Dictionary:
 	var applied: bool = CardManager.mana_of(bot) != mana_before or CardManager.current_turn_peer_id() != bot \
 		or CardManager.inventories.get(bot, []).size() != hand_before \
 		or CardManager.has_proposed_law_this_round(bot) != laws_before \
-		or CardManager.is_turn_blocked() != blocked_before
+		or CardManager.is_turn_blocked() != blocked_before or CardManager.speech_done != speech_before
 	return action if applied else {}
 
 func _handle_votes(now: float) -> void:

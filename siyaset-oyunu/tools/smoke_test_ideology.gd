@@ -42,6 +42,7 @@ func _initialize() -> void:
 	mm = root.get_node("MultiplayerManager")
 	pm = root.get_node("PartyManager")
 	cm = root.get_node("CardManager")
+	cm.speech_required = false  # meclis konuşması ayrıca test edilir
 	gm = root.get_node("GovernmentManager")
 	game_map = root.get_node("GameMap")
 	cm.fixed_map_seed = 1950
@@ -121,7 +122,13 @@ func _initialize() -> void:
 	cm.organizations[pid] = {1: 1}
 	cm.province_ideology[pid] = ideology(1.5, 1.5, 1.0)
 	cm._update_stronghold(pid)
-	check("%75+ yakin + teskilat = siyasi kale", cm.stronghold_of(pid) == 1, str(cm.stronghold_closeness(pid, 1)))
+	check("yakin il + 1. seviye teskilat kale DEGIL", cm.stronghold_of(pid) == -1)
+	cm.organizations[pid] = {1: GameRules.ORG_MAX_LEVEL}
+	for i in int(PublicOpinion.STRONGHOLD_EFFORT) - 1:
+		cm._campaign_in(pid, 1, 1.0)
+	check("tam teskilat ama az miting: kale degil", cm.stronghold_of(pid) == -1, str(cm.kale_effort_of(pid, 1)))
+	cm._campaign_in(pid, 1, 1.0)
+	check("tam teskilat + yeterli miting + yakin secmen = siyasi kale", cm.stronghold_of(pid) == 1, str(cm.stronghold_closeness(pid, 1)))
 	var extra: bool = false
 	for entry in cm._pending_log:
 		if String(entry["kind"]) == "stronghold":
@@ -262,6 +269,188 @@ func _initialize() -> void:
 	for i in cm.EVENT_LOG_LIMIT + 10:
 		cm.log_event("kayit %d" % i)
 	check("log siniri asilmaz", cm.event_log.size() == cm.EVENT_LOG_LIMIT)
+
+	print("")
+	print("=== 6) MECLIS KONUSMASI ===")
+	new_game({1: ideology(1.5, 1.5, 1.5), 2: ideology(-1.5, -1.5, -1.5), 3: ideology(1.5, -1.5, 1.5)})
+	cm.speech_required = true
+	cm.speech_done = false
+	cm.mana[1] = 10.0
+	var org_pid: String = game_map.ids[2]
+	cm.organizations[org_pid] = {1: 1}
+	check("sira gelince konusma zorunlu", cm.needs_speech(1) and not cm.needs_speech(2))
+	check("konusmadan once hamle yok", not cm.can_choose_main_action(1) and not cm.can_miting(1, org_pid) \
+		and not cm.can_play_card(1, "mana_bonusu"))
+	cm._apply_pass(1, true)
+	check("konusmadan tur bitirilemez", cm.current_turn_peer_id() == 1)
+	cm._apply_speech(2, "economic", -1)
+	check("sirasi olmayan konusamaz", not cm.speech_done)
+	cm._apply_speech(1, "economic", -1)
+	check("konusma partiyi yarim adim kaydirir", near(float(pm.parties[1]["ideology"]["economic"]), 1.0) and cm.speech_done,
+		str(pm.parties[1]["ideology"]))
+	check("konusmadan sonra hamle serbest", cm.can_choose_main_action(1) and cm.can_miting(1, org_pid))
+	cm._apply_speech(1, "social", 1)
+	check("turda tek konusma", near(float(pm.parties[1]["ideology"]["social"]), 1.5))
+	cm._apply_pass(1, true)
+	check("siradaki oyuncu yine konusmak zorunda", cm.current_turn_peer_id() == 2 and cm.needs_speech(2))
+	cm.speech_required = false
+
+	print("")
+	print("=== 7) ILLER BASKIN PARTIYI TAKIP EDER ===")
+	new_game({1: ideology(3.0, 1.5, 1.5), 2: ideology(-1.5, -1.5, -1.5)})
+	var fid: String = game_map.ids[3]
+	cm.province_ideology[fid] = ideology(2.5, 1.0, 1.0)
+	cm.local_support[fid] = {1: 10.0}
+	var shares: Dictionary = cm._province_share_map()[fid]
+	var share1 := float(shares[1]) / 100.0
+	var before_e := float(cm.province_ideology[fid]["economic"])
+	var other: String = game_map.ids[4]
+	cm.province_ideology[other] = ideology(-2.0, -1.0, -1.0)
+	var other_before := float(cm.province_ideology[other]["economic"])
+	var other_share := float(cm._province_share_map()[other][1]) / 100.0
+	cm._shift_ideologies([{"peer": 1, "axis": "economic", "delta": -2.0}])
+	var moved_f := float(cm.province_ideology[fid]["economic"]) - before_e
+	check("guclu oldugu il partiyle birlikte kayar (pay x yari)", near(moved_f, -2.0 * share1 * PublicOpinion.PROVINCE_FOLLOW, 0.01),
+		"%.3f (pay %.2f)" % [moved_f, share1])
+	check("zayif oldugu il az kayar", absf(float(cm.province_ideology[other]["economic"]) - other_before) < absf(moved_f) \
+		and other_share < share1, "%.2f / %.2f" % [other_share, share1])
+
+	print("")
+	print("=== 8) KALE KUSATMASI ===")
+	# 4 parti: 1 kale sahibi, 2 ona benzer, 3 ve 4 zit gorusde.
+	new_game({1: ideology(1.5, 1.5, 1.5), 2: ideology(1.5, 1.5, 1.0), 3: ideology(-1.5, -1.5, -1.5), 4: ideology(-1.5, -1.5, 1.5)})
+	var kid: String = game_map.ids[5]
+	cm.province_ideology[kid] = ideology(1.5, 1.5, 1.5)
+	cm.organizations[kid] = {1: GameRules.ORG_MAX_LEVEL}
+	cm.kale_effort[kid] = {1: PublicOpinion.STRONGHOLD_EFFORT}
+	cm._update_stronghold(kid)
+	check("kale kuruldu", cm.stronghold_of(kid) == 1)
+	for i in 6:
+		cm._campaign_in(kid, 3, 1.0)
+	check("tek parti ne kadar miting yapsa da kaleyi dusuremez", cm.stronghold_of(kid) == 1, "kusatma %.1f" % cm.siege_total(kid))
+	for i in 3:
+		cm._campaign_in(kid, 4, 1.0)
+	check("zit gorusten 2 parti de yetmez", cm.stronghold_of(kid) == 1, "kusatma %.1f" % cm.siege_total(kid))
+	cm._campaign_in(kid, 1, 1.0)
+	check("sahibinin mitingi kusatmayi geriletir", cm.siege_total(kid) < 4.0, "%.1f" % cm.siege_total(kid))
+	cm.siege.erase(kid)
+	for p in [3, 4]:
+		for i in 3:
+			cm._campaign_in(kid, p, 1.0)
+	cm._campaign_in(kid, 2, 1.0)
+	cm._campaign_in(kid, 2, 1.0)
+	check("ucuncu parti katilinca kale duser", cm.stronghold_of(kid) != 1 and cm.kale_effort_of(kid, 1) == 0.0)
+	# Benzer görüşte iki parti yeterli.
+	new_game({1: ideology(1.5, 1.5, 1.5), 2: ideology(1.5, 1.5, 1.0), 3: ideology(1.5, 1.0, 1.5)})
+	cm.province_ideology[kid] = ideology(1.5, 1.5, 1.5)
+	cm.organizations[kid] = {1: GameRules.ORG_MAX_LEVEL}
+	cm.kale_effort[kid] = {1: PublicOpinion.STRONGHOLD_EFFORT}
+	cm._update_stronghold(kid)
+	for i in 3:
+		cm._campaign_in(kid, 2, 1.0)
+	check("benzer gorusten tek parti de dusuremez", cm.stronghold_of(kid) == 1, "%.1f" % cm.siege_total(kid))
+	for i in 3:
+		cm._campaign_in(kid, 3, 1.0)
+	check("benzer gorusten 2 parti kaleyi dusurur", cm.stronghold_of(kid) != 1, "%.1f" % cm.siege_total(kid))
+
+	print("")
+	print("=== 9) KARISIKLIK, BOLUNME VE GERI DONUS ===")
+	new_game({1: ideology(1.5, 1.5, 1.5), 2: ideology(-1.5, -1.5, -1.5), 3: ideology(1.5, -1.5, 1.5)})
+	mm.players[2]["bot"] = true
+	cm.last_seats = {1: 200, 2: 150, 3: 150}
+	cm.election_seats = cm.last_seats.duplicate()
+	cm.national_list = {1: 80, 2: 60, 3: 60}
+	cm.last_election_round = 4
+	cm.round_number = 5
+	cm.organizations[kid] = {1: 2}
+	cm._apply_card_effect(2, "isyan", 1)
+	check("tek ic karisiklik bolmez", cm.turmoil_of(1) < PublicOpinion.SPLIT_TURMOIL)
+	cm._apply_card_effect(2, "isyan", 1)
+	var turn_size: int = cm.turn_order.size()
+	cm.current_turn_index = 0
+	gm.government = {"pm": 3}  # hükümet var: tur sonunda erken seçim olmasın
+	gm.main_gov_peer_id = 3
+	gm._set_phase(gm.Phase.GOVERNING)
+	GameRules.configure(2, 8)
+	GameRules.set_election_anchor(0)
+	cm.round_number = 5  # seçim turu değil
+	cm._finish_round()
+	check("karisiklik esigi asildi: parti bolundu", cm.splinters.size() == 1 and cm.turn_order.size() == turn_size + 1,
+		str(cm.splinters))
+	var sid: int = int(cm.splinters.keys()[0]) if not cm.splinters.is_empty() else -1
+	check("ayrilan parti yapay zeka, ayni gorus, benzer renk", mm.is_bot(sid) \
+		and str(pm.parties[sid]["ideology"]) == str(pm.parties[1]["ideology"]) \
+		and not Color(pm.parties[sid]["bg_color"]).is_equal_approx(Color(pm.parties[1]["bg_color"])))
+	var split_seats := int(cm.last_seats.get(sid, 0))
+	check("vekillerin ciddi bolumu gecti", split_seats >= int(200 * PublicOpinion.SPLIT_SEAT_SHARE_MIN) - 1 \
+		and cm.last_seats[1] + split_seats == 200, "%d / %d" % [split_seats, cm.last_seats[1]])
+	check("ayrilan parti bir daha bolunemez", true)
+	cm.turmoil[sid] = 99.0
+	cm._check_splits()
+	check("ayrilan parti tekrar bolunmez", cm.splinters.size() == 1)
+	cm.turmoil[1] = 99.0
+	cm._check_splits()
+	check("ana partinin ayni anda ikinci ayriligi yok", cm.splinters.size() == 1)
+	cm.organizations[kid][sid] = 2
+	cm.organizations[kid][1] = 1
+	cm.turmoil[1] = 0.5
+	cm._check_reunions()
+	check("secim atlatmadan geri donmez", cm.splinters.has(sid))
+	cm.splinters[sid]["elections"] = 1
+	cm.turmoil[1] = 5.0
+	cm._check_reunions()
+	check("karisiklik surerken 1 secimden sonra donmez", cm.splinters.has(sid))
+	gm.scores[sid] = 7
+	gm.scores[1] = 3
+	cm.splinters[sid]["elections"] = PublicOpinion.SPLIT_MAX_ELECTIONS
+	cm._check_reunions()
+	check("en gec 4 secimden sonra doner", not cm.splinters.has(sid) and not cm.turn_order.has(sid) and not pm.parties.has(sid))
+	check("vekilleri ve teskilatlariyla doner, puan birlesir", cm.last_seats[1] == 200 and cm.organization_level(kid, 1) == 2 \
+		and gm.score_of(1) == 10, "%d mv, puan %d" % [cm.last_seats[1], gm.score_of(1)])
+
+	print("")
+	print("=== 10) YENI KARTLAR VE KURALLAR ===")
+	new_game({1: ideology(1.5, 1.5, 1.5), 2: ideology(-1.5, -1.5, -1.5)})
+	check("tur basina mana 3 (hukumet 4)", GameRules.MANA_PER_ROUND == 3 and GameRules.MANA_PER_ROUND_GOVERNMENT == 4)
+	check("yasa gecirmek +5 puan", cm.law_pass_score(false) == 5 and cm.law_pass_score(true) == 5)
+	check("bakanlik +3, yardimcilik +5, basbakanlik +10", GovernmentPresets.MINISTRY_POINTS == 3 \
+		and GovernmentPresets.DEPUTY_PM_POINTS == 5 and GovernmentPresets.PM_POINTS == 10)
+	cm.mana[1] = 0.0
+	cm._apply_card_effect(1, "mana_bonusu_guclu")
+	check("guclu mana bonusu +6", near(cm.mana_of(1), 6.0))
+	cm.inventories[1] = []
+	cm._apply_card_effect(1, "bonus_kart")
+	check("bonus kart 2 kart ceker", cm.inventories[1].size() == 2, str(cm.inventories[1]))
+	cm.inventories[2] = ["karalama"]
+	cm._apply_card_effect(1, "kart_calma", 2)
+	check("kart calma: rakibin kartini alir", cm.inventories[2].is_empty() and cm.inventories[1].size() == 3)
+	cm._apply_card_effect(1, "kart_calma", 2)
+	check("eli bossa kart bosa gider", cm.inventories[1].size() == 3)
+	var bot_name_lengths := {}
+	var name_ok := true
+	for i in 40:
+		var n: String = pm._bot_party_name([])
+		bot_name_lengths[n.length()] = true
+		if not n.ends_with("P") or n.length() < 2 or n.length() > 3:
+			name_ok = false
+	check("bot adlari XP bicimi (1-2 harf + P)", name_ok and bot_name_lengths.has(2) and bot_name_lengths.has(3), str(bot_name_lengths.keys()))
+	check("parti adi 1-14 karakter", pm.NAME_MAX_LENGTH == 14 and pm.is_valid_name("A") and pm.is_valid_name("12345678901234") \
+		and not pm.is_valid_name("123456789012345"))
+	mm.players = {10: {"name": "insan"}, 11: {"name": "", "bot": true}, 12: {"name": "", "bot": true}}
+	pm.parties = {10: {"name": "Insan", "bg_color": Color("22A9D6")}}
+	pm.add_bot_party(11)
+	pm.add_bot_party(12)
+	var close_pair := false
+	var colors: Array = [Color("22A9D6"), Color(pm.parties[11]["bg_color"]), Color(pm.parties[12]["bg_color"])]
+	for ci in colors.size():
+		for cj in range(ci + 1, colors.size()):
+			if pm.color_distance(colors[ci], colors[cj]) < pm.BOT_COLOR_MIN_DISTANCE:
+				close_pair = true
+	check("bot renkleri oyunculara ve birbirine cok yakin degil", not close_pair, str(colors))
+	pm.parties[10]["bg_color"] = colors[1]
+	pm._adjust_bot_colors()
+	check("oyuncu botun rengine yakin renk secince bot uzaklasir",
+		pm.color_distance(Color(pm.parties[11]["bg_color"]), colors[1]) >= pm.BOT_COLOR_MIN_DISTANCE)
 
 	print("")
 	if fails == 0:

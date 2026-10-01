@@ -87,8 +87,9 @@ func refresh() -> void:
 	var owner := CardManager.stronghold_of(province_id)
 	if owner != -1:
 		var party: Dictionary = PartyManager.parties.get(owner, {})
-		_body.add_child(_label("%s'nın SİYASİ KALESİ — rakipler seçmeni %%%d daha yavaş çevirir." % [
-			party.get("name", "?"), int(round(PublicOpinion.STRONGHOLD_RESISTANCE * 100.0))], 12,
+		_body.add_child(_label("%s'nın SİYASİ KALESİ — rakipler seçmeni %%%d daha yavaş çevirir, karalama yarı etkili. Kuşatma: %%%d (en az 2-3 partinin mitingi düşürür)." % [
+			party.get("name", "?"), int(round(PublicOpinion.STRONGHOLD_RESISTANCE * 100.0)),
+			int(round(CardManager.siege_total(province_id) / PublicOpinion.SIEGE_BREAK * 100.0))], 12,
 			(party.get("bg_color", UiTheme.GOLD) as Color).lightened(0.3)))
 
 	_build_intel()
@@ -105,21 +106,24 @@ func _build_intel() -> void:
 	var level := CardManager.organization_level(province_id, me)
 	_section("TEŞKİLAT RAPORU  ·  seviye %d/%d  (sadece sen görürsün)" % [level, GameRules.ORG_MAX_LEVEL])
 	if level == 0:
-		_body.add_child(_label("Bu ilde teşkilatın yok. Teşkilatlanma (%d mana): 1. seviye ilin görüşünü, 2. seviye isabetli anketi açar; her seviye oy bonusu da verir. Miting ve karalama da teşkilat ister." % GameRules.ORG_MANA_COST, 12, DIM))
+		_body.add_child(_label("Bu ilde teşkilatın yok. Teşkilatlanma (%d mana): 1. seviye ilin görüşünü ve yaklaşık oyunu, 2. seviye %%90 doğru anketi açar; her seviye oy bonusu verir ve seçmeni sana çeker. Miting ve karalama da teşkilat ister." % GameRules.ORG_MANA_COST, 12, DIM))
 		return
 	var center := CardManager.province_center(province_id)
 	for axis in IdeologyAxes.AXES:
-		_body.add_child(_label(CardPresets.leaning_text(axis, roundi(float(center.get(axis, 0.0)))), 12, INTEL_COLOR))
+		_body.add_child(_label("%s: %s" % [IdeologyAxes.AXIS_SIDES[axis]["title"],
+			IdeologyAxes.position_text(axis, float(center.get(axis, 0.0)))], 12, INTEL_COLOR))
 	# Seçmene ne kadar yakınsın (kale %75'te kurulur); sayı değil kelime.
 	var closeness := CardManager.stronghold_closeness(province_id, me)
-	var closeness_text := "çok yakın" if closeness >= PublicOpinion.STRONGHOLD_THRESHOLD else ("yakın" if closeness >= 0.55 \
+	var closeness_text := "çok yakın" if closeness >= 0.75 else ("yakın" if closeness >= PublicOpinion.STRONGHOLD_THRESHOLD \
 		else ("uzak" if closeness >= 0.3 else "çok uzak"))
 	_body.add_child(_label("Seçmen sana %s." % closeness_text, 12, INTEL_COLOR))
+	_build_kale_progress(me, level, closeness)
 	var poll := CardManager.province_poll(me, province_id)
 	if poll.is_empty():
-		_body.add_child(_label("Anket için teşkilatı 2. seviyeye çıkar (%d mana)." % GameRules.ORG_MANA_COST, 12, DIM))
 		return
-	var accuracy := "yüksek isabetli" if level >= 3 else "orta isabetli"
+	var accuracy := "%90 doğru" if level >= 2 else "yaklaşık"
+	if level < 2:
+		_body.add_child(_label("2. seviye teşkilat (%d mana) %%90 doğru anket verir." % GameRules.ORG_MANA_COST, 12, DIM))
 	_body.add_child(_label("Anket (%s, ±%%%d)  ·  şimdi seçim olsa (oy · mv):" % [accuracy,
 		int(round(CardManager.poll_error(me, province_id) * 100.0))], 12, INTEL_COLOR))
 	var ids: Array = poll.keys()
@@ -140,6 +144,16 @@ func _build_intel() -> void:
 	for peer_id in ids:
 		var entry: Dictionary = poll[peer_id]
 		_body.add_child(_party_row(int(peer_id), "%%%.0f · %d" % [float(entry["percent"]), int(entry["seats"])], false))
+
+## Kale yolu: teşkilat tam + kale emeği (miting/yatırım) + seçmen yakınlığı.
+func _build_kale_progress(me: int, level: int, closeness: float) -> void:
+	if CardManager.stronghold_of(province_id) == me:
+		_body.add_child(_label("Burası SENİN KALEN.", 12, UiTheme.GOLD))
+		return
+	var effort := CardManager.kale_effort_of(province_id, me)
+	_body.add_child(_label("Kale yolu: teşkilat %d/%d · miting/yatırım %d/%d · seçmen %s" % [level, GameRules.ORG_MAX_LEVEL,
+		mini(int(effort), int(PublicOpinion.STRONGHOLD_EFFORT)), int(PublicOpinion.STRONGHOLD_EFFORT),
+		"yeterince yakın" if closeness >= PublicOpinion.STRONGHOLD_THRESHOLD else "henüz uzak"], 12, DIM))
 
 ## Bir parti satırı: rozet, ad, istatistik; show_strength ise ildeki gücü ve il başkanlığı.
 func _party_row(peer_id: int, stats_text: String, show_strength: bool) -> Control:

@@ -15,7 +15,7 @@ extends Node
 signal parties_updated
 
 const NAME_MIN_LENGTH := 1
-const NAME_MAX_LENGTH := 12
+const NAME_MAX_LENGTH := 14
 
 # peer_id -> {
 #   "name": String, "icon_index": int, "icon_color": Color, "bg_color": Color,
@@ -154,7 +154,76 @@ func reset() -> void:
 	_broadcast_parties()
 	parties_updated.emit()
 
-const BOT_PARTY_NAMES := ["Demokrasi", "Refah", "Birlik", "Vatan", "Atılım", "Hürriyet", "Kalkınma", "Adalet"]
+## BOT PARTİ ADLARI: "XP" biçiminde; X %75 iki harf, %25 tek harf ("AKP", "MP").
+const BOT_NAME_LETTERS := "ABCDEFGHİJKLMNORSTUVYZ"
+const BOT_NAME_TWO_LETTER_CHANCE := 0.75
+## Bot rengi oyunculara ve diğer botlara bundan yakın olmasın (0..1 algısal
+## mesafe; paletteki komşu maviler/turkuazlar bunun altında kalır).
+const BOT_COLOR_MIN_DISTANCE := 0.2
+
+static func _bot_party_name(used: Array) -> String:
+	for attempt in 60:
+		var count := 2 if randf() < BOT_NAME_TWO_LETTER_CHANCE else 1
+		var letters := ""
+		for i in count:
+			letters += BOT_NAME_LETTERS[randi_range(0, BOT_NAME_LETTERS.length() - 1)]
+		var candidate := letters + "P"
+		if not used.has(candidate):
+			return candidate
+	return "P%d" % randi_range(10, 99)
+
+## İki rengin algısal mesafesi (0 aynı .. ~1 çok farklı; "redmean" yaklaşımı).
+static func color_distance(a: Color, b: Color) -> float:
+	var rm := (a.r + b.r) * 0.5
+	var dr := a.r - b.r
+	var dg := a.g - b.g
+	var db := a.b - b.b
+	return sqrt((2.0 + rm) * dr * dr + 4.0 * dg * dg + (3.0 - rm) * db * db) / 3.0
+
+## Paletten, avoid'deki renklerin hepsine yeterince uzak bir renk (yoksa en uzak).
+func _pick_distinct_color(avoid: Array) -> Color:
+	var good: Array = []
+	var best := PartyPresets.COLORS[0]
+	var best_distance := -1.0
+	for color in PartyPresets.COLORS:
+		if color.is_equal_approx(Color.WHITE):
+			continue
+		var nearest := INF
+		for other in avoid:
+			nearest = minf(nearest, color_distance(color, other))
+		if nearest >= BOT_COLOR_MIN_DISTANCE:
+			good.append(color)
+		if nearest > best_distance:
+			best_distance = nearest
+			best = color
+	return good[randi_range(0, good.size() - 1)] if not good.is_empty() else best
+
+## Host: botların renklerini oyunculara ve birbirlerine göre ayarlar. Oda
+## sahibinin elle seçtiği bot rengi ("color_locked") korunur. Değişiklik
+## olduysa true döner.
+func _adjust_bot_colors() -> bool:
+	var avoid: Array = []
+	var bots: Array = []
+	for peer_id in parties.keys():
+		if MultiplayerManager.is_bot(int(peer_id)) and not bool(parties[peer_id].get("color_locked", false)):
+			bots.append(int(peer_id))
+		elif parties[peer_id].has("bg_color"):
+			avoid.append(Color(parties[peer_id]["bg_color"]))
+	bots.sort()
+	var changed := false
+	for bot in bots:
+		var current := Color(parties[bot].get("bg_color", Color.TRANSPARENT))
+		var too_close := current.a <= 0.0
+		for other in avoid:
+			if color_distance(current, other) < BOT_COLOR_MIN_DISTANCE:
+				too_close = true
+				break
+		if too_close:
+			current = _pick_distinct_color(avoid)
+			parties[bot]["bg_color"] = current
+			changed = true
+		avoid.append(current)
+	return changed
 
 ## Host: bir bot için hazır (kilitli) rastgele bir parti oluşturur.
 func add_bot_party(peer_id: int) -> void:
@@ -163,22 +232,46 @@ func add_bot_party(peer_id: int) -> void:
 	var used_names: Array = []
 	for party in parties.values():
 		used_names.append(party.get("name", ""))
-	var party_name := "Parti%d" % randi_range(10, 99)
-	var names := BOT_PARTY_NAMES.duplicate()
-	names.shuffle()
-	for candidate in names:
-		if not used_names.has(candidate):
-			party_name = candidate
-			break
-	var bg := _free_color(Color.TRANSPARENT)
 	parties[peer_id] = {
-		"name": party_name,
+		"name": _bot_party_name(used_names),
 		"icon_index": PartyPresets.random_icon_index(),
 		"icon_color": Color.WHITE,
-		"bg_color": bg,
+		"bg_color": Color.TRANSPARENT,
 		"ideology": IdeologyAxes.random_start_ideology(),
 		"ready": true,
 	}
+	_adjust_bot_colors()
+	if MultiplayerManager.room_code != "":
+		_broadcast_parties()
+	parties_updated.emit()
+
+## BÖLÜNEN PARTİ: ana partiyle BİREBİR aynı görüş ve logo, BENZER (aynı değil)
+## renk. Host çağırır (bkz. CardManager._split_party).
+func add_splinter_party(peer_id: int, parent_id: int, party_name: String) -> void:
+	var parent: Dictionary = parties.get(parent_id, {})
+	parties[peer_id] = {
+		"name": party_name,
+		"icon_index": int(parent.get("icon_index", 0)),
+		"icon_color": Color.WHITE,
+		"bg_color": similar_color(Color(parent.get("bg_color", Color(0.5, 0.5, 0.5)))),
+		"ideology": (parent.get("ideology", IdeologyAxes.default_values()) as Dictionary).duplicate(),
+		"ready": true,
+		"splinter_of": parent_id,
+	}
+	if MultiplayerManager.room_code != "":
+		_broadcast_parties()
+	parties_updated.emit()
+
+## Ana rengin "akrabası": tonu biraz kayık, açıklığı belirgin farklı.
+static func similar_color(base: Color) -> Color:
+	var value := base.v * 0.62 if base.get_luminance() > 0.45 else minf(1.0, base.v * 1.25 + 0.15)
+	return Color.from_hsv(fposmod(base.h + 0.04, 1.0), clampf(base.s * 0.85, 0.25, 1.0), clampf(value, 0.25, 1.0))
+
+## Host: oyundan çıkan (ana partisine dönen) partiyi siler.
+func remove_party(peer_id: int) -> void:
+	if not parties.has(peer_id):
+		return
+	parties.erase(peer_id)
 	if MultiplayerManager.room_code != "":
 		_broadcast_parties()
 	parties_updated.emit()
@@ -228,6 +321,7 @@ func _apply_party_local_only(party_name: String, icon_index: int, icon_color: Co
 		"ideology": ideology,
 		"ready": was_ready,
 	}
+	_adjust_bot_colors()
 	parties_updated.emit()
 
 func _apply_party(peer_id: int, party_name: String, icon_index: int, icon_color: Color, bg_color: Color, ideology: Dictionary) -> void:
@@ -244,6 +338,7 @@ func _apply_party(peer_id: int, party_name: String, icon_index: int, icon_color:
 		"ideology": ideology,
 		"ready": was_ready,
 	}
+	_adjust_bot_colors()
 	_broadcast_parties()
 	parties_updated.emit()
 
@@ -260,6 +355,7 @@ func _apply_party_and_ready(peer_id: int, party_name: String, icon_index: int, i
 		"ideology": ideology,
 		"ready": is_ready_value,
 	}
+	_adjust_bot_colors()
 	_broadcast_parties()
 	parties_updated.emit()
 	if is_ready_value and all_ready():
@@ -334,6 +430,8 @@ func _apply_bot_party(bot_id: int, party_name: String, icon_index: int, bg_color
 		return
 	parties[bot_id]["name"] = party_name
 	parties[bot_id]["icon_index"] = icon_index
+	if not Color(parties[bot_id].get("bg_color", Color.TRANSPARENT)).is_equal_approx(bg_color):
+		parties[bot_id]["color_locked"] = true
 	parties[bot_id]["bg_color"] = bg_color
 	if not ideology.is_empty():
 		parties[bot_id]["ideology"] = ideology.duplicate()

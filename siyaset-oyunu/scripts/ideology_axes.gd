@@ -28,6 +28,18 @@ const AXIS_SIDES := {
 const STEP := 0.5
 const LAW_PROPOSE_SHIFT := 1.0
 const LAW_VOTE_SHIFT := 0.5
+## MECLİS KONUŞMASI: sıra gelen oyuncu hamleden önce 6 uçtan birini savunur,
+## partisi o yöne bu kadar kayar (zorunlu, atlanamaz).
+const SPEECH_SHIFT := 0.5
+## Konuşmanın başlığı: eksen -> yön -> başlık.
+const SPEECH_TITLES := {
+	"economic": {-1: "Sosyal devlet", 1: "Serbest piyasa"},
+	"social": {-1: "Özgürlükler", 1: "Aile ve gelenek"},
+	"administrative": {-1: "Yerinden yönetim", 1: "Güçlü merkez"},
+}
+
+static func speech_title(axis: String, dir: int) -> String:
+	return String(SPEECH_TITLES.get(axis, {}).get(1 if dir > 0 else -1, axis))
 
 static func default_values() -> Dictionary:
 	var v := {}

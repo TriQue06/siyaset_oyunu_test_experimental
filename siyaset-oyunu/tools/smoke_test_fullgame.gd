@@ -78,6 +78,7 @@ func _initialize() -> void:
 	print("=== 3) ERKEN SECIM: TAKVIM KAYAR ===")
 	GameRules.configure(4, 8)   # 4 yilda bir = 8 tur; secimler 8, 16, 24...
 	cm.init_game()
+	cm.speech_required = false  # doğrudan çağrılar: meclis konuşması ayrıca test edilir
 	gm.result_hold_seconds = 0.0
 	cm.turn_order = ids.duplicate()
 	cm.last_seats = {1: 150, 2: 200, 3: 50}

@@ -122,7 +122,31 @@ func _kale_summary() -> String:
 		var owner := int(cm.strongholds[province_id])
 		var name: String = pm.parties.get(owner, {}).get("name", "?")
 		counts[name] = int(counts.get(name, 0)) + 1
-	return "kale %d/%d %s" % [cm.strongholds.size(), cm._province_ids.size(), str(counts)]
+	var splits := 0
+	var merges := 0
+	for entry in cm.event_log:
+		if String(entry["kind"]) == "party_split":
+			splits += 1
+		elif String(entry["kind"]) == "party_merge":
+			merges += 1
+	# Son seçimde il oy oranlarının bantları (güç haritası bantları) ve illerin görüşü.
+	var bands := [0, 0, 0, 0, 0]
+	for province_id in cm.last_province_results.keys():
+		var top := 0.0
+		for peer_id in cm.last_province_results[province_id].keys():
+			top = maxf(top, float(cm.last_province_results[province_id][peer_id]["percent"]))
+		var band := 0
+		for limit in [5.0, 15.0, 40.0, 80.0]:
+			if top >= limit:
+				band += 1
+		bands[band] += 1
+	var spread := 0.0
+	for province_id in cm.province_ideology.keys():
+		for axis in IdeologyAxes.AXES:
+			spread += absf(float(cm.province_ideology[province_id][axis]))
+	spread /= maxf(1.0, cm.province_ideology.size() * 3.0)
+	return "kale %d/%d %s · bolunme %d, donus %d · il birincisi bantlari %s · illerin ort. |eksen| %.2f" % [
+		cm.strongholds.size(), cm._province_ids.size(), str(counts), splits, merges, str(bands), spread]
 
 func _initialize() -> void:
 	await process_frame

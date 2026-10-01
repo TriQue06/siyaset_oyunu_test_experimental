@@ -71,6 +71,7 @@ func _initialize() -> void:
 	mm = root.get_node("MultiplayerManager")
 	pm = root.get_node("PartyManager")
 	cm = root.get_node("CardManager")
+	cm.speech_required = false  # meclis konuşması ayrıca test edilir
 	cm.fixed_map_seed = 1950
 	gm = root.get_node("GovernmentManager")
 	gp = root.get_node("GovernmentPresets")
@@ -349,7 +350,7 @@ func _initialize() -> void:
 	cm._add_local(TestProvinces.id("konya"), 3, -2.0)
 	check("populizm: baskasinin karalamasi etkilenmez", near(cm.local_of(TestProvinces.id("konya"), 3), -2.0 * PublicOpinion.POPULISM_BAD_MULT - 2.0))
 	cm._apply_play(3, 0)
-	check("mana bonusu +5 mana", cm.mana_of(3) == 9 + GameRules.MANA_BONUS_AMOUNT and GameRules.MANA_BONUS_AMOUNT == 5)
+	check("mana bonusu (zayif) +3 mana", cm.mana_of(3) == 9 + GameRules.MANA_BONUS_WEAK and GameRules.MANA_BONUS_WEAK == 3)
 	check("mana bonusu sirayi devretmez", cm.current_turn_peer_id() == 3)
 	cm.round_number += GameRules.POPULISM_ROUNDS
 	check("populizm 5 tur sonra biter", cm.populism_rounds_left(3) == 0)

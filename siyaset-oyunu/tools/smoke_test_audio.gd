@@ -70,6 +70,7 @@ func _initialize() -> void:
 	print("=== 5) OYUN OLAYLARI ===")
 	var gm = root.get_node("GovernmentManager")
 	var cm = root.get_node("CardManager")
+	cm.speech_required = false  # meclis konuşması ayrıca test edilir
 	var heard := func(sound: String) -> bool:
 		return am._last_played.has(sound)
 	am._last_played.clear()

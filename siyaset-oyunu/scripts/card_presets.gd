@@ -4,7 +4,9 @@ extends Node
 ## KARTLAR: sırası gelen oyuncuya oyun bir kart verir; oynamanın bedeli CARD_MANA_COSTS.
 ## YATIRIM ve GENSORU da artık hamle (bkz. CardManager.invest / censure).
 ##   - POPÜLİZM BONUSU : POPULISM_ROUNDS tur kendi hamlelerinin iyi etkisi artar, kötüsü azalır.
-##   - MANA BONUSU     : +MANA_BONUS_AMOUNT mana; kullanınca sıra devreder.
+##   - MANA BONUSU     : zayıf +MANA_BONUS_WEAK, güçlü +MANA_BONUS_STRONG mana.
+##   - BONUS KART      : rastgele BONUS_CARD_DRAW kart daha çekilir.
+##   - KART ÇALMA      : seçilen partinin elinden rastgele 1 kart çalınır (eli boşsa boşa gider).
 ## GÖZCÜ (artık teşkilatın parçası) ve MİTİNG kart değil (bkz. CardManager);
 ## ANKET kaldırıldı (gözcü raporu anlık vekil tahmini gösterir). Türleri eski
 ## kayıtlar/görseller için duruyor, desteye girmez.
@@ -27,10 +29,13 @@ const STEAL_CARD_TYPES: Array[String] = [
 ]
 
 ## Hedef PARTİ seçilen diğer saldırı kartları.
-## Kaset: hedefin ulusal desteğini doğrudan düşürür.
-## Parti içi isyan: hedef, sıradaki İLK yasa oylamasında çekimser kalmak zorunda.
+## Kaset: hedefin ulusal desteğini doğrudan düşürür, partide biraz KARIŞIKLIK çıkarır.
+## İç karışıklık (isyan): hedefin ulusal desteği düşer ve partide çok KARIŞIKLIK
+## çıkar (gizli değer; çok birikirse parti bölünür, bkz. CardManager.turmoil).
+## Kart çalma: hedefin elinden rastgele bir kart alınır.
 const REPUTATION_CARD_TYPE := "kaset"
 const REBELLION_CARD_TYPE := "isyan"
+const CARD_THEFT_CARD_TYPE := "kart_calma"
 
 ## Hükümeti düşürmek için meclise getirilen teklif.
 const CENSURE_CARD_TYPE := "gensoru"
@@ -46,6 +51,8 @@ const EARLY_ELECTION_CARD_TYPE := "erken_secim"
 ## Hedefsiz bonus kartlar: seçip tekrar dokununca (ya da yukarı sürükleyince) oynanır.
 const POPULISM_CARD_TYPE := "populizm"
 const MANA_BONUS_CARD_TYPE := "mana_bonusu"
+const MANA_BONUS_STRONG_CARD_TYPE := "mana_bonusu_guclu"
+const BONUS_CARD_TYPE := "bonus_kart"
 
 ## GÜNDEMLER: her eksenin her ucu için bir sıcak konu (bkz. GameRules gündem
 ## takvimi). Artık kart değil; oyun takvime göre kendisi seçer.
@@ -77,6 +84,9 @@ const CARD_TYPES: Array[String] = [
 	"karalama",
 	"populizm",
 	"mana_bonusu",
+	"mana_bonusu_guclu",
+	"bonus_kart",
+	"kart_calma",
 ]
 
 const AXIS_TITLES := {
@@ -128,6 +138,9 @@ const CARD_MANA_COSTS := {
 	"karalama": 1,
 	"populizm": 1,
 	"mana_bonusu": 0,
+	"mana_bonusu_guclu": 0,
+	"bonus_kart": 1,
+	"kart_calma": 1,
 	"gundem_economic_n": 1,
 	"gundem_economic_p": 1,
 	"gundem_social_n": 1,
@@ -146,6 +159,9 @@ const CARD_ART_ALIAS := {
 	"kaset": "steal_medium",
 	"isyan": "gensoru",
 	"erken_secim": "gensoru",
+	"mana_bonusu_guclu": "mana_bonusu",
+	"bonus_kart": "anket",
+	"kart_calma": "gozcu",
 }
 
 var _card_textures: Dictionary = {}
@@ -165,9 +181,9 @@ func get_card_texture(card_type: String) -> Texture2D:
 func needs_target(card_type: String) -> bool:
 	return STEAL_CARD_TYPES.has(card_type)
 
-## Hedef parti seçilen TÜM kartlar: vekil çalma + kaset + parti içi isyan.
+## Hedef parti seçilen TÜM kartlar: vekil çalma + kaset + iç karışıklık + kart çalma.
 func needs_party_target(card_type: String) -> bool:
-	return needs_target(card_type) or card_type in [REPUTATION_CARD_TYPE, REBELLION_CARD_TYPE]
+	return needs_target(card_type) or card_type in [REPUTATION_CARD_TYPE, REBELLION_CARD_TYPE, CARD_THEFT_CARD_TYPE]
 
 ## Bu kart oynanırken haritadan İL seçilmesi gerekiyor mu? (Karalamada ilden
 ## sonra hedef parti de seçilir.)
@@ -176,7 +192,8 @@ func needs_province_target(card_type: String) -> bool:
 
 ## Hedef gerektirmeyen bonus kart mı? (popülizm, mana bonusu)
 func is_self_card(card_type: String) -> bool:
-	return card_type in [POPULISM_CARD_TYPE, MANA_BONUS_CARD_TYPE, EARLY_ELECTION_CARD_TYPE] 		or is_agenda_card(card_type)
+	return card_type in [POPULISM_CARD_TYPE, MANA_BONUS_CARD_TYPE, MANA_BONUS_STRONG_CARD_TYPE, BONUS_CARD_TYPE,
+		EARLY_ELECTION_CARD_TYPE] or is_agenda_card(card_type)
 
 ## Meclise sunulan (oylanan) kart mı?
 func is_parliament_card(card_type: String) -> bool:
@@ -248,7 +265,15 @@ func card_short_title(card_type: String) -> String:
 		"populizm":
 			return "POPÜLİZM\nBONUSU"
 		"mana_bonusu":
-			return "MANA\nBONUSU"
+			return "MANA BONUSU\nZAYIF"
+		"mana_bonusu_guclu":
+			return "MANA BONUSU\nGÜÇLÜ"
+		"bonus_kart":
+			return "BONUS\nKART"
+		"kart_calma":
+			return "KART\nÇALMA"
+		"isyan":
+			return "İÇ\nKARIŞIKLIK"
 		"erken_secim":
 			return "ERKEN\nSEÇİM"
 		"steal_weak":
@@ -274,7 +299,13 @@ func card_title(card_type: String) -> String:
 		"kaset":
 			return "Kaset / İtibar Suikastı"
 		"isyan":
-			return "Parti İçi İsyan"
+			return "İç Karışıklık"
+		"kart_calma":
+			return "Kart Çalma"
+		"bonus_kart":
+			return "Bonus Kart"
+		"mana_bonusu_guclu":
+			return "Mana Bonusu (Güçlü)"
 		"gensoru":
 			return "Gensoru"
 		"miting":
@@ -347,12 +378,21 @@ func _card_effect_text(card_type: String) -> String:
 	match card_type:
 		REPUTATION_CARD_TYPE:
 			return ("Seçtiğin partinin itibarını sarsan bir kaset sızar:" + "\n"
-				+ "ulusal desteği %.1f puan düşer." + "\n"
+				+ "ulusal desteği %.1f puan düşer, partide karışıklık çıkar." + "\n"
 				+ "Sağdaki bir parti kartına sürükle.") % PublicOpinion.REPUTATION_NATIONAL_DAMAGE
 		REBELLION_CARD_TYPE:
-			return ("Seçtiğin partide isyan çıkar: sıradaki İLK yasa" + "\n"
-				+ "oylamasında çekimser kalmak zorunda kalır." + "\n"
+			return ("Seçtiğin partide iç karışıklık çıkar: ulusal desteği" + "\n"
+				+ "%.1f puan düşer, parti içi huzursuzluk büyür." + "\n"
+				+ "Karışıklık çok birikirse parti BÖLÜNEBİLİR." + "\n"
+				+ "Sağdaki bir parti kartına sürükle.") % PublicOpinion.REBELLION_NATIONAL_DAMAGE
+		CARD_THEFT_CARD_TYPE:
+			return ("Seçtiğin partinin elinden rastgele 1 kart çalarsın." + "\n"
+				+ "Elinde hiç kart yoksa kart boşa gider." + "\n"
 				+ "Sağdaki bir parti kartına sürükle.")
+		BONUS_CARD_TYPE:
+			return "Rastgele %d kart daha çekersin (el doluysa sığdığı kadar).\nSeçmek için dokun, tekrar dokun: kullan." % GameRules.BONUS_CARD_DRAW
+		MANA_BONUS_STRONG_CARD_TYPE:
+			return "+%d mana kazan.\nSeçmek için dokun, tekrar dokun: kullan." % GameRules.MANA_BONUS_STRONG
 		EARLY_ELECTION_CARD_TYPE:
 			return ("Meclise erken seçim önerisi sunarsın." + "\n"
 				+ "Kabul edilirse dönem sonunda sandığa gidilir ve" + "\n"
@@ -375,5 +415,5 @@ func _card_effect_text(card_type: String) -> String:
 				GameRules.POPULISM_ROUNDS, int(PublicOpinion.POPULISM_GOOD_MULT), PublicOpinion.POPULISM_STEAL_MULT,
 				int(round((1.0 - PublicOpinion.POPULISM_BAD_MULT) * 100)), PublicOpinion.POPULISM_ELECTION_NATIONAL]
 		MANA_BONUS_CARD_TYPE:
-			return "+%d mana kazan.\nSeçmek için dokun, tekrar dokun: kullan." % GameRules.MANA_BONUS_AMOUNT
+			return "+%d mana kazan.\nSeçmek için dokun, tekrar dokun: kullan." % GameRules.MANA_BONUS_WEAK
 	return ""

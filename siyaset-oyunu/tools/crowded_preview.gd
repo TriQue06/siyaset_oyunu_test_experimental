@@ -24,6 +24,7 @@ func _initialize() -> void:
 	var mm = root.get_node("MultiplayerManager")
 	var pm = root.get_node("PartyManager")
 	var cm = root.get_node("CardManager")
+	cm.speech_required = false  # önizleme: konuşma paneli ayrıca çekilir
 	root.get_node("BotManager").set_process(false)
 	mm.room_code = ""
 	mm.election_threshold = 3.0
@@ -85,24 +86,21 @@ func _initialize() -> void:
 		_shot("layer_%d" % layer)
 		print("layer istendi ", layer, " -> ", scene._map_layer, " switching ", scene._layer_switching, " queued ", scene._queued_layer)
 	check("vekil katmaninda vekil daireleri gorunur", scene.map_holder.get_node("SeatMarkers").visible)
-	# Güç katmanı herkesin gücüyle hesaplanır: vekil çıkaramayan yeşil göremez,
-	# bir ilde en fazla iki parti koyu yeşil (vekillerin yarısı) olabilir.
-	var projection: Dictionary = cm.projection_all()
-	check("guc haritasi her ili boyar (anket gerekmez)", projection.size() == ids.size(), "%d/%d" % [projection.size(), ids.size()])
-	var green_without_seat := 0
-	var crowded_dark_green := 0
+	# Güç katmanı POTANSİYEL OY ORANI bantlarıyla boyanır, sadece teşkilatın
+	# olduğu illerde (1. seviye yaklaşık, 2. seviye %90 doğru anket).
+	var projection: Dictionary = cm.projection_all(me)
+	var unknown_painted := 0
+	for province_id in ids:
+		if cm.organization_level(province_id, me) == 0 and projection.has(province_id):
+			unknown_painted += 1
+	check("guc haritasi teskilatsiz ili bilmez", unknown_painted == 0, str(unknown_painted))
+	var band_ok := true
 	for province_id in projection.keys():
-		var dark := 0
-		for id in cm.turn_order:
-			var t: float = scene._strength_t(projection[province_id], id)
-			if t > 0.0 and int(projection[province_id][id]["seats"]) == 0:
-				green_without_seat += 1
-			if t >= 0.99:
-				dark += 1
-		if dark > 2:
-			crowded_dark_green += 1
-	check("guc haritasi: vekil cikaramayan ilde yesil yok", green_without_seat == 0, str(green_without_seat))
-	check("guc haritasi: bir ilde en fazla iki parti koyu yesil", crowded_dark_green == 0, str(crowded_dark_green))
+		var color: Color = scene._vote_band_color(float(projection[province_id][me]["percent"]))
+		if not scene.STRENGTH_STOPS.has(color):
+			band_ok = false
+	check("guc haritasi oy bandi renkleri", band_ok and scene._vote_band_color(3.0) == scene.STRENGTH_STOPS[0] \
+		and scene._vote_band_color(85.0) == scene.STRENGTH_STOPS[4] and scene._vote_band_color(20.0) == scene.STRENGTH_STOPS[2])
 	scene._on_layer_button_pressed(2)
 	await create_timer(0.6).timeout
 	cm.current_turn_index = cm.turn_order.find(me)

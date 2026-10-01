@@ -73,9 +73,9 @@ static func set_election_anchor(round_number: int) -> void:
 	ELECTION_ANCHOR = FIRST_ELECTION_ROUND if round_number <= 0 else round_number
 
 const MANA_START := 0
-const MANA_PER_ROUND := 4
+const MANA_PER_ROUND := 3
 ## Hükümette görevi olan partiler tur başına 1 fazla mana alır (iktidar avantajı).
-const MANA_PER_ROUND_GOVERNMENT := 5
+const MANA_PER_ROUND_GOVERNMENT := 4
 ## BEDEL YAZISI: ücretsiz hamleler her yerde "bedelsiz" diye geçer ("bedava"
 ## ya da "0 mana" değil). Mana 0,5 katlarıyla birikebildiği için ondalık da
 ## gerekirse basılır.
@@ -94,18 +94,22 @@ const LAW_AGAINST_LEVEL_1 := 1.0
 const LAW_AGAINST_LEVEL_2 := 2.0
 const LAWS_PER_ROUND := 1
 ## Teşkilat anketinin sapması (her partinin oyu en fazla bu oranda sapar):
-## 2. seviye orta isabet, 3. seviye yüksek isabet.
-const POLL_ERROR_MEDIUM := 0.3
-const POLL_ERROR_HIGH := 0.08
+## 1. seviye YAKLAŞIK oy (±%35), 2. seviye %90 doğruluk (±%10).
+const POLL_ERROR_LOW := 0.35
+const POLL_ERROR_HIGH := 0.10
 const MITING_MANA_COST := 2
 ## Yatırım (sadece hükümet partileri) ve gensoru (sadece muhalefet, hükümet
 ## azınlıktayken) hamleleri.
 const INVEST_MANA_COST := 2
 ## Gensoru BEDELSİZ: muhalefetin elindeki tek gerçek silah engellenmemeli.
 const CENSURE_MANA_COST := 0
-## Popülizm bonusu kartı bu kadar tur sürer; mana bonusu kartı bu kadar mana verir.
+## Popülizm bonusu kartı bu kadar tur sürer. Mana bonusunun iki çeşidi var:
+## zayıf +MANA_BONUS_WEAK, güçlü +MANA_BONUS_STRONG. Bonus kart BONUS_CARD_DRAW kart çeker.
 const POPULISM_ROUNDS := 3
-const MANA_BONUS_AMOUNT := 5
+const MANA_BONUS_WEAK := 3
+const MANA_BONUS_STRONG := 6
+const MANA_BONUS_AMOUNT := MANA_BONUS_WEAK
+const BONUS_CARD_DRAW := 2
 const ELECTION_MANA_BONUS := 1
 ## GÜNDEM TAKVİMİ: ilk seçimden hemen sonraki turdan itibaren AGENDA_ROUNDS tur
 ## (6 ay) gündem, AGENDA_GAP tur (12 ay) ara, yine gündem... Gündemli her tur
@@ -117,9 +121,9 @@ const AGENDA_GAP := 2
 ## (hükümet partisinin yasası daha çok).
 ## Kabul edilen gensoru, getiren partiye puan tablosunda bu kadar puan yazar.
 const CENSURE_PASS_SCORE := 5
-## Yasa geçirmek artık sembolik bir puan: asıl puan iktidarda olmaktan gelir.
-const LAW_PASS_SCORE := 2
-const LAW_PASS_SCORE_GOV := 3
+## Meclisten yasa geçirmek +5 puan (hükümet ya da muhalefet fark etmez).
+const LAW_PASS_SCORE := 5
+const LAW_PASS_SCORE_GOV := 5
 const GOVERNMENT_MANA_BONUS := 1
 const ORG_MANA_COST := 1
 ## En fazla 2 seviye: 1 = ilin görüşü + az bonus, 2 = isabetli anket + yüksek bonus.

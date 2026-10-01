@@ -1,21 +1,22 @@
 class_name ProvinceIdeology
 extends RefCounted
-## İLLERİN GÖRÜŞÜ: her oyunun başında host üretir, oyun boyunca değişmez.
-## Her il 3 eksende -3..+3 arası tam sayı bir noktadır. KOMŞU iller birbirine
-## yakın görüşte olur:
+## İLLERİN DOĞAL GÖRÜŞÜ: her oyunun başında host üretir. İller NÖTRE YAKIN
+## başlar: her eksende −MAX_START..+MAX_START (en fazla ±1). Oyun boyunca
+## partiler teşkilat, miting ve yatırımla illeri kendilerine çeker (bkz.
+## CardManager._pull_province). KOMŞU iller birbirine yakın görüşte olur:
 ##   1. Her ile her eksende rastgele bir değer verilir.
 ##   2. Değerler komşuluk grafiği üzerinde birkaç kez yumuşatılır (her il,
 ##      komşularının ortalamasına yaklaşır).
-##   3. Yumuşatma değerleri merkeze topladığı için her eksen yeniden -3..+3
-##      aralığına yayılır ve tam sayıya yuvarlanır.
+##   3. Yumuşatma değerleri merkeze topladığı için her eksen yeniden
+##      −MAX_START..+MAX_START aralığına yayılır (0,1 adımlı).
 ## Komşuluk altıgen haritadan gelir (GameMap): deniz ile ayrılan bölgeler
 ## komşu sayılmaz.
 
 const SMOOTHING_PASSES := 3
 ## Yumuşatmada ilin kendi değerinin payı (kalanı komşuların ortalaması).
 const SELF_WEIGHT := 0.4
-## Yayma sonrası en uç ilin mutlak değeri (yuvarlamadan önce).
-const SPREAD := 3.3
+## Oyun başında bir ilin bir eksende en uç değeri.
+const MAX_START := 1.0
 
 
 ## province_id -> Array[province_id] (altıgen haritadan).
@@ -23,7 +24,7 @@ static func neighbors() -> Dictionary:
 	var map = Engine.get_main_loop().root.get_node_or_null("GameMap") if Engine.get_main_loop() is SceneTree else null
 	return map.neighbors() if map != null else {}
 
-## province_id -> {"economic": int, "social": int, "administrative": int}
+## province_id -> {"economic": float, "social": float, "administrative": float}
 static func generate(rng: RandomNumberGenerator, province_ids: Array) -> Dictionary:
 	var ids: Array = province_ids.duplicate()
 	ids.sort()  # aynı tohum her makinede aynı haritayı versin
@@ -62,8 +63,8 @@ static func generate(rng: RandomNumberGenerator, province_ids: Array) -> Diction
 		var max_abs := 0.0001
 		for province_id in ids:
 			max_abs = maxf(max_abs, absf(float(values[province_id][axis])))
-		var scale := SPREAD / max_abs
+		var scale := MAX_START / max_abs
 		for province_id in ids:
-			result[province_id][axis] = clampi(roundi(float(values[province_id][axis]) * scale),
-				IdeologyAxes.AXIS_MIN, IdeologyAxes.AXIS_MAX)
+			result[province_id][axis] = clampf(snappedf(float(values[province_id][axis]) * scale, 0.1),
+				-MAX_START, MAX_START)
 	return result

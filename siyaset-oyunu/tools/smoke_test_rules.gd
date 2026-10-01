@@ -77,6 +77,7 @@ func _initialize() -> void:
 	mm = root.get_node("MultiplayerManager")
 	pm = root.get_node("PartyManager")
 	cm = root.get_node("CardManager")
+	cm.speech_required = false  # meclis konuşması ayrıca test edilir
 	cm.fixed_map_seed = 1950
 	gm = root.get_node("GovernmentManager")
 	gp = root.get_node("GovernmentPresets")
@@ -302,8 +303,9 @@ func _initialize() -> void:
 	cm._apply_organization(1, TestProvinces.id("ankara"))
 	check("teskilat kuruldu, mana harcandi; mana bitti -> sira devretmez", cm.organization_level(TestProvinces.id("ankara"), 1) == 1 		and cm.mana_of(1) == 0 and cm.current_turn_peer_id() == 1)
 	cm.current_turn_index = cm.turn_order.find(1)
-	check("teskilat 1: az oy bonusu + il gorusu, anket yok", near(cm.activity_of(TestProvinces.id("ankara"), 1) - cm.local_of(TestProvinces.id("ankara"), 1), PublicOpinion.org_activity(1)) \
-		and cm.knows_leaning(1, TestProvinces.id("ankara")) and cm.province_poll(1, TestProvinces.id("ankara")).is_empty() and not cm.knows_leaning(2, TestProvinces.id("ankara")))
+	check("teskilat 1: az oy bonusu + il gorusu + yaklasik anket", near(cm.activity_of(TestProvinces.id("ankara"), 1) - cm.local_of(TestProvinces.id("ankara"), 1), PublicOpinion.org_activity(1)) \
+		and cm.knows_leaning(1, TestProvinces.id("ankara")) and cm.poll_error(1, TestProvinces.id("ankara")) == GameRules.POLL_ERROR_LOW \
+		and not cm.province_poll(1, TestProvinces.id("ankara")).is_empty() and not cm.knows_leaning(2, TestProvinces.id("ankara")))
 	check("mana yetmezse kurulamaz", not cm.can_build_organization(1, TestProvinces.id("izmir")))
 	cm.mana[1] = 20
 	for i in 5:
@@ -319,7 +321,8 @@ func _initialize() -> void:
 		and poll_seats == cm.province_seat_count(TestProvinces.id("izmir")), str(poll3))
 	check("anket ayni turda degismez", str(cm.province_poll(1, TestProvinces.id("izmir"))) == str(poll3))
 	cm.organizations[TestProvinces.id("izmir")][1] = 1
-	check("teskilat 1: anket yok", cm.poll_error(1, TestProvinces.id("izmir")) < 0.0 and cm.province_poll(1, TestProvinces.id("izmir")).is_empty())
+	check("teskilat 1: yaklasik anket (2. seviyeden az isabetli)", cm.poll_error(1, TestProvinces.id("izmir")) == GameRules.POLL_ERROR_LOW \
+		and GameRules.POLL_ERROR_LOW > GameRules.POLL_ERROR_HIGH and cm.poll_error(2, TestProvinces.id("izmir")) < 0.0)
 	cm.organizations[TestProvinces.id("izmir")][1] = GameRules.ORG_MAX_LEVEL
 	cm.mana[1] = 1
 	check("mana yetmezse miting yapilamaz", not cm.can_miting(1, TestProvinces.id("izmir")))
@@ -497,9 +500,9 @@ func _initialize() -> void:
 	for province_id in ideo.keys():
 		for axis in ["economic", "social", "administrative"]:
 			var v = ideo[province_id][axis]
-			if typeof(v) != TYPE_INT or int(v) < -3 or int(v) > 3:
+			if float(v) < -ProvinceIdeology.MAX_START - 0.001 or float(v) > ProvinceIdeology.MAX_START + 0.001:
 				in_range = false
-	check("degerler -3..+3 tam sayi", in_range)
+	check("iller notre yakin baslar (her eksen -1..+1)", in_range)
 	var nb: Dictionary = ProvinceIdeology.neighbors()
 	check("komsuluk bulundu", nb.size() == root.get_node("GameMap").ids.size() and (nb.get(TestProvinces.id("ankara"), []) as Array).size() >= 3, str(nb.get(TestProvinces.id("ankara"), [])))
 	var near_sum := 0.0
@@ -585,13 +588,15 @@ func _initialize() -> void:
 	cm.mana[kaset_player] = 9
 	cm.last_seats[kaset_target] = maxi(20, int(cm.last_seats.get(kaset_target, 0)))
 	cm.last_seats[kaset_player] = maxi(20, int(cm.last_seats.get(kaset_player, 0)))
+	cm.turmoil = {}
 	var nat_before: float = cm.national_of(kaset_target)
 	cm._apply_card_effect(kaset_player, "kaset", kaset_target)
 	check("kaset: hedefin ulusal destegi dustu", near(cm.national_of(kaset_target), nat_before - PublicOpinion.REPUTATION_NATIONAL_DAMAGE),
 		"%.2f -> %.2f" % [nat_before, cm.national_of(kaset_target)])
+	check("kaset: hedefte karisiklik cikar", near(cm.turmoil_of(kaset_target), PublicOpinion.TURMOIL_REPUTATION))
 	cm._apply_card_effect(kaset_player, "isyan", kaset_target)
-	check("isyan: hedef partide isyan var", cm.has_rebellion(kaset_target))
-	check("isyan tuketilir", cm.consume_rebellion(kaset_target) and not cm.has_rebellion(kaset_target))
+	check("ic karisiklik: karisiklik buyur, cekimser zorlamasi yok", near(cm.turmoil_of(kaset_target),
+		PublicOpinion.TURMOIL_REPUTATION + PublicOpinion.TURMOIL_REBELLION) and not "rebellion" in cm)
 	check("kaset kendine oynanamaz", not cm.can_play_card(kaset_player, "kaset", kaset_player))
 
 	var thief: int = cm.turn_order[0]

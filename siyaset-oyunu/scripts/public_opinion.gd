@@ -4,9 +4,10 @@ extends RefCounted
 ##
 ## Bir partinin bir ildeki seçim desteği iki YAKINLIKTAN oluşur:
 ##   - İDEOLOJİK yakınlık: partinin görüşü ile ilin görüşü arasındaki mesafe
-##     (ElectionModel.support). İllerin görüşü oyun başında belirlenir ve
-##     değişmez (bkz. ProvinceIdeology); partiler NÖTR başlar, görüşleri
-##     sadece sundukları yasalarla kayar.
+##     (ElectionModel.support). İller oyuna NÖTRE YAKIN başlar (her eksen
+##     −1..+1, bkz. ProvinceIdeology); teşkilat, miting ve yatırım ilin
+##     görüşünü partiye ÇEKER. Partiler başta görüşünü seçer, meclis
+##     konuşmaları ve yasalarla kayar; GÜÇLÜ olduğu iller onu kısmen takip eder.
 ##   - AKTİVİTE yakınlığı: o ilde yapılanlar — miting, yatırım, yasa etkileri,
 ##     karalama (il puanı, tur sonunda söner) + İL BAŞKANLIĞI (seviye başına
 ##     kalıcı puan).
@@ -134,8 +135,8 @@ static func withdraw_ally_national(leaver_penalty: float) -> float:
 # --- Kaset / itibar suikastı ------------------------------------------------------
 ## Hedefin ULUSAL desteğinden doğrudan düşer (il puanlarına dokunmaz).
 const REPUTATION_NATIONAL_DAMAGE := 4.0
-## PARTİ İÇİ İSYAN: çekimser kalmaya zorlamanın yanında hedefin ulusal
-## desteğini de düşürür (bölünmüş parti oy kaybeder).
+## İÇ KARIŞIKLIK: hedefin ulusal desteğini düşürür ve partide (gizli)
+## karışıklık çıkarır (bkz. TURMOIL_REBELLION).
 const REBELLION_NATIONAL_DAMAGE := 1.5
 # --- Karalama -----------------------------------------------------------------
 ## Hedefin kaybı = DAMAGE / (1 + DEFENSE_FACTOR × hedefin il gücü)
@@ -172,27 +173,89 @@ const STEAL_VICTIM_NATIONAL_PER_SEAT := 0.012
 const STEAL_VICTIM_NATIONAL_LIMIT := 0.35
 
 # --- İllerin ideolojik dönüşümü (Siyasi Kale) ---------------------------------
-## Miting, yatırım ve yasa artık ilin SEÇMEN MERKEZİNİ de hamleyi yapan partinin
+## Teşkilat, miting, yatırım ve yasa ilin SEÇMEN MERKEZİNİ hamleyi yapan partinin
 ## görüşüne doğru çeker: merkez += (parti − merkez) × oran (eksen başına).
-const MITING_PULL := 0.06
+## Miting ve teşkilat hem görüşü çeker hem oy getirir; yatırım KISMEN çeker ama
+## daha çok oy getirir (bkz. INVEST_LOCAL).
+const MITING_PULL := 0.10
 const INVEST_PULL := 0.05
+## Teşkilat kurulunca/geliştirilince bir kez, sonra her tur seviye başına.
+const ORG_PULL := 0.06
+const ORG_ROUND_PULL := 0.012
+## İLİN PARTİYİ TAKİBİ: parti görüş değiştirince il, partinin oradaki oy payı ×
+## bu oran kadar aynı yöne kayar (%100 oy alan partinin dönüşünün yarısı).
+const PROVINCE_FOLLOW := 0.5
+## Partinin kendi kalesi onu daha sadık takip eder.
+const STRONGHOLD_FOLLOW_MULT := 1.4
 ## Yasa bütün illerde SADECE kendi ekseninde, sunanın o eksendeki görüşüne çeker.
 const LAW_PULL_PASSED := 0.04
 const LAW_PULL_REJECTED := 0.015
 ## GERİ DÖNÜŞ: çekilmeyen il her tur sonunda kendi DOĞAL görüşüne (oyun
 ## başındaki merkez) bu oranda geri döner. Dönüşümü kalıcı kılmak sürekli
 ## emek ister; yoksa tek bir iktidar partisi bütün ülkeyi kendine çekerdi.
-const PROVINCE_REVERSION := 0.06
+const PROVINCE_REVERSION := 0.03
 
+## SİYASİ KALE = o ilde teşkilatı TAM (2. seviye) + kale emeği (o ilde yaptığı
+## miting/yatırım sayısı) STRONGHOLD_EFFORT + seçmen yakınlığı THRESHOLD.
 ## Kale yakınlığı = 1 − mesafe / STRONGHOLD_DISTANCE_SCALE (0..1).
-## %75 yakınlık (mesafe ≤ 1,5) + o ilde teşkilat = SİYASİ KALE.
 const STRONGHOLD_DISTANCE_SCALE := 6.0
-const STRONGHOLD_THRESHOLD := 0.75
-## Kale hemen yıkılmaz: sahibi ancak yakınlık bunun altına düşerse kaybeder
-## (parti kendi görüşünü değiştirip kalesinden uzaklaşırsa).
-const STRONGHOLD_LOSS_THRESHOLD := 0.6
+const STRONGHOLD_THRESHOLD := 0.6
+const STRONGHOLD_EFFORT := 6.0
+## Kale sahibi görüşünü ilden çok uzaklaştırırsa kaleyi kendiliğinden kaybeder.
+const STRONGHOLD_LOSS_THRESHOLD := 0.4
 ## İdeolojik değişim kalkanı: RAKİPLERİN bir kale ili çekme hızı %70 yavaşlar.
 const STRONGHOLD_RESISTANCE := 0.7
+## Kale sahibine kalıcı aktivite (oy) bonusu; kalesinde karalanan partinin
+## kaybı bu çarpanla küçülür. Kale düşünce sahibinin il puanı düşer.
+const STRONGHOLD_ACTIVITY := 2.0
+const STRONGHOLD_DAMAGE_MULT := 0.5
+const STRONGHOLD_FALL_LOCAL := -2.5
+## KUŞATMA: kale ilinde rakip mitingi 1 + benzerlik, karalama yarısı kadar puan
+## yazar. Bir partinin katkısı en fazla SIEGE_PARTY_CAP + SIEGE_SIMILAR_CAP ×
+## benzerlik olur; toplam SIEGE_BREAK'e ulaşınca kale düşer. Böylece tek parti
+## kaleyi düşüremez: farklı görüşte 3 parti ya da kale sahibine benzer 2 parti
+## gerekir. Sahibinin kendi mitingi kuşatmayı SIEGE_DEFENSE kadar geriletir;
+## kuşatma her tur SIEGE_DECAY oranında dağılır.
+const SIEGE_BREAK := 6.0
+const SIEGE_PARTY_CAP := 2.0
+const SIEGE_SIMILAR_CAP := 2.0
+const SIEGE_PROPAGANDA := 0.5
+const SIEGE_DEFENSE := 2.0
+const SIEGE_DECAY := 0.75
+## Benzerlik ölçeği: başlangıçtaki zıt köşeler (her eksende ±1,5) arası mesafe.
+const SIEGE_SIMILARITY_SCALE := 5.2
+
+## Kuşatan ile kale sahibinin görüş benzerliği (0 zıt köşe .. 1 aynı görüş).
+static func siege_similarity(attacker: Dictionary, owner: Dictionary) -> float:
+	return clampf(1.0 - ElectionModel.distance(attacker, owner) / SIEGE_SIMILARITY_SCALE, 0.0, 1.0)
+
+# --- Karışıklık ve bölünme ------------------------------------------------------
+## GİZLİ KARIŞIKLIK: iç karışıklık kartı çok, kaset biraz yazar. Her tur
+## TURMOIL_DECAY ile söner, olumlu hamleler (miting, teşkilat, yatırım, kabul
+## edilen yasa, hükümete girmek) toparlar.
+const TURMOIL_REBELLION := 3.5
+const TURMOIL_REPUTATION := 1.5
+const TURMOIL_DECAY := 0.85
+const TURMOIL_EASE_MITING := 0.3
+const TURMOIL_EASE_ORG := 0.2
+const TURMOIL_EASE_INVEST := 0.5
+const TURMOIL_EASE_LAW := 0.8
+const TURMOIL_EASE_GOVERNMENT := 1.5
+## Karışıklık bunu aşan (ve en az SPLIT_MIN_SEATS vekili olan) parti tur sonunda
+## BÖLÜNÜR: vekillerinin SPLIT_SEAT_SHARE_MIN..MAX'ı aynı görüşte yeni partiye
+## geçer, teşkilatlarının bir kısmı (SPLIT_ORG_CHANCE) onunla gider.
+const SPLIT_TURMOIL := 7.0
+const SPLIT_MIN_SEATS := 8
+const SPLIT_SEAT_SHARE_MIN := 0.35
+const SPLIT_SEAT_SHARE_MAX := 0.5
+const SPLIT_ORG_CHANCE := 0.4
+const SPLIT_NATIONAL_DAMAGE := -1.0
+const SPLIT_AFTER_TURMOIL := 4.0
+## Ayrılan parti en erken SPLIT_MIN, en geç SPLIT_MAX seçim atlattıktan sonra
+## döner; erken dönüş için ana partinin karışıklığı REUNION_TURMOIL'e inmeli.
+const SPLIT_MIN_ELECTIONS := 1
+const SPLIT_MAX_ELECTIONS := 4
+const REUNION_TURMOIL := 2.0
 
 ## İlin merkezinin partiye yakınlığı (kale ölçüsü, 0..1).
 static func stronghold_closeness(party_ideology: Dictionary, center: Dictionary) -> float:

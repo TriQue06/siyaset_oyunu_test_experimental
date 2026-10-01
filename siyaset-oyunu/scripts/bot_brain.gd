@@ -102,9 +102,8 @@ static func _known_centers(bot: int) -> Dictionary:
 		var center := CardManager.province_center(province_id)
 		var estimate := {}
 		for axis in IdeologyAxes.AXES:
-			# Teşkilat raporu gibi: uç ya da "orta" (il görüşü artık kesirli, kayabilir).
-			var v := float(center.get(axis, 0.0))
-			estimate[axis] = 0.0 if absf(v) < 0.5 else signf(v) * LEANING_ESTIMATE
+			# Teşkilat raporu gibi kaba: yarım adıma yuvarlanmış görüş.
+			estimate[axis] = snappedf(float(center.get(axis, 0.0)), 0.5)
 		result[province_id] = estimate
 	return result
 
@@ -135,6 +134,9 @@ static func _mana_value(bot: int) -> float:
 ## "province"} | {"type": "miting", "province"} | |
 ## {"type": "pass"}
 static func choose_action(bot: int) -> Dictionary:
+	# MECLİS KONUŞMASI zorunlu: her şeyden önce.
+	if CardManager.needs_speech(bot):
+		return choose_speech(bot)
 	var known := _known_centers(bot)
 	var best := {"type": "pass"}
 	var best_score := PASS_ACTION_SCORE
@@ -186,6 +188,32 @@ static func choose_action(bot: int) -> Dictionary:
 			best = {"type": "miting", "province": miting["province"]}
 			best_score = float(miting["score"]) - GameRules.MITING_MANA_COST * mana_value
 
+	return best
+
+## MECLİS KONUŞMASI: 6 uçtan, bilinen illerde desteği en çok artıran; bot
+## kendi tarafında ılımlı-belirgin (|1,5| civarı) bir çizgide durmayı sever ve
+## taraf değiştirmekten kaçınır.
+static func choose_speech(bot: int) -> Dictionary:
+	var known := _known_centers(bot)
+	var mine := _ideology(bot)
+	var base := _electoral_strength(mine, known)
+	var best := {}
+	var best_score := -INF
+	for axis in IdeologyAxes.AXES:
+		for dir in [-1, 1]:
+			var v := float(mine.get(axis, 0.0))
+			var moved := mine.duplicate()
+			moved[axis] = IdeologyAxes.clamp_value(v + IdeologyAxes.SPEECH_SHIFT * dir)
+			var nv := float(moved[axis])
+			var score := (_electoral_strength(moved, known) - base) * 20.0
+			score -= absf(absf(nv) - 1.5) * 0.4
+			if absf(v) > 0.25 and signf(nv) != signf(v):
+				score -= 0.6
+			# Eşitlikte botlar hep aynı konuşmayı yapmasın.
+			score += float((absi(bot) + CardManager.round_number + axis.length() * (dir + 2)) % 7) * 0.01
+			if score > best_score:
+				best_score = score
+				best = {"type": "speech", "axis": axis, "dir": dir}
 	return best
 
 ## Seçim desteğini en çok artıracak yasa: bilinen illerdeki etkiler (geçme
@@ -376,9 +404,14 @@ static func _evaluate(bot: int, card_type: String, known: Dictionary) -> Diction
 			if CardManager.populism_rounds_left(bot) > 0:
 				return {}
 			return {"score": 2.2 if _election_soon() else 1.4, "peer": -1, "province": ""}
-		CardPresets.MANA_BONUS_CARD_TYPE:
-			# Turu bitirir: manası azken, yapacak başka şey yokken kullanılır.
+		CardPresets.MANA_BONUS_CARD_TYPE, CardPresets.MANA_BONUS_STRONG_CARD_TYPE:
+			# Manası azken, yapacak başka şey yokken kullanılır.
 			return {"score": 0.9 if CardManager.mana_of(bot) < GameRules.MITING_MANA_COST else 0.3, "peer": -1, "province": ""}
+		CardPresets.BONUS_CARD_TYPE:
+			var room := CardManager.MAX_HAND_SIZE - hand_size(bot) + 1
+			return {} if room < 2 else {"score": 1.1, "peer": -1, "province": ""}
+		CardPresets.CARD_THEFT_CARD_TYPE:
+			return _eval_card_theft(bot)
 		CardPresets.PROPAGANDA_CARD_TYPE:
 			return _eval_propaganda(bot, known)
 	if CardPresets.needs_target(card_type):
@@ -402,7 +435,24 @@ static func _eval_reputation(bot: int) -> Dictionary:
 		score += BLOC_STEAL_BONUS * 0.6
 	return {"score": score, "peer": target, "province": ""}
 
-## Parti içi isyan: yasa oylaması yakınken büyük bir rakibi çekimsere zorlar.
+static func hand_size(peer_id: int) -> int:
+	return (CardManager.inventories.get(peer_id, []) as Array).size()
+
+## Kart çalma: eli en dolu rakip (eli boşsa kart boşa gider).
+static func _eval_card_theft(bot: int) -> Dictionary:
+	if hand_size(bot) >= CardManager.MAX_HAND_SIZE:
+		return {}
+	var target := -1
+	for peer_id in CardManager.turn_order:
+		if peer_id == bot or hand_size(peer_id) == 0:
+			continue
+		if target == -1 or hand_size(peer_id) > hand_size(target):
+			target = peer_id
+	if target == -1:
+		return {}
+	return {"score": 1.0 + float(hand_size(target)) * 0.12, "peer": target, "province": ""}
+
+## İç karışıklık: büyük bir rakibin desteğini düşürür ve partisini sarsar.
 static func _eval_rebellion(bot: int) -> Dictionary:
 	var target := _attack_target(bot)
 	if target == -1 or not CardManager.has_seats(target):

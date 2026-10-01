@@ -402,6 +402,20 @@ func _apply_remove_bot(peer_id: int) -> void:
 	_renumber_bots()
 	_broadcast_player_list()
 
+## OYUN İÇİ BÖLÜNME: karışıklıktan doğan parti oyuna yapay zekâ (bot) olarak
+## girer; ana partisine dönünce çıkar (bkz. CardManager._split_party).
+func add_splinter_bot(leader_name: String) -> int:
+	var id := _free_bot_id()
+	players[id] = {"name": leader_name, "bot": true, "splinter": true}
+	_broadcast_player_list()
+	return id
+
+func remove_splinter_bot(peer_id: int) -> void:
+	if not is_bot(peer_id):
+		return
+	players.erase(peer_id)
+	_broadcast_player_list()
+
 ## Kullanılmayan en küçük bot id'si. Id'ler sabit kalır; görünen AD adaptiftir.
 func _free_bot_id() -> int:
 	var index := 1

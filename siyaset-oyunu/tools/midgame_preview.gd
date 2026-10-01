@@ -92,6 +92,28 @@ func _initialize() -> void:
 		await create_timer(0.3).timeout
 		root.get_texture().get_image().save_png("%s/midgame_org.png" % OS.get_user_data_dir())
 		print("screenshot: midgame_org")
+		# Güç haritası: teşkilatın olduğu illerde oy bandı (1. seviye yaklaşık, 2. seviye %90).
+		var cmp = root.get_node("CardManager")
+		for i in 14:
+			var org_pid: String = cmp._province_ids[i * 3 % cmp._province_ids.size()]
+			var orgs: Dictionary = cmp.organizations.get(org_pid, {})
+			orgs[mm.owner_id] = 1 + i % 2
+			cmp.organizations[org_pid] = orgs
+		scene._set_map_layer(2, false)
+		await create_timer(0.3).timeout
+		root.get_texture().get_image().save_png("%s/midgame_power.png" % OS.get_user_data_dir())
+		print("screenshot: midgame_power")
+		# MECLİS KONUŞMASI: sıra bende, henüz konuşmadım.
+		var cms = root.get_node("CardManager")
+		cms.current_turn_index = cms.turn_order.find(mm.owner_id)
+		cms.speech_done = false
+		gm._clear_proposal()
+		gm._set_phase(gm.Phase.GOVERNING)
+		cms._push_state({"type": "timer"})
+		await create_timer(0.3).timeout
+		root.get_texture().get_image().save_png("%s/midgame_speech.png" % OS.get_user_data_dir())
+		print("screenshot: midgame_speech")
+		scene._speech_panel.hide()
 		scene._set_map_layer(0, false)
 		await create_timer(0.3).timeout
 		# Olay logundaki odak düğmesi: ili olan son kaydı haritada göster.

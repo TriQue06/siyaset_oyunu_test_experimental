@@ -129,9 +129,9 @@ static func expected_shares(parties: Dictionary, center: Dictionary, sharpness: 
 const NATIONAL_LIST_SEATS := 200
 ## Bir partinin bir ildeki oy payı en fazla bu kadar olabilir: keskinlik
 ## arttıkça iller %90'ları görmesin. Fazlası diğer partilere oranla dağılır.
-const PROVINCE_MAX_SHARE := 0.68
+const PROVINCE_MAX_SHARE := 0.92
 ## İl payının ne kadarı ülke genelindeki paydan gelir (bkz. model 4b).
-const NATIONAL_BLEND := 0.4
+const NATIONAL_BLEND := 0.25
 
 ## national: peer_id -> ulusal pay (toplam 1). İl payını onunla karıştırır.
 static func blend_national(shares: Dictionary, national: Dictionary) -> Dictionary:

@@ -2,10 +2,12 @@ extends Node2D
 ## ProvinceMap'in ÇOCUĞU olarak eklenir (bkz. Map.tscn). İllerin üstüne, o
 ## ildeki milletvekili sandalyelerini noktalar halinde çizer.
 ##
-## Noktalar bir raster texture (Sprite2D) yerine _draw()/draw_circle ile
-## VEKTÖR olarak çiziliyor (antialiased) — harita hangi ölçekte gösterilirse
-## gösterilsin (ne kadar büyütülürse büyütülsün) her zaman keskin/pürüzsüz
-## kalır, pikselleşmez.
+## Noktalar SVG gibi NET: her nokta düz bir dörtgen, rengini ve dairesini
+## ParliamentDiagram.SEAT_SHADER çizer (her piksel daireye uzaklığını kendisi
+## hesaplar, kenar ekranda tam 1 piksel yumuşar, kontur en az 1 piksel).
+## Harita hareket ettikçe / büyüdükçe (olay logundaki odak yakınlaşması)
+## noktalar her karede o anki ekran ölçeğinde YENİDEN çizilir: büyütülmüş eski
+## bir çizim gerilip bulanıklaşmaz.
 ##
 ## Yerleşim: her il bir "nokta grubu" (n sandalye için satır/sütun ızgarası)
 ## oluşturur ve grup ilin merkezine (GameMap.center_of) oturur.
@@ -36,8 +38,24 @@ var _groups: Array = []
 
 @onready var _province_map = get_parent()
 
+var _white_texture: Texture2D
+
 func _ready() -> void:
 	_load_seat_centers()
+	var image := Image.create(1, 1, false, Image.FORMAT_RGBA8)
+	image.fill(Color.WHITE)
+	_white_texture = ImageTexture.create_from_image(image)
+	var shader := Shader.new()
+	shader.code = ParliamentDiagram.SEAT_SHADER
+	var shader_material := ShaderMaterial.new()
+	shader_material.shader = shader
+	material = shader_material
+	# Harita (ebeveyn) yakınlaşınca/kayınca yeniden çiz: ölçek o anki ekrana göre.
+	set_notify_transform(true)
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSFORM_CHANGED:
+		queue_redraw()
 
 ## Altıgen haritada merkezler GameMap'ten gelir (bölgenin iç hücresi).
 func _load_seat_centers() -> void:
@@ -202,10 +220,14 @@ func _draw() -> void:
 	var cell := dot_radius * 2.0 + dot_spacing
 	var step_px: int = maxi(outline_half_px * 2 + min_screen_gap_px, int(roundf(cell * scale)))
 
-	# Kontur ve renkli kareler AYRI geçişlerde çizilmeli ki bir noktanın
-	# konturu komşu noktanın renkli karesinin ÜSTÜNE binmesin.
-	for pass_index in 2:
-		var half_px: int = outline_half_px if pass_index == 0 else dot_half_px
+	# Tek geçiş: shader konturu ve dolguyu aynı dörtgende çizer; adım konturlu
+	# çapın üstünde olduğundan noktalar birbirine binmez.
+	var shader_material := material as ShaderMaterial
+	if shader_material != null:
+		shader_material.set_shader_parameter("outline_color", dot_outline_color)
+		shader_material.set_shader_parameter("inner_ratio", float(dot_half_px) / float(outline_half_px))
+	for pass_index in 1:
+		var half_px: int = outline_half_px
 		for g in _groups:
 			var layout: Array = g["layout"]
 			var colors: Array = g["colors"]
@@ -220,7 +242,7 @@ func _draw() -> void:
 				for col in cols:
 					if idx >= colors.size():
 						break
-					var color: Color = dot_outline_color if pass_index == 0 else colors[idx]
+					var color: Color = colors[idx]
 					var center_px := Vector2(x0_px + col * step_px, y_px)
 					_draw_circle_at_screen_px(inv, scale, center_px, half_px, color)
 					idx += 1
@@ -230,4 +252,7 @@ func _draw() -> void:
 ## ekranda aynı tam sayılara oturduğu için kenar yumuşatması her birinde birebir
 ## aynı görünür; adım konturlu çapın üstünde olduğundan daireler değmez.
 func _draw_circle_at_screen_px(inv: Transform2D, screen_scale: float, center_px: Vector2, half_px: int, color: Color) -> void:
-	draw_circle(inv * center_px, float(half_px) / screen_scale, color, true, -1.0, true)
+	var half_local := float(half_px) / screen_scale
+	var center: Vector2 = inv * center_px
+	draw_texture_rect(_white_texture, Rect2(center - Vector2(half_local, half_local), Vector2(half_local, half_local) * 2.0),
+		false, color)

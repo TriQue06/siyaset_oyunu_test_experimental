@@ -77,13 +77,13 @@ const WEIGHT_PROPAGANDA := 12.0
 const WEIGHT_STEAL_WEAK := 12.0
 const WEIGHT_MANA_BONUS := 12.0
 const WEIGHT_MANA_BONUS_STRONG := 6.0
-const WEIGHT_BONUS_CARD := 9.0
+const WEIGHT_BONUS_CARD := 12.0
 const WEIGHT_CARD_THEFT := 6.0
 const WEIGHT_POPULISM := 12.0
 const WEIGHT_STEAL_STRONG := 6.0
 const WEIGHT_EARLY_ELECTION := 6.0
 const WEIGHT_REPUTATION := 6.0
-const WEIGHT_REBELLION := 9.0
+const WEIGHT_REBELLION := 15.0
 
 ## Meclis: haritadaki bölgelerin vekilleri (HexGridGenerator.PROVINCE_SEATS)
 ## + ulusal liste. Harita yüklenince yeniden hesaplanır.

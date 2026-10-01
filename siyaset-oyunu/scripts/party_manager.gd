@@ -155,7 +155,7 @@ func reset() -> void:
 	parties_updated.emit()
 
 ## BOT PARTİ ADLARI: "XP" biçiminde; X %75 iki harf, %25 tek harf ("AKP", "MP").
-const BOT_NAME_LETTERS := "ABCDEFGHİJKLMNORSTUVYZ"
+const BOT_NAME_LETTERS := "ABCDEFGHKLMNORSTUVY"
 const BOT_NAME_TWO_LETTER_CHANCE := 0.75
 ## Bot rengi oyunculara ve diğer botlara bundan yakın olmasın (0..1 algısal
 ## mesafe; paletteki komşu maviler/turkuazlar bunun altında kalır).

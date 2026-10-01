@@ -11,8 +11,6 @@ extends RefCounted
 ##      aynı noktada duran iki parti oyu BÖLER — konumlanma stratejisi buradan
 ##      doğar. İdeoloji kartlarının seçime etkisi de böyle ortaya çıkar.
 ##   3. Küçük rastgelelik: parti başına ulusal dalga + il başına sapma.
-##   4. Eksen keskinliği: il payları bu üsse yükseltilip yeniden normalize
-##      edilir (>1 öndekini abartır, <1 payları birbirine yaklaştırır).
 ##   4b. ÜLKE GENELİ KARIŞIMI: il payı = NATIONAL_BLEND × ulusal pay +
 ##      (1 - NATIONAL_BLEND) × il payı. Bir yerde %70 alıp başka yerde %0
 ##      almak olmasın: partinin illerdeki oyu ülke genelindeki oyu etrafında
@@ -65,14 +63,14 @@ static func support(party_ideology: Dictionary, voter_center: Dictionary) -> flo
 ## Rastgelelik OLMADAN beklenen ulusal paylar (karışımdan önce; toplam 1).
 ## centers: province_id -> seçmen merkezi, local_mod: province_id -> {peer -> puan}.
 static func expected_national(parties: Dictionary, centers: Dictionary, province_seats: Dictionary,
-		sharpness: float, national_mod: Dictionary = {}, local_mod: Dictionary = {}) -> Dictionary:
+		national_mod: Dictionary = {}, local_mod: Dictionary = {}) -> Dictionary:
 	var national := {}
 	var total := 0.0
 	for province_id in province_seats.keys():
 		var n := float(province_seats[province_id])
 		if n <= 0.0:
 			continue
-		var shares := expected_shares(parties, centers.get(province_id, {}), sharpness, national_mod, local_mod.get(province_id, {}))
+		var shares := expected_shares(parties, centers.get(province_id, {}), national_mod, local_mod.get(province_id, {}))
 		for peer_id in shares.keys():
 			national[peer_id] = float(national.get(peer_id, 0.0)) + float(shares[peer_id]) / 100.0 * n
 		total += n
@@ -84,7 +82,7 @@ static func expected_national(parties: Dictionary, centers: Dictionary, province
 ## Rastgelelik OLMADAN bir ildeki beklenen oy payları (peer_id -> yüzde).
 ## Anket kartı kullanır (hata payını CardManager ekler).
 ## national: ulusal paylar (bkz. expected_national); verilirse il payı onunla karışır.
-static func expected_shares(parties: Dictionary, center: Dictionary, sharpness: float,
+static func expected_shares(parties: Dictionary, center: Dictionary,
 		national_mod: Dictionary = {}, local_here: Dictionary = {}, national: Dictionary = {}) -> Dictionary:
 	var peer_ids: Array = parties.keys()
 	peer_ids.sort()
@@ -98,14 +96,8 @@ static func expected_shares(parties: Dictionary, center: Dictionary, sharpness: 
 	var result := {}
 	if raw_total <= 0.0:
 		return result
-	var power: float = maxf(sharpness, 0.01)
-	var sharp_total := 0.0
 	for peer_id in peer_ids:
-		var s: float = pow(maxf(float(raw[peer_id]) / raw_total, 0.0001), power)
-		result[peer_id] = s
-		sharp_total += s
-	for peer_id in peer_ids:
-		result[peer_id] = float(result[peer_id]) / sharp_total
+		result[peer_id] = float(raw[peer_id]) / raw_total
 	result = cap_shares(blend_national(result, national))
 	for peer_id in peer_ids:
 		result[peer_id] = float(result[peer_id]) * 100.0
@@ -127,8 +119,8 @@ static func expected_shares(parties: Dictionary, center: Dictionary, sharpness: 
 ## D'Hondt ile dağıtılan vekiller. Vekil çalma bunlara da erişir
 ## (bkz. CardManager._apply_steal — torbada "" ulusal listeyi temsil eder).
 const NATIONAL_LIST_SEATS := 200
-## Bir partinin bir ildeki oy payı en fazla bu kadar olabilir: keskinlik
-## arttıkça iller %90'ları görmesin. Fazlası diğer partilere oranla dağılır.
+## Bir partinin bir ildeki oy payı en fazla bu kadar olabilir. Fazlası diğer
+## partilere oranla dağılır.
 const PROVINCE_MAX_SHARE := 0.92
 ## İl payının ne kadarı ülke genelindeki paydan gelir (bkz. model 4b).
 const NATIONAL_BLEND := 0.25
@@ -164,7 +156,7 @@ static func cap_shares(shares: Dictionary, cap: float = PROVINCE_MAX_SHARE) -> D
 	return shares
 
 static func compute(parties: Dictionary, province_seats: Dictionary, voters: Dictionary,
-		threshold_percent: float, sharpness: float, rng: RandomNumberGenerator,
+		threshold_percent: float, rng: RandomNumberGenerator,
 		modifiers: Dictionary = {}) -> Dictionary:
 	var national_mod: Dictionary = modifiers.get("national", {})
 	var local_mod: Dictionary = modifiers.get("local", {})
@@ -196,7 +188,6 @@ static func compute(parties: Dictionary, province_seats: Dictionary, voters: Dic
 	for peer_id in peer_ids:
 		national[peer_id] = 0.0
 	var province_shares: Dictionary = {}
-	var power: float = maxf(sharpness, 0.01)
 
 	for province_id in province_ids:
 		var seats_here: int = int(province_seats[province_id])
@@ -210,15 +201,9 @@ static func compute(parties: Dictionary, province_seats: Dictionary, voters: Dic
 				* rng.randf_range(1.0 - PROVINCE_NOISE, 1.0 + PROVINCE_NOISE)
 			raw[peer_id] = w
 			raw_total += w
-		var sharpened: Dictionary = {}
-		var sharp_total := 0.0
-		for peer_id in peer_ids:
-			var s: float = pow(maxf(float(raw[peer_id]) / raw_total, 0.0001), power)
-			sharpened[peer_id] = s
-			sharp_total += s
 		var shares: Dictionary = {}
 		for peer_id in peer_ids:
-			shares[peer_id] = float(sharpened[peer_id]) / sharp_total
+			shares[peer_id] = float(raw[peer_id]) / raw_total
 		for peer_id in peer_ids:
 			national[peer_id] = float(national[peer_id]) + float(shares[peer_id]) * seats_here
 		province_shares[province_id] = shares

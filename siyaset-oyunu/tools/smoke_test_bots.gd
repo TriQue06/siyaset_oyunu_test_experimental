@@ -34,8 +34,6 @@ func _initialize() -> void:
 	mm.room_code = ""
 	gm.result_hold_seconds = 0.0
 	mm.election_threshold = 3.0
-	mm.axis_sharpness_start = 1.0
-	mm.axis_sharpness_increment = 0.1
 	mm.players = {}
 	pm.parties = {}
 	mm.stage = mm.Stage.PARTY_SETUP

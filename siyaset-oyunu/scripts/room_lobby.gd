@@ -33,14 +33,6 @@ var game_length_summary: Label
 var threshold_slider: HSlider
 var map_seed_edit: LineEdit
 var threshold_value_label: Label
-var axis_start_slider: HSlider
-var axis_start_value_label: Label
-var axis_increment_slider: HSlider
-var axis_increment_value_label: Label
-var axis_max_enabled_check: CheckButton
-var axis_max_value_row: HBoxContainer
-var axis_max_value_slider: HSlider
-var axis_max_value_value_label: Label
 
 var _settings_open: bool = false
 var _center_base_x: float = 0.0
@@ -64,23 +56,6 @@ func _ready() -> void:
 	interval_plus.pressed.connect(func(): _change_game_length(1, 0))
 	count_minus.pressed.connect(func(): _change_game_length(0, -1))
 	count_plus.pressed.connect(func(): _change_game_length(0, 1))
-
-	axis_start_slider.min_value = MultiplayerManager.AXIS_SHARPNESS_START_MIN
-	axis_start_slider.max_value = MultiplayerManager.AXIS_SHARPNESS_START_MAX
-	axis_start_slider.step = 0.5
-	axis_start_slider.value_changed.connect(_on_axis_start_slider_changed)
-
-	axis_increment_slider.min_value = MultiplayerManager.AXIS_SHARPNESS_INCREMENT_MIN
-	axis_increment_slider.max_value = MultiplayerManager.AXIS_SHARPNESS_INCREMENT_MAX
-	axis_increment_slider.step = 0.025
-	axis_increment_slider.value_changed.connect(_on_axis_increment_slider_changed)
-
-	axis_max_enabled_check.toggled.connect(_on_axis_max_enabled_toggled)
-
-	axis_max_value_slider.min_value = 0
-	axis_max_value_slider.max_value = MultiplayerManager.AXIS_SHARPNESS_CAP_OPTIONS.size() - 1
-	axis_max_value_slider.step = 1
-	axis_max_value_slider.value_changed.connect(_on_axis_max_value_slider_changed)
 
 	MultiplayerManager.player_list_updated.connect(_refresh)
 	MultiplayerManager.settings_updated.connect(_refresh_settings_display)
@@ -132,10 +107,6 @@ func _refresh() -> void:
 	map_seed_edit.editable = am_owner
 	for button in [interval_minus, interval_plus, count_minus, count_plus]:
 		button.disabled = not am_owner
-	axis_start_slider.editable = am_owner
-	axis_increment_slider.editable = am_owner
-	axis_max_enabled_check.disabled = not am_owner
-	axis_max_value_slider.editable = am_owner
 	_refresh_settings_display()
 
 ## Her oyuncu bir kart: renkli baş harf rozeti, isim, etiketler (Sahip / Sen /
@@ -314,20 +285,6 @@ func _refresh_settings_display() -> void:
 	if not threshold_slider.has_focus():
 		threshold_slider.value = t
 
-	axis_start_value_label.text = "%.1f" % MultiplayerManager.axis_sharpness_start
-	if not axis_start_slider.has_focus():
-		axis_start_slider.value = MultiplayerManager.axis_sharpness_start
-
-	axis_increment_value_label.text = "%.3f" % MultiplayerManager.axis_sharpness_increment
-	if not axis_increment_slider.has_focus():
-		axis_increment_slider.value = MultiplayerManager.axis_sharpness_increment
-
-	axis_max_enabled_check.button_pressed = MultiplayerManager.axis_sharpness_max_enabled
-	axis_max_value_value_label.text = "%.2f" % MultiplayerManager.axis_sharpness_max_value
-	if not axis_max_value_slider.has_focus():
-		var cap_idx := MultiplayerManager.AXIS_SHARPNESS_CAP_OPTIONS.find(MultiplayerManager.axis_sharpness_max_value)
-		axis_max_value_slider.value = cap_idx if cap_idx != -1 else 0
-
 func _format_threshold(value: float) -> String:
 	if is_equal_approx(value, round(value)):
 		return str(int(round(value)))
@@ -339,19 +296,6 @@ func _on_threshold_slider_changed(value: float) -> void:
 func _change_game_length(interval_delta: int, count_delta: int) -> void:
 	MultiplayerManager.set_game_length(MultiplayerManager.election_interval + interval_delta,
 		MultiplayerManager.election_count + count_delta)
-
-func _on_axis_start_slider_changed(value: float) -> void:
-	MultiplayerManager.set_axis_sharpness_start(value)
-
-func _on_axis_increment_slider_changed(value: float) -> void:
-	MultiplayerManager.set_axis_sharpness_increment(value)
-
-func _on_axis_max_enabled_toggled(enabled: bool) -> void:
-	MultiplayerManager.set_axis_sharpness_max_enabled(enabled)
-
-func _on_axis_max_value_slider_changed(index: float) -> void:
-	var value: float = MultiplayerManager.AXIS_SHARPNESS_CAP_OPTIONS[int(index)]
-	MultiplayerManager.set_axis_sharpness_max_value(value)
 
 # --- Ayar paneli ------------------------------------------------------------------
 
@@ -386,28 +330,6 @@ func _build_settings_panel() -> void:
 	map_seed_edit.text_submitted.connect(func(text: String): MultiplayerManager.set_map_seed(text))
 	map_seed_edit.focus_exited.connect(func(): MultiplayerManager.set_map_seed(map_seed_edit.text))
 	map_box.add_child(map_seed_edit)
-
-	var axis := _section("GELİŞMİŞ · EKSEN KESKİNLİĞİ", "İller görüşüne en yakın partiye ne kadar yönelir.")
-	axis_start_value_label = _value_row(axis, "Başlangıç")
-	axis_start_slider = HSlider.new()
-	axis.add_child(axis_start_slider)
-	axis_increment_value_label = _value_row(axis, "Tur başına artış")
-	axis_increment_slider = HSlider.new()
-	axis.add_child(axis_increment_slider)
-	var cap_row := HBoxContainer.new()
-	var cap_label := _row_label("Üst sınır")
-	cap_row.add_child(cap_label)
-	axis_max_enabled_check = CheckButton.new()
-	cap_row.add_child(axis_max_enabled_check)
-	axis.add_child(cap_row)
-	cap_row.visible = false  # tavan hep açık (en fazla 2); sadece değeri seçilir
-	axis_max_value_row = HBoxContainer.new()
-	axis_max_value_row.add_child(_row_label("Üst sınır"))
-	axis_max_value_value_label = _value_label()
-	axis_max_value_row.add_child(axis_max_value_value_label)
-	axis.add_child(axis_max_value_row)
-	axis_max_value_slider = HSlider.new()
-	axis.add_child(axis_max_value_slider)
 
 ## Başlıklı, çerçeveli bir ayar bölümü; içeriğin ekleneceği kutuyu döner.
 func _section(title_text: String, note_text: String) -> VBoxContainer:

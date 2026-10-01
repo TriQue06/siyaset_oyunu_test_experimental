@@ -40,8 +40,7 @@ func _initialize() -> void:
 	gm.result_hold_seconds = 0.0
 
 	var report := {"games": [], "elections": [], "config": {
-		"threshold": mm.election_threshold, "sharpness_start": mm.axis_sharpness_start,
-		"sharpness_increment": mm.axis_sharpness_increment, "max_rounds": GameRules.MAX_ROUNDS,
+		"threshold": mm.election_threshold, "max_rounds": GameRules.MAX_ROUNDS,
 		"province_noise": ElectionModel.PROVINCE_NOISE, "national_swing": ElectionModel.NATIONAL_SWING,
 	}}
 	var started := Time.get_ticks_msec()
@@ -193,7 +192,7 @@ func _record_election(g: int, round_snapshot: Dictionary, prev_seats: Dictionary
 		var rng := RandomNumberGenerator.new()
 		rng.seed = 100000 + g * 100 + s
 		var r := ElectionModel.compute(inputs["ideologies"], seat_counts, inputs["voters"], float(inputs["threshold"]),
-			float(inputs["sharpness"]), rng, mods)
+			rng, mods)
 		if _top_party(r["seats"]) != base_top:
 			top_changes += 1
 		for peer_id in r["seats"].keys():

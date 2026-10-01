@@ -24,7 +24,7 @@ func _initialize() -> void:
 	}
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
-	var res: Dictionary = model.compute(parties, seats, model.load_province_voters(), 7.0, 1.0, rng)
+	var res: Dictionary = model.compute(parties, seats, model.load_province_voters(), 7.0, rng)
 	var sim = sim_script.new()
 	sim.setup(res["province_results"], res["vote_shares"], res["seats"], res["passed_threshold"], 7.0, 12345, 45.0)
 

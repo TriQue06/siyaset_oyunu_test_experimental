@@ -78,8 +78,6 @@ func _initialize() -> void:
 	cp = root.get_node("CardPresets")
 	mm.room_code = ""
 	gm.result_hold_seconds = 0.0
-	mm.axis_sharpness_start = 1.0
-	mm.axis_sharpness_increment = 0.0
 	mm.election_threshold = 0.0
 	cm.set_rng_seed(12345)
 	voters = ElectionModel.load_province_voters()
@@ -89,7 +87,7 @@ func _initialize() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 	var same := {1: ideology(0, 0, 0), 2: ideology(0, 0, 0)}
-	var r := ElectionModel.compute(same, seats, voters, 0.0, 1.0, rng, {"national": {1: 8.0}})
+	var r := ElectionModel.compute(same, seats, voters, 0.0, rng, {"national": {1: 8.0}})
 	check("ulusal +8 puanli, ayni gorusteki partiden belirgin fazla oy aldi",
 		float(r["vote_shares"][1]) > float(r["vote_shares"][2]) + 5.0, str(r["vote_shares"]))
 	check("carpan sinirli", near(PublicOpinion.multiplier(100.0, 100.0), PublicOpinion.MAX_MULT) \

@@ -84,8 +84,6 @@ func _initialize() -> void:
 	cp = root.get_node("CardPresets")
 	mm.room_code = ""  # yerel mod
 	gm.result_hold_seconds = 0.0
-	mm.axis_sharpness_start = 1.0
-	mm.axis_sharpness_increment = 0.0
 	mm.election_threshold = 0.0
 
 	print("=== 1) D'HONDT ===")
@@ -101,7 +99,7 @@ func _initialize() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 42
 	var parties := {1: ideology(1, 1, 2), 2: ideology(0, -1, 1), 3: ideology(-2, -2, -2)}
-	var r := ElectionModel.compute(parties, seat_file, voters, 0.0, 1.0, rng)
+	var r := ElectionModel.compute(parties, seat_file, voters, 0.0, rng)
 	check("toplam %d vekil (%d il + %d ulusal liste)" % [cm.TOTAL_SEATS, cm.TOTAL_SEATS - ElectionModel.NATIONAL_LIST_SEATS, ElectionModel.NATIONAL_LIST_SEATS], int(sum_values(r["seats"])) == cm.TOTAL_SEATS, str(r["seats"]))
 	check("oy oranlari toplami 100", absf(sum_values(r["vote_shares"]) - 100.0) < 0.01, str(sum_values(r["vote_shares"])))
 	check("secmene yakin parti daha cok oy aldi", float(r["vote_shares"][1]) > float(r["vote_shares"][3]), str(r["vote_shares"]))
@@ -116,12 +114,12 @@ func _initialize() -> void:
 
 	rng.seed = 42
 	var share3: float = float(r["vote_shares"][3])
-	var rt := ElectionModel.compute(parties, seat_file, voters, share3 + 0.5, 1.0, rng)
+	var rt := ElectionModel.compute(parties, seat_file, voters, share3 + 0.5, rng)
 	check("baraj alti parti 0 vekil", int(rt["seats"][3]) == 0 and not rt["passed_threshold"].has(3), str(rt["seats"]))
 	check("baraj sonrasi vekil sayisi ayni", int(sum_values(rt["seats"])) == cm.TOTAL_SEATS)
-	var r100 := ElectionModel.compute(parties, seat_file, voters, 100.0, 1.0, rng)
+	var r100 := ElectionModel.compute(parties, seat_file, voters, 100.0, rng)
 	check("kimse gecemezse baraj uygulanmaz", int(sum_values(r100["seats"])) == cm.TOTAL_SEATS and r100["passed_threshold"].size() == 3)
-	var expected := ElectionModel.expected_shares(parties, voters[TestProvinces.id("konya")], 1.0)
+	var expected := ElectionModel.expected_shares(parties, voters[TestProvinces.id("konya")])
 	check("beklenen paylar (anket) toplami 100", absf(sum_values(expected) - 100.0) < 0.01, str(expected))
 
 	print("")

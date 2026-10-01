@@ -23,7 +23,7 @@ extends Node
 ##
 ## TUR SONU (herkes birer kez oynayınca) — bkz. GameRules
 ##   - (mana geliri tur sonunda değil, her oyuncunun sırası geldiğinde verilir),
-##   - eksen keskinliği artar (makam puanları hükümet kurulurken yazılır),
+##   - (makam puanları hükümet kurulurken yazılır),
 ##   - il/ulusal puanlar sıfıra doğru söner (il başkanlığı sönmez),
 ##   - son tursa oyun biter; seçim turuysa (ya da hükümet kurulamadıysa
 ##     ERKEN SEÇİM) seçim yapılır ve hükümet kurma aşaması başlar,
@@ -47,7 +47,7 @@ signal turn_changed(peer_id: int)
 signal card_drawn(peer_id: int, card_type: String)
 ## HERKESİN ekranında animasyon için: state güncellenmeden HEMEN ÖNCE yayınlanır.
 signal card_played(peer_id: int, card_type: String)
-## Seçimsiz bir tur bitti (hükümet puanlarını aldı, keskinlik arttı).
+## Seçimsiz bir tur bitti.
 signal round_advanced
 ## Seçim yapıldı (last_vote_shares / last_seats / last_province_results güncel).
 signal election_completed
@@ -121,9 +121,6 @@ var _agenda_axes: Array = []
 var _last_agenda_axis: String = ""
 ## peer_id -> int: son seçimde ulusal listeden kazanılan vekil.
 var national_list: Dictionary = {}
-## Eksen keskinliği: il bazlı seçim sonuçlarının ne kadar keskin çıkacağını
-## belirleyen üs (bkz. ElectionModel). HER TUR SONUNDA artar.
-var current_axis_sharpness: float = 0.5
 
 ## Şu an oynanan tur (1'den başlar).
 var round_number: int = 1
@@ -605,7 +602,7 @@ func projected_eligible(mods: Dictionary = {}) -> Array:
 	var total := 0.0
 	for province_id in _province_ids:
 		var seats := float(province_seat_count(province_id))
-		var shares := ElectionModel.expected_shares(ideologies, province_center(province_id), current_axis_sharpness,
+		var shares := ElectionModel.expected_shares(ideologies, province_center(province_id),
 			mods["national"], local_mods.get(province_id, {}), _expected_national(mods))
 		for peer_id in shares.keys():
 			national[peer_id] = float(national.get(peer_id, 0.0)) + float(shares[peer_id]) * seats
@@ -630,7 +627,7 @@ func _expected_national(mods: Dictionary) -> Dictionary:
 	for province_id in _province_ids:
 		centers[province_id] = province_center(province_id)
 		seats[province_id] = province_seat_count(province_id)
-	_national_cache = ElectionModel.expected_national(_ideologies(), centers, seats, current_axis_sharpness,
+	_national_cache = ElectionModel.expected_national(_ideologies(), centers, seats,
 		mods["national"], mods["local"])
 	_national_cache_key = mods
 	return _national_cache
@@ -640,7 +637,7 @@ func _expected_national(mods: Dictionary) -> Dictionary:
 func province_projection(province_id: String) -> Dictionary:
 	var mods := election_modifiers()
 	var local_mods: Dictionary = mods["local"]
-	var shares := ElectionModel.expected_shares(_ideologies(), province_center(province_id), current_axis_sharpness,
+	var shares := ElectionModel.expected_shares(_ideologies(), province_center(province_id),
 		mods["national"], local_mods.get(province_id, {}), _expected_national(mods))
 	var alloc := ElectionModel.allocate(shares, projected_eligible(mods), province_seat_count(province_id))
 	var result := {}
@@ -663,7 +660,7 @@ func projection_all(viewer: int = -1) -> Dictionary:
 		if error < 0.0:
 			continue
 		var seat_count := province_seat_count(province_id)
-		var shares := ElectionModel.expected_shares(ideologies, province_center(province_id), current_axis_sharpness,
+		var shares := ElectionModel.expected_shares(ideologies, province_center(province_id),
 			mods["national"], local_mods.get(province_id, {}), _expected_national(mods))
 		if viewer != -1:
 			var noisy := {}
@@ -761,7 +758,6 @@ func init_game() -> void:
 	agenda = {}
 	_agenda_axes = []
 	national_list = {}
-	current_axis_sharpness = minf(MultiplayerManager.axis_sharpness_start, MultiplayerManager.axis_sharpness_max_value if MultiplayerManager.axis_sharpness_max_enabled else MultiplayerManager.AXIS_SHARPNESS_HARD_MAX)
 	round_number = 1
 	last_election_round = 0
 	last_election_was_early = false
@@ -1493,7 +1489,7 @@ func referendum_projection() -> Dictionary:
 	var yes_total := 0.0
 	var weight_total := 0.0
 	for province_id in _province_ids:
-		var shares := ElectionModel.expected_shares(ideologies, province_center(province_id), current_axis_sharpness,
+		var shares := ElectionModel.expected_shares(ideologies, province_center(province_id),
 			mods["national"], local_mods.get(province_id, {}), national_expected)
 		var yes := 0.0
 		var no := 0.0
@@ -1790,7 +1786,7 @@ func _province_share_map() -> Dictionary:
 	var national := _expected_national(mods)
 	var result := {}
 	for province_id in _province_ids:
-		result[province_id] = ElectionModel.expected_shares(ideologies, province_center(province_id), current_axis_sharpness,
+		result[province_id] = ElectionModel.expected_shares(ideologies, province_center(province_id),
 			mods["national"], local_mods.get(province_id, {}), national)
 	return result
 
@@ -2238,10 +2234,6 @@ func _finish_round() -> void:
 	# (bkz. GovernmentManager.award_formation_scores).
 	var finished_round := round_number
 	round_number += 1
-	current_axis_sharpness = minf(current_axis_sharpness + MultiplayerManager.axis_sharpness_increment,
-		MultiplayerManager.AXIS_SHARPNESS_HARD_MAX)
-	if MultiplayerManager.axis_sharpness_max_enabled:
-		current_axis_sharpness = minf(current_axis_sharpness, MultiplayerManager.axis_sharpness_max_value)
 
 	# Ayrılan partiler dönebilir, çok karışan parti bölünür; sonra karışıklık söner.
 	_check_reunions()
@@ -2300,12 +2292,12 @@ func _hold_election(finished_round: int, early: bool) -> void:
 	# Denge analizi (tools/balance_sim.gd) için seçimin girdileri; ağda gönderilmez.
 	last_election_inputs = {
 		"mods": mods, "ideologies": ideologies, "voters": province_voters(),
-		"sharpness": current_axis_sharpness, "threshold": MultiplayerManager.election_threshold,
+		"threshold": MultiplayerManager.election_threshold,
 		"gov_ids": GovernmentManager.government_party_ids(), "organizations": organizations.duplicate(true),
 		"seats_before": last_seats.duplicate(),
 	}
 	var result := ElectionModel.compute(ideologies, _province_seat_counts, province_voters(),
-		MultiplayerManager.election_threshold, current_axis_sharpness, _rng, mods)
+		MultiplayerManager.election_threshold, _rng, mods)
 	last_vote_shares = result["vote_shares"]
 	last_seats = result["seats"]
 	last_province_results = result["province_results"]
@@ -2455,7 +2447,6 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"siege": siege,
 		"agenda": agenda,
 		"national_list": national_list,
-		"sharpness": current_axis_sharpness,
 		"round": round_number,
 		"turn_time_left": _turn_time_left,
 		"last_election_round": last_election_round,
@@ -2496,7 +2487,6 @@ func _apply_state(state: Dictionary) -> void:
 	siege = state.get("siege", {})
 	agenda = state.get("agenda", {})
 	national_list = state.get("national_list", {})
-	current_axis_sharpness = float(state["sharpness"])
 	round_number = int(state["round"])
 	_turn_deadline_ms = Time.get_ticks_msec() + int(float(state["turn_time_left"]) * 1000.0)
 	last_election_round = int(state["last_election_round"])

@@ -113,6 +113,16 @@ func _initialize() -> void:
 		await create_timer(0.3).timeout
 		root.get_texture().get_image().save_png("%s/midgame_speech.png" % OS.get_user_data_dir())
 		print("screenshot: midgame_speech")
+		# İkinci konuşma: panel genişlememeli (eski sütunlar hemen kalkmalı).
+		var first_width: float = scene._speech_panel.size.x
+		cms.speech_done = true
+		cms._push_state({"type": "timer"})
+		pm.parties[mm.owner_id]["ideology"]["economic"] = 2.0
+		cms.speech_done = false
+		cms._push_state({"type": "timer"})
+		await create_timer(0.3).timeout
+		print("KONUSMA SERIDI genislik %.0f -> %.0f %s" % [first_width, scene._speech_panel.size.x,
+			"AYNI" if absf(first_width - scene._speech_panel.size.x) < 1.0 else "GENISLEDI"])
 		scene._speech_panel.hide()
 		scene._set_map_layer(0, false)
 		await create_timer(0.3).timeout

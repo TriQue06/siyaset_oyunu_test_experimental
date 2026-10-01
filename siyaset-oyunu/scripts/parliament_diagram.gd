@@ -12,7 +12,7 @@ extends Control
 ## çiziliyor — orijinal JS ile aynı.
 
 const SPAN := 180.0          # yay açısı (derece) — orijinal JS: SPAN
-const SEAT_RADIUS_FACTOR := 0.8  # orijinal JS: SRF
+const SEAT_RADIUS_FACTOR := 0.9  # orijinal JS: SRF
 
 ## Her koltuk: koyu ince konturlu, kenarı yumuşatılmış (antialiased) daire.
 ## Konturun kalınlığı koltuk yarıçapına ORANLI tek bir değer — bütün koltuklarda
@@ -38,17 +38,36 @@ var _min_gap_norm: float = 0.0 # en yakın iki koltuk merkezi arası (normalize)
 var _count_plate: PanelContainer
 var _count_label: Label
 
-## KOLTUKLAR İKİ MultiMesh İLE ÇİZİLİR (kontur + iç dolgu), her biri TEK
-## çizim çağrısı. Eskiden koltuk başına iki draw_circle vardı: 500 koltuk =
+## KOLTUKLAR TEK MultiMesh İLE ÇİZİLİR (tek çizim çağrısı). Eskiden koltuk başına iki draw_circle vardı: 500 koltuk =
 ## ~2000 çizim çağrısı/kare. Masaüstünde native GL bunu yutuyordu ama WebGL2'de
 ## her çağrı tarayıcı katmanından geçtiği için seçim gecesi 1-2 FPS'e düşüyordu.
-var _outline_mmi: MultiMeshInstance2D
 var _seat_mmi: MultiMeshInstance2D
-## Koltuk dokuları: kenarı yumuşatılmış dolu beyaz daire (renk modulate ile).
-## NET GÖRÜNSÜN diye her doku EKRANDAKİ piksel çapında üretilir (çap -> doku)
-## ve koltuklar piksel ızgarasına oturtulur: büyük bir dokuyu küçültüp kesirli
-## konumlara koymak koltukları bulanıklaştırıyordu.
-static var _circle_textures: Dictionary = {}
+## KOLTUK SHADER'I: doku yok. Her piksel daireye uzaklığını kendisi hesaplar,
+## kenar ekranda tam 1 piksel yumuşatılır (fwidth): hangi ölçekte ve hangi
+## kesirli konumda olursa olsun daire hem keskin hem pürüzsüz. Kontur aynı
+## çizimde: iç dolgu instance rengi, dış halka outline_color.
+## (Önceki iki deneme: büyük dokuyu küçültmek bulanık, piksel boyutunda doku
+## + en yakın piksel ise tırtıklı ve düzensiz görünüyordu.)
+const SEAT_SHADER := """
+shader_type canvas_item;
+uniform vec4 outline_color : source_color = vec4(0.07, 0.08, 0.1, 1.0);
+uniform float inner_ratio = 0.84;
+void fragment() {
+	// d: merkezden uzaklık (kenar = 1). px: bir ekran pikselinin d cinsinden boyu.
+	float d = length(UV - vec2(0.5)) * 2.0;
+	float px = max(fwidth(d), 0.0001);
+	// Kenara piksel cinsinden uzaklık -> alan kaplaması (tam 1 piksellik geçiş).
+	float inside = (1.0 - d) / px;
+	float outer = clamp(inside + 0.5, 0.0, 1.0);
+	// Kontur en az 1 piksel: küçük koltuklarda yumuşatmanın içinde kaybolmasın.
+	float ring = max(1.0, (1.0 - inner_ratio) / px);
+	float inner = clamp(inside - ring + 0.5, 0.0, 1.0);
+	vec4 fill = COLOR;
+	COLOR = vec4(mix(outline_color.rgb, fill.rgb, inner), outer * mix(outline_color.a, fill.a, inner));
+}
+"""
+static var _seat_material: ShaderMaterial = null
+static var _white_texture: Texture2D = null
 ## Yerleşim (konum/yarıçap) sadece boyut değişince kurulur; renkler her
 ## set_results'ta güncellenir.
 var _instances_built_for := Vector2.ZERO
@@ -104,13 +123,7 @@ func _ready() -> void:
 	_build_count_plate()
 	resized.connect(_place_count_plate)
 	resized.connect(_rebuild_instances)
-	# Ekranda kayarsa (yerleşim, pencere) koltuklar piksel ızgarasına yeniden otursun.
-	set_notify_transform(true)
 	_rebuild_instances()
-
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_TRANSFORM_CHANGED and is_inside_tree() and _outline_mmi != null:
-		_rebuild_instances()
 
 ## VEKİL SAYISI LEVHASI: yarım dairenin ORTASINDAKİ boş alanda duran, kendi
 ## zemini (ek UI katmanı) olan monospace bir sayı. Önce çıplak draw_string,
@@ -158,91 +171,58 @@ func _place_count_plate() -> void:
 func _arc_origin() -> Vector2:
 	return Vector2(size.x * 0.5, size.y * 0.98)
 
-## Koltuk yarıçapı (piksel). Yarıçap, en yakın komşu mesafesinin %45'i ile
+## Koltuk yarıçapı (piksel). Yarıçap, en yakın komşu mesafesinin %48'i ile
 ## sınırlı: kontur dahil hiçbir daire komşusuna değmez.
 func _seat_radius_px(scale: float) -> float:
 	var radius: float = _seat_radius_norm * scale
 	if _min_gap_norm > 0.0:
-		radius = minf(radius, _min_gap_norm * scale * 0.45)
+		radius = minf(radius, _min_gap_norm * scale * 0.48)
 	return maxf(1.5, radius)
 
-## diameter piksel çapında, kenarı 1 piksel yumuşatılmış dolu daire dokusu.
-static func _circle_texture(diameter: int) -> Texture2D:
-	diameter = maxi(2, diameter)
-	if _circle_textures.has(diameter):
-		return _circle_textures[diameter]
-	var image := Image.create(diameter, diameter, false, Image.FORMAT_RGBA8)
-	var center := float(diameter) * 0.5
-	var radius := float(diameter) * 0.5
-	for y in diameter:
-		for x in diameter:
-			# Piksel merkezinin daireye uzaklığı: kenar tam 1 piksellik geçiş.
-			var d := Vector2(float(x) + 0.5 - center, float(y) + 0.5 - center).length()
-			var a: float = clampf(radius - d + 0.5, 0.0, 1.0)
-			image.set_pixel(x, y, Color(1.0, 1.0, 1.0, a))
-	var texture := ImageTexture.create_from_image(image)
-	_circle_textures[diameter] = texture
-	return texture
-
 func _ensure_multimeshes() -> void:
-	if _outline_mmi != null:
+	if _seat_mmi != null:
 		return
-	for is_outline in [true, false]:
-		var mmi := MultiMeshInstance2D.new()
-		# Doku ekran pikseliyle birebir: en yakın piksel, bulanıklık yok.
-		mmi.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		add_child(mmi)
-		if is_outline:
-			_outline_mmi = mmi
-		else:
-			_seat_mmi = mmi
+	if _seat_material == null:
+		var shader := Shader.new()
+		shader.code = SEAT_SHADER
+		_seat_material = ShaderMaterial.new()
+		_seat_material.shader = shader
+		var image := Image.create(1, 1, false, Image.FORMAT_RGBA8)
+		image.fill(Color.WHITE)
+		_white_texture = ImageTexture.create_from_image(image)
+	_seat_mmi = MultiMeshInstance2D.new()
+	_seat_mmi.texture = _white_texture
+	# Her diyagram kendi kontur ayarını taşısın: malzeme kopyalanır.
+	_seat_mmi.material = _seat_material.duplicate()
+	add_child(_seat_mmi)
 
 ## Koltuk konumları ve yarıçapları — sadece kontrol boyutu değişince.
 func _rebuild_instances() -> void:
 	_ensure_multimeshes()
 	var count := _dot_positions.size()
-	for mmi in [_outline_mmi, _seat_mmi]:
-		if mmi.multimesh == null:
-			var mm := MultiMesh.new()
-			mm.transform_format = MultiMesh.TRANSFORM_2D
-			mm.use_colors = mmi == _seat_mmi
-			var quad := QuadMesh.new()
-			quad.size = Vector2.ONE
-			mm.mesh = quad
-			mmi.multimesh = mm
-		mmi.multimesh.instance_count = count
-	_outline_mmi.visible = count > 0
+	if _seat_mmi.multimesh == null:
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_2D
+		mm.use_colors = true
+		var quad := QuadMesh.new()
+		quad.size = Vector2.ONE
+		mm.mesh = quad
+		_seat_mmi.multimesh = mm
+	_seat_mmi.multimesh.instance_count = count
 	_seat_mmi.visible = count > 0
 	if count == 0:
 		return
 	var scale: float = minf(size.x * 0.5, size.y * 0.96)
 	var origin := _arc_origin()
 	var radius := _seat_radius_px(scale)
-	# Ekran pikseline çevir: çaplar tam sayı, konumlar piksel ızgarasında.
-	var to_screen := get_global_transform_with_canvas()
-	var pixel_scale: float = maxf(0.01, to_screen.get_scale().x)
-	var outer_px := maxi(2, roundi(radius * 2.0 * pixel_scale))
-	var inner_px := maxi(1, roundi(radius * 2.0 * (1.0 - outline_ratio) * pixel_scale))
-	# Kontur her yandan eşit kalınlıkta olsun: iki çapın farkı çift sayı.
-	if (outer_px - inner_px) % 2 != 0:
-		inner_px -= 1
-	_outline_mmi.texture = _circle_texture(outer_px)
-	_seat_mmi.texture = _circle_texture(inner_px)
-	var outer_local := float(outer_px) / pixel_scale
-	var inner_local := float(inner_px) / pixel_scale
-	var from_screen := to_screen.affine_inverse()
+	var material := _seat_mmi.material as ShaderMaterial
+	material.set_shader_parameter("outline_color", outline_color)
+	material.set_shader_parameter("inner_ratio", 1.0 - outline_ratio)
 	for i in count:
 		var p: Vector2 = _dot_positions[i]
-		var screen_center: Vector2 = to_screen * (origin + Vector2(p.x - 1.0, -p.y) * scale)
-		# Çift çaplı dairenin merkezi piksel köşesinde, tek çaplınınki piksel ortasında.
-		var snapped := (screen_center - Vector2(0.5, 0.5) * float(outer_px % 2)).round() \
-			+ Vector2(0.5, 0.5) * float(outer_px % 2)
-		var center: Vector2 = from_screen * snapped
-		_outline_mmi.multimesh.set_instance_transform_2d(i,
-			Transform2D(0.0, Vector2(outer_local, outer_local), 0.0, center))
+		var center := origin + Vector2(p.x - 1.0, -p.y) * scale
 		_seat_mmi.multimesh.set_instance_transform_2d(i,
-			Transform2D(0.0, Vector2(inner_local, inner_local), 0.0, center))
-	_outline_mmi.modulate = outline_color
+			Transform2D(0.0, Vector2(radius * 2.0, radius * 2.0), 0.0, center))
 	_instances_built_for = size
 	_update_instance_colors()
 

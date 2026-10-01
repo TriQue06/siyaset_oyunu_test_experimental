@@ -3145,7 +3145,10 @@ func _refresh_speech_panel() -> void:
 	var key := "%d:%d:%s" % [CardManager.round_number, CardManager.current_turn_index, str(ideology)]
 	if key != _speech_key:
 		_speech_key = key
+		# Eski sütunlar HEMEN çıkarılır: queue_free kare sonuna kadar beklerken panel
+		# eski + yeni sütunlarla (6 sütun) ölçülüp gereksiz genişliyordu.
 		for child in _speech_rows.get_children():
+			_speech_rows.remove_child(child)
 			child.queue_free()
 		for axis in IdeologyAxes.AXES:
 			_speech_rows.add_child(_speech_row(axis, float(ideology.get(axis, 0.0))))

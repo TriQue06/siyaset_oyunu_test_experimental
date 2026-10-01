@@ -254,9 +254,6 @@ var _law_agenda_label: Label
 var _law_points_label: Label
 ## Haritanın sağ üstünde gündem bandı.
 var _agenda_banner: PanelContainer
-## Referandum sürerken sol panelde: anket, kalan tur, ertelenen seçim.
-var _referendum_banner: PanelContainer
-var _referendum_label: Label
 var _agenda_label: Label
 
 ## MECLİS KONUŞMASI paneli (sıra gelince, hamleden önce zorunlu).
@@ -338,7 +335,6 @@ func _ready() -> void:
 	_place_right_column_controls()
 	_build_law_designer()
 	_build_agenda_banner()
-	_build_referendum_banner()
 	_build_propaganda_menu()
 	_build_speech_panel()
 	vote_yes_button.pressed.connect(_on_vote_pressed.bind(GovernmentManager.VOTE_YES))
@@ -1524,7 +1520,6 @@ func _on_opinion_changed() -> void:
 	_refresh_strongholds()
 	_refresh_score_panel()
 	_refresh_agenda_banner()
-	_refresh_referendum_banner()
 	if _map_layer != MapLayer.SEATS:
 		_apply_map_layer_colors()
 	if _province_panel != null and _province_panel.visible:
@@ -2322,8 +2317,6 @@ func _action_button(title: String, cost_text: String, color: Color) -> Button:
 ## Neden şu an bu hamle yapılamıyor? (Buton ipucu ve uyarı yazısı.)
 func _action_block_reason(cost: int, is_law: bool = false) -> String:
 	var me := multiplayer.get_unique_id()
-	if CardManager.is_referendum_active():
-		return "Referandum kampanyası sürüyor: sadece miting ve kartlar kullanılabilir."
 	if is_law and CardManager.last_seats.is_empty():
 		return "İlk seçime kadar meclis yok: yasa yapılamaz."
 	if is_law and not CardManager.has_seats(me):
@@ -2374,40 +2367,6 @@ func _build_agenda_banner() -> void:
 	else:
 		add_child(_agenda_banner)
 	_refresh_agenda_banner()
-
-## Gündem varken sol panelde konu ve etkisi yazar.
-func _build_referendum_banner() -> void:
-	_referendum_banner = PanelContainer.new()
-	var style := UiSkin.color_box(UiTheme.PURPLE.darkened(0.35), UiSkin.BUTTON_TINT_NORMAL)
-	style.set_content_margin_all(UiTheme.PAD_S)
-	_referendum_banner.add_theme_stylebox_override("panel", style)
-	_referendum_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_referendum_label = Label.new()
-	_referendum_label.add_theme_font_override("font", UiTheme.mono())
-	_referendum_label.add_theme_font_size_override("font_size", UiTheme.FS_TINY)
-	_referendum_label.add_theme_color_override("font_color", UiTheme.TEXT)
-	_referendum_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_referendum_banner.add_child(_referendum_label)
-	if _agenda_banner != null and _agenda_banner.get_parent() != null:
-		_agenda_banner.get_parent().add_child(_referendum_banner)
-		_agenda_banner.get_parent().move_child(_referendum_banner, _agenda_banner.get_index() + 1)
-	else:
-		add_child(_referendum_banner)
-	_refresh_referendum_banner()
-
-## Referandum levhası: canlı anket (herkes görür), senin kararın, kalan tur.
-func _refresh_referendum_banner() -> void:
-	if _referendum_banner == null:
-		return
-	_referendum_banner.visible = CardManager.is_referendum_active()
-	if not _referendum_banner.visible:
-		return
-	var projection := CardManager.referendum_projection()
-	var me := multiplayer.get_unique_id()
-	_referendum_label.text = "REFERANDUM · %d tur kaldı\nAnket: EVET %%%d – HAYIR %%%d\nSen: %s%s" % [
-		CardManager.referendum_rounds_left(), int(round(float(projection.get("yes", 50.0)))),
-		int(round(float(projection.get("no", 50.0)))), CardManager.referendum_side_text(me),
-		"\nSeçim ertelendi" if bool(CardManager.referendum.get("postponed", false)) else ""]
 
 func _refresh_agenda_banner() -> void:
 	if _agenda_banner == null:
@@ -2585,8 +2544,7 @@ func _refresh_constitution_section() -> void:
 		_constitution_info.text = "Şu anki kuralları değiştirmiyor. Bir ayarı değiştir."
 		_constitution_button.disabled = true
 	elif can:
-		_constitution_info.text = "Meclisin 2/3'ü (%d vekil) EVET derse yürürlüğe girer; %d–%d EVET'te REFERANDUMA gider (2 tur kampanya). Gündem şartı yok, dönemdeki yasa hakkını kullanır." % [
-			needed, GovernmentManager.referendum_threshold_seats(), needed - 1]
+		_constitution_info.text = "Meclisin 2/3'ü (%d vekil) EVET derse yürürlüğe girer, yoksa reddedilir. Gündem şartı yok, dönemdeki yasa hakkını kullanır." % needed
 	else:
 		_constitution_info.text = _action_block_reason(0, true)
 

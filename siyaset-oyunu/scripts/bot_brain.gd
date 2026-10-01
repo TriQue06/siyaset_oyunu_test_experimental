@@ -430,9 +430,6 @@ static func _evaluate(bot: int, card_type: String, known: Dictionary) -> Diction
 
 ## Kaset: en büyük rakibin (blok varsa insan hükümetinin) ulusal desteğini vurur.
 static func _eval_reputation(bot: int) -> Dictionary:
-	if CardManager.is_referendum_active():
-		var rival := _referendum_opponent(bot)
-		return {} if rival == -1 else {"score": 2.8, "peer": rival, "province": ""}
 	var target := _attack_target(bot)
 	if target == -1:
 		return {}
@@ -483,8 +480,6 @@ static func _attack_target(bot: int) -> int:
 
 ## Beklenen il gücü kazancı × ilin vekil sayısı × partinin o ildeki (bilinen) şansı.
 static func _eval_miting(bot: int, known: Dictionary) -> Dictionary:
-	if CardManager.is_referendum_active():
-		return _eval_referendum_miting(bot)
 	var ideology := _ideology(bot)
 	var best_province := ""
 	var best_value := -INF
@@ -510,39 +505,6 @@ static func _eval_miting(bot: int, known: Dictionary) -> Dictionary:
 	var score := best_value * 1.4 * (1.4 if _election_soon() else 1.0)
 	return {"score": score, "peer": -1, "province": best_province}
 
-# --- Referandum kampanyası -------------------------------------------------------------
-
-## Referandumda kararını (EVET/HAYIR) savunan bot: kendi kampanyasının en zayıf
-## olduğu büyük illerde miting yapar. Çekimser bot kampanyaya katılmaz.
-static func _eval_referendum_miting(bot: int) -> Dictionary:
-	if CardManager.referendum_side(bot) == GovernmentManager.VOTE_ABSTAIN:
-		return {}
-	var best := ""
-	var best_value := -INF
-	for province_id in _seats().keys():
-		var seats := float(CardManager.province_seat_count(province_id))
-		var risk := CardManager.miting_risk(bot, province_id)
-		var value := seats * (1.0 - risk * 1.5) / (1.0 + maxf(0.0, CardManager.ref_local_of(province_id, bot)) / 3.0)
-		if value > best_value:
-			best_value = value
-			best = province_id
-	if best == "":
-		return {}
-	return {"score": 1.6 + best_value / 8.0, "peer": -1, "province": best}
-
-## Referandumda karşı taraftaki en büyük parti (karalama/kaset hedefi).
-static func _referendum_opponent(bot: int) -> int:
-	var side := CardManager.referendum_side(bot)
-	if side == GovernmentManager.VOTE_ABSTAIN:
-		return -1
-	var target := -1
-	for peer_id in CardManager.turn_order:
-		if peer_id == bot or CardManager.referendum_side(peer_id) != -side:
-			continue
-		if target == -1 or GovernmentManager.seats_of(peer_id) > GovernmentManager.seats_of(target):
-			target = peer_id
-	return target
-
 static func _eval_investment(bot: int, known: Dictionary) -> Dictionary:
 	if not CardManager.is_government_party(bot):
 		return {}
@@ -560,16 +522,6 @@ static func _eval_investment(bot: int, known: Dictionary) -> Dictionary:
 
 ## En büyük rakibi, en çok vekilli ve onun zayıf, botun güçlü olduğu ilde karala.
 static func _eval_propaganda(bot: int, known: Dictionary) -> Dictionary:
-	if CardManager.is_referendum_active():
-		# Referandumda karşı kampanyayı en kalabalık ilde karala.
-		var rival := _referendum_opponent(bot)
-		if rival == -1:
-			return {}
-		var biggest := ""
-		for province_id in _seats().keys():
-			if biggest == "" or CardManager.province_seat_count(province_id) > CardManager.province_seat_count(biggest):
-				biggest = province_id
-		return {"score": 2.2, "peer": rival, "province": biggest}
 	var best := {}
 	var best_value := -INF
 	for province_id in _seats().keys():
@@ -715,8 +667,8 @@ static func choose_vote(bot: int) -> int:
 ##   - KAZANAN HEPSİNİ ALIR: bot çok ilde birinciyse ve bu sayım ona vekil
 ##     kazandıracaksa (kalesi olmayan, az ilde birinci rakipler ezilir).
 ##   - Hare: küçük parti (%20 altı) daha orantılı sayım ister.
-## Teklif ancak meclisin salt çoğunluğunun (referandum yolu) EVET demesi
-## bekleniyorsa yapılır; insanların oyu bilinmez, sayılmaz.
+## Teklif ancak meclisin 2/3'ünün EVET demesi bekleniyorsa yapılır;
+## insanların oyu bilinmez, sayılmaz.
 const CONSTITUTION_EVERY_ROUNDS := 4
 static var _constitution_rounds: Dictionary = {}
 
@@ -774,11 +726,9 @@ static func _best_constitution(bot: int) -> Dictionary:
 			if peer_id != bot and MultiplayerManager.is_bot(peer_id) \
 					and _constitution_vote(peer_id, payload) == GovernmentManager.VOTE_YES:
 				yes += GovernmentManager.seats_of(peer_id)
-		if yes < GovernmentManager.referendum_threshold_seats():
-			continue
+		if yes < GovernmentManager.constitution_threshold_seats():
+			continue  # 2/3 yoksa teklif boşa gider
 		var score := 1.6 + float(option["urgency"]) + float(struggling) * 0.2
-		if yes >= GovernmentManager.constitution_threshold_seats():
-			score += 0.5  # referandumsuz geçer
 		if best.is_empty() or score > float(best["score"]):
 			best = {"payload": payload, "score": score}
 	return best

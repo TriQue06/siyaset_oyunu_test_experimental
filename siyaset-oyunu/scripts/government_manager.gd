@@ -490,10 +490,6 @@ func submit_constitution(peer_id: int, payload: Dictionary) -> bool:
 func constitution_threshold_seats() -> int:
 	return int(ceil(total_seats() * CONSTITUTION_MAJORITY - 0.0001))
 
-## Bu kadar EVET (salt çoğunluğun üstü) ama 2/3'ün altı -> REFERANDUM.
-func referendum_threshold_seats() -> int:
-	return total_seats() / 2 + 1
-
 ## Yasa: EVET vekilleri HAYIR'dan fazlaysa geçer (çekimserler sayılmaz).
 static func law_passes(yes: int, no: int) -> bool:
 	return yes > no
@@ -646,20 +642,12 @@ func _resolve_proposal() -> void:
 
 	if kind == KIND_CONSTITUTION:
 		var needed := constitution_threshold_seats()
-		var referendum_needed := referendum_threshold_seats()
 		var const_passed: bool = totals.x >= needed
 		var payload := proposal_assignments.duplicate()
-		var votes_for_referendum := votes.duplicate()
 		_clear_proposal()
 		_set_phase(Phase.GOVERNING if has_government() else Phase.IDLE)
 		last_resolution_reason = "Anayasa değişikliği %s (EVET %d / gereken %d)." % [
-			"KABUL EDİLDİ" if const_passed else "mecliste yetmedi", totals.x, needed]
-		var go_referendum: bool = not const_passed and totals.x >= referendum_needed
-		if go_referendum:
-			# 2/3 yok ama salt çoğunluk EVET: karar HALKA gider (2 tur kampanya).
-			last_resolution_reason = "Anayasa değişikliği: EVET %d (salt çoğunluk var, 2/3 = %d yok) — REFERANDUMA gidiliyor! 2 tur kampanya: sadece miting ve kartlar." % [
-				totals.x, needed]
-			CardManager.start_referendum(proposer, payload, votes_for_referendum)
+			"KABUL EDİLDİ" if const_passed else "REDDEDİLDİ", totals.x, needed]
 		if const_passed:
 			MultiplayerManager.apply_constitution(payload)
 			# Takvim son seçimden itibaren yeni aralıkla işlesin.

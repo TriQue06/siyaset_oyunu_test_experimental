@@ -164,14 +164,6 @@ var kale_effort: Dictionary = {}
 ## KUŞATMA: province_id -> {peer_id -> puan}. Kale ilinde RAKİP mitingleri ve
 ## karalamaları biriktirir; toplam SIEGE_BREAK'e ulaşınca kale düşer.
 var siege: Dictionary = {}
-## REFERANDUM (boş = yok). Meclis anayasa değişikliğine salt çoğunlukla ama
-## 2/3'ün altında EVET dediyse karar halka gider:
-##   {"proposer", "payload" (anayasa paketi), "sides": peer -> VOTE_*,
-##    "start_round", "end_round" (bu turun SONUNDA sonuçlanır: tam 2 tur),
-##    "national": peer -> kampanya puanı, "local": il -> {peer -> puan},
-##    "postponed": bool (seçim ertelendi), "postponed_final": bool}
-## Bu 2 turda sadece MİTİNG ve KARTLAR kullanılır; seçim varsa ertelenir.
-var referendum: Dictionary = {}
 ## Sadece host: illerin oyun başındaki DOĞAL görüşü (geri dönüş hedefi).
 var _province_origin: Dictionary = {}
 ## peer_id -> int
@@ -319,8 +311,6 @@ func needs_speech(peer_id: int) -> bool:
 func can_propose_law(peer_id: int, law_type: String = "") -> bool:
 	if not can_choose_main_action(peer_id) or mana_of(peer_id) < law_mana_cost(peer_id, law_type):
 		return false
-	if is_referendum_active():
-		return false  # referandumda sadece miting ve kartlar
 	if not has_seats(peer_id):
 		return false  # meclis dışı parti yasa teklif edemez
 	# Yasa sadece gündemdeki eksende sunulabilir.
@@ -354,7 +344,7 @@ func law_mana_cost(peer_id: int, law_type: String = "") -> int:
 ## (anayasa her dönem gündeme bakılmaksızın önerilebilir). Yasa hakkını
 ## kullanır: aynı dönemde ikisinden sadece biri sunulabilir.
 func can_propose_constitution(peer_id: int) -> bool:
-	if not can_choose_main_action(peer_id) or is_referendum_active():
+	if not can_choose_main_action(peer_id):
 		return false
 	if not has_seats(peer_id):
 		return false
@@ -393,7 +383,7 @@ func has_proposed_law_this_round(peer_id: int) -> bool:
 
 ## Yatırım hamlesi: sadece hükümet partileri.
 func can_invest(peer_id: int, province_id: String = "") -> bool:
-	return can_choose_main_action(peer_id) and not is_referendum_active() and is_government_party(peer_id) \
+	return can_choose_main_action(peer_id) and is_government_party(peer_id) \
 		and mana_of(peer_id) >= GameRules.INVEST_MANA_COST and (province_id == "" or has_province(province_id))
 
 ## Mecliste en az bir vekili var mı? (Vekilsiz parti oy veremez, yasa ve
@@ -403,7 +393,7 @@ func has_seats(peer_id: int) -> bool:
 
 ## Gensoru hamlesi: muhalefet, hükümet görevde ve salt çoğunluğu yokken.
 func can_censure(peer_id: int) -> bool:
-	return can_choose_main_action(peer_id) and not is_referendum_active() and mana_of(peer_id) >= GameRules.CENSURE_MANA_COST and has_seats(peer_id) \
+	return can_choose_main_action(peer_id) and mana_of(peer_id) >= GameRules.CENSURE_MANA_COST and has_seats(peer_id) \
 		and GovernmentManager.phase == GovernmentManager.Phase.GOVERNING and GovernmentManager.has_government() \
 		and not GovernmentManager.has_majority() and not is_government_party(peer_id)
 
@@ -415,9 +405,6 @@ func populism_rounds_left(peer_id: int) -> int:
 func can_miting(peer_id: int, province_id: String = "") -> bool:
 	if not can_choose_main_action(peer_id) or mana_of(peer_id) < GameRules.MITING_MANA_COST:
 		return false
-	if is_referendum_active():
-		# Referandum kampanyası: her ilde miting yapılabilir (teşkilat şartı yok).
-		return province_id == "" or has_province(province_id)
 	if province_id == "":
 		return has_organization_anywhere(peer_id)
 	# Miting artik teskilat ister: once ilde orgutlenmis olmak gerekir.
@@ -431,7 +418,7 @@ func has_organization_anywhere(peer_id: int) -> bool:
 	return false
 
 func can_build_organization(peer_id: int, province_id: String) -> bool:
-	return can_choose_main_action(peer_id) and not is_referendum_active() and mana_of(peer_id) >= GameRules.ORG_MANA_COST \
+	return can_choose_main_action(peer_id) and mana_of(peer_id) >= GameRules.ORG_MANA_COST \
 		and has_province(province_id) and organization_level(province_id, peer_id) < GameRules.ORG_MAX_LEVEL
 
 ## Bir partiden vekil çalınabilir mi? Kendinden çalınamaz, meclis dışı partiden
@@ -464,7 +451,7 @@ func can_play_card(peer_id: int, card_type: String, target_peer_id: int = -1, ta
 		return false
 	if card_type == CardPresets.EARLY_ELECTION_CARD_TYPE:
 		# Meclis gerekir, oylama açık olmamalı, zaten erken seçim kararı yoksa.
-		return has_seats(peer_id) and not early_election_pending and not is_referendum_active() \
+		return has_seats(peer_id) and not early_election_pending \
 			and GovernmentManager.can_submit_law()
 	if CardPresets.needs_target(card_type):
 		return is_valid_steal_target(peer_id, target_peer_id)
@@ -475,7 +462,7 @@ func can_play_card(peer_id: int, card_type: String, target_peer_id: int = -1, ta
 	if card_type == CardPresets.PROPAGANDA_CARD_TYPE:
 		# Karalama da teskilat ister: ilde orgutlu olmayan parti kampanya yapamaz.
 		return has_province(target_province) and turn_order.has(target_peer_id) \
-			and target_peer_id != peer_id and (is_referendum_active() or organization_level(target_province, peer_id) > 0)
+			and target_peer_id != peer_id and organization_level(target_province, peer_id) > 0
 	if card_type == CardPresets.SCOUT_CARD_TYPE:
 		return false  # gözcü artık teşkilatın parçası
 	if CardPresets.needs_province_target(card_type):
@@ -787,7 +774,6 @@ func init_game() -> void:
 	strongholds = {}
 	kale_effort = {}
 	siege = {}
-	referendum = {}
 	game_finished = false
 	final_ranking = []
 	game_end_reason = ""
@@ -829,7 +815,6 @@ func abandon_game() -> void:
 	turmoil = {}
 	splinters = {}
 	speech_done = false
-	referendum = {}
 	mana = {}
 	game_finished = false
 	final_ranking = []
@@ -1141,9 +1126,6 @@ func _province_name(province_id: String) -> String:
 ## Miting: riski ilin mevcut siyasi dengesine göre hesaplanır, zar atılır.
 func _apply_miting(peer_id: int, province_id: String) -> void:
 	var risk := miting_risk(peer_id, province_id)
-	if is_referendum_active():
-		_apply_referendum_miting(peer_id, province_id, risk)
-		return
 	if _rng.randf() < risk:
 		_add_local(province_id, peer_id, PublicOpinion.PROVOCATION_LOCAL, true)
 		_add_national(peer_id, PublicOpinion.PROVOCATION_NATIONAL, true)
@@ -1178,9 +1160,6 @@ func _apply_investment(peer_id: int, province_id: String) -> void:
 
 ## Karalama: hedefe eksi, karalayana artı; ikisi de o ildeki güçleriyle ölçeklenir.
 func _apply_propaganda(peer_id: int, target_peer_id: int, province_id: String) -> void:
-	if is_referendum_active():
-		_apply_referendum_propaganda(peer_id, target_peer_id, province_id)
-		return
 	var damage := PublicOpinion.propaganda_damage(party_strength(province_id, target_peer_id))
 	if populism_rounds_left(peer_id) > 0:
 		damage *= PublicOpinion.POPULISM_GOOD_MULT
@@ -1384,190 +1363,6 @@ func _log_province(province_id: String, text: String) -> void:
 	while events.size() > PROVINCE_EVENT_LIMIT:
 		events.pop_front()
 	province_events[province_id] = events
-
-# --- Referandum ----------------------------------------------------------------------
-
-func is_referendum_active() -> bool:
-	return not referendum.is_empty()
-
-## Kaç tur kaldı (içinde bulunulan tur dahil).
-func referendum_rounds_left() -> int:
-	if referendum.is_empty():
-		return 0
-	return maxi(1, int(referendum["end_round"]) - round_number + 1)
-
-## Partinin referandumdaki kararı: VOTE_YES / VOTE_NO / VOTE_ABSTAIN.
-func referendum_side(peer_id: int) -> int:
-	return int(referendum.get("sides", {}).get(peer_id, GovernmentManager.VOTE_ABSTAIN))
-
-func referendum_side_text(peer_id: int) -> String:
-	match referendum_side(peer_id):
-		GovernmentManager.VOTE_YES:
-			return "EVET"
-		GovernmentManager.VOTE_NO:
-			return "HAYIR"
-	return "çekimser"
-
-## GovernmentManager: anayasa değişikliği salt çoğunluğu aştı ama 2/3'te kaldı.
-## Referandum bu andan itibaren TAM 2 TUR sürer (bir sonraki turun sonunda sonuç).
-func start_referendum(proposer: int, payload: Dictionary, votes: Dictionary) -> void:
-	if not _is_authority():
-		return
-	var sides := {}
-	for peer_id in turn_order:
-		sides[peer_id] = GovernmentManager.normalize_vote(votes.get(peer_id, GovernmentManager.VOTE_ABSTAIN)) \
-			if votes.has(peer_id) else GovernmentManager.VOTE_ABSTAIN
-	referendum = {"proposer": proposer, "payload": payload.duplicate(), "sides": sides,
-		"start_round": round_number, "end_round": round_number + 1,
-		"national": {}, "local": {}, "postponed": false, "postponed_final": false}
-	_push_state({"type": "referendum_start"})
-
-func _ref_add_national(peer_id: int, amount: float, own: bool = false) -> void:
-	if own:
-		amount = _own_effect(peer_id, amount)
-	var national: Dictionary = referendum.get("national", {})
-	national[peer_id] = PublicOpinion.clamp_points(float(national.get(peer_id, 0.0)) + amount)
-	referendum["national"] = national
-
-func _ref_add_local(province_id: String, peer_id: int, amount: float, own: bool = false) -> void:
-	if own:
-		amount = _own_effect(peer_id, amount)
-	var local: Dictionary = referendum.get("local", {})
-	var entry: Dictionary = local.get(province_id, {})
-	entry[peer_id] = PublicOpinion.clamp_points(float(entry.get(peer_id, 0.0)) + amount)
-	local[province_id] = entry
-	referendum["local"] = local
-
-func ref_local_of(province_id: String, peer_id: int) -> float:
-	return float(referendum.get("local", {}).get(province_id, {}).get(peer_id, 0.0))
-
-func ref_national_of(peer_id: int) -> float:
-	return float(referendum.get("national", {}).get(peer_id, 0.0))
-
-## Referandum mitingi: partinin KARARINI halka benimsetir (genel seçime etkisi yok).
-func _apply_referendum_miting(peer_id: int, province_id: String, risk: float) -> void:
-	var side := referendum_side_text(peer_id)
-	if _rng.randf() < risk:
-		_ref_add_local(province_id, peer_id, PublicOpinion.PROVOCATION_LOCAL, true)
-		_ref_add_national(peer_id, PublicOpinion.PROVOCATION_NATIONAL, true)
-		_log_province(province_id, "%s referandum mitinginde PROVOKASYON" % _party_name(peer_id))
-		_event_message = "%s'da %s'ın \"%s\" mitinginde provokasyon çıktı! (risk %%%d)" % [
-			_province_name(province_id), _party_name(peer_id), side, int(round(risk * 100.0))]
-		return
-	_ref_add_local(province_id, peer_id, PublicOpinion.MITING_LOCAL, true)
-	_ref_add_national(peer_id, PublicOpinion.MITING_NATIONAL, true)
-	_log_province(province_id, "%s referandum mitingi: \"%s\"" % [_party_name(peer_id), side])
-	_event_message = "%s, %s'da \"%s\" mitingi yaptı (referandum)." % [_party_name(peer_id), _province_name(province_id), side]
-
-## Referandum karalaması: hedefin (ve kararının) o ildeki inandırıcılığı düşer,
-## karalayanınki artar. Genel seçime etkisi yok.
-func _apply_referendum_propaganda(peer_id: int, target_peer_id: int, province_id: String) -> void:
-	var damage := PublicOpinion.propaganda_damage(party_strength(province_id, target_peer_id))
-	if populism_rounds_left(peer_id) > 0:
-		damage *= PublicOpinion.POPULISM_GOOD_MULT
-	var gain := PublicOpinion.propaganda_gain(party_strength(province_id, peer_id))
-	damage = clampf(damage, 0.0, maxf(0.0, ref_local_of(province_id, target_peer_id) - PublicOpinion.PROPAGANDA_FLOOR))
-	_ref_add_local(province_id, target_peer_id, -damage)
-	_ref_add_local(province_id, peer_id, gain, true)
-	_log_province(province_id, "%s, %s'ın \"%s\" kampanyasını karaladı" % [
-		_party_name(peer_id), _party_name(target_peer_id), referendum_side_text(target_peer_id)])
-	_event_message = "%s, %s'da %s'ın \"%s\" kampanyasına karşı karalama yaptı (referandum)." % [
-		_party_name(peer_id), _province_name(province_id), _party_name(target_peer_id), referendum_side_text(target_peer_id)]
-
-## HALKOYU TAHMİNİ (rastgelesiz). Her ilde partilerin beklenen oy payları
-## (seçim modeli) × kampanya gücü; partinin seçmeni partinin kararına oy verir,
-## çekimser partinin seçmeni ikiye bölünür. Ülke sonucu il vekil sayısıyla
-## ağırlıklı ortalama. Dönüş: {"yes": %, "no": %, "provinces": il -> EVET %}.
-func referendum_projection() -> Dictionary:
-	if referendum.is_empty():
-		return {}
-	var mods := election_modifiers()
-	var local_mods: Dictionary = mods["local"]
-	var ideologies := _ideologies()
-	var national_expected := _expected_national(mods)
-	var provinces := {}
-	var yes_total := 0.0
-	var weight_total := 0.0
-	for province_id in _province_ids:
-		var shares := ElectionModel.expected_shares(ideologies, province_center(province_id),
-			mods["national"], local_mods.get(province_id, {}), national_expected)
-		var yes := 0.0
-		var no := 0.0
-		for peer_id in shares.keys():
-			var w := float(shares[peer_id]) * PublicOpinion.referendum_multiplier(ref_national_of(int(peer_id)),
-				ref_local_of(province_id, int(peer_id)))
-			match referendum_side(int(peer_id)):
-				GovernmentManager.VOTE_YES:
-					yes += w
-				GovernmentManager.VOTE_NO:
-					no += w
-				_:
-					yes += w * 0.5
-					no += w * 0.5
-		var pct := yes / maxf(0.0001, yes + no) * 100.0
-		provinces[province_id] = pct
-		var seats := float(province_seat_count(province_id))
-		yes_total += pct * seats
-		weight_total += seats
-	var national_yes := yes_total / maxf(1.0, weight_total)
-	return {"yes": national_yes, "no": 100.0 - national_yes, "provinces": provinces}
-
-## Tur sonu referandum işleri. true dönerse _finish_round burada biter.
-func _referendum_round_end(finished_round: int) -> bool:
-	var no_government := not last_seats.is_empty() and not GovernmentManager.has_government() \
-		and GovernmentManager.phase == GovernmentManager.Phase.IDLE
-	var is_final := finished_round >= GameRules.MAX_ROUNDS
-	var wants_election := is_final or early_election_pending or GameRules.is_election_round(finished_round) or no_government
-	if finished_round < int(referendum["end_round"]):
-		# Kampanya sürüyor: seçim varsa referandum sonrasına ERTELENİR.
-		var message := ""
-		if wants_election and not bool(referendum["postponed"]):
-			message = "Seçim, referandum sonuçlanana kadar ertelendi."
-		if wants_election:
-			referendum["postponed"] = true
-			referendum["postponed_final"] = bool(referendum["postponed_final"]) or is_final
-			early_election_pending = false
-		_decay_opinion()
-		var event := {"type": "round"}
-		if message != "":
-			event["message"] = message
-		_push_state(event)
-		_schedule_agenda()
-		return true
-	# Referandum bitti: halk karar verir.
-	var postponed: bool = bool(referendum["postponed"]) or wants_election
-	var postponed_final: bool = bool(referendum["postponed_final"]) or is_final
-	early_election_pending = false
-	_resolve_referendum()
-	if postponed_final:
-		final_election_pending = true
-		_hold_election(finished_round, false)
-		return true
-	if postponed:
-		# Ertelenen seçim şimdi; takvim buradan itibaren yeniden işler.
-		election_anchor = finished_round
-		GameRules.set_election_anchor(election_anchor)
-		_hold_election(finished_round, false)
-		_schedule_agenda()
-		return true
-	return false
-
-func _resolve_referendum() -> void:
-	var projection := referendum_projection()
-	var yes := clampf(float(projection.get("yes", 50.0)) + _rng.randf_range(-PublicOpinion.REFERENDUM_NOISE, PublicOpinion.REFERENDUM_NOISE), 0.0, 100.0)
-	var passed := yes > 50.0
-	var payload: Dictionary = referendum["payload"]
-	var proposer := int(referendum["proposer"])
-	referendum = {}
-	var text := "REFERANDUM SONUCU: EVET %%%s – HAYIR %%%s. Anayasa değişikliği halk tarafından %s." % [
-		String.num(yes, 1), String.num(100.0 - yes, 1), "KABUL EDİLDİ" if passed else "REDDEDİLDİ"]
-	if passed:
-		MultiplayerManager.apply_constitution(payload)
-		rebase_election_calendar()
-		text += " Yeni baraj %%%s, seçimler %d yılda bir, sayım: %s." % [
-			String.num(MultiplayerManager.election_threshold, 1), MultiplayerManager.election_interval,
-			ElectionModel.method_title(MultiplayerManager.seat_method)]
-	_push_state({"type": "referendum_end", "peer_id": proposer, "message": text})
 
 # --- Siyasi kale -------------------------------------------------------------------
 
@@ -1996,8 +1791,6 @@ func _merge_splinter(splinter: int) -> void:
 	passed_threshold.erase(splinter)
 	for province_id in last_province_results.keys():
 		last_province_results[province_id].erase(splinter)
-	if not referendum.is_empty():
-		referendum.get("sides", {}).erase(splinter)
 	var idx := turn_order.find(splinter)
 	if idx != -1:
 		turn_order.remove_at(idx)
@@ -2115,12 +1908,6 @@ func _apply_reputation(peer_id: int, target_peer_id: int) -> void:
 	if populism_rounds_left(peer_id) > 0:
 		damage *= PublicOpinion.POPULISM_GOOD_MULT
 	_add_turmoil(target_peer_id, PublicOpinion.TURMOIL_REPUTATION)
-	if is_referendum_active():
-		# İFTİRA: referandumda kaset partinin ve kararının inandırıcılığını vurur.
-		_ref_add_national(target_peer_id, -damage)
-		_event_message = "%s hakkında kaset sızdı: referandumda \"%s\" kampanyası sarsıldı. (%s)" % [
-			_party_name(target_peer_id), referendum_side_text(target_peer_id), _party_name(peer_id)]
-		return
 	_add_national(target_peer_id, -damage)
 	_event_message = "%s hakkında kaset sızdı: ulusal desteği %.1f puan düştü. (%s)" % [
 		_party_name(target_peer_id), damage, _party_name(peer_id)]
@@ -2240,10 +2027,6 @@ func _finish_round() -> void:
 	_check_splits()
 	for peer_id in turmoil.keys():
 		turmoil[peer_id] = turmoil_of(int(peer_id)) * PublicOpinion.TURMOIL_DECAY
-
-	if not referendum.is_empty():
-		if _referendum_round_end(finished_round):
-			return
 
 	if finished_round >= GameRules.MAX_ROUNDS:
 		# SON SEÇİM: kurulan hükümet puanlarını alınca oyun biter (bkz. on_block_state_changed).
@@ -2462,7 +2245,6 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"events": province_events,
 		"organizations": organizations,
 		"strongholds": strongholds,
-		"referendum": referendum,
 		"province_ideology": province_ideology,
 		"mana": mana,
 		"game_finished": game_finished,
@@ -2504,7 +2286,6 @@ func _apply_state(state: Dictionary) -> void:
 	province_events = state["events"]
 	organizations = state.get("organizations", {})
 	strongholds = state.get("strongholds", {})
-	referendum = state.get("referendum", {})
 	mana = state.get("mana", {})
 	game_finished = bool(state["game_finished"])
 	final_ranking = state["final_ranking"]

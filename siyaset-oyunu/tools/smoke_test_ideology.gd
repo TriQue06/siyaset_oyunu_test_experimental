@@ -153,7 +153,7 @@ func _initialize() -> void:
 		ElectionModel.support(ideology(-2.5, -2.0, -2.0), center_before) < ElectionModel.support(ideology(1.5, 1.5, 1.0), center_before))
 
 	print("")
-	print("=== 5) ANAYASA VE REFERANDUM ===")
+	print("=== 5) ANAYASA (2/3 YA DA RET) ===")
 	var votes3 := {1: 0.47, 2: 0.33, 3: 0.20}
 	check("D'Hondt", str(ElectionModel.dhondt(votes3, [1, 2, 3], 7)) == str({1: 4, 2: 2, 3: 1}))
 	check("Hare kotasi + en buyuk kalan", str(ElectionModel.hare(votes3, [1, 2, 3], 7)) == str({1: 3, 2: 2, 3: 2}))
@@ -169,84 +169,23 @@ func _initialize() -> void:
 	cm.round_number = 5
 	cm.last_election_round = 4
 	cm.current_turn_index = 0
-	check("anayasa %67, referandum esigi salt cogunluk", gm.constitution_threshold_seats() == 334 and gm.referendum_threshold_seats() == 251)
+	check("anayasa 2/3 = 334", gm.constitution_threshold_seats() == 334 and not gm.has_method("referendum_threshold_seats"))
 	var change := {"threshold": 5.0, "interval": 3, "seat_method": "hare"}
 	cm._apply_constitution_proposal(1, change)
 	gm._apply_vote(2, gm.VOTE_NO)
-	gm._apply_vote(3, gm.VOTE_NO)
-	check("%50 alti EVET: reddedilir, referandum yok", not cm.is_referendum_active() and is_equal_approx(mm.election_threshold, 0.0))
-	cm.law_rounds = {}
-	cm._apply_constitution_proposal(1, change)
-	gm._apply_vote(2, gm.VOTE_NO)
 	gm._apply_vote(3, gm.VOTE_YES)
-	check("300 EVET (%50 ustu, %67 alti): REFERANDUM basladi", cm.is_referendum_active() \
-		and gm.last_resolution_reason.find("REFERANDUM") != -1 and is_equal_approx(mm.election_threshold, 0.0), gm.last_resolution_reason)
-	check("referandum tam 2 tur surer", int(cm.referendum["end_round"]) == cm.round_number + 1 and cm.referendum_rounds_left() == 2)
-	check("taraflar meclis oyundan", cm.referendum_side(1) == gm.VOTE_YES and cm.referendum_side(3) == gm.VOTE_YES \
-		and cm.referendum_side(2) == gm.VOTE_NO)
+	check("300 EVET (2/3 alti): REDDEDILIR, referandum yok", is_equal_approx(mm.election_threshold, 0.0)
+		and gm.last_resolution_reason.find("REDDEDİLDİ") != -1 and not "referendum" in cm, gm.last_resolution_reason)
+	cm.law_rounds = {}
 	cm.mana[1] = 20.0
-	var no_org: String = game_map.ids[5]
-	cm.organizations.erase(no_org)
-	check("referandumda yasa/anayasa/teskilat/yatirim/gensoru yok", not cm.can_propose_law(1) and not cm.can_propose_constitution(1) \
-		and not cm.can_build_organization(1, no_org) and not cm.can_invest(1) and not cm.can_censure(1))
-	check("referandumda teskilatsiz ilde miting ve karalama serbest", cm.can_miting(1, no_org) \
-		and cm.can_play_card(1, "karalama", 2, no_org))
-	check("erken secim karti referandumda oynanamaz", not cm.can_play_card(1, "erken_secim"))
-	var local_before: float = cm.local_of(no_org, 1)
-	var national_before: float = cm.national_of(1)
-	var yes0: float = float(cm.referendum_projection()["yes"])
-	for i in 6:
-		cm._apply_referendum_miting(1, no_org, 0.0)
-	var yes1: float = float(cm.referendum_projection()["yes"])
-	check("EVET mitingi EVET oyunu arttirir", yes1 > yes0, "%.1f -> %.1f" % [yes0, yes1])
-	check("referandum mitingi genel secim destegini degistirmez", near(cm.local_of(no_org, 1), local_before) \
-		and near(cm.national_of(1), national_before))
-	for i in 4:
-		cm._apply_reputation(2, 1)
-		cm._apply_referendum_propaganda(2, 3, no_org)
-	var yes2: float = float(cm.referendum_projection()["yes"])
-	check("EVET diyen partiler karalanip iftiraya ugrayinca EVET duser", yes2 < yes1, "%.1f -> %.1f" % [yes1, yes2])
-	check("referandumda kaset genel secime islemez", near(cm.national_of(1), national_before))
-	# Tur 5 bitiyor: referandum surer. Takvimde secim olsun: ertelenmeli.
-	var interval_rounds: int = GameRules.ELECTION_INTERVAL
-	GameRules.set_election_anchor(cm.round_number)
-	var elections_before: int = cm.last_election_round
-	cm._finish_round()
-	check("kampanya surerken secim ERTELENIR", cm.is_referendum_active() and cm.last_election_round == elections_before \
-		and bool(cm.referendum["postponed"]), str(cm.referendum.get("postponed")))
-	check("1 tur kaldi", cm.referendum_rounds_left() == 1)
-	# Halk EVET'e kazansin: EVET tarafinin kampanyasi guclu.
-	cm.referendum["national"] = {1: 10.0, 3: 10.0, 2: -10.0}
-	cm.referendum["local"] = {}
-	cm._finish_round()
-	check("2. turun sonunda referandum sonuclanir", not cm.is_referendum_active())
-	check("referandumla sayim yontemi de degisir", mm.seat_method == "hare" and ElectionModel.seat_method == "hare")
-	check("halk kabul edince anayasa yururluge girer", is_equal_approx(mm.election_threshold, 5.0) and mm.election_interval == 3,
-		str(mm.election_threshold))
-	check("ertelenen secim referandumdan hemen sonra yapilir", cm.last_election_round == cm.round_number - 1,
-		"%d / %d" % [cm.last_election_round, cm.round_number])
-	var logged := false
-	for entry in cm.event_log:
-		if String(entry["text"]).find("REFERANDUM SONUCU") != -1:
-			logged = true
-	check("sonuc loga duser", logged)
-	# Halk reddeder.
-	new_game({1: ideology(1.5, 1.5, 1.5), 2: ideology(-1.5, -1.5, -1.5), 3: ideology(1.5, -1.5, 1.5)})
-	mm.election_threshold = 0.0
-	cm.last_seats = {1: 150, 2: 200, 3: 150}
-	cm.election_seats = cm.last_seats.duplicate()
-	cm.round_number = 6
-	cm.last_election_round = 4
-	cm.current_turn_index = 0
-	cm._apply_constitution_proposal(1, {"threshold": 5.0, "interval": 3})
-	gm._apply_vote(2, gm.VOTE_NO)
+	cm._apply_constitution_proposal(1, change)
+	gm._apply_vote(2, gm.VOTE_YES)
 	gm._apply_vote(3, gm.VOTE_YES)
-	cm.referendum["national"] = {1: -10.0, 3: -10.0, 2: 10.0}
-	cm._finish_round()
-	cm._finish_round()
-	check("halk reddederse kurallar degismez", not cm.is_referendum_active() and is_equal_approx(mm.election_threshold, 0.0))
+	check("2/3 EVET: hemen yururluge girer", is_equal_approx(mm.election_threshold, 5.0) and mm.election_interval == 3
+		and mm.seat_method == "hare" and ElectionModel.seat_method == "hare", gm.last_resolution_reason)
+	mm.election_threshold = 0.0
+	mm.reset_seat_method()
 	cm.law_rounds = {}
-	cm.referendum = {}
 	gm._clear_proposal()
 	gm._set_phase(gm.Phase.IDLE)  # önceki turlarda seçim/kurma açılmış olabilir
 	cm.last_seats = {1: 150, 2: 200, 3: 150}
@@ -468,7 +407,7 @@ func _initialize() -> void:
 	brain._constitution_rounds = {}
 	var plan: Dictionary = brain._best_constitution(1)
 	check("buyukler istemezse baraj teklifi cogunluk bulamaz, teklif yok", plan.is_empty(), str(plan))
-	cm.last_seats = {1: 120, 2: 200, 3: 180}
+	cm.last_seats = {1: 160, 2: 160, 3: 180}  # zorlananlar birlikte 2/3'ü bulur
 	plan = brain._best_constitution(1)
 	check("barajda zorlanan bot (ve zorlanan ortagi) barajin dusmesini onerir", not plan.is_empty()
 		and float(plan["payload"]["threshold"]) < 7.0, str(plan))
@@ -508,6 +447,7 @@ func _initialize() -> void:
 	check("cok ilde birinci partiye WTA vekil kazandirir", brain.wta_seat_gain(1) > 10 and brain.wta_seat_gain(2) < 0,
 		"%d / %d" % [brain.wta_seat_gain(1), brain.wta_seat_gain(2)])
 	mm.election_threshold = 3.0  # baraj zaten rakibi disarida birakiyor
+	cm.last_seats = {1: 340, 2: 150, 3: 10}  # teklif sahibi tek başına 2/3
 	brain._constitution_rounds = {}
 	var wta_plan: Dictionary = brain._best_constitution(1)
 	check("bot kazanan hepsini alir sayimini onerir", not wta_plan.is_empty()

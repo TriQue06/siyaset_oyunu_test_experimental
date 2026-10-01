@@ -31,6 +31,8 @@ func _initialize() -> void:
 	# koşması için. Tohumsuzken "en az bir hükümet kuruldu" arada bir
 	# tutmuyordu ve hata tekrar üretilemiyordu.
 	cm.set_rng_seed(20260923)
+	# Bot adları, renkleri ve başlangıç görüşleri genel rastgeleliği kullanır: o da sabit.
+	seed(20260923)
 	mm.room_code = ""
 	gm.result_hold_seconds = 0.0
 	mm.election_threshold = 3.0

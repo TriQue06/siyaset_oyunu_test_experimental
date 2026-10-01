@@ -964,21 +964,39 @@ static func build_government(bot: int) -> Dictionary:
 		partners.append(peer_id)
 		seats += GovernmentManager.seats_of(peer_id)
 
+	# MAKAMLAR ORTAKLARIN KABUL KURALINA GÖRE dağıtılır (bkz. _coalition_offer_vote):
+	# her ortak koalisyondaki sandalye payının COALITION_FAIR_SHARE'i kadar (ve en
+	# az COALITION_MIN_POINTS) makam puanı ister. Başbakanlık kurana kalır; diğer
+	# makamlar büyükten küçüğe, açığı en büyük ortağa verilir, artanı kurana.
 	var assignments := {}
-	var ministries: Array = []
 	for post in GovernmentPresets.POSTS:
 		assignments[post["id"]] = bot
-		if post["id"] != GovernmentPresets.POST_PM and post["id"] != GovernmentPresets.POST_DEPUTY_PM:
-			ministries.append(post["id"])
 	if partners.is_empty():
 		return assignments
-	assignments[GovernmentPresets.POST_DEPUTY_PM] = partners[0]
-	var slot := 0
+	var total_points := 0
+	for post in GovernmentPresets.POSTS:
+		total_points += int(post["points"])
+	var required := {}
+	var given := {}
 	for peer_id in partners:
-		var share := maxi(1, int(round(ministries.size() * float(GovernmentManager.seats_of(peer_id)) / float(seats))))
-		for i in share:
-			if slot >= ministries.size() - 1:  # görevli parti en az bir bakanlık tutsun
-				break
-			assignments[ministries[slot]] = peer_id
-			slot += 1
+		var share := float(GovernmentManager.seats_of(peer_id)) / maxf(1.0, float(seats))
+		required[peer_id] = maxf(float(COALITION_MIN_POINTS), float(total_points) * share * COALITION_FAIR_SHARE)
+		given[peer_id] = 0
+	var posts: Array = []
+	for post in GovernmentPresets.POSTS:
+		if post["id"] != GovernmentPresets.POST_PM:
+			posts.append(post)
+	posts.sort_custom(func(a, b): return int(a["points"]) > int(b["points"]))
+	for post in posts:
+		var pick := -1
+		var deficit := 0.01
+		for peer_id in partners:
+			var missing: float = float(required[peer_id]) - float(given[peer_id])
+			if missing > deficit:
+				deficit = missing
+				pick = peer_id
+		if pick == -1:
+			break  # herkes hakkını aldı: kalan makamlar kurana
+		assignments[post["id"]] = pick
+		given[pick] = int(given[pick]) + int(post["points"])
 	return assignments

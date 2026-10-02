@@ -169,9 +169,10 @@ static func choose_action(bot: int) -> Dictionary:
 		best_score = float(constitution["score"])
 
 	var org := _best_organization(bot, known)
-	if not org.is_empty() and float(org["score"]) - GameRules.ORG_MANA_COST * mana_value > best_score:
+	var org_cost := GameRules.org_cost(CardManager.organization_level(String(org.get("province", "")), bot)) if not org.is_empty() else 0
+	if not org.is_empty() and float(org["score"]) - org_cost * mana_value > best_score:
 		best = {"type": "organization", "province": org["province"]}
-		best_score = float(org["score"]) - GameRules.ORG_MANA_COST * mana_value
+		best_score = float(org["score"]) - org_cost * mana_value
 
 	if CardManager.can_invest(bot):
 		var invest := _eval_investment(bot, known)

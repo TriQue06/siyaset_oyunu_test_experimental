@@ -76,7 +76,7 @@ const CENSURE_REJECTED_NATIONAL := -1.0
 # --- Teşkilat ------------------------------------------------------------------
 ## Seviyeye göre KALICI aktivite (sönmez): 1 az, 2 orta, 3 yüksek oy bonusu.
 ## Seviye 0, 1, 2 (2 = tavan; eski 3. seviyenin bonusu buraya taşındı).
-const ORG_ACTIVITY_BY_LEVEL := [0.0, 2.0, 6.0]
+const ORG_ACTIVITY_BY_LEVEL := [0.0, 1.5, 4.0]
 ## MİTİNG ve KARALAMA artık teşkilat ister; izin kontrolü CardManager'da
 ## (can_miting / can_play_card) yapılır. Buradaki çarpan sadece ETKİ içindir:
 ## 2. seviye teşkilatın olduğu ilde miting ve karalama biraz daha vurur.
@@ -185,6 +185,8 @@ const ORG_ROUND_PULL := 0.012
 ## İLİN PARTİYİ TAKİBİ: parti görüş değiştirince il, partinin oradaki oy payı ×
 ## bu oran kadar aynı yöne kayar (%100 oy alan partinin dönüşünün yarısı).
 const PROVINCE_FOLLOW := 0.5
+## Meclis grup toplantısını (konuşmayı) atlayan partinin ulusal puanı (çok küçük).
+const SPEECH_SKIP_NATIONAL := -0.3
 ## Partinin kendi kalesi onu daha sadık takip eder.
 const STRONGHOLD_FOLLOW_MULT := 1.4
 ## Yasa bütün illerde SADECE kendi ekseninde, sunanın o eksendeki görüşüne çeker.

@@ -125,7 +125,14 @@ const CENSURE_PASS_SCORE := 5
 const LAW_PASS_SCORE := 5
 const LAW_PASS_SCORE_GOV := 5
 const GOVERNMENT_MANA_BONUS := 1
+## Teşkilat: kurmak (1. seviye) ORG_MANA_COST, geliştirmek (2. seviye)
+## ORG_UPGRADE_MANA_COST. Ucuz teşkilat botların haritayı kaplamasına yol açıyordu.
 const ORG_MANA_COST := 1
+const ORG_UPGRADE_MANA_COST := 2
+
+## Bu ildeki teşkilatı bir seviye ilerletmenin bedeli (current_level: şu anki seviye).
+static func org_cost(current_level: int) -> int:
+	return ORG_MANA_COST if current_level <= 0 else ORG_UPGRADE_MANA_COST
 ## En fazla 2 seviye: 1 = ilin görüşü + az bonus, 2 = isabetli anket + yüksek bonus.
 const ORG_MAX_LEVEL := 2
 

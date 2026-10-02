@@ -308,7 +308,7 @@ func _initialize() -> void:
 	cm.mana[1] = 20
 	for i in 5:
 		cm._apply_organization(1, TestProvinces.id("izmir"))
-	check("en fazla ORG_MAX_LEVEL", cm.organization_level(TestProvinces.id("izmir"), 1) == GameRules.ORG_MAX_LEVEL and cm.mana_of(1) == 20 - GameRules.ORG_MAX_LEVEL * GameRules.ORG_MANA_COST,
+	check("en fazla ORG_MAX_LEVEL", cm.organization_level(TestProvinces.id("izmir"), 1) == GameRules.ORG_MAX_LEVEL and cm.mana_of(1) == 20 - GameRules.ORG_MANA_COST - GameRules.ORG_UPGRADE_MANA_COST,
 		"seviye %d, mana %d" % [cm.organization_level(TestProvinces.id("izmir"), 1), cm.mana_of(1)])
 	check("seviye arttikca oy bonusu artar", PublicOpinion.org_activity(1) < PublicOpinion.org_activity(2))
 	var poll3: Dictionary = cm.province_poll(1, TestProvinces.id("izmir"))

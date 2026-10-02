@@ -262,6 +262,8 @@ const SPEECH_COLUMN_WIDTH := 118.0
 var _speech_panel: PanelContainer
 var _speech_rows: HBoxContainer
 var _speech_key: String = ""
+## Bu sırada "Atla"ya basıldı mı (tur:sıra)?
+var _speech_skipped_key: String = ""
 ## GÜÇ HARİTASI: potansiyel oy oranı bantları (%) ve renkleri.
 const VOTE_BANDS := [5.0, 15.0, 40.0, 80.0]
 const VOTE_BAND_LABELS := ["0-5", "5-15", "15-40", "40-80", "80+"]
@@ -828,7 +830,7 @@ func _on_turn_changed(_peer_id: int) -> void:
 	if current != _last_turn_peer:
 		_last_turn_peer = current
 		if current == multiplayer.get_unique_id() and not CardManager.game_finished:
-			_show_toast("Sıra sende: +%d mana (toplam %s). Önce meclis konuşmanı yap." % [CardManager.turn_income(current), CardManager.mana_text(CardManager.mana_of(current))])
+			_show_toast("Sıra sende: +%d mana (toplam %s). İstersen grup toplantısında konuş." % [CardManager.turn_income(current), CardManager.mana_text(CardManager.mana_of(current))])
 			AudioManager.play("turn_start")
 	_update_turn_indicator()
 	_refresh_speech_panel()
@@ -1506,7 +1508,7 @@ func _select_target_province(province_id: String) -> void:
 	elif _pending_org:
 		var level := CardManager.organization_level(province_id, me)
 		detail = "%s: teşkilat zaten en üst seviyede" % pname if level >= GameRules.ORG_MAX_LEVEL \
-			else "%s: teşkilat seviye %d → %d (%d mana) · %s" % [pname, level, level + 1, GameRules.ORG_MANA_COST, _org_level_text(level + 1)]
+			else "%s: teşkilat seviye %d → %d (%d mana) · %s" % [pname, level, level + 1, GameRules.org_cost(level), _org_level_text(level + 1)]
 	else:
 		var card_type: String = CardManager.my_inventory()[_pending_province_hand_index]
 		if card_type == CardPresets.MITING_CARD_TYPE:
@@ -2291,7 +2293,7 @@ func _build_action_buttons() -> void:
 	_law_button.pressed.connect(_on_law_button_pressed)
 	_miting_button = _action_button("MİTİNG", GameRules.cost_text(GameRules.MITING_MANA_COST), UiTheme.RED)
 	_miting_button.pressed.connect(_on_miting_button_pressed)
-	_org_button = _action_button("TEŞKİLAT", GameRules.cost_text(GameRules.ORG_MANA_COST), UiTheme.BLUE)
+	_org_button = _action_button("TEŞKİLAT", "%d/%d mana" % [GameRules.ORG_MANA_COST, GameRules.ORG_UPGRADE_MANA_COST], UiTheme.BLUE)
 	_org_button.pressed.connect(_on_org_button_pressed)
 	_invest_button = _action_button("YATIRIM", GameRules.cost_text(GameRules.INVEST_MANA_COST), UiTheme.GREEN_DARK)
 	_invest_button.pressed.connect(_on_invest_button_pressed)
@@ -3051,7 +3053,7 @@ func _on_org_button_pressed() -> void:
 		_province_panel.hide()
 	_begin_org_view()
 	_refresh_action_buttons()
-	_set_target_hint("Teşkilatlanma: bir ile dokun, tekrar dokun: kur / geliştir (%d mana)  ·  Butona tekrar dokun: iptal" % GameRules.ORG_MANA_COST)
+	_set_target_hint("Teşkilatlanma: bir ile dokun, tekrar dokun: kur (%d mana) / geliştir (%d mana)  ·  Butona tekrar dokun: iptal" % [GameRules.ORG_MANA_COST, GameRules.ORG_UPGRADE_MANA_COST])
 
 ## Teşkilat seviyesinin getirdikleri (kısa).
 static func _org_level_text(level: int) -> String:
@@ -3079,11 +3081,25 @@ func _build_speech_panel() -> void:
 	box.add_theme_constant_override("separation", 4)
 	_speech_panel.add_child(box)
 	var title := Label.new()
-	title.text = "MECLİS KONUŞMASI · bir görüşü savun (partin yarım adım kayar)"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 6)
+	box.add_child(header)
+	title.text = "MECLİS GRUP TOPLANTISI · bir görüşü savun (partin yarım adım kayar)"
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 11)
 	title.add_theme_color_override("font_color", UiTheme.GOLD)
-	box.add_child(title)
+	header.add_child(title)
+	# Atla: bu sıra konuşma yok (sıra bitince ulusal puan çok az düşer).
+	var skip := Button.new()
+	skip.text = "Atla"
+	skip.tooltip_text = "Bu sıra konuşma yok: sıra bitince ulusal destek çok az düşer."
+	skip.add_theme_font_size_override("font_size", 11)
+	UiSkin.skin_button(skip)
+	skip.pressed.connect(func():
+		_speech_skipped_key = "%d:%d" % [CardManager.round_number, CardManager.current_turn_index]
+		_speech_panel.hide())
+	header.add_child(skip)
 	_speech_rows = HBoxContainer.new()
 	_speech_rows.add_theme_constant_override("separation", 6)
 	box.add_child(_speech_rows)
@@ -3094,7 +3110,8 @@ func _refresh_speech_panel() -> void:
 	if _speech_panel == null:
 		return
 	var me := multiplayer.get_unique_id()
-	var wanted := CardManager.needs_speech(me) and not CardManager.is_turn_blocked() and not CardManager.game_finished
+	var wanted := CardManager.needs_speech(me) and not CardManager.is_turn_blocked() and not CardManager.game_finished \
+		and _speech_skipped_key != "%d:%d" % [CardManager.round_number, CardManager.current_turn_index]
 	if not wanted:
 		_speech_panel.hide()
 		_speech_key = ""

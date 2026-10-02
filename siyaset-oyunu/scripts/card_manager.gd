@@ -6,9 +6,9 @@ extends Node
 ## uygular ve herkese yayınlar.
 ##
 ## TUR AKIŞI (bir oyuncunun sırası):
-##   0) MECLİS KONUŞMASI (zorunlu, atlanamaz): 6 uçtan birini seçer, partisi o
-##      yöne IdeologyAxes.SPEECH_SHIFT kayar; güçlü olduğu iller kısmen takip eder.
-##      Konuşmadan önce hiçbir hamle yapılamaz, tur bitirilemez.
+##   0) MECLİS GRUP TOPLANTISI (konuşma): 6 uçtan birini seçer, partisi o yöne
+##      IdeologyAxes.SPEECH_SHIFT kayar; güçlü olduğu iller kısmen takip eder.
+##      Atlanabilir: konuşmadan biten sıra ulusal PublicOpinion.SPEECH_SKIP_NATIONAL.
 ##   a) KART OYNA: elden bir kart oyna; kartın mana bedeli düşer
 ##      (CardPresets.card_cost).
 ##   b) YASA TASARLA (GameRules.LAW_MANA_COST): meclise yasa sun; meclis yoksa
@@ -264,7 +264,7 @@ func is_my_turn() -> bool:
 
 ## Sıra bende VE tur akışı engellenmemiş mi? (UI bunu kullanmalı.)
 func can_act() -> bool:
-	return is_my_turn() and not is_turn_blocked() and not needs_speech(multiplayer.get_unique_id())
+	return is_my_turn() and not is_turn_blocked()
 
 func my_inventory() -> Array:
 	return inventories.get(multiplayer.get_unique_id(), [])
@@ -300,10 +300,10 @@ func is_government_party(peer_id: int) -> bool:
 ## Sıra bu oyuncuda ve tur akışı engellenmemiş mi? (Her hamlenin ön şartı;
 ## hamle sayısı sınırsız, mana belirler.)
 func can_choose_main_action(peer_id: int) -> bool:
-	return peer_id == current_turn_peer_id() and not is_turn_blocked() and not needs_speech(peer_id)
+	return peer_id == current_turn_peer_id() and not is_turn_blocked()
 
-## Bu oyuncu şu an MECLİS KONUŞMASI yapmak zorunda mı? (Sırası gelmiş, henüz
-## konuşmamış.) Konuşmadan önce hiçbir hamle yapılamaz.
+## Bu oyuncu bu sırada henüz grup toplantısında konuşmadı mı? (Konuşma
+## atlanabilir; sıra konuşmadan biterse ulusal puan biraz düşer.)
 func needs_speech(peer_id: int) -> bool:
 	return speech_required and not turn_order.is_empty() and peer_id == current_turn_peer_id() and not speech_done
 
@@ -418,7 +418,8 @@ func has_organization_anywhere(peer_id: int) -> bool:
 	return false
 
 func can_build_organization(peer_id: int, province_id: String) -> bool:
-	return can_choose_main_action(peer_id) and mana_of(peer_id) >= GameRules.ORG_MANA_COST \
+	return can_choose_main_action(peer_id) and (province_id == "" and mana_of(peer_id) >= GameRules.ORG_MANA_COST \
+		or mana_of(peer_id) >= GameRules.org_cost(organization_level(province_id, peer_id))) \
 		and has_province(province_id) and organization_level(province_id, peer_id) < GameRules.ORG_MAX_LEVEL
 
 ## Bir partiden vekil çalınabilir mi? Kendinden çalınamaz, meclis dışı partiden
@@ -447,7 +448,7 @@ func is_outside_parliament(peer_id: int) -> bool:
 
 ## Bu kart şu an bu hedeflerle oynanabilir mi? (Host doğrulaması ve UI.)
 func can_play_card(peer_id: int, card_type: String, target_peer_id: int = -1, target_province: String = "") -> bool:
-	if mana_of(peer_id) < CardPresets.card_cost(card_type) or needs_speech(peer_id):
+	if mana_of(peer_id) < CardPresets.card_cost(card_type):
 		return false
 	if card_type == CardPresets.EARLY_ELECTION_CARD_TYPE:
 		# Meclis gerekir, oylama açık olmamalı, zaten erken seçim kararı yoksa.
@@ -890,8 +891,6 @@ func discard_card(hand_index: int) -> void:
 func _apply_discard(peer_id: int, hand_index: int) -> void:
 	if not _is_local_only() and (is_turn_blocked() or peer_id != current_turn_peer_id()):
 		return
-	if needs_speech(peer_id):
-		return
 	var hand: Array = inventories.get(peer_id, [])
 	if hand_index < 0 or hand_index >= hand.size():
 		return
@@ -1003,9 +1002,11 @@ func _apply_play(peer_id: int, hand_index: int, target_peer_id: int = -1, target
 func _apply_pass(peer_id: int, voluntary: bool = true) -> void:
 	if is_turn_blocked() or peer_id != current_turn_peer_id():
 		return
-	# Konuşmadan tur bitirilemez (süre dolarsa sıra yine de devreder).
-	if voluntary and needs_speech(peer_id):
-		return
+	# Grup toplantısı atlandıysa taban biraz küser (çok küçük ulusal eksi).
+	if needs_speech(peer_id):
+		_add_national(peer_id, PublicOpinion.SPEECH_SKIP_NATIONAL)
+		_pending_log.append({"text": "%s grup toplantısını atladı." % _party_name(peer_id),
+			"peer_id": peer_id, "province": "", "kind": "speech"})
 	var wrapped := _advance_turn()
 	_push_state({"type": "passed", "peer_id": peer_id})
 	_finish_round_if_needed(wrapped)
@@ -1026,7 +1027,7 @@ func _apply_law(peer_id: int, law_type: String) -> void:
 func _apply_organization(peer_id: int, province_id: String) -> void:
 	if not can_build_organization(peer_id, province_id):
 		return
-	mana[peer_id] = mana_of(peer_id) - GameRules.ORG_MANA_COST
+	mana[peer_id] = mana_of(peer_id) - GameRules.org_cost(organization_level(province_id, peer_id))
 	var entry: Dictionary = organizations.get(province_id, {})
 	var level := int(entry.get(peer_id, 0)) + 1
 	entry[peer_id] = level
@@ -1641,7 +1642,7 @@ func _apply_speech(peer_id: int, axis: String, dir: int) -> void:
 	var d := 1 if dir > 0 else -1
 	speech_done = true
 	var moved := _shift_ideologies([{"peer": peer_id, "axis": axis, "delta": IdeologyAxes.SPEECH_SHIFT * d}])
-	var text := "%s, Meclis kürsüsünde \"%s\" konuşması yaptı (%s)." % [_party_name(peer_id),
+	var text := "%s, meclis grup toplantısında \"%s\" konuşması yaptı (%s)." % [_party_name(peer_id),
 		IdeologyAxes.speech_title(axis, d), IdeologyAxes.AXIS_SIDES[axis]["pos" if d > 0 else "neg"]]
 	if moved.is_empty():
 		text += " Partisi bu konuda zaten en uçta."

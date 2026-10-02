@@ -123,7 +123,7 @@ func _build_intel() -> void:
 		return
 	var accuracy := "%90 doğru" if level >= 2 else "yaklaşık"
 	if level < 2:
-		_body.add_child(_label("2. seviye teşkilat (%d mana) %%90 doğru anket verir." % GameRules.ORG_MANA_COST, 12, DIM))
+		_body.add_child(_label("2. seviye teşkilat (%d mana) %%90 doğru anket verir." % GameRules.ORG_UPGRADE_MANA_COST, 12, DIM))
 	_body.add_child(_label("Anket (%s, ±%%%d)  ·  şimdi seçim olsa (oy · mv):" % [accuracy,
 		int(round(CardManager.poll_error(me, province_id) * 100.0))], 12, INTEL_COLOR))
 	var ids: Array = poll.keys()
@@ -219,7 +219,7 @@ func _build_own() -> void:
 	var org_text := "Teşkilat yok" if level == 0 else "Teşkilat: seviye %d/%d (oy bonusu %+.1f)" % [level, GameRules.ORG_MAX_LEVEL,
 		CardManager.org_bonus(province_id, me)]
 	if level < GameRules.ORG_MAX_LEVEL:
-		org_text += "  ·  %s: %d mana" % ["kurmak" if level == 0 else "geliştirmek", GameRules.ORG_MANA_COST]
+		org_text += "  ·  %s: %d mana" % ["kurmak" if level == 0 else "geliştirmek", GameRules.org_cost(level)]
 	_body.add_child(_label(org_text, 12))
 
 func _build_events() -> void:

@@ -210,28 +210,30 @@ func _initialize() -> void:
 	check("log siniri asilmaz", cm.event_log.size() == cm.EVENT_LOG_LIMIT)
 
 	print("")
-	print("=== 6) MECLIS KONUSMASI ===")
+	print("=== 6) MECLIS GRUP TOPLANTISI (atlanabilir konusma) ===")
 	new_game({1: ideology(1.5, 1.5, 1.5), 2: ideology(-1.5, -1.5, -1.5), 3: ideology(1.5, -1.5, 1.5)})
 	cm.speech_required = true
 	cm.speech_done = false
 	cm.mana[1] = 10.0
 	var org_pid: String = game_map.ids[2]
 	cm.organizations[org_pid] = {1: 1}
-	check("sira gelince konusma zorunlu", cm.needs_speech(1) and not cm.needs_speech(2))
-	check("konusmadan once hamle yok", not cm.can_choose_main_action(1) and not cm.can_miting(1, org_pid) \
-		and not cm.can_play_card(1, "mana_bonusu"))
-	cm._apply_pass(1, true)
-	check("konusmadan tur bitirilemez", cm.current_turn_peer_id() == 1)
+	check("sira gelince konusma bekleniyor", cm.needs_speech(1) and not cm.needs_speech(2))
+	check("konusmadan da hamle yapilabilir", cm.can_choose_main_action(1) and cm.can_miting(1, org_pid) 		and cm.can_play_card(1, "mana_bonusu"))
 	cm._apply_speech(2, "economic", -1)
 	check("sirasi olmayan konusamaz", not cm.speech_done)
 	cm._apply_speech(1, "economic", -1)
 	check("konusma partiyi yarim adim kaydirir", near(float(pm.parties[1]["ideology"]["economic"]), 1.0) and cm.speech_done,
 		str(pm.parties[1]["ideology"]))
-	check("konusmadan sonra hamle serbest", cm.can_choose_main_action(1) and cm.can_miting(1, org_pid))
 	cm._apply_speech(1, "social", 1)
 	check("turda tek konusma", near(float(pm.parties[1]["ideology"]["social"]), 1.5))
+	var nat1: float = cm.national_of(1)
 	cm._apply_pass(1, true)
-	check("siradaki oyuncu yine konusmak zorunda", cm.current_turn_peer_id() == 2 and cm.needs_speech(2))
+	check("konusan partiye ceza yok", near(cm.national_of(1), nat1))
+	check("siradaki oyuncu konusabilir", cm.current_turn_peer_id() == 2 and cm.needs_speech(2))
+	var nat2: float = cm.national_of(2)
+	cm._apply_pass(2, true)
+	check("konusmayi atlayan sira sonunda cok az ulusal kaybeder", near(cm.national_of(2), nat2 + PublicOpinion.SPEECH_SKIP_NATIONAL)
+		and PublicOpinion.SPEECH_SKIP_NATIONAL < 0.0 and PublicOpinion.SPEECH_SKIP_NATIONAL > -0.5, "%.2f -> %.2f" % [nat2, cm.national_of(2)])
 	cm.speech_required = false
 
 	print("")

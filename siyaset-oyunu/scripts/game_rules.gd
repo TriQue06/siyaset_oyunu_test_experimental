@@ -128,7 +128,7 @@ const GOVERNMENT_MANA_BONUS := 1
 ## Teşkilat: kurmak (1. seviye) ORG_MANA_COST, geliştirmek (2. seviye)
 ## ORG_UPGRADE_MANA_COST. Ucuz teşkilat botların haritayı kaplamasına yol açıyordu.
 const ORG_MANA_COST := 1
-const ORG_UPGRADE_MANA_COST := 2
+const ORG_UPGRADE_MANA_COST := 1
 
 ## Bu ildeki teşkilatı bir seviye ilerletmenin bedeli (current_level: şu anki seviye).
 static func org_cost(current_level: int) -> int:

@@ -70,10 +70,12 @@ func _ready() -> void:
 	# Parti kurma süresi her zaman sınırsız (lobi ayarı kaldırıldı).
 	_unlimited_time = true
 	_time_left = 0.0
-	_party_name = "Parti%d" % randi_range(1, 99)
+	# Parti adı BOŞ gelir; ad yazılmadan hazır verilemez.
+	_party_name = ""
 	_ideology = IdeologyAxes.random_start_ideology()
 
 	name_edit.text = _party_name
+	name_edit.placeholder_text = "Parti adını yaz"
 	name_edit.max_length = PartyManager.NAME_MAX_LENGTH
 	name_edit.text_changed.connect(_on_name_changed)
 
@@ -132,6 +134,12 @@ func _update_name_hint() -> void:
 	var valid := PartyManager.is_valid_name(_party_name)
 	name_hint_label.text = "%d-%d karakter" % [PartyManager.NAME_MIN_LENGTH, PartyManager.NAME_MAX_LENGTH]
 	name_hint_label.modulate = UiTheme.TEXT_MUTED if valid else UiTheme.RED
+	_refresh_ready_button()
+
+## Hazır düğmesi: bot düzenlenirken ya da parti adı boş/geçersizken basılamaz
+## (kilitliyken "İptal Et" her zaman basılabilir).
+func _refresh_ready_button() -> void:
+	ready_button.disabled = _editing_bot() or (not _is_locked and not PartyManager.is_valid_name(_party_name))
 
 func _build_icon_grid() -> void:
 	for i in PartyPresets.icon_count():
@@ -450,7 +458,7 @@ func _start_editing(bot_id: int) -> void:
 		_ideology = (_own_backup.get("ideology", _ideology) as Dictionary).duplicate()
 		title_label.text = "PARTİNİ KUR"
 		_set_controls_disabled(_is_locked)
-		ready_button.disabled = false
+		_refresh_ready_button()
 	else:
 		_edit_target = bot_id
 		var party: Dictionary = PartyManager.parties.get(bot_id, {})
@@ -478,7 +486,7 @@ func _start_editing(bot_id: int) -> void:
 ## uygulayıp oyunu erken/varsayılan veriyle başlatma riski bu şekilde
 ## tamamen ortadan kalkıyor (bkz. PartyManager.set_party_and_ready).
 func _on_ready_pressed() -> void:
-	if _editing_bot():
+	if _editing_bot() or (not _is_locked and not PartyManager.is_valid_name(_party_name)):
 		return
 	_is_locked = not _is_locked
 	_set_controls_disabled(_is_locked)

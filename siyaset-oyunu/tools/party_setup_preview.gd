@@ -33,6 +33,9 @@ func _initialize() -> void:
 	root.add_child(scene)
 	for i in 5:
 		await process_frame
+	# Parti adı artık boş gelir: önizleme için bir ad yaz.
+	scene.name_edit.text = "Deneme"
+	scene._on_name_changed("Deneme")
 	check("benim rengim Ayse'ninkinden farkli", not Color(pm.parties[me]["bg_color"]).is_equal_approx(colors[0]))
 	check("panelde 5 oyuncu", scene._players_list.get_child_count() == 5, str(scene._players_list.get_child_count()))
 

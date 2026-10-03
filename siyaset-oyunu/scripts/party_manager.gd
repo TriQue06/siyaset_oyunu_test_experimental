@@ -436,6 +436,32 @@ func set_my_politician(data: Dictionary) -> void:
 	else:
 		_request_set_politician.rpc_id(1, data)
 
+## Oda sahibi: botun siyasetçisini tamamen rastgele yeniden üretir (cinsiyet,
+## ad, soyad, geçmiş, memleket). Host değilse istek host'a gider.
+func randomize_bot_politician(bot_id: int) -> void:
+	if not MultiplayerManager.is_local_owner() or not MultiplayerManager.is_bot(bot_id):
+		return
+	if MultiplayerManager.room_code == "" or MultiplayerManager.is_host:
+		_randomize_bot_politician(bot_id)
+	else:
+		_request_randomize_bot_politician.rpc_id(1, bot_id)
+
+func _randomize_bot_politician(bot_id: int) -> void:
+	if not parties.has(bot_id):
+		return
+	var bot_name := PoliticianPresets.random_name(PoliticianPresets.used_surnames(bot_id))
+	var homes := GameMap.province_ids()
+	var home := String(homes[randi() % homes.size()]) if not homes.is_empty() else ""
+	_apply_politician(bot_id, PoliticianPresets.make(bot_name["first_name"], bot_name["surname"],
+		PoliticianPresets.random_background(), home, bot_name["gender"]))
+
+@rpc("any_peer", "reliable")
+func _request_randomize_bot_politician(bot_id: int) -> void:
+	if not MultiplayerManager.is_host or multiplayer.get_remote_sender_id() != MultiplayerManager.owner_id \
+			or not MultiplayerManager.is_bot(bot_id):
+		return
+	_randomize_bot_politician(bot_id)
+
 ## Host: bir partinin siyasetçisini yazar ve yayar (botların memleketi de buradan düzeltilir).
 func set_politician_host(peer_id: int, data: Dictionary) -> void:
 	_apply_politician(peer_id, data)

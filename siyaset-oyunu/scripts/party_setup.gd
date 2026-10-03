@@ -64,6 +64,7 @@ var _players_list: VBoxContainer
 ## sahibiysem) bir bot. Bot düzenlenirken kendi seçimlerim burada saklanır.
 var _edit_target: int = -1
 var _own_backup: Dictionary = {}
+var _bot_profile_button: Button
 @onready var title_label: Label = $TopBar/TitleLabel
 
 func _ready() -> void:
@@ -88,6 +89,7 @@ func _ready() -> void:
 	if ideology_title is Label:
 		ideology_title.text = "Parti görüşü"
 	_build_ideology_rows()
+	_build_bot_profile_button()
 	ready_button.pressed.connect(_on_ready_pressed)
 	MultiplayerManager.party_setup_finished.connect(_on_party_setup_finished)
 	PartyManager.parties_updated.connect(_refresh_ready_count)
@@ -129,6 +131,7 @@ func _on_name_changed(new_text: String) -> void:
 	_update_name_hint()
 	if PartyManager.is_valid_name(_party_name):
 		_push_party()
+	_refresh_players_panel()
 
 func _update_name_hint() -> void:
 	var valid := PartyManager.is_valid_name(_party_name)
@@ -140,6 +143,23 @@ func _update_name_hint() -> void:
 ## (kilitliyken "İptal Et" her zaman basılabilir).
 func _refresh_ready_button() -> void:
 	ready_button.disabled = _editing_bot() or (not _is_locked and not PartyManager.is_valid_name(_party_name))
+	if _bot_profile_button != null:
+		_bot_profile_button.visible = _editing_bot()
+
+## Oda sahibi bot düzenlerken: botun siyasetçisini (cinsiyet, ad, soyad,
+## geçmiş, memleket) rastgele yeniden üretir. Sınırsız basılabilir.
+func _build_bot_profile_button() -> void:
+	_bot_profile_button = Button.new()
+	_bot_profile_button.text = "🎲 Bot Profilini Rastgele Yap"
+	_bot_profile_button.tooltip_text = "Botun adını, soyadını, geçmişini ve memleketini rastgele değiştir"
+	_bot_profile_button.focus_mode = Control.FOCUS_NONE
+	_bot_profile_button.custom_minimum_size = Vector2(0, 40)
+	_bot_profile_button.visible = false
+	_bot_profile_button.pressed.connect(func():
+		if _editing_bot():
+			PartyManager.randomize_bot_politician(_edit_target))
+	ready_button.get_parent().add_child(_bot_profile_button)
+	ready_button.get_parent().move_child(_bot_profile_button, ready_button.get_index())
 
 func _build_icon_grid() -> void:
 	for i in PartyPresets.icon_count():
@@ -242,16 +262,29 @@ func _build_players_panel() -> void:
 func _refresh_players_panel() -> void:
 	if _players_list == null:
 		return
+	# Hemen çıkar: aynı karede birkaç kez yenilenince eski satırlar birikmesin.
 	for child in _players_list.get_children():
+		_players_list.remove_child(child)
 		child.queue_free()
 	var my_id := multiplayer.get_unique_id()
 	var order: Array = MultiplayerManager.lobby_order() if not MultiplayerManager.players.is_empty() else [my_id]
 	for peer_id in order:
-		var party: Dictionary = PartyManager.parties.get(peer_id, {})
+		var party: Dictionary = PartyManager.parties.get(peer_id, {}).duplicate()
+		# KENDİ SATIRIM ve DÜZENLENEN BOT anlık: seçimler (ad boşken host'a hiç
+		# gitmez) beklemeden panelde görünsün.
+		var live_target := _edit_target if _editing_bot() else my_id
+		if int(peer_id) == live_target:
+			party["icon_index"] = _selected_icon_index
+			party["bg_color"] = _selected_bg_color
+			if _party_name.strip_edges() != "":
+				party["name"] = _party_name
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
 		var swatch := ColorRect.new()
 		swatch.custom_minimum_size = Vector2(40, 40)
+		# KARE KALSIN: satır (ad + parti + siyasetçi) 40'tan yüksek, gerilmesin.
+		swatch.size_flags_vertical = SIZE_SHRINK_CENTER
+		swatch.size_flags_horizontal = SIZE_SHRINK_CENTER
 		swatch.color = Color(party.get("bg_color", Color(0.3, 0.3, 0.3)))
 		if party.has("icon_index"):
 			var icon := TextureRect.new()
@@ -432,6 +465,7 @@ func _update_preview() -> void:
 	preview_icon.texture = PartyPresets.get_icon_texture(_selected_icon_index, PREVIEW_ICON_PIXEL_SIZE)
 	preview_icon.modulate = ICON_COLOR
 	preview_icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	_refresh_players_panel()
 
 func _push_party() -> void:
 	if not PartyManager.is_valid_name(_party_name):

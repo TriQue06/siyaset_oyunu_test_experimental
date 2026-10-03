@@ -81,10 +81,19 @@ const FEMALE_NAMES := [
 ## Soyad = kök + ek ("Gök" + "yelken" = "Gökyelken"). Yaygın siyasetçi
 ## soyadı kalıpları (-oğlu, -doğan, -demir, -kaya, -han ...) bilerek yok.
 const SURNAME_ROOTS := ["Ak", "Kara", "Gök", "Yel", "Dağ", "Çam", "Ay", "Gün", "Tan", "Bal",
-	"Kır", "Ulu", "Boz", "Sarı", "Alp", "Çağ", "Al", "Ilık", "Sis", "Ilgaz"]
+	"Kır", "Ulu", "Boz", "Sarı", "Alp", "Çağ", "Al", "Ilık", "Sis", "Ilgaz",
+	"Yaz", "Kış", "Göl", "Su", "Kum", "Yıldız", "Bulut", "Çiy", "Tuz", "Ilgın",
+	"Kızıl", "Mavi", "Yeşil", "Ala", "Gümüş", "Altın", "Bakır", "Pamuk", "İpek", "Kuş",
+	"Turna", "Ceylan", "Şahin", "Kartal", "Atmaca", "Güz", "Bahar", "Sabah", "Akşam", "Kervan",
+	"Deniz", "Orman", "Bayır", "Eğin", "Erik", "Elma", "Ceviz", "Sedir", "Kekik", "Nar"]
 const SURNAME_ENDS := ["söğüt", "yelken", "pınar", "yamaç", "çınar", "ırmak", "doruk", "koru",
 	"bulut", "yaprak", "kumsal", "dere", "yayla", "gölge", "rüzgâr", "fidan", "kuşak", "sırt",
-	"meşe", "ılgın", "serçe", "kıyı", "çiçek", "ova"]
+	"meşe", "ılgın", "serçe", "kıyı", "çiçek", "ova",
+	"bağ", "bahçe", "çayır", "çeşme", "köprü", "geçit", "vadi", "boyu", "yaka", "kanat",
+	"dal", "kök", "tohum", "başak", "gül", "lale", "sümbül", "kavak", "ardıç", "selvi",
+	"çam", "kozan", "tarla", "harman", "değirmen", "kuyu", "kaynak", "göl", "ada", "liman",
+	"yol", "kapı", "evli", "yurdu", "türkü", "ezgi", "ışın", "şafak", "yıldız", "ay",
+	"tepe", "yazı", "örs", "kalem", "dokuma", "keman", "yüce", "soy", "ok", "yay"]
 ## Gerçek (Türk) siyasetçi soyadları: üretici bunları ASLA vermez.
 const BANNED_SURNAMES := ["Erdoğan", "Kılıçdaroğlu", "Bahçeli", "Akşener", "İnce", "Demirtaş",
 	"Davutoğlu", "Babacan", "Özel", "İmamoğlu", "Yavaş", "Özal", "Demirel", "Ecevit", "Erbakan",
@@ -92,7 +101,7 @@ const BANNED_SURNAMES := ["Erdoğan", "Kılıçdaroğlu", "Bahçeli", "Akşener"
 	"Sezer", "Soylu", "Karamollaoğlu", "Perinçek", "Oğan", "Dervişoğlu", "Bakırhan", "Kurtulmuş",
 	"Yıldırım", "Arınç", "Akdoğan", "Uysal", "Altan", "Sancar", "Koç", "Aydın", "Ağıralioğlu",
 	"Akpınar", "Gökçek", "Ağar", "Karayalçın", "Talabani", "Günaydın", "Kaya", "Demir",
-	"Çağlayan", "Bozdağ", "Albayrak", "Tanal", "Altay", "Akar", "Ulusoy", "Sarıgül", "Alpay"]
+	"Çağlayan", "Bozdağ", "Albayrak", "Tanal", "Altay", "Akar", "Ulusoy", "Sarıgül", "Alpay", "Altınok", "Akyol", "Gökçe", "Akgül", "Tanyol", "Karabağ"]
 
 const NAME_MAX_LENGTH := 40
 
@@ -147,20 +156,34 @@ static func is_banned_surname(surname: String) -> bool:
 static func _pick(list: Array, rng: RandomNumberGenerator) -> String:
 	return String(list[(rng.randi() if rng != null else randi()) % list.size()])
 
+## "Ayay", "Gölgöl" gibi kökü ile eki aynı olan soyadlar elenir.
+static func _is_doubled(surname: String) -> bool:
+	var low := surname.to_lower()
+	var half := low.length() / 2
+	return low.length() % 2 == 0 and low.left(half) == low.substr(half)
+
 ## Rastgele soyad; avoid'deki (oyunda kullanılan) soyadları ve yasaklıları vermez.
 static func random_surname(avoid: Array = [], rng: RandomNumberGenerator = null) -> String:
 	var surname := ""
 	for attempt in 200:
 		surname = _pick(SURNAME_ROOTS, rng) + _pick(SURNAME_ENDS, rng)
-		if not is_banned_surname(surname) and not avoid.has(surname):
+		if not is_banned_surname(surname) and not avoid.has(surname) and not _is_doubled(surname):
 			return surname
 	return surname
 
+## Rastgele ad (%75 erkek, %25 kadın); avoid verilirse o ad tekrar gelmez.
+static func random_first_name(avoid: String = "", rng: RandomNumberGenerator = null) -> String:
+	var first := avoid
+	for attempt in 20:
+		var roll := rng.randf() if rng != null else randf()
+		first = _pick(MALE_NAMES if roll < MALE_NAME_CHANCE else FEMALE_NAMES, rng)
+		if first != avoid:
+			break
+	return first
+
 ## {"first_name", "surname"}: sınırsız yeniden üretilebilir.
 static func random_name(avoid_surnames: Array = [], rng: RandomNumberGenerator = null) -> Dictionary:
-	var roll := rng.randf() if rng != null else randf()
-	var first := _pick(MALE_NAMES if roll < MALE_NAME_CHANCE else FEMALE_NAMES, rng)
-	return {"first_name": first, "surname": random_surname(avoid_surnames, rng)}
+	return {"first_name": random_first_name("", rng), "surname": random_surname(avoid_surnames, rng)}
 
 ## Oyunda (diğer partilerde) kullanılan soyadları.
 static func used_surnames(except_peer: int = 0) -> Array:

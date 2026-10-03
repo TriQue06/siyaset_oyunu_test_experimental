@@ -89,7 +89,7 @@ func _initialize() -> void:
 		if PP.FEMALE_NAMES.has(n):
 			overlap = true
 	check("erkek ve kadin listeleri ayrik", not overlap)
-	check("soyadlar cesitli", seen.size() > 100, str(seen.size()))
+	check("soyadlar cesitli", seen.size() > 400, str(seen.size()))
 	check("gercek soyad reddedilir", not PP.is_valid(PP.make("Ali", "Erdoğan", "sendikaci", home)))
 	check("rastgele soyad kullanilani vermez", not PP.random_surname(["Gökyelken"]).is_empty())
 	var bot_surnames := {}

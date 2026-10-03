@@ -8,7 +8,7 @@ extends Control
 
 const MAP_SCENE := preload("res://scenes/Map.tscn")
 const LEFT_WIDTH := 540.0
-const CARD_SIZE := Vector2(258, 132)
+const CARD_SIZE := Vector2(258, 116)
 const MAP_PADDING := 12.0
 ## Eksen renkleri (parti profil kartındaki işaretlerle aynı aile).
 const AXIS_COLORS := {
@@ -88,14 +88,22 @@ func _build_left() -> Control:
 	_name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_name_label.clip_text = true
 	name_row.add_child(_name_label)
-	var dice := Button.new()
-	dice.text = "🎲 Rastgele"
-	dice.tooltip_text = "Yeni bir ad ve soyad üret"
-	dice.focus_mode = Control.FOCUS_NONE
-	dice.custom_minimum_size = Vector2(150, 44)
-	dice.pressed.connect(_reroll_name)
-	name_row.add_child(dice)
-	_reroll_name()
+	# Üç zar: sadece ad, sadece soyad, ikisi birden (sınırsız basılır).
+	var dice_row := HBoxContainer.new()
+	dice_row.add_theme_constant_override("separation", 8)
+	body.add_child(dice_row)
+	for spec in [["🎲 Ad", "Sadece adı değiştir", true, false],
+			["🎲 Soyad", "Sadece soyadı değiştir", false, true],
+			["🎲 İkisi de", "Ad ve soyadı birlikte değiştir", true, true]]:
+		var dice := Button.new()
+		dice.text = spec[0]
+		dice.tooltip_text = spec[1]
+		dice.focus_mode = Control.FOCUS_NONE
+		dice.custom_minimum_size = Vector2(0, 36)
+		dice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		dice.pressed.connect(_reroll_name.bind(spec[2], spec[3]))
+		dice_row.add_child(dice)
+	_reroll_name(true, true)
 
 	body.add_child(PopupKit.section("Geçmiş", "partinin bir ekseni buradan gelir"))
 	var scroll := ScrollContainer.new()
@@ -140,7 +148,7 @@ func _background_card(id: String) -> Button:
 	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	button.add_child(margin)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 4)
+	box.add_theme_constant_override("separation", 2)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	margin.add_child(box)
 	var head := HBoxContainer.new()
@@ -224,13 +232,14 @@ func _fit_map() -> void:
 
 # --- Etkileşim ----------------------------------------------------------------------
 
-func _reroll_name() -> void:
-	var avoid := PoliticianPresets.used_surnames(multiplayer.get_unique_id())
-	if _surname != "":
-		avoid.append(_surname)  # her basışta farklı bir soyad
-	var generated := PoliticianPresets.random_name(avoid)
-	_first_name = String(generated["first_name"])
-	_surname = String(generated["surname"])
+func _reroll_name(first: bool, last: bool) -> void:
+	if first:
+		_first_name = PoliticianPresets.random_first_name(_first_name)
+	if last:
+		var avoid := PoliticianPresets.used_surnames(multiplayer.get_unique_id())
+		if _surname != "":
+			avoid.append(_surname)  # her basışta farklı bir soyad
+		_surname = PoliticianPresets.random_surname(avoid)
 	_name_label.text = _full_name()
 	if _continue != null:
 		_refresh()

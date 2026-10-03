@@ -243,7 +243,6 @@ func add_bot_party(peer_id: int) -> void:
 		"ready": true,
 	}
 	var background := PoliticianPresets.random_background()
-	parties[peer_id]["ideology"] = PoliticianPresets.apply_to_ideology(background, parties[peer_id]["ideology"])
 	var homes := GameMap.province_ids()
 	var bot_name := PoliticianPresets.random_name(PoliticianPresets.used_surnames(peer_id))
 	parties[peer_id]["politician"] = PoliticianPresets.make(bot_name["first_name"], bot_name["surname"],

@@ -71,7 +71,7 @@ func _ready() -> void:
 	_unlimited_time = true
 	_time_left = 0.0
 	_party_name = "Parti%d" % randi_range(1, 99)
-	_ideology = PoliticianPresets.apply_to_ideology(_target_background(), IdeologyAxes.random_start_ideology())
+	_ideology = IdeologyAxes.random_start_ideology()
 
 	name_edit.text = _party_name
 	name_edit.max_length = PartyManager.NAME_MAX_LENGTH
@@ -380,12 +380,6 @@ func _on_bg_color_selected(index: int) -> void:
 	_update_preview()
 	_push_party()
 
-## Düzenlenen partinin siyasetçisinin geçmişi (kendi partim ya da bot).
-func _target_background() -> String:
-	if _editing_bot():
-		return PoliticianPresets.background_of(_edit_target)
-	return String(PartyManager.my_politician.get("background", PoliticianPresets.background_of(multiplayer.get_unique_id())))
-
 ## Her eksen için: başlık + iki uç düğmesi (ör. "Devletçi" | "Piyasacı").
 ## Oyuncu SADECE kelimeleri görür; arkadaki değer ±IdeologyAxes.START_MAGNITUDE.
 func _build_ideology_rows() -> void:
@@ -415,11 +409,6 @@ func _build_ideology_rows() -> void:
 			button.add_theme_font_size_override("font_size", 11)
 			button.button_pressed = (float(_ideology.get(axis, 0.0)) > 0.0) == (dir > 0)
 			button.disabled = _is_locked and not _editing_bot()
-			# GEÇMİŞİN EKSENİ SABİT: sendikacı Devletçi, iş insanı Piyasacı başlar...
-			var bg_info := PoliticianPresets.background(_target_background())
-			if not bg_info.is_empty() and String(bg_info["axis"]) == axis:
-				button.disabled = true
-				button.tooltip_text = "Siyasetçinin geçmişi (%s) bu ekseni belirler." % String(bg_info["title"])
 			button.pressed.connect(_on_ideology_side_pressed.bind(axis, dir))
 			row.add_child(button)
 			pair.append(button)
@@ -468,8 +457,7 @@ func _start_editing(bot_id: int) -> void:
 		_party_name = String(party.get("name", ""))
 		_selected_icon_index = int(party.get("icon_index", 0))
 		_selected_bg_color = party.get("bg_color", _selected_bg_color)
-		_ideology = PoliticianPresets.apply_to_ideology(PoliticianPresets.background_of(bot_id),
-			(party.get("ideology", IdeologyAxes.random_start_ideology()) as Dictionary))
+		_ideology = (party.get("ideology", IdeologyAxes.random_start_ideology()) as Dictionary).duplicate()
 		title_label.text = "BOT PARTİSİ: %s" % MultiplayerManager.players.get(bot_id, {}).get("name", "Bot")
 		_set_controls_disabled(false)
 		ready_button.disabled = true  # hazır butonu sadece kendi partin için

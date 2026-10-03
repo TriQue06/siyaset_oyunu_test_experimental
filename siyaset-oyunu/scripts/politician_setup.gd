@@ -20,7 +20,6 @@ const HOME_COLOR := Color("FFC93C")
 ## Cinsiyet düğmeleri: erkek mavi, kadın pembe.
 const GENDER_STYLE := {"m": {"text": "Erkek", "color": Color("3A8DE0")},
 	"f": {"text": "Kadın", "color": Color("E8559C")}}
-const NEIGHBOR_COLOR := Color(1.0, 0.79, 0.24, 0.42)
 
 var _background_id: String = ""
 var _hometown: String = ""
@@ -124,7 +123,7 @@ func _build_left() -> Control:
 		dice_row.add_child(dice)
 	_reroll_name(true, true)
 
-	body.add_child(PopupKit.section("Geçmiş", "partinin bir ekseni buradan gelir"))
+	body.add_child(PopupKit.section("Geçmiş", "görüşünü bir uca biraz daha iter"))
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -192,9 +191,8 @@ func _build_right() -> Control:
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var body: VBoxContainer = built[1]
 	body.add_child(PopupKit.section("Memleket", "haritadan bir il seç"))
-	body.add_child(PopupKit.note(("Memleketinde 2. seviye teşkilatla başlarsın, il seçmeni görüşüne çekilir; " +
-		"memleketinde +%.0f, komşu illerde +%.1f kalıcı hemşehri desteğin olur.") % [
-		PoliticianPresets.HOMETOWN_ACTIVITY, PoliticianPresets.NEIGHBOR_ACTIVITY], UiTheme.TEXT_MUTED))
+	body.add_child(PopupKit.note("Memleketinde güçlü bir teşkilatla başlarsın; hemşehrilerin sana sahip çıkar ve görüşüne yakınlaşır.",
+		UiTheme.TEXT_MUTED))
 
 	_map_clip = Control.new()
 	_map_clip.clip_contents = true
@@ -323,25 +321,17 @@ func _paint_map() -> void:
 	_map.clear_overlay()
 	if _hometown == "":
 		return
-	var colors := {_hometown: HOME_COLOR}
-	for n in GameMap.neighbors().get(_hometown, []):
-		colors[n] = NEIGHBOR_COLOR
-	_map.set_province_colors(colors)
+	_map.set_province_colors({_hometown: HOME_COLOR})
 
 ## Alt bilgi: üzerinde durulan il, yoksa seçili memleket.
 func _refresh_info() -> void:
 	var id := _hovered if _hovered != "" else _hometown
 	if id == "":
 		_info_title.text = "Bir il seç"
-		_info_body.text = "Büyük iller çok vekil getirir; komşusu çok olan il hemşehri desteğini geniş alana yayar."
+		_info_body.text = "Haritada bir ile tıkla: orası senin memleketin olur."
 		return
-	var neighbors: Array = GameMap.neighbors().get(id, [])
-	var near_seats := 0
-	for n in neighbors:
-		near_seats += GameMap.seats_of(String(n))
 	_info_title.text = GameMap.name_of(id) + ("  ★ memleket" if id == _hometown else "")
-	_info_body.text = "%d vekil · %d komşu il (toplam %d vekil)%s" % [GameMap.seats_of(id), neighbors.size(),
-		near_seats, " · kıyı" if GameMap.is_coastal(id) else ""]
+	_info_body.text = "Senin memleketin." if id == _hometown else "Seçmek için tıkla."
 
 func _is_complete() -> bool:
 	return _surname != "" and _background_id != "" and _hometown != ""

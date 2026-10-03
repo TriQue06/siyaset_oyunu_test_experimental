@@ -31,8 +31,8 @@ func _initialize() -> void:
 	var map_before: Array = gmap.province_ids().duplicate()
 	var home := String(gmap.province_ids()[0])
 	pm.set_my_politician(PP.make("Ayla", "Gökyelken", "is_insani", home))
-	var ideology: Dictionary = PP.apply_to_ideology("is_insani", {"economic": -1.5, "social": -1.5, "administrative": 1.5})
-	check("is insani partiyi piyasaci baslatir", float(ideology["economic"]) > 0.0)
+	var ideology: Dictionary = {"economic": -1.5, "social": -1.5, "administrative": 1.5}
+	check("is insani + devletci secim -1 olur", is_equal_approx(float(PP.shifted_ideology("is_insani", ideology)["economic"]), -1.0))
 	pm.set_party_and_ready("Yeni Yol", 3, Color.WHITE, Color("F20C1F"), ideology, true)
 	var me: int = mm.owner_id
 	check("oyun basladi", mm.stage == mm.Stage.IN_GAME)
@@ -45,19 +45,20 @@ func _initialize() -> void:
 		str(cm.mana_of(me)))
 	var neighbor := String(gmap.neighbors().get(home, [""])[0])
 	check("hemsehri destegi memlekette", is_equal_approx(PP.hometown_activity(home, me), PP.HOMETOWN_ACTIVITY))
-	check("hemsehri destegi komsuda", is_equal_approx(PP.hometown_activity(neighbor, me), PP.NEIGHBOR_ACTIVITY))
+	check("komsu il etkilenmez", PP.hometown_activity(neighbor, me) == 0.0)
+	check("oyun basinda geçmis kaymasi uygulandi", is_equal_approx(float(pm.parties[me]["ideology"]["economic"]), -1.0),
+		str(pm.parties[me]["ideology"]))
 	check("aktiviteye eklendi", cm.activity_of(home, me) >= PublicOpinion.org_activity(2) + PP.HOMETOWN_ACTIVITY - 0.01,
 		"%.2f" % cm.activity_of(home, me))
-	check("komsu aktivite haritasinda", float(cm.activity_entry(neighbor).get(me, 0.0)) >= PP.NEIGHBOR_ACTIVITY - 0.01)
 	var all_bots_ok := true
 	for bot in mm.bot_ids():
 		var bh: String = PP.hometown_of(bot)
 		var bg: Dictionary = PP.background(PP.background_of(bot))
 		var bot_ideology: Dictionary = pm.parties[bot]["ideology"]
 		if bh == "" or cm.organization_level(bh, bot) != PP.HOMETOWN_ORG_LEVEL \
-				or sign(float(bot_ideology[bg["axis"]])) != int(bg["dir"]):
+				or not [1.0, 2.0].has(absf(float(bot_ideology[bg["axis"]]))):
 			all_bots_ok = false
-	check("botlarin da siyasetcisi, memleketi ve uyumlu gorusu var", all_bots_ok)
+	check("botlarin da siyasetcisi, memleketi ve gecmis kaymasi var", all_bots_ok)
 
 	# Geçmiş avantajları.
 	var bot: int = mm.bot_ids()[0]

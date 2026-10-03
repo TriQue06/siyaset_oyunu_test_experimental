@@ -810,6 +810,10 @@ func _apply_politician_starts() -> void:
 			var fixed := data.duplicate()
 			fixed["hometown"] = home
 			PartyManager.set_politician_host(peer_id, fixed)
+		# Geçmiş, ekseninde görüşü o uca biraz daha kaydırır (kilit yok).
+		var shift := PoliticianPresets.ideology_shift(String(data.get("background", "")))
+		if not shift.is_empty():
+			PartyManager.apply_ideology_delta(peer_id, shift["axis"], shift["delta"])
 		if home == "":
 			continue
 		organizations[home] = organizations.get(home, {})

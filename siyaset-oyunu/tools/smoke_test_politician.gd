@@ -96,6 +96,13 @@ func _initialize() -> void:
 			overlap = true
 	check("erkek ve kadin listeleri ayrik", not overlap)
 	check("soyadlar cesitli", seen.size() > 400, str(seen.size()))
+	var yilmaz := false
+	for i in 2000:
+		if PP.random_surname() == "Yılmaz":
+			yilmaz = true
+	check("Yilmaz soyadi cikabilir", yilmaz)
+	check("Karabulut gecerli", not PP.is_banned_surname("Karabulut"))
+	check("Bayraktar, Soylu, Albayrak yasakli", PP.is_banned_surname("Bayraktar") and PP.is_banned_surname("Soylu") and PP.is_banned_surname("Albayrak"))
 	check("gercek soyad reddedilir", not PP.is_valid(PP.make("Ali", "Erdoğan", "sendikaci", home)))
 	check("rastgele soyad kullanilani vermez", not PP.random_surname(["Gökyelken"]).is_empty())
 	var bot_surnames := {}

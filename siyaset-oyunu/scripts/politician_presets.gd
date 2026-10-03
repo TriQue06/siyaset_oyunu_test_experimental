@@ -107,15 +107,19 @@ const SURNAME_ENDS := ["söğüt", "yelken", "pınar", "yamaç", "çınar", "ır
 	"tepe", "yazı", "örs", "kalem", "dokuma", "keman", "yüce", "yay",
 	"sazlı", "kamış", "çalı", "fındık", "kiraz", "kayın", "palamut", "yonca", "kestane", "defne",
 	"soy", "ay", "ok", "yol", "gül", "yıldız", "bulut"]
+## Kök + ekle üretilemeyen ama izin verilen tek parça soyadlar; arada bir
+## (STANDALONE_SURNAME_CHANCE) bunlardan biri gelir.
+const STANDALONE_SURNAMES := ["Yılmaz"]
+const STANDALONE_SURNAME_CHANCE := 0.04
 ## Gerçek (Türk) siyasetçi soyadları: üretici bunları ASLA vermez.
 const BANNED_SURNAMES := ["Erdoğan", "Kılıçdaroğlu", "Bahçeli", "Akşener", "İnce", "Demirtaş",
 	"Davutoğlu", "Babacan", "Özel", "İmamoğlu", "Yavaş", "Özal", "Demirel", "Ecevit", "Erbakan",
-	"İnönü", "Atatürk", "Menderes", "Türkeş", "Baykal", "Çiller", "Yılmaz", "Bayar", "Gül",
+	"İnönü", "Atatürk", "Menderes", "Türkeş", "Baykal", "Çiller", "Bayar", "Gül",
 	"Sezer", "Soylu", "Karamollaoğlu", "Perinçek", "Oğan", "Dervişoğlu", "Bakırhan", "Kurtulmuş",
 	"Yıldırım", "Arınç", "Akdoğan", "Uysal", "Altan", "Sancar", "Koç", "Aydın", "Ağıralioğlu",
 	"Akpınar", "Gökçek", "Ağar", "Karayalçın", "Talabani", "Günaydın", "Kaya", "Demir",
 	"Çağlayan", "Bozdağ", "Albayrak", "Tanal", "Altay", "Akar", "Ulusoy", "Sarıgül", "Alpay", "Altınok", "Akyol", "Gökçe", "Akgül", "Tanyol", "Karabağ",
-	"Akbulut", "Aksoy", "Akay", "Altınay", "Ayyıldız", "Akyıldız", "Günay", "Karabulut", "Altınsoy",
+	"Akbulut", "Aksoy", "Akay", "Altınay", "Ayyıldız", "Akyıldız", "Günay", "Altınsoy",
 	"Ceylanpınar", "Kızılay", "Bilgiç", "Ünal", "Çelik", "Kurt", "Doğan", "Şimşek", "Polat", "Kalkan",
 	"Elitaş", "Ağbal", "Bostancı", "Tüfenkci", "Zeybekci", "Fidan", "Bayraktar", "Kacır", "Göktaş"]
 
@@ -183,7 +187,11 @@ static func _is_doubled(surname: String) -> bool:
 static func random_surname(avoid: Array = [], rng: RandomNumberGenerator = null) -> String:
 	var surname := ""
 	for attempt in 200:
-		surname = _pick(SURNAME_ROOTS, rng) + _pick(SURNAME_ENDS, rng)
+		var roll := rng.randf() if rng != null else randf()
+		if roll < STANDALONE_SURNAME_CHANCE:
+			surname = _pick(STANDALONE_SURNAMES, rng)
+		else:
+			surname = _pick(SURNAME_ROOTS, rng) + _pick(SURNAME_ENDS, rng)
 		if not is_banned_surname(surname) and not avoid.has(surname) and not _is_doubled(surname):
 			return surname
 	return surname

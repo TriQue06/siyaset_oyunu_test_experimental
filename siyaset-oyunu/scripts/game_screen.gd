@@ -264,9 +264,6 @@ var _speech_rows: HBoxContainer
 var _speech_key: String = ""
 ## Bu sırada "Atla"ya basıldı mı (tur:sıra)?
 var _speech_skipped_key: String = ""
-## GÜÇ HARİTASI: potansiyel oy oranı bantları (%) ve renkleri.
-const VOTE_BANDS := [5.0, 15.0, 40.0, 80.0]
-const VOTE_BAND_LABELS := ["0-5", "5-15", "15-40", "40-80", "80+"]
 
 func _ready() -> void:
 	AudioManager.play_music("game")
@@ -2872,10 +2869,10 @@ func _rebuild_layer_legend() -> void:
 				swatches.append([MAP_BLANK_COLOR.lerp(mine, float(level) / GameRules.ORG_MAX_LEVEL), str(level)])
 			swatches.append([null, "teşkilat seviyem"])
 		MapLayer.STRENGTH:
-			swatches.append([null, "oyum %"])
+			swatches.append([null, "vekil yok"])
 			for i in STRENGTH_STOPS.size():
-				swatches.append([STRENGTH_STOPS[i], VOTE_BAND_LABELS[i]])
-			swatches.append([MAP_UNKNOWN_COLOR, "?"])
+				swatches.append([STRENGTH_STOPS[i], ""])
+			swatches.append([null, "ilin yarısı"])
 	_layer_legend.visible = not swatches.is_empty()
 	for entry in swatches:
 		if entry[0] == null:
@@ -2938,16 +2935,18 @@ func _apply_map_layer_colors() -> void:
 	if _map_layer == MapLayer.SEATS:
 		colors = _seat_layer_colors.duplicate()
 	else:
-		# GÜÇ: teşkilatın olduğu illerde anket (1. seviye yaklaşık, 2. seviye %90
-		# doğru); teşkilat yoksa bilgi yok.
-		var projection: Dictionary = CardManager.projection_all(me) if _map_layer == MapLayer.STRENGTH else {}
+		# GÜÇ: her ilde, teşkilattan bağımsız, KESİN tahmin (şimdi seçim olsa).
+		var gradient := Gradient.new()
+		gradient.offsets = PackedFloat32Array([0.0, 0.25, 0.5, 0.75, 1.0])
+		gradient.colors = PackedColorArray(STRENGTH_STOPS)
+		var projection: Dictionary = CardManager.projection_all() if _map_layer == MapLayer.STRENGTH else {}
 		for province_id in map_holder.get_all_province_ids():
 			match _map_layer:
 				MapLayer.ORGANIZATION:
 					colors[province_id] = MAP_BLANK_COLOR.lerp(mine, float(CardManager.organization_level(province_id, me)) / GameRules.ORG_MAX_LEVEL)
 				MapLayer.STRENGTH:
-					if projection.has(province_id) and (projection[province_id] as Dictionary).has(me):
-						colors[province_id] = _vote_band_color(float(projection[province_id][me]["percent"]))
+					if projection.has(province_id):
+						colors[province_id] = gradient.sample((_strength_t(projection[province_id], me) + 1.0) * 0.5)
 					else:
 						colors[province_id] = MAP_UNKNOWN_COLOR
 	_province_base_colors = colors
@@ -2961,13 +2960,22 @@ func _apply_map_layer_colors() -> void:
 		_hovered_province_id = ""
 		_highlight_province(selected)
 
-## Güç katmanı rengi: potansiyel oy oranının bandı (%0-5 .. %80+).
-func _vote_band_color(percent: float) -> Color:
-	var band := 0
-	for limit in VOTE_BANDS:
-		if percent >= float(limit):
-			band += 1
-	return STRENGTH_STOPS[band]
+## Güç katmanı: TÜM partilerin gücüyle, şimdi seçim olsa bu ilde durumum.
+## −1 (koyu kırmızı) .. +1 (koyu yeşil). Vekil çıkaramıyorsam en fazla sarıya
+## yakın turuncu (bir vekile ne kadar yakın olduğuma göre); vekil çıkarıyorsam
+## sarı yeşilden, ilin vekillerinin yarısını alıyorsam koyu yeşile.
+func _strength_t(entry: Dictionary, me: int) -> float:
+	if entry.is_empty() or not entry.has(me):
+		return -1.0
+	var mine: Dictionary = entry[me]
+	var seat_count := maxi(1, int(entry.get("seat_count", 1)))
+	var won := int(mine["seats"])
+	var quotient := float(mine["quotient"])
+	# Sürekli ölçü: oy / son kazanan bölüm ≈ "kesirli vekil": her hamle rengi kaydırır.
+	var fractional := float(mine["percent"]) / quotient if quotient > 0.0 and quotient < INF else 0.0
+	if won <= 0:
+		return -1.0 + 0.85 * clampf(fractional, 0.0, 1.0)
+	return 0.2 + 0.8 * clampf(maxf(float(won), fractional) / float(seat_count) / 0.5, 0.0, 1.0)
 
 ## Katmanı değiştirir: eski görünümün anlık görüntüsü bir yana, yeni katman
 ## öbür yandan kayarak gelir (sağdaki katman sağdan, soldaki soldan).

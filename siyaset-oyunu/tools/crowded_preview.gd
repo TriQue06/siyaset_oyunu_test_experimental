@@ -86,21 +86,15 @@ func _initialize() -> void:
 		_shot("layer_%d" % layer)
 		print("layer istendi ", layer, " -> ", scene._map_layer, " switching ", scene._layer_switching, " queued ", scene._queued_layer)
 	check("vekil katmaninda vekil daireleri gorunur", scene.map_holder.get_node("SeatMarkers").visible)
-	# Güç katmanı POTANSİYEL OY ORANI bantlarıyla boyanır, sadece teşkilatın
-	# olduğu illerde (1. seviye yaklaşık, 2. seviye %90 doğru anket).
-	var projection: Dictionary = cm.projection_all(me)
-	var unknown_painted := 0
-	for province_id in ids:
-		if cm.organization_level(province_id, me) == 0 and projection.has(province_id):
-			unknown_painted += 1
-	check("guc haritasi teskilatsiz ili bilmez", unknown_painted == 0, str(unknown_painted))
-	var band_ok := true
+	# Güç katmanı her ilde (teşkilattan bağımsız) kesin tahminle, kırmızı-sarı-yeşil degrade.
+	var projection: Dictionary = cm.projection_all()
+	check("guc haritasi her ili gosterir", projection.size() == ids.size(), "%d/%d" % [projection.size(), ids.size()])
+	var t_ok := true
 	for province_id in projection.keys():
-		var color: Color = scene._vote_band_color(float(projection[province_id][me]["percent"]))
-		if not scene.STRENGTH_STOPS.has(color):
-			band_ok = false
-	check("guc haritasi oy bandi renkleri", band_ok and scene._vote_band_color(3.0) == scene.STRENGTH_STOPS[0] \
-		and scene._vote_band_color(85.0) == scene.STRENGTH_STOPS[4] and scene._vote_band_color(20.0) == scene.STRENGTH_STOPS[2])
+		var t: float = scene._strength_t(projection[province_id], me)
+		if t < -1.0 or t > 1.0:
+			t_ok = false
+	check("guc haritasi degrade degerleri [-1, 1]", t_ok)
 	scene._on_layer_button_pressed(2)
 	await create_timer(0.6).timeout
 	cm.current_turn_index = cm.turn_order.find(me)

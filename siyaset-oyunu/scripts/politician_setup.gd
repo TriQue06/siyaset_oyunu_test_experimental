@@ -18,8 +18,8 @@ const AXIS_COLORS := {
 }
 const HOME_COLOR := Color("FFC93C")
 ## Cinsiyet düğmeleri: erkek mavi, kadın pembe.
-const GENDER_STYLE := {"m": {"icon": "♂", "text": "Erkek", "color": Color("3A8DE0")},
-	"f": {"icon": "♀", "text": "Kadın", "color": Color("E8559C")}}
+const GENDER_STYLE := {"m": {"text": "Erkek", "color": Color("3A8DE0")},
+	"f": {"text": "Kadın", "color": Color("E8559C")}}
 const NEIGHBOR_COLOR := Color(1.0, 0.79, 0.24, 0.42)
 
 var _background_id: String = ""
@@ -95,11 +95,11 @@ func _build_left() -> Control:
 	# Önce cinsiyet: ad listesi buna göre seçilir.
 	for g in ["m", "f"]:
 		var gb := Button.new()
-		gb.text = String(GENDER_STYLE[g]["icon"])
-		gb.tooltip_text = String(GENDER_STYLE[g]["text"])
+		gb.text = String(GENDER_STYLE[g]["text"])
 		gb.focus_mode = Control.FOCUS_NONE
-		gb.custom_minimum_size = Vector2(40, 38)
-		gb.add_theme_font_size_override("font_size", 20)
+		gb.custom_minimum_size = Vector2(86, 38)
+		gb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		gb.add_theme_font_size_override("font_size", 15)
 		gb.pressed.connect(_on_gender_pressed.bind(g))
 		name_row.add_child(gb)
 		_gender_buttons[g] = gb
@@ -257,20 +257,16 @@ func _on_gender_pressed(gender: String) -> void:
 	_gender = gender
 	_reroll_name(true, false)
 
-## Seçili cinsiyet dolu renkte, diğeri sönük.
+## Klasik düğme dokusu, cinsiyet renginde: seçili tam renk, diğeri koyu ve sönük.
 func _style_gender_buttons() -> void:
 	for g in _gender_buttons.keys():
 		var gb: Button = _gender_buttons[g]
 		var color: Color = GENDER_STYLE[g]["color"]
 		var selected: bool = g == _gender
-		var box := StyleBoxFlat.new()
-		box.bg_color = color if selected else Color(color, 0.12)
-		box.border_color = color
-		box.set_border_width_all(2)
-		for state in ["normal", "hover", "pressed"]:
-			gb.add_theme_stylebox_override(state, box)
-		for prop in ["font_color", "font_hover_color", "font_pressed_color"]:
-			gb.add_theme_color_override(prop, Color.WHITE if selected else color)
+		UiSkin.skin_color_button(gb, color if selected else color.darkened(0.55))
+		if not selected:
+			for prop in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+				gb.add_theme_color_override(prop, UiTheme.TEXT_MUTED)
 
 func _reroll_name(first: bool, last: bool) -> void:
 	_style_gender_buttons()

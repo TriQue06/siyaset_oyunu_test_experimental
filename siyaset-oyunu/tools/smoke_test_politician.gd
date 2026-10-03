@@ -79,6 +79,16 @@ func _initialize() -> void:
 		if PP.is_banned_surname(String(n["surname"])) or String(n["first_name"]) == "":
 			all_ok = false
 	check("500 rastgele isimde yasakli soyad yok", all_ok)
+	var males := 0
+	for i in 4000:
+		if PP.MALE_NAMES.has(PP.random_name()["first_name"]):
+			males += 1
+	check("adlarin ~%75'i erkek", absf(males / 4000.0 - 0.75) < 0.03, "%.3f" % (males / 4000.0))
+	var overlap := false
+	for n in PP.MALE_NAMES:
+		if PP.FEMALE_NAMES.has(n):
+			overlap = true
+	check("erkek ve kadin listeleri ayrik", not overlap)
 	check("soyadlar cesitli", seen.size() > 100, str(seen.size()))
 	check("gercek soyad reddedilir", not PP.is_valid(PP.make("Ali", "Erdoğan", "sendikaci", home)))
 	check("rastgele soyad kullanilani vermez", not PP.random_surname(["Gökyelken"]).is_empty())

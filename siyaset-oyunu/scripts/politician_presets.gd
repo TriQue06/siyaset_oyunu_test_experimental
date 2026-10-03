@@ -58,13 +58,25 @@ const NEIGHBOR_ACTIVITY := 1.5
 const HOMETOWN_PULL := 0.4
 
 # --- Rastgele isim ----------------------------------------------------------------
-const FIRST_NAMES := [
-	"Ahmet", "Ayla", "Aras", "Bahar", "Barlas", "Belgin", "Berk", "Cansu", "Cemre", "Cihan",
-	"Defne", "Doruk", "Ece", "Emre", "Eylül", "Ferit", "Figen", "Gaye", "Gökay", "Gülay",
-	"Hakan", "Hülya", "Ilgın", "İlkay", "İpek", "Kaan", "Kerem", "Lale", "Levent", "Melis",
-	"Mert", "Nazlı", "Nevzat", "Nilgün", "Oktay", "Orhun", "Özge", "Pelin", "Rüya", "Selin",
-	"Serdar", "Sevgi", "Sinem", "Şebnem", "Tamer", "Tuba", "Tuncay", "Ufuk", "Ülkü", "Vedat",
-	"Yasemin", "Yekta", "Zafer", "Zeynep", "Arda", "Burcu", "Ceyda", "Erkin", "Gizem", "Onur",
+## Adlar: %75 erkek, %25 kadın (MALE_NAME_CHANCE). Liste büyüdükçe çeşit artar.
+const MALE_NAME_CHANCE := 0.75
+const MALE_NAMES := [
+	"Ahmet", "Aras", "Barlas", "Berk", "Cihan", "Doruk", "Emre", "Ferit", "Gökay", "Hakan",
+	"İlkay", "Kaan", "Kerem", "Levent", "Mert", "Nevzat", "Oktay", "Orhun", "Serdar", "Tamer",
+	"Tuncay", "Ufuk", "Vedat", "Yekta", "Zafer", "Arda", "Erkin", "Onur",
+	"Alper", "Atilla", "Bora", "Burak", "Cem", "Cengiz", "Coşkun", "Erhan", "Erol", "Ersin",
+	"Eren", "Fikret", "Halil", "Haluk", "Hasan", "Hüseyin", "İbrahim", "İsmail", "Kemal", "Koray",
+	"Kudret", "Metin", "Murat", "Mustafa", "Necati", "Nihat", "Oğuz", "Orhan", "Osman", "Özcan",
+	"Rıza", "Sadık", "Salih", "Selim", "Sinan", "Suat", "Şükrü", "Tarık", "Tayfun", "Turgut",
+	"Ümit", "Volkan", "Yavuz", "Yusuf", "Zeki", "Bülent", "Cahit", "Ergün", "Faruk", "Gürkan",
+	"Hikmet", "İlhan", "Kenan", "Mahir", "Necip", "Nurettin", "Rahmi", "Recai", "Sabri", "Şahin",
+]
+const FEMALE_NAMES := [
+	"Ayla", "Bahar", "Belgin", "Cansu", "Cemre", "Defne", "Ece", "Eylül", "Figen", "Gaye",
+	"Gülay", "Hülya", "Ilgın", "İpek", "Lale", "Melis", "Nazlı", "Nilgün", "Özge", "Pelin",
+	"Rüya", "Selin", "Sevgi", "Sinem", "Şebnem", "Tuba", "Ülkü", "Yasemin", "Zeynep", "Burcu",
+	"Ceyda", "Gizem", "Aslı", "Derya", "Elif", "Esra", "Filiz", "Gönül", "Handan", "Leyla",
+	"Meltem", "Nermin", "Nesrin", "Oya", "Serpil", "Sevim", "Songül", "Şule", "Türkan", "Zerrin",
 ]
 ## Soyad = kök + ek ("Gök" + "yelken" = "Gökyelken"). Yaygın siyasetçi
 ## soyadı kalıpları (-oğlu, -doğan, -demir, -kaya, -han ...) bilerek yok.
@@ -146,7 +158,9 @@ static func random_surname(avoid: Array = [], rng: RandomNumberGenerator = null)
 
 ## {"first_name", "surname"}: sınırsız yeniden üretilebilir.
 static func random_name(avoid_surnames: Array = [], rng: RandomNumberGenerator = null) -> Dictionary:
-	return {"first_name": _pick(FIRST_NAMES, rng), "surname": random_surname(avoid_surnames, rng)}
+	var roll := rng.randf() if rng != null else randf()
+	var first := _pick(MALE_NAMES if roll < MALE_NAME_CHANCE else FEMALE_NAMES, rng)
+	return {"first_name": first, "surname": random_surname(avoid_surnames, rng)}
 
 ## Oyunda (diğer partilerde) kullanılan soyadları.
 static func used_surnames(except_peer: int = 0) -> Array:

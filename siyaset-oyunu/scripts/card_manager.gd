@@ -2189,14 +2189,16 @@ func _push_state(event: Dictionary, include_results: bool = false) -> void:
 
 func _emit_post_event(event: Dictionary) -> void:
 	var type: String = event.get("type", "")
+	# Seçim: ekran ÖNCE donsun (bkz. GameScreen._on_election_completed), sonra
+	# paneller güncellensin — yoksa sonuç bir an önceden görünüyordu.
+	if type == "election":
+		election_completed.emit()
 	inventories_updated.emit()
 	if type in ["full", "player_left", "party_split", "party_merge"]:
 		turn_order_updated.emit()
 	turn_changed.emit(current_turn_peer_id())
 	opinion_changed.emit()
 	match type:
-		"election":
-			election_completed.emit()
 		"round":
 			round_advanced.emit()
 		"game_over":

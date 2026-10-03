@@ -468,7 +468,9 @@ func _on_election_completed() -> void:
 	# sonuçlarını hiç görmüyordu. Bayrak sayesinde önce sonuçlar oynuyor,
 	# GameScreen'e dönüldüğünde _ready() içindeki kontrol görevi devralıyor.
 	_leaving_for_results = true
-	SceneTransition.fade_to_scene("res://scenes/ElectionResults.tscn")
+	# Ekran donar: kararma sürerken paneller yeni meclisi / hükümet görevini
+	# gösterse de görünmez (seçimden önce sonucu ele veriyordu).
+	SceneTransition.freeze_and_fade_to_scene("res://scenes/ElectionResults.tscn")
 
 ## Seçimsiz bir tur bitti: hükümet puanlarını aldı, yeni tur başladı.
 func _on_round_advanced() -> void:

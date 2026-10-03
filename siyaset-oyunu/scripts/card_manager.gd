@@ -1066,7 +1066,7 @@ func _apply_card_effect(peer_id: int, card_type: String, target_peer_id: int = -
 		CardPresets.BONUS_CARD_TYPE:
 			var drawn := 0
 			for i in GameRules.BONUS_CARD_DRAW:
-				if _deal_turn_card(peer_id) != "":
+				if _deal_turn_card(peer_id, [CardPresets.BONUS_CARD_TYPE]) != "":
 					drawn += 1
 			_event_message = "%s bonus kart kullandı (+%d kart)." % [_party_name(peer_id), drawn]
 		CardPresets.MANA_BONUS_STRONG_CARD_TYPE:
@@ -1775,12 +1775,16 @@ func turn_income(peer_id: int) -> int:
 
 ## Desteden bir kartı doğrudan ele verir. El doluysa verilmez.
 ## Dönen değer: verilen kartın türü ("" = verilmedi).
-func _deal_turn_card(peer_id: int) -> String:
+## exclude: bu kart türleri çekilmez (bonus karttan bonus kart çıkmaz).
+func _deal_turn_card(peer_id: int, exclude: Array = []) -> String:
 	if not inventories.has(peer_id):
 		inventories[peer_id] = []
 	if inventories[peer_id].size() >= MAX_HAND_SIZE:
 		return ""
-	var card_type := CardPresets.weighted_pick(_draw_weights(peer_id), _rng)
+	var weights := _draw_weights(peer_id)
+	for card_type in exclude:
+		weights.erase(card_type)
+	var card_type := CardPresets.weighted_pick(weights, _rng)
 	inventories[peer_id].insert(inventories[peer_id].size() / 2, card_type)
 	return card_type
 

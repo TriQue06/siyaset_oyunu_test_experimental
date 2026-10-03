@@ -306,6 +306,12 @@ func _initialize() -> void:
 	cm.inventories[1] = []
 	cm._apply_card_effect(1, "bonus_kart")
 	check("bonus kart 2 kart ceker", cm.inventories[1].size() == 2, str(cm.inventories[1]))
+	var bonus_from_bonus := 0
+	for i in 200:
+		cm.inventories[1] = []
+		cm._apply_card_effect(1, "bonus_kart")
+		bonus_from_bonus += cm.inventories[1].count("bonus_kart")
+	check("bonus karttan bonus kart cikmaz", bonus_from_bonus == 0, str(bonus_from_bonus))
 	cm.inventories[2] = ["karalama"]
 	cm._apply_card_effect(1, "kart_calma", 2)
 	check("kart calma: rakibin kartini alir", cm.inventories[2].is_empty() and cm.inventories[1].size() == 3)

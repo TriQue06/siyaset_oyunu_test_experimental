@@ -1,9 +1,9 @@
 class_name ProvincePanel
 extends PanelContainer
 ## Haritada bir ile TIKLAYINCA açılan il menüsü (görünüm: PopupKit).
-##   - başlık: il adı, vekil sayısı, kale çipi,
+##   - başlık: il adı, vekil sayısı,
 ##   - SENİN TEŞKİLATIN (sadece bu oyuncu): seviye, ilin görüşü, seçmen
-##     yakınlığı, kale yolu çubukları ve anket (1. seviye yaklaşık, 2. seviye
+##     yakınlığı ve anket (1. seviye yaklaşık, 2. seviye
 ##     %90 doğru). Teşkilat yoksa bilgi yok,
 ##   - SEN BU İLDE: güç, teşkilat bonusu, miting riski, sonraki teşkilat bedeli,
 ##   - SON SEÇİM (herkese açık) ve SON OLAYLAR.
@@ -54,9 +54,7 @@ func refresh() -> void:
 		remove_child(child)
 		child.queue_free()
 	var me := multiplayer.get_unique_id()
-	var owner := CardManager.stronghold_of(province_id)
-	var accent: Color = PartyManager.parties.get(owner, {}).get("bg_color", UiTheme.PANEL_LIGHT) if owner != -1 else UiTheme.PANEL_LIGHT
-	var parts := PopupKit.frame(PANEL_WIDTH, accent, self)
+	var parts := PopupKit.frame(PANEL_WIDTH, UiTheme.PANEL_LIGHT, self)
 	var root: VBoxContainer = parts[1]
 
 	var head := PopupKit.header(ElectionNightSim.province_name(province_id),
@@ -64,14 +62,6 @@ func refresh() -> void:
 			hide()
 			closed.emit())
 	root.add_child(head)
-	if owner != -1:
-		var party: Dictionary = PartyManager.parties.get(owner, {})
-		var kale := HBoxContainer.new()
-		kale.add_theme_constant_override("separation", 6)
-		kale.add_child(PopupKit.chip("KALE · %s" % String(party.get("name", "?")), (party.get("bg_color", UiTheme.GOLD) as Color).lightened(0.2)))
-		kale.add_child(PopupKit.chip("kuşatma %%%d" % int(round(CardManager.siege_total(province_id) / PublicOpinion.SIEGE_BREAK * 100.0)), UiTheme.RED))
-		root.add_child(kale)
-		root.add_child(PopupKit.note("Rakipler burada seçmeni %%%d daha yavaş çevirir, karalama yarı etkili. 2-3 partinin mitingi kaleyi düşürebilir." % int(round(PublicOpinion.STRONGHOLD_RESISTANCE * 100.0))))
 
 	_scroll = ScrollContainer.new()
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -106,12 +96,11 @@ func _build_intel(me: int) -> void:
 	for axis in IdeologyAxes.AXES:
 		_body.add_child(PopupKit.kv(IdeologyAxes.AXIS_SIDES[axis]["title"],
 			IdeologyAxes.position_text(axis, float(center.get(axis, 0.0))), INTEL_COLOR))
-	var closeness := CardManager.stronghold_closeness(province_id, me)
-	var closeness_text := "çok yakın" if closeness >= 0.75 else ("yakın" if closeness >= PublicOpinion.STRONGHOLD_THRESHOLD \
+	var closeness := CardManager.voter_closeness(province_id, me)
+	var closeness_text := "çok yakın" if closeness >= 0.75 else ("yakın" if closeness >= PublicOpinion.CLOSENESS_NEAR \
 		else ("uzak" if closeness >= 0.3 else "çok uzak"))
-	var closeness_color := UiTheme.GREEN if closeness >= PublicOpinion.STRONGHOLD_THRESHOLD else (UiTheme.GOLD if closeness >= 0.3 else UiTheme.RED)
+	var closeness_color := UiTheme.GREEN if closeness >= PublicOpinion.CLOSENESS_NEAR else (UiTheme.GOLD if closeness >= 0.3 else UiTheme.RED)
 	_body.add_child(PopupKit.kv("Seçmen sana", closeness_text, closeness_color))
-	_build_kale_progress(me, level, closeness)
 	_build_poll(me, level)
 
 ## Teşkilat seviyesi: dolu/boş kareler + seviye adı.
@@ -131,20 +120,6 @@ func _level_row(level: int) -> Control:
 	var text := PopupKit.label("  %d/%d" % [level, GameRules.ORG_MAX_LEVEL], PopupKit.FS_TEXT, UiTheme.TEXT)
 	row.add_child(text)
 	return row
-
-## Kale yolu: teşkilat tam + kale emeği (miting/yatırım) + seçmen yakınlığı.
-func _build_kale_progress(me: int, level: int, closeness: float) -> void:
-	if CardManager.stronghold_of(province_id) == me:
-		_body.add_child(PopupKit.kv("Kale", "SENİN KALEN", UiTheme.GOLD))
-		return
-	var effort := CardManager.kale_effort_of(province_id, me)
-	var need := PublicOpinion.STRONGHOLD_EFFORT
-	_body.add_child(PopupKit.label("Kale yolu", PopupKit.FS_SMALL, UiTheme.TEXT))
-	_body.add_child(PopupKit.meter("Teşkilat", level, GameRules.ORG_MAX_LEVEL, UiTheme.BLUE, "%d/%d" % [level, GameRules.ORG_MAX_LEVEL]))
-	_body.add_child(PopupKit.meter("Miting/yatırım", minf(effort, need), need, UiTheme.GOLD, "%d/%d" % [mini(int(effort), int(need)), int(need)]))
-	_body.add_child(PopupKit.meter("Seçmen", closeness, PublicOpinion.STRONGHOLD_THRESHOLD,
-		UiTheme.GREEN if closeness >= PublicOpinion.STRONGHOLD_THRESHOLD else UiTheme.GOLD,
-		"tamam" if closeness >= PublicOpinion.STRONGHOLD_THRESHOLD else "uzak"))
 
 func _build_poll(me: int, level: int) -> void:
 	var poll := CardManager.province_poll(me, province_id)

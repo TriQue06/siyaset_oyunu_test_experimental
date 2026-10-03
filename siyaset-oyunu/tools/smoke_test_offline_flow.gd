@@ -115,13 +115,8 @@ func play(seed_value: int, human_votes: bool) -> Dictionary:
 	return {"stall": not cm.game_finished, "where": "sure doldu: " + _diagnose(),
 		"seconds": now, "elections": elections}
 
-## Oyun sonu SİYASİ KALE dağılımı (bilgi amaçlı): parti -> kale sayısı.
+## Oyun sonu dinamikleri (bilgi amaçlı): bölünmeler, il birincisi bantları, illerin görüşü.
 func _kale_summary() -> String:
-	var counts := {}
-	for province_id in cm.strongholds.keys():
-		var owner := int(cm.strongholds[province_id])
-		var name: String = pm.parties.get(owner, {}).get("name", "?")
-		counts[name] = int(counts.get(name, 0)) + 1
 	var splits := 0
 	var merges := 0
 	for entry in cm.event_log:
@@ -145,8 +140,8 @@ func _kale_summary() -> String:
 		for axis in IdeologyAxes.AXES:
 			spread += absf(float(cm.province_ideology[province_id][axis]))
 	spread /= maxf(1.0, cm.province_ideology.size() * 3.0)
-	return "kale %d/%d %s · bolunme %d, donus %d · il birincisi bantlari %s · illerin ort. |eksen| %.2f · baraj %%%s, sayim %s" % [
-		cm.strongholds.size(), cm._province_ids.size(), str(counts), splits, merges, str(bands), spread, String.num(mm.election_threshold, 1), mm.seat_method]
+	return "bolunme %d, donus %d · il birincisi bantlari %s · illerin ort. |eksen| %.2f · baraj %%%s, sayim %s" % [
+		splits, merges, str(bands), spread, String.num(mm.election_threshold, 1), mm.seat_method]
 
 func _initialize() -> void:
 	await process_frame

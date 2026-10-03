@@ -1518,7 +1518,6 @@ func _select_target_province(province_id: String) -> void:
 	_set_target_hint("%s  ·  Onaylamak için tekrar dokun" % detail)
 
 func _on_opinion_changed() -> void:
-	_refresh_strongholds()
 	_refresh_score_panel()
 	_refresh_agenda_banner()
 	if _map_layer != MapLayer.SEATS:
@@ -2932,20 +2931,9 @@ func _on_layer_button_pressed(layer: int) -> void:
 	_set_map_layer(layer)
 
 ## Katmana göre il renkleri. Vurgulu il (seçim modu) koyulaştırılmış kalır.
-## Siyasi kaleler haritada sahibinin renginde küçük bir kale simgesiyle durur.
-func _refresh_strongholds() -> void:
-	if map_holder == null:
-		return
-	var marks := {}
-	for province_id in CardManager.strongholds.keys():
-		var owner := int(CardManager.strongholds[province_id])
-		marks[province_id] = PartyManager.parties.get(owner, {}).get("bg_color", UiTheme.GOLD)
-	map_holder.set_strongholds(marks)
-
 func _apply_map_layer_colors() -> void:
 	if map_holder == null:
 		return
-	_refresh_strongholds()
 	var me := multiplayer.get_unique_id()
 	var mine: Color = PartyManager.parties.get(me, {}).get("bg_color", Color(0.5, 0.5, 0.5))
 	mine.a = 1.0
@@ -3088,7 +3076,7 @@ static func _org_level_text(level: int) -> String:
 		1:
 			return "az oy bonusu, ilin görüşü, yaklaşık oy"
 		2:
-			return "yüksek oy bonusu, %90 doğru oy, kale yolu"
+			return "yüksek oy bonusu, %90 doğru oy"
 		3:
 			return "yüksek oy bonusu, yüksek isabetli anket"
 	return ""

@@ -155,15 +155,6 @@ var province_events: Dictionary = {}
 var province_ideology: Dictionary = {}
 ## province_id -> { peer_id -> seviye (1..GameRules.ORG_MAX_LEVEL) }
 var organizations: Dictionary = {}
-## SİYASİ KALE: province_id -> peer_id (bkz. PublicOpinion.STRONGHOLD_*).
-var strongholds: Dictionary = {}
-## KALE EMEĞİ: province_id -> {peer_id -> puan}. O ilde yapılan her miting ve
-## yatırım +1. Teşkilatı tam olan, emeği STRONGHOLD_EFFORT'a ulaşan ve seçmeni
-## kendine yakın parti ili KALE yapar.
-var kale_effort: Dictionary = {}
-## KUŞATMA: province_id -> {peer_id -> puan}. Kale ilinde RAKİP mitingleri ve
-## karalamaları biriktirir; toplam SIEGE_BREAK'e ulaşınca kale düşer.
-var siege: Dictionary = {}
 ## Sadece host: illerin oyun başındaki DOĞAL görüşü (geri dönüş hedefi).
 var _province_origin: Dictionary = {}
 ## peer_id -> int
@@ -193,7 +184,7 @@ var final_election_pending: bool = false
 var _heartbeat_timer: float = 0.0
 ## Son hamlenin herkese duyurulacak mesajı.
 var _event_message: String = ""
-## Kale kazanma/kaybetme gibi ek log kayıtları: bir sonraki state olayına iliştirilir.
+## Bölünme/birleşme gibi ek log kayıtları: bir sonraki state olayına iliştirilir.
 var _pending_log: Array = []
 var _rng := RandomNumberGenerator.new()
 
@@ -502,11 +493,9 @@ func organization_level(province_id: String, peer_id: int) -> int:
 func activity_of(province_id: String, peer_id: int) -> float:
 	return local_of(province_id, peer_id) + org_bonus(province_id, peer_id)
 
-## Teşkilatın oy bonusu (popülizm sürerken büyür) + KALE bonusu.
+## Teşkilatın oy bonusu (popülizm sürerken büyür).
 func org_bonus(province_id: String, peer_id: int) -> float:
 	var bonus := PublicOpinion.org_activity(organization_level(province_id, peer_id))
-	if stronghold_of(province_id) == peer_id:
-		bonus += PublicOpinion.STRONGHOLD_ACTIVITY
 	if populism_rounds_left(peer_id) > 0:
 		bonus *= PublicOpinion.POPULISM_GOOD_MULT
 	return bonus
@@ -772,9 +761,6 @@ func init_game() -> void:
 	province_ideology = ProvinceIdeology.generate(_rng, _province_ids)
 	_province_origin = province_ideology.duplicate(true)
 	organizations = {}
-	strongholds = {}
-	kale_effort = {}
-	siege = {}
 	game_finished = false
 	final_ranking = []
 	game_end_reason = ""
@@ -810,9 +796,6 @@ func abandon_game() -> void:
 	province_events = {}
 	province_ideology = {}
 	organizations = {}
-	strongholds = {}
-	kale_effort = {}
-	siege = {}
 	turmoil = {}
 	splinters = {}
 	speech_done = false
@@ -1141,7 +1124,6 @@ func _apply_miting(peer_id: int, province_id: String) -> void:
 		_log_province(province_id, "%s miting yaptı (+%.1f)" % [_party_name(peer_id), PublicOpinion.MITING_LOCAL * org_mult])
 		_pull_province(province_id, peer_id, PublicOpinion.MITING_PULL)
 		_ease_turmoil(peer_id, PublicOpinion.TURMOIL_EASE_MITING)
-		_campaign_in(province_id, peer_id, 1.0)
 		_event_message = "%s, %s'da miting yaptı." % [_party_name(peer_id), _province_name(province_id)]
 
 ## Yatırım: getiren parti daha çok, hükümet ortakları daha az kazanır.
@@ -1154,7 +1136,6 @@ func _apply_investment(peer_id: int, province_id: String) -> void:
 			_add_local(province_id, partner, PublicOpinion.INVEST_PARTNER_LOCAL)
 	_pull_province(province_id, peer_id, PublicOpinion.INVEST_PULL)
 	_ease_turmoil(peer_id, PublicOpinion.TURMOIL_EASE_INVEST)
-	_add_kale_effort(province_id, peer_id, 1.0)
 	_log_province(province_id, "Hükümet yatırımı — %s getirdi (+%.1f, ortaklar +%.1f)" % [
 		_party_name(peer_id), PublicOpinion.INVEST_LOCAL, PublicOpinion.INVEST_PARTNER_LOCAL])
 	_event_message = "%s, %s'a hükümet yatırımı getirdi." % [_party_name(peer_id), _province_name(province_id)]
@@ -1166,10 +1147,6 @@ func _apply_propaganda(peer_id: int, target_peer_id: int, province_id: String) -
 		damage *= PublicOpinion.POPULISM_GOOD_MULT
 	var org_mult := PublicOpinion.org_action_mult(organization_level(province_id, peer_id))
 	damage *= org_mult
-	# KALE: kalesinde karalanan partiye hasar az işler; karalama kuşatmaya sayılır.
-	if stronghold_of(province_id) == target_peer_id:
-		damage *= PublicOpinion.STRONGHOLD_DAMAGE_MULT
-		_add_siege(province_id, peer_id, PublicOpinion.SIEGE_PROPAGANDA)
 	var gain := PublicOpinion.propaganda_gain(party_strength(province_id, peer_id)) * org_mult
 	# Taban: karalama il puanını PROPAGANDA_FLOOR'un altına itemez.
 	var current := local_of(province_id, target_peer_id)
@@ -1247,7 +1224,6 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 	for province_id in _province_ids:
 		_pull_province(province_id, proposer, PublicOpinion.LAW_PULL_PASSED if passed else PublicOpinion.LAW_PULL_REJECTED,
 			axis, proposer_ideology, false)
-	_refresh_all_strongholds()
 	if passed:
 		notes += " %s +%d puan." % [_party_name(proposer), law_pass_score(proposer_in_gov)]
 		_ease_turmoil(proposer, PublicOpinion.TURMOIL_EASE_LAW)
@@ -1365,139 +1341,21 @@ func _log_province(province_id: String, text: String) -> void:
 		events.pop_front()
 	province_events[province_id] = events
 
-# --- Siyasi kale -------------------------------------------------------------------
+# --- İllerin görüşü ---------------------------------------------------------------
 
-## İlin seçmen merkezini partinin görüşüne doğru çeker (kaledeyse rakip yavaş).
+## İlin seçmen merkezini partinin görüşüne doğru çeker.
 func _pull_province(province_id: String, peer_id: int, rate: float, axis_only: String = "",
 		target: Dictionary = {}, update: bool = true) -> void:
 	if not province_ideology.has(province_id):
 		return
 	if target.is_empty():
 		target = PartyManager.parties.get(peer_id, {}).get("ideology", {})
-	var owner := int(strongholds.get(province_id, -1))
-	var shielded := owner != -1 and owner != peer_id
-	province_ideology[province_id] = PublicOpinion.pull_center(province_ideology[province_id], target, rate, shielded, axis_only)
-	if update:
-		_update_stronghold(province_id)
+	province_ideology[province_id] = PublicOpinion.pull_center(province_ideology[province_id], target, rate, axis_only)
 
-func stronghold_of(province_id: String) -> int:
-	return int(strongholds.get(province_id, -1))
-
-func stronghold_closeness(province_id: String, peer_id: int) -> float:
+## Bu partinin görüşü ilin seçmenine ne kadar yakın (0..1)?
+func voter_closeness(province_id: String, peer_id: int) -> float:
 	var ideology: Dictionary = PartyManager.parties.get(peer_id, {}).get("ideology", {})
-	return PublicOpinion.stronghold_closeness(ideology, province_center(province_id))
-
-func kale_effort_of(province_id: String, peer_id: int) -> float:
-	return float(kale_effort.get(province_id, {}).get(peer_id, 0.0))
-
-## Kale şartları: teşkilat TAM, kale emeği (miting/yatırım) yeterli ve seçmen
-## partiye yakın.
-func can_hold_stronghold(province_id: String, peer_id: int) -> bool:
-	return organization_level(province_id, peer_id) >= GameRules.ORG_MAX_LEVEL \
-		and kale_effort_of(province_id, peer_id) >= PublicOpinion.STRONGHOLD_EFFORT \
-		and stronghold_closeness(province_id, peer_id) >= PublicOpinion.STRONGHOLD_THRESHOLD
-
-## Kalenin kuşatma toplamı (0..SIEGE_BREAK).
-func siege_total(province_id: String) -> float:
-	var total := 0.0
-	for value in siege.get(province_id, {}).values():
-		total += float(value)
-	return total
-
-func _add_kale_effort(province_id: String, peer_id: int, amount: float) -> void:
-	var entry: Dictionary = kale_effort.get(province_id, {})
-	entry[peer_id] = float(entry.get(peer_id, 0.0)) + amount
-	kale_effort[province_id] = entry
-	_update_stronghold(province_id)
-
-## İlde miting: kale emeği birikir. Başkasının kalesindeyse KUŞATMA, kendi
-## kalesindeyse SAVUNMA (kuşatma geriler).
-func _campaign_in(province_id: String, peer_id: int, amount: float) -> void:
-	var owner := stronghold_of(province_id)
-	if owner == peer_id:
-		_defend_stronghold(province_id, PublicOpinion.SIEGE_DEFENSE * amount)
-	elif owner != -1:
-		_add_siege(province_id, peer_id, amount)
-	_add_kale_effort(province_id, peer_id, amount)
-
-## Rakibin kuşatma puanı: benzer görüşteki rakip daha çok puan ve daha yüksek
-## tavan alır (kalenin seçmenini daha kolay ikna eder). Tek parti tavanı
-## SIEGE_BREAK'in altında: kaleyi düşürmek en az 2-3 partinin işidir.
-func _add_siege(province_id: String, attacker: int, amount: float) -> void:
-	var owner := stronghold_of(province_id)
-	if owner == -1 or attacker == owner:
-		return
-	var similarity := PublicOpinion.siege_similarity(
-		PartyManager.parties.get(attacker, {}).get("ideology", {}), PartyManager.parties.get(owner, {}).get("ideology", {}))
-	var entry: Dictionary = siege.get(province_id, {})
-	var cap := PublicOpinion.SIEGE_PARTY_CAP + PublicOpinion.SIEGE_SIMILAR_CAP * similarity
-	entry[attacker] = minf(float(entry.get(attacker, 0.0)) + amount * (1.0 + similarity), cap)
-	siege[province_id] = entry
-	if siege_total(province_id) >= PublicOpinion.SIEGE_BREAK - 0.001:
-		_break_stronghold(province_id)
-
-func _defend_stronghold(province_id: String, amount: float) -> void:
-	var total := siege_total(province_id)
-	if total <= 0.0:
-		return
-	var keep := maxf(0.0, total - amount) / total
-	var entry: Dictionary = siege.get(province_id, {})
-	for peer_id in entry.keys():
-		entry[peer_id] = float(entry[peer_id]) * keep
-	siege[province_id] = entry
-
-## Kuşatma başarılı: kale düşer, sahibinin kale emeği sıfırlanır.
-func _break_stronghold(province_id: String) -> void:
-	var owner := stronghold_of(province_id)
-	if owner == -1:
-		return
-	var attackers: Array = []
-	for peer_id in siege.get(province_id, {}).keys():
-		attackers.append(_party_name(int(peer_id)))
-	strongholds.erase(province_id)
-	siege.erase(province_id)
-	var effort: Dictionary = kale_effort.get(province_id, {})
-	effort.erase(owner)
-	kale_effort[province_id] = effort
-	_add_local(province_id, owner, PublicOpinion.STRONGHOLD_FALL_LOCAL)
-	_log_province(province_id, "%s'nın kalesi kuşatmayla düştü (%s)" % [_party_name(owner), ", ".join(PackedStringArray(attackers))])
-	_pending_log.append({"text": "%s'daki %s kalesi düştü! Kuşatanlar: %s." % [_province_name(province_id), _party_name(owner),
-		", ".join(PackedStringArray(attackers))], "peer_id": owner, "province": province_id, "kind": "stronghold_lost"})
-	_update_stronghold(province_id)
-
-## Kale kurulur: şartları (can_hold_stronghold) sağlayan, kale emeği en yüksek
-## parti. Kale kolay yıkılmaz: sahibi ancak KUŞATMAYLA (bkz. _add_siege), oyundan
-## çıkarak ya da görüşünü ilden çok uzaklaştırarak (STRONGHOLD_LOSS_THRESHOLD) kaybeder.
-func _update_stronghold(province_id: String) -> void:
-	var owner := stronghold_of(province_id)
-	var new_owner := owner
-	if owner != -1 and (not turn_order.has(owner) \
-			or stronghold_closeness(province_id, owner) < PublicOpinion.STRONGHOLD_LOSS_THRESHOLD \
-			or kale_effort_of(province_id, owner) < PublicOpinion.STRONGHOLD_KEEP_EFFORT):
-		new_owner = -1
-	if new_owner == -1:
-		var best_effort := 0.0
-		for peer_id in turn_order:
-			if not can_hold_stronghold(province_id, int(peer_id)):
-				continue
-			var effort := kale_effort_of(province_id, int(peer_id))
-			if effort > best_effort:
-				best_effort = effort
-				new_owner = int(peer_id)
-	if new_owner == owner:
-		return
-	siege.erase(province_id)
-	if owner != -1:
-		_log_province(province_id, "%s bu ildeki siyasi kalesini kaybetti" % _party_name(owner))
-		_pending_log.append({"text": "%s, %s'daki siyasi kalesini kaybetti." % [_party_name(owner), _province_name(province_id)],
-			"peer_id": owner, "province": province_id, "kind": "stronghold_lost"})
-	if new_owner == -1:
-		strongholds.erase(province_id)
-	else:
-		strongholds[province_id] = new_owner
-		_log_province(province_id, "%s bu ili SİYASİ KALESİ yaptı" % _party_name(new_owner))
-		_pending_log.append({"text": "%s, %s bölgesini siyasi kalesi yaptı." % [_party_name(new_owner), _province_name(province_id)],
-			"peer_id": new_owner, "province": province_id, "kind": "stronghold"})
+	return PublicOpinion.voter_closeness(ideology, province_center(province_id))
 
 ## Tur sonu: her il doğal görüşüne biraz geri döner (bkz. PROVINCE_REVERSION).
 func _revert_provinces() -> void:
@@ -1506,8 +1364,7 @@ func _revert_provinces() -> void:
 		if origin.is_empty():
 			continue
 		province_ideology[province_id] = PublicOpinion.pull_center(province_ideology[province_id], origin,
-			PublicOpinion.PROVINCE_REVERSION, false)
-	_refresh_all_strongholds()
+			PublicOpinion.PROVINCE_REVERSION)
 
 ## Tur sonu: teşkilatlar bulundukları ilin seçmenini her tur biraz daha
 ## partilerine çeker (seviye başına ORG_ROUND_PULL).
@@ -1520,57 +1377,6 @@ func _org_pressure() -> void:
 			var level := int(orgs[peer_id])
 			if level > 0 and turn_order.has(int(peer_id)):
 				_pull_province(String(province_id), int(peer_id), PublicOpinion.ORG_ROUND_PULL * level, "", {}, false)
-
-## Tur sonu KALE BAKIMI: kale emeği azalır (ihmal edilen kale düşer) ve ilde
-## beklenen oyda sahibini geçen bir parti varsa kale düşer.
-func _check_stronghold_upkeep() -> void:
-	for province_id in kale_effort.keys():
-		var entry: Dictionary = kale_effort[province_id]
-		for peer_id in entry.keys():
-			var value := float(entry[peer_id]) - PublicOpinion.STRONGHOLD_EFFORT_DECAY
-			if value <= 0.0:
-				entry.erase(peer_id)
-			else:
-				entry[peer_id] = value
-	if strongholds.is_empty():
-		return
-	var shares := _province_share_map()
-	for province_id in strongholds.keys():
-		var owner := stronghold_of(String(province_id))
-		var here: Dictionary = shares.get(province_id, {})
-		var mine := float(here.get(owner, 0.0))
-		var overtaken := -1
-		for peer_id in here.keys():
-			if int(peer_id) != owner and float(here[peer_id]) > mine:
-				overtaken = int(peer_id)
-		if overtaken != -1:
-			strongholds.erase(province_id)
-			siege.erase(province_id)
-			# Emek sıfırlanır: kale aynı anda geri verilmesin, yeniden kurulması gereksin.
-			(kale_effort.get(province_id, {}) as Dictionary).erase(owner)
-			_log_province(String(province_id), "%s oyda %s'nın gerisine düştü, kale elden gitti" % [
-				_party_name(owner), _party_name(overtaken)])
-			_pending_log.append({"text": "%s, %s'daki kalesini kaybetti: %s oyda öne geçti." % [_party_name(owner),
-				_province_name(String(province_id)), _party_name(overtaken)], "peer_id": owner,
-				"province": String(province_id), "kind": "stronghold_lost"})
-	_refresh_all_strongholds()
-
-## Tur sonu: kuşatmalar zamanla dağılır.
-func _decay_siege() -> void:
-	for province_id in siege.keys():
-		var entry: Dictionary = siege[province_id]
-		for peer_id in entry.keys():
-			var value := float(entry[peer_id]) * PublicOpinion.SIEGE_DECAY
-			if value < 0.05:
-				entry.erase(peer_id)
-			else:
-				entry[peer_id] = value
-		if entry.is_empty():
-			siege.erase(province_id)
-
-func _refresh_all_strongholds() -> void:
-	for province_id in _province_ids:
-		_update_stronghold(province_id)
 
 # --- İllerin partiyi takibi -------------------------------------------------------
 
@@ -1588,7 +1394,7 @@ func _province_share_map() -> Dictionary:
 
 ## Partilerin görüşünü kaydırır. Partinin GÜÇLÜ olduğu iller onu kısmen TAKİP
 ## eder: il, partinin oradaki oy payı × PROVINCE_FOLLOW kadar aynı yöne kayar
-## (kalesiyse daha çok). Baskın parti görüş değiştirmekten korkmamalı; ilde
+## Baskın parti görüş değiştirmekten korkmamalı; ilde
 ## farklı görüşte birden çok güçlü parti varsa il ikisinin arasında kalır.
 ## Dönüş: gerçekleşen kaymalar [{"peer", "axis", "delta"}].
 func _shift_ideologies(changes: Array) -> Array:
@@ -1616,12 +1422,9 @@ func _shift_ideologies(changes: Array) -> Array:
 		for change in actual:
 			var peer := int(change["peer"])
 			var follow := float(here.get(peer, 0.0)) / 100.0 * PublicOpinion.PROVINCE_FOLLOW
-			if stronghold_of(province_id) == peer:
-				follow *= PublicOpinion.STRONGHOLD_FOLLOW_MULT
 			var axis := String(change["axis"])
 			center[axis] = clampf(float(center.get(axis, 0.0)) + float(change["delta"]) * minf(follow, 0.9), -3.0, 3.0)
 		province_ideology[province_id] = center
-	_refresh_all_strongholds()
 	return actual
 
 # --- Meclis konuşması ---------------------------------------------------------------
@@ -1770,16 +1573,6 @@ func _merge_splinter(splinter: int) -> void:
 		if entry.has(splinter):
 			entry[parent] = PublicOpinion.clamp_points(float(entry.get(parent, 0.0)) + float(entry[splinter]))
 			entry.erase(splinter)
-	for province_id in kale_effort.keys():
-		var entry: Dictionary = kale_effort[province_id]
-		if entry.has(splinter):
-			entry[parent] = float(entry.get(parent, 0.0)) + float(entry[splinter])
-			entry.erase(splinter)
-	for province_id in strongholds.keys():
-		if int(strongholds[province_id]) == splinter:
-			strongholds[province_id] = parent
-	for province_id in siege.keys():
-		siege[province_id].erase(splinter)
 	_add_national(parent, maxf(0.0, national_of(splinter)) * 0.5)
 	national_support.erase(splinter)
 	var hand: Array = inventories.get(parent, [])
@@ -1812,8 +1605,6 @@ func _merge_splinter(splinter: int) -> void:
 func _decay_opinion() -> void:
 	_org_pressure()
 	_revert_provinces()
-	_decay_siege()
-	_check_stronghold_upkeep()
 	for peer_id in national_support.keys():
 		var value: float = national_of(peer_id) * PublicOpinion.NATIONAL_DECAY
 		if absf(value) < 0.05:
@@ -2227,8 +2018,6 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"populism": populism,
 		"splinters": splinters,
 		"speech_done": speech_done,
-		"kale_effort": kale_effort,
-		"siege": siege,
 		"agenda": agenda,
 		"national_list": national_list,
 		"round": round_number,
@@ -2245,7 +2034,6 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"local": local_support,
 		"events": province_events,
 		"organizations": organizations,
-		"strongholds": strongholds,
 		"province_ideology": province_ideology,
 		"mana": mana,
 		"game_finished": game_finished,
@@ -2266,8 +2054,6 @@ func _apply_state(state: Dictionary) -> void:
 	populism = state.get("populism", {})
 	splinters = state.get("splinters", {})
 	speech_done = bool(state.get("speech_done", false))
-	kale_effort = state.get("kale_effort", {})
-	siege = state.get("siege", {})
 	agenda = state.get("agenda", {})
 	national_list = state.get("national_list", {})
 	round_number = int(state["round"])
@@ -2286,7 +2072,6 @@ func _apply_state(state: Dictionary) -> void:
 	local_support = state["local"]
 	province_events = state["events"]
 	organizations = state.get("organizations", {})
-	strongholds = state.get("strongholds", {})
 	mana = state.get("mana", {})
 	game_finished = bool(state["game_finished"])
 	final_ranking = state["final_ranking"]

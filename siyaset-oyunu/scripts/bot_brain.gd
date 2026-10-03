@@ -667,7 +667,7 @@ static func choose_vote(bot: int) -> int:
 ##     bir rakip varsa, kendisi rahatça üstünde kalacaksa barajı o rakibin
 ##     hemen üstüne çıkarmak (rakibi meclisten atmak, vekillerini paylaşmak).
 ##   - KAZANAN HEPSİNİ ALIR: bot çok ilde birinciyse ve bu sayım ona vekil
-##     kazandıracaksa (kalesi olmayan, az ilde birinci rakipler ezilir).
+##     kazandıracaksa (az ilde birinci rakipler ezilir).
 ##   - Hare: küçük parti (%20 altı) daha orantılı sayım ister.
 ## Teklif ancak meclisin 2/3'ünün EVET demesi bekleniyorsa yapılır;
 ## insanların oyu bilinmez, sayılmaz.
@@ -737,7 +737,7 @@ static func _best_constitution(bot: int) -> Dictionary:
 
 ## "Kazanan hepsini alır" olsaydı son seçimin il sonuçlarıyla bu parti kaç
 ## il vekili KAZANIR (+) ya da KAYBEDERDİ (−): birinci olduğu illerin bütün
-## vekilleri eksi şu anki il vekilleri. Kalesi olmayan, az ilde birinci
+## vekilleri eksi şu anki il vekilleri. Az ilde birinci
 ## partiler bu sayımda ezilir.
 static func wta_seat_gain(peer_id: int) -> int:
 	var now := 0

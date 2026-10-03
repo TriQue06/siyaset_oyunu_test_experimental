@@ -172,7 +172,7 @@ const STEAL_THIEF_NATIONAL_LIMIT := -0.25
 const STEAL_VICTIM_NATIONAL_PER_SEAT := 0.012
 const STEAL_VICTIM_NATIONAL_LIMIT := 0.35
 
-# --- İllerin ideolojik dönüşümü (Siyasi Kale) ---------------------------------
+# --- İllerin ideolojik dönüşümü ---------------------------------
 ## Teşkilat, miting, yatırım ve yasa ilin SEÇMEN MERKEZİNİ hamleyi yapan partinin
 ## görüşüne doğru çeker: merkez += (parti − merkez) × oran (eksen başına).
 ## Miting ve teşkilat hem görüşü çeker hem oy getirir; yatırım KISMEN çeker ama
@@ -187,8 +187,6 @@ const ORG_ROUND_PULL := 0.012
 const PROVINCE_FOLLOW := 0.5
 ## Meclis grup toplantısını (konuşmayı) atlayan partinin ulusal puanı (çok küçük).
 const SPEECH_SKIP_NATIONAL := -0.3
-## Partinin kendi kalesi onu daha sadık takip eder.
-const STRONGHOLD_FOLLOW_MULT := 1.4
 ## Yasa bütün illerde SADECE kendi ekseninde, sunanın o eksendeki görüşüne çeker.
 const LAW_PULL_PASSED := 0.04
 const LAW_PULL_REJECTED := 0.015
@@ -197,44 +195,10 @@ const LAW_PULL_REJECTED := 0.015
 ## emek ister; yoksa tek bir iktidar partisi bütün ülkeyi kendine çekerdi.
 const PROVINCE_REVERSION := 0.03
 
-## SİYASİ KALE = o ilde teşkilatı TAM (2. seviye) + kale emeği (o ilde yaptığı
-## miting/yatırım sayısı) STRONGHOLD_EFFORT + seçmen yakınlığı THRESHOLD.
-## Kale yakınlığı = 1 − mesafe / STRONGHOLD_DISTANCE_SCALE (0..1).
-const STRONGHOLD_DISTANCE_SCALE := 6.0
-const STRONGHOLD_THRESHOLD := 0.6
-const STRONGHOLD_EFFORT := 6.0
-## KALE BAKIM İSTER: kale emeği her tur EFFORT_DECAY azalır; sahibinin emeği
-## STRONGHOLD_KEEP_EFFORT'un altına inerse (uzun süre o ile uğramadıysa) kale
-## düşer. Tur sonunda ilde beklenen oyda sahibini GEÇEN bir parti varsa da düşer.
-const STRONGHOLD_EFFORT_DECAY := 0.25
-const STRONGHOLD_KEEP_EFFORT := 3.0
-## Kale sahibi görüşünü ilden çok uzaklaştırırsa kaleyi kendiliğinden kaybeder.
-const STRONGHOLD_LOSS_THRESHOLD := 0.4
-## İdeolojik değişim kalkanı: RAKİPLERİN bir kale ili çekme hızı %70 yavaşlar.
-const STRONGHOLD_RESISTANCE := 0.7
-## Kale sahibine kalıcı aktivite (oy) bonusu; kalesinde karalanan partinin
-## kaybı bu çarpanla küçülür. Kale düşünce sahibinin il puanı düşer.
-const STRONGHOLD_ACTIVITY := 2.0
-const STRONGHOLD_DAMAGE_MULT := 0.5
-const STRONGHOLD_FALL_LOCAL := -2.5
-## KUŞATMA: kale ilinde rakip mitingi 1 + benzerlik, karalama yarısı kadar puan
-## yazar. Bir partinin katkısı en fazla SIEGE_PARTY_CAP + SIEGE_SIMILAR_CAP ×
-## benzerlik olur; toplam SIEGE_BREAK'e ulaşınca kale düşer. Böylece tek parti
-## kaleyi düşüremez: farklı görüşte 3 parti ya da kale sahibine benzer 2 parti
-## gerekir. Sahibinin kendi mitingi kuşatmayı SIEGE_DEFENSE kadar geriletir;
-## kuşatma her tur SIEGE_DECAY oranında dağılır.
-const SIEGE_BREAK := 6.0
-const SIEGE_PARTY_CAP := 2.0
-const SIEGE_SIMILAR_CAP := 2.0
-const SIEGE_PROPAGANDA := 0.5
-const SIEGE_DEFENSE := 2.0
-const SIEGE_DECAY := 0.75
-## Benzerlik ölçeği: başlangıçtaki zıt köşeler (her eksende ±1,5) arası mesafe.
-const SIEGE_SIMILARITY_SCALE := 5.2
-
-## Kuşatan ile kale sahibinin görüş benzerliği (0 zıt köşe .. 1 aynı görüş).
-static func siege_similarity(attacker: Dictionary, owner: Dictionary) -> float:
-	return clampf(1.0 - ElectionModel.distance(attacker, owner) / SIEGE_SIMILARITY_SCALE, 0.0, 1.0)
+## Seçmen yakınlığı = 1 − mesafe / CLOSENESS_DISTANCE_SCALE (0..1); il
+## menüsünde "seçmen sana yakın/uzak" olarak gösterilir.
+const CLOSENESS_DISTANCE_SCALE := 6.0
+const CLOSENESS_NEAR := 0.6
 
 # --- Karışıklık ve bölünme ------------------------------------------------------
 ## GİZLİ KARIŞIKLIK: iç karışıklık kartı çok, kaset biraz yazar. Her tur
@@ -264,14 +228,14 @@ const SPLIT_MIN_ELECTIONS := 1
 const SPLIT_MAX_ELECTIONS := 4
 const REUNION_TURMOIL := 2.0
 
-## İlin merkezinin partiye yakınlığı (kale ölçüsü, 0..1).
-static func stronghold_closeness(party_ideology: Dictionary, center: Dictionary) -> float:
-	return clampf(1.0 - ElectionModel.distance(party_ideology, center) / STRONGHOLD_DISTANCE_SCALE, 0.0, 1.0)
+## İlin merkezinin partiye yakınlığı (0..1).
+static func voter_closeness(party_ideology: Dictionary, center: Dictionary) -> float:
+	return clampf(1.0 - ElectionModel.distance(party_ideology, center) / CLOSENESS_DISTANCE_SCALE, 0.0, 1.0)
 
 ## Bir çekim adımı: yeni merkez (eksen −3..+3 içinde kalır). axis_only verilirse
-## sadece o eksen çekilir. Kalesi başkasına ait ilde oran kalkan kadar azalır.
-static func pull_center(center: Dictionary, target: Dictionary, rate: float, shielded: bool, axis_only: String = "") -> Dictionary:
-	var effective := rate * ((1.0 - STRONGHOLD_RESISTANCE) if shielded else 1.0)
+## sadece o eksen çekilir.
+static func pull_center(center: Dictionary, target: Dictionary, rate: float, axis_only: String = "") -> Dictionary:
+	var effective := rate
 	var result := center.duplicate()
 	for axis in AXES:
 		if axis_only != "" and axis != axis_only:

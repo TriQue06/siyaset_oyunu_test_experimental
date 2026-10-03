@@ -1,7 +1,7 @@
 extends SceneTree
 ## İdeolojik dönüşüm ve SİYASİ KALE testleri (yerel mod, RPC yok):
 ## parti görüşü değişiminin bedeli, görüşe aykırı yasanın mana bedeli, illerin
-## seçmen merkezinin çekilmesi, kalenin kurulması/kalkanı/kaybedilmesi,
+## seçmen merkezinin çekilmesi,
 ## altıgen haritanın bütünlüğü ve olay logu.
 ##   godot --headless --path . --script res://tools/smoke_test_ideology.gd
 
@@ -110,7 +110,7 @@ func _initialize() -> void:
 	check("koklu gorusune aykiri yasa +2 mana", cm.law_mana_cost(1, cp.law_type("economic", -1)) == GameRules.LAW_MANA_COST + 2)
 
 	print("")
-	print("=== 3) ILLERIN DONUSUMU VE SIYASI KALE ===")
+	print("=== 3) ILLERIN DONUSUMU ===")
 	new_game({1: ideology(1.5, 1.5, 1.5), 2: ideology(-1.5, -1.5, -1.5)})
 	var pid: String = game_map.ids[0]
 	cm.province_ideology[pid] = ideology(-2.0, 0.0, 0.0)
@@ -118,39 +118,20 @@ func _initialize() -> void:
 	cm._pull_province(pid, 1, PublicOpinion.MITING_PULL)
 	var moved: float = float(cm.province_ideology[pid]["economic"]) - float(before["economic"])
 	check("miting ilin seçmenini partiye cekti", near(moved, (1.5 - -2.0) * PublicOpinion.MITING_PULL), "%.3f" % moved)
-	check("teskilat yokken kale olmaz", cm.stronghold_of(pid) == -1)
-	cm.organizations[pid] = {1: 1}
+	# Parti kendi görüşünü değiştirir: il yerinde kalır (takip sadece _shift_ideologies ile).
 	cm.province_ideology[pid] = ideology(1.5, 1.5, 1.0)
-	cm._update_stronghold(pid)
-	check("yakin il + 1. seviye teskilat kale DEGIL", cm.stronghold_of(pid) == -1)
-	cm.organizations[pid] = {1: GameRules.ORG_MAX_LEVEL}
-	for i in int(PublicOpinion.STRONGHOLD_EFFORT) - 1:
-		cm._campaign_in(pid, 1, 1.0)
-	check("tam teskilat ama az miting: kale degil", cm.stronghold_of(pid) == -1, str(cm.kale_effort_of(pid, 1)))
-	cm._campaign_in(pid, 1, 1.0)
-	check("tam teskilat + yeterli miting + yakin secmen = siyasi kale", cm.stronghold_of(pid) == 1, str(cm.stronghold_closeness(pid, 1)))
-	var extra: bool = false
-	for entry in cm._pending_log:
-		if String(entry["kind"]) == "stronghold":
-			extra = true
-	check("kale olayi loga iliştirilir", extra)
-	var c_before := float(cm.province_ideology[pid]["economic"])
-	cm._pull_province(pid, 2, PublicOpinion.MITING_PULL)
-	var shielded_move := absf(float(cm.province_ideology[pid]["economic"]) - c_before)
-	var free_move := absf((-1.5 - c_before) * PublicOpinion.MITING_PULL)
-	check("rakip kaleyi %70 daha yavas cevirir", near(shielded_move, free_move * (1.0 - PublicOpinion.STRONGHOLD_RESISTANCE)),
-		"%.3f / %.3f" % [shielded_move, free_move])
-	# Parti kendi görüşünü değiştirir: il yerinde kalır, kale hemen yıkılmaz.
 	var center_before: Dictionary = cm.province_ideology[pid].duplicate()
 	pm.parties[1]["ideology"] = ideology(0.5, 1.5, 1.0)
-	cm._update_stronghold(pid)
 	check("parti kayinca ilin gorusu degismez", str(cm.province_ideology[pid]) == str(center_before))
-	check("kucuk kaymada kale yikilmaz", cm.stronghold_of(pid) == 1, "%.2f" % cm.stronghold_closeness(pid, 1))
-	pm.parties[1]["ideology"] = ideology(-2.5, -2.0, -2.0)
-	cm._update_stronghold(pid)
-	check("kalesinden cok uzaklasan parti kaleyi kaybeder", cm.stronghold_of(pid) == -1, "%.2f" % cm.stronghold_closeness(pid, 1))
-	check("kalesinden uzaklasan parti orada daha az destek alir",
+	cm.organizations[pid] = {1: GameRules.ORG_MAX_LEVEL}
+	var c_before := float(cm.province_ideology[pid]["economic"])
+	cm._pull_province(pid, 2, PublicOpinion.MITING_PULL)
+	check("rakip de ili tam hizla ceker (kale kalkani yok)",
+		near(float(cm.province_ideology[pid]["economic"]) - c_before, (-1.5 - c_before) * PublicOpinion.MITING_PULL))
+	cm.province_ideology[pid] = center_before.duplicate()
+	check("secmenden uzaklasan parti orada daha az destek alir",
 		ElectionModel.support(ideology(-2.5, -2.0, -2.0), center_before) < ElectionModel.support(ideology(1.5, 1.5, 1.0), center_before))
+	check("kale sistemi yok", not ("strongholds" in cm) and not cm.has_method("stronghold_of"))
 
 	print("")
 	print("=== 5) ANAYASA (2/3 YA DA RET) ===")
@@ -257,44 +238,6 @@ func _initialize() -> void:
 		and other_share < share1, "%.2f / %.2f" % [other_share, share1])
 
 	print("")
-	print("=== 8) KALE KUSATMASI ===")
-	# 4 parti: 1 kale sahibi, 2 ona benzer, 3 ve 4 zit gorusde.
-	new_game({1: ideology(1.5, 1.5, 1.5), 2: ideology(1.5, 1.5, 1.0), 3: ideology(-1.5, -1.5, -1.5), 4: ideology(-1.5, -1.5, 1.5)})
-	var kid: String = game_map.ids[5]
-	cm.province_ideology[kid] = ideology(1.5, 1.5, 1.5)
-	cm.organizations[kid] = {1: GameRules.ORG_MAX_LEVEL}
-	cm.kale_effort[kid] = {1: PublicOpinion.STRONGHOLD_EFFORT}
-	cm._update_stronghold(kid)
-	check("kale kuruldu", cm.stronghold_of(kid) == 1)
-	for i in 6:
-		cm._campaign_in(kid, 3, 1.0)
-	check("tek parti ne kadar miting yapsa da kaleyi dusuremez", cm.stronghold_of(kid) == 1, "kusatma %.1f" % cm.siege_total(kid))
-	for i in 3:
-		cm._campaign_in(kid, 4, 1.0)
-	check("zit gorusten 2 parti de yetmez", cm.stronghold_of(kid) == 1, "kusatma %.1f" % cm.siege_total(kid))
-	cm._campaign_in(kid, 1, 1.0)
-	check("sahibinin mitingi kusatmayi geriletir", cm.siege_total(kid) < 4.0, "%.1f" % cm.siege_total(kid))
-	cm.siege.erase(kid)
-	for p in [3, 4]:
-		for i in 3:
-			cm._campaign_in(kid, p, 1.0)
-	cm._campaign_in(kid, 2, 1.0)
-	cm._campaign_in(kid, 2, 1.0)
-	check("ucuncu parti katilinca kale duser", cm.stronghold_of(kid) != 1 and cm.kale_effort_of(kid, 1) == 0.0)
-	# Benzer görüşte iki parti yeterli.
-	new_game({1: ideology(1.5, 1.5, 1.5), 2: ideology(1.5, 1.5, 1.0), 3: ideology(1.5, 1.0, 1.5)})
-	cm.province_ideology[kid] = ideology(1.5, 1.5, 1.5)
-	cm.organizations[kid] = {1: GameRules.ORG_MAX_LEVEL}
-	cm.kale_effort[kid] = {1: PublicOpinion.STRONGHOLD_EFFORT}
-	cm._update_stronghold(kid)
-	for i in 3:
-		cm._campaign_in(kid, 2, 1.0)
-	check("benzer gorusten tek parti de dusuremez", cm.stronghold_of(kid) == 1, "%.1f" % cm.siege_total(kid))
-	for i in 3:
-		cm._campaign_in(kid, 3, 1.0)
-	check("benzer gorusten 2 parti kaleyi dusurur", cm.stronghold_of(kid) != 1, "%.1f" % cm.siege_total(kid))
-
-	print("")
 	print("=== 9) KARISIKLIK, BOLUNME VE GERI DONUS ===")
 	new_game({1: ideology(1.5, 1.5, 1.5), 2: ideology(-1.5, -1.5, -1.5), 3: ideology(1.5, -1.5, 1.5)})
 	mm.players[2]["bot"] = true
@@ -303,6 +246,7 @@ func _initialize() -> void:
 	cm.national_list = {1: 80, 2: 60, 3: 60}
 	cm.last_election_round = 4
 	cm.round_number = 5
+	var kid: String = game_map.ids[5]
 	cm.organizations[kid] = {1: 2}
 	cm._apply_card_effect(2, "isyan", 1)
 	check("tek ic karisiklik bolmez", cm.turmoil_of(1) < PublicOpinion.SPLIT_TURMOIL)
@@ -457,33 +401,6 @@ func _initialize() -> void:
 	check("az ilde birinci rakip WTA'ya HAYIR der", brain._constitution_vote(2, {"seat_method": "wta"}) == gm.VOTE_NO)
 	mm.election_threshold = 0.0
 	cm.last_province_results = {}
-
-	print("")
-	print("=== 13) KALE DUSEBILIR (ihmal ve oyda geriye dusme) ===")
-	new_game({1: ideology(1.5, 1.5, 1.5), 2: ideology(-1.5, -1.5, -1.5)})
-	var uid: String = game_map.ids[6]
-	cm.province_ideology[uid] = ideology(1.5, 1.5, 1.5)
-	cm.organizations[uid] = {1: GameRules.ORG_MAX_LEVEL}
-	cm.kale_effort[uid] = {1: PublicOpinion.STRONGHOLD_EFFORT}
-	cm._update_stronghold(uid)
-	check("kale kuruldu", cm.stronghold_of(uid) == 1)
-	var rounds := 0
-	while cm.stronghold_of(uid) == 1 and rounds < 40:
-		cm.province_ideology[uid] = ideology(1.5, 1.5, 1.5)
-		cm._check_stronghold_upkeep()
-		rounds += 1
-	check("ihmal edilen kale (hic miting yok) zamanla duser", cm.stronghold_of(uid) == -1 and rounds > 4, "%d tur" % rounds)
-	cm.kale_effort[uid] = {1: PublicOpinion.STRONGHOLD_EFFORT}
-	cm._update_stronghold(uid)
-	cm._check_stronghold_upkeep()
-	check("bakimli kale tur sonunu atlatir", cm.stronghold_of(uid) == 1)
-	# Rakip ilde oyda öne geçer.
-	cm.local_support[uid] = {2: 10.0}
-	cm.national_support = {2: 10.0}
-	pm.parties[2]["ideology"] = ideology(1.5, 1.5, 1.5)
-	cm._check_stronghold_upkeep()
-	check("rakip oyda one gecince kale duser ve hemen geri gelmez", cm.stronghold_of(uid) != 1 \
-		and cm.kale_effort_of(uid, 1) == 0.0)
 
 	print("")
 	if fails == 0:

@@ -491,11 +491,13 @@ func organization_level(province_id: String, peer_id: int) -> int:
 
 ## AKTİVİTE yakınlığı: sönen il puanı + teşkilatın kalıcı katkısı.
 func activity_of(province_id: String, peer_id: int) -> float:
-	return local_of(province_id, peer_id) + org_bonus(province_id, peer_id)
+	return local_of(province_id, peer_id) + org_bonus(province_id, peer_id) 		+ PoliticianPresets.hometown_activity(province_id, peer_id)
 
 ## Teşkilatın oy bonusu (popülizm sürerken büyür).
 func org_bonus(province_id: String, peer_id: int) -> float:
 	var bonus := PublicOpinion.org_activity(organization_level(province_id, peer_id))
+	if PoliticianPresets.has_background(peer_id, "belediye_baskani"):
+		bonus *= PoliticianPresets.MAYOR_ORG_MULT
 	if populism_rounds_left(peer_id) > 0:
 		bonus *= PublicOpinion.POPULISM_GOOD_MULT
 	return bonus
@@ -506,6 +508,11 @@ func activity_entry(province_id: String) -> Dictionary:
 	var orgs: Dictionary = organizations.get(province_id, {})
 	for peer_id in orgs.keys():
 		entry[peer_id] = float(entry.get(peer_id, 0.0)) + org_bonus(province_id, int(peer_id))
+	# Hemşehri desteği (memleket ve komşuları).
+	for peer_id in PartyManager.parties.keys():
+		var home_bonus := PoliticianPresets.hometown_activity(province_id, int(peer_id))
+		if home_bonus > 0.0:
+			entry[peer_id] = float(entry.get(peer_id, 0.0)) + home_bonus
 	return entry
 
 ## Tüm iller: province_id -> {peer_id -> aktivite}.
@@ -752,6 +759,9 @@ func init_game() -> void:
 	# YENİ ÜLKE: her oyunda rastgele altıgen harita (herkese tam durumla gider).
 	# Lobide tohum girildiyse o ülke, yoksa rastgele (1..999 999 999) bir tohum.
 	var map_seed := fixed_map_seed
+	# Oyun başlarken (siyasetçi profilinden önce) kesinleşen harita.
+	if map_seed == 0:
+		map_seed = MultiplayerManager.game_map_seed
 	if map_seed == 0 and MultiplayerManager.map_seed != "":
 		map_seed = int(MultiplayerManager.map_seed)
 	if map_seed == 0:
@@ -761,6 +771,7 @@ func init_game() -> void:
 	province_ideology = ProvinceIdeology.generate(_rng, _province_ids)
 	_province_origin = province_ideology.duplicate(true)
 	organizations = {}
+	_apply_politician_starts()
 	game_finished = false
 	final_ranking = []
 	game_end_reason = ""
@@ -773,6 +784,32 @@ func init_game() -> void:
 	if not _is_local_only():
 		MultiplayerManager._sync_seat_method.rpc(MultiplayerManager.seat_method)
 	_push_state({"type": "full"}, true)
+
+## SİYASETÇİ PROFİLİ (bkz. PoliticianPresets): memlekette bedava teşkilat,
+## memleket seçmeni partinin görüşüne çekilir (kalıcı), iş insanı ek mana alır.
+## Memleketi bu haritada olmayan (ör. test tohumu farklı) siyasetçiye rastgele
+## bir il verilir.
+func _apply_politician_starts() -> void:
+	for peer_id in MultiplayerManager.players.keys():
+		var data: Dictionary = PoliticianPresets.of(peer_id)
+		if data.is_empty():
+			continue
+		var home := String(data.get("hometown", ""))
+		if not _province_ids.has(home) and not _province_ids.is_empty():
+			home = String(_province_ids[_rng.randi() % _province_ids.size()])
+			var fixed := data.duplicate()
+			fixed["hometown"] = home
+			PartyManager.set_politician_host(peer_id, fixed)
+		if home == "":
+			continue
+		organizations[home] = organizations.get(home, {})
+		organizations[home][peer_id] = PoliticianPresets.HOMETOWN_ORG_LEVEL
+		var ideology: Dictionary = PartyManager.parties.get(peer_id, {}).get("ideology", {})
+		if not ideology.is_empty() and province_ideology.has(home):
+			province_ideology[home] = PublicOpinion.pull_center(province_ideology[home], ideology, PoliticianPresets.HOMETOWN_PULL)
+			_province_origin[home] = province_ideology[home].duplicate()
+		if PoliticianPresets.has_background(peer_id, "is_insani"):
+			mana[peer_id] = mana_of(peer_id) + PoliticianPresets.BUSINESS_START_MANA
 
 ## Oyundan ayrılınca YEREL oyun durumunu temizler (ağ yayını yok).
 func abandon_game() -> void:
@@ -1119,6 +1156,8 @@ func _apply_miting(peer_id: int, province_id: String) -> void:
 			_province_name(province_id), _party_name(peer_id), int(round(risk * 100.0))]
 	else:
 		var org_mult := PublicOpinion.org_action_mult(organization_level(province_id, peer_id))
+		if PoliticianPresets.has_background(peer_id, "sendikaci"):
+			org_mult *= PoliticianPresets.UNION_MITING_MULT
 		_add_local(province_id, peer_id, PublicOpinion.MITING_LOCAL * org_mult, true)
 		_add_national(peer_id, PublicOpinion.MITING_NATIONAL * org_mult, true)
 		_log_province(province_id, "%s miting yaptı (+%.1f)" % [_party_name(peer_id), PublicOpinion.MITING_LOCAL * org_mult])
@@ -1143,6 +1182,8 @@ func _apply_investment(peer_id: int, province_id: String) -> void:
 ## Karalama: hedefe eksi, karalayana artı; ikisi de o ildeki güçleriyle ölçeklenir.
 func _apply_propaganda(peer_id: int, target_peer_id: int, province_id: String) -> void:
 	var damage := PublicOpinion.propaganda_damage(party_strength(province_id, target_peer_id))
+	if PoliticianPresets.has_background(target_peer_id, "ilahiyatci"):
+		damage *= PoliticianPresets.CLERIC_DAMAGE_MULT
 	if populism_rounds_left(peer_id) > 0:
 		damage *= PublicOpinion.POPULISM_GOOD_MULT
 	var org_mult := PublicOpinion.org_action_mult(organization_level(province_id, peer_id))
@@ -1174,7 +1215,8 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 	var agenda_mult := agenda_law_mult(law_type)
 	for province_id in _province_ids:
 		var alignment := PublicOpinion.law_alignment(province_center(province_id), axis, dir)
-		_add_local(province_id, proposer, PublicOpinion.law_proposer_delta(alignment, passed) * agenda_mult, true)
+		var law_mult := PoliticianPresets.ACADEMIC_LAW_MULT if PoliticianPresets.has_background(proposer, "akademisyen") else 1.0
+		_add_local(province_id, proposer, PublicOpinion.law_proposer_delta(alignment, passed) * agenda_mult * law_mult, true)
 		for voter in votes.keys():
 			if int(voter) == proposer:
 				continue
@@ -1465,6 +1507,8 @@ func turmoil_of(peer_id: int) -> float:
 func _add_turmoil(peer_id: int, amount: float) -> void:
 	if peer_id == -1 or not _is_authority():
 		return
+	if amount > 0.0 and PoliticianPresets.has_background(peer_id, "emekli_subay"):
+		amount *= PoliticianPresets.OFFICER_TURMOIL_MULT
 	var value := maxf(0.0, turmoil_of(peer_id) + amount)
 	if value <= 0.0:
 		turmoil.erase(peer_id)
@@ -1699,6 +1743,8 @@ func _apply_reputation(peer_id: int, target_peer_id: int) -> void:
 	var damage := PublicOpinion.REPUTATION_NATIONAL_DAMAGE
 	if populism_rounds_left(peer_id) > 0:
 		damage *= PublicOpinion.POPULISM_GOOD_MULT
+	if PoliticianPresets.has_background(target_peer_id, "ilahiyatci"):
+		damage *= PoliticianPresets.CLERIC_DAMAGE_MULT
 	_add_turmoil(target_peer_id, PublicOpinion.TURMOIL_REPUTATION)
 	_add_national(target_peer_id, -damage)
 	_event_message = "%s hakkında kaset sızdı: ulusal desteği %.1f puan düştü. (%s)" % [

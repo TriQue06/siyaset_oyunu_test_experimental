@@ -86,6 +86,8 @@ var election_count: int = GameRules.DEFAULT_ELECTION_COUNT
 ## aynı ülkeyi üretir. Oyundaki tohum ESC menüsünde görünür ve kopyalanabilir.
 const MAP_SEED_MAX_DIGITS := 9
 var map_seed: String = ""
+## Bu oyunun kesinleşmiş harita tohumu (oyun başlarken belirlenir; 0 = henüz yok).
+var game_map_seed: int = 0
 ## SAYIM YÖNTEMİ (anayasa değişikliğiyle değişir; yeni oyunda D'Hondt).
 const DEFAULT_SEAT_METHOD := "dhondt"
 var seat_method: String = DEFAULT_SEAT_METHOD
@@ -198,6 +200,7 @@ func start_offline(player_name: String) -> void:
 	is_host = true
 	room_code = ""
 	map_seed = ""
+	game_map_seed = 0
 	reset_seat_method()
 	election_threshold = THRESHOLD_DEFAULT
 	election_interval = GameRules.DEFAULT_ELECTION_INTERVAL
@@ -618,10 +621,15 @@ func _close_room(reason: String) -> void:
 ## Sadece host çağırır: parti verilerini sıfırlayıp herkesi oyuna başlatır.
 func _broadcast_game_start() -> void:
 	stage = Stage.PARTY_SETUP
+	# HARİTA ŞİMDİ KURULUR: siyasetçi profilinde memleket haritadan seçildiği
+	# için ülke parti kurulumundan önce belli olmalı. Lobide tohum girildiyse o,
+	# yoksa rastgele; herkes aynı tohumla aynı haritayı üretir.
+	game_map_seed = int(map_seed) if map_seed != "" else randi_range(1, 999999999)
+	GameMap.generate_new(game_map_seed)
 	PartyManager.reset()
 	for bot in bot_ids():
 		PartyManager.add_bot_party(bot)
-	_notify_game_start.rpc()
+	_notify_game_start.rpc(game_map_seed)
 	game_started.emit()
 
 ## Sadece host çağırır (Parti Kurulum ekranındaki geri sayım host'ta bitince):
@@ -786,9 +794,11 @@ func _request_start_game() -> void:
 
 ## Host'tan istemcilere: oyun başlıyor, Parti Kurulum ekranına geç.
 @rpc("authority", "reliable")
-func _notify_game_start() -> void:
+func _notify_game_start(seed_value: int) -> void:
 	if is_host:
 		return
+	game_map_seed = seed_value
+	GameMap.generate_new(seed_value)
 	game_started.emit()
 
 ## Host'tan istemcilere: oda kapatılıyor, herkes lobiden çıkmalı.

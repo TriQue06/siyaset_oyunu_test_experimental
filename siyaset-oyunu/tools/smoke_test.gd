@@ -12,6 +12,7 @@ func _initialize() -> void:
 		"res://scenes/SettingsOverlay.tscn",
 		"res://scenes/SceneTransition.tscn",
 		"res://scenes/PartySetup.tscn",
+		"res://scenes/PoliticianSetup.tscn",
 		"res://scenes/GameScreen.tscn",
 		"res://scenes/ElectionResults.tscn",
 		"res://scenes/GovernmentFormation.tscn",

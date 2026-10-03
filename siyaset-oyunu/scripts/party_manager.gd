@@ -23,6 +23,8 @@ const NAME_MAX_LENGTH := 14
 #   "ready": bool,
 # }
 var parties: Dictionary = {}
+## Bu cihazdaki oyuncunun siyasetçisi (profil ekranında seçilir).
+var my_politician: Dictionary = {}
 ## Her yayında artar; istemci heartbeat'te farklı görürse tam durumu ister
 ## (bkz. CardManager._heartbeat).
 var state_version: int = 0
@@ -240,6 +242,12 @@ func add_bot_party(peer_id: int) -> void:
 		"ideology": IdeologyAxes.random_start_ideology(),
 		"ready": true,
 	}
+	var background := PoliticianPresets.random_background()
+	parties[peer_id]["ideology"] = PoliticianPresets.apply_to_ideology(background, parties[peer_id]["ideology"])
+	var homes := GameMap.province_ids()
+	parties[peer_id]["politician"] = PoliticianPresets.make(
+		String(MultiplayerManager.players.get(peer_id, {}).get("name", "Bot")), background,
+		String(homes[randi() % homes.size()]) if not homes.is_empty() else "")
 	_adjust_bot_colors()
 	if MultiplayerManager.room_code != "":
 		_broadcast_parties()
@@ -313,6 +321,7 @@ func _apply_party_local_only(party_name: String, icon_index: int, icon_color: Co
 		parties_updated.emit()
 		return
 	var was_ready: bool = parties.get(id, {}).get("ready", false)
+	var old_politician: Dictionary = parties.get(id, {}).get("politician", {})
 	parties[id] = {
 		"name": party_name,
 		"icon_index": icon_index,
@@ -321,6 +330,7 @@ func _apply_party_local_only(party_name: String, icon_index: int, icon_color: Co
 		"ideology": ideology,
 		"ready": was_ready,
 	}
+	_restore_politician(id, old_politician)
 	_adjust_bot_colors()
 	parties_updated.emit()
 
@@ -330,6 +340,7 @@ func _apply_party(peer_id: int, party_name: String, icon_index: int, icon_color:
 		parties_updated.emit()
 		return
 	var was_ready: bool = parties.get(peer_id, {}).get("ready", false)
+	var old_politician: Dictionary = parties.get(peer_id, {}).get("politician", {})
 	parties[peer_id] = {
 		"name": party_name,
 		"icon_index": icon_index,
@@ -338,6 +349,7 @@ func _apply_party(peer_id: int, party_name: String, icon_index: int, icon_color:
 		"ideology": ideology,
 		"ready": was_ready,
 	}
+	_restore_politician(peer_id, old_politician)
 	_adjust_bot_colors()
 	_broadcast_parties()
 	parties_updated.emit()
@@ -347,6 +359,7 @@ func _apply_party_and_ready(peer_id: int, party_name: String, icon_index: int, i
 		_broadcast_parties()
 		parties_updated.emit()
 		return
+	var old_politician: Dictionary = parties.get(peer_id, {}).get("politician", {})
 	parties[peer_id] = {
 		"name": party_name,
 		"icon_index": icon_index,
@@ -355,6 +368,7 @@ func _apply_party_and_ready(peer_id: int, party_name: String, icon_index: int, i
 		"ideology": ideology,
 		"ready": is_ready_value,
 	}
+	_restore_politician(peer_id, old_politician)
 	_adjust_bot_colors()
 	_broadcast_parties()
 	parties_updated.emit()
@@ -402,6 +416,45 @@ func _request_set_party_and_ready(party_name: String, icon_index: int, icon_colo
 		return
 	var sender_id := multiplayer.get_remote_sender_id()
 	_apply_party_and_ready(sender_id, party_name, icon_index, icon_color, bg_color, ideology, is_ready_value)
+
+# --- Siyasetçi profili (bkz. PoliticianPresets) ---------------------------------------
+
+## Parti sözlüğü yeniden yazılırken siyasetçi verisi kaybolmasın.
+func _restore_politician(peer_id: int, politician: Dictionary) -> void:
+	if not politician.is_empty() and parties.has(peer_id):
+		parties[peer_id]["politician"] = politician
+
+## Bu oyuncunun siyasetçisini ayarlar (profil ekranında "Devam"a basınca).
+func set_my_politician(data: Dictionary) -> void:
+	if not PoliticianPresets.is_valid(data):
+		return
+	# Yerel kopya: host'un yayını gelmeden parti kurulumu geçmişi bilsin.
+	my_politician = data.duplicate()
+	if MultiplayerManager.is_standalone_preview() or MultiplayerManager.room_code == "":
+		_apply_politician(multiplayer.get_unique_id(), data)
+	elif MultiplayerManager.is_host:
+		_apply_politician(multiplayer.get_unique_id(), data)
+	else:
+		_request_set_politician.rpc_id(1, data)
+
+## Host: bir partinin siyasetçisini yazar ve yayar (botların memleketi de buradan düzeltilir).
+func set_politician_host(peer_id: int, data: Dictionary) -> void:
+	_apply_politician(peer_id, data)
+
+func _apply_politician(peer_id: int, data: Dictionary) -> void:
+	if not parties.has(peer_id):
+		parties[peer_id] = {}
+	parties[peer_id]["politician"] = PoliticianPresets.make(String(data.get("name", "")),
+		String(data.get("background", "")), String(data.get("hometown", "")))
+	if MultiplayerManager.room_code != "" and MultiplayerManager.is_host:
+		_broadcast_parties()
+	parties_updated.emit()
+
+@rpc("any_peer", "reliable")
+func _request_set_politician(data: Dictionary) -> void:
+	if not MultiplayerManager.is_host or not PoliticianPresets.is_valid(data):
+		return
+	_apply_politician(multiplayer.get_remote_sender_id(), data)
 
 # --- Oda sahibi: bot partilerini düzenleme ------------------------------------------
 

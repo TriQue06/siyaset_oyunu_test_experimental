@@ -1,0 +1,82 @@
+extends SceneTree
+## SİYASETÇİ PROFİLİ TESTİ: harita oyun başında kurulur, memleket ve geçmiş
+## kuralları oyuna doğru yansır (bkz. PP).
+##   godot --headless --path . --script res://tools/smoke_test_politician.gd
+
+var _failed := 0
+## Autoload'lardan sonra yüklenir (sınıf autoload adlarını kullanıyor).
+var PP
+
+func check(label: String, ok: bool, detail: String = "") -> void:
+	if not ok:
+		_failed += 1
+	print("  [%s]  %s%s" % ["OK" if ok else "HATA", label, ("  -> " + detail) if detail != "" else ""])
+
+func _initialize() -> void:
+	await process_frame
+	PP = load("res://scripts/politician_presets.gd")
+	var mm = root.get_node("MultiplayerManager")
+	var cm = root.get_node("CardManager")
+	var pm = root.get_node("PartyManager")
+	var gmap = root.get_node("GameMap")
+	root.get_node("BotManager").set_process(false)
+
+	print("=== SIYASETCI PROFILI ===")
+	check("6 gecmis, her eksen ucu bir kez", _covers_all_sides())
+	mm.start_offline("Barış")
+	for i in 3:
+		mm.add_bot()
+	mm.start_game()
+	check("harita oyun baslarken kuruldu", mm.game_map_seed != 0 and not gmap.province_ids().is_empty())
+	var map_before: Array = gmap.province_ids().duplicate()
+	var home := String(gmap.province_ids()[0])
+	pm.set_my_politician(PP.make("Barış", "is_insani", home))
+	var ideology: Dictionary = PP.apply_to_ideology("is_insani", {"economic": -1.5, "social": -1.5, "administrative": 1.5})
+	check("is insani partiyi piyasaci baslatir", float(ideology["economic"]) > 0.0)
+	pm.set_party_and_ready("Yeni Yol", 3, Color.WHITE, Color("F20C1F"), ideology, true)
+	var me: int = mm.owner_id
+	check("oyun basladi", mm.stage == mm.Stage.IN_GAME)
+	check("oyun ayni haritada", gmap.province_ids() == map_before)
+	check("siyasetci parti verisinde korundu", PP.background_of(me) == "is_insani",
+		str(pm.parties.get(me, {}).get("politician", {})))
+	check("memlekette 2. seviye teskilat", cm.organization_level(home, me) == PP.HOMETOWN_ORG_LEVEL)
+	var first_income: int = cm.turn_income(me) if cm.current_turn_peer_id() == me else 0
+	check("is insani +2 mana ile basladi", cm.mana_of(me) == GameRules.MANA_START + PP.BUSINESS_START_MANA + first_income,
+		str(cm.mana_of(me)))
+	var neighbor := String(gmap.neighbors().get(home, [""])[0])
+	check("hemsehri destegi memlekette", is_equal_approx(PP.hometown_activity(home, me), PP.HOMETOWN_ACTIVITY))
+	check("hemsehri destegi komsuda", is_equal_approx(PP.hometown_activity(neighbor, me), PP.NEIGHBOR_ACTIVITY))
+	check("aktiviteye eklendi", cm.activity_of(home, me) >= PublicOpinion.org_activity(2) + PP.HOMETOWN_ACTIVITY - 0.01,
+		"%.2f" % cm.activity_of(home, me))
+	check("komsu aktivite haritasinda", float(cm.activity_entry(neighbor).get(me, 0.0)) >= PP.NEIGHBOR_ACTIVITY - 0.01)
+	var all_bots_ok := true
+	for bot in mm.bot_ids():
+		var bh: String = PP.hometown_of(bot)
+		var bg: Dictionary = PP.background(PP.background_of(bot))
+		var bot_ideology: Dictionary = pm.parties[bot]["ideology"]
+		if bh == "" or cm.organization_level(bh, bot) != PP.HOMETOWN_ORG_LEVEL \
+				or sign(float(bot_ideology[bg["axis"]])) != int(bg["dir"]):
+			all_bots_ok = false
+	check("botlarin da siyasetcisi, memleketi ve uyumlu gorusu var", all_bots_ok)
+
+	# Geçmiş avantajları.
+	var bot: int = mm.bot_ids()[0]
+	cm.turmoil.erase(bot)
+	pm.parties[bot]["politician"]["background"] = "emekli_subay"
+	cm._add_turmoil(bot, 1.0)
+	check("emekli subay karisikligi az biriktirir", is_equal_approx(cm.turmoil_of(bot), PP.OFFICER_TURMOIL_MULT))
+	pm.parties[bot]["politician"]["background"] = "belediye_baskani"
+	var bh: String = PP.hometown_of(bot)
+	check("belediye baskani teskilat bonusu", is_equal_approx(cm.org_bonus(bh, bot),
+		PublicOpinion.org_activity(2) * PP.MAYOR_ORG_MULT) or cm.populism_rounds_left(bot) > 0)
+
+	print("")
+	print("=== %s ===" % ("TUM TESTLER GECTI" if _failed == 0 else "%d TEST BASARISIZ" % _failed))
+	quit(1 if _failed > 0 else 0)
+
+func _covers_all_sides() -> bool:
+	var seen := {}
+	for id in PP.BACKGROUND_ORDER:
+		var info: Dictionary = PP.background(id)
+		seen["%s%d" % [info["axis"], int(info["dir"])]] = true
+	return PP.BACKGROUNDS.size() == 6 and seen.size() == 6

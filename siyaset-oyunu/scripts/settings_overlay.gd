@@ -214,7 +214,7 @@ func open_menu() -> void:
 	var scene := get_tree().current_scene
 	var scene_path: String = scene.scene_file_path if scene != null else ""
 	var in_game_scene: bool = scene_path in ["res://scenes/GameScreen.tscn", "res://scenes/GovernmentFormation.tscn",
-		"res://scenes/ElectionResults.tscn", "res://scenes/PartySetup.tscn"]
+		"res://scenes/ElectionResults.tscn", "res://scenes/PartySetup.tscn", "res://scenes/PoliticianSetup.tscn"]
 	_leave_button.visible = MultiplayerManager.room_code != "" or in_game_scene
 	_leave_button.text = "Oyundan Ayrıl"
 	_leave_note.text = ""

@@ -455,7 +455,7 @@ func _on_start_pressed() -> void:
 	MultiplayerManager.start_game()
 
 func _on_game_started() -> void:
-	SceneTransition.fade_to_scene("res://scenes/PartySetup.tscn")
+	SceneTransition.fade_to_scene("res://scenes/PoliticianSetup.tscn")
 
 func _on_leave_pressed() -> void:
 	MultiplayerManager.leave_room()

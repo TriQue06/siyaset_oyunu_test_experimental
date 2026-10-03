@@ -455,8 +455,6 @@ func can_play_card(peer_id: int, card_type: String, target_peer_id: int = -1, ta
 		# Karalama da teskilat ister: ilde orgutlu olmayan parti kampanya yapamaz.
 		return has_province(target_province) and turn_order.has(target_peer_id) \
 			and target_peer_id != peer_id and organization_level(target_province, peer_id) > 0
-	if card_type == CardPresets.SCOUT_CARD_TYPE:
-		return false  # gözcü artık teşkilatın parçası
 	if CardPresets.needs_province_target(card_type):
 		if not has_province(target_province):
 			return false

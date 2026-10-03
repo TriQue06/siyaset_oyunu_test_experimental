@@ -7,12 +7,9 @@ extends Node
 ##   - MANA BONUSU     : zayıf +MANA_BONUS_WEAK, güçlü +MANA_BONUS_STRONG mana.
 ##   - BONUS KART      : rastgele BONUS_CARD_DRAW kart daha çekilir.
 ##   - KART ÇALMA      : seçilen partinin elinden rastgele 1 kart çalınır (eli boşsa boşa gider).
-## GÖZCÜ (artık teşkilatın parçası) ve MİTİNG kart değil (bkz. CardManager);
-## ANKET kaldırıldı (gözcü raporu anlık vekil tahmini gösterir). Türleri eski
-## kayıtlar/görseller için duruyor, desteye girmez.
+## MİTİNG, YATIRIM, GENSORU kart değil, hamle; türleri hamlenin kimliği olarak durur.
 ##   - MİTİNG    : seçilen ilde güç kazandırır; provokasyon riski var.
 ##   - YATIRIM   : sadece hükümet partilerine gelir; seçilen ile yatırım.
-##   - ANKET     : bir ilin güncel oy tahmini (±%20 hata); sonucu sadece oynayan görür.
 ##   - KARALAMA  : bir ilde bir partiyi karalar: ona eksi, oynayana artı.
 ##   - VEKİL ÇALMA / GENSORU : koşullu özel kartlar.
 ## YASA bir kart DEĞİL, bir hamle türüdür (bkz. CardManager.propose_law): eksen
@@ -41,8 +38,6 @@ const CARD_THEFT_CARD_TYPE := "kart_calma"
 const CENSURE_CARD_TYPE := "gensoru"
 const MITING_CARD_TYPE := "miting"
 const INVEST_CARD_TYPE := "yatirim"
-const POLL_CARD_TYPE := "anket"
-const SCOUT_CARD_TYPE := "gozcu"
 const PROPAGANDA_CARD_TYPE := "karalama"
 ## ERKEN SEÇİM: meclise getirilir, kabul edilirse dönem sonunda sandığa gidilir
 ## ve seçim takvimi o tarihten itibaren yeniden işler.
@@ -79,8 +74,6 @@ const CARD_TYPES: Array[String] = [
 	"gensoru",
 	"miting",
 	"yatirim",
-	"anket",
-	"gozcu",
 	"karalama",
 	"populizm",
 	"mana_bonusu",
@@ -141,12 +134,6 @@ const CARD_MANA_COSTS := {
 	"mana_bonusu_guclu": 0,
 	"bonus_kart": 0,
 	"kart_calma": 1,
-	"gundem_economic_n": 1,
-	"gundem_economic_p": 1,
-	"gundem_social_n": 1,
-	"gundem_social_p": 1,
-	"gundem_administrative_n": 1,
-	"gundem_administrative_p": 1,
 	"steal_weak": 1,
 	"steal_strong": 3,
 	"kaset": 2,
@@ -188,19 +175,16 @@ func needs_party_target(card_type: String) -> bool:
 ## Bu kart oynanırken haritadan İL seçilmesi gerekiyor mu? (Karalamada ilden
 ## sonra hedef parti de seçilir.)
 func needs_province_target(card_type: String) -> bool:
-	return card_type in [MITING_CARD_TYPE, INVEST_CARD_TYPE, POLL_CARD_TYPE, SCOUT_CARD_TYPE, PROPAGANDA_CARD_TYPE]
+	return card_type in [MITING_CARD_TYPE, INVEST_CARD_TYPE, PROPAGANDA_CARD_TYPE]
 
 ## Hedef gerektirmeyen bonus kart mı? (popülizm, mana bonusu)
 func is_self_card(card_type: String) -> bool:
 	return card_type in [POPULISM_CARD_TYPE, MANA_BONUS_CARD_TYPE, MANA_BONUS_STRONG_CARD_TYPE, BONUS_CARD_TYPE,
-		EARLY_ELECTION_CARD_TYPE] or is_agenda_card(card_type)
+		EARLY_ELECTION_CARD_TYPE]
 
 ## Meclise sunulan (oylanan) kart mı?
 func is_parliament_card(card_type: String) -> bool:
 	return card_type == EARLY_ELECTION_CARD_TYPE or is_law_card(card_type)
-
-func is_agenda_card(card_type: String) -> bool:
-	return AGENDAS.has(card_type)
 
 ## {"axis", "dir", "title", "text", "side"} ya da boş sözlük.
 func agenda_data(card_type: String) -> Dictionary:
@@ -282,15 +266,11 @@ func card_short_title(card_type: String) -> String:
 			return "VEKİL ÇALMA\nORTA"
 		"steal_strong":
 			return "VEKİL ÇALMA\nGÜÇLÜ"
-	if is_agenda_card(card_type):
-		return "GÜNDEM\n" + String(agenda_data(card_type)["title"]).to_upper()
 	return card_title(card_type).to_upper()
 
 func card_title(card_type: String) -> String:
 	if is_law_card(card_type):
 		return String(law_data(card_type)["title"])
-	if is_agenda_card(card_type):
-		return "Gündem: " + String(agenda_data(card_type)["title"])
 	match card_type:
 		"steal_weak":
 			return "Vekil Çalma"
@@ -312,10 +292,6 @@ func card_title(card_type: String) -> String:
 			return "Miting"
 		"yatirim":
 			return "Yatırım"
-		"anket":
-			return "Anket"
-		"gozcu":
-			return "Gözcü"
 		"karalama":
 			return "Karalama"
 		"populizm":
@@ -371,10 +347,6 @@ func _card_effect_text(card_type: String) -> String:
 		return "Seçtiğin partiden vekil çal: %d-%d; görüşü sana yakınsa %d-%d'e kadar, zıt uçtaysa %d-%d.\n%s\nSağdaki bir parti kartına sürükle." % [
 			int(r["min"]), int(r["max"]), int(close["min"]), int(close["max"]),
 			int(far["min"]), int(far["max"]), cost_line]
-	if is_agenda_card(card_type):
-		var agenda := agenda_data(card_type)
-		return "%s\n%d dönem boyunca gündem bu: %s.\nDokun, tekrar dokun: kullan." % [agenda["text"], GameRules.AGENDA_ROUNDS,
-			agenda_effect_text(card_type)]
 	match card_type:
 		REPUTATION_CARD_TYPE:
 			return ("Seçtiğin partinin itibarını sarsan bir kaset sızar:" + "\n"
@@ -404,10 +376,6 @@ func _card_effect_text(card_type: String) -> String:
 			return "Seçtiğin ilde güç kazan (+%.0f).\nİl sana uzaksa provokasyon riski var." % PublicOpinion.MITING_LOCAL
 		INVEST_CARD_TYPE:
 			return "Hükümet: seçtiğin ile yatırım.\nSen +%.0f, ortakların +%.1f güç kazanır." % [PublicOpinion.INVEST_LOCAL, PublicOpinion.INVEST_PARTNER_LOCAL]
-		POLL_CARD_TYPE:
-			return "Anket artık gözcü raporunun parçası."
-		SCOUT_CARD_TYPE:
-			return "Bir ilin görüşünü öğren: her eksende hangi uçta.\nSadece sen görürsün, kalıcıdır."
 		PROPAGANDA_CARD_TYPE:
 			return "Bir ilde bir partiyi karala: ona eksi, sana artı.\nİlde güçlü olan partiye az işler."
 		POPULISM_CARD_TYPE:

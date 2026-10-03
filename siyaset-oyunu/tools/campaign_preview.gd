@@ -52,7 +52,7 @@ func _initialize() -> void:
 	cm.organizations = {TestProvinces.id("istanbul"): {2: 2, me: 1}, TestProvinces.id("ankara"): {3: 1}, TestProvinces.id("izmir"): {4: 3}}
 	cm._add_local(TestProvinces.id("istanbul"), me, 3.0)
 	cm.mana[me] = 4
-	cm.inventories[me] = ["miting", "anket", "gozcu", "karalama"]
+	cm.inventories[me] = ["karalama", "populizm"]
 	cm._apply_poll(me, TestProvinces.id("istanbul"))
 	cm._apply_scout(me, TestProvinces.id("istanbul"))
 	cm._push_state({"type": "full"}, true)

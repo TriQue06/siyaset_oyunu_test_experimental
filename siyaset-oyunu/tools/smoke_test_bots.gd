@@ -101,7 +101,7 @@ func _initialize() -> void:
 	check("botlar yasa sundu", int(played.get("law", 0)) > 0)
 	check("botlar teskilat kurdu", int(played.get("teskilat", 0)) > 0)
 	check("botlar miting yapti", int(played.get("miting", 0)) > 0)
-	check("botlar kart oynadi", int(played.get("karalama", 0)) + int(played.get("anket", 0)) + int(played.get("steal_weak", 0)) \
+	check("botlar kart oynadi", int(played.get("karalama", 0)) + int(played.get("steal_weak", 0)) \
 		+ int(played.get("steal_medium", 0)) + int(played.get("steal_strong", 0)) > 0)
 	var dealt := 0
 	for id in cm.turn_order:

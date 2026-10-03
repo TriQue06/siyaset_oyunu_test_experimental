@@ -26,7 +26,7 @@ const AXIS_SIDES := {
 	"administrative": {"title": "İdare", "neg": "Federal", "pos": "Üniter"},
 }
 const STEP := 0.5
-const LAW_PROPOSE_SHIFT := 1.0
+const LAW_PROPOSE_SHIFT := 0.5
 const LAW_VOTE_SHIFT := 0.5
 ## MECLİS KONUŞMASI: sıra gelen oyuncu hamleden önce 6 uçtan birini savunur,
 ## partisi o yöne bu kadar kayar (zorunlu, atlanamaz).

@@ -260,8 +260,9 @@ const SPEECH_COLUMN_WIDTH := 118.0
 var _speech_panel: PanelContainer
 var _speech_rows: HBoxContainer
 var _speech_key: String = ""
-## Bu sırada "Atla"ya basıldı mı (tur:sıra)?
-var _speech_skipped_key: String = ""
+## GRUP TOPLANTISI hamle düğmesiyle bu sırada (tur:sıra) açıldı mı?
+var _speech_open_key: String = ""
+var _speech_button: Button
 
 func _ready() -> void:
 	AudioManager.play_music("game")
@@ -827,7 +828,7 @@ func _on_turn_changed(_peer_id: int) -> void:
 	if current != _last_turn_peer:
 		_last_turn_peer = current
 		if current == multiplayer.get_unique_id() and not CardManager.game_finished:
-			_show_toast("Sıra sende: +%d mana (toplam %s). İstersen grup toplantısında konuş." % [CardManager.turn_income(current), CardManager.mana_text(CardManager.mana_of(current))])
+			_show_toast("Sıra sende: +%d mana (toplam %s)." % [CardManager.turn_income(current), CardManager.mana_text(CardManager.mana_of(current))])
 			AudioManager.play("turn_start")
 	_update_turn_indicator()
 	_refresh_speech_panel()
@@ -2272,7 +2273,7 @@ func _build_action_buttons() -> void:
 	_mana_plate.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_show_toast(_mana_rules))
-	_mana_rules = "Sıran gelince +%d mana (hükümette görevin varsa +%d) ve 1 kart; manan yettikçe istediğin kadar hamle yap, biriken mana kalır.\nHamleler: yasa %s (dönemde 1), miting %s, teşkilat %s (seviye başına), yatırım %s, gensoru %s.\nKart oynamak sınırsız; istemediğin kartı bozdurup bedelinin yarısını mana olarak alabilirsin. Kart bedelleri: karalama %d, vekil çalma %d/%d, kaset %d, iç karışıklık %d, popülizm %d, mana bonusu %d (zayıf +%d, güçlü +%d), bonus kart %d, kart çalma %d.\nSıranın başında meclis grup toplantısında konuşabilirsin (atlarsan ulusal destek çok az düşer).\nTur kendiliğinden bitmez: \"Turu Bitir\"e bas. Seçimden sonra herkese +%d kart ve +%d mana, yeni hükümete +%d mana." % [
+	_mana_rules = "Sıran gelince +%d mana (hükümette görevin varsa +%d) ve 1 kart; manan yettikçe istediğin kadar hamle yap, biriken mana kalır.\nHamleler: yasa %s (dönemde 1), miting %s, teşkilat %s (seviye başına), yatırım %s, gensoru %s.\nKart oynamak sınırsız; istemediğin kartı bozdurup bedelinin yarısını mana olarak alabilirsin. Kart bedelleri: karalama %d, vekil çalma %d/%d, kaset %d, iç karışıklık %d, popülizm %d, mana bonusu %d (zayıf +%d, güçlü +%d), bonus kart %d, kart çalma %d.\nTOPLANTI hamlesi (bedelsiz, sırada bir kez): grup toplantısında bir görüşü savun, partin yarım adım kayar; konuşmadan biten sırada ulusal destek çok az düşer.\nTur kendiliğinden bitmez: \"Turu Bitir\"e bas. Seçimden sonra herkese +%d kart ve +%d mana, yeni hükümete +%d mana." % [
 		GameRules.MANA_PER_ROUND, GameRules.MANA_PER_ROUND_GOVERNMENT,
 		GameRules.cost_text(GameRules.LAW_MANA_COST), GameRules.cost_text(GameRules.MITING_MANA_COST),
 		GameRules.cost_text(GameRules.ORG_MANA_COST), GameRules.cost_text(GameRules.INVEST_MANA_COST),
@@ -2307,6 +2308,10 @@ func _build_action_buttons() -> void:
 	_invest_button.pressed.connect(_on_invest_button_pressed)
 	_censure_button = _action_button("GENSORU", GameRules.cost_text(GameRules.CENSURE_MANA_COST), UiTheme.RED_DARK)
 	_censure_button.pressed.connect(_on_censure_button_pressed)
+	# GRUP TOPLANTISI: bedelsiz hamle, düğme her zaman açık (sırada 1 konuşma).
+	_speech_button = _action_button("TOPLANTI", "bedelsiz", UiTheme.GOLD_DIM)
+	_speech_button.tooltip_text = "Meclis grup toplantısı: bir görüşü savun, partin yarım adım kayar. Bedelsiz, sırada bir kez."
+	_speech_button.pressed.connect(_on_speech_button_pressed)
 
 ## Hamle butonu: ızgaraya eklenir, sabit kutu boyutunda kalır ve yazı taşarsa
 ## kırpılır — böylece hiçbir buton komşusunu itemez.
@@ -3109,14 +3114,14 @@ func _build_speech_panel() -> void:
 	title.add_theme_font_size_override("font_size", 11)
 	title.add_theme_color_override("font_color", UiTheme.GOLD)
 	header.add_child(title)
-	# Atla: bu sıra konuşma yok (sıra bitince ulusal puan çok az düşer).
+	# Kapat: şerit gizlenir; hamle düğmesiyle yeniden açılır.
 	var skip := Button.new()
-	skip.text = "Atla"
-	skip.tooltip_text = "Bu sıra konuşma yok: sıra bitince ulusal destek çok az düşer."
+	skip.text = "Kapat"
+	skip.tooltip_text = "Toplantıyı kapat (TOPLANTI düğmesiyle yeniden açılır)."
 	skip.add_theme_font_size_override("font_size", 11)
 	UiSkin.skin_button(skip)
 	skip.pressed.connect(func():
-		_speech_skipped_key = "%d:%d" % [CardManager.round_number, CardManager.current_turn_index]
+		_speech_open_key = ""
 		_speech_panel.hide())
 	header.add_child(skip)
 	_speech_rows = HBoxContainer.new()
@@ -3125,12 +3130,24 @@ func _build_speech_panel() -> void:
 	_speech_panel.hide()
 	add_child(_speech_panel)
 
+func _on_speech_button_pressed() -> void:
+	var me := multiplayer.get_unique_id()
+	if not CardManager.can_act():
+		_show_toast("Sıran değil.")
+		return
+	if not CardManager.needs_speech(me):
+		_show_toast("Bu sıra grup toplantısında zaten konuştun.")
+		return
+	var key := "%d:%d" % [CardManager.round_number, CardManager.current_turn_index]
+	_speech_open_key = "" if _speech_open_key == key else key
+	_refresh_speech_panel()
+
 func _refresh_speech_panel() -> void:
 	if _speech_panel == null:
 		return
 	var me := multiplayer.get_unique_id()
 	var wanted := CardManager.needs_speech(me) and not CardManager.is_turn_blocked() and not CardManager.game_finished \
-		and _speech_skipped_key != "%d:%d" % [CardManager.round_number, CardManager.current_turn_index]
+		and _speech_open_key == "%d:%d" % [CardManager.round_number, CardManager.current_turn_index]
 	if not wanted:
 		_speech_panel.hide()
 		_speech_key = ""

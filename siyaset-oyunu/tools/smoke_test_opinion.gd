@@ -170,6 +170,7 @@ func _initialize() -> void:
 	var eco_neg := extreme("economic", false)
 	var a_pos := PublicOpinion.law_alignment(voters[eco_pos], "economic", 1)
 	var a_neg := PublicOpinion.law_alignment(voters[eco_neg], "economic", 1)
+	var eco3_before := float(pm.parties[3]["ideology"]["economic"])
 	var law_eco: String = cp.law_type("economic", 1)
 	check("muhalefet yasa getirebilir", gm.submit_law(3, law_eco) and gm.proposal_kind == gm.KIND_LAW)
 	gm._apply_vote(3, gm.VOTE_YES)
@@ -185,7 +186,7 @@ func _initialize() -> void:
 		"%.2f (uyum %.2f)" % [cm.local_of(eco_pos, 1), a_pos])
 	check("HAYIR: yakin ilde eksi, zit ilde arti", cm.local_of(eco_pos, 2) < 0.0 and cm.local_of(eco_neg, 2) > 0.0)
 	check("yasa ulusal puana sadece gorus degisimi bedeli yazar", cm.national_support.values().all(func(v): return float(v) <= 0.0), str(cm.national_support))
-	check("getirenin gorusu yasa yonune kaydi", int(pm.parties[3]["ideology"]["economic"]) == 2)
+	check("getirenin gorusu yasa yonune yarim adim kaydi", is_equal_approx(float(pm.parties[3]["ideology"]["economic"]), eco3_before + 0.5), str(pm.parties[3]["ideology"]["economic"]))
 
 	cm.local_support = {}
 	var soc_mid := most_neutral("social")

@@ -1217,7 +1217,7 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 			elif partner_choice == GovernmentManager.VOTE_NO:
 				_add_national(partner, PublicOpinion.LAW_PARTNER_NO_NATIONAL)
 				_add_national(pm_party, PublicOpinion.LAW_PM_PARTNER_NO_NATIONAL)
-	# Görüş kayması: sunan yasanın yönünde 1 adım, EVET yasanın yönünde,
+	# Görüş kayması: sunan yasanın yönünde yarım adım, EVET yasanın yönünde,
 	# HAYIR ters yönde yarım adım; çekimser kaymaz.
 	var shifts: Array = [{"peer": proposer, "axis": axis, "delta": IdeologyAxes.LAW_PROPOSE_SHIFT * dir}]
 	for voter in votes.keys():

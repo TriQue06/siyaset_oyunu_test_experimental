@@ -352,7 +352,7 @@ func _initialize() -> void:
 	var before3 := float(pm.parties[3]["ideology"]["social"])
 	var before1 := float(pm.parties[1]["ideology"]["social"])
 	cm.apply_law_result(1, cp.law_type("social", -1), {1: 1, 2: 1, 3: -1}, true, [])
-	check("sunan 1 adim kaydi", near(float(pm.parties[1]["ideology"]["social"]), before1 - 1.0))
+	check("sunan yarim adim kaydi", near(float(pm.parties[1]["ideology"]["social"]), before1 - 0.5))
 	check("EVET yasa yonune yarim adim", near(float(pm.parties[2]["ideology"]["social"]), before2 - 0.5))
 	check("HAYIR ters yone yarim adim", near(float(pm.parties[3]["ideology"]["social"]), before3 + 0.5))
 	cm.apply_law_result(1, cp.law_type("social", -1), {2: 0}, false, [])

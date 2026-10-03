@@ -115,6 +115,36 @@ func _initialize() -> void:
 		await create_timer(0.3).timeout
 		# Olay logundaki odak düğmesi: ili olan son kaydı haritada göster.
 
+		# TIKLAMA MENÜLERİ: il paneli (teşkilat 2), parti profili, kart bilgisi.
+		var cmq = root.get_node("CardManager")
+		var pid: String = cmq._province_ids[0]
+		var porgs: Dictionary = cmq.organizations.get(pid, {})
+		porgs[mm.owner_id] = 2
+		cmq.organizations[pid] = porgs
+		scene._on_province_clicked(pid)
+		await create_timer(0.4).timeout
+		root.get_texture().get_image().save_png("%s/popup_province.png" % OS.get_user_data_dir())
+		var pid2: String = cmq._province_ids[5]
+		var o2: Dictionary = cmq.organizations.get(pid2, {})
+		o2.erase(mm.owner_id)
+		cmq.organizations[pid2] = o2
+		scene._on_province_clicked(pid2)
+		await create_timer(0.4).timeout
+		root.get_texture().get_image().save_png("%s/popup_province_noorg.png" % OS.get_user_data_dir())
+		scene._province_panel.hide()
+		scene._toggle_profile(cmq.turn_order[2])
+		await create_timer(0.4).timeout
+		root.get_texture().get_image().save_png("%s/popup_party.png" % OS.get_user_data_dir())
+		scene._toggle_profile(cmq.turn_order[2])
+		if scene.hand_container.get_child_count() > 0:
+			scene._show_card_info(String(cmq.my_inventory()[0]), scene.hand_container.get_child(0))
+			await create_timer(0.3).timeout
+			root.get_texture().get_image().save_png("%s/popup_card.png" % OS.get_user_data_dir())
+			scene._card_info.hide()
+		scene._show_toast("Bu ilde teşkilatın yok. Önce teşkilatlanmalısın.")
+		await create_timer(0.3).timeout
+		root.get_texture().get_image().save_png("%s/popup_toast.png" % OS.get_user_data_dir())
+		print("screenshot: popups")
 		var focus_entry := {}
 		for entry in root.get_node("CardManager").event_log:
 			if String(entry.get("province", "")) != "":

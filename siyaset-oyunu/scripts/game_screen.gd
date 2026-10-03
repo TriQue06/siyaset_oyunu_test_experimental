@@ -190,8 +190,6 @@ var _province_panel: ProvincePanel
 var _target_hint: Label
 ## Eldeki bir kartın üstüne gelince çıkan açıklama kutusu.
 var _card_info: PanelContainer
-var _card_info_title: Label
-var _card_info_desc: Label
 var _abstain_button: Button
 ## Sürüklenen kart (el içindeki sırası; -1 = sürükleme yok) ve imleci izleyen kopyası.
 var _drag_hand_index: int = -1
@@ -285,6 +283,8 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_apply_layout)
 
 	hover_tooltip.hide()
+	# Profil, harita katman düğmelerinin (z 5) ve il menüsünün üstünde.
+	hover_tooltip.z_index = 120
 	PartyManager.parties_updated.connect(_on_parties_updated)
 	CardManager.turn_order_updated.connect(_rebuild_player_panel)
 	CardManager.turn_changed.connect(_on_turn_changed)
@@ -1487,7 +1487,8 @@ func _on_province_clicked(province_id: String) -> void:
 	_province_panel.position = Vector2(LEFT_PANEL_WIDTH + 12, 12)
 	_province_panel.show_province(province_id)
 	# HARİTA BÖLGESİNDEN AŞAĞI TAŞMASIN: aşağıda parlamento diyagramı var.
-	_province_panel.clamp_to_height(_top_area_height() - 24.0)
+	# Menü haritanın altındaki meclis alanının üstüne de uzayabilir (kart barına kadar).
+	_province_panel.clamp_to_height(_usable_height() - 24.0)
 
 ## Hedef seçme modunda dokunulan il: vurgulanır, üstte ne olacağı yazar.
 func _select_target_province(province_id: String) -> void:
@@ -1547,33 +1548,43 @@ func _set_target_hint(text: String) -> void:
 
 func _build_card_info() -> void:
 	_card_info = PanelContainer.new()
-	UiSkin.skin_panel(_card_info, UiSkin.PANEL_DARK)
 	_card_info.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_card_info.z_index = 110
-	var margin := MarginContainer.new()
-	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 10)
-	_card_info.add_child(margin)
-	var box := VBoxContainer.new()
-	box.custom_minimum_size = Vector2(280, 0)
-	margin.add_child(box)
-	_card_info_title = Label.new()
-	_card_info_title.add_theme_font_size_override("font_size", 15)
-	box.add_child(_card_info_title)
-	_card_info_desc = Label.new()
-	_card_info_desc.add_theme_font_size_override("font_size", 12)
-	_card_info_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	# Sarma genişliği baştan bilinmezse otomatik sarmalı etiket minimum
-	# yüksekliğini harf başına bir satır sanıp kutuyu ekran boyu şişiriyordu.
-	_card_info_desc.custom_minimum_size = Vector2(280, 0)
-	box.add_child(_card_info_desc)
 	_card_info.hide()
 	add_child(_card_info)
 
 ## Hover edilen kartın hemen üstünde adını ve ne yaptığını gösterir.
 func _show_card_info(card_type: String, holder: Control) -> void:
-	_card_info_title.text = CardPresets.card_title(card_type)
-	_card_info_desc.text = CardPresets.card_description(card_type)
+	for child in _card_info.get_children():
+		_card_info.remove_child(child)
+		child.queue_free()
+	# Açıklama satırlarını ayır: etki (tek paragraf), nasıl kullanılır, bedel.
+	var effect: PackedStringArray = []
+	var usage: PackedStringArray = []
+	for line in CardPresets.card_description(card_type).split("\n", false):
+		var lower := line.to_lower()
+		if line.begins_with("Bedel:"):
+			continue
+		if "sürükle" in lower or "dokun" in lower:
+			usage.append(line.strip_edges())
+		else:
+			effect.append(line.strip_edges())
+	var cost := CardPresets.card_cost(card_type)
+	var accent := UiTheme.RED if CardPresets.needs_target(card_type) else UiTheme.BLUE
+	var parts := PopupKit.frame(300.0, accent, _card_info)
+	var box: VBoxContainer = parts[1]
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 8)
+	var title := UiTheme.mono_label(CardPresets.card_title(card_type), PopupKit.FS_TITLE - 2, UiTheme.TEXT, true)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(title)
+	if not CardPresets.is_law_card(card_type):
+		head.add_child(PopupKit.chip(GameRules.cost_text(cost), UiTheme.BLUE.lightened(0.2)))
+	box.add_child(head)
+	if not effect.is_empty():
+		box.add_child(PopupKit.note(" ".join(effect), UiTheme.TEXT, 276.0))
+	if not usage.is_empty():
+		box.add_child(PopupKit.note(" ".join(usage), UiTheme.GOLD, 276.0))
 	_card_info.show()
 	_card_info.reset_size()
 	var viewport_size := get_viewport_rect().size

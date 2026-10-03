@@ -1,131 +1,158 @@
 class_name ProvincePanel
 extends PanelContainer
-## Haritada bir ile TIKLAYINCA açılan il detay paneli:
-##   - milletvekili sayısı,
-##   - TEŞKİLAT RAPORU (sadece bu oyuncu): 1. seviyede ilin görüşü (her eksende
-##     hangi uç), 2. seviyede isabetli ANKET ("şimdi
-##     seçim olsa" oy ve vekil tahmini, daireler). Teşkilat yoksa bilgi yok.
-##   - son seçimin il sonucu (herkese açık),
-##   - kendi partinin burada gücü, miting riski ve il başkanlığı durumu,
-##   - ildeki son olaylar.
+## Haritada bir ile TIKLAYINCA açılan il menüsü (görünüm: PopupKit).
+##   - başlık: il adı, vekil sayısı, kale çipi,
+##   - SENİN TEŞKİLATIN (sadece bu oyuncu): seviye, ilin görüşü, seçmen
+##     yakınlığı, kale yolu çubukları ve anket (1. seviye yaklaşık, 2. seviye
+##     %90 doğru). Teşkilat yoksa bilgi yok,
+##   - SEN BU İLDE: güç, teşkilat bonusu, miting riski, sonraki teşkilat bedeli,
+##   - SON SEÇİM (herkese açık) ve SON OLAYLAR.
 ## İlin gerçek görüşü burada ASLA doğrudan gösterilmez — teşkilatla öğrenilir.
 ## Durum değiştikçe GameScreen refresh() çağırır.
 
 signal closed
 
-const PANEL_WIDTH := 340.0
-const BADGE_SIZE := Vector2(22, 22)
+const PANEL_WIDTH := 330.0
 const DIM := UiTheme.TEXT_MUTED
-const INTEL_COLOR := UiTheme.BLUE
+const INTEL_COLOR := Color("8CC4FF")
+## Son olaylar bölümünde en fazla bu kadar kayıt.
+const MAX_EVENTS := 5
 
 var province_id: String = ""
 var _body: VBoxContainer
 var _scroll: ScrollContainer
+var _max_height := 600.0
 
 func _ready() -> void:
-	UiSkin.skin_panel(self, UiSkin.PANEL_DARK)
-	custom_minimum_size = Vector2(PANEL_WIDTH, 0)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	z_index = 95
-	var margin := MarginContainer.new()
-	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 12)
-	add_child(margin)
-	# İçerik KAYDIRILABİLİR: uzun il raporu paneli boyuna büyütüp parlamento
-	# diyagramının üstünü kapatıyordu. Artık panelin boyunu GameScreen
-	# sınırlıyor (bkz. clamp_to_height), taşan kısım kaydırılıyor.
-	_scroll = ScrollContainer.new()
-	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	margin.add_child(_scroll)
-	_body = VBoxContainer.new()
-	_body.add_theme_constant_override("separation", 6)
-	_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_scroll.add_child(_body)
 	refresh()
 
 ## Panel en fazla bu kadar uzar; içerik daha uzunsa kaydırılır.
 func clamp_to_height(max_height: float) -> void:
+	_max_height = max_height
 	await get_tree().process_frame
-	var wanted: float = _body.get_combined_minimum_size().y + 24.0
-	size = Vector2(PANEL_WIDTH, minf(wanted, maxf(120.0, max_height)))
+	_fit()
+
+func _fit() -> void:
+	if _body == null:
+		return
+	# Başlık + kaydırılan içerik + kenar boşlukları.
+	var wanted: float = get_combined_minimum_size().y - _scroll.get_combined_minimum_size().y \
+		+ _body.get_combined_minimum_size().y
+	size = Vector2(PANEL_WIDTH, minf(wanted, maxf(140.0, _max_height)))
 
 func show_province(id: String) -> void:
 	province_id = id
 	refresh()
 	show()
 
-static func _label(text: String, size: int = 12, color: Color = Color.WHITE) -> Label:
-	var label := Label.new()
-	label.text = text
-	label.add_theme_font_size_override("font_size", size)
-	label.modulate = color
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	return label
-
 func refresh() -> void:
-	if _body == null or province_id == "":
+	if province_id == "" or not is_inside_tree():
 		return
-	for child in _body.get_children():
+	for child in get_children():
+		remove_child(child)
 		child.queue_free()
-
-	var header := HBoxContainer.new()
-	var title := _label(ElectionNightSim.province_name(province_id), 18)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header.add_child(title)
-	var close_button := Button.new()
-	close_button.text = "Kapat"
-	UiSkin.skin_button(close_button)
-	close_button.pressed.connect(func():
-		hide()
-		closed.emit()
-	)
-	header.add_child(close_button)
-	_body.add_child(header)
-	_body.add_child(_label("%d milletvekili" % CardManager.province_seat_count(province_id), 12, DIM))
-	# SİYASİ KALE herkese açık bilgi: rakiplerin burada seçmeni çevirmesi yavaş.
+	var me := multiplayer.get_unique_id()
 	var owner := CardManager.stronghold_of(province_id)
+	var accent: Color = PartyManager.parties.get(owner, {}).get("bg_color", UiTheme.PANEL_LIGHT) if owner != -1 else UiTheme.PANEL_LIGHT
+	var parts := PopupKit.frame(PANEL_WIDTH, accent, self)
+	var root: VBoxContainer = parts[1]
+
+	var head := PopupKit.header(ElectionNightSim.province_name(province_id),
+		"%d milletvekili" % CardManager.province_seat_count(province_id), null, func():
+			hide()
+			closed.emit())
+	root.add_child(head)
 	if owner != -1:
 		var party: Dictionary = PartyManager.parties.get(owner, {})
-		_body.add_child(_label("%s'nın SİYASİ KALESİ — rakipler seçmeni %%%d daha yavaş çevirir, karalama yarı etkili. Kuşatma: %%%d (en az 2-3 partinin mitingi düşürür)." % [
-			party.get("name", "?"), int(round(PublicOpinion.STRONGHOLD_RESISTANCE * 100.0)),
-			int(round(CardManager.siege_total(province_id) / PublicOpinion.SIEGE_BREAK * 100.0))], 12,
-			(party.get("bg_color", UiTheme.GOLD) as Color).lightened(0.3)))
+		var kale := HBoxContainer.new()
+		kale.add_theme_constant_override("separation", 6)
+		kale.add_child(PopupKit.chip("KALE · %s" % String(party.get("name", "?")), (party.get("bg_color", UiTheme.GOLD) as Color).lightened(0.2)))
+		kale.add_child(PopupKit.chip("kuşatma %%%d" % int(round(CardManager.siege_total(province_id) / PublicOpinion.SIEGE_BREAK * 100.0)), UiTheme.RED))
+		root.add_child(kale)
+		root.add_child(PopupKit.note("Rakipler burada seçmeni %%%d daha yavaş çevirir, karalama yarı etkili. 2-3 partinin mitingi kaleyi düşürebilir." % int(round(PublicOpinion.STRONGHOLD_RESISTANCE * 100.0))))
 
-	_build_intel()
-	_build_parties()
-	_build_own()
+	_scroll = ScrollContainer.new()
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root.add_child(_scroll)
+	# Sağda kaydırma çubuğuna yer: değerler çubuğun altında kalmasın.
+	var gutter := MarginContainer.new()
+	gutter.add_theme_constant_override("margin_right", 10)
+	gutter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_scroll.add_child(gutter)
+	_body = VBoxContainer.new()
+	_body.add_theme_constant_override("separation", PopupKit.GAP)
+	_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	gutter.add_child(_body)
+
+	if PartyManager.parties.has(me):
+		_build_intel(me)
+		_build_own(me)
+	_build_last_election(me)
 	_build_events()
+	if is_visible_in_tree():
+		_fit.call_deferred()
 
-func _section(text: String) -> void:
-	_body.add_child(UiTheme.rule())
-	_body.add_child(UiTheme.section_label(text))
-
-func _build_intel() -> void:
-	var me := multiplayer.get_unique_id()
+func _build_intel(me: int) -> void:
 	var level := CardManager.organization_level(province_id, me)
-	_section("TEŞKİLAT RAPORU  ·  seviye %d/%d  (sadece sen görürsün)" % [level, GameRules.ORG_MAX_LEVEL])
+	_body.add_child(PopupKit.section("Senin teşkilatın", "sadece sen görürsün"))
+	_body.add_child(_level_row(level))
 	if level == 0:
-		_body.add_child(_label("Bu ilde teşkilatın yok. Teşkilatlanma (%d mana): 1. seviye ilin görüşünü ve yaklaşık oyunu, 2. seviye %%90 doğru anketi açar; her seviye oy bonusu verir ve seçmeni sana çeker. Miting ve karalama da teşkilat ister." % GameRules.ORG_MANA_COST, 12, DIM))
+		_body.add_child(PopupKit.note("Burada teşkilatın yok. Kurmak %d mana: ilin görüşünü ve yaklaşık anketi açar, oy bonusu verir. Miting ve karalama da teşkilat ister." % GameRules.ORG_MANA_COST))
 		return
 	var center := CardManager.province_center(province_id)
 	for axis in IdeologyAxes.AXES:
-		_body.add_child(_label("%s: %s" % [IdeologyAxes.AXIS_SIDES[axis]["title"],
-			IdeologyAxes.position_text(axis, float(center.get(axis, 0.0)))], 12, INTEL_COLOR))
-	# Seçmene ne kadar yakınsın (kale %75'te kurulur); sayı değil kelime.
+		_body.add_child(PopupKit.kv(IdeologyAxes.AXIS_SIDES[axis]["title"],
+			IdeologyAxes.position_text(axis, float(center.get(axis, 0.0))), INTEL_COLOR))
 	var closeness := CardManager.stronghold_closeness(province_id, me)
 	var closeness_text := "çok yakın" if closeness >= 0.75 else ("yakın" if closeness >= PublicOpinion.STRONGHOLD_THRESHOLD \
 		else ("uzak" if closeness >= 0.3 else "çok uzak"))
-	_body.add_child(_label("Seçmen sana %s." % closeness_text, 12, INTEL_COLOR))
+	var closeness_color := UiTheme.GREEN if closeness >= PublicOpinion.STRONGHOLD_THRESHOLD else (UiTheme.GOLD if closeness >= 0.3 else UiTheme.RED)
+	_body.add_child(PopupKit.kv("Seçmen sana", closeness_text, closeness_color))
 	_build_kale_progress(me, level, closeness)
+	_build_poll(me, level)
+
+## Teşkilat seviyesi: dolu/boş kareler + seviye adı.
+func _level_row(level: int) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 4)
+	var key := PopupKit.label("Seviye", PopupKit.FS_TEXT, PopupKit.KEY)
+	key.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(key)
+	var mine: Color = PartyManager.parties.get(multiplayer.get_unique_id(), {}).get("bg_color", UiTheme.BLUE)
+	for i in GameRules.ORG_MAX_LEVEL:
+		var pip := ColorRect.new()
+		pip.custom_minimum_size = Vector2(16, 10)
+		pip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		pip.color = mine if i < level else UiTheme.SLOT
+		row.add_child(pip)
+	var text := PopupKit.label("  %d/%d" % [level, GameRules.ORG_MAX_LEVEL], PopupKit.FS_TEXT, UiTheme.TEXT)
+	row.add_child(text)
+	return row
+
+## Kale yolu: teşkilat tam + kale emeği (miting/yatırım) + seçmen yakınlığı.
+func _build_kale_progress(me: int, level: int, closeness: float) -> void:
+	if CardManager.stronghold_of(province_id) == me:
+		_body.add_child(PopupKit.kv("Kale", "SENİN KALEN", UiTheme.GOLD))
+		return
+	var effort := CardManager.kale_effort_of(province_id, me)
+	var need := PublicOpinion.STRONGHOLD_EFFORT
+	_body.add_child(PopupKit.label("Kale yolu", PopupKit.FS_SMALL, UiTheme.TEXT))
+	_body.add_child(PopupKit.meter("Teşkilat", level, GameRules.ORG_MAX_LEVEL, UiTheme.BLUE, "%d/%d" % [level, GameRules.ORG_MAX_LEVEL]))
+	_body.add_child(PopupKit.meter("Miting/yatırım", minf(effort, need), need, UiTheme.GOLD, "%d/%d" % [mini(int(effort), int(need)), int(need)]))
+	_body.add_child(PopupKit.meter("Seçmen", closeness, PublicOpinion.STRONGHOLD_THRESHOLD,
+		UiTheme.GREEN if closeness >= PublicOpinion.STRONGHOLD_THRESHOLD else UiTheme.GOLD,
+		"tamam" if closeness >= PublicOpinion.STRONGHOLD_THRESHOLD else "uzak"))
+
+func _build_poll(me: int, level: int) -> void:
 	var poll := CardManager.province_poll(me, province_id)
 	if poll.is_empty():
 		return
 	var accuracy := "%90 doğru" if level >= 2 else "yaklaşık"
-	if level < 2:
-		_body.add_child(_label("2. seviye teşkilat (%d mana) %%90 doğru anket verir." % GameRules.ORG_UPGRADE_MANA_COST, 12, DIM))
-	_body.add_child(_label("Anket (%s, ±%%%d)  ·  şimdi seçim olsa (oy · mv):" % [accuracy,
-		int(round(CardManager.poll_error(me, province_id) * 100.0))], 12, INTEL_COLOR))
+	_body.add_child(PopupKit.section("Anket · şimdi seçim olsa", "%s ±%%%d" % [accuracy,
+		int(round(CardManager.poll_error(me, province_id) * 100.0))]))
 	var ids: Array = poll.keys()
 	ids.sort_custom(func(x, y):
 		var sa := int(poll[x]["seats"])
@@ -141,96 +168,83 @@ func _build_intel() -> void:
 	var dots := SeatDots.new()
 	dots.colors = colors
 	_body.add_child(dots)
+	_body.add_child(_columns_header())
 	for peer_id in ids:
 		var entry: Dictionary = poll[peer_id]
-		_body.add_child(_party_row(int(peer_id), "%%%.0f · %d" % [float(entry["percent"]), int(entry["seats"])], false))
+		_body.add_child(PopupKit.party_row(PartyManager.parties.get(peer_id, {}), int(peer_id) == me,
+			["%%%.0f" % float(entry["percent"]), str(int(entry["seats"]))], [44, 30]))
+	if level < 2:
+		_body.add_child(PopupKit.note("2. seviye teşkilat (%d mana) %%90 doğru anket verir." % GameRules.ORG_UPGRADE_MANA_COST, UiTheme.TEXT_DIM))
 
-## Kale yolu: teşkilat tam + kale emeği (miting/yatırım) + seçmen yakınlığı.
-func _build_kale_progress(me: int, level: int, closeness: float) -> void:
-	if CardManager.stronghold_of(province_id) == me:
-		_body.add_child(_label("Burası SENİN KALEN.", 12, UiTheme.GOLD))
-		return
-	var effort := CardManager.kale_effort_of(province_id, me)
-	_body.add_child(_label("Kale yolu: teşkilat %d/%d · miting/yatırım %d/%d · seçmen %s" % [level, GameRules.ORG_MAX_LEVEL,
-		mini(int(effort), int(PublicOpinion.STRONGHOLD_EFFORT)), int(PublicOpinion.STRONGHOLD_EFFORT),
-		"yeterince yakın" if closeness >= PublicOpinion.STRONGHOLD_THRESHOLD else "henüz uzak"], 12, DIM))
-
-## Bir parti satırı: rozet, ad, istatistik; show_strength ise ildeki gücü ve il başkanlığı.
-func _party_row(peer_id: int, stats_text: String, show_strength: bool) -> Control:
-	var me := multiplayer.get_unique_id()
-	var party: Dictionary = PartyManager.parties.get(peer_id, {})
+func _columns_header() -> Control:
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 6)
-	var badge := PartyBadge.build(party, BADGE_SIZE, 40)
-	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(badge)
-	var name_label := _label(party.get("name", "?"), UiTheme.FS_TINY, UiTheme.GOLD if peer_id == me else UiTheme.TEXT)
-	name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(name_label)
-	var stats := _label(stats_text, 12, DIM)
-	stats.autowrap_mode = TextServer.AUTOWRAP_OFF
-	row.add_child(stats)
-	if show_strength:
-		var activity := CardManager.activity_of(province_id, peer_id)
-		var activity_label := _label("%+.1f" % activity, 12, _opinion_color(activity))
-		activity_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-		activity_label.custom_minimum_size = Vector2(40, 0)
-		activity_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		row.add_child(activity_label)
-		var level := CardManager.organization_level(province_id, peer_id)
-		var org_label := _label("B%d" % level if level > 0 else "—", UiTheme.FS_TINY, UiTheme.GREEN if level > 0 else DIM)
-		org_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-		org_label.custom_minimum_size = Vector2(24, 0)
-		org_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		row.add_child(org_label)
+	row.add_theme_constant_override("separation", 8)
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(spacer)
+	for pair in [["oy", 44], ["mv", 30]]:
+		var l := PopupKit.label(pair[0], PopupKit.FS_SECTION, UiTheme.TEXT_DIM)
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		l.custom_minimum_size = Vector2(pair[1], 0)
+		row.add_child(l)
 	return row
 
+func _build_own(me: int) -> void:
+	var level := CardManager.organization_level(province_id, me)
+	_body.add_child(PopupKit.section("Sen bu ilde"))
+	var power := CardManager.activity_of(province_id, me)
+	_body.add_child(PopupKit.kv("Yerel güç", "%+.1f" % power, _opinion_color(power)))
+	if level > 0:
+		_body.add_child(PopupKit.kv("Teşkilat oy bonusu", "%+.1f" % CardManager.org_bonus(province_id, me), UiTheme.GREEN))
+		var risk := CardManager.miting_risk(me, province_id)
+		var color := UiTheme.GREEN if risk < 0.15 else (UiTheme.GOLD if risk < 0.3 else UiTheme.RED)
+		_body.add_child(PopupKit.kv("Miting provokasyon riski", "%%%d" % int(round(risk * 100.0)), color))
+		var mult := PublicOpinion.org_action_mult(level)
+		if not is_equal_approx(mult, 1.0):
+			_body.add_child(PopupKit.kv("Miting/karalama etkisi", "×%.1f" % mult, UiTheme.GREEN))
+	else:
+		_body.add_child(PopupKit.kv("Miting / karalama", "teşkilat gerekli", UiTheme.RED))
+	if level < GameRules.ORG_MAX_LEVEL:
+		_body.add_child(PopupKit.kv("Teşkilat %s" % ("kurmak" if level == 0 else "geliştirmek"),
+			"%d mana" % GameRules.org_cost(level), UiTheme.BLUE.lightened(0.3)))
+
 ## Son seçim sonucu herkese açık bilgi.
-func _build_parties() -> void:
+func _build_last_election(me: int) -> void:
 	var results: Dictionary = CardManager.last_province_results.get(province_id, {})
 	if results.is_empty():
 		return
-	_section("SON SEÇİM  (oy · mv)")
+	_body.add_child(PopupKit.section("Son seçim"))
+	_body.add_child(_columns_header())
 	var ids: Array = results.keys()
 	ids.sort_custom(func(a, b): return float(results[a].get("percent", 0.0)) > float(results[b].get("percent", 0.0)))
 	for peer_id in ids:
 		var entry: Dictionary = results[peer_id]
-		_body.add_child(_party_row(int(peer_id), "%%%.0f · %d" % [float(entry.get("percent", 0.0)), int(entry.get("seats", 0))], false))
-
-func _build_own() -> void:
-	var me := multiplayer.get_unique_id()
-	if not PartyManager.parties.has(me):
-		return
-	_section("SEN BU İLDE")
-	var level := CardManager.organization_level(province_id, me)
-	if level < 1:
-		# Miting ve karalama artık teşkilat ister.
-		_body.add_child(_label("Miting ve karalama için önce teşkilatlanmalısın.", 13, UiTheme.RED))
-	else:
-		var risk := CardManager.miting_risk(me, province_id)
-		var color := UiTheme.GREEN if risk < 0.15 else (UiTheme.GOLD if risk < 0.3 else UiTheme.RED)
-		var mult := PublicOpinion.org_action_mult(level)
-		var mult_text := "" if is_equal_approx(mult, 1.0) else "  ·  miting/karalama etkisi ×%.1f" % mult
-		_body.add_child(_label("Miting provokasyon riski: %%%d%s" % [int(round(risk * 100.0)), mult_text], 13, color))
-	var power := CardManager.activity_of(province_id, me)
-	_body.add_child(_label("Buradaki gücün: %+.1f" % power, 12, _opinion_color(power)))
-	var org_text := "Teşkilat yok" if level == 0 else "Teşkilat: seviye %d/%d (oy bonusu %+.1f)" % [level, GameRules.ORG_MAX_LEVEL,
-		CardManager.org_bonus(province_id, me)]
-	if level < GameRules.ORG_MAX_LEVEL:
-		org_text += "  ·  %s: %d mana" % ["kurmak" if level == 0 else "geliştirmek", GameRules.org_cost(level)]
-	_body.add_child(_label(org_text, 12))
+		var seats := int(entry.get("seats", 0))
+		_body.add_child(PopupKit.party_row(PartyManager.parties.get(peer_id, {}), int(peer_id) == me,
+			["%%%.0f" % float(entry.get("percent", 0.0)), [str(seats), UiTheme.TEXT if seats > 0 else UiTheme.TEXT_DIM]], [44, 30]))
 
 func _build_events() -> void:
-	_section("SON OLAYLAR")
+	_body.add_child(PopupKit.section("Son olaylar"))
 	var events: Array = CardManager.province_events.get(province_id, [])
 	if events.is_empty():
-		_body.add_child(_label("Bu ilde henüz bir olay yok.", 12, DIM))
+		_body.add_child(PopupKit.note("Bu ilde henüz bir olay yok.", UiTheme.TEXT_DIM))
 		return
+	var shown := 0
 	for i in range(events.size() - 1, -1, -1):
+		if shown >= MAX_EVENTS:
+			break
+		shown += 1
 		var event: Dictionary = events[i]
-		_body.add_child(_label("%s: %s" % [GameRules.period_label(int(event.get("round", 1))), event.get("text", "")], 11))
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		var when := PopupKit.label(GameRules.period_label(int(event.get("round", 1))), PopupKit.FS_SECTION, UiTheme.TEXT_DIM)
+		when.custom_minimum_size = Vector2(64, 0)
+		when.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		row.add_child(when)
+		var text := PopupKit.note(String(event.get("text", "")), UiTheme.TEXT)
+		text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(text)
+		_body.add_child(row)
 
 static func _opinion_color(value: float) -> Color:
 	if value > 0.05:
@@ -240,10 +254,10 @@ static func _opinion_color(value: float) -> Color:
 	return DIM
 
 
-## Anlık vekil tahmini: her vekil bir daire, parti sırasıyla satır satır.
+## Anlık vekil tahmini: her vekil bir kare nokta, parti sırasıyla satır satır.
 class SeatDots extends Control:
-	const DOT := 14.0
-	const GAP := 4.0
+	const DOT := 12.0
+	const GAP := 3.0
 	var colors: Array = []
 
 	func _ready() -> void:
@@ -252,7 +266,7 @@ class SeatDots extends Control:
 		_update_height()
 
 	func _per_row() -> int:
-		return maxi(1, int((maxf(size.x, ProvincePanel.PANEL_WIDTH - 24.0) + GAP) / (DOT + GAP)))
+		return maxi(1, int((maxf(size.x, ProvincePanel.PANEL_WIDTH - 50.0) + GAP) / (DOT + GAP)))
 
 	func _update_height() -> void:
 		var rows := int(ceil(float(colors.size()) / _per_row()))
@@ -262,6 +276,6 @@ class SeatDots extends Control:
 	func _draw() -> void:
 		var per_row := _per_row()
 		for i in colors.size():
-			var center := Vector2((i % per_row) * (DOT + GAP) + DOT * 0.5, (i / per_row) * (DOT + GAP) + DOT * 0.5)
-			draw_circle(center, DOT * 0.5, UiTheme.INK, true, -1.0, true)
-			draw_circle(center, DOT * 0.5 - 2.0, colors[i], true, -1.0, true)
+			var pos := Vector2((i % per_row) * (DOT + GAP), (i / per_row) * (DOT + GAP))
+			draw_rect(Rect2(pos, Vector2(DOT, DOT)), UiTheme.INK)
+			draw_rect(Rect2(pos + Vector2(2, 2), Vector2(DOT - 4, DOT - 4)), colors[i])

@@ -411,7 +411,7 @@ func _card_effect_text(card_type: String) -> String:
 		PROPAGANDA_CARD_TYPE:
 			return "Bir ilde bir partiyi karala: ona eksi, sana artı.\nİlde güçlü olan partiye az işler."
 		POPULISM_CARD_TYPE:
-			return "%d dönem boyunca her şey güçlenir: miting, yasa, karalama\nhasarı ve teşkilat bonusu %d kat, vekil çalma %.1f kat; kötü sonuçlar\n%%%d azalır; bu sürede seçim olursa ulusal +%.1f. Dokun, tekrar dokun: kullan." % [
+			return "%d dönem boyunca her şey güçlenir: miting, yasa, karalama hasarı ve teşkilat bonusu %d kat, vekil çalma %.1f kat; kötü sonuçlar %%%d azalır; bu sürede seçim olursa ulusal +%.1f.\nSeçmek için dokun, tekrar dokun: kullan." % [
 				GameRules.POPULISM_ROUNDS, int(PublicOpinion.POPULISM_GOOD_MULT), PublicOpinion.POPULISM_STEAL_MULT,
 				int(round((1.0 - PublicOpinion.POPULISM_BAD_MULT) * 100)), PublicOpinion.POPULISM_ELECTION_NATIONAL]
 		MANA_BONUS_CARD_TYPE:

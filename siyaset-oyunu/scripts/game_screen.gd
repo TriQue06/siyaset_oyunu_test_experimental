@@ -2308,7 +2308,7 @@ func _build_action_buttons() -> void:
 	_invest_button.pressed.connect(_on_invest_button_pressed)
 	_censure_button = _action_button("GENSORU", GameRules.cost_text(GameRules.CENSURE_MANA_COST), UiTheme.RED_DARK)
 	_censure_button.pressed.connect(_on_censure_button_pressed)
-	# GRUP TOPLANTISI: bedelsiz hamle, düğme her zaman açık (sırada 1 konuşma).
+	# GRUP TOPLANTISI: bedelsiz hamle; sıra sendeyken açık, sırada bir kez.
 	_speech_button = _action_button("TOPLANTI", "bedelsiz", UiTheme.GOLD_DIM)
 	_speech_button.tooltip_text = "Meclis grup toplantısı: bir görüşü savun, partin yarım adım kayar. Bedelsiz, sırada bir kez."
 	_speech_button.pressed.connect(_on_speech_button_pressed)
@@ -2361,6 +2361,9 @@ func _refresh_action_buttons() -> void:
 	# disabled kullanılmıyor: pasif butona dokununca neden olmadığı uyarı olarak çıksın.
 	_law_button.modulate.a = 1.0 if law_ok else 0.45
 	_org_button.modulate.a = 1.0 if org_ok or _pending_org else 0.45
+	# TOPLANTI: sıra sendeyken bedelsiz açık; sırada bir kez (konuşunca söner).
+	if _speech_button != null:
+		_speech_button.modulate.a = 1.0 if CardManager.can_act() and CardManager.needs_speech(me) else 0.45
 
 func _build_agenda_banner() -> void:
 	_agenda_banner = PanelContainer.new()

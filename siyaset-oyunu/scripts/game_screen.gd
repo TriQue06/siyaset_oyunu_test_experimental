@@ -2264,8 +2264,8 @@ func _build_action_buttons() -> void:
 	_mana_plate.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_show_toast(_mana_rules))
-	_mana_rules = "Sıran gelince +%d mana (hükümette görevin varsa +%d) ve 1 kart; manan yettikçe istediğin kadar hamle yap, biriken mana kalır.\nHamleler: yasa %s (dönemde 1), miting %s, teşkilat %s (seviye başına), yatırım %s, gensoru %s.\nKart oynamak sınırsız; istemediğin kartı bozdurup bedelinin yarısını mana olarak alabilirsin. Kart bedelleri: karalama %d, vekil çalma %d/%d, kaset %d, iç karışıklık %d, popülizm %d, mana bonusu %d (zayıf +%d, güçlü +%d), bonus kart %d, kart çalma %d.\nHer sıranın başında meclis konuşması zorunlu.\nTur kendiliğinden bitmez: \"Turu Bitir\"e bas. Seçimden sonra herkese +%d kart ve +%d mana, yeni hükümete +%d mana." % [
-		GameRules.MANA_PER_ROUND, GameRules.MANA_PER_ROUND_GOVERNMENT,
+	_mana_rules = "Sıran gelince +%d mana (hükümette görevin varsa +%d, son seçimde %%%d altındaysan +%d) ve 1 kart; manan yettikçe istediğin kadar hamle yap, biriken mana kalır.\nHamleler: yasa %s (dönemde 1), miting %s, teşkilat %s (seviye başına), yatırım %s, gensoru %s.\nKart oynamak sınırsız; istemediğin kartı bozdurup bedelinin yarısını mana olarak alabilirsin. Kart bedelleri: karalama %d, vekil çalma %d/%d, kaset %d, iç karışıklık %d, popülizm %d, mana bonusu %d (zayıf +%d, güçlü +%d), bonus kart %d, kart çalma %d.\nSıranın başında meclis grup toplantısında konuşabilirsin (atlarsan ulusal destek çok az düşer).\nTur kendiliğinden bitmez: \"Turu Bitir\"e bas. Seçimden sonra herkese +%d kart ve +%d mana, yeni hükümete +%d mana." % [
+		GameRules.MANA_PER_ROUND, GameRules.MANA_PER_ROUND_GOVERNMENT, int(GameRules.UNDERDOG_SHARE), GameRules.MANA_PER_ROUND + GameRules.MANA_UNDERDOG_BONUS,
 		GameRules.cost_text(GameRules.LAW_MANA_COST), GameRules.cost_text(GameRules.MITING_MANA_COST),
 		GameRules.cost_text(GameRules.ORG_MANA_COST), GameRules.cost_text(GameRules.INVEST_MANA_COST),
 		GameRules.cost_text(GameRules.CENSURE_MANA_COST),

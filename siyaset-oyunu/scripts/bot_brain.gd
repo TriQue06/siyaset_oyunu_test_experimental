@@ -539,7 +539,8 @@ static func _eval_propaganda(bot: int, known: Dictionary) -> Dictionary:
 				continue
 			var damage := PublicOpinion.propaganda_damage(PublicOpinion.party_strength(
 				_ideology(target), center, CardManager.activity_of(province_id, target)))
-			var rival := 1.0 + float(GovernmentManager.seats_of(target)) / _total_seats() * 2.0
+			# Zayıfı ezmek yerine öndekini hedef al: değer ağırlıkla rakibin büyüklüğünden.
+			var rival := 0.3 + float(GovernmentManager.seats_of(target)) / _total_seats() * 4.0
 			var value := (gain + damage * 0.6 * rival) * seats / 6.0
 			if value > best_value:
 				best_value = value

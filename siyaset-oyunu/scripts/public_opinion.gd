@@ -25,7 +25,7 @@ const MAX_MULT := 2.0
 const LIMIT := 10.0
 ## Tur sonu sönme katsayıları (düşük = eski hamleler çabuk unutulur).
 const NATIONAL_DECAY := 0.75
-const LOCAL_DECAY := 0.62
+const LOCAL_DECAY := 0.72
 
 # --- Miting -----------------------------------------------------------------
 const MITING_LOCAL := 5.0
@@ -76,7 +76,7 @@ const CENSURE_REJECTED_NATIONAL := -1.0
 # --- Teşkilat ------------------------------------------------------------------
 ## Seviyeye göre KALICI aktivite (sönmez): 1 az, 2 orta, 3 yüksek oy bonusu.
 ## Seviye 0, 1, 2 (2 = tavan; eski 3. seviyenin bonusu buraya taşındı).
-const ORG_ACTIVITY_BY_LEVEL := [0.0, 1.5, 4.0]
+const ORG_ACTIVITY_BY_LEVEL := [0.0, 2.5, 6.0]
 ## MİTİNG ve KARALAMA artık teşkilat ister; izin kontrolü CardManager'da
 ## (can_miting / can_play_card) yapılır. Buradaki çarpan sadece ETKİ içindir:
 ## 2. seviye teşkilatın olduğu ilde miting ve karalama biraz daha vurur.
@@ -146,7 +146,7 @@ const PROPAGANDA_DAMAGE := 5.0
 ## ilden silinmez, karşı kampanyayla toparlanabilir.
 const PROPAGANDA_FLOOR := -3.0
 const PROPAGANDA_GAIN := 1.5
-const PROPAGANDA_DEFENSE_FACTOR := 0.5
+const PROPAGANDA_DEFENSE_FACTOR := 0.2
 const PROPAGANDA_ATTACK_FACTOR := 0.3
 ## Bir partinin bir ildeki GÜCÜ = IDEOLOGY_WEIGHT × ideolojik yakınlık (0..1)
 ## + ACTIVITY_WEIGHT × pozitif aktivite.

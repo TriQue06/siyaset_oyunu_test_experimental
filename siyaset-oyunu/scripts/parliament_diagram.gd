@@ -18,7 +18,8 @@ const SEAT_RADIUS_FACTOR := 0.9  # orijinal JS: SRF
 ## Konturun kalınlığı koltuk yarıçapına ORANLI tek bir değer — bütün koltuklarda
 ## birebir aynı. Toplam yarıçap (kontur dahil) komşu koltuk mesafesinin
 ## yarısından küçük tutulur, daireler hiçbir zaman iç içe geçmez.
-@export var outline_ratio: float = 0.16
+## Meclis koltukları koyu zeminde konturSUZ, dolgun ve parlak durur.
+@export var outline_ratio: float = 0.0
 @export var outline_color: Color = Color(0.07, 0.08, 0.1)
 
 var _dot_positions: Array = [] # Array[Vector2], normalize (x: 0..2, merkez=1 / y: 0..~1)
@@ -52,16 +53,20 @@ const SEAT_SHADER := """
 shader_type canvas_item;
 uniform vec4 outline_color : source_color = vec4(0.07, 0.08, 0.1, 1.0);
 uniform float inner_ratio = 0.84;
+// Konturun piksel cinsinden en ince hali (0 = kontur yok).
+uniform float min_ring = 1.0;
 void fragment() {
 	// d: merkezden uzaklık (kenar = 1). px: bir ekran pikselinin d cinsinden boyu.
 	float d = length(UV - vec2(0.5)) * 2.0;
 	float px = max(fwidth(d), 0.0001);
 	// Kenara piksel cinsinden uzaklık -> alan kaplaması (tam 1 piksellik geçiş).
 	float inside = (1.0 - d) / px;
-	float outer = clamp(inside + 0.5, 0.0, 1.0);
-	// Kontur en az 1 piksel: küçük koltuklarda yumuşatmanın içinde kaybolmasın.
-	float ring = max(1.0, (1.0 - inner_ratio) / px);
-	float inner = clamp(inside - ring + 0.5, 0.0, 1.0);
+	// Yarım piksellik geçiş: kenar keskin (piksel sanatı gibi) ama tırtıksız.
+	float outer = clamp(inside * 2.0 + 0.5, 0.0, 1.0);
+	// Kontur en az min_ring piksel: küçük koltuklarda yumuşatmanın içinde kaybolmasın.
+	float ring = (1.0 - inner_ratio) / px;
+	ring = ring > 0.0 ? max(min_ring, ring) : 0.0;
+	float inner = clamp((inside - ring) * 2.0 + 0.5, 0.0, 1.0);
 	vec4 fill = COLOR;
 	COLOR = vec4(mix(outline_color.rgb, fill.rgb, inner), outer * mix(outline_color.a, fill.a, inner));
 }
@@ -176,7 +181,7 @@ func _arc_origin() -> Vector2:
 func _seat_radius_px(scale: float) -> float:
 	var radius: float = _seat_radius_norm * scale
 	if _min_gap_norm > 0.0:
-		radius = minf(radius, _min_gap_norm * scale * 0.48)
+		radius = minf(radius, _min_gap_norm * scale * 0.47)
 	return maxf(1.5, radius)
 
 func _ensure_multimeshes() -> void:

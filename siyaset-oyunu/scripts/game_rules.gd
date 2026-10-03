@@ -76,10 +76,6 @@ const MANA_START := 0
 const MANA_PER_ROUND := 4
 ## Hükümette görevi olan partiler tur başına 1 fazla mana alır (iktidar avantajı).
 const MANA_PER_ROUND_GOVERNMENT := 5
-## GERİDEN GELEN: son seçimde ulusal oyu bu yüzdenin altında kalan parti tur
-## başına +MANA_UNDERDOG_BONUS mana alır (zayıf olan daha da zayıflamasın).
-const UNDERDOG_SHARE := 10.0
-const MANA_UNDERDOG_BONUS := 1
 ## BEDEL YAZISI: ücretsiz hamleler her yerde "bedelsiz" diye geçer ("bedava"
 ## ya da "0 mana" değil). Mana 0,5 katlarıyla birikebildiği için ondalık da
 ## gerekirse basılır.

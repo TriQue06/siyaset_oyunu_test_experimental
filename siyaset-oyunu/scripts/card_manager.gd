@@ -1980,13 +1980,7 @@ func _peek_turn_card(peer_id: int) -> String:
 func turn_income(peer_id: int) -> int:
 	if GovernmentManager.government_party_ids().has(peer_id):
 		return GameRules.MANA_PER_ROUND_GOVERNMENT
-	if is_underdog(peer_id):
-		return GameRules.MANA_PER_ROUND + GameRules.MANA_UNDERDOG_BONUS
 	return GameRules.MANA_PER_ROUND
-
-## Son seçimde ulusal oyu GameRules.UNDERDOG_SHARE'in altında kaldı mı?
-func is_underdog(peer_id: int) -> bool:
-	return not last_vote_shares.is_empty() and float(last_vote_shares.get(peer_id, 0.0)) < GameRules.UNDERDOG_SHARE
 
 ## Desteden bir kartı doğrudan ele verir. El doluysa verilmez.
 ## Dönen değer: verilen kartın türü ("" = verilmedi).

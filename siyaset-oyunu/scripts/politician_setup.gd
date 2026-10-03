@@ -35,6 +35,9 @@ var _continue: Button
 
 func _ready() -> void:
 	theme = load("res://assets/ui/main_theme.tres")
+	# Harita tıklamaları _unhandled_input ile gelir: tam ekran kök düğüm
+	# (varsayılan STOP) tıklamaları yutuyordu, memleket seçilemiyordu.
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_build_ui()
 	if GameMap.province_ids().is_empty():
 		# Tek başına çalıştırılan sahne (oyun yok): örnek bir harita kur.

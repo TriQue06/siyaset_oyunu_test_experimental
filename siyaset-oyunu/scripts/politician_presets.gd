@@ -107,10 +107,15 @@ const SURNAME_ENDS := ["söğüt", "yelken", "pınar", "yamaç", "çınar", "ır
 	"tepe", "yazı", "örs", "kalem", "dokuma", "keman", "yüce", "yay",
 	"sazlı", "kamış", "çalı", "fındık", "kiraz", "kayın", "palamut", "yonca", "kestane", "defne",
 	"soy", "ay", "ok", "yol", "gül", "yıldız", "bulut"]
-## Kök + ekle üretilemeyen ama izin verilen tek parça soyadlar; arada bir
-## (STANDALONE_SURNAME_CHANCE) bunlardan biri gelir.
-const STANDALONE_SURNAMES := ["Yılmaz"]
-const STANDALONE_SURNAME_CHANCE := 0.04
+## TEK PARÇA soyadlar: soyad her zaman kök + ek olmak zorunda değil;
+## STANDALONE_SURNAME_CHANCE olasılıkla bu listeden biri gelir.
+const STANDALONE_SURNAMES := ["Yılmaz", "Bulut", "Yaprak", "Çınar", "Doruk", "Pınar", "Kartal",
+	"Ceylan", "Deniz", "Güneş", "Erdem", "Çetin", "Duman", "Ateş", "Sönmez", "Akın", "Tuna",
+	"Toprak", "Kaptan", "Ilgaz", "Ergin", "Yazgan", "Sevinç", "Kuzey", "Ozan", "Irmak", "Serin",
+	"Sarp", "Yalın", "Önder", "Oral", "Tümer", "Uyar", "Gürsoy", "Bilgin", "Tezcan", "Varol",
+	"Erkan", "Atay", "Sağlam", "Ekinci", "Bakırcı", "Kalender", "Demirci", "Yörük", "Bulgurcu",
+	"Pekmez", "Kuru", "Tatlı", "Çakır", "Kekeç", "Şen", "Ilıcalı", "Turhan", "Yeter", "Koral"]
+const STANDALONE_SURNAME_CHANCE := 0.35
 ## Gerçek (Türk) siyasetçi soyadları: üretici bunları ASLA vermez.
 const BANNED_SURNAMES := ["Erdoğan", "Kılıçdaroğlu", "Bahçeli", "Akşener", "İnce", "Demirtaş",
 	"Davutoğlu", "Babacan", "Özel", "İmamoğlu", "Yavaş", "Özal", "Demirel", "Ecevit", "Erbakan",

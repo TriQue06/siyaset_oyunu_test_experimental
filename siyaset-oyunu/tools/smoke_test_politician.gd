@@ -95,7 +95,7 @@ func _initialize() -> void:
 		if PP.FEMALE_NAMES.has(n) or PP.UNISEX_NAMES.has(n):
 			overlap = true
 	check("erkek ve kadin listeleri ayrik", not overlap)
-	check("soyadlar cesitli", seen.size() > 400, str(seen.size()))
+	check("soyadlar cesitli", seen.size() > 300, str(seen.size()))
 	var yilmaz := false
 	for i in 2000:
 		if PP.random_surname() == "Yılmaz":

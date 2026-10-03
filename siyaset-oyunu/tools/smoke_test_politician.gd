@@ -81,12 +81,18 @@ func _initialize() -> void:
 	check("500 rastgele isimde yasakli soyad yok", all_ok)
 	var males := 0
 	for i in 4000:
-		if PP.MALE_NAMES.has(PP.random_name()["first_name"]):
+		if PP.random_name()["gender"] == "m":
 			males += 1
-	check("adlarin ~%75'i erkek", absf(males / 4000.0 - 0.75) < 0.03, "%.3f" % (males / 4000.0))
+	check("botlarin ~%75'i erkek", absf(males / 4000.0 - 0.75) < 0.03, "%.3f" % (males / 4000.0))
+	var gender_ok := true
+	for i in 300:
+		if PP.FEMALE_NAMES.has(PP.random_first_name("m")) or PP.MALE_NAMES.has(PP.random_first_name("f")):
+			gender_ok = false
+	check("ad secilen cinsiyete uyar (unisex ikisinde)", gender_ok and PP.names_for("m").has("Deniz") and PP.names_for("f").has("Deniz"))
+	check("istenen adlar var", PP.MALE_NAMES.has("Recep") and PP.MALE_NAMES.has("Necdet") and PP.FEMALE_NAMES.has("Meral") and PP.FEMALE_NAMES.has("Tansu"))
 	var overlap := false
 	for n in PP.MALE_NAMES:
-		if PP.FEMALE_NAMES.has(n):
+		if PP.FEMALE_NAMES.has(n) or PP.UNISEX_NAMES.has(n):
 			overlap = true
 	check("erkek ve kadin listeleri ayrik", not overlap)
 	check("soyadlar cesitli", seen.size() > 400, str(seen.size()))

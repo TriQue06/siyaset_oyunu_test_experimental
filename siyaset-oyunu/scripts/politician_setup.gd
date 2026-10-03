@@ -8,7 +8,7 @@ extends Control
 
 const MAP_SCENE := preload("res://scenes/Map.tscn")
 const LEFT_WIDTH := 540.0
-const CARD_SIZE := Vector2(258, 116)
+const CARD_SIZE := Vector2(258, 112)
 const MAP_PADDING := 12.0
 ## Eksen renkleri (parti profil kartındaki işaretlerle aynı aile).
 const AXIS_COLORS := {
@@ -17,11 +17,16 @@ const AXIS_COLORS := {
 	"administrative": Color("AA67F4"),
 }
 const HOME_COLOR := Color("FFC93C")
+## Cinsiyet düğmeleri: erkek mavi, kadın pembe.
+const GENDER_STYLE := {"m": {"icon": "♂", "text": "Erkek", "color": Color("3A8DE0")},
+	"f": {"icon": "♀", "text": "Kadın", "color": Color("E8559C")}}
 const NEIGHBOR_COLOR := Color(1.0, 0.79, 0.24, 0.42)
 
 var _background_id: String = ""
 var _hometown: String = ""
 var _hovered: String = ""
+var _gender: String = "m"
+var _gender_buttons: Dictionary = {}   # "m"/"f" -> Button
 var _first_name: String = ""
 var _surname: String = ""
 var _name_label: Label
@@ -87,6 +92,17 @@ func _build_left() -> Control:
 	var name_row := HBoxContainer.new()
 	name_row.add_theme_constant_override("separation", 10)
 	body.add_child(name_row)
+	# Önce cinsiyet: ad listesi buna göre seçilir.
+	for g in ["m", "f"]:
+		var gb := Button.new()
+		gb.text = String(GENDER_STYLE[g]["icon"])
+		gb.tooltip_text = String(GENDER_STYLE[g]["text"])
+		gb.focus_mode = Control.FOCUS_NONE
+		gb.custom_minimum_size = Vector2(40, 38)
+		gb.add_theme_font_size_override("font_size", 20)
+		gb.pressed.connect(_on_gender_pressed.bind(g))
+		name_row.add_child(gb)
+		_gender_buttons[g] = gb
 	_name_label = UiTheme.mono_label("", 24, UiTheme.TEXT, true)
 	_name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_name_label.clip_text = true
@@ -235,9 +251,31 @@ func _fit_map() -> void:
 
 # --- Etkileşim ----------------------------------------------------------------------
 
+func _on_gender_pressed(gender: String) -> void:
+	if gender == _gender:
+		return
+	_gender = gender
+	_reroll_name(true, false)
+
+## Seçili cinsiyet dolu renkte, diğeri sönük.
+func _style_gender_buttons() -> void:
+	for g in _gender_buttons.keys():
+		var gb: Button = _gender_buttons[g]
+		var color: Color = GENDER_STYLE[g]["color"]
+		var selected: bool = g == _gender
+		var box := StyleBoxFlat.new()
+		box.bg_color = color if selected else Color(color, 0.12)
+		box.border_color = color
+		box.set_border_width_all(2)
+		for state in ["normal", "hover", "pressed"]:
+			gb.add_theme_stylebox_override(state, box)
+		for prop in ["font_color", "font_hover_color", "font_pressed_color"]:
+			gb.add_theme_color_override(prop, Color.WHITE if selected else color)
+
 func _reroll_name(first: bool, last: bool) -> void:
+	_style_gender_buttons()
 	if first:
-		_first_name = PoliticianPresets.random_first_name(_first_name)
+		_first_name = PoliticianPresets.random_first_name(_gender, _first_name)
 	if last:
 		var avoid := PoliticianPresets.used_surnames(multiplayer.get_unique_id())
 		if _surname != "":
@@ -316,5 +354,5 @@ func _on_continue_pressed() -> void:
 	if not _is_complete():
 		return
 	_continue.disabled = true
-	PartyManager.set_my_politician(PoliticianPresets.make(_first_name, _surname, _background_id, _hometown))
+	PartyManager.set_my_politician(PoliticianPresets.make(_first_name, _surname, _background_id, _hometown, _gender))
 	SceneTransition.fade_to_scene("res://scenes/PartySetup.tscn")

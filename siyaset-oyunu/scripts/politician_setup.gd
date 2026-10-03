@@ -22,7 +22,9 @@ const NEIGHBOR_COLOR := Color(1.0, 0.79, 0.24, 0.42)
 var _background_id: String = ""
 var _hometown: String = ""
 var _hovered: String = ""
-var _name_edit: LineEdit
+var _first_name: String = ""
+var _surname: String = ""
+var _name_label: Label
 var _cards: Dictionary = {}          # background id -> Button
 var _map_clip: Control
 var _map: Node2D
@@ -78,12 +80,22 @@ func _build_left() -> Control:
 	var built := _panel(LEFT_WIDTH)
 	var body: VBoxContainer = built[1]
 	body.add_child(PopupKit.section("Siyasetçi"))
-	_name_edit = LineEdit.new()
-	_name_edit.max_length = PoliticianPresets.NAME_MAX_LENGTH
-	_name_edit.text = PlayerProfile.player_name.left(PoliticianPresets.NAME_MAX_LENGTH)
-	_name_edit.placeholder_text = "Adın"
-	_name_edit.text_changed.connect(func(_t): _refresh())
-	body.add_child(_name_edit)
+	# İSİM RASTGELE: elle yazılmaz, zar sınırsız atılabilir.
+	var name_row := HBoxContainer.new()
+	name_row.add_theme_constant_override("separation", 10)
+	body.add_child(name_row)
+	_name_label = UiTheme.mono_label("", 24, UiTheme.TEXT, true)
+	_name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_name_label.clip_text = true
+	name_row.add_child(_name_label)
+	var dice := Button.new()
+	dice.text = "🎲 Rastgele"
+	dice.tooltip_text = "Yeni bir ad ve soyad üret"
+	dice.focus_mode = Control.FOCUS_NONE
+	dice.custom_minimum_size = Vector2(150, 44)
+	dice.pressed.connect(_reroll_name)
+	name_row.add_child(dice)
+	_reroll_name()
 
 	body.add_child(PopupKit.section("Geçmiş", "partinin bir ekseni buradan gelir"))
 	var scroll := ScrollContainer.new()
@@ -212,6 +224,20 @@ func _fit_map() -> void:
 
 # --- Etkileşim ----------------------------------------------------------------------
 
+func _reroll_name() -> void:
+	var avoid := PoliticianPresets.used_surnames(multiplayer.get_unique_id())
+	if _surname != "":
+		avoid.append(_surname)  # her basışta farklı bir soyad
+	var generated := PoliticianPresets.random_name(avoid)
+	_first_name = String(generated["first_name"])
+	_surname = String(generated["surname"])
+	_name_label.text = _full_name()
+	if _continue != null:
+		_refresh()
+
+func _full_name() -> String:
+	return "%s %s" % [_first_name, _surname]
+
 func _on_background_pressed(id: String) -> void:
 	_background_id = id
 	_refresh()
@@ -237,14 +263,12 @@ func _refresh() -> void:
 	var ready := _is_complete()
 	_continue.disabled = not ready
 	var missing: Array = []
-	if _name_edit.text.strip_edges() == "":
-		missing.append("ad")
 	if _background_id == "":
 		missing.append("geçmiş")
 	if _hometown == "":
 		missing.append("memleket")
 	if ready:
-		_summary.text = "%s · %s · memleket %s" % [_name_edit.text.strip_edges(),
+		_summary.text = "%s · %s · memleket %s" % [_full_name(),
 			PoliticianPresets.title(_background_id), GameMap.name_of(_hometown)]
 	else:
 		_summary.text = "Seçilmedi: " + ", ".join(missing)
@@ -274,11 +298,11 @@ func _refresh_info() -> void:
 		near_seats, " · kıyı" if GameMap.is_coastal(id) else ""]
 
 func _is_complete() -> bool:
-	return _name_edit.text.strip_edges() != "" and _background_id != "" and _hometown != ""
+	return _surname != "" and _background_id != "" and _hometown != ""
 
 func _on_continue_pressed() -> void:
 	if not _is_complete():
 		return
 	_continue.disabled = true
-	PartyManager.set_my_politician(PoliticianPresets.make(_name_edit.text, _background_id, _hometown))
+	PartyManager.set_my_politician(PoliticianPresets.make(_first_name, _surname, _background_id, _hometown))
 	SceneTransition.fade_to_scene("res://scenes/PartySetup.tscn")

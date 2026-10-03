@@ -245,9 +245,9 @@ func add_bot_party(peer_id: int) -> void:
 	var background := PoliticianPresets.random_background()
 	parties[peer_id]["ideology"] = PoliticianPresets.apply_to_ideology(background, parties[peer_id]["ideology"])
 	var homes := GameMap.province_ids()
-	parties[peer_id]["politician"] = PoliticianPresets.make(
-		String(MultiplayerManager.players.get(peer_id, {}).get("name", "Bot")), background,
-		String(homes[randi() % homes.size()]) if not homes.is_empty() else "")
+	var bot_name := PoliticianPresets.random_name(PoliticianPresets.used_surnames(peer_id))
+	parties[peer_id]["politician"] = PoliticianPresets.make(bot_name["first_name"], bot_name["surname"],
+		background, String(homes[randi() % homes.size()]) if not homes.is_empty() else "")
 	_adjust_bot_colors()
 	if MultiplayerManager.room_code != "":
 		_broadcast_parties()
@@ -444,8 +444,8 @@ func set_politician_host(peer_id: int, data: Dictionary) -> void:
 func _apply_politician(peer_id: int, data: Dictionary) -> void:
 	if not parties.has(peer_id):
 		parties[peer_id] = {}
-	parties[peer_id]["politician"] = PoliticianPresets.make(String(data.get("name", "")),
-		String(data.get("background", "")), String(data.get("hometown", "")))
+	parties[peer_id]["politician"] = PoliticianPresets.make(String(data.get("first_name", "")),
+		String(data.get("surname", "")), String(data.get("background", "")), String(data.get("hometown", "")))
 	if MultiplayerManager.room_code != "" and MultiplayerManager.is_host:
 		_broadcast_parties()
 	parties_updated.emit()

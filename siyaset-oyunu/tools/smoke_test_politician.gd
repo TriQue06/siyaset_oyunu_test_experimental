@@ -30,7 +30,7 @@ func _initialize() -> void:
 	check("harita oyun baslarken kuruldu", mm.game_map_seed != 0 and not gmap.province_ids().is_empty())
 	var map_before: Array = gmap.province_ids().duplicate()
 	var home := String(gmap.province_ids()[0])
-	pm.set_my_politician(PP.make("Barış", "is_insani", home))
+	pm.set_my_politician(PP.make("Ayla", "Gökyelken", "is_insani", home))
 	var ideology: Dictionary = PP.apply_to_ideology("is_insani", {"economic": -1.5, "social": -1.5, "administrative": 1.5})
 	check("is insani partiyi piyasaci baslatir", float(ideology["economic"]) > 0.0)
 	pm.set_party_and_ready("Yeni Yol", 3, Color.WHITE, Color("F20C1F"), ideology, true)
@@ -69,6 +69,29 @@ func _initialize() -> void:
 	var bh: String = PP.hometown_of(bot)
 	check("belediye baskani teskilat bonusu", is_equal_approx(cm.org_bonus(bh, bot),
 		PublicOpinion.org_activity(2) * PP.MAYOR_ORG_MULT) or cm.populism_rounds_left(bot) > 0)
+
+	# Rastgele isim ve güvenilirlik.
+	var all_ok := true
+	var seen := {}
+	for i in 500:
+		var n: Dictionary = PP.random_name()
+		seen[n["surname"]] = true
+		if PP.is_banned_surname(String(n["surname"])) or String(n["first_name"]) == "":
+			all_ok = false
+	check("500 rastgele isimde yasakli soyad yok", all_ok)
+	check("soyadlar cesitli", seen.size() > 100, str(seen.size()))
+	check("gercek soyad reddedilir", not PP.is_valid(PP.make("Ali", "Erdoğan", "sendikaci", home)))
+	check("rastgele soyad kullanilani vermez", not PP.random_surname(["Gökyelken"]).is_empty())
+	var bot_surnames := {}
+	for b in mm.bot_ids():
+		bot_surnames[PP.surname_of(b)] = true
+	check("botlarin soyadlari farkli ve dolu", bot_surnames.size() == mm.bot_ids().size() and not bot_surnames.has(""))
+	check("guvenilirlik 100 baslar", is_equal_approx(cm.credibility_of(me), 100.0))
+	check("oy kaybinda dusus", is_equal_approx(cm.credibility_drop(20.0, 17.0), 11.0))
+	check("oy artisinda dusus yok", cm.credibility_drop(17.0, 20.0) == 0.0)
+	cm.credibility[me] = 100.0
+	cm._update_credibility({me: 20.0}, {me: 15.0})
+	check("guvenilirlik guncellendi", is_equal_approx(cm.credibility_of(me), 85.0), str(cm.credibility_of(me)))
 
 	print("")
 	print("=== %s ===" % ("TUM TESTLER GECTI" if _failed == 0 else "%d TEST BASARISIZ" % _failed))

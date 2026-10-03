@@ -9,7 +9,10 @@ extends RefCounted
 ##     başlanır, il seçmeni partinin görüşüne çekilir ve hem memlekette hem
 ##     komşularında kalıcı "hemşehri" desteği vardır.
 ## Veri parti sözlüğünde durur: parties[peer]["politician"] =
-##   {"name": String, "background": String, "hometown": String}
+##   {"first_name", "surname", "name" (ad + soyad), "background", "hometown"}
+## İSİM TAMAMEN RASTGELE (elle yazılmaz): random_name(). SOYAD ileride çok
+## yerde kullanılacak (bkz. surname_of). Soyadlar uydurma kök + ekten üretilir;
+## gerçek siyasetçi soyadları BANNED_SURNAMES ile ayrıca engellenir.
 ## (bkz. PartyManager.set_my_politician). Kişisel özellikler sonra eklenecek.
 
 ## Geçmiş -> {title, axis, dir, blurb, perk}. Sıra ekranda da bu sıra.
@@ -54,7 +57,32 @@ const NEIGHBOR_ACTIVITY := 1.5
 ## ilin "kökeni" de çekilir, zamanla geri dönmez).
 const HOMETOWN_PULL := 0.4
 
-const NAME_MAX_LENGTH := 20
+# --- Rastgele isim ----------------------------------------------------------------
+const FIRST_NAMES := [
+	"Ahmet", "Ayla", "Aras", "Bahar", "Barlas", "Belgin", "Berk", "Cansu", "Cemre", "Cihan",
+	"Defne", "Doruk", "Ece", "Emre", "Eylül", "Ferit", "Figen", "Gaye", "Gökay", "Gülay",
+	"Hakan", "Hülya", "Ilgın", "İlkay", "İpek", "Kaan", "Kerem", "Lale", "Levent", "Melis",
+	"Mert", "Nazlı", "Nevzat", "Nilgün", "Oktay", "Orhun", "Özge", "Pelin", "Rüya", "Selin",
+	"Serdar", "Sevgi", "Sinem", "Şebnem", "Tamer", "Tuba", "Tuncay", "Ufuk", "Ülkü", "Vedat",
+	"Yasemin", "Yekta", "Zafer", "Zeynep", "Arda", "Burcu", "Ceyda", "Erkin", "Gizem", "Onur",
+]
+## Soyad = kök + ek ("Gök" + "yelken" = "Gökyelken"). Yaygın siyasetçi
+## soyadı kalıpları (-oğlu, -doğan, -demir, -kaya, -han ...) bilerek yok.
+const SURNAME_ROOTS := ["Ak", "Kara", "Gök", "Yel", "Dağ", "Çam", "Ay", "Gün", "Tan", "Bal",
+	"Kır", "Ulu", "Boz", "Sarı", "Alp", "Çağ", "Al", "Ilık", "Sis", "Ilgaz"]
+const SURNAME_ENDS := ["söğüt", "yelken", "pınar", "yamaç", "çınar", "ırmak", "doruk", "koru",
+	"bulut", "yaprak", "kumsal", "dere", "yayla", "gölge", "rüzgâr", "fidan", "kuşak", "sırt",
+	"meşe", "ılgın", "serçe", "kıyı", "çiçek", "ova"]
+## Gerçek (Türk) siyasetçi soyadları: üretici bunları ASLA vermez.
+const BANNED_SURNAMES := ["Erdoğan", "Kılıçdaroğlu", "Bahçeli", "Akşener", "İnce", "Demirtaş",
+	"Davutoğlu", "Babacan", "Özel", "İmamoğlu", "Yavaş", "Özal", "Demirel", "Ecevit", "Erbakan",
+	"İnönü", "Atatürk", "Menderes", "Türkeş", "Baykal", "Çiller", "Yılmaz", "Bayar", "Gül",
+	"Sezer", "Soylu", "Karamollaoğlu", "Perinçek", "Oğan", "Dervişoğlu", "Bakırhan", "Kurtulmuş",
+	"Yıldırım", "Arınç", "Akdoğan", "Uysal", "Altan", "Sancar", "Koç", "Aydın", "Ağıralioğlu",
+	"Akpınar", "Gökçek", "Ağar", "Karayalçın", "Talabani", "Günaydın", "Kaya", "Demir",
+	"Çağlayan", "Bozdağ", "Albayrak", "Tanal", "Altay", "Akar", "Ulusoy", "Sarıgül", "Alpay"]
+
+const NAME_MAX_LENGTH := 40
 
 static func is_valid_background(id: String) -> bool:
 	return BACKGROUNDS.has(id)
@@ -85,18 +113,62 @@ static func random_background(rng: RandomNumberGenerator = null) -> String:
 	var index := (rng.randi() if rng != null else randi()) % BACKGROUND_ORDER.size()
 	return String(BACKGROUND_ORDER[index])
 
-static func make(politician_name: String, background_id: String, hometown: String) -> Dictionary:
-	return {"name": politician_name.strip_edges().left(NAME_MAX_LENGTH),
+static func make(first_name: String, surname: String, background_id: String, hometown: String) -> Dictionary:
+	first_name = first_name.strip_edges()
+	surname = surname.strip_edges()
+	return {"first_name": first_name, "surname": surname,
+		"name": ("%s %s" % [first_name, surname]).left(NAME_MAX_LENGTH),
 		"background": background_id, "hometown": hometown}
 
 static func is_valid(data: Dictionary) -> bool:
 	return is_valid_background(String(data.get("background", ""))) \
-		and String(data.get("name", "")).strip_edges() != ""
+		and String(data.get("first_name", "")) != "" and String(data.get("surname", "")) != "" \
+		and not is_banned_surname(String(data.get("surname", "")))
+
+static func is_banned_surname(surname: String) -> bool:
+	var key := surname.strip_edges().to_lower()
+	for banned in BANNED_SURNAMES:
+		if String(banned).to_lower() == key:
+			return true
+	return false
+
+static func _pick(list: Array, rng: RandomNumberGenerator) -> String:
+	return String(list[(rng.randi() if rng != null else randi()) % list.size()])
+
+## Rastgele soyad; avoid'deki (oyunda kullanılan) soyadları ve yasaklıları vermez.
+static func random_surname(avoid: Array = [], rng: RandomNumberGenerator = null) -> String:
+	var surname := ""
+	for attempt in 200:
+		surname = _pick(SURNAME_ROOTS, rng) + _pick(SURNAME_ENDS, rng)
+		if not is_banned_surname(surname) and not avoid.has(surname):
+			return surname
+	return surname
+
+## {"first_name", "surname"}: sınırsız yeniden üretilebilir.
+static func random_name(avoid_surnames: Array = [], rng: RandomNumberGenerator = null) -> Dictionary:
+	return {"first_name": _pick(FIRST_NAMES, rng), "surname": random_surname(avoid_surnames, rng)}
+
+## Oyunda (diğer partilerde) kullanılan soyadları.
+static func used_surnames(except_peer: int = 0) -> Array:
+	var used: Array = []
+	for peer_id in PartyManager.parties.keys():
+		if int(peer_id) != except_peer:
+			var surname := String(PartyManager.parties[peer_id].get("politician", {}).get("surname", ""))
+			if surname != "":
+				used.append(surname)
+	return used
 
 # --- Partiye göre sorgular (PartyManager.parties üzerinden) ------------------------------
 
 static func of(peer_id: int) -> Dictionary:
 	return PartyManager.parties.get(peer_id, {}).get("politician", {})
+
+## Genel başkanın soyadı (ileride olaylarda/metinlerde kullanılacak).
+static func surname_of(peer_id: int) -> String:
+	return String(of(peer_id).get("surname", ""))
+
+static func full_name_of(peer_id: int) -> String:
+	return String(of(peer_id).get("name", ""))
 
 static func background_of(peer_id: int) -> String:
 	return String(of(peer_id).get("background", ""))

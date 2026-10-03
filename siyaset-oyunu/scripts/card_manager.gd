@@ -129,6 +129,15 @@ var last_election_round: int = 0
 var last_election_was_early: bool = false
 # peer_id -> float (yüzde, toplamı 100). Son seçimin sonucu.
 var last_vote_shares: Dictionary = {}
+## GENEL BAŞKAN GÜVENİLİRLİĞİ: peer_id -> 0..CREDIBILITY_MAX. Parti bir önceki
+## seçime göre oy kaybederse düşer. ŞİMDİLİK HİÇBİR ETKİSİ YOK; ileride genel
+## başkan değişimi gibi olaylar buna bağlanacak.
+var credibility: Dictionary = {}
+const CREDIBILITY_MAX := 100.0
+const CREDIBILITY_START := 100.0
+## Oy kaybında düşüş: sabit + kaybedilen her yüzde puanı başına.
+const CREDIBILITY_DROP_BASE := 5.0
+const CREDIBILITY_DROP_PER_POINT := 2.0
 # peer_id -> int. Son seçimden bu yana (vekil çalma dahil) milletvekili dağılımı.
 var last_seats: Dictionary = {}
 # province_id -> { peer_id -> {"percent": float, "seats": int} }
@@ -770,6 +779,9 @@ func init_game() -> void:
 	_province_origin = province_ideology.duplicate(true)
 	organizations = {}
 	_apply_politician_starts()
+	credibility = {}
+	for peer_id in MultiplayerManager.players.keys():
+		credibility[peer_id] = CREDIBILITY_START
 	game_finished = false
 	final_ranking = []
 	game_end_reason = ""
@@ -809,6 +821,25 @@ func _apply_politician_starts() -> void:
 		if PoliticianPresets.has_background(peer_id, "is_insani"):
 			mana[peer_id] = mana_of(peer_id) + PoliticianPresets.BUSINESS_START_MANA
 
+func credibility_of(peer_id: int) -> float:
+	return float(credibility.get(peer_id, CREDIBILITY_START))
+
+## Bir önceki seçime göre oy kaybeden partinin genel başkanı güven kaybeder
+## (ilk seçimde kıyas yok). Oy yüzdeleri puan cinsinden (ör. 23.4).
+static func credibility_drop(old_share: float, new_share: float) -> float:
+	var loss := old_share - new_share
+	if loss <= 0.0:
+		return 0.0
+	return CREDIBILITY_DROP_BASE + CREDIBILITY_DROP_PER_POINT * loss
+
+func _update_credibility(old_shares: Dictionary, new_shares: Dictionary) -> void:
+	for peer_id in new_shares.keys():
+		if not old_shares.has(peer_id):
+			continue
+		var drop := credibility_drop(float(old_shares[peer_id]), float(new_shares[peer_id]))
+		if drop > 0.0:
+			credibility[peer_id] = clampf(credibility_of(int(peer_id)) - drop, 0.0, CREDIBILITY_MAX)
+
 ## Oyundan ayrılınca YEREL oyun durumunu temizler (ağ yayını yok).
 func abandon_game() -> void:
 	inventories = {}
@@ -833,6 +864,7 @@ func abandon_game() -> void:
 	organizations = {}
 	turmoil = {}
 	splinters = {}
+	credibility = {}
 	speech_done = false
 	mana = {}
 	game_finished = false
@@ -1622,7 +1654,7 @@ func _merge_splinter(splinter: int) -> void:
 		if hand.size() < MAX_HAND_SIZE:
 			hand.append(card)
 	inventories[parent] = hand
-	for table in [inventories, mana, populism, law_rounds, national_list, last_seats, election_seats, last_vote_shares, turmoil]:
+	for table in [inventories, mana, populism, law_rounds, national_list, last_seats, election_seats, last_vote_shares, turmoil, credibility]:
 		table.erase(splinter)
 	passed_threshold.erase(splinter)
 	for province_id in last_province_results.keys():
@@ -1921,6 +1953,7 @@ func _hold_election(finished_round: int, early: bool) -> void:
 	}
 	var result := ElectionModel.compute(ideologies, _province_seat_counts, province_voters(),
 		MultiplayerManager.election_threshold, _rng, mods)
+	_update_credibility(last_vote_shares, result["vote_shares"])
 	last_vote_shares = result["vote_shares"]
 	last_seats = result["seats"]
 	last_province_results = result["province_results"]
@@ -2073,6 +2106,7 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"last_election_round": last_election_round,
 		"early": last_election_was_early,
 		"vote_shares": last_vote_shares,
+		"credibility": credibility,
 		"seats": last_seats,
 		"election_seats": election_seats,
 		"early_election_pending": early_election_pending,
@@ -2109,6 +2143,7 @@ func _apply_state(state: Dictionary) -> void:
 	last_election_round = int(state["last_election_round"])
 	last_election_was_early = bool(state["early"])
 	last_vote_shares = state["vote_shares"]
+	credibility = state.get("credibility", {})
 	last_seats = state["seats"]
 	election_seats = state.get("election_seats", {})
 	early_election_pending = bool(state.get("early_election_pending", false))

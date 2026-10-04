@@ -10,7 +10,7 @@ extends RefCounted
 ##     başlanır, il seçmeni partinin görüşüne çekilir ve memlekette kalıcı
 ##     "hemşehri" desteği vardır. Komşu iller ETKİLENMEZ.
 ## ARAYÜZ METİNLERİ SAYI İÇERMEZ (özet anlatım); sayılar sadece burada.
-## Veri parti sözlüğünde durur: parties[peer]["politician"] =
+## Veri PartyManager.politicians[peer] içinde durur (partiden bağımsız) =
 ##   {"gender", "first_name", "surname", "name" (ad + soyad), "background", "hometown"}
 ## İSİM TAMAMEN RASTGELE (elle yazılmaz): random_name(). SOYAD ileride çok
 ## yerde kullanılacak (bkz. surname_of). Soyadlar uydurma kök + ekten üretilir;
@@ -241,9 +241,9 @@ static func random_name(avoid_surnames: Array = [], rng: RandomNumberGenerator =
 ## Oyunda (diğer partilerde) kullanılan soyadları.
 static func used_surnames(except_peer: int = 0) -> Array:
 	var used: Array = []
-	for peer_id in PartyManager.parties.keys():
+	for peer_id in PartyManager.politicians.keys():
 		if int(peer_id) != except_peer:
-			var surname := String(PartyManager.parties[peer_id].get("politician", {}).get("surname", ""))
+			var surname := String(PartyManager.politicians[peer_id].get("surname", ""))
 			if surname != "":
 				used.append(surname)
 	return used
@@ -251,7 +251,7 @@ static func used_surnames(except_peer: int = 0) -> Array:
 # --- Partiye göre sorgular (PartyManager.parties üzerinden) ------------------------------
 
 static func of(peer_id: int) -> Dictionary:
-	return PartyManager.parties.get(peer_id, {}).get("politician", {})
+	return PartyManager.politicians.get(peer_id, {})
 
 ## Genel başkanın soyadı (ileride olaylarda/metinlerde kullanılacak).
 static func surname_of(peer_id: int) -> String:
@@ -277,9 +277,20 @@ static func hometown_of(peer_id: int) -> String:
 static func has_background(peer_id: int, id: String) -> bool:
 	return background_of(peer_id) == id
 
-## Hemşehri desteği: sadece memleket (komşu iller etkilenmez).
-static func hometown_activity(province_id: String, peer_id: int) -> float:
-	var home := hometown_of(peer_id)
-	if home != "" and home == province_id:
-		return HOMETOWN_ACTIVITY
+## PARTİ DÜZEYİ geçmiş avantajı: partinin herhangi bir üyesinde bu geçmiş var mı?
+## (Teşkilat bonusu, karalamaya dayanıklılık, iç karışıklık gibi partiye ait
+## etkiler; miting/yasa gibi hamle etkileri hamleyi yapan siyasetçiye bakar.)
+static func party_has_background(party_or_peer: int, id: String) -> bool:
+	for member in PartyManager.members_of(PartyManager.party_of(party_or_peer)):
+		if has_background(int(member), id):
+			return true
+	return false
+
+## Hemşehri desteği: sadece memleket (komşu iller etkilenmez). Partide iki
+## siyasetçi varsa ikisinin memleketi de sayılır.
+static func hometown_activity(province_id: String, party_or_peer: int) -> float:
+	for member in PartyManager.members_of(PartyManager.party_of(party_or_peer)):
+		var home := hometown_of(int(member))
+		if home != "" and home == province_id:
+			return HOMETOWN_ACTIVITY
 	return 0.0

@@ -110,7 +110,7 @@ func _level_row(level: int) -> Control:
 	var key := PopupKit.label("Seviye", PopupKit.FS_TEXT, PopupKit.KEY)
 	key.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(key)
-	var mine: Color = PartyManager.parties.get(multiplayer.get_unique_id(), {}).get("bg_color", UiTheme.BLUE)
+	var mine: Color = PartyManager.data_of(multiplayer.get_unique_id()).get("bg_color", UiTheme.BLUE)
 	for i in GameRules.ORG_MAX_LEVEL:
 		var pip := ColorRect.new()
 		pip.custom_minimum_size = Vector2(16, 10)
@@ -137,7 +137,7 @@ func _build_poll(me: int, level: int) -> void:
 		return float(poll[x]["percent"]) > float(poll[y]["percent"]))
 	var colors: Array = []
 	for peer_id in ids:
-		var color: Color = PartyManager.parties.get(peer_id, {}).get("bg_color", Color(0.5, 0.5, 0.5))
+		var color: Color = PartyManager.data_of(peer_id).get("bg_color", Color(0.5, 0.5, 0.5))
 		for i in int(poll[peer_id]["seats"]):
 			colors.append(color)
 	var dots := SeatDots.new()
@@ -146,7 +146,7 @@ func _build_poll(me: int, level: int) -> void:
 	_body.add_child(_columns_header())
 	for peer_id in ids:
 		var entry: Dictionary = poll[peer_id]
-		_body.add_child(PopupKit.party_row(PartyManager.parties.get(peer_id, {}), int(peer_id) == me,
+		_body.add_child(PopupKit.party_row(PartyManager.data_of(peer_id), int(peer_id) == me,
 			["%%%.0f" % float(entry["percent"]), str(int(entry["seats"]))], [44, 30]))
 	if level < 2:
 		_body.add_child(PopupKit.note("2. seviye teşkilat (%d mana) %%90 doğru anket verir." % GameRules.ORG_UPGRADE_MANA_COST, UiTheme.TEXT_DIM))
@@ -195,7 +195,7 @@ func _build_last_election(me: int) -> void:
 	for peer_id in ids:
 		var entry: Dictionary = results[peer_id]
 		var seats := int(entry.get("seats", 0))
-		_body.add_child(PopupKit.party_row(PartyManager.parties.get(peer_id, {}), int(peer_id) == me,
+		_body.add_child(PopupKit.party_row(PartyManager.data_of(peer_id), int(peer_id) == me,
 			["%%%.0f" % float(entry.get("percent", 0.0)), [str(seats), UiTheme.TEXT if seats > 0 else UiTheme.TEXT_DIM]], [44, 30]))
 
 func _build_events() -> void:

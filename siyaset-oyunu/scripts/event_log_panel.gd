@@ -67,7 +67,7 @@ func _add_row(entry: Dictionary) -> void:
 	row.add_theme_constant_override("separation", 4)
 	row.mouse_filter = Control.MOUSE_FILTER_PASS
 	var peer_id := int(entry.get("peer_id", -1))
-	var party: Dictionary = PartyManager.parties.get(peer_id, {})
+	var party: Dictionary = PartyManager.data_of(peer_id)
 	if not party.is_empty():
 		var badge := PartyBadge.build(party, Vector2(BADGE_SIZE, BADGE_SIZE), 36, peer_id == multiplayer.get_unique_id())
 		badge.size_flags_vertical = Control.SIZE_SHRINK_BEGIN

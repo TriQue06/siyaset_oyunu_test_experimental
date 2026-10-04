@@ -313,7 +313,7 @@ func _refresh_players_panel() -> void:
 		party_label.add_theme_font_size_override("font_size", 17)
 		party_label.clip_text = true
 		texts.add_child(party_label)
-		var politician: Dictionary = party.get("politician", {})
+		var politician: Dictionary = PoliticianPresets.of(int(peer_id))
 		if not politician.is_empty():
 			var leader_label := Label.new()
 			leader_label.text = "%s · %s · %s" % [String(politician.get("name", "")),

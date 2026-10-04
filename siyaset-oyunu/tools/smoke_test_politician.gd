@@ -38,7 +38,7 @@ func _initialize() -> void:
 	check("oyun basladi", mm.stage == mm.Stage.IN_GAME)
 	check("oyun ayni haritada", gmap.province_ids() == map_before)
 	check("siyasetci parti verisinde korundu", PP.background_of(me) == "is_insani",
-		str(pm.parties.get(me, {}).get("politician", {})))
+		str(pm.politicians.get(me, {})))
 	check("memlekette 2. seviye teskilat", cm.organization_level(home, me) == PP.HOMETOWN_ORG_LEVEL)
 	var first_income: int = cm.turn_income(me) if cm.current_turn_peer_id() == me else 0
 	check("is insani +2 mana ile basladi", cm.mana_of(me) == GameRules.MANA_START + PP.BUSINESS_START_MANA + first_income,
@@ -63,10 +63,10 @@ func _initialize() -> void:
 	# Geçmiş avantajları.
 	var bot: int = mm.bot_ids()[0]
 	cm.turmoil.erase(bot)
-	pm.parties[bot]["politician"]["background"] = "emekli_subay"
+	pm.politicians[bot]["background"] = "emekli_subay"
 	cm._add_turmoil(bot, 1.0)
 	check("emekli subay karisikligi az biriktirir", is_equal_approx(cm.turmoil_of(bot), PP.OFFICER_TURMOIL_MULT))
-	pm.parties[bot]["politician"]["background"] = "belediye_baskani"
+	pm.politicians[bot]["background"] = "belediye_baskani"
 	var bh: String = PP.hometown_of(bot)
 	check("belediye baskani teskilat bonusu", is_equal_approx(cm.org_bonus(bh, bot),
 		PublicOpinion.org_activity(2) * PP.MAYOR_ORG_MULT) or cm.populism_rounds_left(bot) > 0)

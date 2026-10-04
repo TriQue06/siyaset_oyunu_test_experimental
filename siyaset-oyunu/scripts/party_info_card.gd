@@ -8,7 +8,7 @@ const WIDTH := 320.0
 const DIM := UiTheme.TEXT_MUTED
 
 static func build(peer_id: int, my_id: int) -> PanelContainer:
-	var party: Dictionary = PartyManager.parties.get(peer_id, {})
+	var party: Dictionary = PartyManager.data_of(peer_id)
 	var color: Color = party.get("bg_color", Color(0.5, 0.5, 0.5))
 	var parts := PopupKit.frame(WIDTH, color)
 	var card: PanelContainer = parts[0]

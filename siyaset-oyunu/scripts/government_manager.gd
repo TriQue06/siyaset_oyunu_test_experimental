@@ -98,7 +98,9 @@ var last_resolution_reason: String = ""
 # --- Kurulu hükümet ---
 var government: Dictionary = {}            # post_id -> peer_id
 var main_gov_peer_id: int = -1             # başbakanlığı tutan parti
-var scores: Dictionary = {}                # peer_id -> int (biriken puan)
+## PUANLAR SİYASETÇİ TABANLI: peer_id (oyuncu) -> int. İki kişilik partide
+## hükümet kaynaklı puanlar iki oyuncuya bölünür; yasa/gensoru puanı sunana.
+var scores: Dictionary = {}
 ## Bir ortak çekildi ve ana iktidar partisi yalnız kalabilir (bkz. ABANDONED_FALL_PENALTY).
 var abandoned: bool = false
 ## Sadece host (botların kararı için): mevcut hükümetin kurulduğu ve son
@@ -160,8 +162,22 @@ func mandate_peer_id() -> int:
 		return -1
 	return mandate_order[mandate_index]
 
+## Hükümeti GENEL BAŞKAN kurar (parti anahtarı = genel başkanın peer_id'si).
 func is_my_mandate() -> bool:
 	return mandate_peer_id() == multiplayer.get_unique_id()
+
+## İKİ KİŞİLİK PARTİDE MECLİS OYU: partinin vekilleri ikiye bölünür; genel
+## başkan 2/3'ünü, yardımcı 1/3'ünü yönetir. Tek kişilik partide hepsi.
+const LEADER_VOTE_SHARE := 2.0 / 3.0
+
+## Bir oyuncunun (oy verenin) oylamada temsil ettiği vekil sayısı.
+func vote_weight(voter: int) -> int:
+	var pid := PartyManager.party_of(voter)
+	var seats := seats_of(pid)
+	if PartyManager.member_count(pid) < 2:
+		return seats
+	var leader_part := int(round(seats * LEADER_VOTE_SHARE))
+	return leader_part if voter == pid else seats - leader_part
 
 func attempts_left() -> int:
 	return maxi(0, MAX_ATTEMPTS - attempts_used)
@@ -169,8 +185,9 @@ func attempts_left() -> int:
 func current_attempt_number() -> int:
 	return MAX_ATTEMPTS - attempts_left() + 1
 
+## Partinin vekil sayısı (oyuncu verilirse partisinin).
 func seats_of(peer_id: int) -> int:
-	return int(CardManager.last_seats.get(peer_id, 0))
+	return int(CardManager.last_seats.get(PartyManager.party_of(peer_id), 0))
 
 func total_seats() -> int:
 	var total := 0
@@ -178,12 +195,23 @@ func total_seats() -> int:
 		total += int(CardManager.last_seats[peer_id])
 	return total
 
-## Meclise girmiş (en az 1 vekili olan) partiler — oy kullanabilenler.
-func voter_ids() -> Array:
+## Meclise girmiş (en az 1 vekili olan) partiler. Bağımsızlar bloğu dahil
+## DEĞİL (oyuncusu yok, hükümet kuramaz, oy vermez).
+func seated_party_ids() -> Array:
 	var ids: Array = []
 	for peer_id in CardManager.last_seats.keys():
-		if int(CardManager.last_seats[peer_id]) > 0:
-			ids.append(peer_id)
+		if int(CardManager.last_seats[peer_id]) > 0 and not PartyManager.is_bloc(int(peer_id)):
+			ids.append(int(peer_id))
+	ids.sort()
+	return ids
+
+## Oy kullanabilen OYUNCULAR: meclisteki partilerin üyeleri (iki kişilik
+## partide genel başkan ve yardımcı ayrı ayrı oy verir, bkz. vote_weight).
+func voter_ids() -> Array:
+	var ids: Array = []
+	for pid in seated_party_ids():
+		for member in PartyManager.members_of(pid):
+			ids.append(int(member))
 	return ids
 
 ## Hükümette en az bir görevi olan partiler.
@@ -264,7 +292,7 @@ func phase_seconds_left() -> float:
 	return maxf(0.0, float(_phase_deadline_ms - Time.get_ticks_msec()) / 1000.0)
 
 func _party_name(peer_id: int) -> String:
-	return PartyManager.parties.get(peer_id, {}).get("name", "?")
+	return PartyManager.data_of(peer_id).get("name", "?")
 
 ## Aktif oylamadaki EVET ve HAYIR milletvekili toplamları (çekimserler hariç).
 func vote_seat_totals() -> Vector2i:
@@ -273,16 +301,23 @@ func vote_seat_totals() -> Vector2i:
 	for peer_id in votes.keys():
 		match int(votes[peer_id]):
 			VOTE_YES:
-				yes += seats_of(peer_id)
+				yes += _vote_seats(int(peer_id))
 			VOTE_NO:
-				no += seats_of(peer_id)
+				no += _vote_seats(int(peer_id))
 	return Vector2i(yes, no)
+
+## Oylamada bir oyun temsil ettiği vekil: koalisyon görüşmesinde ortak partinin
+## kararı genel başkanındır (tüm vekiller), meclis oylamasında bölünür.
+func _vote_seats(voter: int) -> int:
+	if is_coalition_stage():
+		return seats_of(voter)
+	return vote_weight(voter)
 
 func abstain_seats() -> int:
 	var total := 0
 	for peer_id in votes.keys():
 		if int(votes[peer_id]) == VOTE_ABSTAIN:
-			total += seats_of(peer_id)
+			total += _vote_seats(int(peer_id))
 	return total
 
 # --- Host tarafı: aşama yönetimi -------------------------------------------
@@ -328,10 +363,26 @@ func award_formation_scores() -> void:
 		var points := round_points_of(peer_id)
 		if points <= 0:
 			continue
-		scores[peer_id] = score_of(peer_id) + points
+		add_party_score(peer_id, points)
+
+## Partiye yazılan puan (hükümet makamları, ceza) üyelerine bölünür: genel
+## başkan yuvarlamada artanı alır.
+func add_party_score(pid: int, points: int) -> void:
+	var members: Array = PartyManager.members_of(PartyManager.party_of(pid))
+	if members.is_empty():
+		return
+	var share := points / members.size()
+	var rest := points - share * members.size()
+	for i in members.size():
+		var member := int(members[i])
+		scores[member] = score_of(member) + share + (rest if i == 0 else 0)
 
 func _build_mandate_order() -> void:
-	mandate_order = voter_ids()
+	# Bağımsızlar (tek sandalye) hükümet kuramaz.
+	mandate_order = []
+	for pid in seated_party_ids():
+		if not PartyManager.is_independent(pid):
+			mandate_order.append(pid)
 	# Milletvekili sayısına göre azalan; eşitlikte oy oranı, o da eşitse
 	# peer_id — sıralama her istemcide AYNI çıksın diye tam deterministik.
 	mandate_order.sort_custom(func(a, b):
@@ -411,8 +462,10 @@ func submit_censure(peer_id: int) -> void:
 
 ## Bu parti koalisyondan çekilebilir mi? (Hükümette, ana iktidar partisi
 ## değil, oylama/kurma sürmüyor.)
+## Çekilme kararı GENEL BAŞKANIN (parti anahtarı = genel başkan).
 func can_withdraw(peer_id: int) -> bool:
-	return phase == Phase.GOVERNING and peer_id != main_gov_peer_id and government_party_ids().has(peer_id)
+	return phase == Phase.GOVERNING and PartyManager.is_leader(peer_id) and peer_id != main_gov_peer_id \
+		and government_party_ids().has(peer_id)
 
 ## Küçük ortak koalisyondan çekilir: görevleri ana iktidar partisine geçer.
 ## PUAN TABLOSUNA dokunulmaz; sadece sonraki seçime yansıyan ulusal puan düşer
@@ -565,7 +618,7 @@ func _apply_government_proposal(peer_id: int, assignments: Dictionary) -> void:
 ## Her görev dolu olmalı ve sadece meclise girmiş partilere verilebilmeli.
 ## Teklif sahibi hükümette olmak zorunda.
 func _is_valid_assignment(assignments: Dictionary) -> bool:
-	var valid_voters := voter_ids()
+	var valid_voters := mandate_order.duplicate()
 	for post in GovernmentPresets.POSTS:
 		var post_id: String = post["id"]
 		if not assignments.has(post_id):
@@ -628,7 +681,7 @@ func _resolve_proposal() -> void:
 			CardPresets.card_title(law_type), "kabul edildi" if passed else "reddedildi", totals.x, totals.y]
 		if passed:
 			# Kabul edilen yasa getirene ciddi puan yazar; hükümetinki daha çok.
-			var points: int = CardManager.law_pass_score(gov_ids.has(proposer))
+			var points: int = CardManager.law_pass_score(gov_ids.has(PartyManager.party_of(proposer)))
 			scores[proposer] = score_of(proposer) + points
 			last_resolution_reason += " %s +%d puan." % [_party_name(proposer), points]
 		# Kamuoyu sonuçları ÖNCE: fazın açılması ertelenmiş bir tur sonunu (ve
@@ -712,7 +765,7 @@ func _resolve_proposal() -> void:
 			var fall_note := " %s +%d puan." % [_party_name(proposer), GameRules.CENSURE_PASS_SCORE]
 			scores[proposer] = score_of(proposer) + GameRules.CENSURE_PASS_SCORE
 			if abandoned and government_party_ids().size() == 1 and main_gov_peer_id != -1:
-				scores[main_gov_peer_id] = score_of(main_gov_peer_id) - GovernmentPresets.ABANDONED_FALL_PENALTY
+				add_party_score(main_gov_peer_id, -GovernmentPresets.ABANDONED_FALL_PENALTY)
 				fall_note = " Yalnız kalan %s −%d puan." % [_party_name(main_gov_peer_id), GovernmentPresets.ABANDONED_FALL_PENALTY]
 			abandoned = false
 			government.clear()
@@ -783,6 +836,78 @@ func merge_party(old_id: int, new_id: int) -> void:
 		if idx < mandate_index:
 			mandate_index -= 1
 	_push_state()
+
+## Parti anahtarı değişti (genel başkan değişti): hükümet ve teklif kayıtları
+## yeni anahtara taşınır. Oylar oyuncu tabanlı olduğu için dokunulmaz.
+func rekey_party(old_id: int, new_id: int) -> void:
+	for post_id in government.keys():
+		if int(government[post_id]) == old_id:
+			government[post_id] = new_id
+	for post_id in proposal_assignments.keys():
+		if proposal_kind == KIND_GOVERNMENT and int(proposal_assignments[post_id]) == old_id:
+			proposal_assignments[post_id] = new_id
+	if main_gov_peer_id == old_id:
+		main_gov_peer_id = new_id
+	var i := mandate_order.find(old_id)
+	if i != -1:
+		mandate_order[i] = new_id
+	var j := proposal_gov_ids.find(old_id)
+	if j != -1:
+		proposal_gov_ids[j] = new_id
+	if proposal_kind == KIND_GOVERNMENT and proposal_peer_id == old_id:
+		proposal_peer_id = new_id
+
+## PARTİLER BİRLEŞTİ: old_id'nin görevleri ve görev sırası new_id'ye geçer
+## (puanlar siyasetçiye ait olduğu için taşınmaz).
+func absorb_party(old_id: int, new_id: int) -> void:
+	if not _is_authority():
+		return
+	for post_id in government.keys():
+		if int(government[post_id]) == old_id:
+			government[post_id] = new_id
+	if main_gov_peer_id == old_id:
+		main_gov_peer_id = new_id
+	proposal_gov_ids.erase(old_id)
+	var idx := mandate_order.find(old_id)
+	if idx != -1:
+		mandate_order.remove_at(idx)
+		if idx < mandate_index:
+			mandate_index -= 1
+	if phase == Phase.VOTING and proposal_kind == KIND_GOVERNMENT and proposal_assignments.values().has(old_id):
+		_clear_proposal()
+		_set_phase(Phase.FORMING if mandate_index < mandate_order.size() else Phase.IDLE)
+		last_resolution_reason = "Partiler birleştiği için hükümet teklifi düştü."
+	_push_state()
+
+## PARTİ FESHEDİLDİ (vekilleri zaten dağıtıldı). Hükümetteyse hükümet azınlığa
+## düşer ama DÜŞMEZ: başbakanlık partisiyse başbakanlık en büyük ortağa geçer;
+## ortağı yoksa hükümet düşer. Dönüş: olay metnine eklenecek not.
+func party_dissolved(pid: int) -> String:
+	if not _is_authority():
+		return ""
+	var note := ""
+	if government.values().has(pid):
+		var partners := government_party_ids()
+		partners.erase(pid)
+		if main_gov_peer_id == pid and not partners.is_empty():
+			partners.sort_custom(func(a, b): return seats_of(a) > seats_of(b) or (seats_of(a) == seats_of(b) and a < b))
+			var new_main := int(partners[0])
+			for post_id in government.keys():
+				if int(government[post_id]) == pid:
+					government[post_id] = new_main
+			main_gov_peer_id = new_main
+			note = " Başbakanlık %s'ye geçti; hükümet azınlıkta." % _party_name(new_main)
+		elif main_gov_peer_id != pid:
+			for post_id in government.keys():
+				if int(government[post_id]) == pid:
+					government[post_id] = main_gov_peer_id
+			note = " Görevleri %s'ye geçti." % _party_name(main_gov_peer_id)
+			if not has_majority():
+				note += " Hükümet salt çoğunluğu kaybetti."
+		else:
+			note = " Hükümet düştü."
+	remove_player(pid)
+	return note
 
 func remove_player(peer_id: int) -> void:
 	if not _is_authority():

@@ -64,6 +64,8 @@ signal game_over
 signal event_logged(entry: Dictionary)
 
 const MAX_HAND_SIZE := 9
+## Bağımsız siyasetçinin (teşkilatsız) mitinginde provokasyon riski çarpanı.
+const INDEPENDENT_MITING_RISK_MULT := 1.5
 ## Olay logunda tutulan en fazla kayıt.
 const EVENT_LOG_LIMIT := 80
 const HEARTBEAT_INTERVAL := 5.0
@@ -110,8 +112,20 @@ var turmoil: Dictionary = {}
 ## BÖLÜNEN PARTİLER: ayrılan (yapay zekâ) partinin peer_id -> {"parent": ana parti,
 ## "elections": ayrıldıktan sonra atlattığı seçim, "since": ayrıldığı tur}.
 var splinters: Dictionary = {}
-## MECLİS KONUŞMASI: sırası gelen oyuncu bu sırada konuşmasını yaptı mı?
+## MECLİS KONUŞMASI: sırası gelen oyuncunun PARTİSİ bu dönem konuştu mu?
+## (Grup toplantısı partiye aittir: iki kişilik partide biri konuştuysa
+## diğeri o dönem konuşamaz; bkz. speech_rounds.)
 var speech_done: bool = false
+## Parti -> grup toplantısı yaptığı son dönem.
+var speech_rounds: Dictionary = {}
+## PARTİ SİYASETİ (bkz. "Parti siyaseti" bölümü):
+## Bekleyen davet/başvurular: [{"id", "from", "to", "kind": "invite"|"apply"}].
+var offers: Array = []
+var _offer_seq: int = 0
+## Parti -> kongre yapıldığı son dönem (dönemde bir kongre).
+var congress_rounds: Dictionary = {}
+## Bir önceki seçimin oy oranları (kongrede "oy kaybı" ölçüsü).
+var previous_vote_shares: Dictionary = {}
 ## Testler için: false ise konuşma şartı aranmaz.
 var speech_required: bool = true
 ## GÜNDEM: {"type": gündem türü, "until": bittiği tur} (boş = gündem yok).
@@ -255,6 +269,27 @@ func current_turn_peer_id() -> int:
 		return -1
 	return turn_order[current_turn_index % turn_order.size()]
 
+## OYUNCU / PARTİ: sıra, mana, el, puan ve güvenilirlik OYUNCUYA (peer_id);
+## destek, teşkilat, vekil, görüş, yasa/toplantı hakkı PARTİYE aittir. Parti
+## anahtarı genel başkanın peer_id'sidir (bkz. PartyManager.party_of). Parti
+## düzeyindeki sorgular ve yazmalar argümanı her zaman party_of'tan geçirir:
+## yardımcı da kendi peer_id'siyle sorsa partisinin verisini görür.
+func party_of(peer_id: int) -> int:
+	return PartyManager.party_of(peer_id)
+
+## Seçime giren partiler (bağımsızlar dahil, Bağımsızlar bloğu hariç), sıra düzeninde.
+func party_ids() -> Array:
+	var ids: Array = []
+	for peer_id in turn_order:
+		var pid := party_of(int(peer_id))
+		if not ids.has(pid):
+			ids.append(pid)
+	return ids
+
+## Partideki oyuncu sayısı (mana ve puan bölüşümü için).
+func member_count(peer_id: int) -> int:
+	return PartyManager.member_count(party_of(peer_id))
+
 ## Hükümet kurulurken, mecliste bir teklif oylanırken ya da oyun bittiyse
 ## TUR DURUR: kimse kart çekemez, oynayamaz, pas geçemez.
 func is_turn_blocked() -> bool:
@@ -298,7 +333,7 @@ func province_seat_count(province_id: String) -> int:
 	return int(_province_seat_counts.get(province_id, 0))
 
 func is_government_party(peer_id: int) -> bool:
-	return GovernmentManager.government_party_ids().has(peer_id)
+	return GovernmentManager.government_party_ids().has(party_of(peer_id))
 
 ## Sıra bu oyuncuda ve tur akışı engellenmemiş mi? (Her hamlenin ön şartı;
 ## hamle sayısı sınırsız, mana belirler.)
@@ -335,7 +370,7 @@ func law_mana_cost(peer_id: int, law_type: String = "") -> int:
 	var law := CardPresets.law_data(law_type)
 	if law.is_empty():
 		return GameRules.LAW_MANA_COST
-	var value := float(PartyManager.parties.get(peer_id, {}).get("ideology", {}).get(law["axis"], 0.0))
+	var value := float(PartyManager.data_of(peer_id).get("ideology", {}).get(law["axis"], 0.0))
 	if signf(value) == float(-int(law["dir"])):
 		if absf(value) >= GameRules.LAW_AGAINST_LEVEL_2:
 			return GameRules.LAW_MANA_COST + 2
@@ -372,7 +407,7 @@ func _apply_constitution_proposal(peer_id: int, payload: Dictionary) -> void:
 	_event_message = ""
 	if not GovernmentManager.submit_constitution(peer_id, payload):
 		return
-	law_rounds[peer_id] = round_number
+	law_rounds[party_of(peer_id)] = round_number
 	_push_state({"type": "law", "peer_id": peer_id, "law": "anayasa"})
 
 @rpc("any_peer", "reliable")
@@ -381,8 +416,9 @@ func _request_constitution(payload: Dictionary) -> void:
 		return
 	_apply_constitution_proposal(multiplayer.get_remote_sender_id(), payload)
 
+## Yasa hakkı PARTİYE aittir: dönemde bir yasa (partinin iki üyesinden biri sunar).
 func has_proposed_law_this_round(peer_id: int) -> bool:
-	return int(law_rounds.get(peer_id, 0)) == round_number
+	return int(law_rounds.get(party_of(peer_id), 0)) == round_number
 
 ## Yatırım hamlesi: sadece hükümet partileri.
 func can_invest(peer_id: int, province_id: String = "") -> bool:
@@ -392,7 +428,7 @@ func can_invest(peer_id: int, province_id: String = "") -> bool:
 ## Mecliste en az bir vekili var mı? (Vekilsiz parti oy veremez, yasa ve
 ## gensoru veremez, vekil çalamaz.)
 func has_seats(peer_id: int) -> bool:
-	return int(last_seats.get(peer_id, 0)) > 0
+	return int(last_seats.get(party_of(peer_id), 0)) > 0
 
 ## Gensoru hamlesi: muhalefet, hükümet görevde ve salt çoğunluğu yokken.
 func can_censure(peer_id: int) -> bool:
@@ -402,12 +438,15 @@ func can_censure(peer_id: int) -> bool:
 
 ## Popülizm bonusunun kalan turu (kullanıldığı turda POPULISM_ROUNDS, yoksa 0).
 func populism_rounds_left(peer_id: int) -> int:
-	return maxi(0, int(populism.get(peer_id, 0)) - round_number)
+	return maxi(0, int(populism.get(party_of(peer_id), 0)) - round_number)
 
 ## Miting hamlesi: seçilen ilde güç (provokasyon riskiyle).
 func can_miting(peer_id: int, province_id: String = "") -> bool:
 	if not can_choose_main_action(peer_id) or mana_of(peer_id) < GameRules.MITING_MANA_COST:
 		return false
+	# BAĞIMSIZ siyasetçinin teşkilatı yoktur: her ilde miting yapabilir.
+	if PartyManager.is_independent(peer_id):
+		return province_id == "" or has_province(province_id)
 	if province_id == "":
 		return has_organization_anywhere(peer_id)
 	# Miting artik teskilat ister: once ilde orgutlenmis olmak gerekir.
@@ -415,12 +454,15 @@ func can_miting(peer_id: int, province_id: String = "") -> bool:
 
 ## Partinin herhangi bir ilde teskilati var mi? (miting/karalama on sarti)
 func has_organization_anywhere(peer_id: int) -> bool:
+	peer_id = party_of(peer_id)
 	for province_id in organizations.keys():
 		if organization_level(String(province_id), peer_id) > 0:
 			return true
 	return false
 
 func can_build_organization(peer_id: int, province_id: String) -> bool:
+	if PartyManager.is_independent(peer_id):
+		return false  # bağımsızın teşkilatı olmaz
 	return can_choose_main_action(peer_id) and (province_id == "" and mana_of(peer_id) >= GameRules.ORG_MANA_COST \
 		or mana_of(peer_id) >= GameRules.org_cost(organization_level(province_id, peer_id))) \
 		and has_province(province_id) and organization_level(province_id, peer_id) < GameRules.ORG_MAX_LEVEL
@@ -428,7 +470,7 @@ func can_build_organization(peer_id: int, province_id: String) -> bool:
 ## Bir partiden vekil çalınabilir mi? Kendinden çalınamaz, meclis dışı partiden
 ## çalınamaz ve hedefin en az 2 vekili olmalı (1'in altına DÜŞÜRÜLEMEZ).
 func is_valid_steal_target(peer_id: int, target_peer_id: int) -> bool:
-	if target_peer_id == -1 or target_peer_id == peer_id:
+	if target_peer_id == -1 or party_of(target_peer_id) == party_of(peer_id):
 		return false
 	# Meclis dışı parti de vekil çalabilir (ilk seçimden sonra), ama etkisi
 	# YARI YARIYA (bkz. steal_efficiency) ve bu ceza sonraki seçime kadar sürer.
@@ -441,13 +483,13 @@ func is_valid_steal_target(peer_id: int, target_peer_id: int) -> bool:
 ## sayesinde meclise girse bile ceza sonraki seçime kadar devam eder — ölçüt
 ## son SEÇİMDEKİ sonuç (election_seats), o anki vekil sayısı değil.
 func steal_efficiency(peer_id: int) -> float:
-	if int(election_seats.get(peer_id, 0)) > 0:
+	if int(election_seats.get(party_of(peer_id), 0)) > 0:
 		return 1.0
 	return PublicOpinion.STEAL_OUTSIDER_EFFICIENCY
 
 ## Bu parti son seçimde meclis dışında mı kaldı?
 func is_outside_parliament(peer_id: int) -> bool:
-	return int(election_seats.get(peer_id, 0)) <= 0
+	return int(election_seats.get(party_of(peer_id), 0)) <= 0
 
 ## Bu kart şu an bu hedeflerle oynanabilir mi? (Host doğrulaması ve UI.)
 func can_play_card(peer_id: int, card_type: String, target_peer_id: int = -1, target_province: String = "") -> bool:
@@ -459,14 +501,20 @@ func can_play_card(peer_id: int, card_type: String, target_peer_id: int = -1, ta
 			and GovernmentManager.can_submit_law()
 	if CardPresets.needs_target(card_type):
 		return is_valid_steal_target(peer_id, target_peer_id)
-	if card_type == CardPresets.REPUTATION_CARD_TYPE or card_type == CardPresets.CARD_THEFT_CARD_TYPE:
-		return turn_order.has(target_peer_id) and target_peer_id != peer_id
+	# Hedef PARTİ (ya da kart çalmada o partinin oyuncusu): kendi partin olamaz.
+	var other_party := target_peer_id != -1 and party_ids().has(party_of(target_peer_id)) \
+		and not PartyManager.same_party(target_peer_id, peer_id)
+	if card_type == CardPresets.REPUTATION_CARD_TYPE:
+		return other_party
+	if card_type == CardPresets.CARD_THEFT_CARD_TYPE:
+		return other_party and turn_order.has(target_peer_id)
 	if card_type == CardPresets.REBELLION_CARD_TYPE:
-		return turn_order.has(target_peer_id) and target_peer_id != peer_id and has_seats(target_peer_id)
+		return other_party and has_seats(target_peer_id)
 	if card_type == CardPresets.PROPAGANDA_CARD_TYPE:
-		# Karalama da teskilat ister: ilde orgutlu olmayan parti kampanya yapamaz.
-		return has_province(target_province) and turn_order.has(target_peer_id) \
-			and target_peer_id != peer_id and organization_level(target_province, peer_id) > 0
+		# Karalama teşkilat ister (ilde örgütlü olmayan parti kampanya yapamaz);
+		# BAĞIMSIZ siyasetçinin teşkilatı yoktur, her ilde yapabilir.
+		return has_province(target_province) and other_party \
+			and (organization_level(target_province, peer_id) > 0 or PartyManager.is_independent(peer_id))
 	if CardPresets.needs_province_target(card_type):
 		if not has_province(target_province):
 			return false
@@ -481,10 +529,10 @@ func can_play_card(peer_id: int, card_type: String, target_peer_id: int = -1, ta
 # --- Güç sorguları ------------------------------------------------------------
 
 func national_of(peer_id: int) -> float:
-	return float(national_support.get(peer_id, 0.0))
+	return float(national_support.get(party_of(peer_id), 0.0))
 
 func local_of(province_id: String, peer_id: int) -> float:
-	return float(local_support.get(province_id, {}).get(peer_id, 0.0))
+	return float(local_support.get(province_id, {}).get(party_of(peer_id), 0.0))
 
 ## İllerin görüşü (oyun başında üretilir). Oyun kurulmamışsa (testler, editör)
 ## dosyadaki örnek görüşlere düşer.
@@ -497,7 +545,7 @@ func province_center(province_id: String) -> Dictionary:
 	return province_voters().get(province_id, {})
 
 func organization_level(province_id: String, peer_id: int) -> int:
-	return int(organizations.get(province_id, {}).get(peer_id, 0))
+	return int(organizations.get(province_id, {}).get(party_of(peer_id), 0))
 
 ## AKTİVİTE yakınlığı: sönen il puanı + teşkilatın kalıcı katkısı.
 func activity_of(province_id: String, peer_id: int) -> float:
@@ -506,7 +554,7 @@ func activity_of(province_id: String, peer_id: int) -> float:
 ## Teşkilatın oy bonusu (popülizm sürerken büyür).
 func org_bonus(province_id: String, peer_id: int) -> float:
 	var bonus := PublicOpinion.org_activity(organization_level(province_id, peer_id))
-	if PoliticianPresets.has_background(peer_id, "belediye_baskani"):
+	if PoliticianPresets.party_has_background(peer_id, "belediye_baskani"):
 		bonus *= PoliticianPresets.MAYOR_ORG_MULT
 	if populism_rounds_left(peer_id) > 0:
 		bonus *= PublicOpinion.POPULISM_GOOD_MULT
@@ -518,8 +566,8 @@ func activity_entry(province_id: String) -> Dictionary:
 	var orgs: Dictionary = organizations.get(province_id, {})
 	for peer_id in orgs.keys():
 		entry[peer_id] = float(entry.get(peer_id, 0.0)) + org_bonus(province_id, int(peer_id))
-	# Hemşehri desteği (memleket ve komşuları).
-	for peer_id in PartyManager.parties.keys():
+	# Hemşehri desteği (üyelerin memleketi).
+	for peer_id in party_ids():
 		var home_bonus := PoliticianPresets.hometown_activity(province_id, int(peer_id))
 		if home_bonus > 0.0:
 			entry[peer_id] = float(entry.get(peer_id, 0.0)) + home_bonus
@@ -536,7 +584,7 @@ func activity_map() -> Dictionary:
 
 ## Bir partinin bir ildeki gücü (ideolojik + aktivite).
 func party_strength(province_id: String, peer_id: int) -> float:
-	var ideology: Dictionary = PartyManager.parties.get(peer_id, {}).get("ideology", IdeologyAxes.default_values())
+	var ideology: Dictionary = PartyManager.data_of(peer_id).get("ideology", IdeologyAxes.default_values())
 	return PublicOpinion.party_strength(ideology, province_center(province_id), activity_of(province_id, peer_id))
 
 ## Teşkilat bilgisi (sadece o partinin arayüzü gösterir):
@@ -561,7 +609,7 @@ func province_poll(peer_id: int, province_id: String) -> Dictionary:
 	if error < 0.0:
 		return {}
 	var projection := province_projection(province_id)
-	return _noisy_poll(projection, error, "%s:%d:%d" % [province_id, peer_id, round_number], province_seat_count(province_id),
+	return _noisy_poll(projection, error, "%s:%d:%d" % [province_id, party_of(peer_id), round_number], province_seat_count(province_id),
 		projected_eligible())
 
 func _noisy_poll(projection: Dictionary, error: float, seed_text: String, seat_count: int, eligible: Array) -> Dictionary:
@@ -602,11 +650,11 @@ func projected_eligible(mods: Dictionary = {}) -> Array:
 			national[peer_id] = float(national.get(peer_id, 0.0)) + float(shares[peer_id]) * seats
 		total += seats
 	var eligible: Array = []
-	for peer_id in turn_order:
+	for peer_id in party_ids():
 		if total > 0.0 and float(national.get(peer_id, 0.0)) / total >= MultiplayerManager.election_threshold:
 			eligible.append(peer_id)
 	if eligible.is_empty():
-		eligible = turn_order.duplicate()
+		eligible = party_ids()
 	return eligible
 
 ## Gürültüsüz beklenen ulusal paylar (il payları bununla karışır). Aynı
@@ -635,7 +683,7 @@ func province_projection(province_id: String) -> Dictionary:
 		mods["national"], local_mods.get(province_id, {}), _expected_national(mods))
 	var alloc := ElectionModel.allocate(shares, projected_eligible(mods), province_seat_count(province_id))
 	var result := {}
-	for peer_id in turn_order:
+	for peer_id in party_ids():
 		result[peer_id] = {"percent": float(shares.get(peer_id, 0.0)), "seats": int(alloc.get(peer_id, 0))}
 	return result
 
@@ -665,22 +713,27 @@ func projection_all(viewer: int = -1) -> Dictionary:
 				shares[peer_id] = float(noisy[peer_id]["percent"])
 		var alloc := ElectionModel.allocate(shares, eligible, seat_count)
 		var last_quotient := INF
-		for peer_id in turn_order:
+		var parties_now := party_ids()
+		for peer_id in parties_now:
 			var won := int(alloc.get(peer_id, 0))
 			if won > 0:
 				last_quotient = minf(last_quotient, float(shares.get(peer_id, 0.0)) / float(won))
 		var entry := {}
-		for peer_id in turn_order:
+		for peer_id in parties_now:
 			entry[peer_id] = {"percent": float(shares.get(peer_id, 0.0)), "seats": int(alloc.get(peer_id, 0)),
 				"quotient": last_quotient}
 		entry["seat_count"] = seat_count
 		result[province_id] = entry
 	return result
 
+## Ülke genelinde yarışan partilerin görüşü. BAĞIMSIZLAR dahil değil: sadece
+## memleketlerinde aday olurlar (bkz. _add_independent_seats).
 func _ideologies() -> Dictionary:
 	var result := {}
-	for peer_id in turn_order:
-		result[peer_id] = PartyManager.parties.get(peer_id, {}).get("ideology", IdeologyAxes.default_values())
+	for peer_id in party_ids():
+		if PartyManager.is_independent(peer_id):
+			continue
+		result[peer_id] = PartyManager.data_of(peer_id).get("ideology", IdeologyAxes.default_values())
 	return result
 
 ## İlin mevcut siyasi dengesi (il görüşü + güçlü partilerin çekişi).
@@ -693,8 +746,12 @@ func province_balance(province_id: String) -> Dictionary:
 
 ## Bu parti bu ilde miting yaparsa provokasyon olasılığı (0..0.5).
 func miting_risk(peer_id: int, province_id: String) -> float:
-	var ideology: Dictionary = PartyManager.parties.get(peer_id, {}).get("ideology", IdeologyAxes.default_values())
-	return PublicOpinion.provocation_risk(ideology, province_balance(province_id), organization_level(province_id, peer_id))
+	var ideology: Dictionary = PartyManager.data_of(peer_id).get("ideology", IdeologyAxes.default_values())
+	var risk := PublicOpinion.provocation_risk(ideology, province_balance(province_id), organization_level(province_id, peer_id))
+	# Bağımsız teşkilatsız miting yapar: provokasyon riski daha yüksek.
+	if PartyManager.is_independent(peer_id):
+		risk = minf(PublicOpinion.PROVOCATION_MAX_RISK, risk * INDEPENDENT_MITING_RISK_MULT)
+	return risk
 
 # --- Olay logu -----------------------------------------------------------------
 
@@ -746,6 +803,10 @@ func init_game() -> void:
 	current_turn_index = 0
 	_grant_turn_income()
 	law_rounds = {}
+	speech_rounds = {}
+	offers = []
+	congress_rounds = {}
+	previous_vote_shares = {}
 	populism = {}
 	turmoil = {}
 	splinters = {}
@@ -1064,14 +1125,23 @@ func _apply_play(peer_id: int, hand_index: int, target_peer_id: int = -1, target
 func _apply_pass(peer_id: int, voluntary: bool = true) -> void:
 	if is_turn_blocked() or peer_id != current_turn_peer_id():
 		return
-	# Grup toplantısı atlandıysa taban biraz küser (çok küçük ulusal eksi).
-	if needs_speech(peer_id):
+	# Grup toplantısı atlandıysa taban biraz küser (çok küçük ulusal eksi). İki
+	# kişilik partide bu dönem sırası gelecek bir üye daha varsa o konuşabilir.
+	if needs_speech(peer_id) and not _party_member_later_this_round(peer_id):
 		_add_national(peer_id, PublicOpinion.SPEECH_SKIP_NATIONAL)
 		_pending_log.append({"text": "%s grup toplantısını atladı." % _party_name(peer_id),
 			"peer_id": peer_id, "province": "", "kind": "speech"})
 	var wrapped := _advance_turn()
 	_push_state({"type": "passed", "peer_id": peer_id})
 	_finish_round_if_needed(wrapped)
+
+## Bu oyuncunun partisinden bu dönem sırası henüz gelmemiş bir üye var mı?
+func _party_member_later_this_round(peer_id: int) -> bool:
+	for i in range(current_turn_index + 1, turn_order.size()):
+		var other := int(turn_order[i])
+		if other != peer_id and PartyManager.same_party(other, peer_id):
+			return true
+	return false
 
 func _apply_law(peer_id: int, law_type: String) -> void:
 	if not can_propose_law(peer_id, law_type):
@@ -1080,7 +1150,7 @@ func _apply_law(peer_id: int, law_type: String) -> void:
 	if not GovernmentManager.submit_law(peer_id, law_type):
 		return
 	mana[peer_id] = mana_of(peer_id) - law_mana_cost(peer_id, law_type)
-	law_rounds[peer_id] = round_number
+	law_rounds[party_of(peer_id)] = round_number
 	var event := {"type": "law", "peer_id": peer_id, "law": law_type}
 	if _event_message != "":
 		event["message"] = _event_message
@@ -1091,8 +1161,8 @@ func _apply_organization(peer_id: int, province_id: String) -> void:
 		return
 	mana[peer_id] = mana_of(peer_id) - GameRules.org_cost(organization_level(province_id, peer_id))
 	var entry: Dictionary = organizations.get(province_id, {})
-	var level := int(entry.get(peer_id, 0)) + 1
-	entry[peer_id] = level
+	var level := int(entry.get(party_of(peer_id), 0)) + 1
+	entry[party_of(peer_id)] = level
 	organizations[province_id] = entry
 	var verb := "kurdu" if level == 1 else "geliştirdi"
 	_log_province(province_id, "%s teşkilat %s (seviye %d)" % [_party_name(peer_id), verb, level])
@@ -1155,7 +1225,7 @@ func _apply_card_effect(peer_id: int, card_type: String, target_peer_id: int = -
 			GovernmentManager.submit_early_election(peer_id)
 			_event_message = "%s erken seçim önergesi verdi." % _party_name(peer_id)
 		CardPresets.POPULISM_CARD_TYPE:
-			populism[peer_id] = round_number + GameRules.POPULISM_ROUNDS
+			populism[party_of(peer_id)] = round_number + GameRules.POPULISM_ROUNDS
 			_event_message = "%s popülizme başladı: %d dönem boyunca hamleleri daha etkili." % [_party_name(peer_id), GameRules.POPULISM_ROUNDS]
 		CardPresets.MANA_BONUS_CARD_TYPE:
 			mana[peer_id] = mana_of(peer_id) + GameRules.MANA_BONUS_WEAK
@@ -1165,7 +1235,7 @@ func _apply_card_effect(peer_id: int, card_type: String, target_peer_id: int = -
 	return false
 
 func _party_name(peer_id: int) -> String:
-	return PartyManager.parties.get(peer_id, {}).get("name", "?")
+	return PartyManager.data_of(peer_id).get("name", "?")
 
 ## KART ÇALMA: hedefin elinden rastgele bir kart alınır (el doluysa kart yanar).
 ## Hangi kartın çalındığı herkese duyurulmaz.
@@ -1231,7 +1301,7 @@ func _apply_investment(peer_id: int, province_id: String) -> void:
 ## Karalama: hedefe eksi, karalayana artı; ikisi de o ildeki güçleriyle ölçeklenir.
 func _apply_propaganda(peer_id: int, target_peer_id: int, province_id: String) -> void:
 	var damage := PublicOpinion.propaganda_damage(party_strength(province_id, target_peer_id))
-	if PoliticianPresets.has_background(target_peer_id, "ilahiyatci"):
+	if PoliticianPresets.party_has_background(target_peer_id, "ilahiyatci"):
 		damage *= PoliticianPresets.CLERIC_DAMAGE_MULT
 	if populism_rounds_left(peer_id) > 0:
 		damage *= PublicOpinion.POPULISM_GOOD_MULT
@@ -1260,50 +1330,60 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 		return
 	var axis: String = law["axis"]
 	var dir: int = int(law["dir"])
-	var proposer_in_gov := gov_ids.has(proposer)
+	# Yasayı OYUNCU sunar, etkiler PARTİSİNE yazılır.
+	var proposer_party := party_of(proposer)
+	var proposer_in_gov := gov_ids.has(proposer_party)
 	var agenda_mult := agenda_law_mult(law_type)
+	# Oy verenler partiye göre: iki kişilik partide her üyenin oyu kendi vekil
+	# payı kadar etkiler (bkz. GovernmentManager.vote_weight).
+	var party_votes := _party_vote_shares(votes)
+	var law_mult := PoliticianPresets.ACADEMIC_LAW_MULT if PoliticianPresets.has_background(proposer, "akademisyen") else 1.0
 	for province_id in _province_ids:
 		var alignment := PublicOpinion.law_alignment(province_center(province_id), axis, dir)
-		var law_mult := PoliticianPresets.ACADEMIC_LAW_MULT if PoliticianPresets.has_background(proposer, "akademisyen") else 1.0
-		_add_local(province_id, proposer, PublicOpinion.law_proposer_delta(alignment, passed) * agenda_mult * law_mult, true)
-		for voter in votes.keys():
-			if int(voter) == proposer:
+		_add_local(province_id, proposer_party, PublicOpinion.law_proposer_delta(alignment, passed) * agenda_mult * law_mult, true)
+		for pid in party_votes.keys():
+			if int(pid) == proposer_party:
 				continue
-			var choice := GovernmentManager.normalize_vote(votes[voter])
-			_add_local(province_id, int(voter), PublicOpinion.law_vote_delta(alignment, choice, gov_ids.has(voter), proposer_in_gov) * agenda_mult, true)
+			for entry in party_votes[pid]:
+				_add_local(province_id, int(pid), PublicOpinion.law_vote_delta(alignment, int(entry["choice"]), gov_ids.has(pid),
+					proposer_in_gov) * agenda_mult * float(entry["weight"]), true)
 	# KOALİSYON UYUMU: başbakanın partisinin yasasına hükümet ortağının oyu
 	# ulusal puana yansır (kısmi).
 	var pm_party := GovernmentManager.main_gov_peer_id
-	if proposer == pm_party and pm_party != -1:
-		for voter in votes.keys():
-			var partner := int(voter)
-			if partner == proposer or not gov_ids.has(partner):
+	if proposer_party == pm_party and pm_party != -1:
+		for pid in party_votes.keys():
+			var partner := int(pid)
+			if partner == proposer_party or not gov_ids.has(partner):
 				continue
-			var partner_choice := GovernmentManager.normalize_vote(votes[voter])
-			if partner_choice == GovernmentManager.VOTE_YES:
-				_add_national(partner, PublicOpinion.LAW_PARTNER_YES_NATIONAL)
-			elif partner_choice == GovernmentManager.VOTE_NO:
-				_add_national(partner, PublicOpinion.LAW_PARTNER_NO_NATIONAL)
-				_add_national(pm_party, PublicOpinion.LAW_PM_PARTNER_NO_NATIONAL)
+			for entry in party_votes[pid]:
+				var weight := float(entry["weight"])
+				match int(entry["choice"]):
+					GovernmentManager.VOTE_YES:
+						_add_national(partner, PublicOpinion.LAW_PARTNER_YES_NATIONAL * weight)
+					GovernmentManager.VOTE_NO:
+						_add_national(partner, PublicOpinion.LAW_PARTNER_NO_NATIONAL * weight)
+						_add_national(pm_party, PublicOpinion.LAW_PM_PARTNER_NO_NATIONAL * weight)
 	# Görüş kayması: sunan yasanın yönünde yarım adım, EVET yasanın yönünde,
-	# HAYIR ters yönde yarım adım; çekimser kaymaz.
-	var shifts: Array = [{"peer": proposer, "axis": axis, "delta": IdeologyAxes.LAW_PROPOSE_SHIFT * dir}]
+	# HAYIR ters yönde yarım adım; çekimser kaymaz. Partinin görüşünü GENEL
+	# BAŞKANIN oyu belirler (parti çizgisi).
+	var shifts: Array = [{"peer": proposer_party, "axis": axis, "delta": IdeologyAxes.LAW_PROPOSE_SHIFT * dir}]
 	for voter in votes.keys():
-		if int(voter) == proposer:
+		var voter_party := party_of(int(voter))
+		if voter_party == proposer_party or int(voter) != voter_party:
 			continue
 		var choice := GovernmentManager.normalize_vote(votes[voter])
 		if choice != GovernmentManager.VOTE_ABSTAIN:
-			shifts.append({"peer": int(voter), "axis": axis, "delta": IdeologyAxes.LAW_VOTE_SHIFT * dir * choice})
+			shifts.append({"peer": voter_party, "axis": axis, "delta": IdeologyAxes.LAW_VOTE_SHIFT * dir * choice})
 	var before := {}
 	for change in shifts:
-		before[change["peer"]] = float(PartyManager.parties.get(change["peer"], {}).get("ideology", {}).get(axis, 0.0))
+		before[change["peer"]] = float(PartyManager.data_of(change["peer"]).get("ideology", {}).get(axis, 0.0))
 	_shift_ideologies(shifts)
 	var notes := ""
 	# TABAN GÜVENİ: radikalleşen ya da yerleşik görüşünden dönen parti ulusal
 	# destek kaybeder (bkz. PublicOpinion.ideology_shift_national).
 	var shaken: Array = []
 	for peer in before.keys():
-		var after := float(PartyManager.parties.get(peer, {}).get("ideology", {}).get(axis, 0.0))
+		var after := float(PartyManager.data_of(peer).get("ideology", {}).get(axis, 0.0))
 		var penalty := PublicOpinion.ideology_shift_national(float(before[peer]), after)
 		if penalty < 0.0:
 			_add_national(int(peer), penalty, true)
@@ -1311,16 +1391,29 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 	if not shaken.is_empty():
 		notes += " Görüş değişimi tabanı sarstı: %s." % ", ".join(PackedStringArray(shaken))
 	# Yasa, illerin seçmenini kendi ekseninde sunanın görüşüne doğru çeker.
-	var proposer_ideology: Dictionary = PartyManager.parties.get(proposer, {}).get("ideology", {})
+	var proposer_ideology: Dictionary = PartyManager.data_of(proposer_party).get("ideology", {})
 	for province_id in _province_ids:
-		_pull_province(province_id, proposer, PublicOpinion.LAW_PULL_PASSED if passed else PublicOpinion.LAW_PULL_REJECTED,
+		_pull_province(province_id, proposer_party, PublicOpinion.LAW_PULL_PASSED if passed else PublicOpinion.LAW_PULL_REJECTED,
 			axis, proposer_ideology, false)
 	if passed:
-		notes += " %s +%d puan." % [_party_name(proposer), law_pass_score(proposer_in_gov)]
-		_ease_turmoil(proposer, PublicOpinion.TURMOIL_EASE_LAW)
+		notes += " %s +%d puan." % [_actor_name(proposer), law_pass_score(proposer_in_gov)]
+		_ease_turmoil(proposer_party, PublicOpinion.TURMOIL_EASE_LAW)
 	_push_state({"type": "opinion", "peer_id": proposer, "message": "%s %s — %s bu görüşe yakın illerde güçlendi%s. Partisi %s yönüne kaydı.%s" % [
 		law["title"], "KABUL EDİLDİ" if passed else "reddedildi", _party_name(proposer),
 		" (2 kat)" if passed else "", law["side"], notes]})
+
+## Oylar (oyuncu -> oy) partiye göre: parti -> [{"choice", "weight"}]; weight,
+## oyuncunun partinin vekillerinden yönettiği pay (tek kişilik partide 1).
+func _party_vote_shares(votes: Dictionary) -> Dictionary:
+	var result := {}
+	for voter in votes.keys():
+		var pid := party_of(int(voter))
+		var seats := GovernmentManager.seats_of(pid)
+		var weight := 1.0 if seats <= 0 or member_count(pid) < 2 else float(GovernmentManager.vote_weight(int(voter))) / seats
+		var list: Array = result.get(pid, [])
+		list.append({"choice": GovernmentManager.normalize_vote(votes[voter]), "weight": weight})
+		result[pid] = list
+	return result
 
 ## Kabul edilen yasanın getiren partiye yazdığı puan.
 static func law_pass_score(proposer_in_gov: bool) -> int:
@@ -1414,6 +1507,7 @@ func _add_national(peer_id: int, amount: float, own: bool = false) -> void:
 		amount = _own_effect(peer_id, amount)
 	if amount == 0.0 or peer_id == -1:
 		return
+	peer_id = party_of(peer_id)
 	national_support[peer_id] = PublicOpinion.clamp_points(national_of(peer_id) + amount)
 
 func _add_local(province_id: String, peer_id: int, amount: float, own: bool = false) -> void:
@@ -1421,6 +1515,7 @@ func _add_local(province_id: String, peer_id: int, amount: float, own: bool = fa
 		amount = _own_effect(peer_id, amount)
 	if amount == 0.0 or peer_id == -1:
 		return
+	peer_id = party_of(peer_id)
 	var entry: Dictionary = local_support.get(province_id, {})
 	entry[peer_id] = PublicOpinion.clamp_points(float(entry.get(peer_id, 0.0)) + amount)
 	local_support[province_id] = entry
@@ -1440,12 +1535,12 @@ func _pull_province(province_id: String, peer_id: int, rate: float, axis_only: S
 	if not province_ideology.has(province_id):
 		return
 	if target.is_empty():
-		target = PartyManager.parties.get(peer_id, {}).get("ideology", {})
+		target = PartyManager.data_of(peer_id).get("ideology", {})
 	province_ideology[province_id] = PublicOpinion.pull_center(province_ideology[province_id], target, rate, axis_only)
 
 ## Bu partinin görüşü ilin seçmenine ne kadar yakın (0..1)?
 func voter_closeness(province_id: String, peer_id: int) -> float:
-	var ideology: Dictionary = PartyManager.parties.get(peer_id, {}).get("ideology", {})
+	var ideology: Dictionary = PartyManager.data_of(peer_id).get("ideology", {})
 	return PublicOpinion.voter_closeness(ideology, province_center(province_id))
 
 ## Tur sonu: her il doğal görüşüne biraz geri döner (bkz. PROVINCE_REVERSION).
@@ -1466,7 +1561,7 @@ func _org_pressure() -> void:
 		var orgs: Dictionary = organizations[province_id]
 		for peer_id in orgs.keys():
 			var level := int(orgs[peer_id])
-			if level > 0 and turn_order.has(int(peer_id)):
+			if level > 0 and party_ids().has(int(peer_id)):
 				_pull_province(String(province_id), int(peer_id), PublicOpinion.ORG_ROUND_PULL * level, "", {}, false)
 
 # --- İllerin partiyi takibi -------------------------------------------------------
@@ -1494,11 +1589,11 @@ func _shift_ideologies(changes: Array) -> Array:
 	for change in changes:
 		var peer := int(change["peer"])
 		if not before.has(peer):
-			before[peer] = (PartyManager.parties.get(peer, {}).get("ideology", {}) as Dictionary).duplicate()
+			before[peer] = (PartyManager.data_of(peer).get("ideology", {}) as Dictionary).duplicate()
 	PartyManager.apply_ideology_deltas(changes)
 	var actual: Array = []
 	for peer in before.keys():
-		var after: Dictionary = PartyManager.parties.get(peer, {}).get("ideology", {})
+		var after: Dictionary = PartyManager.data_of(peer).get("ideology", {})
 		for axis in IdeologyAxes.AXES:
 			var delta := float(after.get(axis, 0.0)) - float(before[peer].get(axis, 0.0))
 			if not is_zero_approx(delta):
@@ -1535,7 +1630,8 @@ func _apply_speech(peer_id: int, axis: String, dir: int) -> void:
 		return
 	var d := 1 if dir > 0 else -1
 	speech_done = true
-	var moved := _shift_ideologies([{"peer": peer_id, "axis": axis, "delta": IdeologyAxes.SPEECH_SHIFT * d}])
+	speech_rounds[party_of(peer_id)] = round_number
+	var moved := _shift_ideologies([{"peer": party_of(peer_id), "axis": axis, "delta": IdeologyAxes.SPEECH_SHIFT * d}])
 	var text := "%s, meclis grup toplantısında \"%s\" konuşması yaptı (%s)." % [_party_name(peer_id),
 		IdeologyAxes.speech_title(axis, d), IdeologyAxes.AXIS_SIDES[axis]["pos" if d > 0 else "neg"]]
 	if moved.is_empty():
@@ -1551,12 +1647,13 @@ func _request_speech(axis: String, dir: int) -> void:
 # --- Karışıklık ve bölünme ------------------------------------------------------------
 
 func turmoil_of(peer_id: int) -> float:
-	return float(turmoil.get(peer_id, 0.0))
+	return float(turmoil.get(party_of(peer_id), 0.0))
 
 func _add_turmoil(peer_id: int, amount: float) -> void:
 	if peer_id == -1 or not _is_authority():
 		return
-	if amount > 0.0 and PoliticianPresets.has_background(peer_id, "emekli_subay"):
+	peer_id = party_of(peer_id)
+	if amount > 0.0 and PoliticianPresets.party_has_background(peer_id, "emekli_subay"):
 		amount *= PoliticianPresets.OFFICER_TURMOIL_MULT
 	var value := maxf(0.0, turmoil_of(peer_id) + amount)
 	if value <= 0.0:
@@ -1571,6 +1668,10 @@ func _ease_turmoil(peer_id: int, amount: float) -> void:
 func is_splinter(peer_id: int) -> bool:
 	return splinters.has(peer_id)
 
+## Sonradan katılan geçici bot partisi mi? (Sıralamaya girmez.)
+func is_temporary(peer_id: int) -> bool:
+	return bool(PartyManager.data_of(peer_id).get("temporary", false)) and MultiplayerManager.is_bot(peer_id)
+
 ## Bu partiden ayrılmış (henüz geri dönmemiş) parti; yoksa -1.
 func splinter_of(parent: int) -> int:
 	for splinter in splinters.keys():
@@ -1581,9 +1682,9 @@ func splinter_of(parent: int) -> int:
 ## Tur sonu: karışıklık söner; çok karışan parti bölünür. Ayrılmış bir parti
 ## bir daha bölünemez, ana partinin de aynı anda tek ayrılanı olabilir.
 func _check_splits() -> void:
-	for peer_id in turn_order.duplicate():
+	for peer_id in party_ids():
 		var parent := int(peer_id)
-		if turmoil_of(parent) < PublicOpinion.SPLIT_TURMOIL or is_splinter(parent) or splinter_of(parent) != -1:
+		if PartyManager.is_independent(parent) or turmoil_of(parent) < PublicOpinion.SPLIT_TURMOIL or is_splinter(parent) or splinter_of(parent) != -1:
 			continue
 		if int(last_seats.get(parent, 0)) < PublicOpinion.SPLIT_MIN_SEATS:
 			continue
@@ -1641,8 +1742,8 @@ func _check_reunions() -> void:
 	for splinter in splinters.keys().duplicate():
 		var info: Dictionary = splinters[splinter]
 		var parent := int(info.get("parent", -1))
-		if not turn_order.has(parent):
-			splinters.erase(splinter)  # ana parti oyundan çıktı: bağımsız kalır
+		if not party_ids().has(parent) or PartyManager.is_independent(parent):
+			splinters.erase(splinter)  # ana parti oyundan çıktı / feshedildi: bağımsız kalır
 			continue
 		var elections := int(info.get("elections", 0))
 		if elections >= PublicOpinion.SPLIT_MAX_ELECTIONS \
@@ -1770,11 +1871,11 @@ func _apply_steal(peer_id: int, target_peer_id: int, card_type: String) -> bool:
 		wanted = int(round(wanted * PublicOpinion.POPULISM_STEAL_MULT))
 	# Meclis dışı parti yarı verimle çalar.
 	wanted = maxi(1, int(round(wanted * steal_efficiency(peer_id))))
-	var amount: int = mini(wanted, int(last_seats[target_peer_id]))
+	var amount: int = mini(wanted, int(last_seats.get(party_of(target_peer_id), 0)))
 	if amount <= 0:
 		return false
 
-	var moved := _move_seats(target_peer_id, peer_id, amount)
+	var moved := _move_seats(party_of(target_peer_id), party_of(peer_id), amount)
 	if moved == 0:
 		return false
 	# Transfer meşru görünmez: çalan küçük bir ulusal destek kaybeder, çalınan
@@ -1792,7 +1893,7 @@ func _apply_reputation(peer_id: int, target_peer_id: int) -> void:
 	var damage := PublicOpinion.REPUTATION_NATIONAL_DAMAGE
 	if populism_rounds_left(peer_id) > 0:
 		damage *= PublicOpinion.POPULISM_GOOD_MULT
-	if PoliticianPresets.has_background(target_peer_id, "ilahiyatci"):
+	if PoliticianPresets.party_has_background(target_peer_id, "ilahiyatci"):
 		damage *= PoliticianPresets.CLERIC_DAMAGE_MULT
 	_add_turmoil(target_peer_id, PublicOpinion.TURMOIL_REPUTATION)
 	_add_national(target_peer_id, -damage)
@@ -1804,16 +1905,19 @@ func grant_government_mana(peer_ids: Array) -> void:
 	if not _is_authority():
 		return
 	for peer_id in peer_ids:
-		if mana.has(peer_id):
-			mana[peer_id] = mana_of(peer_id) + GameRules.GOVERNMENT_MANA_BONUS
+		# İki kişilik partide mana iki oyuncuya bölünür.
+		var members: Array = PartyManager.members_of(party_of(int(peer_id)))
+		for member in members:
+			if mana.has(member):
+				mana[member] = mana_of(member) + float(GameRules.GOVERNMENT_MANA_BONUS) / members.size()
 		# Hükümete girmek parti içini toparlar.
 		_ease_turmoil(int(peer_id), PublicOpinion.TURMOIL_EASE_GOVERNMENT)
 	_push_state({"type": "mana"})
 
 ## İki partinin ideolojik yakınlığı: 1 aynı görüş, 0 zıt radikal uçlar.
 func ideological_closeness(a: int, b: int) -> float:
-	var ia: Dictionary = PartyManager.parties.get(a, {}).get("ideology", IdeologyAxes.default_values())
-	var ib: Dictionary = PartyManager.parties.get(b, {}).get("ideology", IdeologyAxes.default_values())
+	var ia: Dictionary = PartyManager.data_of(a).get("ideology", IdeologyAxes.default_values())
+	var ib: Dictionary = PartyManager.data_of(b).get("ideology", IdeologyAxes.default_values())
 	return clampf(1.0 - IdeologyAxes.distance(ia, ib) / IdeologyAxes.max_distance(), 0.0, 1.0)
 
 ## Bu partinin hedeften bu kartla çalabileceği vekil aralığı (yakınlığa göre).
@@ -1841,8 +1945,10 @@ func _advance_turn() -> bool:
 ## otomatik olarak bir kart geliyor. Dağıtılan kart, bu hamleden sonra
 ## gönderilecek state olayına iliştirilsin diye _pending_dealt'ta beklet.
 func _grant_turn_income() -> void:
-	speech_done = false
 	var peer_id := current_turn_peer_id()
+	# Grup toplantısı PARTİYE aittir: partinin diğer üyesi bu dönem konuştuysa
+	# bu oyuncu konuşamaz (ve konuşmadığı için cezası da yok).
+	speech_done = peer_id != -1 and int(speech_rounds.get(party_of(peer_id), 0)) == round_number
 	if peer_id == -1:
 		return
 	mana[peer_id] = mana_of(peer_id) + turn_income(peer_id)
@@ -1862,11 +1968,11 @@ func _peek_turn_card(peer_id: int) -> String:
 		return ""
 	return CardPresets.weighted_pick(_draw_weights(peer_id), _rng)
 
-## Tur geliri: hükümette görevi olan partiler bir fazla mana alır.
-func turn_income(peer_id: int) -> int:
-	if GovernmentManager.government_party_ids().has(peer_id):
-		return GameRules.MANA_PER_ROUND_GOVERNMENT
-	return GameRules.MANA_PER_ROUND
+## Tur geliri: hükümette görevi olan partiler bir fazla mana alır. İKİ KİŞİLİK
+## PARTİDE gelir iki oyuncuya bölünür (her biri yarısını alır).
+func turn_income(peer_id: int) -> float:
+	var base := GameRules.MANA_PER_ROUND_GOVERNMENT if is_government_party(peer_id) else GameRules.MANA_PER_ROUND
+	return float(base) / member_count(peer_id)
 
 ## Desteden bir kartı doğrudan ele verir. El doluysa verilmez.
 ## Dönen değer: verilen kartın türü ("" = verilmedi).
@@ -1955,7 +2061,7 @@ func election_modifiers() -> Dictionary:
 	for peer_id in GovernmentManager.government_party_ids():
 		national[peer_id] = float(national.get(peer_id, 0.0)) + PublicOpinion.GOVERNMENT_FATIGUE
 	# Popülizm sürerken seçim: seçmen vaatleri hatırlar.
-	for peer_id in turn_order:
+	for peer_id in party_ids():
 		if populism_rounds_left(peer_id) > 0:
 			national[peer_id] = float(national.get(peer_id, 0.0)) + PublicOpinion.POPULISM_ELECTION_NATIONAL
 	return {"national": national, "local": activity_map()}
@@ -1972,7 +2078,13 @@ func _hold_election(finished_round: int, early: bool) -> void:
 	}
 	var result := ElectionModel.compute(ideologies, _province_seat_counts, province_voters(),
 		MultiplayerManager.election_threshold, _rng, mods)
+	_add_independent_seats(result, ideologies, mods)
+	# Fesihten kalan Bağımsızlar bloğu seçimle dağılır.
+	if PartyManager.parties.has(PartyManager.BLOC_ID):
+		PartyManager.parties.erase(PartyManager.BLOC_ID)
+		PartyManager.broadcast()
 	_update_credibility(last_vote_shares, result["vote_shares"])
+	previous_vote_shares = last_vote_shares.duplicate()
 	last_vote_shares = result["vote_shares"]
 	last_seats = result["seats"]
 	last_province_results = result["province_results"]
@@ -1985,7 +2097,7 @@ func _hold_election(finished_round: int, early: bool) -> void:
 	last_election_was_early = early
 	# Seçim sonrası herkese mana ve 1 kart hediye.
 	for peer_id in turn_order:
-		mana[peer_id] = mana_of(peer_id) + GameRules.ELECTION_MANA_BONUS
+		mana[peer_id] = mana_of(peer_id) + float(GameRules.ELECTION_MANA_BONUS) / member_count(peer_id)
 		_deal_turn_card(peer_id)
 	# Seçimde kullanıldıktan SONRA söner: seçimden hemen önceki hamleler tam etkili.
 	_decay_opinion()
@@ -1994,6 +2106,46 @@ func _hold_election(finished_round: int, early: bool) -> void:
 	# Yeni meclis: hükümet kurma görevi en çok vekili olan partiye verilir.
 	# Seçim gecesi yayını herkesin ekranında oynarken kurma süresi yanmasın.
 	GovernmentManager.start_formation(GameRules.ELECTION_NIGHT_SECONDS + GameRules.ELECTION_NIGHT_HOLD + 2.0)
+
+## BAĞIMSIZ ADAY: sadece memleketinde yarışır, en fazla 1 sandalye kazanır.
+## O ildeki payı (diğer partilerle birlikte hesaplanır) ilin bir vekillik
+## kotasının INDEPENDENT_QUOTA_FACTOR'ünü geçerse, ilin en çok vekil çıkaran
+## partisinden bir sandalye alır. Az bir miting bile yetebilir (hemşehri desteği).
+const INDEPENDENT_QUOTA_FACTOR := 0.6
+
+func _add_independent_seats(result: Dictionary, ideologies: Dictionary, mods: Dictionary) -> void:
+	var province_results: Dictionary = result["province_results"]
+	var seats: Dictionary = result["seats"]
+	var vote_shares: Dictionary = result["vote_shares"]
+	var local_mods: Dictionary = mods["local"]
+	var total_seats := 0
+	for province_id in _province_ids:
+		total_seats += province_seat_count(province_id)
+	for pid in party_ids():
+		if not PartyManager.is_independent(pid):
+			continue
+		var home := PoliticianPresets.hometown_of(pid)
+		if not province_results.has(home):
+			continue
+		var field := ideologies.duplicate()
+		field[pid] = PartyManager.data_of(pid).get("ideology", IdeologyAxes.default_values())
+		var shares := ElectionModel.expected_shares(field, province_center(home), mods["national"], local_mods.get(home, {}))
+		var share := float(shares.get(pid, 0.0))
+		var seats_here := province_seat_count(home)
+		var entry: Dictionary = province_results[home]
+		var won := 0
+		if seats_here > 0 and share >= 100.0 / float(seats_here + 1) * INDEPENDENT_QUOTA_FACTOR:
+			var victim := -1
+			for other in entry.keys():
+				if int(entry[other].get("seats", 0)) > 0 and (victim == -1 or int(entry[other]["seats"]) > int(entry[victim]["seats"])):
+					victim = int(other)
+			if victim != -1:
+				entry[victim]["seats"] = int(entry[victim]["seats"]) - 1
+				seats[victim] = int(seats.get(victim, 0)) - 1
+				won = 1
+		entry[pid] = {"percent": share, "seats": won}
+		seats[pid] = won
+		vote_shares[pid] = share * seats_here / maxf(1.0, float(total_seats))
 
 ## Son seçimin ardından hükümet kurma bitti: puan tablosu kesinleşir. Makam
 ## puanları hükümet kurulurken zaten yazıldı, burada tekrar yazılmaz.
@@ -2009,30 +2161,33 @@ func _end_game(reason: String) -> void:
 	game_finished = true
 	game_end_reason = reason
 	final_ranking = []
+	# SİYASETÇİ TABANLI sıralama: her oyuncu ayrı satır; bölünen ve geçici
+	# (sonradan katılan) bot partileri sıralamaya girmez.
 	var ids: Array = []
 	for peer_id in turn_order:
-		if not is_splinter(peer_id):
+		if not is_splinter(party_of(int(peer_id))) and not is_temporary(int(peer_id)):
 			ids.append(peer_id)
 	ids.sort_custom(func(a, b):
 		var sa := ranking_score(a)
 		var sb := ranking_score(b)
 		if sa != sb:
 			return sa > sb
-		var va := int(last_seats.get(a, 0))
-		var vb := int(last_seats.get(b, 0))
+		var va := int(last_seats.get(party_of(int(a)), 0))
+		var vb := int(last_seats.get(party_of(int(b)), 0))
 		if va != vb:
 			return va > vb
 		return a < b
 	)
 	for peer_id in ids:
-		var party: Dictionary = PartyManager.parties.get(peer_id, {})
+		var party: Dictionary = PartyManager.data_of(int(peer_id))
 		final_ranking.append({
 			"peer_id": peer_id,
 			"name": party.get("name", "?"),
 			"leader": PoliticianPresets.display_name(int(peer_id)),
 			"color": party.get("bg_color", Color(0.5, 0.5, 0.5)),
 			"score": ranking_score(peer_id),
-			"seats": int(last_seats.get(peer_id, 0)),
+			"seats": int(last_seats.get(party_of(int(peer_id)), 0)),
+			"independent": PartyManager.is_independent(int(peer_id)),
 		})
 	GovernmentManager.end_game()
 	_push_state({"type": "game_over"})
@@ -2040,6 +2195,8 @@ func _end_game(reason: String) -> void:
 ## Sıralama puanı: ayrılmış (henüz dönmemiş) partinin puanı ana partiye sayılır.
 func ranking_score(peer_id: int) -> int:
 	var score := GovernmentManager.score_of(peer_id)
+	if not PartyManager.is_leader(peer_id):
+		return score
 	for splinter in splinters.keys():
 		if int(splinters[splinter].get("parent", -1)) == peer_id:
 			score += GovernmentManager.score_of(int(splinter))
@@ -2068,6 +2225,29 @@ func remove_player(peer_id: int) -> void:
 		return
 	var idx := turn_order.find(peer_id)
 	if idx == -1:
+		return
+	_drop_offers_of(peer_id)
+	# PARTİ ÜYESİ AYRILDI: parti yaşamaya devam eder. Yardımcı giderse sadece
+	# üyelikten düşer; genel başkan giderse parti yardımcıya geçer.
+	var pid := party_of(peer_id)
+	var keep_party := false
+	if pid != peer_id:
+		PartyManager.parties[pid].erase("deputy")
+		keep_party = true
+	elif PartyManager.deputy_of(pid) != -1:
+		_rekey_party(pid, PartyManager.deputy_of(pid), -1)
+		keep_party = true
+	PartyManager.politicians.erase(peer_id)
+	if keep_party:
+		PartyManager.broadcast()
+		_remove_from_turn_order(idx)
+		inventories.erase(peer_id)
+		mana.erase(peer_id)
+		credibility.erase(peer_id)
+		GovernmentManager.votes.erase(peer_id)
+		_push_state({"type": "player_left", "peer_id": peer_id}, true)
+		if turn_order.size() < GameRules.MIN_PLAYERS_TO_CONTINUE:
+			_end_game("Yeterli oyuncu kalmadı.")
 		return
 	var was_current := idx == current_turn_index
 	turn_order.remove_at(idx)
@@ -2107,6 +2287,527 @@ func remove_player(peer_id: int) -> void:
 		return
 	_finish_round_if_needed(wrapped)
 
+# --- Parti siyaseti ------------------------------------------------------------------
+## OYUNCU PARTİSİNİ FESHEDEBİLİR, BAĞIMSIZ KALABİLİR, YENİ PARTİ KURABİLİR, BAŞKA
+## BİR PARTİYE KATILABİLİR (ya da partisini birleştirebilir). Bir partide en
+## fazla iki oyuncu olur (genel başkan + yardımcı); ikisi üst üste oynar, mana
+## geliri bölünür, yasa ve grup toplantısı hakkı ortaktır, meclis oyu 2/3–1/3
+## bölünür. Kurallar:
+##   FESİH (genel başkan, tek kişilik parti): vekillerin yarısı Bağımsızlar
+##     bloğuna, yarısı görüşü en yakın partilere (öklid mesafesi) dağılır;
+##     teşkilatlar silinir; hükümetteyse hükümet azınlığa düşer (başbakanlık
+##     en büyük ortağa geçer; ortak yoksa hükümet düşer); güvenilirlik biraz
+##     düşer; siyasetçi BAĞIMSIZ olur.
+##   İSTİFA (genel başkan, yardımcısı varken "feshet"): parti yardımcıya kalır.
+##   YENİ PARTİ (bağımsız): FOUND_PARTY_COST mana; bağımsızken toplanan
+##     kişisel popülerlik (ulusal puan) partiye geçer.
+##   AYRILIP PARTİ KURMA (yardımcı): LEAVE_PARTY_COST mana; teşkilatların
+##     rastgele üçte birini götürür (2. seviye bazı iller iki tarafa 1'er
+##     seviye bölünür), memleketindeki teşkilat da onunla gider.
+##   DAVET / BAŞVURU: davet eden genel başkandır, başvuru genel başkana
+##     yapılır; karşı taraf kabul eder. Katılan bağımsızsa yardımcı olur;
+##     kendi tek kişilik partisi varsa PARTİLER BİRLEŞİR (vekil, teşkilat,
+##     destek ev sahibi partiye geçer).
+##   KONGRE (iki kişilik parti, dönemde bir, CONGRESS_COST mana): genel
+##     başkanlık oylanır; genel başkan avantajlıdır ama oy kaybı, karışıklık ya
+##     da vekil kaybı varsa rakip neredeyse kesin kazanır.
+const FOUND_PARTY_COST := 8
+const LEAVE_PARTY_COST := 2
+const CONGRESS_COST := 2
+const DISSOLVE_CREDIBILITY := 8.0
+const CONGRESS_LOSER_CREDIBILITY := 5.0
+const DISSOLVE_BLOC_SHARE := 0.5
+## Fesihte partinin ulusal puanının siyasetçiye (kişisel popülerlik) kalan payı.
+const DISSOLVE_NATIONAL_KEEP := 0.5
+## Birleşmede katılan partinin ulusal puanının ev sahibine geçen payı.
+const MERGE_NATIONAL_SHARE := 0.5
+const LEAVE_ORG_SHARE := 1.0 / 3.0
+const CONGRESS_INCUMBENT_BONUS := 25.0
+const CONGRESS_CRISIS_CHANCE := 0.9
+const CONGRESS_TURMOIL := 3.0
+## Botun daveti/başvuruyu kabul etmesi için gereken görüş yakınlığı (0..1).
+const BOT_JOIN_CLOSENESS := 0.6
+
+# Sorgular (arayüz ve host doğrulaması) -------------------------------------------
+
+func can_dissolve(peer_id: int) -> bool:
+	return can_choose_main_action(peer_id) and PartyManager.is_leader(peer_id) and not PartyManager.is_independent(peer_id)
+
+## Feshetmek yerine istifa mı? (Yardımcısı varsa parti ona kalır.)
+func dissolve_is_resignation(peer_id: int) -> bool:
+	return PartyManager.deputy_of(peer_id) != -1
+
+func can_found_party(peer_id: int) -> bool:
+	return can_choose_main_action(peer_id) and PartyManager.is_independent(peer_id) and mana_of(peer_id) >= FOUND_PARTY_COST
+
+func can_leave_party(peer_id: int) -> bool:
+	return can_choose_main_action(peer_id) and PartyManager.is_deputy(peer_id) and mana_of(peer_id) >= LEAVE_PARTY_COST
+
+func can_congress(peer_id: int) -> bool:
+	var pid := party_of(peer_id)
+	return can_choose_main_action(peer_id) and PartyManager.member_count(pid) >= 2 \
+		and int(congress_rounds.get(pid, 0)) != round_number and mana_of(peer_id) >= CONGRESS_COST
+
+## Daveti (invite) EV SAHİBİ partinin genel başkanı gönderir; başvuruyu
+## (apply) katılmak isteyen gönderir. Dönüş: [ev sahibi, katılan].
+static func offer_roles(from_peer: int, to_peer: int, kind: String) -> Array:
+	return [from_peer, to_peer] if kind == "invite" else [to_peer, from_peer]
+
+## Bu davet/başvuru şu an geçerli mi? (Gönderirken ve kabul ederken bakılır.)
+func is_valid_offer(from_peer: int, to_peer: int, kind: String) -> bool:
+	if not ["invite", "apply"].has(kind) or from_peer == to_peer:
+		return false
+	if not turn_order.has(from_peer) or not turn_order.has(to_peer) or game_finished:
+		return false
+	var roles := offer_roles(from_peer, to_peer, kind)
+	var host := int(roles[0])
+	var joiner := int(roles[1])
+	if not PartyManager.is_leader(host) or PartyManager.is_independent(host) or PartyManager.member_count(host) >= PartyManager.MAX_MEMBERS:
+		return false
+	# Katılan kendi kaydının başı olmalı (bağımsız ya da tek kişilik parti).
+	return PartyManager.is_leader(joiner) and PartyManager.member_count(joiner) == 1
+
+## Gönderebilir mi? Sırası gelen oyuncu gönderir; aynı teklif iki kez olmaz.
+func can_send_offer(from_peer: int, to_peer: int, kind: String) -> bool:
+	if not can_choose_main_action(from_peer) or not is_valid_offer(from_peer, to_peer, kind):
+		return false
+	for offer in offers:
+		if int(offer["from"]) == from_peer and int(offer["to"]) == to_peer:
+			return false
+	return true
+
+## Bu oyuncuya gelmiş bekleyen teklifler.
+func offers_for(peer_id: int) -> Array:
+	var result: Array = []
+	for offer in offers:
+		if int(offer["to"]) == peer_id:
+			result.append(offer)
+	return result
+
+func credibility_add(peer_id: int, amount: float) -> void:
+	credibility[peer_id] = clampf(credibility_of(peer_id) + amount, 0.0, CREDIBILITY_MAX)
+
+# İstemci istekleri ------------------------------------------------------------------
+
+func dissolve_party() -> void:
+	var me := multiplayer.get_unique_id()
+	if not can_dissolve(me):
+		return
+	if _is_authority():
+		_apply_dissolve(me)
+	else:
+		_request_dissolve.rpc_id(1)
+
+## data: {"name", "icon_index", "bg_color"}
+func found_party(data: Dictionary) -> void:
+	var me := multiplayer.get_unique_id()
+	if not can_found_party(me) and not can_leave_party(me):
+		return
+	if _is_authority():
+		_apply_found(me, data)
+	else:
+		_request_found.rpc_id(1, data)
+
+func request_congress() -> void:
+	var me := multiplayer.get_unique_id()
+	if not can_congress(me):
+		return
+	if _is_authority():
+		_apply_congress(me)
+	else:
+		_request_congress.rpc_id(1)
+
+func send_offer(to_peer: int, kind: String) -> void:
+	var me := multiplayer.get_unique_id()
+	if not can_send_offer(me, to_peer, kind):
+		return
+	if _is_authority():
+		_apply_send_offer(me, to_peer, kind)
+	else:
+		_request_send_offer.rpc_id(1, to_peer, kind)
+
+func respond_offer(offer_id: int, accept: bool) -> void:
+	if _is_authority():
+		_apply_respond_offer(multiplayer.get_unique_id(), offer_id, accept)
+	else:
+		_request_respond_offer.rpc_id(1, offer_id, accept)
+
+@rpc("any_peer", "reliable")
+func _request_dissolve() -> void:
+	if MultiplayerManager.is_host:
+		_apply_dissolve(multiplayer.get_remote_sender_id())
+
+@rpc("any_peer", "reliable")
+func _request_found(data: Dictionary) -> void:
+	if MultiplayerManager.is_host:
+		_apply_found(multiplayer.get_remote_sender_id(), data)
+
+@rpc("any_peer", "reliable")
+func _request_congress() -> void:
+	if MultiplayerManager.is_host:
+		_apply_congress(multiplayer.get_remote_sender_id())
+
+@rpc("any_peer", "reliable")
+func _request_send_offer(to_peer: int, kind: String) -> void:
+	if MultiplayerManager.is_host:
+		_apply_send_offer(multiplayer.get_remote_sender_id(), to_peer, kind)
+
+@rpc("any_peer", "reliable")
+func _request_respond_offer(offer_id: int, accept: bool) -> void:
+	if MultiplayerManager.is_host:
+		_apply_respond_offer(multiplayer.get_remote_sender_id(), offer_id, accept)
+
+# Host: uygulama ------------------------------------------------------------------------
+
+func _apply_dissolve(peer_id: int) -> void:
+	if not can_dissolve(peer_id):
+		return
+	var pid := peer_id
+	var party_name := _party_name(pid)
+	var ideology: Dictionary = (PartyManager.data_of(pid).get("ideology", IdeologyAxes.default_values()) as Dictionary).duplicate()
+	credibility_add(peer_id, -DISSOLVE_CREDIBILITY)
+	var deputy := PartyManager.deputy_of(pid)
+	if deputy != -1:
+		# İSTİFA: parti yardımcıya kalır, istifa eden bağımsız olur.
+		_rekey_party(pid, deputy, -1)
+		_make_independent(peer_id, ideology)
+		_drop_offers_of(peer_id)
+		PartyManager.broadcast()
+		_push_state({"type": "party_change", "peer_id": peer_id, "message":
+			"%s, %s genel başkanlığından istifa etti; partinin yeni genel başkanı %s. %s artık bağımsız." % [
+			PoliticianPresets.display_name(peer_id), party_name, PoliticianPresets.display_name(deputy),
+			PoliticianPresets.surname_of(peer_id)]}, true)
+		return
+	# FESİH: vekillerin yarısı Bağımsızlar bloğuna, yarısı yakın partilere.
+	var seats := int(last_seats.get(pid, 0))
+	var to_bloc := int(round(seats * DISSOLVE_BLOC_SHARE))
+	var others: Array = []
+	for other in party_ids():
+		if int(other) != pid and not PartyManager.is_independent(int(other)):
+			others.append(int(other))
+	if others.is_empty():
+		to_bloc = seats
+	if to_bloc > 0:
+		_ensure_bloc()
+		_move_seats(pid, PartyManager.BLOC_ID, to_bloc)
+	var rest := int(last_seats.get(pid, 0))
+	if rest > 0 and not others.is_empty():
+		# Görüşe yakınlık ağırlığıyla D'Hondt: en yakın parti en çoğunu alır.
+		var weights := {}
+		for other in others:
+			weights[other] = ideological_closeness(pid, other) + 0.01
+		var alloc := ElectionModel.dhondt(weights, others, rest)
+		for other in others:
+			if int(alloc.get(other, 0)) > 0:
+				_move_seats(pid, int(other), int(alloc[other]))
+	election_seats[pid] = 0
+	last_vote_shares.erase(pid)
+	previous_vote_shares.erase(pid)
+	passed_threshold.erase(pid)
+	for province_id in organizations.keys():
+		organizations[province_id].erase(pid)
+	for province_id in local_support.keys():
+		local_support[province_id].erase(pid)
+	national_support[pid] = national_of(pid) * DISSOLVE_NATIONAL_KEEP
+	populism.erase(pid)
+	turmoil.erase(pid)
+	for splinter in splinters.keys():
+		if int(splinters[splinter].get("parent", -1)) == pid:
+			splinters.erase(splinter)
+	_make_independent(peer_id, ideology)
+	_drop_offers_of(peer_id)
+	PartyManager.broadcast()
+	var gov_note := GovernmentManager.party_dissolved(pid)
+	_push_state({"type": "party_change", "peer_id": peer_id, "message":
+		"%s, %s'yi FESHETTİ ve bağımsız kaldı. %d vekil Bağımsızlar'a, %d vekil yakın partilere geçti.%s" % [
+		PoliticianPresets.display_name(peer_id), party_name, to_bloc, rest, gov_note]}, true)
+
+## Siyasetçiyi bağımsız kayda çevirir (gri, kullanıcı simgeli, adıyla).
+func _make_independent(peer_id: int, ideology: Dictionary) -> void:
+	PartyManager.parties[peer_id] = {
+		"name": PoliticianPresets.display_name(peer_id).left(PartyManager.NAME_MAX_LENGTH + 10),
+		"icon_index": PartyPresets.USER_ICON_INDEX,
+		"icon_color": Color.WHITE,
+		"bg_color": PartyPresets.INDEPENDENT_COLOR,
+		"ideology": ideology,
+		"independent": true,
+		"ready": true,
+	}
+
+## Bağımsızlar bloğu kaydı (fesihte sahipsiz kalan vekiller).
+func _ensure_bloc() -> void:
+	if PartyManager.parties.has(PartyManager.BLOC_ID):
+		return
+	PartyManager.parties[PartyManager.BLOC_ID] = {
+		"name": "Bağımsızlar",
+		"icon_index": PartyPresets.USER_ICON_INDEX,
+		"icon_color": Color.WHITE,
+		"bg_color": PartyPresets.INDEPENDENT_COLOR.darkened(0.25),
+		"ideology": IdeologyAxes.default_values(),
+		"bloc": true,
+	}
+
+## Parti verisi geçerli mi? (ad, ikon, renk; başka partide olmayan renk.)
+func _valid_party_data(peer_id: int, data: Dictionary) -> bool:
+	var party_name := String(data.get("name", "")).strip_edges()
+	if not PartyManager.is_valid_name(party_name):
+		return false
+	for other in PartyManager.parties.keys():
+		if int(other) != peer_id and String(PartyManager.parties[other].get("name", "")) == party_name:
+			return false
+	var icon := int(data.get("icon_index", -1))
+	if icon < 0 or icon >= PartyPresets.icon_count():
+		return false
+	var color: Color = data.get("bg_color", Color.WHITE)
+	if color.is_equal_approx(Color.WHITE) or not PartyPresets.COLORS.has(color):
+		return false
+	return PartyManager.color_owner(color, peer_id) == -1
+
+## YENİ PARTİ: bağımsız kurar (FOUND_PARTY_COST) ya da yardımcı ayrılıp kurar
+## (LEAVE_PARTY_COST, teşkilatların bir kısmını götürür).
+func _apply_found(peer_id: int, data: Dictionary) -> void:
+	var leaving := can_leave_party(peer_id)
+	if not can_found_party(peer_id) and not leaving:
+		return
+	if not _valid_party_data(peer_id, data):
+		return
+	var info := {
+		"name": String(data["name"]).strip_edges(),
+		"icon_index": int(data["icon_index"]),
+		"icon_color": Color.WHITE,
+		"bg_color": Color(data["bg_color"]),
+		"ready": true,
+		"founded_round": round_number,
+	}
+	var text := ""
+	if leaving:
+		var old_party := party_of(peer_id)
+		mana[peer_id] = mana_of(peer_id) - LEAVE_PARTY_COST
+		info["ideology"] = (PartyManager.data_of(old_party).get("ideology", IdeologyAxes.default_values()) as Dictionary).duplicate()
+		PartyManager.parties[old_party].erase("deputy")
+		PartyManager.parties[peer_id] = info
+		var taken := _split_organizations(old_party, peer_id)
+		text = "%s, %s'den ayrılıp %s'yi kurdu (%d teşkilat yanında)." % [PoliticianPresets.display_name(peer_id),
+			_party_name(old_party), info["name"], taken]
+	else:
+		mana[peer_id] = mana_of(peer_id) - FOUND_PARTY_COST
+		info["ideology"] = (PartyManager.data_of(peer_id).get("ideology", IdeologyAxes.default_values()) as Dictionary).duplicate()
+		# Bağımsızken toplanan kişisel popülerlik (ulusal puan) partiye geçer;
+		# memleketten kazanılan bağımsız sandalye de partinin olur.
+		PartyManager.parties[peer_id] = info
+		text = "%s, %s'yi kurdu. Bağımsızken kazandığı destek yeni partisine geçti." % [
+			PoliticianPresets.display_name(peer_id), info["name"]]
+	_drop_offers_of(peer_id)
+	PartyManager.broadcast()
+	_push_state({"type": "party_change", "peer_id": peer_id, "message": text}, true)
+
+## Ayrılan yardımcı eski partinin teşkilatlarının rastgele üçte birini götürür:
+## 1. seviye il ona geçer; 2. seviye il ya bütünüyle geçer ya da iki tarafa
+## 1'er seviye bölünür. Ayrılanın memleketi özel: oradaki teşkilat ona geçer
+## (iki üyenin memleketi aynıysa güvenilirliği yüksek olan tutar).
+func _split_organizations(from_party: int, to_party: int) -> int:
+	var provinces: Array = []
+	for province_id in organizations.keys():
+		if int(organizations[province_id].get(from_party, 0)) > 0:
+			provinces.append(String(province_id))
+	provinces.sort()
+	var home := PoliticianPresets.hometown_of(to_party)
+	var taken := 0
+	if provinces.has(home):
+		var rival_home := PoliticianPresets.hometown_of(from_party)
+		if rival_home != home or credibility_of(to_party) > credibility_of(from_party):
+			organizations[home][to_party] = organizations[home][from_party]
+			organizations[home].erase(from_party)
+			taken += 1
+		provinces.erase(home)
+	# Rastgele üçte bir (deterministik karıştırma host RNG'siyle).
+	for i in range(provinces.size() - 1, 0, -1):
+		var j := _rng.randi_range(0, i)
+		var tmp = provinces[i]
+		provinces[i] = provinces[j]
+		provinces[j] = tmp
+	var count := int(round((provinces.size() + taken) * LEAVE_ORG_SHARE)) - taken
+	for k in clampi(count, 0, provinces.size()):
+		var province_id := String(provinces[k])
+		var entry: Dictionary = organizations[province_id]
+		var level := int(entry.get(from_party, 0))
+		if level >= 2 and _rng.randf() < 0.5:
+			entry[from_party] = 1
+			entry[to_party] = 1
+		else:
+			entry[to_party] = level
+			entry.erase(from_party)
+		taken += 1
+	return taken
+
+func _apply_congress(peer_id: int) -> void:
+	if not can_congress(peer_id):
+		return
+	var pid := party_of(peer_id)
+	var leader := pid
+	var deputy := PartyManager.deputy_of(pid)
+	mana[peer_id] = mana_of(peer_id) - CONGRESS_COST
+	congress_rounds[pid] = round_number
+	var lost_votes := previous_vote_shares.has(pid) and last_vote_shares.has(pid) \
+		and float(last_vote_shares[pid]) < float(previous_vote_shares[pid])
+	var lost_seats := int(last_seats.get(pid, 0)) < int(election_seats.get(pid, 0))
+	var crisis := lost_votes or lost_seats or turmoil_of(pid) >= CONGRESS_TURMOIL
+	var leader_power := credibility_of(leader) + CONGRESS_INCUMBENT_BONUS
+	var deputy_power := credibility_of(deputy)
+	var deputy_chance := CONGRESS_CRISIS_CHANCE if crisis else clampf(deputy_power / maxf(1.0, leader_power + deputy_power), 0.1, 0.6)
+	var deputy_wins := _rng.randf() < deputy_chance
+	var party_name := _party_name(pid)
+	var text := ""
+	if deputy_wins:
+		credibility_add(leader, -CONGRESS_LOSER_CREDIBILITY)
+		_rekey_party(pid, deputy, leader)
+		text = "%s KONGRESİ: %s genel başkan seçildi, %s yardımcılığa geriledi.%s" % [party_name,
+			PoliticianPresets.display_name(deputy), PoliticianPresets.display_name(leader),
+			" (Parti krizdeydi.)" if crisis else ""]
+	else:
+		credibility_add(deputy, -CONGRESS_LOSER_CREDIBILITY)
+		text = "%s KONGRESİ: %s genel başkanlığını korudu." % [party_name, PoliticianPresets.display_name(leader)]
+	PartyManager.broadcast()
+	_push_state({"type": "party_change", "peer_id": peer_id, "message": text}, true)
+
+func _apply_send_offer(from_peer: int, to_peer: int, kind: String) -> void:
+	if not can_send_offer(from_peer, to_peer, kind):
+		return
+	_offer_seq += 1
+	var offer := {"id": _offer_seq, "from": from_peer, "to": to_peer, "kind": kind}
+	offers.append(offer)
+	var text := "%s, %s'yi partisine davet etti." % [PoliticianPresets.display_name(from_peer), PoliticianPresets.display_name(to_peer)] \
+		if kind == "invite" else "%s, %s'nin partisine katılmak için başvurdu." % [
+		PoliticianPresets.display_name(from_peer), PoliticianPresets.display_name(to_peer)]
+	_push_state({"type": "offer", "peer_id": from_peer, "message": text})
+	# Bot hemen karar verir: görüşü yakınsa kabul eder.
+	if MultiplayerManager.is_bot(to_peer):
+		var roles := offer_roles(from_peer, to_peer, kind)
+		var accept := ideological_closeness(int(roles[0]), int(roles[1])) >= BOT_JOIN_CLOSENESS \
+			and not is_government_party(int(roles[1]))
+		_apply_respond_offer(to_peer, int(offer["id"]), accept)
+
+func _apply_respond_offer(peer_id: int, offer_id: int, accept: bool) -> void:
+	var offer := {}
+	for o in offers:
+		if int(o["id"]) == offer_id and int(o["to"]) == peer_id:
+			offer = o
+	if offer.is_empty():
+		return
+	offers.erase(offer)
+	var from_peer := int(offer["from"])
+	var kind := String(offer["kind"])
+	if not accept or not is_valid_offer(from_peer, peer_id, kind):
+		_push_state({"type": "offer", "peer_id": peer_id, "message": "%s teklifi reddetti." % PoliticianPresets.display_name(peer_id)})
+		return
+	var roles := offer_roles(from_peer, peer_id, kind)
+	_join_party(int(roles[0]), int(roles[1]))
+
+## Katılan (joiner) ev sahibi partiye yardımcı olarak girer. Kendi partisi
+## varsa iki parti BİRLEŞİR.
+func _join_party(host: int, joiner: int) -> void:
+	var host_name := _party_name(host)
+	var merging := not PartyManager.is_independent(joiner)
+	var joiner_party_name := _party_name(joiner)
+	var moved := _move_seats(joiner, host, int(last_seats.get(joiner, 0)))
+	election_seats[host] = int(election_seats.get(host, 0)) + int(election_seats.get(joiner, 0))
+	last_vote_shares[host] = float(last_vote_shares.get(host, 0.0)) + float(last_vote_shares.get(joiner, 0.0))
+	if passed_threshold.has(joiner) and not passed_threshold.has(host):
+		passed_threshold.append(host)
+	for province_id in organizations.keys():
+		var entry: Dictionary = organizations[province_id]
+		var level := int(entry.get(joiner, 0))
+		if level > int(entry.get(host, 0)):
+			entry[host] = level
+		entry.erase(joiner)
+	for province_id in local_support.keys():
+		var entry: Dictionary = local_support[province_id]
+		if entry.has(joiner):
+			entry[host] = PublicOpinion.clamp_points(float(entry.get(host, 0.0)) + float(entry[joiner]))
+			entry.erase(joiner)
+	_add_national(host, maxf(0.0, national_of(joiner)) * MERGE_NATIONAL_SHARE)
+	for splinter in splinters.keys():
+		if int(splinters[splinter].get("parent", -1)) == joiner:
+			splinters[splinter]["parent"] = host
+	for table in [national_support, populism, turmoil, law_rounds, speech_rounds, congress_rounds,
+			national_list, last_seats, election_seats, last_vote_shares, previous_vote_shares]:
+		table.erase(joiner)
+	passed_threshold.erase(joiner)
+	for province_id in last_province_results.keys():
+		last_province_results[province_id].erase(joiner)
+	GovernmentManager.absorb_party(joiner, host)
+	PartyManager.parties.erase(joiner)
+	PartyManager.parties[host]["deputy"] = joiner
+	# Genel başkan ve yardımcısı üst üste oynar.
+	_place_after(joiner, host)
+	_drop_offers_of(joiner)
+	_drop_offers_of(host)
+	PartyManager.broadcast()
+	var text := "%s, %s'ye katıldı ve genel başkan yardımcısı oldu." % [PoliticianPresets.display_name(joiner), host_name]
+	if merging:
+		text = "%s ile %s BİRLEŞTİ: %s, %s'nin genel başkan yardımcısı oldu (%d vekil katıldı)." % [
+			host_name, joiner_party_name, PoliticianPresets.display_name(joiner), host_name, moved]
+	_push_state({"type": "party_change", "peer_id": joiner, "message": text}, true)
+
+## Sıradaki yerini değiştirir: peer, anchor'un hemen ardından oynar.
+func _place_after(peer_id: int, anchor: int) -> void:
+	var current := current_turn_peer_id()
+	var idx := turn_order.find(peer_id)
+	if idx == -1:
+		return
+	turn_order.remove_at(idx)
+	turn_order.insert(turn_order.find(anchor) + 1, peer_id)
+	var now := turn_order.find(current)
+	if now != -1:
+		current_turn_index = now
+
+func _remove_from_turn_order(idx: int) -> void:
+	var was_current := idx == current_turn_index
+	turn_order.remove_at(idx)
+	if idx < current_turn_index:
+		current_turn_index -= 1
+	elif was_current:
+		_turn_time_left = GameRules.TURN_TIMEOUT
+		if current_turn_index >= turn_order.size():
+			current_turn_index = 0
+
+## Bu oyuncunun gönderdiği ya da ona gelen bütün teklifleri siler.
+func _drop_offers_of(peer_id: int) -> void:
+	for offer in offers.duplicate():
+		if int(offer["from"]) == peer_id or int(offer["to"]) == peer_id:
+			offers.erase(offer)
+
+## PARTİ ANAHTARI DEĞİŞİR (genel başkan değişti): partiye ait bütün kayıtlar
+## old_id'den new_id'ye taşınır. new_deputy: partide kalan yardımcı (-1: yok).
+func _rekey_party(old_id: int, new_id: int, new_deputy: int) -> void:
+	var data: Dictionary = PartyManager.parties.get(old_id, {}).duplicate()
+	data.erase("deputy")
+	if new_deputy != -1:
+		data["deputy"] = new_deputy
+	PartyManager.parties.erase(old_id)
+	PartyManager.parties[new_id] = data
+	for table in [national_support, populism, turmoil, law_rounds, speech_rounds, congress_rounds,
+			national_list, last_seats, election_seats, last_vote_shares, previous_vote_shares]:
+		if table.has(old_id):
+			table[new_id] = table[old_id]
+			table.erase(old_id)
+	var t := passed_threshold.find(old_id)
+	if t != -1:
+		passed_threshold[t] = new_id
+	for nested in [last_province_results, local_support, organizations]:
+		for province_id in nested.keys():
+			var entry: Dictionary = nested[province_id]
+			if entry.has(old_id):
+				entry[new_id] = entry[old_id]
+				entry.erase(old_id)
+	if splinters.has(old_id):
+		splinters[new_id] = splinters[old_id]
+		splinters.erase(old_id)
+	for splinter in splinters.keys():
+		if int(splinters[splinter].get("parent", -1)) == old_id:
+			splinters[splinter]["parent"] = new_id
+	GovernmentManager.rekey_party(old_id, new_id)
+
 # --- Senkronizasyon ---------------------------------------------------------
 
 func _pack_state(include_results: bool) -> Dictionary:
@@ -2119,6 +2820,10 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"populism": populism,
 		"splinters": splinters,
 		"speech_done": speech_done,
+		"speech_rounds": speech_rounds,
+		"offers": offers,
+		"congress_rounds": congress_rounds,
+		"previous_vote_shares": previous_vote_shares,
 		"agenda": agenda,
 		"national_list": national_list,
 		"round": round_number,
@@ -2157,6 +2862,10 @@ func _apply_state(state: Dictionary) -> void:
 	populism = state.get("populism", {})
 	splinters = state.get("splinters", {})
 	speech_done = bool(state.get("speech_done", false))
+	speech_rounds = state.get("speech_rounds", {})
+	offers = state.get("offers", [])
+	congress_rounds = state.get("congress_rounds", {})
+	previous_vote_shares = state.get("previous_vote_shares", {})
 	agenda = state.get("agenda", {})
 	national_list = state.get("national_list", {})
 	round_number = int(state["round"])
@@ -2202,7 +2911,7 @@ func _push_state(event: Dictionary, include_results: bool = false) -> void:
 		_pending_dealt = {}
 	state_version += 1
 	if not _is_local_only():
-		_receive_state.rpc(_pack_state(include_results or event.get("type", "") in ["full", "election", "player_left", "party_split", "party_merge"]), event)
+		_receive_state.rpc(_pack_state(include_results or event.get("type", "") in ["full", "election", "player_left", "party_split", "party_merge", "party_change"]), event)
 	_emit_post_event(event)
 
 func _emit_post_event(event: Dictionary) -> void:
@@ -2212,7 +2921,7 @@ func _emit_post_event(event: Dictionary) -> void:
 	if type == "election":
 		election_completed.emit()
 	inventories_updated.emit()
-	if type in ["full", "player_left", "party_split", "party_merge"]:
+	if type in ["full", "player_left", "party_split", "party_merge", "party_change"]:
 		turn_order_updated.emit()
 	turn_changed.emit(current_turn_peer_id())
 	opinion_changed.emit()
@@ -2221,7 +2930,7 @@ func _emit_post_event(event: Dictionary) -> void:
 			round_advanced.emit()
 		"game_over":
 			game_over.emit()
-		"full", "player_left", "party_split", "party_merge":
+		"full", "player_left", "party_split", "party_merge", "party_change":
 			seats_changed.emit()
 		"played":
 			if bool(event.get("seats_changed", false)):

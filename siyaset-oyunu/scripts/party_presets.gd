@@ -87,7 +87,18 @@ func icon_count() -> int:
 ## Küçük bir ızgara ikonu için ~64-96, kocaman bir önizleme için ~400-600
 ## gibi kullanım yerine göre farklı değerler verilmeli — her biri kendi
 ## çözünürlüğünde rasterize edilir, tek bir dokuyu büyütüp bulanıklaştırmayız.
+## BAĞIMSIZ SİYASETÇİ simgesi (gri zeminde kullanıcı): parti ikonu değil,
+## özel indeks. Bağımsızlar bloğu da aynı simgeyi kullanır.
+const USER_ICON_INDEX := -10
+const USER_ICON_PATH := "res://assets/ui/independent_user.svg"
+const INDEPENDENT_COLOR := Color("6E6A80")
+
 func get_icon_texture(index: int, target_pixel_size: int = 128) -> Texture2D:
+	if index == USER_ICON_INDEX:
+		var user_key := "user_%d" % target_pixel_size
+		if not _texture_cache.has(user_key):
+			_texture_cache[user_key] = SvgRaster.load_texture(USER_ICON_PATH, target_pixel_size / ICON_NATIVE_SIZE)
+		return _texture_cache[user_key]
 	if index < 0 or index >= icon_paths.size():
 		return null
 	var key := "%d_%d" % [index, target_pixel_size]

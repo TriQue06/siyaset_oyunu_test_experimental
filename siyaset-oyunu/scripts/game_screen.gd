@@ -521,7 +521,7 @@ func _focus_log_entry(entry: Dictionary) -> void:
 	# Harita kutusunun dışına fazla taşmasın.
 	var min_pos := _map_clip.size - GameMap.map_size() * zoom
 	target = Vector2(clampf(target.x, min_pos.x, 0.0), clampf(target.y, min_pos.y, 0.0))
-	var color: Color = PartyManager.parties.get(int(entry.get("peer_id", -1)), {}).get("bg_color", UiTheme.GOLD)
+	var color: Color = PartyManager.data_of(int(entry.get("peer_id", -1))).get("bg_color", UiTheme.GOLD)
 	_focus_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 	_focus_tween.set_parallel(true)
 	_focus_tween.tween_property(map_holder, "scale", Vector2(zoom, zoom), FOCUS_MOVE)
@@ -576,7 +576,7 @@ func _refresh_parliament_diagram() -> void:
 	var voting := GovernmentManager.is_voting()
 	var entries: Array = []
 	for peer_id in ids:
-		var color: Color = PartyManager.parties.get(peer_id, {}).get("bg_color", Color(0.5, 0.5, 0.5))
+		var color: Color = PartyManager.data_of(peer_id).get("bg_color", Color(0.5, 0.5, 0.5))
 		if voting and GovernmentManager.votes.has(peer_id):
 			color = VOTE_COLORS[int(GovernmentManager.votes[peer_id])]
 		entries.append({"seats": int(CardManager.last_seats[peer_id]), "color": color})
@@ -620,7 +620,7 @@ func _refresh_province_winner_colors() -> void:
 			continue
 		# İlin rengi, salt çoğunluk olsun olmasın, DOĞRUDAN o ilde en çok
 		# koltuğu alan partinin kendi rengi, tam opak.
-		var party_color: Color = PartyManager.parties.get(winner_id, {}).get("bg_color", Color(0.5, 0.5, 0.5))
+		var party_color: Color = PartyManager.data_of(winner_id).get("bg_color", Color(0.5, 0.5, 0.5))
 		party_color.a = 1.0
 		_seat_layer_colors[province_id] = party_color
 	_apply_map_layer_colors()
@@ -639,7 +639,7 @@ func _refresh_map_seat_markers() -> void:
 			var seats: int = entry[peer_id]["seats"]
 			if seats <= 0:
 				continue
-			var color: Color = PartyManager.parties.get(peer_id, {}).get("bg_color", Color(0.5, 0.5, 0.5))
+			var color: Color = PartyManager.data_of(peer_id).get("bg_color", Color(0.5, 0.5, 0.5))
 			for i in seats:
 				colors.append(color)
 		if not colors.is_empty():
@@ -816,7 +816,7 @@ func _rebuild_player_panel() -> void:
 	player_panel_list.columns = 1
 
 	for peer_id in _ordered_peer_ids():
-		var party: Dictionary = PartyManager.parties.get(peer_id, {})
+		var party: Dictionary = PartyManager.data_of(peer_id)
 		var avatar := _build_avatar(peer_id, party)
 		player_panel_list.add_child(avatar)
 
@@ -849,7 +849,7 @@ func _update_turn_indicator() -> void:
 		turn_indicator.hide()
 		return
 	turn_indicator.show()
-	var party: Dictionary = PartyManager.parties.get(peer_id, {})
+	var party: Dictionary = PartyManager.data_of(peer_id)
 	_update_turn_indicator_text()
 	var badge := PartyBadge.build(party, turn_indicator_badge_slot.custom_minimum_size, BADGE_ICON_PIXEL_SIZE)
 	turn_indicator_badge_slot.add_child(badge)
@@ -858,7 +858,7 @@ func _update_turn_indicator_text() -> void:
 	var peer_id := CardManager.current_turn_peer_id()
 	if peer_id == -1:
 		return
-	var party: Dictionary = PartyManager.parties.get(peer_id, {})
+	var party: Dictionary = PartyManager.data_of(peer_id)
 	var pname: String = party.get("name", MultiplayerManager.players.get(peer_id, {}).get("name", "?"))
 	var suffix := " (Sen)" if peer_id == multiplayer.get_unique_id() else ""
 	var timer := "" if CardManager.is_turn_blocked() else "\nSüre: %s" % GameRules.format_seconds(CardManager.turn_seconds_left())
@@ -2022,7 +2022,7 @@ func _refresh_waiting_overlay() -> void:
 		_waiting_badge_holder = holder
 		for child in _waiting_badge_slot.get_children():
 			child.queue_free()
-		var badge := PartyBadge.build(PartyManager.parties.get(holder, {}), Vector2(96, 96), 192)
+		var badge := PartyBadge.build(PartyManager.data_of(holder), Vector2(96, 96), 192)
 		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_waiting_badge_slot.add_child(badge)
 		_waiting_badge_slot.position = Vector2(get_viewport_rect().size.x * 0.5 - 48.0, get_viewport_rect().size.y * 0.5 - 190.0)
@@ -2120,7 +2120,7 @@ func _refresh_proposer_chip() -> void:
 		child.queue_free()
 	# TEK SATIR ve DAR: yarım dairenin üstünde kalan boş şerit ancak bu kadar
 	# yer bırakıyor, daha yükseği koltukların üstüne biniyor.
-	_proposer_row.add_child(PartyBadge.build(PartyManager.parties.get(peer_id, {}),
+	_proposer_row.add_child(PartyBadge.build(PartyManager.data_of(peer_id),
 		Vector2(22, 22), BADGE_ICON_PIXEL_SIZE))
 	var who := Label.new()
 	who.text = _party_name_of(peer_id)
@@ -2588,7 +2588,7 @@ func _refresh_law_designer() -> void:
 		_law_agenda_label.text = "Gündem: %s — sadece %s yasaları" % [data["title"], data["axis_title"]]
 	for child in _law_rows.get_children():
 		child.queue_free()
-	var ideology: Dictionary = PartyManager.parties.get(me, {}).get("ideology", {})
+	var ideology: Dictionary = PartyManager.data_of(me).get("ideology", {})
 	for axis in IdeologyAxes.AXES:
 		var info: Dictionary = CardPresets.AXIS_TITLES[axis]
 		var row := HBoxContainer.new()
@@ -2623,7 +2623,7 @@ func _ideology_bar(axis: String, value: float) -> Control:
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var left := _law_color(axis, -1)
 	var right := _law_color(axis, 1)
-	var mine: Color = PartyManager.parties.get(multiplayer.get_unique_id(), {}).get("bg_color", Color.WHITE)
+	var mine: Color = PartyManager.data_of(multiplayer.get_unique_id()).get("bg_color", Color.WHITE)
 	bar.draw.connect(func():
 		var w := bar.size.x
 		var y := bar.size.y * 0.5
@@ -2885,7 +2885,7 @@ func _refresh_layer_bar() -> void:
 func _rebuild_layer_legend() -> void:
 	for child in _layer_legend.get_children():
 		child.queue_free()
-	var mine: Color = PartyManager.parties.get(multiplayer.get_unique_id(), {}).get("bg_color", Color(0.5, 0.5, 0.5))
+	var mine: Color = PartyManager.data_of(multiplayer.get_unique_id()).get("bg_color", Color(0.5, 0.5, 0.5))
 	var swatches: Array = []
 	match _map_layer:
 		MapLayer.ORGANIZATION:
@@ -2941,7 +2941,7 @@ func _apply_map_layer_colors() -> void:
 	if map_holder == null:
 		return
 	var me := multiplayer.get_unique_id()
-	var mine: Color = PartyManager.parties.get(me, {}).get("bg_color", Color(0.5, 0.5, 0.5))
+	var mine: Color = PartyManager.data_of(me).get("bg_color", Color(0.5, 0.5, 0.5))
 	mine.a = 1.0
 	var colors := {}
 	map_holder.set_dark_borders(_map_layer == MapLayer.ORGANIZATION)
@@ -3149,7 +3149,7 @@ func _refresh_speech_panel() -> void:
 		_speech_panel.hide()
 		_speech_key = ""
 		return
-	var ideology: Dictionary = PartyManager.parties.get(me, {}).get("ideology", {})
+	var ideology: Dictionary = PartyManager.data_of(me).get("ideology", {})
 	var key := "%d:%d:%s" % [CardManager.round_number, CardManager.current_turn_index, str(ideology)]
 	if key != _speech_key:
 		_speech_key = key
@@ -3235,7 +3235,7 @@ func _ask_propaganda_target(hand_index: int, province_id: String) -> void:
 			continue
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
-		var badge := PartyBadge.build(PartyManager.parties.get(peer_id, {}), Vector2(34, 34), BADGE_ICON_PIXEL_SIZE)
+		var badge := PartyBadge.build(PartyManager.data_of(peer_id), Vector2(34, 34), BADGE_ICON_PIXEL_SIZE)
 		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(badge)

@@ -83,7 +83,7 @@ static func _bloc_solidarity() -> bool:
 	return _bloc_forming
 
 static func _ideology(peer_id: int) -> Dictionary:
-	return PartyManager.parties.get(peer_id, {}).get("ideology", IdeologyAxes.default_values())
+	return PartyManager.data_of(peer_id).get("ideology", IdeologyAxes.default_values())
 
 static func _seats() -> Dictionary:
 	return CardManager._province_seat_counts

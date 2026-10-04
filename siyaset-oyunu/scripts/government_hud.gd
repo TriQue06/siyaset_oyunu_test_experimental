@@ -10,7 +10,7 @@ const TITLE_COLOR := UiTheme.TEXT_MUTED
 const DIM_COLOR := UiTheme.TEXT_MUTED
 
 static func party_name_of(peer_id: int) -> String:
-	return PartyManager.parties.get(peer_id, {}).get("name", "?")
+	return PartyManager.data_of(peer_id).get("name", "?")
 
 static func leader_name_of(peer_id: int) -> String:
 	return PoliticianPresets.display_name(peer_id)
@@ -39,7 +39,7 @@ static func _mono_label(text: String, font_size: int, color: Color) -> Label:
 	return label
 
 static func _badge(peer_id: int) -> Control:
-	var badge := PartyBadge.build(PartyManager.parties.get(peer_id, {}), BADGE_SIZE, BADGE_ICON_PIXEL_SIZE)
+	var badge := PartyBadge.build(PartyManager.data_of(peer_id), BADGE_SIZE, BADGE_ICON_PIXEL_SIZE)
 	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	badge.tooltip_text = party_name_of(peer_id)

@@ -23,6 +23,10 @@ const NAME_MAX_LENGTH := 14
 #   "ready": bool,
 # }
 var parties: Dictionary = {}
+## SİYASETÇİLER (oyuncu başına, partiden bağımsız): peer_id -> PoliticianPresets
+## sözlüğü. Oyuncu başka partiye katılsa da, partisini feshetse de siyasetçisi
+## burada kalır (bkz. PoliticianPresets.of).
+var politicians: Dictionary = {}
 ## Bu cihazdaki oyuncunun siyasetçisi (profil ekranında seçilir).
 var my_politician: Dictionary = {}
 ## Her yayında artar; istemci heartbeat'te farklı görürse tam durumu ister
@@ -56,6 +60,64 @@ func _free_color(also_avoid: Color) -> Color:
 			continue
 		colors.append(color)
 	return colors[randi_range(0, colors.size() - 1)] if not colors.is_empty() else PartyPresets.COLORS[0]
+
+# --- PARTİ ÜYELİĞİ -------------------------------------------------------------------
+## Bir PARTİ, genel başkanının peer_id'siyle tutulur (anahtar = genel başkan).
+## Partide en fazla bir YARDIMCI daha olabilir: parties[pid]["deputy"] = peer_id.
+## BAĞIMSIZ siyasetçi de tek kişilik bir kayıttır: parties[pid]["independent"].
+## Fesihte sahipsiz kalan vekiller BLOC_ID anahtarlı "Bağımsızlar" kaydında
+## durur (oyuncusu yok, seçime girmez; bir sonraki seçimde kaybolur).
+const BLOC_ID := -2
+const MAX_MEMBERS := 2
+
+## Bu oyuncunun (ya da parti anahtarının) partisi. Kaydı olmayan peer kendisi
+## sayılır (testler ve eski kayıtlar parti tablosu olmadan çalışır).
+func party_of(peer_id: int) -> int:
+	if parties.has(peer_id):
+		return peer_id
+	for pid in parties.keys():
+		if int(parties[pid].get("deputy", -1)) == peer_id:
+			return int(pid)
+	return peer_id
+
+## Oyuncunun ya da partinin parti verisi (yardımcı için genel başkanın partisi).
+func data_of(peer_id: int) -> Dictionary:
+	return parties.get(party_of(peer_id), {})
+
+## Partinin üyeleri: [genel başkan, (yardımcı)]. Bağımsızlar bloğunun üyesi yok.
+func members_of(pid: int) -> Array:
+	if pid == BLOC_ID or not parties.has(pid):
+		return [] if pid == BLOC_ID else [pid]
+	var deputy := int(parties[pid].get("deputy", -1))
+	return [pid] if deputy == -1 else [pid, deputy]
+
+func member_count(pid: int) -> int:
+	return maxi(1, members_of(pid).size())
+
+func deputy_of(pid: int) -> int:
+	return int(parties.get(pid, {}).get("deputy", -1))
+
+func is_leader(peer_id: int) -> bool:
+	return parties.has(peer_id) and peer_id != BLOC_ID
+
+func is_deputy(peer_id: int) -> bool:
+	return party_of(peer_id) != peer_id
+
+func is_independent(pid: int) -> bool:
+	return bool(parties.get(party_of(pid), {}).get("independent", false))
+
+func is_bloc(pid: int) -> bool:
+	return pid == BLOC_ID
+
+## Aynı partide mi? (Bir oyuncu kendisiyle de aynı partidedir.)
+func same_party(a: int, b: int) -> bool:
+	return party_of(a) == party_of(b)
+
+## Host: parti kayıtlarını yayınlar (CardManager'daki parti işlemleri sonrası).
+func broadcast() -> void:
+	if MultiplayerManager.room_code != "" and MultiplayerManager.is_host:
+		_broadcast_parties()
+	parties_updated.emit()
 
 func my_party() -> Dictionary:
 	return parties.get(multiplayer.get_unique_id(), {})
@@ -153,6 +215,7 @@ func reset() -> void:
 	if not MultiplayerManager.is_host:
 		return
 	parties.clear()
+	politicians.clear()
 	_broadcast_parties()
 	parties_updated.emit()
 
@@ -245,7 +308,7 @@ func add_bot_party(peer_id: int) -> void:
 	var background := PoliticianPresets.random_background()
 	var homes := GameMap.province_ids()
 	var bot_name := PoliticianPresets.random_name(PoliticianPresets.used_surnames(peer_id))
-	parties[peer_id]["politician"] = PoliticianPresets.make(bot_name["first_name"], bot_name["surname"],
+	politicians[peer_id] = PoliticianPresets.make(bot_name["first_name"], bot_name["surname"],
 		background, String(homes[randi() % homes.size()]) if not homes.is_empty() else "", bot_name["gender"])
 	_adjust_bot_colors()
 	if MultiplayerManager.room_code != "":
@@ -320,7 +383,6 @@ func _apply_party_local_only(party_name: String, icon_index: int, icon_color: Co
 		parties_updated.emit()
 		return
 	var was_ready: bool = parties.get(id, {}).get("ready", false)
-	var old_politician: Dictionary = parties.get(id, {}).get("politician", {})
 	parties[id] = {
 		"name": party_name,
 		"icon_index": icon_index,
@@ -329,7 +391,6 @@ func _apply_party_local_only(party_name: String, icon_index: int, icon_color: Co
 		"ideology": ideology,
 		"ready": was_ready,
 	}
-	_restore_politician(id, old_politician)
 	_adjust_bot_colors()
 	parties_updated.emit()
 
@@ -339,7 +400,6 @@ func _apply_party(peer_id: int, party_name: String, icon_index: int, icon_color:
 		parties_updated.emit()
 		return
 	var was_ready: bool = parties.get(peer_id, {}).get("ready", false)
-	var old_politician: Dictionary = parties.get(peer_id, {}).get("politician", {})
 	parties[peer_id] = {
 		"name": party_name,
 		"icon_index": icon_index,
@@ -348,7 +408,6 @@ func _apply_party(peer_id: int, party_name: String, icon_index: int, icon_color:
 		"ideology": ideology,
 		"ready": was_ready,
 	}
-	_restore_politician(peer_id, old_politician)
 	_adjust_bot_colors()
 	_broadcast_parties()
 	parties_updated.emit()
@@ -358,7 +417,6 @@ func _apply_party_and_ready(peer_id: int, party_name: String, icon_index: int, i
 		_broadcast_parties()
 		parties_updated.emit()
 		return
-	var old_politician: Dictionary = parties.get(peer_id, {}).get("politician", {})
 	parties[peer_id] = {
 		"name": party_name,
 		"icon_index": icon_index,
@@ -367,7 +425,6 @@ func _apply_party_and_ready(peer_id: int, party_name: String, icon_index: int, i
 		"ideology": ideology,
 		"ready": is_ready_value,
 	}
-	_restore_politician(peer_id, old_politician)
 	_adjust_bot_colors()
 	_broadcast_parties()
 	parties_updated.emit()
@@ -418,11 +475,6 @@ func _request_set_party_and_ready(party_name: String, icon_index: int, icon_colo
 
 # --- Siyasetçi profili (bkz. PoliticianPresets) ---------------------------------------
 
-## Parti sözlüğü yeniden yazılırken siyasetçi verisi kaybolmasın.
-func _restore_politician(peer_id: int, politician: Dictionary) -> void:
-	if not politician.is_empty() and parties.has(peer_id):
-		parties[peer_id]["politician"] = politician
-
 ## Bu oyuncunun siyasetçisini ayarlar (profil ekranında "Devam"a basınca).
 func set_my_politician(data: Dictionary) -> void:
 	if not PoliticianPresets.is_valid(data):
@@ -447,7 +499,7 @@ func randomize_bot_politician(bot_id: int) -> void:
 		_request_randomize_bot_politician.rpc_id(1, bot_id)
 
 func _randomize_bot_politician(bot_id: int) -> void:
-	if not parties.has(bot_id):
+	if not parties.has(bot_id) and not politicians.has(bot_id):
 		return
 	var bot_name := PoliticianPresets.random_name(PoliticianPresets.used_surnames(bot_id))
 	var homes := GameMap.province_ids()
@@ -467,9 +519,7 @@ func set_politician_host(peer_id: int, data: Dictionary) -> void:
 	_apply_politician(peer_id, data)
 
 func _apply_politician(peer_id: int, data: Dictionary) -> void:
-	if not parties.has(peer_id):
-		parties[peer_id] = {}
-	parties[peer_id]["politician"] = PoliticianPresets.make(String(data.get("first_name", "")),
+	politicians[peer_id] = PoliticianPresets.make(String(data.get("first_name", "")),
 		String(data.get("surname", "")), String(data.get("background", "")), String(data.get("hometown", "")),
 		String(data.get("gender", "m")))
 	if MultiplayerManager.room_code != "" and MultiplayerManager.is_host:
@@ -532,7 +582,7 @@ func _request_set_bot_party(bot_id: int, party_name: String, icon_index: int, bg
 
 func _broadcast_parties() -> void:
 	state_version += 1
-	_sync_parties.rpc(parties, state_version)
+	_sync_parties.rpc(parties, politicians, state_version)
 
 ## İstemci: tam durumu host'tan ister (heartbeat sürüm uyuşmazlığında).
 func request_full_sync() -> void:
@@ -544,10 +594,11 @@ func request_full_sync() -> void:
 func _request_full_sync() -> void:
 	if not MultiplayerManager.is_host:
 		return
-	_sync_parties.rpc_id(multiplayer.get_remote_sender_id(), parties, state_version)
+	_sync_parties.rpc_id(multiplayer.get_remote_sender_id(), parties, politicians, state_version)
 
 @rpc("authority", "reliable")
-func _sync_parties(new_parties: Dictionary, version: int) -> void:
+func _sync_parties(new_parties: Dictionary, new_politicians: Dictionary, version: int) -> void:
 	parties = new_parties
+	politicians = new_politicians
 	state_version = version
 	parties_updated.emit()

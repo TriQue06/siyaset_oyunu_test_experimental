@@ -385,7 +385,7 @@ func _leave() -> void:
 # --- Parti bilgisi ---------------------------------------------------------------
 
 func _party(peer_id) -> Dictionary:
-	return PartyManager.parties.get(peer_id, {})
+	return PartyManager.data_of(peer_id)
 
 func _party_name(peer_id) -> String:
 	return String(_party(peer_id).get("name", MultiplayerManager.players.get(peer_id, {}).get("name", "?")))

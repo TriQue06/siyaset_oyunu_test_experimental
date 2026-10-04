@@ -130,7 +130,7 @@ func _ranking_row(index: int, entry: Dictionary, is_me: bool) -> Control:
 
 ## Rozet için parti verisi: oyuncu ayrıldıysa sıralamadaki renkle yedek.
 func _party_for(entry: Dictionary) -> Dictionary:
-	var party: Dictionary = PartyManager.parties.get(int(entry.get("peer_id", -1)), {})
+	var party: Dictionary = PartyManager.data_of(int(entry.get("peer_id", -1)))
 	if party.is_empty():
 		party = {"name": entry.get("name", "?"), "icon_index": 0, "icon_color": Color.WHITE, "bg_color": entry.get("color", Color.GRAY)}
 	return party

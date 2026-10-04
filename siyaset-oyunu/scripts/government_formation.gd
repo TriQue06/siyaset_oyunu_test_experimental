@@ -108,7 +108,7 @@ func _refresh_seat_view() -> void:
 	var seat_entries: Array = []
 	var rows: Array = []
 	for peer_id in ids:
-		var party: Dictionary = PartyManager.parties.get(peer_id, {})
+		var party: Dictionary = PartyManager.data_of(peer_id)
 		var color: Color = party.get("bg_color", Color(0.5, 0.5, 0.5))
 		var seats := GovernmentManager.seats_of(peer_id)
 		seat_entries.append({"seats": seats, "color": color if _partners.has(peer_id) else color.darkened(0.6)})
@@ -138,7 +138,7 @@ func _build_partner_bar() -> void:
 		var in_gov: bool = _partners.has(peer_id)
 		var btn := Button.new()
 		UiSkin.skin_button(btn)
-		btn.text = "%s (%d)" % [PartyManager.parties.get(peer_id, {}).get("name", "?"), GovernmentManager.seats_of(peer_id)]
+		btn.text = "%s (%d)" % [PartyManager.data_of(peer_id).get("name", "?"), GovernmentManager.seats_of(peer_id)]
 		btn.modulate = Color.WHITE if in_gov else Color(0.78, 0.78, 0.78, 1.0)
 		btn.tooltip_text = "Görevli parti (sabit)" if peer_id == me else ("Hükümetten çıkar" if in_gov else "Hükümete ekle")
 		btn.disabled = peer_id == me
@@ -174,7 +174,7 @@ func _build_partner_rows() -> void:
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		name_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		name_label.text = "%s — %s   (%d sandalye)" % [
-			PartyManager.parties.get(peer_id, {}).get("name", "?"),
+			PartyManager.data_of(peer_id).get("name", "?"),
 			MultiplayerManager.players.get(peer_id, {}).get("name", "?"),
 			GovernmentManager.seats_of(peer_id),
 		]
@@ -276,7 +276,7 @@ func _refresh_chip_states() -> void:
 ## Bir partiyi temsil eden çip. Görünen her şey PNG: zemin ui_slot.png
 ## (parti rengiyle boyanmış) + parti ikonu + seçim vurgusu.
 func _build_party_chip(peer_id: int) -> Control:
-	var party: Dictionary = PartyManager.parties.get(peer_id, {})
+	var party: Dictionary = PartyManager.data_of(peer_id)
 
 	var chip := Control.new()
 	chip.custom_minimum_size = CHIP_SIZE
@@ -312,7 +312,7 @@ func _refresh_summary() -> void:
 		var names: Array[String] = []
 		for peer_id in _partners:
 			seats += GovernmentManager.seats_of(peer_id)
-			names.append(PartyManager.parties.get(peer_id, {}).get("name", "?"))
+			names.append(PartyManager.data_of(peer_id).get("name", "?"))
 		var total := GovernmentManager.total_seats()
 		summary_label.text = "Ortaklar: %s\nToplam %d/%d sandalye — %s" % [
 			" + ".join(names), seats, total,
@@ -331,12 +331,12 @@ func _refresh_summary() -> void:
 
 	var parts: Array[String] = []
 	for peer_id in points.keys():
-		parts.append("%s +%d" % [PartyManager.parties.get(peer_id, {}).get("name", "?"), points[peer_id]])
+		parts.append("%s +%d" % [PartyManager.data_of(peer_id).get("name", "?"), points[peer_id]])
 
 	var pm_peer: int = int(_assignments.get(GovernmentPresets.POST_PM, -1))
 	var total2 := GovernmentManager.total_seats()
 	summary_label.text = "Ana iktidar partisi: %s  |  Hükümet %d/%d sandalye (%s)\n%s" % [
-		PartyManager.parties.get(pm_peer, {}).get("name", "?"),
+		PartyManager.data_of(pm_peer).get("name", "?"),
 		gov_seats, total2,
 		"salt çoğunluk VAR" if gov_seats * 2 > total2 else "salt çoğunluk YOK",
 		" · ".join(parts),

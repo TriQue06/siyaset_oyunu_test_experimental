@@ -90,6 +90,7 @@ func _initialize() -> void:
 		if PP.FEMALE_NAMES.has(PP.random_first_name("m")) or PP.MALE_NAMES.has(PP.random_first_name("f")):
 			gender_ok = false
 	check("ad secilen cinsiyete uyar (unisex ikisinde)", gender_ok and PP.names_for("m").has("Deniz") and PP.names_for("f").has("Deniz"))
+	check("Umit ve Ozgur sadece erkek", not PP.names_for("f").has("Ümit") and not PP.names_for("f").has("Özgür") and PP.names_for("m").has("Ümit") and PP.names_for("m").has("Özgür"))
 	check("istenen adlar var", PP.MALE_NAMES.has("Recep") and PP.MALE_NAMES.has("Necdet") and PP.FEMALE_NAMES.has("Meral") and PP.FEMALE_NAMES.has("Tansu"))
 	var overlap := false
 	for n in PP.MALE_NAMES:

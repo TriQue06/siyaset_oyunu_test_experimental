@@ -67,6 +67,7 @@ const HOMETOWN_PULL := 0.4
 const MALE_NAME_CHANCE := 0.75
 const GENDERS := ["m", "f"]
 const MALE_NAMES := [
+	"Özgür", "Ümit",
 	"Ahmet", "Aras", "Barlas", "Berk", "Cihan", "Doruk", "Emre", "Ferit", "Gökay", "Hakan", "Kaan",
 	"Kerem", "Levent", "Mert", "Nevzat", "Oktay", "Orhun", "Serdar", "Tamer", "Tuncay", "Ufuk",
 	"Vedat", "Yekta", "Zafer", "Arda", "Erkin", "Onur", "Alper", "Atilla", "Bora", "Burak", "Cem",
@@ -88,7 +89,7 @@ const FEMALE_NAMES := [
 	"Nesrin", "Oya", "Serpil", "Sevim", "Songül", "Şule", "Türkan", "Zerrin", "Tansu", "Meral",
 ]
 const UNISEX_NAMES := [
-	"Deniz", "Özgür", "Ümit", "İlkay",
+	"Deniz", "İlkay",
 ]
 ## Soyad = kök + ek ("Gök" + "yelken" = "Gökyelken"). Yaygın siyasetçi
 ## soyadı kalıpları (-oğlu, -doğan, -demir, -kaya, -han) bilerek yok; -soy,

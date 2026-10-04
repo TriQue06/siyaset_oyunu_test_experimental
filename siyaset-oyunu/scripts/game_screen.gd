@@ -265,7 +265,7 @@ var _speech_open_key: String = ""
 var _speech_button: Button
 
 func _ready() -> void:
-	AudioManager.play_music("game")
+	AudioManager.play_game_music()
 	map_holder.province_clicked.connect(_on_province_clicked)
 	_refresh_game_settings_label()
 	MultiplayerManager.settings_updated.connect(_refresh_game_settings_label)

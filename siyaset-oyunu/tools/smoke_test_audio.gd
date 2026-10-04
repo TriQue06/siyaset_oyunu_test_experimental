@@ -125,6 +125,13 @@ func _initialize() -> void:
 	for track in am._music_streams:
 		var stream = am._music_streams[track]
 		check("%s: motor dongusu kapali (fade ile donduruyoruz)" % track, not ("loop" in stream) or not stream.loop)
+	check("ikinci oyun muzigi yuklendi", am._music_streams.has("game2"))
+	var card_mgr = root.get_node("CardManager")
+	var seen := {}
+	for i in 40:
+		card_mgr._pick_music_track()
+		seen[card_mgr.music_track] = true
+	check("oyun muzigi iki parcadan rastgele secilir", seen.size() == 2 and seen.has("game") and seen.has("game2"), str(seen.keys()))
 	check("arka plan muzigi secim muziginden kisik",
 		float(am.MUSIC_GAIN["game"]) < float(am.MUSIC_GAIN["election"]), "%s dB / %s dB" % [am.MUSIC_GAIN["game"], am.MUSIC_GAIN["election"]])
 	check("arka plan fade'i uzun", float(am.MUSIC_FADE_IN["game"]) >= 2.0 and float(am.MUSIC_FADE_OUT["game"]) >= 2.0)

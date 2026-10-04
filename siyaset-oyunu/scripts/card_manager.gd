@@ -133,6 +133,9 @@ var last_vote_shares: Dictionary = {}
 ## seçime göre oy kaybederse düşer. ŞİMDİLİK HİÇBİR ETKİSİ YOK; ileride genel
 ## başkan değişimi gibi olaylar buna bağlanacak.
 var credibility: Dictionary = {}
+## Bu dönemin oyun müziği (AudioManager.GAME_TRACKS); oyun başında ve her
+## seçimden sonra rastgele seçilir, herkes aynısını duyar.
+var music_track: String = "game"
 const CREDIBILITY_MAX := 100.0
 const CREDIBILITY_START := 100.0
 ## Oy kaybında düşüş: sabit + kaybedilen her yüzde puanı başına.
@@ -782,6 +785,7 @@ func init_game() -> void:
 	credibility = {}
 	for peer_id in MultiplayerManager.players.keys():
 		credibility[peer_id] = CREDIBILITY_START
+	_pick_music_track()
 	game_finished = false
 	final_ranking = []
 	game_end_reason = ""
@@ -824,6 +828,10 @@ func _apply_politician_starts() -> void:
 			_province_origin[home] = province_ideology[home].duplicate()
 		if PoliticianPresets.has_background(peer_id, "is_insani"):
 			mana[peer_id] = mana_of(peer_id) + PoliticianPresets.BUSINESS_START_MANA
+
+func _pick_music_track() -> void:
+	var tracks: Array = AudioManager.GAME_TRACKS
+	music_track = String(tracks[_rng.randi() % tracks.size()])
 
 func credibility_of(peer_id: int) -> float:
 	return float(credibility.get(peer_id, CREDIBILITY_START))
@@ -1974,6 +1982,7 @@ func _hold_election(finished_round: int, early: bool) -> void:
 		_deal_turn_card(peer_id)
 	# Seçimde kullanıldıktan SONRA söner: seçimden hemen önceki hamleler tam etkili.
 	_decay_opinion()
+	_pick_music_track()  # seçim gecesinden sonra yeni dönemin müziği
 	_push_state({"type": "election"}, true)
 	# Yeni meclis: hükümet kurma görevi en çok vekili olan partiye verilir.
 	# Seçim gecesi yayını herkesin ekranında oynarken kurma süresi yanmasın.
@@ -2111,6 +2120,7 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"early": last_election_was_early,
 		"vote_shares": last_vote_shares,
 		"credibility": credibility,
+		"music_track": music_track,
 		"seats": last_seats,
 		"election_seats": election_seats,
 		"early_election_pending": early_election_pending,
@@ -2148,6 +2158,7 @@ func _apply_state(state: Dictionary) -> void:
 	last_election_was_early = bool(state["early"])
 	last_vote_shares = state["vote_shares"]
 	credibility = state.get("credibility", {})
+	music_track = String(state.get("music_track", "game"))
 	last_seats = state["seats"]
 	election_seats = state.get("election_seats", {})
 	early_election_pending = bool(state.get("early_election_pending", false))

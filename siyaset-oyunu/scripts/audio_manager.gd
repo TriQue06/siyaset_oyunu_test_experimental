@@ -42,15 +42,20 @@ const SOUNDS := {
 ## baştan açılırken yükselir.
 const MUSIC := {
 	"game": "res://assets/audio/music/game_loop.ogg",
+	"game2": "res://assets/audio/music/game_loop_2.ogg",
 	"election": "res://assets/audio/music/election.ogg",
 }
-## Parça başına ses kazancı (dB) ve fade süreleri (saniye).
-const MUSIC_GAIN := {"game": -10.0, "election": -3.0}
-const MUSIC_FADE_IN := {"game": 3.0, "election": 0.35}
-const MUSIC_FADE_OUT := {"game": 3.0, "election": 0.4}
+## OYUN MÜZİKLERİ: oyunun başında ve her seçim gecesinden sonra host bunlardan
+## birini rastgele seçer, herkes aynısını duyar (bkz. CardManager.music_track).
+const GAME_TRACKS := ["game", "game2"]
+## Parça başına ses kazancı (dB) ve fade süreleri (saniye). game2 kaynakta
+## ~1,7 dB daha yüksek: kazancı ona göre eşitlendi.
+const MUSIC_GAIN := {"game": -10.0, "game2": -11.7, "election": -3.0}
+const MUSIC_FADE_IN := {"game": 3.0, "game2": 3.0, "election": 0.35}
+const MUSIC_FADE_OUT := {"game": 3.0, "game2": 3.0, "election": 0.4}
 ## Parçaların ilk saniyesi atlanır (giriş vuruşu/sessizliği istenmiyor).
 ## Dosyayı kesmiyoruz: çalma bu saniyeden başlıyor, döngüde de öyle.
-const MUSIC_START := {"game": 1.0, "election": 1.0}
+const MUSIC_START := {"game": 1.0, "game2": 0.0, "election": 1.0}
 const MUSIC_SILENT_DB := -60.0
 
 ## %100'ün karşılığı: kaydırıcı sonuna geldiğinde bus'a uygulanan gerçek
@@ -113,6 +118,11 @@ func play_music(track: String) -> void:
 		_music_player.stop()
 	_music_name = track
 	_start_music(_music_generation)
+
+## Bu dönemin oyun müziği (host seçer, durumla herkese gider).
+func play_game_music() -> void:
+	var track := String(CardManager.music_track)
+	play_music(track if GAME_TRACKS.has(track) else "game")
 
 ## Müziği kısarak durdurur (menüler sessiz).
 func stop_music() -> void:

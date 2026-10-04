@@ -115,7 +115,7 @@ func _refresh_seat_view() -> void:
 		rows.append({
 			"party": party,
 			"name": party.get("name", "?"),
-			"leader": MultiplayerManager.players.get(peer_id, {}).get("name", ""),
+			"leader": PoliticianPresets.display_name(int(peer_id)),
 			"color": color,
 			"percent": float(CardManager.last_vote_shares.get(peer_id, 0.0)),
 			"seats": seats,

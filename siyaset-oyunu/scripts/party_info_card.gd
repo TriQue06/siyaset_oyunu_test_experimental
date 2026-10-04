@@ -15,7 +15,7 @@ static func build(peer_id: int, my_id: int) -> PanelContainer:
 	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var box: VBoxContainer = parts[1]
 
-	var leader := String(MultiplayerManager.players.get(peer_id, {}).get("name", "?"))
+	var leader := PoliticianPresets.display_name(peer_id)
 	if MultiplayerManager.is_bot(peer_id):
 		leader += " · bot"
 	if peer_id == my_id:

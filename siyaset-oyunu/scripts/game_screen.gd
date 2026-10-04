@@ -1852,13 +1852,17 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 			second.add_child(_avatar_tag("SEN", UiTheme.GOLD, UiTheme.INK))
 		if populism_left > 0:
 			second.add_child(_avatar_tag("POP %d" % populism_left, UiTheme.PURPLE, UiTheme.TEXT))
-	elif is_turn or is_self:
-		# Çok dar satır: sadece tek bir etiket sığar.
+	elif is_turn or is_self or populism_left > 0:
+		# Çok dar satır: sıra/sen etiketinden biri + POP (popülizm sürüyorsa;
+		# eskiden dar satırda POP hiç görünmüyordu).
 		var tag_row := HBoxContainer.new()
 		tag_row.add_theme_constant_override("separation", 3)
 		tag_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		tag_row.add_child(_avatar_tag("SIRA" if is_turn else "SEN",
-			UiTheme.TEXT if is_turn else UiTheme.GOLD, UiTheme.INK))
+		if is_turn or is_self:
+			tag_row.add_child(_avatar_tag("SIRA" if is_turn else "SEN",
+				UiTheme.TEXT if is_turn else UiTheme.GOLD, UiTheme.INK))
+		if populism_left > 0:
+			tag_row.add_child(_avatar_tag("POP %d" % populism_left, UiTheme.PURPLE, UiTheme.TEXT))
 		row.add_child(tag_row)
 
 	# AÇIK SEKMENİN SAYI SÜTUNLARI (başlıkları tablonun ilk satırında).

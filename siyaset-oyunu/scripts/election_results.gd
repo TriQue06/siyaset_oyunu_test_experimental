@@ -391,7 +391,7 @@ func _party_name(peer_id) -> String:
 	return String(_party(peer_id).get("name", MultiplayerManager.players.get(peer_id, {}).get("name", "?")))
 
 func _leader_name(peer_id) -> String:
-	return String(MultiplayerManager.players.get(peer_id, {}).get("name", ""))
+	return PoliticianPresets.display_name(int(peer_id))
 
 ## Parti logosu (seçim gecesi çubuklarında rengin üstüne çizilir).
 func _party_icon(peer_id) -> Texture2D:

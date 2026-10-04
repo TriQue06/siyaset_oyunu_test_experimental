@@ -1100,7 +1100,7 @@ func _apply_organization(peer_id: int, province_id: String) -> void:
 	_pull_province(province_id, peer_id, PublicOpinion.ORG_PULL)
 	_ease_turmoil(peer_id, PublicOpinion.TURMOIL_EASE_ORG)
 	_push_state({"type": "organization", "peer_id": peer_id, "province": province_id,
-		"message": "%s, %s'da teşkilat %s (seviye %d)." % [_party_name(peer_id), _province_name(province_id), verb, level]})
+		"message": "%s, %s'da teşkilat %s (seviye %d)." % [_actor_name(peer_id), _province_name(province_id), verb, level]})
 
 func _apply_invest_move(peer_id: int, province_id: String) -> void:
 	if not can_invest(peer_id, province_id):
@@ -1183,6 +1183,13 @@ func _apply_card_theft(peer_id: int, target_peer_id: int) -> void:
 		inventories[peer_id] = mine
 	_event_message = "%s, %s'ın elinden bir kart çaldı." % [_party_name(peer_id), _party_name(target_peer_id)]
 
+## Olay metinlerinde hamleyi yapan: "Soyad (Parti)"; siyasetçi yoksa parti adı.
+func _actor_name(peer_id: int) -> String:
+	var surname := PoliticianPresets.surname_of(peer_id)
+	if surname == "":
+		return _party_name(peer_id)
+	return "%s (%s)" % [surname, _party_name(peer_id)]
+
 func _province_name(province_id: String) -> String:
 	return GameMap.name_of(province_id)
 
@@ -1205,7 +1212,7 @@ func _apply_miting(peer_id: int, province_id: String) -> void:
 		_log_province(province_id, "%s miting yaptı (+%.1f)" % [_party_name(peer_id), PublicOpinion.MITING_LOCAL * org_mult])
 		_pull_province(province_id, peer_id, PublicOpinion.MITING_PULL)
 		_ease_turmoil(peer_id, PublicOpinion.TURMOIL_EASE_MITING)
-		_event_message = "%s, %s'da miting yaptı." % [_party_name(peer_id), _province_name(province_id)]
+		_event_message = "%s, %s'da miting yaptı." % [_actor_name(peer_id), _province_name(province_id)]
 
 ## Yatırım: getiren parti daha çok, hükümet ortakları daha az kazanır.
 ## Popülizm yatırımı büyütmez (popülist iktidar için miting daha etkili).
@@ -1239,7 +1246,7 @@ func _apply_propaganda(peer_id: int, target_peer_id: int, province_id: String) -
 	_log_province(province_id, "%s, %s karşıtı kampanya yaptı (%s −%.1f, %s +%.1f)" % [
 		_party_name(peer_id), _party_name(target_peer_id), _party_name(target_peer_id), damage, _party_name(peer_id), gain])
 	_event_message = "%s, %s'da %s karşıtı karalama kampanyası yaptı." % [
-		_party_name(peer_id), _province_name(province_id), _party_name(target_peer_id)]
+		_actor_name(peer_id), _province_name(province_id), _party_name(target_peer_id)]
 
 ## GovernmentManager, bir yasa oylaması sonuçlanınca (host) çağırır. Etkiler
 ## PARTİ PUANINA değil, İL İL aktiviteye yazılır (bkz. PublicOpinion yasa kuralları).
@@ -2022,7 +2029,7 @@ func _end_game(reason: String) -> void:
 		final_ranking.append({
 			"peer_id": peer_id,
 			"name": party.get("name", "?"),
-			"leader": MultiplayerManager.players.get(peer_id, {}).get("name", "?"),
+			"leader": PoliticianPresets.display_name(int(peer_id)),
 			"color": party.get("bg_color", Color(0.5, 0.5, 0.5)),
 			"score": ranking_score(peer_id),
 			"seats": int(last_seats.get(peer_id, 0)),

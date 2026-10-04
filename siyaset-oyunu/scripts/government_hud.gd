@@ -13,7 +13,7 @@ static func party_name_of(peer_id: int) -> String:
 	return PartyManager.parties.get(peer_id, {}).get("name", "?")
 
 static func leader_name_of(peer_id: int) -> String:
-	return MultiplayerManager.players.get(peer_id, {}).get("name", "?")
+	return PoliticianPresets.display_name(peer_id)
 
 static func _clear(box: Container) -> void:
 	for child in box.get_children():

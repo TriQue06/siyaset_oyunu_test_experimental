@@ -260,6 +260,14 @@ static func surname_of(peer_id: int) -> String:
 static func full_name_of(peer_id: int) -> String:
 	return String(of(peer_id).get("name", ""))
 
+## Ekranlarda partinin başındaki kişi: siyasetçinin adı-soyadı; siyasetçisi
+## yoksa (eski kayıt, bölünen parti) oyuncu adı.
+static func display_name(peer_id: int) -> String:
+	var full := full_name_of(peer_id)
+	if full != "":
+		return full
+	return String(MultiplayerManager.players.get(peer_id, {}).get("name", "?"))
+
 static func background_of(peer_id: int) -> String:
 	return String(of(peer_id).get("background", ""))
 

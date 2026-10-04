@@ -88,6 +88,34 @@ const MAP_SEED_MAX_DIGITS := 9
 var map_seed: String = ""
 ## Bu oyunun kesinleşmiş harita tohumu (oyun başlarken belirlenir; 0 = henüz yok).
 var game_map_seed: int = 0
+## RASTGELE PARTİLER (lobi ayarı, varsayılan açık): seçimlerden sonra arada
+## bir yeni bir bot partisi katılır (bkz. CardManager._maybe_add_temporary_party).
+var random_parties: bool = true
+
+func set_random_parties(value: bool) -> void:
+	if not is_local_owner():
+		return
+	if is_host:
+		random_parties = value
+		if room_code != "":
+			_sync_random_parties.rpc(random_parties)
+		settings_updated.emit()
+	else:
+		_request_set_random_parties.rpc_id(1, value)
+
+@rpc("any_peer", "reliable")
+func _request_set_random_parties(value: bool) -> void:
+	if not is_host or multiplayer.get_remote_sender_id() != owner_id:
+		return
+	random_parties = value
+	_sync_random_parties.rpc(random_parties)
+	settings_updated.emit()
+
+@rpc("authority", "reliable")
+func _sync_random_parties(value: bool) -> void:
+	random_parties = value
+	settings_updated.emit()
+
 ## SAYIM YÖNTEMİ (anayasa değişikliğiyle değişir; yeni oyunda D'Hondt).
 const DEFAULT_SEAT_METHOD := "dhondt"
 var seat_method: String = DEFAULT_SEAT_METHOD
@@ -200,6 +228,7 @@ func start_offline(player_name: String) -> void:
 	is_host = true
 	room_code = ""
 	map_seed = ""
+	random_parties = true
 	game_map_seed = 0
 	reset_seat_method()
 	election_threshold = THRESHOLD_DEFAULT
@@ -445,6 +474,7 @@ func _broadcast_player_list() -> void:
 	if room_code != "" and multiplayer.multiplayer_peer != null:
 		_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count)
 		_sync_map_seed.rpc(map_seed)
+		_sync_random_parties.rpc(random_parties)
 	player_list_updated.emit()
 
 @rpc("any_peer", "reliable")
@@ -472,6 +502,7 @@ func transfer_ownership(new_owner_id: int) -> void:
 		owner_id = new_owner_id
 		_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count)
 		_sync_map_seed.rpc(map_seed)
+		_sync_random_parties.rpc(random_parties)
 		player_list_updated.emit()
 	else:
 		_request_transfer_ownership.rpc_id(1, new_owner_id)
@@ -595,6 +626,7 @@ func _on_peer_disconnected(id: int) -> void:
 		owner_id = multiplayer.get_unique_id()
 	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count)
 	_sync_map_seed.rpc(map_seed)
+	_sync_random_parties.rpc(random_parties)
 	player_list_updated.emit()
 	if not was_player:
 		return
@@ -680,6 +712,7 @@ func _request_join(code: String, player_name: String, signature: String) -> void
 	players[sender_id] = {"name": player_name}
 	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count)
 	_sync_map_seed.rpc(map_seed)
+	_sync_random_parties.rpc(random_parties)
 	player_list_updated.emit()
 
 @rpc("authority", "reliable")
@@ -711,6 +744,7 @@ func _request_transfer_ownership(new_owner_id: int) -> void:
 	owner_id = new_owner_id
 	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count)
 	_sync_map_seed.rpc(map_seed)
+	_sync_random_parties.rpc(random_parties)
 	player_list_updated.emit()
 
 ## Host-olmayan mevcut sahip, baraj değiştirmek istediğinde host'a istek yollar.
@@ -755,6 +789,7 @@ func set_map_seed(text: String) -> void:
 		map_seed = clean
 		if room_code != "":
 			_sync_map_seed.rpc(map_seed)
+			_sync_random_parties.rpc(random_parties)
 		settings_updated.emit()
 	else:
 		_request_set_map_seed.rpc_id(1, clean)
@@ -773,6 +808,7 @@ func _request_set_map_seed(text: String) -> void:
 		return
 	map_seed = clean_map_seed(text)
 	_sync_map_seed.rpc(map_seed)
+	_sync_random_parties.rpc(random_parties)
 	settings_updated.emit()
 
 @rpc("authority", "reliable")

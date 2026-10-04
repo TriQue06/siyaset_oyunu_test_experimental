@@ -32,6 +32,7 @@ var count_plus: Button
 var game_length_summary: Label
 var threshold_slider: HSlider
 var map_seed_edit: LineEdit
+var random_parties_check: CheckButton
 var threshold_value_label: Label
 
 var _settings_open: bool = false
@@ -105,6 +106,7 @@ func _refresh() -> void:
 
 	threshold_slider.editable = am_owner
 	map_seed_edit.editable = am_owner
+	random_parties_check.disabled = not am_owner
 	for button in [interval_minus, interval_plus, count_minus, count_plus]:
 		button.disabled = not am_owner
 	_refresh_settings_display()
@@ -263,6 +265,8 @@ class RobotIcon extends Control:
 func _refresh_settings_display() -> void:
 	if map_seed_edit != null and not map_seed_edit.has_focus():
 		map_seed_edit.text = MultiplayerManager.map_seed
+	if random_parties_check != null:
+		random_parties_check.set_pressed_no_signal(MultiplayerManager.random_parties)
 	var t := MultiplayerManager.election_threshold
 	var interval := MultiplayerManager.election_interval
 	var count := MultiplayerManager.election_count
@@ -330,6 +334,13 @@ func _build_settings_panel() -> void:
 	map_seed_edit.text_submitted.connect(func(text: String): MultiplayerManager.set_map_seed(text))
 	map_seed_edit.focus_exited.connect(func(): MultiplayerManager.set_map_seed(map_seed_edit.text))
 	map_box.add_child(map_seed_edit)
+
+	var parties_box := _section("RASTGELE PARTİLER", "Açıksa seçimlerden sonra arada bir yeni bir parti (bot) kurulur; bir iki seçim sonra kendini fesheder.")
+	random_parties_check = CheckButton.new()
+	random_parties_check.text = "Yeni partiler katılabilir"
+	random_parties_check.focus_mode = Control.FOCUS_NONE
+	random_parties_check.toggled.connect(func(on: bool): MultiplayerManager.set_random_parties(on))
+	parties_box.add_child(random_parties_check)
 
 ## Başlıklı, çerçeveli bir ayar bölümü; içeriğin ekleneceği kutuyu döner.
 func _section(title_text: String, note_text: String) -> VBoxContainer:

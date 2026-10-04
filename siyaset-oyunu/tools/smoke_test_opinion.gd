@@ -71,6 +71,7 @@ func _initialize() -> void:
 	mm = root.get_node("MultiplayerManager")
 	pm = root.get_node("PartyManager")
 	cm = root.get_node("CardManager")
+	cm.allow_temporary_parties = false
 	cm.speech_required = false  # meclis konuşması ayrıca test edilir
 	cm.fixed_map_seed = 1950
 	gm = root.get_node("GovernmentManager")

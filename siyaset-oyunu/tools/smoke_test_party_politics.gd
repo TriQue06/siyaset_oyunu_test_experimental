@@ -38,6 +38,7 @@ func _initialize() -> void:
 	PP = load("res://scripts/politician_presets.gd")
 	mm = root.get_node("MultiplayerManager")
 	cm = root.get_node("CardManager")
+	cm.allow_temporary_parties = false
 	gm = root.get_node("GovernmentManager")
 	pm = root.get_node("PartyManager")
 	root.get_node("BotManager").set_process(false)
@@ -163,6 +164,33 @@ func _initialize() -> void:
 	mm.players.erase(b2)
 	cm.remove_player(b2)
 	check("yardımcı gidince parti kalır", pm.is_leader(me) and pm.deputy_of(me) == -1 and not cm.turn_order.has(b2))
+
+	print("=== GEÇİCİ PARTİLER ===")
+	cm.allow_temporary_parties = true
+	var temp := -1
+	for attempt in 30:
+		cm._hold_election(cm.round_number, false)
+		for peer in cm.turn_order:
+			if pm.parties.has(peer) and bool(pm.parties[peer].get("temporary", false)):
+				temp = int(peer)
+		if temp != -1:
+			break
+	check("rastgele yeni parti katıldı", temp != -1 and mm.players.has(temp))
+	check("sandalyesiz başlar, biraz destekle", int(cm.last_seats.get(temp, 0)) == 0 and cm.national_of(temp) > 0.0)
+	cm.allow_temporary_parties = false
+	cm._hold_election(cm.round_number, false)
+	cm._hold_election(cm.round_number, false)
+	check("geçici parti en geç iki seçimde feshedip çıktı", not cm.turn_order.has(temp) and not pm.parties.has(temp)
+		and not mm.players.has(temp))
+	mm.random_parties = false
+	cm.allow_temporary_parties = true
+	var none := true
+	for attempt in 10:
+		cm._hold_election(cm.round_number, false)
+		for peer in cm.turn_order:
+			if pm.parties.has(peer) and bool(pm.parties[peer].get("temporary", false)):
+				none = false
+	check("lobi ayarı kapalıysa yeni parti gelmez", none)
 
 	print("")
 	print("=== %s ===" % ("TUM TESTLER GECTI" if _failed == 0 else "%d TEST BASARISIZ" % _failed))

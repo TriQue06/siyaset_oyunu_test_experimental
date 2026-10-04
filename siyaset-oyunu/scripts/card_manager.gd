@@ -2079,7 +2079,7 @@ func _hold_election(finished_round: int, early: bool) -> void:
 	var result := ElectionModel.compute(ideologies, _province_seat_counts, province_voters(),
 		MultiplayerManager.election_threshold, _rng, mods)
 	_add_independent_seats(result, ideologies, mods)
-	# Fesihten kalan Bağımsızlar bloğu seçimle dağılır.
+	# Fesihten kalan Bağımsızlar bloğu seçimle dağılır (aşağıda sonuçlar yazılınca).
 	if PartyManager.parties.has(PartyManager.BLOC_ID):
 		PartyManager.parties.erase(PartyManager.BLOC_ID)
 		PartyManager.broadcast()
@@ -2092,6 +2092,9 @@ func _hold_election(finished_round: int, early: bool) -> void:
 	national_list = result.get("national_list", {})
 	election_seats = last_seats.duplicate()
 	last_election_round = finished_round
+	# Geçici partiler: süresi dolan fesheder, sonra belki yeni biri katılır.
+	_retire_temporary_parties()
+	_maybe_add_temporary_party()
 	for splinter in splinters.keys():
 		splinters[splinter]["elections"] = int(splinters[splinter].get("elections", 0)) + 1
 	last_election_was_early = early
@@ -2479,27 +2482,9 @@ func _apply_dissolve(peer_id: int) -> void:
 			PoliticianPresets.surname_of(peer_id)]}, true)
 		return
 	# FESİH: vekillerin yarısı Bağımsızlar bloğuna, yarısı yakın partilere.
-	var seats := int(last_seats.get(pid, 0))
-	var to_bloc := int(round(seats * DISSOLVE_BLOC_SHARE))
-	var others: Array = []
-	for other in party_ids():
-		if int(other) != pid and not PartyManager.is_independent(int(other)):
-			others.append(int(other))
-	if others.is_empty():
-		to_bloc = seats
-	if to_bloc > 0:
-		_ensure_bloc()
-		_move_seats(pid, PartyManager.BLOC_ID, to_bloc)
-	var rest := int(last_seats.get(pid, 0))
-	if rest > 0 and not others.is_empty():
-		# Görüşe yakınlık ağırlığıyla D'Hondt: en yakın parti en çoğunu alır.
-		var weights := {}
-		for other in others:
-			weights[other] = ideological_closeness(pid, other) + 0.01
-		var alloc := ElectionModel.dhondt(weights, others, rest)
-		for other in others:
-			if int(alloc.get(other, 0)) > 0:
-				_move_seats(pid, int(other), int(alloc[other]))
+	var scattered := _scatter_seats(pid)
+	var to_bloc := int(scattered[0])
+	var rest := int(scattered[1])
 	election_seats[pid] = 0
 	last_vote_shares.erase(pid)
 	previous_vote_shares.erase(pid)
@@ -2521,6 +2506,105 @@ func _apply_dissolve(peer_id: int) -> void:
 	_push_state({"type": "party_change", "peer_id": peer_id, "message":
 		"%s, %s'yi FESHETTİ ve bağımsız kaldı. %d vekil Bağımsızlar'a, %d vekil yakın partilere geçti.%s" % [
 		PoliticianPresets.display_name(peer_id), party_name, to_bloc, rest, gov_note]}, true)
+
+## Feshedilen partinin vekilleri: yarısı Bağımsızlar bloğuna, yarısı görüşü
+## en yakın partilere (öklid mesafesine göre yakınlık ağırlıklı D'Hondt).
+## Dönüş: [bloğa giden, partilere giden].
+func _scatter_seats(pid: int) -> Array:
+	var seats := int(last_seats.get(pid, 0))
+	var to_bloc := int(round(seats * DISSOLVE_BLOC_SHARE))
+	var others: Array = []
+	for other in party_ids():
+		if int(other) != pid and not PartyManager.is_independent(int(other)):
+			others.append(int(other))
+	if others.is_empty():
+		to_bloc = seats
+	if to_bloc > 0:
+		_ensure_bloc()
+		_move_seats(pid, PartyManager.BLOC_ID, to_bloc)
+	var rest := int(last_seats.get(pid, 0))
+	if rest > 0 and not others.is_empty():
+		var weights := {}
+		for other in others:
+			weights[other] = ideological_closeness(pid, other) + 0.01
+		var alloc := ElectionModel.dhondt(weights, others, rest)
+		for other in others:
+			if int(alloc.get(other, 0)) > 0:
+				_move_seats(pid, int(other), int(alloc[other]))
+	return [to_bloc, rest]
+
+# Geçici (rastgele katılan) partiler ---------------------------------------------------
+## Lobide açıksa (MultiplayerManager.random_parties) her seçimden sonra
+## TEMP_PARTY_CHANCE olasılıkla yeni bir bot partisi kurulur: sandalyesiz,
+## biraz ulusal destekle başlar, oyun sonu sıralamasına girmez. Kendini
+## feshetmek üzere kurulur: ilk seçimde barajı geçemezse ya da
+## TEMP_PARTY_ELECTIONS seçim atlattıktan sonra feshedip oyundan çıkar.
+const TEMP_PARTY_CHANCE := 0.3
+const TEMP_PARTY_ELECTIONS := 2
+const TEMP_PARTY_NATIONAL := 2.0
+
+## Testler kapatır (rastgele katılan parti test beklentilerini bozmasın).
+var allow_temporary_parties: bool = true
+
+func _maybe_add_temporary_party() -> void:
+	if not allow_temporary_parties or not MultiplayerManager.random_parties or game_finished:
+		return
+	if MultiplayerManager.players.size() >= MultiplayerManager.MAX_PLAYERS:
+		return
+	if _rng.randf() >= TEMP_PARTY_CHANCE:
+		return
+	var bot := MultiplayerManager.add_splinter_bot("Yeni Parti")
+	PartyManager.add_bot_party(bot)
+	PartyManager.parties[bot]["temporary"] = true
+	PartyManager.parties[bot]["temp_elections"] = 0
+	var home := PoliticianPresets.hometown_of(bot)
+	if not _province_ids.has(home) and not _province_ids.is_empty():
+		var fixed := PoliticianPresets.of(bot).duplicate()
+		fixed["hometown"] = String(_province_ids[_rng.randi() % _province_ids.size()])
+		PartyManager.set_politician_host(bot, fixed)
+	PartyManager.broadcast()
+	turn_order.append(bot)
+	inventories[bot] = []
+	mana[bot] = float(GameRules.MANA_PER_ROUND)
+	credibility[bot] = CREDIBILITY_START
+	national_support[bot] = TEMP_PARTY_NATIONAL
+	_pending_log.append({"text": "YENİ PARTİ: %s, %s'yi kurdu." % [PoliticianPresets.display_name(bot), _party_name(bot)],
+		"peer_id": bot, "province": "", "kind": "party_change"})
+
+## Seçimden sonra: geçici partiler seçim sayar; süresi dolan ya da barajı
+## geçemeyen fesheder ve oyundan çıkar.
+func _retire_temporary_parties() -> void:
+	for bot in turn_order.duplicate():
+		var pid := int(bot)
+		if not PartyManager.is_leader(pid) or not bool(PartyManager.parties[pid].get("temporary", false)):
+			continue
+		var elections := int(PartyManager.parties[pid].get("temp_elections", 0)) + 1
+		PartyManager.parties[pid]["temp_elections"] = elections
+		if elections < TEMP_PARTY_ELECTIONS and passed_threshold.has(pid):
+			continue
+		var party_name := _party_name(pid)
+		var scattered := _scatter_seats(pid)
+		var deputy := PartyManager.deputy_of(pid)
+		if deputy != -1:
+			# Yardımcısı (bir oyuncu) varsa parti feshedilince o bağımsız kalır.
+			_make_independent(deputy, (PartyManager.parties[pid].get("ideology", {}) as Dictionary).duplicate())
+		for table in [national_support, populism, turmoil, law_rounds, speech_rounds, congress_rounds,
+				national_list, last_seats, election_seats, last_vote_shares, previous_vote_shares, inventories, mana, credibility]:
+			table.erase(pid)
+		passed_threshold.erase(pid)
+		for nested in [last_province_results, local_support, organizations]:
+			for province_id in nested.keys():
+				nested[province_id].erase(pid)
+		_drop_offers_of(pid)
+		var idx := turn_order.find(pid)
+		if idx != -1:
+			_remove_from_turn_order(idx)
+		PartyManager.parties.erase(pid)
+		PartyManager.politicians.erase(pid)
+		MultiplayerManager.remove_splinter_bot(pid)
+		PartyManager.broadcast()
+		_pending_log.append({"text": "%s kendini feshetti (%d vekil dağıldı)." % [party_name, int(scattered[0]) + int(scattered[1])],
+			"peer_id": -1, "province": "", "kind": "party_change"})
 
 ## Siyasetçiyi bağımsız kayda çevirir (gri, kullanıcı simgeli, adıyla).
 func _make_independent(peer_id: int, ideology: Dictionary) -> void:

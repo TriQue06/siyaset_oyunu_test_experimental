@@ -77,6 +77,7 @@ func _initialize() -> void:
 	mm = root.get_node("MultiplayerManager")
 	pm = root.get_node("PartyManager")
 	cm = root.get_node("CardManager")
+	cm.allow_temporary_parties = false
 	cm.speech_required = false  # meclis konuşması ayrıca test edilir
 	cm.fixed_map_seed = 1950
 	gm = root.get_node("GovernmentManager")
@@ -572,7 +573,8 @@ func _initialize() -> void:
 		hands_before[id] = cm.inventories.get(id, []).size()
 	cm._hold_election(cm.round_number, false)
 	var gift_ok := true
-	for id in cm.turn_order:
+	# Seçimden sonra rastgele yeni bir parti katılabilir: sadece eskilere bak.
+	for id in hands_before.keys():
 		if cm.inventories[id].size() != mini(int(hands_before[id]) + 1, cm.MAX_HAND_SIZE):
 			gift_ok = false
 	check("secimden sonra herkese 1 kart hediye", gift_ok)

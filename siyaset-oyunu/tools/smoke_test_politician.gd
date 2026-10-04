@@ -17,6 +17,7 @@ func _initialize() -> void:
 	PP = load("res://scripts/politician_presets.gd")
 	var mm = root.get_node("MultiplayerManager")
 	var cm = root.get_node("CardManager")
+	cm.allow_temporary_parties = false
 	var pm = root.get_node("PartyManager")
 	var gmap = root.get_node("GameMap")
 	root.get_node("BotManager").set_process(false)

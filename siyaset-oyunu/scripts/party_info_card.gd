@@ -7,7 +7,9 @@ extends RefCounted
 const WIDTH := 320.0
 const DIM := UiTheme.TEXT_MUTED
 
-static func build(peer_id: int, my_id: int) -> PanelContainer:
+## on_action(kind: String, peer_id: int): parti işlemi düğmeleri (fesih,
+## kongre, davet...) basılınca çağrılır; verilmezse kart sadece bilgi gösterir.
+static func build(peer_id: int, my_id: int, on_action: Callable = Callable()) -> PanelContainer:
 	var party: Dictionary = PartyManager.data_of(peer_id)
 	var color: Color = party.get("bg_color", Color(0.5, 0.5, 0.5))
 	var parts := PopupKit.frame(WIDTH, color)
@@ -15,21 +17,30 @@ static func build(peer_id: int, my_id: int) -> PanelContainer:
 	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var box: VBoxContainer = parts[1]
 
-	var leader := PoliticianPresets.display_name(peer_id)
-	if MultiplayerManager.is_bot(peer_id):
-		leader += " · bot"
+	# BAŞLIK: siyasetçinin adı (büyük) ve partisi (alt satır) — ikisi de vurgulu.
+	var independent := PartyManager.is_independent(peer_id)
+	var title := PoliticianPresets.display_name(peer_id)
 	if peer_id == my_id:
-		leader += " (sen)"
-	box.add_child(PopupKit.header(String(party.get("name", "?")), leader, PartyBadge.build(party, Vector2(40, 40), 64)))
+		title += " (sen)"
+	var sub := "Bağımsız siyasetçi" if independent else String(party.get("name", "?"))
+	if MultiplayerManager.is_bot(peer_id):
+		sub += " · bot"
+	box.add_child(PopupKit.header(title, sub, PartyBadge.build(party, Vector2(40, 40), 64)))
+	# İki kişilik parti: kadro.
+	var members: Array = PartyManager.members_of(CardManager.party_of(peer_id))
+	if members.size() >= 2:
+		box.add_child(PopupKit.note("Genel başkan: %s  ·  Yardımcı: %s" % [PoliticianPresets.display_name(int(members[0])),
+			PoliticianPresets.display_name(int(members[1]))], color.lightened(0.45)))
 
 	# Sayılar: dört eşit kutu.
 	var stats := HBoxContainer.new()
 	stats.add_theme_constant_override("separation", 4)
 	stats.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(stats)
-	var has_seats: bool = CardManager.last_seats.has(peer_id)
-	stats.add_child(_stat(str(int(CardManager.last_seats.get(peer_id, 0))) if has_seats else "—", "vekil", UiTheme.TEXT))
-	stats.add_child(_stat("%%%.1f" % float(CardManager.last_vote_shares[peer_id]) if has_seats else "—", "oy", UiTheme.TEXT))
+	var pid := CardManager.party_of(peer_id)
+	var has_seats: bool = CardManager.last_seats.has(pid)
+	stats.add_child(_stat(str(int(CardManager.last_seats.get(pid, 0))) if has_seats else "—", "vekil", UiTheme.TEXT))
+	stats.add_child(_stat("%%%.1f" % float(CardManager.last_vote_shares.get(pid, 0.0)) if has_seats else "—", "oy", UiTheme.TEXT))
 	stats.add_child(_stat(str(GovernmentManager.score_of(peer_id)), "puan", UiTheme.GOLD))
 	var opinion := CardManager.national_of(peer_id)
 	stats.add_child(_stat("%+.1f" % opinion, "kamuoyu", ProvincePanel._opinion_color(opinion)))
@@ -44,7 +55,68 @@ static func build(peer_id: int, my_id: int) -> PanelContainer:
 	var ideology: Dictionary = party.get("ideology", IdeologyAxes.default_values())
 	for axis in IdeologyAxes.AXES:
 		box.add_child(_axis_row(axis, float(ideology.get(axis, 0)), color))
+	if on_action.is_valid():
+		var actions := _actions(peer_id, my_id, on_action)
+		if actions != null:
+			card.mouse_filter = Control.MOUSE_FILTER_STOP
+			box.add_child(actions)
 	return card
+
+## PARTİ İŞLEMLERİ (bkz. CardManager "Parti siyaseti"). Kendi kartında:
+## fesih/istifa, kongre, ayrılıp parti kurma, (bağımsızken) parti kurma.
+## Başkasının kartında: partine davet, partisine başvuru. Sırası gelmeyen ya da
+## manası yetmeyen için düğme sönük durur.
+static func _actions(peer_id: int, my_id: int, on_action: Callable) -> Control:
+	var list: Array = []  # [metin, tür, basılabilir mi, onay ister mi]
+	if peer_id == my_id:
+		if PartyManager.is_independent(my_id):
+			list.append(["Yeni Parti Kur · %d mana" % CardManager.FOUND_PARTY_COST, "found", CardManager.can_found_party(my_id), false])
+		elif PartyManager.is_deputy(my_id):
+			list.append(["Ayrıl ve Parti Kur · %d mana" % CardManager.LEAVE_PARTY_COST, "leave", CardManager.can_leave_party(my_id), false])
+		else:
+			var resign := CardManager.dissolve_is_resignation(my_id)
+			list.append(["Genel Başkanlıktan İstifa Et" if resign else "Partiyi Feshet", "dissolve", CardManager.can_dissolve(my_id), true])
+		if PartyManager.member_count(CardManager.party_of(my_id)) >= 2:
+			list.append(["Kongre Talep Et · %d mana" % CardManager.CONGRESS_COST, "congress", CardManager.can_congress(my_id), false])
+	else:
+		if CardManager.is_valid_offer(my_id, peer_id, "invite"):
+			list.append(["Partime Davet Et", "invite", CardManager.can_send_offer(my_id, peer_id, "invite"), false])
+		if CardManager.is_valid_offer(my_id, peer_id, "apply"):
+			var verb := "Partisine Katılmak İçin Başvur" if PartyManager.is_independent(my_id) else "Partimi Birleştirmeyi Öner"
+			list.append([verb, "apply", CardManager.can_send_offer(my_id, peer_id, "apply"), false])
+	if list.is_empty():
+		return null
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 4)
+	box.add_child(PopupKit.section("Parti"))
+	var any_disabled := false
+	for entry in list:
+		var button := Button.new()
+		button.text = String(entry[0])
+		button.focus_mode = Control.FOCUS_NONE
+		button.custom_minimum_size = Vector2(0, 32)
+		button.add_theme_font_size_override("font_size", 13)
+		button.disabled = not bool(entry[2])
+		any_disabled = any_disabled or button.disabled
+		var kind := String(entry[1])
+		if kind == "dissolve" or kind == "leave":
+			UiSkin.skin_color_button(button, UiTheme.RED_DARK)
+		else:
+			UiSkin.skin_button(button)
+		if bool(entry[3]):
+			# Geri dönüşü olmayan işlem: iki kez basınca olur.
+			button.pressed.connect(func():
+				if not button.has_meta("armed"):
+					button.set_meta("armed", true)
+					button.text = "Emin misin? Tekrar bas"
+					return
+				on_action.call(kind, peer_id))
+		else:
+			button.pressed.connect(func(): on_action.call(kind, peer_id))
+		box.add_child(button)
+	if any_disabled:
+		box.add_child(PopupKit.note("Sıran gelince ve manan yetince yapabilirsin.", DIM))
+	return box
 
 ## "Hükümet: Başbakanlık, 3 bakanlık" / "Muhalefet" / "Hükümet yok".
 static func role_text(peer_id: int) -> String:

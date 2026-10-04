@@ -329,6 +329,7 @@ func _ready() -> void:
 	_build_target_hint()
 	_build_card_info()
 	_build_action_buttons()
+	_build_offer_bar()
 	_build_trash_button()
 	_build_player_tabs()
 	# Çöp kutusu destenin yanına otursun (yerleşim butonlar kurulduktan sonra).
@@ -766,15 +767,16 @@ func _table_value(text: String, width: float, color: Color, size: int = UiTheme.
 func _player_row_values(peer_id: int, is_self: bool) -> Array:
 	match _player_tab:
 		1:
-			var percent: float = float(CardManager.last_vote_shares.get(peer_id, 0.0))
-			var won: int = int(CardManager.election_seats.get(peer_id, CardManager.last_seats.get(peer_id, 0)))
-			var below: bool = not CardManager.last_vote_shares.is_empty() 				and not CardManager.passed_threshold.has(peer_id)
+			var pid := CardManager.party_of(peer_id)
+			var percent: float = float(CardManager.last_vote_shares.get(pid, 0.0))
+			var won: int = int(CardManager.election_seats.get(pid, CardManager.last_seats.get(pid, 0)))
+			var below: bool = not CardManager.last_vote_shares.is_empty() 				and not CardManager.passed_threshold.has(pid)
 			return [
 				_table_value("%%%.1f" % percent, 56.0, UiTheme.RED if below else UiTheme.TEXT),
 				_table_value(str(won), 50.0, UiTheme.TEXT_MUTED),
 			]
 		2:
-			var now: int = int(CardManager.last_seats.get(peer_id, 0))
+			var now: int = int(CardManager.last_seats.get(CardManager.party_of(peer_id), 0))
 			var national: float = CardManager.national_of(peer_id)
 			return [
 				_table_value(str(now), 46.0, UiTheme.TEXT_MUTED),
@@ -859,7 +861,8 @@ func _update_turn_indicator_text() -> void:
 	if peer_id == -1:
 		return
 	var party: Dictionary = PartyManager.data_of(peer_id)
-	var pname: String = party.get("name", MultiplayerManager.players.get(peer_id, {}).get("name", "?"))
+	var party_text := "Bağımsız" if PartyManager.is_independent(peer_id) else String(party.get("name", "?"))
+	var pname := "%s · %s" % [PoliticianPresets.display_name(peer_id), party_text]
 	var suffix := " (Sen)" if peer_id == multiplayer.get_unique_id() else ""
 	var timer := "" if CardManager.is_turn_blocked() else "\nSüre: %s" % GameRules.format_seconds(CardManager.turn_seconds_left())
 	turn_indicator_label.text = "Sıra: %s%s%s" % [pname, suffix, timer]
@@ -1299,7 +1302,8 @@ func _drop_target(card_type: String) -> Dictionary:
 		elif card_type == CardPresets.INVEST_CARD_TYPE and not CardManager.is_government_party(me):
 			result["label"] = "Yatırımı sadece hükümet partileri yapabilir"
 			result["error"] = result["label"]
-		elif card_type != CardPresets.INVEST_CARD_TYPE and CardManager.organization_level(province_id, me) < 1:
+		elif card_type != CardPresets.INVEST_CARD_TYPE and CardManager.organization_level(province_id, me) < 1 \
+				and not PartyManager.is_independent(me):
 			result["label"] = "%s'da teşkilatın yok — önce teşkilatlan" % pname
 			result["error"] = result["label"]
 		else:
@@ -1444,7 +1448,7 @@ func _on_province_clicked(province_id: String) -> void:
 		_cancel_targeting()
 		if CardManager.can_miting(me, province_id):
 			CardManager.miting(province_id)
-		elif CardManager.organization_level(province_id, me) < 1:
+		elif CardManager.organization_level(province_id, me) < 1 and not PartyManager.is_independent(me):
 			_show_toast("Bu ilde teşkilatın yok. Önce teşkilatlanmalısın.")
 		else:
 			_show_toast(_action_block_reason(GameRules.MITING_MANA_COST))
@@ -1519,7 +1523,72 @@ func _select_target_province(province_id: String) -> void:
 			detail = "%s: %s" % [pname, CardPresets.card_title(card_type)]
 	_set_target_hint("%s  ·  Onaylamak için tekrar dokun" % detail)
 
+# --- Davet / başvuru şeridi ------------------------------------------------------
+
+var _offer_bar: PanelContainer
+var _offer_label: Label
+var _offer_id := -1
+
+## Bana gelen davet/başvuru: ekranın üst ortasında Kabul / Reddet şeridi.
+func _build_offer_bar() -> void:
+	var built := PopupKit.frame(520, UiTheme.GOLD)
+	_offer_bar = built[0]
+	_offer_bar.z_index = 90
+	_offer_bar.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_offer_bar.position = Vector2(-260, 14)
+	_offer_bar.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(_offer_bar)
+	var body: VBoxContainer = built[1]
+	_offer_label = PopupKit.note("", UiTheme.TEXT)
+	body.add_child(_offer_label)
+	var buttons := HBoxContainer.new()
+	buttons.alignment = BoxContainer.ALIGNMENT_END
+	buttons.add_theme_constant_override("separation", 8)
+	body.add_child(buttons)
+	var reject := Button.new()
+	reject.text = "Reddet"
+	reject.custom_minimum_size = Vector2(110, 34)
+	UiSkin.skin_color_button(reject, UiTheme.RED_DARK)
+	reject.pressed.connect(func(): _answer_offer(false))
+	buttons.add_child(reject)
+	var accept := Button.new()
+	accept.text = "Kabul Et"
+	accept.custom_minimum_size = Vector2(130, 34)
+	UiSkin.skin_color_button(accept, UiTheme.GREEN_DARK)
+	accept.pressed.connect(func(): _answer_offer(true))
+	buttons.add_child(accept)
+	_refresh_offer_bar()
+
+func _refresh_offer_bar() -> void:
+	if _offer_bar == null:
+		return
+	var offers := CardManager.offers_for(multiplayer.get_unique_id())
+	if offers.is_empty() or CardManager.game_finished:
+		_offer_bar.hide()
+		_offer_id = -1
+		return
+	var offer: Dictionary = offers[0]
+	_offer_id = int(offer["id"])
+	var from_peer := int(offer["from"])
+	var who := "%s (%s)" % [PoliticianPresets.display_name(from_peer),
+		"bağımsız" if PartyManager.is_independent(from_peer) else _party_name_of(from_peer)]
+	var me := multiplayer.get_unique_id()
+	if String(offer["kind"]) == "invite":
+		_offer_label.text = ("%s seni partisine davet ediyor. Kabul edersen genel başkan yardımcısı olursun%s." % [who,
+			"" if PartyManager.is_independent(me) else "; partin onun partisiyle BİRLEŞİR"])
+	else:
+		_offer_label.text = ("%s partine katılmak istiyor. Kabul edersen senin yardımcın olur%s." % [who,
+			"" if PartyManager.is_independent(from_peer) else "; iki parti BİRLEŞİR"])
+	_offer_bar.show()
+
+func _answer_offer(accept: bool) -> void:
+	if _offer_id == -1:
+		return
+	CardManager.respond_offer(_offer_id, accept)
+	_offer_bar.hide()
+
 func _on_opinion_changed() -> void:
+	_refresh_offer_bar()
 	_refresh_score_panel()
 	_refresh_agenda_banner()
 	if _map_layer != MapLayer.SEATS:
@@ -1828,9 +1897,16 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 	info.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(info)
-	# PARTİ ADI (ve dar değilse liderin adı) — sayılar sağdaki sütunlarda.
-	var name_label := _avatar_label(String(party.get("name", "?")), UiTheme.FS_SMALL, UiTheme.GOLD if is_self else UiTheme.TEXT)
-	name_label.add_theme_font_override("font", UiTheme.mono())
+	# SİYASETÇİ ADI (birinci satır, kalın) ve PARTİSİ (ikinci satır, parti
+	# renginde) — ikisi de vurgulu. Sayılar sağdaki sütunlarda.
+	var independent := PartyManager.is_independent(peer_id)
+	var party_text := "Bağımsız" if independent else String(party.get("name", "?"))
+	var party_color: Color = UiTheme.TEXT_MUTED if independent else color.lightened(0.45)
+	var name_text := PoliticianPresets.display_name(peer_id)
+	if compact:
+		name_text = "%s · %s" % [PoliticianPresets.surname_of(peer_id) if PoliticianPresets.surname_of(peer_id) != "" else name_text, party_text]
+	var name_label := _avatar_label(name_text, UiTheme.FS_SMALL, UiTheme.GOLD if is_self else UiTheme.TEXT)
+	name_label.add_theme_font_override("font", UiTheme.mono(true))
 	info.add_child(name_label)
 	# İKİNCİ SATIR: liderin adı ve ETİKETLER (SIRA / SEN / POP) yan yana.
 	# Etiketleri ayrı bir satıra koymak kartı üçüncü satır kadar uzatıyor,
@@ -1842,17 +1918,22 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 		second.add_theme_constant_override("separation", 4)
 		second.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		info.add_child(second)
-		var leader_label := _avatar_label(_leader_name_of(peer_id), UiTheme.FS_TINY, UiTheme.TEXT_MUTED)
-		leader_label.add_theme_font_override("font", UiTheme.mono())
-		leader_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		second.add_child(leader_label)
+		var party_label := _avatar_label(party_text, UiTheme.FS_TINY + 1, party_color)
+		party_label.add_theme_font_override("font", UiTheme.mono(true))
+		party_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		second.add_child(party_label)
+		# Parti içi rol: iki kişilik partide genel başkan (GB) ve yardımcı (YRD).
+		if PartyManager.is_deputy(peer_id):
+			second.add_child(_avatar_tag("YRD", color, UiTheme.TEXT))
+		elif PartyManager.deputy_of(peer_id) != -1:
+			second.add_child(_avatar_tag("GB", color, UiTheme.TEXT))
 		if is_turn:
 			second.add_child(_avatar_tag("SIRA", UiTheme.TEXT, UiTheme.INK))
 		if is_self:
 			second.add_child(_avatar_tag("SEN", UiTheme.GOLD, UiTheme.INK))
 		if populism_left > 0:
 			second.add_child(_avatar_tag("POP %d" % populism_left, UiTheme.PURPLE, UiTheme.TEXT))
-	elif is_turn or is_self or populism_left > 0:
+	elif is_turn or is_self or populism_left > 0 or PartyManager.member_count(CardManager.party_of(peer_id)) >= 2:
 		# Çok dar satır: sıra/sen etiketinden biri + POP (popülizm sürüyorsa;
 		# eskiden dar satırda POP hiç görünmüyordu).
 		var tag_row := HBoxContainer.new()
@@ -1863,6 +1944,10 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 				UiTheme.TEXT if is_turn else UiTheme.GOLD, UiTheme.INK))
 		if populism_left > 0:
 			tag_row.add_child(_avatar_tag("POP %d" % populism_left, UiTheme.PURPLE, UiTheme.TEXT))
+		if PartyManager.is_deputy(peer_id):
+			tag_row.add_child(_avatar_tag("YRD", color, UiTheme.TEXT))
+		elif PartyManager.deputy_of(peer_id) != -1:
+			tag_row.add_child(_avatar_tag("GB", color, UiTheme.TEXT))
 		row.add_child(tag_row)
 
 	# AÇIK SEKMENİN SAYI SÜTUNLARI (başlıkları tablonun ilk satırında).
@@ -1922,6 +2007,22 @@ func _toggle_profile(peer_id: int) -> void:
 	_profile_peer_id = peer_id
 	_show_tooltip_for(peer_id)
 
+## Profil kartındaki parti işlemleri (bkz. PartyInfoCard._actions).
+func _on_party_action(kind: String, peer_id: int) -> void:
+	_hide_profile()
+	match kind:
+		"dissolve":
+			CardManager.dissolve_party()
+		"congress":
+			CardManager.request_congress()
+		"found", "leave":
+			var dialog := FoundPartyDialog.new()
+			dialog.leaving = kind == "leave"
+			add_child(dialog)
+		"invite", "apply":
+			CardManager.send_offer(peer_id, kind)
+			_show_toast("Teklifin %s'ye iletildi." % PoliticianPresets.display_name(peer_id))
+
 func _hide_profile() -> void:
 	_profile_peer_id = -1
 	if hover_tooltip != null:
@@ -1956,7 +2057,7 @@ func _show_tooltip_for(peer_id: int) -> void:
 	for child in hover_tooltip.get_children():
 		if child != hover_tooltip_image:
 			child.queue_free()
-	var card := PartyInfoCard.build(peer_id, multiplayer.get_unique_id())
+	var card := PartyInfoCard.build(peer_id, multiplayer.get_unique_id(), _on_party_action)
 	card.modulate.a = 0.0
 	hover_tooltip.add_child(card)
 	hover_tooltip.show()

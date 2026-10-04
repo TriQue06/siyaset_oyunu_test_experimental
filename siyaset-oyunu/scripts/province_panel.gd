@@ -146,7 +146,7 @@ func _build_poll(me: int, level: int) -> void:
 	_body.add_child(_columns_header())
 	for peer_id in ids:
 		var entry: Dictionary = poll[peer_id]
-		_body.add_child(PopupKit.party_row(PartyManager.data_of(peer_id), int(peer_id) == me,
+		_body.add_child(PopupKit.party_row(PartyManager.data_of(peer_id), int(peer_id) == CardManager.party_of(me),
 			["%%%.0f" % float(entry["percent"]), str(int(entry["seats"]))], [44, 30]))
 	if level < 2:
 		_body.add_child(PopupKit.note("2. seviye teşkilat (%d mana) %%90 doğru anket verir." % GameRules.ORG_UPGRADE_MANA_COST, UiTheme.TEXT_DIM))
@@ -195,7 +195,7 @@ func _build_last_election(me: int) -> void:
 	for peer_id in ids:
 		var entry: Dictionary = results[peer_id]
 		var seats := int(entry.get("seats", 0))
-		_body.add_child(PopupKit.party_row(PartyManager.data_of(peer_id), int(peer_id) == me,
+		_body.add_child(PopupKit.party_row(PartyManager.data_of(peer_id), int(peer_id) == CardManager.party_of(me),
 			["%%%.0f" % float(entry.get("percent", 0.0)), [str(seats), UiTheme.TEXT if seats > 0 else UiTheme.TEXT_DIM]], [44, 30]))
 
 func _build_events() -> void:

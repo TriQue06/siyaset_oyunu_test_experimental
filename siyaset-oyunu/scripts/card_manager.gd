@@ -126,6 +126,17 @@ var _offer_seq: int = 0
 var congress_rounds: Dictionary = {}
 ## Bir önceki seçimin oy oranları (kongrede "oy kaybı" ölçüsü).
 var previous_vote_shares: Dictionary = {}
+## KATKI (oyuncu -> puan): iki kişilik partide kimin partiyi ne kadar büyüttüğü.
+## Ayrılırken götürülen pay buna (ve biraz rastgeleliğe) bağlıdır. Birleşmede
+## iki tarafın getirdiği vekil/teşkilat başlangıç katkısı olur.
+var contributions: Dictionary = {}
+## Sadece host: il -> {parti -> o teşkilatı kuran oyuncu} (ayrılırken önce
+## kendi kurduğu teşkilatları götürür).
+var _org_builders: Dictionary = {}
+## Sadece host (botlar için soyut): KARDEŞ PARTİLER — birlikte büyüyüp ayrılan
+## iki bot partisi bir süre birbirine saldırmaz, koalisyonda birbirini seçer.
+## parti -> {"other": parti, "until": dönem}
+var siblings: Dictionary = {}
 ## Testler için: false ise konuşma şartı aranmaz.
 var speech_required: bool = true
 ## GÜNDEM: {"type": gündem türü, "until": bittiği tur} (boş = gündem yok).
@@ -811,6 +822,9 @@ func init_game() -> void:
 	offers = []
 	congress_rounds = {}
 	previous_vote_shares = {}
+	contributions = {}
+	_org_builders = {}
+	siblings = {}
 	populism = {}
 	turmoil = {}
 	splinters = {}
@@ -1155,6 +1169,7 @@ func _apply_law(peer_id: int, law_type: String) -> void:
 		return
 	mana[peer_id] = mana_of(peer_id) - law_mana_cost(peer_id, law_type)
 	law_rounds[party_of(peer_id)] = round_number
+	_contribute(peer_id, CONTRIB_LAW)
 	var event := {"type": "law", "peer_id": peer_id, "law": law_type}
 	if _event_message != "":
 		event["message"] = _event_message
@@ -1168,6 +1183,10 @@ func _apply_organization(peer_id: int, province_id: String) -> void:
 	var level := int(entry.get(party_of(peer_id), 0)) + 1
 	entry[party_of(peer_id)] = level
 	organizations[province_id] = entry
+	var builders: Dictionary = _org_builders.get(province_id, {})
+	builders[party_of(peer_id)] = peer_id
+	_org_builders[province_id] = builders
+	_contribute(peer_id, CONTRIB_ORG)
 	var verb := "kurdu" if level == 1 else "geliştirdi"
 	_log_province(province_id, "%s teşkilat %s (seviye %d)" % [_party_name(peer_id), verb, level])
 	# Teşkilat seçmeni de partiye yaklaştırır (ve parti içini toparlar).
@@ -1181,6 +1200,7 @@ func _apply_invest_move(peer_id: int, province_id: String) -> void:
 		return
 	mana[peer_id] = mana_of(peer_id) - GameRules.INVEST_MANA_COST
 	_event_message = ""
+	_contribute(peer_id, CONTRIB_MITING)
 	_apply_investment(peer_id, province_id)
 	_push_state({"type": "invest", "peer_id": peer_id, "province": province_id, "message": _event_message})
 
@@ -1197,6 +1217,7 @@ func _apply_miting_move(peer_id: int, province_id: String) -> void:
 		return
 	mana[peer_id] = mana_of(peer_id) - GameRules.MITING_MANA_COST
 	_event_message = ""
+	_contribute(peer_id, CONTRIB_MITING)
 	_apply_miting(peer_id, province_id)
 	_push_state({"type": "miting", "peer_id": peer_id, "province": province_id, "message": _event_message})
 
@@ -1635,6 +1656,7 @@ func _apply_speech(peer_id: int, axis: String, dir: int) -> void:
 	var d := 1 if dir > 0 else -1
 	speech_done = true
 	speech_rounds[party_of(peer_id)] = round_number
+	_contribute(peer_id, CONTRIB_SPEECH)
 	var moved := _shift_ideologies([{"peer": party_of(peer_id), "axis": axis, "delta": IdeologyAxes.SPEECH_SHIFT * d}])
 	var text := "%s, meclis grup toplantısında \"%s\" konuşması yaptı (%s)." % [_party_name(peer_id),
 		IdeologyAxes.speech_title(axis, d), IdeologyAxes.AXIS_SIDES[axis]["pos" if d > 0 else "neg"]]
@@ -1882,6 +1904,7 @@ func _apply_steal(peer_id: int, target_peer_id: int, card_type: String) -> bool:
 	var moved := _move_seats(party_of(target_peer_id), party_of(peer_id), amount)
 	if moved == 0:
 		return false
+	_contribute(peer_id, CONTRIB_PER_STOLEN_SEAT * moved)
 	# Transfer meşru görünmez: çalan küçük bir ulusal destek kaybeder, çalınan
 	# parti mağduriyetten küçük bir destek kazanır (ikisi de kısmi).
 	# NORMAL vekil çalmanın ulusal bedeli YOK; sadece güçlü varyant bedel öder.
@@ -1909,11 +1932,11 @@ func grant_government_mana(peer_ids: Array) -> void:
 	if not _is_authority():
 		return
 	for peer_id in peer_ids:
-		# İki kişilik partide mana iki oyuncuya bölünür.
+		# İki kişilik partide iki oyuncu da hükümet manasını alır.
 		var members: Array = PartyManager.members_of(party_of(int(peer_id)))
 		for member in members:
 			if mana.has(member):
-				mana[member] = mana_of(member) + float(GameRules.GOVERNMENT_MANA_BONUS) / members.size()
+				mana[member] = mana_of(member) + float(GameRules.GOVERNMENT_MANA_BONUS)
 		# Hükümete girmek parti içini toparlar.
 		_ease_turmoil(int(peer_id), PublicOpinion.TURMOIL_EASE_GOVERNMENT)
 	_push_state({"type": "mana"})
@@ -1974,9 +1997,17 @@ func _peek_turn_card(peer_id: int) -> String:
 
 ## Tur geliri: hükümette görevi olan partiler bir fazla mana alır. İKİ KİŞİLİK
 ## PARTİDE gelir iki oyuncuya bölünür (her biri yarısını alır).
+## İKİ KİŞİLİK PARTİ: taban ikiye bölünür; genel başkan yarısının 1 fazlasını,
+## yardımcı 0,5 fazlasını alır (4 manada 3 ve 2,5). Parti toplamda daha çok
+## mana alır: birlikte büyümek hızlıdır, bedeli iktidar puanının bölünmesi.
+const LEADER_MANA_EXTRA := 1.0
+const DEPUTY_MANA_EXTRA := 0.5
+
 func turn_income(peer_id: int) -> float:
-	var base := GameRules.MANA_PER_ROUND_GOVERNMENT if is_government_party(peer_id) else GameRules.MANA_PER_ROUND
-	return float(base) / member_count(peer_id)
+	var base := float(GameRules.MANA_PER_ROUND_GOVERNMENT if is_government_party(peer_id) else GameRules.MANA_PER_ROUND)
+	if member_count(peer_id) < 2:
+		return base
+	return base * 0.5 + (LEADER_MANA_EXTRA if PartyManager.is_leader(peer_id) else DEPUTY_MANA_EXTRA)
 
 ## Desteden bir kartı doğrudan ele verir. El doluysa verilmez.
 ## Dönen değer: verilen kartın türü ("" = verilmedi).
@@ -2099,15 +2130,18 @@ func _hold_election(finished_round: int, early: bool) -> void:
 	national_list = result.get("national_list", {})
 	election_seats = last_seats.duplicate()
 	last_election_round = finished_round
-	# Geçici partiler: süresi dolan fesheder, sonra belki yeni biri katılır.
+	# Geçici partiler: süresi dolan fesheder; botlar ittifak kurar/bozar; sonra
+	# belki yeni bir parti katılır. (Hükümet kurma bundan sonra başlar: ayrılan
+	# kardeş partiler ayrı ayrı makam alabilir.)
 	_retire_temporary_parties()
+	_bot_alliances()
 	_maybe_add_temporary_party()
 	for splinter in splinters.keys():
 		splinters[splinter]["elections"] = int(splinters[splinter].get("elections", 0)) + 1
 	last_election_was_early = early
 	# Seçim sonrası herkese mana ve 1 kart hediye.
 	for peer_id in turn_order:
-		mana[peer_id] = mana_of(peer_id) + float(GameRules.ELECTION_MANA_BONUS) / member_count(peer_id)
+		mana[peer_id] = mana_of(peer_id) + float(GameRules.ELECTION_MANA_BONUS)
 		_deal_turn_card(peer_id)
 	# Seçimde kullanıldıktan SONRA söner: seçimden hemen önceki hamleler tam etkili.
 	_decay_opinion()
@@ -2350,8 +2384,11 @@ func dissolve_is_resignation(peer_id: int) -> bool:
 func can_found_party(peer_id: int) -> bool:
 	return can_choose_main_action(peer_id) and PartyManager.is_independent(peer_id) and mana_of(peer_id) >= FOUND_PARTY_COST
 
+## İki kişilik partinin İKİ ÜYESİ de ayrılıp parti kurabilir (genel başkan
+## ayrılırsa parti yardımcıya kalır).
 func can_leave_party(peer_id: int) -> bool:
-	return can_choose_main_action(peer_id) and PartyManager.is_deputy(peer_id) and mana_of(peer_id) >= LEAVE_PARTY_COST
+	return can_choose_main_action(peer_id) and PartyManager.member_count(party_of(peer_id)) >= 2 \
+		and mana_of(peer_id) >= LEAVE_PARTY_COST
 
 func can_congress(peer_id: int) -> bool:
 	var pid := party_of(peer_id)
@@ -2547,6 +2584,103 @@ func _scatter_seats(pid: int) -> Array:
 				_move_seats(pid, int(other), int(alloc[other]))
 	return [to_bloc, rest]
 
+# Bot ittifakları ---------------------------------------------------------------------
+## BOTLAR DA OYUNCULAR GİBİ OYNAR: birlikte büyür, sonra ayrılıp kardeş parti
+## olarak iktidarı paylaşır. Her seçimden sonra (host):
+##   AYRILMA: iki botun ortak partisi meclisin %45'ine ulaştıysa ya da
+##     BOT_MERGE_ELECTIONS seçim birlikte kaldıysa yardımcı bot ayrılır
+##     (katkı oranında), iki parti SIBLING_ROUNDS dönem KARDEŞ olur:
+##     birbirine saldırmaz, birbirinin teklifine evet der, koalisyonda önce
+##     birbirini seçer (bkz. BotBrain.is_ally).
+##   BİRLEŞME: görüşü yakın (BOT_JOIN_CLOSENESS), biri zayıf (barajın altında ya
+##     da meclisin %15.inden azı) iki tek kişilik bot BOT_MERGE_CHANCE ile birleşir.
+const BOT_MERGE_CHANCE := 0.3
+const BOT_MERGE_ELECTIONS := 2
+const BOT_SPLIT_SEAT_SHARE := 0.45
+const BOT_WEAK_SEAT_SHARE := 0.15
+var SIBLING_ROUNDS: int:
+	get: return GameRules.ELECTION_INTERVAL * 2
+
+func _is_plain_bot_party(pid: int) -> bool:
+	return MultiplayerManager.is_bot(pid) and PartyManager.is_leader(pid) and not PartyManager.is_independent(pid) \
+		and not is_splinter(pid) and not bool(PartyManager.parties[pid].get("temporary", false))
+
+## Testler kapatır (rastgele ittifak test beklentilerini bozmasın).
+var allow_bot_alliances: bool = true
+
+func _bot_alliances() -> void:
+	if not allow_bot_alliances:
+		return
+	var total := 0
+	for k in last_seats.keys():
+		total += int(last_seats[k])
+	total = maxi(1, total)
+	# 1) Ayrılma (tek seferde bir tane).
+	for pid in party_ids():
+		var deputy := PartyManager.deputy_of(int(pid))
+		if deputy == -1 or not _is_plain_bot_party(int(pid)) or not MultiplayerManager.is_bot(deputy):
+			continue
+		var together := int(PartyManager.parties[pid].get("merged_elections", 0)) + 1
+		PartyManager.parties[pid]["merged_elections"] = together
+		if float(last_seats.get(pid, 0)) / total < BOT_SPLIT_SEAT_SHARE and together < BOT_MERGE_ELECTIONS:
+			continue
+		var info := _random_party_info(deputy)
+		var text := _split_party_by_share(deputy, info)
+		siblings[int(pid)] = {"other": deputy, "until": round_number + SIBLING_ROUNDS}
+		siblings[deputy] = {"other": int(pid), "until": round_number + SIBLING_ROUNDS}
+		_pending_log.append({"text": text + " İki parti kardeş: iktidarı birlikte kovalayacaklar.",
+			"peer_id": deputy, "province": "", "kind": "party_change"})
+		PartyManager.broadcast()
+		break
+	# 2) Birleşme.
+	if _rng.randf() >= BOT_MERGE_CHANCE:
+		return
+	var singles: Array = []
+	for pid in party_ids():
+		if _is_plain_bot_party(int(pid)) and PartyManager.member_count(int(pid)) == 1 and not is_government_party(int(pid)):
+			singles.append(int(pid))
+	var best: Array = []
+	var best_closeness := BOT_JOIN_CLOSENESS
+	for i in singles.size():
+		for j in range(i + 1, singles.size()):
+			var a := int(singles[i])
+			var b := int(singles[j])
+			var weak := not passed_threshold.has(a) or not passed_threshold.has(b) \
+				or float(mini(int(last_seats.get(a, 0)), int(last_seats.get(b, 0)))) / total < BOT_WEAK_SEAT_SHARE
+			var closeness := ideological_closeness(a, b)
+			if weak and closeness >= best_closeness:
+				best_closeness = closeness
+				best = [a, b]
+	if best.is_empty():
+		return
+	var host := int(best[0])
+	var joiner := int(best[1])
+	if int(last_seats.get(joiner, 0)) > int(last_seats.get(host, 0)):
+		host = int(best[1])
+		joiner = int(best[0])
+	var host_name := _party_name(host)
+	var joiner_name := _party_name(joiner)
+	_join_party(host, joiner)
+	PartyManager.parties[host]["merged_elections"] = 0
+	_pending_log.append({"text": "%s ile %s güçlerini birleştirdi: birlikte daha hızlı büyüyecekler." % [host_name, joiner_name],
+		"peer_id": host, "province": "", "kind": "party_change"})
+
+## Botun yeni partisi için rastgele ad, logo ve boşta bir renk.
+func _random_party_info(peer_id: int) -> Dictionary:
+	var used: Array = []
+	var colors: Array = []
+	for party in PartyManager.parties.values():
+		used.append(String(party.get("name", "")))
+		colors.append(Color(party.get("bg_color", Color.TRANSPARENT)))
+	return {
+		"name": PartyManager._bot_party_name(used),
+		"icon_index": PartyPresets.random_icon_index(),
+		"icon_color": Color.WHITE,
+		"bg_color": PartyManager._pick_distinct_color(colors),
+		"ready": true,
+		"founded_round": round_number,
+	}
+
 # Geçici (rastgele katılan) partiler ---------------------------------------------------
 ## Lobide açıksa (MultiplayerManager.random_parties) her seçimden sonra
 ## TEMP_PARTY_CHANCE olasılıkla yeni bir bot partisi kurulur: sandalyesiz,
@@ -2679,14 +2813,8 @@ func _apply_found(peer_id: int, data: Dictionary) -> void:
 	}
 	var text := ""
 	if leaving:
-		var old_party := party_of(peer_id)
 		mana[peer_id] = mana_of(peer_id) - LEAVE_PARTY_COST
-		info["ideology"] = (PartyManager.data_of(old_party).get("ideology", IdeologyAxes.default_values()) as Dictionary).duplicate()
-		PartyManager.parties[old_party].erase("deputy")
-		PartyManager.parties[peer_id] = info
-		var taken := _split_organizations(old_party, peer_id)
-		text = "%s, %s'den ayrılıp %s'yi kurdu (%d teşkilat yanında)." % [PoliticianPresets.display_name(peer_id),
-			_party_name(old_party), info["name"], taken]
+		text = _split_party_by_share(peer_id, info)
 	else:
 		mana[peer_id] = mana_of(peer_id) - FOUND_PARTY_COST
 		info["ideology"] = (PartyManager.data_of(peer_id).get("ideology", IdeologyAxes.default_values()) as Dictionary).duplicate()
@@ -2699,34 +2827,143 @@ func _apply_found(peer_id: int, data: Dictionary) -> void:
 	PartyManager.broadcast()
 	_push_state({"type": "party_change", "peer_id": peer_id, "message": text}, true)
 
-## Ayrılan yardımcı eski partinin teşkilatlarının rastgele üçte birini götürür:
-## 1. seviye il ona geçer; 2. seviye il ya bütünüyle geçer ya da iki tarafa
-## 1'er seviye bölünür. Ayrılanın memleketi özel: oradaki teşkilat ona geçer
-## (iki üyenin memleketi aynıysa güvenilirliği yüksek olan tutar).
-func _split_organizations(from_party: int, to_party: int) -> int:
-	var provinces: Array = []
+# Katkı ve ayrılma -------------------------------------------------------------------
+const CONTRIB_ORG := 2.0
+const CONTRIB_MITING := 1.0
+const CONTRIB_LAW := 2.0
+const CONTRIB_SPEECH := 0.5
+const CONTRIB_PER_STOLEN_SEAT := 0.2
+## Birleşmede getirilen varlıkların başlangıç katkısı.
+const CONTRIB_PER_SEAT := 0.3
+const CONTRIB_BASE := 3.0
+## Ayrılık payı: KATKI_AĞIRLIĞI × katkı payı + kalanı rastgele (0,25..0,75).
+const SPLIT_CONTRIB_WEIGHT := 0.65
+const SPLIT_SHARE_MIN := 0.15
+const SPLIT_SHARE_MAX := 0.85
+## Ayrılığın ulusal bedeli (iki partiye de): taban + seçime yakınlıkla artan kısım.
+const SPLIT_NATIONAL_BASE := -0.5
+const SPLIT_NATIONAL_NEAR_ELECTION := -1.5
+
+func _contribute(peer_id: int, amount: float) -> void:
+	if PartyManager.member_count(party_of(peer_id)) < 2 and not contributions.has(peer_id):
+		return  # tek kişilik partide katkı tutulmaz (birleşince başlar)
+	contributions[peer_id] = float(contributions.get(peer_id, 0.0)) + amount
+
+## Bu oyuncunun partideki katkı payı (0..1; tek kişilikse 1).
+func contribution_share(peer_id: int) -> float:
+	var members: Array = PartyManager.members_of(party_of(peer_id))
+	if members.size() < 2:
+		return 1.0
+	var total := 0.0
+	for member in members:
+		total += maxf(0.0, float(contributions.get(int(member), 0.0)))
+	if total <= 0.0:
+		return 0.5
+	return maxf(0.0, float(contributions.get(peer_id, 0.0))) / total
+
+## Ayrılırsa beklenen pay (rastgelelik ortalamasıyla) — arayüz önizlemesi.
+func expected_split_share(peer_id: int) -> float:
+	return clampf(SPLIT_CONTRIB_WEIGHT * contribution_share(peer_id) + (1.0 - SPLIT_CONTRIB_WEIGHT) * 0.5,
+		SPLIT_SHARE_MIN, SPLIT_SHARE_MAX)
+
+## Ayrılık önizlemesi: {"share", "seats", "orgs"} (beklenen değerler).
+func split_preview(peer_id: int) -> Dictionary:
+	var pid := party_of(peer_id)
+	var share := expected_split_share(peer_id)
+	var orgs := 0
 	for province_id in organizations.keys():
-		if int(organizations[province_id].get(from_party, 0)) > 0:
-			provinces.append(String(province_id))
-	provinces.sort()
+		if int(organizations[province_id].get(pid, 0)) > 0:
+			orgs += 1
+	return {"share": share, "seats": int(round(int(last_seats.get(pid, 0)) * share)), "orgs": int(round(orgs * share))}
+
+## Seçime yakınlık (0: seçim yeni yapıldı .. 1: bu dönem sandık var).
+func _election_nearness() -> float:
+	var next := GameRules.next_election_round(round_number)
+	if next == -1:
+		return 0.0
+	var interval := maxi(1, GameRules.ELECTION_INTERVAL)
+	return clampf(1.0 - float(next - round_number) / float(interval), 0.0, 1.0)
+
+## AYRILIK: oyuncu partisinden ayrılıp info ile yeni parti kurar. Katkısı (ve
+## biraz rastgelelik) oranında vekil, teşkilat ve destek götürür; memleketindeki
+## teşkilat onunla gider. Genel başkan ayrılırsa parti yardımcıya kalır. İki
+## parti de seçime yakınlıkla artan küçük bir ulusal bedel öder. Dönüş: olay metni.
+func _split_party_by_share(peer_id: int, info: Dictionary) -> String:
+	var old_party := party_of(peer_id)
+	var old_name := _party_name(old_party)
+	var share := clampf(SPLIT_CONTRIB_WEIGHT * contribution_share(peer_id)
+		+ (1.0 - SPLIT_CONTRIB_WEIGHT) * _rng.randf_range(0.25, 0.75), SPLIT_SHARE_MIN, SPLIT_SHARE_MAX)
+	if old_party == peer_id:
+		# Genel başkan ayrılıyor: parti yardımcıya kalır.
+		var deputy := PartyManager.deputy_of(old_party)
+		_rekey_party(old_party, deputy, -1)
+		old_party = deputy
+	else:
+		PartyManager.parties[old_party].erase("deputy")
+	info["ideology"] = (PartyManager.data_of(old_party).get("ideology", IdeologyAxes.default_values()) as Dictionary).duplicate()
+	PartyManager.parties[peer_id] = info
+	# Vekiller ve oy oranı.
+	var seats := _move_seats(old_party, peer_id, int(round(int(last_seats.get(old_party, 0)) * share)))
+	var es := int(election_seats.get(old_party, 0))
+	election_seats[peer_id] = int(round(es * share))
+	election_seats[old_party] = es - int(election_seats[peer_id])
+	var vote := float(last_vote_shares.get(old_party, 0.0))
+	if vote > 0.0:
+		last_vote_shares[peer_id] = vote * share
+		last_vote_shares[old_party] = vote * (1.0 - share)
+	if passed_threshold.has(old_party) and not passed_threshold.has(peer_id):
+		passed_threshold.append(peer_id)
+	# Destek: ulusal ve il puanları paylaşılır, sonra ayrılık bedeli.
+	var national := national_of(old_party)
+	national_support[peer_id] = national * share
+	national_support[old_party] = national * (1.0 - share)
+	for province_id in local_support.keys():
+		var entry: Dictionary = local_support[province_id]
+		if entry.has(old_party):
+			var value := float(entry[old_party])
+			entry[peer_id] = value * share
+			entry[old_party] = value * (1.0 - share)
+	var penalty := SPLIT_NATIONAL_BASE + SPLIT_NATIONAL_NEAR_ELECTION * _election_nearness()
+	_add_national(peer_id, penalty)
+	_add_national(old_party, penalty)
+	var orgs := _split_organizations(old_party, peer_id, share)
+	contributions.erase(peer_id)
+	contributions.erase(old_party)
+	return "%s, %s'den ayrılıp %s'yi kurdu: %d vekil, %d teşkilat ve desteğin %%%d'i onunla gitti (ayrılık bedeli: ulusal %.1f)." % [
+		PoliticianPresets.display_name(peer_id), old_name, info["name"], seats, orgs, int(round(share * 100.0)), penalty]
+
+## Teşkilatlar pay oranında bölünür: önce ayrılanın kurduğu iller, sonra
+## rastgele. 2. seviye bir il ya bütünüyle geçer ya da iki tarafa 1'er seviye
+## bölünür. Ayrılanın memleketi özel: oradaki teşkilat ona geçer (iki üyenin
+## memleketi aynıysa güvenilirliği yüksek olan tutar).
+func _split_organizations(from_party: int, to_party: int, share: float) -> int:
+	var own: Array = []
+	var rest: Array = []
+	for province_id in organizations.keys():
+		if int(organizations[province_id].get(from_party, 0)) <= 0:
+			continue
+		if int(_org_builders.get(province_id, {}).get(from_party, -1)) == to_party:
+			own.append(String(province_id))
+		else:
+			rest.append(String(province_id))
+	own.sort()
+	rest.sort()
+	_shuffle(own)
+	_shuffle(rest)
+	var ordered: Array = own + rest
+	var total := ordered.size()
 	var home := PoliticianPresets.hometown_of(to_party)
 	var taken := 0
-	if provinces.has(home):
+	if ordered.has(home):
 		var rival_home := PoliticianPresets.hometown_of(from_party)
 		if rival_home != home or credibility_of(to_party) > credibility_of(from_party):
 			organizations[home][to_party] = organizations[home][from_party]
 			organizations[home].erase(from_party)
 			taken += 1
-		provinces.erase(home)
-	# Rastgele üçte bir (deterministik karıştırma host RNG'siyle).
-	for i in range(provinces.size() - 1, 0, -1):
-		var j := _rng.randi_range(0, i)
-		var tmp = provinces[i]
-		provinces[i] = provinces[j]
-		provinces[j] = tmp
-	var count := int(round((provinces.size() + taken) * LEAVE_ORG_SHARE)) - taken
-	for k in clampi(count, 0, provinces.size()):
-		var province_id := String(provinces[k])
+		ordered.erase(home)
+	var count := clampi(int(round(total * share)) - taken, 0, ordered.size())
+	for k in count:
+		var province_id := String(ordered[k])
 		var entry: Dictionary = organizations[province_id]
 		var level := int(entry.get(from_party, 0))
 		if level >= 2 and _rng.randf() < 0.5:
@@ -2737,6 +2974,13 @@ func _split_organizations(from_party: int, to_party: int) -> int:
 			entry.erase(from_party)
 		taken += 1
 	return taken
+
+func _shuffle(list: Array) -> void:
+	for i in range(list.size() - 1, 0, -1):
+		var j := _rng.randi_range(0, i)
+		var tmp = list[i]
+		list[i] = list[j]
+		list[j] = tmp
 
 func _apply_congress(peer_id: int) -> void:
 	if not can_congress(peer_id):
@@ -2807,6 +3051,9 @@ func _apply_respond_offer(peer_id: int, offer_id: int, accept: bool) -> void:
 ## Katılan (joiner) ev sahibi partiye yardımcı olarak girer. Kendi partisi
 ## varsa iki parti BİRLEŞİR.
 func _join_party(host: int, joiner: int) -> void:
+	# Başlangıç katkısı: iki tarafın getirdiği vekil ve teşkilat.
+	contributions[host] = _assets_value(host)
+	contributions[joiner] = _assets_value(joiner)
 	var host_name := _party_name(host)
 	var merging := not PartyManager.is_independent(joiner)
 	var joiner_party_name := _party_name(joiner)
@@ -2820,6 +3067,10 @@ func _join_party(host: int, joiner: int) -> void:
 		var level := int(entry.get(joiner, 0))
 		if level > int(entry.get(host, 0)):
 			entry[host] = level
+			# Teşkilatı kuran (getiren) olarak katılan kaydedilir.
+			var builders: Dictionary = _org_builders.get(province_id, {})
+			builders[host] = joiner
+			_org_builders[province_id] = builders
 		entry.erase(joiner)
 	for province_id in local_support.keys():
 		var entry: Dictionary = local_support[province_id]
@@ -2850,6 +3101,12 @@ func _join_party(host: int, joiner: int) -> void:
 		text = "%s ile %s BİRLEŞTİ: %s, %s'nin genel başkan yardımcısı oldu (%d vekil katıldı)." % [
 			host_name, joiner_party_name, PoliticianPresets.display_name(joiner), host_name, moved]
 	_push_state({"type": "party_change", "peer_id": joiner, "message": text}, true)
+
+func _assets_value(pid: int) -> float:
+	var orgs := 0
+	for province_id in organizations.keys():
+		orgs += int(organizations[province_id].get(pid, 0))
+	return CONTRIB_BASE + CONTRIB_PER_SEAT * int(last_seats.get(pid, 0)) + CONTRIB_ORG * orgs
 
 ## Sıradaki yerini değiştirir: peer, anchor'un hemen ardından oynar.
 func _place_after(peer_id: int, anchor: int) -> void:
@@ -2905,6 +3162,12 @@ func _rekey_party(old_id: int, new_id: int, new_deputy: int) -> void:
 	if splinters.has(old_id):
 		splinters[new_id] = splinters[old_id]
 		splinters.erase(old_id)
+	if siblings.has(old_id):
+		siblings[new_id] = siblings[old_id]
+		siblings.erase(old_id)
+	for other in siblings.keys():
+		if int(siblings[other].get("other", -1)) == old_id:
+			siblings[other]["other"] = new_id
 	for splinter in splinters.keys():
 		if int(splinters[splinter].get("parent", -1)) == old_id:
 			splinters[splinter]["parent"] = new_id
@@ -2926,6 +3189,7 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"offers": offers,
 		"congress_rounds": congress_rounds,
 		"previous_vote_shares": previous_vote_shares,
+		"contributions": contributions,
 		"agenda": agenda,
 		"national_list": national_list,
 		"round": round_number,
@@ -2968,6 +3232,7 @@ func _apply_state(state: Dictionary) -> void:
 	offers = state.get("offers", [])
 	congress_rounds = state.get("congress_rounds", {})
 	previous_vote_shares = state.get("previous_vote_shares", {})
+	contributions = state.get("contributions", {})
 	agenda = state.get("agenda", {})
 	national_list = state.get("national_list", {})
 	round_number = int(state["round"])

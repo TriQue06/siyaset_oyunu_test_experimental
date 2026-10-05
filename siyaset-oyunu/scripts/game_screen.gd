@@ -34,7 +34,6 @@ const PLAYER_TAB_COLUMNS := [
 const PLAYER_TAB_HEIGHT := 30.0
 ## Sütun başlığı satırının yüksekliği ve iki satırlık kartın alt sınırı.
 const PLAYER_HEADER_HEIGHT := 20.0
-const COMPACT_ROW_HEIGHT := 56.0
 ## Alt haznede meclisin (sol) aldığı pay; kalan sağ kısım el kartlarına.
 ## Alt haznenin (parlamento + hamleler) kullandığı genişlik payı. Kalanı
 ## el kartlarına gider. Hazne içeriğinden dar kalırsa HBox taşar; bu yüzden
@@ -832,7 +831,7 @@ func _on_turn_changed(_peer_id: int) -> void:
 	if current != _last_turn_peer:
 		_last_turn_peer = current
 		if current == multiplayer.get_unique_id() and not CardManager.game_finished:
-			_show_toast("Sıra sende: +%d mana (toplam %s)." % [CardManager.turn_income(current), CardManager.mana_text(CardManager.mana_of(current))])
+			_show_toast("Sıra sende: +%s mana (toplam %s)." % [CardManager.mana_text(CardManager.turn_income(current)), CardManager.mana_text(CardManager.mana_of(current))])
 			AudioManager.play("turn_start")
 	_update_turn_indicator()
 	_refresh_speech_panel()
@@ -1579,6 +1578,7 @@ func _refresh_offer_bar() -> void:
 	else:
 		_offer_label.text = ("%s partine katılmak istiyor. Kabul edersen senin yardımcın olur%s." % [who,
 			"" if PartyManager.is_independent(from_peer) else "; iki parti BİRLEŞİR"])
+	_offer_label.text += "\nBirlikte iki kat hamle ve fazladan mana; iktidar puanı ikiye bölünür. Güçlenince ayrılıp iki parti olarak iktidarı paylaşabilirsiniz."
 	_offer_bar.show()
 
 func _answer_offer(accept: bool) -> void:
@@ -1869,90 +1869,85 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 	style.content_margin_left = 6
 	# Sıra/hedef çerçevesi kartın üstüne çiziliyor: sayılar kenara değmesin.
 	style.content_margin_right = 14
-	# Çok oyunculu ve alçak ekranda kart sıkışır: tek satır (sadece parti adı).
-	# İki satırlık kartın asgari yüksekliği ~56 px; altına inince tek satıra
-	# düşülür, yoksa satırlar ızgaraya sığmayıp sonuncusu kırpılıyor.
-	var compact := _avatar_height < COMPACT_ROW_HEIGHT
-	style.content_margin_top = 1 if compact else 4
-	style.content_margin_bottom = 1 if compact else 4
+	# SABİT DÜZEN: oyuncu sayısı ne olursa olsun her satır İKİ SATIRDIR ve hiçbir
+	# bilgi atılmaz; siyasetçinin adı kısaltılmaz (gerekirse yazısı küçülür).
+	#   1. satır: siyasetçinin adı + etiketler (SIRA / SEN / POP / GB / YRD)
+	#   2. satır: partisi + açık sekmenin sayı sütunları (başlıklarla hizalı)
+	style.content_margin_top = 1 if _avatar_height < 40.0 else 3
+	style.content_margin_bottom = 1 if _avatar_height < 40.0 else 3
 	card.add_theme_stylebox_override("panel", style)
 
 	var row := HBoxContainer.new()
-	# Dar sütun: boşluklar küçük tutulur, yoksa satırın asgari genişliği
-	# paneli aşıp sayı sütunlarını ekran dışına itiyor.
 	row.add_theme_constant_override("separation", 5)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(row)
 	# Solda parti renginde şerit: kartın kime ait olduğu ilk bakışta belli.
 	row.add_child(UiTheme.stripe(color))
-	var badge_size: float = clampf(_avatar_height - (6.0 if compact else 16.0), 18.0, 44.0)
+	var badge_size: float = clampf(_avatar_height - 12.0, 22.0, 40.0)
 	var badge := PartyBadge.build(party, Vector2(badge_size, badge_size), BADGE_ICON_PIXEL_SIZE)
 	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(badge)
 
+	# YAZI BOYUTU satır yüksekliğine göre biraz küçülür (bilgi atılmaz): 8 oyuncuda
+	# ad 12, parti 10; az oyuncuda ad 14, parti 12.
+	var name_size: int = clampi(int((_avatar_height - 6.0) * 0.42), 10, UiTheme.FS_SMALL)
+	var party_size: int = maxi(9, name_size - 2)
 	var info := VBoxContainer.new()
-	info.add_theme_constant_override("separation", -2)
+	info.add_theme_constant_override("separation", -4 if _avatar_height < 40.0 else -2)
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(info)
-	# SİYASETÇİ ADI (birinci satır, kalın) ve PARTİSİ (ikinci satır, parti
-	# renginde) — ikisi de vurgulu. Sayılar sağdaki sütunlarda.
 	var independent := PartyManager.is_independent(peer_id)
 	var party_text := "Bağımsız" if independent else String(party.get("name", "?"))
 	var party_color: Color = UiTheme.TEXT_MUTED if independent else color.lightened(0.45)
-	var name_text := PoliticianPresets.display_name(peer_id)
-	if compact:
-		name_text = "%s · %s" % [PoliticianPresets.surname_of(peer_id) if PoliticianPresets.surname_of(peer_id) != "" else name_text, party_text]
-	var name_label := _avatar_label(name_text, UiTheme.FS_SMALL, UiTheme.GOLD if is_self else UiTheme.TEXT)
-	name_label.add_theme_font_override("font", UiTheme.mono(true))
-	info.add_child(name_label)
-	# İKİNCİ SATIR: liderin adı ve ETİKETLER (SIRA / SEN / POP) yan yana.
-	# Etiketleri ayrı bir satıra koymak kartı üçüncü satır kadar uzatıyor,
-	# dar ekranda tablonun son partisi kırpılıyordu. Tablonun SAĞ tarafı
-	# yalnızca sayı sütunlarına ayrılır, böylece başlıklarla tam hizalanır.
 	var populism_left := CardManager.populism_rounds_left(peer_id)
-	if not compact:
-		var second := HBoxContainer.new()
-		second.add_theme_constant_override("separation", 4)
-		second.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		info.add_child(second)
-		var party_label := _avatar_label(party_text, UiTheme.FS_TINY + 1, party_color)
-		party_label.add_theme_font_override("font", UiTheme.mono(true))
-		party_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		second.add_child(party_label)
-		# Parti içi rol: iki kişilik partide genel başkan (GB) ve yardımcı (YRD).
-		if PartyManager.is_deputy(peer_id):
-			second.add_child(_avatar_tag("YRD", color, UiTheme.TEXT))
-		elif PartyManager.deputy_of(peer_id) != -1:
-			second.add_child(_avatar_tag("GB", color, UiTheme.TEXT))
-		if is_turn:
-			second.add_child(_avatar_tag("SIRA", UiTheme.TEXT, UiTheme.INK))
-		if is_self:
-			second.add_child(_avatar_tag("SEN", UiTheme.GOLD, UiTheme.INK))
-		if populism_left > 0:
-			second.add_child(_avatar_tag("POP %d" % populism_left, UiTheme.PURPLE, UiTheme.TEXT))
-	elif is_turn or is_self or populism_left > 0 or PartyManager.member_count(CardManager.party_of(peer_id)) >= 2:
-		# Çok dar satır: sıra/sen etiketinden biri + POP (popülizm sürüyorsa;
-		# eskiden dar satırda POP hiç görünmüyordu).
-		var tag_row := HBoxContainer.new()
-		tag_row.add_theme_constant_override("separation", 3)
-		tag_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		if is_turn or is_self:
-			tag_row.add_child(_avatar_tag("SIRA" if is_turn else "SEN",
-				UiTheme.TEXT if is_turn else UiTheme.GOLD, UiTheme.INK))
-		if populism_left > 0:
-			tag_row.add_child(_avatar_tag("POP %d" % populism_left, UiTheme.PURPLE, UiTheme.TEXT))
-		if PartyManager.is_deputy(peer_id):
-			tag_row.add_child(_avatar_tag("YRD", color, UiTheme.TEXT))
-		elif PartyManager.deputy_of(peer_id) != -1:
-			tag_row.add_child(_avatar_tag("GB", color, UiTheme.TEXT))
-		row.add_child(tag_row)
 
+	# 1. SATIR: ad + etiketler.
+	var first := HBoxContainer.new()
+	first.add_theme_constant_override("separation", 3)
+	first.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	info.add_child(first)
+	var tags: Array = []
+	if is_turn:
+		tags.append(["SIRA", UiTheme.TEXT, UiTheme.INK])
+	if is_self:
+		tags.append(["SEN", UiTheme.GOLD, UiTheme.INK])
+	if populism_left > 0:
+		tags.append(["POP %d" % populism_left, UiTheme.PURPLE, UiTheme.TEXT])
+	if PartyManager.is_deputy(peer_id):
+		tags.append(["YRD", color, UiTheme.TEXT])
+	elif PartyManager.deputy_of(peer_id) != -1:
+		tags.append(["GB", color, UiTheme.TEXT])
+	var tags_width := 0.0
+	for tag in tags:
+		tags_width += String(tag[0]).length() * 6.0 + 10.0
+	var name_text := PoliticianPresets.display_name(peer_id)
+	var name_width := _row_text_width(badge_size) - tags_width
+	var name_label := _avatar_label(name_text, _fit_font_size(name_text, name_width, name_size, 9),
+		UiTheme.GOLD if is_self else UiTheme.TEXT)
+	name_label.clip_text = false
+	name_label.add_theme_font_override("font", UiTheme.mono(true))
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	first.add_child(name_label)
+	for tag in tags:
+		var tag_control := _avatar_tag(String(tag[0]), tag[1], tag[2])
+		tag_control.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		first.add_child(tag_control)
+
+	# 2. SATIR: parti + sayı sütunları.
+	var second := HBoxContainer.new()
+	second.add_theme_constant_override("separation", 5)
+	second.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	info.add_child(second)
+	var party_label := _avatar_label(party_text, party_size, party_color)
+	party_label.add_theme_font_override("font", UiTheme.mono(true))
+	party_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	second.add_child(party_label)
 	# AÇIK SEKMENİN SAYI SÜTUNLARI (başlıkları tablonun ilk satırında).
 	for cell in _player_row_values(peer_id, is_self):
-		row.add_child(cell)
+		second.add_child(cell)
 	# Hangi oyuncuya ait olduğu düğümün ÜSTÜNDE saklanıyor: hover tespiti ve
 	# tooltip konumu panelin çocuk SIRASINA güvenmez (bkz. _party_under_mouse).
 	card.set_meta("peer_id", peer_id)
@@ -1963,7 +1958,7 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 			VOTE_COLORS[int(GovernmentManager.votes[peer_id])] if voted else UiTheme.TEXT_MUTED)
 		tag.clip_text = false
 		tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		row.add_child(tag)
+		first.add_child(tag)
 	# Vekil çalma hedefi vurgusu (bkz. _refresh_target_highlights).
 	var halo := Panel.new()
 	halo.name = "TargetHalo"
@@ -2028,6 +2023,20 @@ func _hide_profile() -> void:
 	if hover_tooltip != null:
 		hover_tooltip.hide()
 
+## Satırdaki metin alanının genişliği (şerit, rozet ve kenar payları hariç).
+func _row_text_width(badge_size: float) -> float:
+	var width: float = player_panel_list.size.x if player_panel_list != null and player_panel_list.size.x > 0.0 \
+		else RIGHT_COLUMN_WIDTH - 24.0
+	return width - 6.0 - 14.0 - 6.0 - badge_size - 10.0
+
+## Metin bu genişliğe sığana kadar yazı boyutunu küçültür (isim kısaltılmaz).
+func _fit_font_size(text: String, width: float, largest: int, smallest: int) -> int:
+	var font := UiTheme.mono(true)
+	for size in range(largest, smallest - 1, -1):
+		if font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x <= width:
+			return size
+	return smallest
+
 func _avatar_tag(text: String, bg: Color, fg: Color) -> Control:
 	var tag := Label.new()
 	tag.text = text
@@ -2036,10 +2045,15 @@ func _avatar_tag(text: String, bg: Color, fg: Color) -> Control:
 	tag.add_theme_color_override("font_color", fg)
 	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := UiSkin.color_box(bg, UiSkin.FILL)
+	# Düz ve ince kutu: dokulu kutu satırı yükseltiyordu (8 oyuncuda taşma).
+	var style := StyleBoxFlat.new()
+	style.bg_color = bg
 	style.content_margin_left = 3
 	style.content_margin_right = 3
+	style.content_margin_top = 0
+	style.content_margin_bottom = 0
 	tag.add_theme_stylebox_override("normal", style)
+	tag.add_theme_constant_override("line_spacing", 0)
 	return tag
 
 func _avatar_label(text: String, font_size: int, color: Color) -> Label:

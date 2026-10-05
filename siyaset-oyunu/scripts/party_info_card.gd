@@ -68,15 +68,23 @@ static func build(peer_id: int, my_id: int, on_action: Callable = Callable()) ->
 ## manası yetmeyen için düğme sönük durur.
 static func _actions(peer_id: int, my_id: int, on_action: Callable) -> Control:
 	var list: Array = []  # [metin, tür, basılabilir mi, onay ister mi]
+	var notes: Array = []
 	if peer_id == my_id:
+		var two := PartyManager.member_count(CardManager.party_of(my_id)) >= 2
 		if PartyManager.is_independent(my_id):
 			list.append(["Yeni Parti Kur · %d mana" % CardManager.FOUND_PARTY_COST, "found", CardManager.can_found_party(my_id), false])
-		elif PartyManager.is_deputy(my_id):
-			list.append(["Ayrıl ve Parti Kur · %d mana" % CardManager.LEAVE_PARTY_COST, "leave", CardManager.can_leave_party(my_id), false])
 		else:
-			var resign := CardManager.dissolve_is_resignation(my_id)
-			list.append(["Genel Başkanlıktan İstifa Et" if resign else "Partiyi Feshet", "dissolve", CardManager.can_dissolve(my_id), true])
-		if PartyManager.member_count(CardManager.party_of(my_id)) >= 2:
+			if two:
+				list.append(["Ayrıl ve Parti Kur · %d mana" % CardManager.LEAVE_PARTY_COST, "leave", CardManager.can_leave_party(my_id), false])
+				var preview := CardManager.split_preview(my_id)
+				notes.append("Ayrılırsan beklenen: ~%d vekil · ~%d teşkilat · desteğin %%%d'i (katkına göre, biraz şans). Seçime yaklaştıkça ayrılık daha çok oy kaybettirir." % [
+					int(preview["seats"]), int(preview["orgs"]), int(round(float(preview["share"]) * 100.0))])
+			else:
+				notes.append("Birleşmek: bir partiyi davet et ya da birine başvur. Birlikte iki kat hamle ve fazladan mana (genel başkan yarı+1, yardımcı yarı+0,5); iktidar puanı ikiye bölünür. Çoğunluğa yaklaşınca ayrılıp iki parti olarak iktidarı paylaşmak daha çok puan getirir.")
+			if PartyManager.is_leader(my_id):
+				var resign := CardManager.dissolve_is_resignation(my_id)
+				list.append(["Genel Başkanlıktan İstifa Et" if resign else "Partiyi Feshet", "dissolve", CardManager.can_dissolve(my_id), true])
+		if two:
 			list.append(["Kongre Talep Et · %d mana" % CardManager.CONGRESS_COST, "congress", CardManager.can_congress(my_id), false])
 	else:
 		if CardManager.is_valid_offer(my_id, peer_id, "invite"):
@@ -90,6 +98,8 @@ static func _actions(peer_id: int, my_id: int, on_action: Callable) -> Control:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 4)
 	box.add_child(PopupKit.section("Parti"))
+	for note in notes:
+		box.add_child(PopupKit.note(String(note), UiTheme.TEXT_MUTED, WIDTH - 2.0 * PopupKit.PAD))
 	var any_disabled := false
 	for entry in list:
 		var button := Button.new()

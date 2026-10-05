@@ -63,7 +63,7 @@ static func bloc_active() -> bool:
 ## Muhalefetteki (vekili olan) botlar.
 static func bloc_members() -> Array:
 	var members: Array = []
-	for peer_id in GovernmentManager.voter_ids():
+	for peer_id in GovernmentManager.seated_party_ids():
 		if MultiplayerManager.is_bot(peer_id) and not CardManager.is_government_party(peer_id):
 			members.append(peer_id)
 	return members
@@ -81,6 +81,18 @@ static func _bloc_solidarity() -> bool:
 	if GovernmentManager.has_government() or CardManager.round_number <= 1:
 		_bloc_forming = false
 	return _bloc_forming
+
+## DOST mu? Aynı partideki ortak ya da KARDEŞ PARTİ (birlikte büyüyüp ayrılan
+## bot partileri bir süre birbirine saldırmaz, birbirini destekler).
+static func is_ally(bot: int, other: int) -> bool:
+	if other == -1:
+		return false
+	if PartyManager.same_party(bot, other):
+		return true
+	var mine := CardManager.party_of(bot)
+	var info: Dictionary = CardManager.siblings.get(mine, {})
+	return not info.is_empty() and int(info.get("other", -1)) == CardManager.party_of(other) \
+		and CardManager.round_number < int(info.get("until", 0))
 
 static func _ideology(peer_id: int) -> Dictionary:
 	return PartyManager.data_of(peer_id).get("ideology", IdeologyAxes.default_values())
@@ -448,7 +460,7 @@ static func _eval_card_theft(bot: int) -> Dictionary:
 		return {}
 	var target := -1
 	for peer_id in CardManager.turn_order:
-		if peer_id == bot or hand_size(peer_id) == 0:
+		if is_ally(bot, int(peer_id)) or hand_size(peer_id) == 0:
 			continue
 		if target == -1 or hand_size(peer_id) > hand_size(target):
 			target = peer_id
@@ -472,8 +484,8 @@ static func _attack_target(bot: int) -> int:
 	if bloc_active() and bloc_members().has(bot):
 		return GovernmentManager.main_gov_peer_id
 	var target := -1
-	for peer_id in CardManager.turn_order:
-		if peer_id == bot:
+	for peer_id in CardManager.party_ids():
+		if is_ally(bot, int(peer_id)):
 			continue
 		if target == -1 or GovernmentManager.seats_of(peer_id) > GovernmentManager.seats_of(target):
 			target = peer_id
@@ -534,8 +546,8 @@ static func _eval_propaganda(bot: int, known: Dictionary) -> Dictionary:
 		var center: Dictionary = known.get(province_id, {})
 		var gain := PublicOpinion.propaganda_gain(PublicOpinion.party_strength(
 			_ideology(bot), center, CardManager.activity_of(province_id, bot)))
-		for target in CardManager.turn_order:
-			if target == bot:
+		for target in CardManager.party_ids():
+			if is_ally(bot, int(target)):
 				continue
 			var damage := PublicOpinion.propaganda_damage(PublicOpinion.party_strength(
 				_ideology(target), center, CardManager.activity_of(province_id, target)))
@@ -558,16 +570,16 @@ static func _eval_steal(bot: int, card_type: String) -> Dictionary:
 			return bloc
 	var in_gov := CardManager.is_government_party(bot)
 	var target := -1
-	for peer_id in CardManager.turn_order:
-		if not CardManager.is_valid_steal_target(bot, peer_id):
+	for peer_id in CardManager.party_ids():
+		if not CardManager.is_valid_steal_target(bot, peer_id) or is_ally(bot, int(peer_id)):
 			continue
 		if GovernmentManager.has_government() and CardManager.is_government_party(peer_id) == in_gov:
 			continue
 		if target == -1 or GovernmentManager.seats_of(peer_id) > GovernmentManager.seats_of(target):
 			target = peer_id
 	if target == -1:
-		for peer_id in CardManager.turn_order:
-			if CardManager.is_valid_steal_target(bot, peer_id) \
+		for peer_id in CardManager.party_ids():
+			if CardManager.is_valid_steal_target(bot, peer_id) and not is_ally(bot, int(peer_id)) \
 					and (target == -1 or GovernmentManager.seats_of(peer_id) > GovernmentManager.seats_of(target)):
 				target = peer_id
 	if target == -1:
@@ -627,6 +639,11 @@ static func _censure_worth_it(bot: int) -> bool:
 # --- Oylama --------------------------------------------------------------------
 
 static func choose_vote(bot: int) -> int:
+	# Kardeş parti ya da partideki ortak: teklifini destekler (gensoru hariç
+	# kendi hükümetine karşıysa ayrıca bakılır).
+	var proposer := GovernmentManager.proposal_peer_id
+	if proposer != -1 and is_ally(bot, proposer) and GovernmentManager.proposal_kind != GovernmentManager.KIND_CENSURE:
+		return GovernmentManager.VOTE_YES
 	match GovernmentManager.proposal_kind:
 		GovernmentManager.KIND_GOVERNMENT:
 			if bot == GovernmentManager.proposal_peer_id:
@@ -811,6 +828,8 @@ static func _early_election_vote(bot: int) -> int:
 ## puanı, koalisyondaki sandalye payına göre hakkının altındaysa reddeder.
 ## İki partilik bir koalisyonda tek bakanlık (1 puan) hiçbir zaman yetmez.
 static func _coalition_offer_vote(bot: int) -> int:
+	if is_ally(bot, GovernmentManager.proposal_peer_id):
+		return GovernmentManager.VOTE_YES  # kardeş partinin hükümetine katılır
 	var offered := 0
 	var gov_seats := float(GovernmentManager.seats_of(GovernmentManager.proposal_peer_id))
 	for post in GovernmentManager.proposal_assignments.keys():
@@ -886,10 +905,15 @@ static func _censure_vote(bot: int) -> int:
 static func build_government(bot: int) -> Dictionary:
 	var total := GovernmentManager.total_seats()
 	var mine := _ideology(bot)
-	var candidates: Array = GovernmentManager.voter_ids()
-	candidates.erase(bot)
+	# Ortak adayları PARTİLER (bağımsızlar hükümete giremez), kardeş parti önce.
+	var candidates: Array = []
+	for pid in GovernmentManager.seated_party_ids():
+		if int(pid) != CardManager.party_of(bot) and not PartyManager.is_independent(int(pid)):
+			candidates.append(int(pid))
 	var bloc := _bloc_solidarity()
 	candidates.sort_custom(func(a, b):
+		if is_ally(bot, a) != is_ally(bot, b):
+			return is_ally(bot, a)
 		# Blok dayanışmasında önce diğer botlar ortak seçilir.
 		if bloc and MultiplayerManager.is_bot(a) != MultiplayerManager.is_bot(b):
 			return MultiplayerManager.is_bot(a)

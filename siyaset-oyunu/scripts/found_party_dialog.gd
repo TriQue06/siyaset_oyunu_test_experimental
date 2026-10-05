@@ -39,7 +39,7 @@ func _ready() -> void:
 	body.add_child(PopupKit.header("YENİ PARTİ KUR" if not leaving else "AYRIL VE PARTİ KUR",
 		"Bedel: %d mana · görüşün aynen devam eder" % cost, null, queue_free))
 	if leaving:
-		body.add_child(PopupKit.note("Partinden ayrılırken teşkilatların bir kısmını ve memleketindeki teşkilatı yanında götürürsün.", UiTheme.TEXT_MUTED))
+		body.add_child(PopupKit.note("Katkına göre (biraz da şansla) vekillerin, teşkilatların ve desteğin bir kısmını götürürsün; memleketindeki teşkilat seninle gelir. Seçime yaklaştıkça ayrılık iki partiye de daha çok oy kaybettirir.", UiTheme.TEXT_MUTED))
 	else:
 		body.add_child(PopupKit.note("Bağımsızken topladığın destek yeni partine geçer; memleketinden kazandığın sandalye de partinin olur.", UiTheme.TEXT_MUTED))
 

@@ -21,8 +21,9 @@ func _initialize() -> void:
 	var bm = root.get_node("BotManager")
 	bm.set_process(false)
 	cm.allow_temporary_parties = false
+	cm.allow_bot_alliances = false
 	mm.start_offline("Barış")
-	for i in 4:
+	for i in 7:
 		mm.add_bot()
 	mm.start_game()
 	pm.set_party_and_ready("Yeni Yol", 0, Color.WHITE, Color("F20C1F"),
@@ -51,6 +52,11 @@ func _initialize() -> void:
 	root.add_child(scene)
 	await _frames(30)
 	_shot("party_politics_board")
+	var list: Control = scene.player_panel_list
+	print("LISTE boy=%s avatar_h=%.1f" % [str(list.size), scene._avatar_height])
+	print("VIEWPORT %s  panel=%s" % [str(scene.get_viewport_rect().size), str((scene.get_node("PlayerPanel") as Control).get_global_rect())])
+	for child in list.get_children():
+		print("  satir %s" % str(child.get_global_rect()))
 	# Profilim: parti işlemleri.
 	scene._toggle_profile(me)
 	await _frames(10)

@@ -39,6 +39,7 @@ func _initialize() -> void:
 	mm = root.get_node("MultiplayerManager")
 	cm = root.get_node("CardManager")
 	cm.allow_temporary_parties = false
+	cm.allow_bot_alliances = false
 	gm = root.get_node("GovernmentManager")
 	pm = root.get_node("PartyManager")
 	root.get_node("BotManager").set_process(false)
@@ -124,8 +125,10 @@ func _initialize() -> void:
 		"%d + %d -> %d" % [me_seats, b1_seats, int(cm.last_seats.get(me, 0))])
 	check("yardımcı genel başkanın hemen ardından oynar", cm.turn_order.find(b1) == cm.turn_order.find(me) + 1, str(cm.turn_order))
 	check("party_of yardımcıyı partiye bağlar", cm.party_of(b1) == me and pm.data_of(b1)["name"] == "Yeni Yol")
-	check("mana geliri bölünür", is_equal_approx(cm.turn_income(b1), cm.turn_income(me))
-		and cm.turn_income(me) < float(GameRules.MANA_PER_ROUND), str(cm.turn_income(me)))
+	var base := float(GameRules.MANA_PER_ROUND_GOVERNMENT if cm.is_government_party(me) else GameRules.MANA_PER_ROUND)
+	check("mana: genel başkan yarı+1, yardımcı yarı+0,5", is_equal_approx(cm.turn_income(me), base * 0.5 + 1.0)
+		and is_equal_approx(cm.turn_income(b1), base * 0.5 + 0.5), "%s / %s" % [cm.turn_income(me), cm.turn_income(b1)])
+	check("birleşme başlangıç katkısı", cm.contributions.has(me) and cm.contributions.has(b1))
 	check("iki üye de oy verir", gm.voter_ids().has(me) and gm.voter_ids().has(b1))
 	check("oy 2/3 - 1/3 bölünür", gm.vote_weight(me) + gm.vote_weight(b1) == gm.seats_of(me) and gm.vote_weight(me) > gm.vote_weight(b1),
 		"%d / %d" % [gm.vote_weight(me), gm.vote_weight(b1)])
@@ -161,7 +164,12 @@ func _initialize() -> void:
 	cm.organizations["px3"] = {b1: 1}
 	give_turn(me)
 	cm.mana[me] = 10.0
+	var seats_party_before := int(cm.last_seats.get(b1, 0))
+	var total_before_split := total_seats()
 	cm.found_party({"name": "Hür Yol", "icon_index": 2, "bg_color": free_color(me)})
+	check("ayrılan pay oranında vekil götürdü", int(cm.last_seats.get(me, 0)) > 0
+		and int(cm.last_seats.get(me, 0)) < seats_party_before and total_seats() == total_before_split,
+		"%d / %d" % [int(cm.last_seats.get(me, 0)), seats_party_before])
 	check("ayrılan yeni parti kurdu", pm.is_leader(me) and pm.parties[me]["name"] == "Hür Yol" and pm.deputy_of(b1) == -1,
 		str(pm.parties.get(me, {})))
 	check("ayrılma 2 mana", is_equal_approx(cm.mana_of(me), 8.0), str(cm.mana_of(me)))
@@ -170,6 +178,19 @@ func _initialize() -> void:
 		if int(cm.organizations[province_id].get(me, 0)) > 0:
 			my_orgs += 1
 	check("teşkilatların bir kısmı ayrılanla gitti", my_orgs >= 1, str(my_orgs))
+
+	print("=== GENEL BAŞKAN AYRILIR ===")
+	# b1 (genel başkan) b3'ü davet eder; sonra genel başkan ayrılır, parti b3'e kalır.
+	pm.parties[b3]["ideology"] = pm.parties[b1]["ideology"].duplicate()
+	give_turn(b1)
+	cm._apply_send_offer(b1, b3, "invite")
+	check("üçüncü birleşme", pm.deputy_of(b1) == b3)
+	var party_name_before: String = pm.parties[b1]["name"]
+	give_turn(b1)
+	cm.mana[b1] = 10.0
+	cm._apply_found(b1, {"name": "Öz Yol", "icon_index": 6, "bg_color": free_color(b1)})
+	check("genel başkan ayrıldı, parti yardımcıya kaldı", pm.is_leader(b3) and pm.parties[b3]["name"] == party_name_before
+		and pm.parties.has(b1) and pm.parties[b1]["name"] == "Öz Yol")
 
 	print("=== FESİH VE BAĞIMSIZLIK ===")
 	cm.last_seats[me] = 10
@@ -215,6 +236,37 @@ func _initialize() -> void:
 	mm.players.erase(b2)
 	cm.remove_player(b2)
 	check("yardımcı gidince parti kalır", pm.is_leader(me) and pm.deputy_of(me) == -1 and not cm.turn_order.has(b2))
+
+	print("=== BOT İTTİFAKLARI ===")
+	mm.add_bot()
+	mm.add_bot()
+	var BB = load("res://scripts/bot_brain.gd")
+	cm.allow_bot_alliances = true
+	# İki tek kişilik, aynı görüşte, zayıf bot.
+	var pair: Array = []
+	for peer in cm.party_ids():
+		if cm._is_plain_bot_party(int(peer)) and pm.member_count(int(peer)) == 1 and not cm.is_government_party(int(peer)):
+			pair.append(int(peer))
+	pair = pair.slice(0, 2)
+	var merged := false
+	if pair.size() == 2:
+		pm.parties[pair[1]]["ideology"] = pm.parties[pair[0]]["ideology"].duplicate()
+		cm.passed_threshold.erase(pair[1])
+		for attempt in 40:
+			cm._bot_alliances()
+			if pm.deputy_of(pair[0]) == pair[1] or pm.deputy_of(pair[1]) == pair[0]:
+				merged = true
+				break
+	check("zayıf ve yakın iki bot birleşti", merged, str(pair))
+	if merged:
+		var host: int = pm.party_of(pair[0])
+		var deputy: int = pm.deputy_of(host)
+		check("birleşen botlar birbirine dost", BB.is_ally(host, deputy))
+		pm.parties[host]["merged_elections"] = cm.BOT_MERGE_ELECTIONS
+		cm._bot_alliances()
+		check("birlikte büyüyen botlar ayrıldı", pm.deputy_of(host) == -1 and pm.is_leader(deputy))
+		check("ayrılan botlar kardeş parti", BB.is_ally(host, deputy) and not BB.is_ally(host, me))
+	cm.allow_bot_alliances = false
 
 	print("=== GEÇİCİ PARTİLER ===")
 	cm.allow_temporary_parties = true

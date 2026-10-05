@@ -61,6 +61,20 @@ func _initialize() -> void:
 	check("seçimden sonra meclis var", total_seats() > 0, str(total_seats()))
 	var seats_before := total_seats()
 
+	print("=== HATA DÜZELTMELERİ ===")
+	check("party_of(-1) hiçbir partiye ait değil", pm.party_of(-1) == -1 and pm.data_of(-1).is_empty())
+	# Turun ilk oyuncusu: önceki dönem konuştuysa yeni dönemde yine konuşabilmeli.
+	var first: int = cm.turn_order[0]
+	cm.current_turn_index = 0
+	gm._set_phase(gm.Phase.IDLE)
+	cm._apply_speech(first, "economic", 1)
+	check("konuşunca bu dönem tekrar konuşamaz", not cm.needs_speech(first))
+	for i in cm.turn_order.size():
+		cm._apply_pass(cm.current_turn_peer_id(), true)
+		gm._set_phase(gm.Phase.IDLE)
+	check("yeni dönemde ilk oyuncu tekrar konuşabilir", cm.current_turn_peer_id() == first and cm.needs_speech(first),
+		"sira %d, donem %d" % [cm.current_turn_peer_id(), cm.round_number])
+
 	print("=== BİRLEŞME ===")
 	pm.parties[b1]["ideology"] = pm.parties[me]["ideology"].duplicate()
 	give_turn(me)

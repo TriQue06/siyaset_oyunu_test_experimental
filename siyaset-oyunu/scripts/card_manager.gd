@@ -342,8 +342,12 @@ func can_choose_main_action(peer_id: int) -> bool:
 
 ## Bu oyuncu bu sırada henüz grup toplantısında konuşmadı mı? (Konuşma
 ## atlanabilir; sıra konuşmadan biterse ulusal puan biraz düşer.)
+## Toplantı hakkı DÖNEMLİKTİR ve partiye aittir: o dönem partisi konuştuysa
+## konuşamaz. (Önbellekteki speech_done'a güvenilmez: turun ilk oyuncusunun
+## sırası tur numarası artmadan başlar, eski dönemin bilgisi taşınıyordu.)
 func needs_speech(peer_id: int) -> bool:
-	return speech_required and not turn_order.is_empty() and peer_id == current_turn_peer_id() and not speech_done
+	return speech_required and not turn_order.is_empty() and peer_id == current_turn_peer_id() \
+		and int(speech_rounds.get(party_of(peer_id), 0)) != round_number
 
 ## Bu oyuncu şu an bir yasa sunabilir mi? (law_type verilirse o yasa geçerli mi.)
 func can_propose_law(peer_id: int, law_type: String = "") -> bool:
@@ -2018,6 +2022,9 @@ func _finish_round() -> void:
 	# (bkz. GovernmentManager.award_formation_scores).
 	var finished_round := round_number
 	round_number += 1
+	# Yeni dönem: sıradaki oyuncunun toplantı bilgisi yeni döneme göre.
+	var current := current_turn_peer_id()
+	speech_done = current != -1 and int(speech_rounds.get(party_of(current), 0)) == round_number
 
 	# Ayrılan partiler dönebilir, çok karışan parti bölünür; sonra karışıklık söner.
 	_check_reunions()

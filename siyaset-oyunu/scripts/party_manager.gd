@@ -73,10 +73,12 @@ const MAX_MEMBERS := 2
 ## Bu oyuncunun (ya da parti anahtarının) partisi. Kaydı olmayan peer kendisi
 ## sayılır (testler ve eski kayıtlar parti tablosu olmadan çalışır).
 func party_of(peer_id: int) -> int:
-	if parties.has(peer_id):
+	# -1 ("kimse": sistem mesajı vb.) hiçbir partiye ait değildir. Yardımcısı
+	# olmayan parti için "deputy" anahtarı yoktur; -1 ile eşleşmemeli.
+	if peer_id < 0 or parties.has(peer_id):
 		return peer_id
 	for pid in parties.keys():
-		if int(parties[pid].get("deputy", -1)) == peer_id:
+		if parties[pid].has("deputy") and int(parties[pid]["deputy"]) == peer_id:
 			return int(pid)
 	return peer_id
 

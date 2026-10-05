@@ -3234,7 +3234,7 @@ func _on_speech_button_pressed() -> void:
 		_show_toast("Sıran değil.")
 		return
 	if not CardManager.needs_speech(me):
-		_show_toast("Bu sıra grup toplantısında zaten konuştun.")
+		_show_toast("Partin bu dönem grup toplantısını zaten yaptı.")
 		return
 	var key := "%d:%d" % [CardManager.round_number, CardManager.current_turn_index]
 	_speech_open_key = "" if _speech_open_key == key else key

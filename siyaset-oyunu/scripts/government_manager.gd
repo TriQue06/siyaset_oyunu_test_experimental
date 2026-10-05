@@ -145,6 +145,11 @@ func tick(delta: float) -> void:
 		return
 	if phase != Phase.FORMING and phase != Phase.VOTING:
 		return
+	# Oylama sırasında parti değişiklikleri (fesih, birleşme, ayrılma) beklenen
+	# oyları azaltabilir: herkes oy verdiyse sonuç hemen açıklanır.
+	if phase == Phase.VOTING and _all_voted():
+		_begin_resolution()
+		return
 	_phase_time_left -= delta
 	if _phase_time_left > 0.0:
 		return
@@ -230,10 +235,16 @@ func is_coalition_stage() -> bool:
 
 ## Açık oylamada şu an oy verebilecek partiler: koalisyon görüşmesinde sadece
 ## ortaklar, diğer her durumda meclisteki herkes.
+## Sadece OYUNDA OLAN oyuncular sayılır: oylama sürerken feshedilen, başka
+## partiye katılan ya da oyundan çıkan bir parti/oyuncu sonsuza dek beklenmesin.
 func eligible_voter_ids() -> Array:
-	if proposal_kind == KIND_GOVERNMENT and proposal_stage == STAGE_COALITION:
-		return proposal_partner_ids()
-	return voter_ids()
+	var ids: Array = proposal_partner_ids() if proposal_kind == KIND_GOVERNMENT and proposal_stage == STAGE_COALITION \
+		else voter_ids()
+	var present: Array = []
+	for peer_id in ids:
+		if CardManager.turn_order.is_empty() or CardManager.turn_order.has(int(peer_id)):
+			present.append(peer_id)
+	return present
 
 func _unique_values(assignments: Dictionary) -> Array:
 	var ids: Array = []

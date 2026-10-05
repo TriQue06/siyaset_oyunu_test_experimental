@@ -2374,6 +2374,13 @@ func is_valid_offer(from_peer: int, to_peer: int, kind: String) -> bool:
 	var joiner := int(roles[1])
 	if not PartyManager.is_leader(host) or PartyManager.is_independent(host) or PartyManager.member_count(host) >= PartyManager.MAX_MEMBERS:
 		return false
+	# BÖLÜNEN KANAT (yapay zekâ) siyasetçi gibi yardımcı olmaz: sadece kendi ana
+	# partisinin davetiyle ERKEN GERİ DÖNER; başka partiyle birleşemez, kimseyi
+	# davet edemez.
+	if is_splinter(host):
+		return false
+	if is_splinter(joiner):
+		return int(splinters[joiner].get("parent", -1)) == host
 	# Katılan kendi kaydının başı olmalı (bağımsız ya da tek kişilik parti).
 	return PartyManager.is_leader(joiner) and PartyManager.member_count(joiner) == 1
 
@@ -2774,8 +2781,8 @@ func _apply_send_offer(from_peer: int, to_peer: int, kind: String) -> void:
 	# Bot hemen karar verir: görüşü yakınsa kabul eder.
 	if MultiplayerManager.is_bot(to_peer):
 		var roles := offer_roles(from_peer, to_peer, kind)
-		var accept := ideological_closeness(int(roles[0]), int(roles[1])) >= BOT_JOIN_CLOSENESS \
-			and not is_government_party(int(roles[1]))
+		var accept := is_splinter(int(roles[1])) or (ideological_closeness(int(roles[0]), int(roles[1])) >= BOT_JOIN_CLOSENESS \
+			and not is_government_party(int(roles[1])))
 		_apply_respond_offer(to_peer, int(offer["id"]), accept)
 
 func _apply_respond_offer(peer_id: int, offer_id: int, accept: bool) -> void:
@@ -2792,6 +2799,9 @@ func _apply_respond_offer(peer_id: int, offer_id: int, accept: bool) -> void:
 		_push_state({"type": "offer", "peer_id": peer_id, "message": "%s teklifi reddetti." % PoliticianPresets.display_name(peer_id)})
 		return
 	var roles := offer_roles(from_peer, peer_id, kind)
+	if is_splinter(int(roles[1])):
+		_merge_splinter(int(roles[1]))  # bölünen kanat ana partisine geri döner
+		return
 	_join_party(int(roles[0]), int(roles[1]))
 
 ## Katılan (joiner) ev sahibi partiye yardımcı olarak girer. Kendi partisi
@@ -2826,6 +2836,7 @@ func _join_party(host: int, joiner: int) -> void:
 	passed_threshold.erase(joiner)
 	for province_id in last_province_results.keys():
 		last_province_results[province_id].erase(joiner)
+	splinters.erase(joiner)
 	GovernmentManager.absorb_party(joiner, host)
 	PartyManager.parties.erase(joiner)
 	PartyManager.parties[host]["deputy"] = joiner

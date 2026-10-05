@@ -80,7 +80,8 @@ static func _actions(peer_id: int, my_id: int, on_action: Callable) -> Control:
 			list.append(["Kongre Talep Et · %d mana" % CardManager.CONGRESS_COST, "congress", CardManager.can_congress(my_id), false])
 	else:
 		if CardManager.is_valid_offer(my_id, peer_id, "invite"):
-			list.append(["Partime Davet Et", "invite", CardManager.can_send_offer(my_id, peer_id, "invite"), false])
+			var label := "Partime Geri Çağır" if CardManager.is_splinter(CardManager.party_of(peer_id)) else "Partime Davet Et"
+			list.append([label, "invite", CardManager.can_send_offer(my_id, peer_id, "invite"), false])
 		if CardManager.is_valid_offer(my_id, peer_id, "apply"):
 			var verb := "Partisine Katılmak İçin Başvur" if PartyManager.is_independent(my_id) else "Partimi Birleştirmeyi Öner"
 			list.append([verb, "apply", CardManager.can_send_offer(my_id, peer_id, "apply"), false])

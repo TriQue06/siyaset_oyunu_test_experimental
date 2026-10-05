@@ -75,6 +75,43 @@ func _initialize() -> void:
 	check("yeni dönemde ilk oyuncu tekrar konuşabilir", cm.current_turn_peer_id() == first and cm.needs_speech(first),
 		"sira %d, donem %d" % [cm.current_turn_peer_id(), cm.round_number])
 
+	print("=== OYLAMA TAKILMASI ===")
+	# Yasa oylaması açıkken bir oyuncu oyundan çıkar; kalanlar oy vermişse sonuç açıklanmalı.
+	cm.current_turn_index = cm.turn_order.find(me)
+	gm._set_phase(gm.Phase.IDLE)
+	gm.submit_law(me, "law:economic:1")
+	var leaver := -1
+	for voter in gm.eligible_voter_ids():
+		if int(voter) != me and not gm.has_voted(int(voter)):
+			leaver = int(voter)
+	for voter in gm.eligible_voter_ids():
+		if int(voter) != leaver and not gm.has_voted(int(voter)):
+			gm._apply_vote(int(voter), gm.VOTE_YES)
+	check("bir oy eksik: oylama sürüyor", gm.phase == gm.Phase.VOTING)
+	# Ayrılan oyuncu sıra listesinden düşer (ör. parti başka partiye katıldı/feshedildi).
+	var saved_order: Array = cm.turn_order.duplicate()
+	cm.turn_order.erase(leaver)
+	gm.tick(0.1)
+	check("eksik oyuncu gidince oylama sonuçlanır", gm.phase != gm.Phase.VOTING, str(gm.phase))
+	cm.turn_order = saved_order
+	cm.current_turn_index = cm.turn_order.find(me)
+	gm._set_phase(gm.Phase.IDLE)
+
+	print("=== BÖLÜNEN KANAT ===")
+	# Ana parti bölünen kanadını davet ederse kanat yardımcı olmaz, geri döner.
+	var parent_party: int = b3
+	cm.last_seats[parent_party] = maxi(20, int(cm.last_seats.get(parent_party, 0)))
+	cm._split_party(parent_party)
+	var splinter: int = cm.splinter_of(parent_party)
+	check("bölünme oldu", splinter != -1)
+	check("başka parti bölünen kanadı davet edemez", not cm.is_valid_offer(me, splinter, "invite"))
+	check("ana parti geri çağırabilir", cm.is_valid_offer(parent_party, splinter, "invite"))
+	cm.current_turn_index = cm.turn_order.find(parent_party)
+	cm._apply_send_offer(parent_party, splinter, "invite")
+	check("kanat ana partiye geri döndü (yardımcı olmadı)", not cm.turn_order.has(splinter) and pm.deputy_of(parent_party) == -1
+		and not cm.splinters.has(splinter))
+	cm.current_turn_index = cm.turn_order.find(me)
+
 	print("=== BİRLEŞME ===")
 	pm.parties[b1]["ideology"] = pm.parties[me]["ideology"].duplicate()
 	give_turn(me)

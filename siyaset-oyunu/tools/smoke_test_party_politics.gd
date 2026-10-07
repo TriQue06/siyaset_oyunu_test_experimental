@@ -307,6 +307,15 @@ func _initialize() -> void:
 	cm.allow_temporary_parties = false
 	cm._hold_election(cm.round_number, false)
 	cm._hold_election(cm.round_number, false)
+	check("seçimde hemen feshetmez, tur ortasını bekler", cm.turn_order.has(temp) and pm.parties[temp].has("retire_at"))
+	cm.current_turn_index = 0
+	var gone_at := -1
+	for step in cm.turn_order.size():
+		var wrapped: bool = cm._advance_turn()
+		if not cm.turn_order.has(temp):
+			gone_at = -2 if wrapped else cm.current_turn_index
+			break
+	check("tur ortasında feshetti", gone_at >= 1, str(gone_at))
 	check("geçici parti en geç iki seçimde feshedip çıktı", not cm.turn_order.has(temp) and not pm.parties.has(temp)
 		and not mm.players.has(temp))
 	mm.random_parties = false

@@ -1964,6 +1964,8 @@ func _advance_turn() -> bool:
 	var wrapped: bool = (current_turn_index + 1) >= size
 	current_turn_index = (current_turn_index + 1) % size
 	_turn_time_left = GameRules.TURN_TIMEOUT
+	if not wrapped:
+		_retire_due_temporary_parties()
 	_grant_turn_income()
 	return wrapped
 
@@ -2785,29 +2787,44 @@ func _retire_temporary_parties() -> void:
 		PartyManager.parties[pid]["temp_elections"] = elections
 		if elections < TEMP_PARTY_ELECTIONS and passed_threshold.has(pid):
 			continue
-		var party_name := _party_name(pid)
-		var scattered := _scatter_seats(pid)
-		var deputy := PartyManager.deputy_of(pid)
-		if deputy != -1:
-			# Yardımcısı (bir oyuncu) varsa parti feshedilince o bağımsız kalır.
-			_make_independent(deputy, (PartyManager.parties[pid].get("ideology", {}) as Dictionary).duplicate())
-		for table in [national_support, populism, turmoil, law_rounds, speech_rounds, congress_rounds,
-				national_list, last_seats, election_seats, last_vote_shares, previous_vote_shares, inventories, mana, credibility]:
-			table.erase(pid)
-		passed_threshold.erase(pid)
-		for nested in [last_province_results, local_support, organizations]:
-			for province_id in nested.keys():
-				nested[province_id].erase(pid)
-		_drop_offers_of(pid)
-		var idx := turn_order.find(pid)
-		if idx != -1:
-			_remove_from_turn_order(idx)
-		PartyManager.parties.erase(pid)
-		PartyManager.politicians.erase(pid)
-		MultiplayerManager.remove_splinter_bot(pid)
-		PartyManager.broadcast()
-		_pending_log.append({"text": "%s kendini feshetti (%d vekil dağıldı)." % [party_name, int(scattered[0]) + int(scattered[1])],
-			"peer_id": -1, "province": "", "kind": "party_change"})
+		# Hemen değil: yeni turun ORTASINDA (ne başında ne sonunda) fesheder.
+		var size := turn_order.size()
+		PartyManager.parties[pid]["retire_at"] = _rng.randi_range(1, maxi(1, size - 2))
+
+## Feshi bekleyen geçici partiler, sıra hedef konuma gelince dağılır.
+func _retire_due_temporary_parties() -> void:
+	for bot in turn_order.duplicate():
+		var pid := int(bot)
+		if not PartyManager.parties.has(pid) or not PartyManager.parties[pid].has("retire_at"):
+			continue
+		if current_turn_index < int(PartyManager.parties[pid]["retire_at"]):
+			continue
+		_dissolve_temporary_party(pid)
+
+func _dissolve_temporary_party(pid: int) -> void:
+	var party_name := _party_name(pid)
+	var scattered := _scatter_seats(pid)
+	var deputy := PartyManager.deputy_of(pid)
+	if deputy != -1:
+		# Yardımcısı (bir oyuncu) varsa parti feshedilince o bağımsız kalır.
+		_make_independent(deputy, (PartyManager.parties[pid].get("ideology", {}) as Dictionary).duplicate())
+	for table in [national_support, populism, turmoil, law_rounds, speech_rounds, congress_rounds,
+			national_list, last_seats, election_seats, last_vote_shares, previous_vote_shares, inventories, mana, credibility]:
+		table.erase(pid)
+	passed_threshold.erase(pid)
+	for nested in [last_province_results, local_support, organizations]:
+		for province_id in nested.keys():
+			nested[province_id].erase(pid)
+	_drop_offers_of(pid)
+	var idx := turn_order.find(pid)
+	if idx != -1:
+		_remove_from_turn_order(idx)
+	PartyManager.parties.erase(pid)
+	PartyManager.politicians.erase(pid)
+	MultiplayerManager.remove_splinter_bot(pid)
+	PartyManager.broadcast()
+	_pending_log.append({"text": "%s kendini feshetti (%d vekil dağıldı)." % [party_name, int(scattered[0]) + int(scattered[1])],
+		"peer_id": -1, "province": "", "kind": "party_change"})
 
 ## Siyasetçiyi bağımsız kayda çevirir (gri, kullanıcı simgeli, adıyla).
 func _make_independent(peer_id: int, ideology: Dictionary) -> void:

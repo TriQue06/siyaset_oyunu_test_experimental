@@ -1734,8 +1734,13 @@ func _splinter_name(parent_name: String) -> String:
 ## bazı il teşkilatları ona geçer.
 func _split_party(parent: int) -> void:
 	var parent_name := _party_name(parent)
-	var splinter := MultiplayerManager.add_splinter_bot("Muhalif Kanat")
+	# Ayrılanların başında YENİ bir siyasetçi var (ana partinin adamı değil).
+	var bot_name := PoliticianPresets.random_name(PoliticianPresets.used_surnames())
+	var splinter := MultiplayerManager.add_splinter_bot("%s %s" % [bot_name["first_name"], bot_name["surname"]])
 	PartyManager.add_splinter_party(splinter, parent, _splinter_name(parent_name))
+	var home := String(_province_ids[_rng.randi() % _province_ids.size()]) if not _province_ids.is_empty() else ""
+	PartyManager.set_politician_host(splinter, PoliticianPresets.make(bot_name["first_name"], bot_name["surname"],
+		PoliticianPresets.random_background(), home, bot_name["gender"]))
 	turn_order.append(splinter)
 	inventories[splinter] = []
 	mana[splinter] = float(GameRules.MANA_PER_ROUND)
@@ -1759,8 +1764,8 @@ func _split_party(parent: int) -> void:
 	turmoil[parent] = PublicOpinion.SPLIT_AFTER_TURMOIL
 	splinters[splinter] = {"parent": parent, "elections": 0, "since": round_number}
 	_push_state({"type": "party_split", "peer_id": parent, "message":
-		"%s BÖLÜNDÜ! Parti içi karışıklık sonunda %d milletvekili ayrılıp %s'yi kurdu." % [
-		parent_name, moved, _party_name(splinter)]}, true)
+		"%s BÖLÜNDÜ! Parti içi karışıklık sonunda %d milletvekili %s önderliğinde ayrılıp %s'yi kurdu." % [
+		parent_name, moved, PoliticianPresets.display_name(splinter), _party_name(splinter)]}, true)
 
 ## Tur sonu: ayrılan parti en erken 1, en geç 4 seçim atlattıktan sonra ana
 ## partisine BÜTÜN vekilleri ve teşkilatlarıyla geri döner. Erken dönüş için

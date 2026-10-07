@@ -183,6 +183,40 @@ static func is_valid(data: Dictionary) -> bool:
 		and String(data.get("first_name", "")) != "" and String(data.get("surname", "")) != "" \
 		and not is_banned_surname(String(data.get("surname", "")))
 
+## ELLE YAZILAN İSİM: her kelimenin baş harfi büyük, gerisi küçük (Türkçe
+## i/İ, ı/I kuralıyla). Harf, boşluk, kesme ve tire dışındakiler atılır.
+const PART_MAX_LENGTH := 20
+static func normalize_name(text: String) -> String:
+	var cleaned := ""
+	for ch in text:
+		if ch == " " or ch == "'" or ch == "-" or ch.to_upper() != ch.to_lower() or "çğıöşüÇĞİÖŞÜ".contains(ch):
+			cleaned += ch
+	while cleaned.contains("  "):
+		cleaned = cleaned.replace("  ", " ")
+	cleaned = cleaned.lstrip(" ").left(PART_MAX_LENGTH)
+	var result := ""
+	var start := true
+	for ch in cleaned:
+		if ch == " " or ch == "-" or ch == "'":
+			result += ch
+			start = ch != "'"
+			continue
+		result += _upper_tr(ch) if start else _lower_tr(ch)
+		start = false
+	return result
+
+static func _upper_tr(ch: String) -> String:
+	match ch:
+		"i": return "İ"
+		"ı": return "I"
+	return ch.to_upper()
+
+static func _lower_tr(ch: String) -> String:
+	match ch:
+		"I": return "ı"
+		"İ": return "i"
+	return ch.to_lower()
+
 static func is_banned_surname(surname: String) -> bool:
 	var key := surname.strip_edges().to_lower()
 	for banned in BANNED_SURNAMES:

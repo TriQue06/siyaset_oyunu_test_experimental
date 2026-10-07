@@ -28,7 +28,8 @@ var _gender: String = "m"
 var _gender_buttons: Dictionary = {}   # "m"/"f" -> Button
 var _first_name: String = ""
 var _surname: String = ""
-var _name_label: Label
+var _first_edit: LineEdit
+var _surname_edit: LineEdit
 var _cards: Dictionary = {}          # background id -> Button
 var _map_clip: Control
 var _map: Node2D
@@ -102,10 +103,11 @@ func _build_left() -> Control:
 		gb.pressed.connect(_on_gender_pressed.bind(g))
 		name_row.add_child(gb)
 		_gender_buttons[g] = gb
-	_name_label = UiTheme.mono_label("", 24, UiTheme.TEXT, true)
-	_name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_name_label.clip_text = true
-	name_row.add_child(_name_label)
+	# Ad ve soyad elle de yazılabilir; baş harfler zorla büyük yapılır.
+	_first_edit = _name_edit("Ad")
+	name_row.add_child(_first_edit)
+	_surname_edit = _name_edit("Soyad")
+	name_row.add_child(_surname_edit)
 	# Üç zar: sadece ad, sadece soyad, ikisi birden (sınırsız basılır).
 	var dice_row := HBoxContainer.new()
 	dice_row.add_theme_constant_override("separation", 8)
@@ -275,7 +277,32 @@ func _reroll_name(first: bool, last: bool) -> void:
 		if _surname != "":
 			avoid.append(_surname)  # her basışta farklı bir soyad
 		_surname = PoliticianPresets.random_surname(avoid)
-	_name_label.text = _full_name()
+	_first_edit.text = _first_name
+	_surname_edit.text = _surname
+	if _continue != null:
+		_refresh()
+
+func _name_edit(placeholder: String) -> LineEdit:
+	var edit := LineEdit.new()
+	edit.placeholder_text = placeholder
+	edit.max_length = PoliticianPresets.PART_MAX_LENGTH
+	edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	edit.custom_minimum_size = Vector2(0, 40)
+	edit.add_theme_font_override("font", UiTheme.mono(true))
+	edit.add_theme_font_size_override("font_size", 20)
+	edit.text_changed.connect(_on_name_typed.bind(edit))
+	return edit
+
+func _on_name_typed(text: String, edit: LineEdit) -> void:
+	var fixed := PoliticianPresets.normalize_name(text)
+	if fixed != text:
+		var caret := edit.caret_column
+		edit.text = fixed
+		edit.caret_column = mini(caret, fixed.length())
+	if edit == _first_edit:
+		_first_name = fixed.strip_edges()
+	else:
+		_surname = fixed.strip_edges()
 	if _continue != null:
 		_refresh()
 
@@ -334,7 +361,8 @@ func _refresh_info() -> void:
 	_info_body.text = "Senin memleketin." if id == _hometown else "Seçmek için tıkla."
 
 func _is_complete() -> bool:
-	return _surname != "" and _background_id != "" and _hometown != ""
+	return _first_name != "" and _surname != "" and not PoliticianPresets.is_banned_surname(_surname) \
+		and _background_id != "" and _hometown != ""
 
 func _on_continue_pressed() -> void:
 	if not _is_complete():

@@ -581,9 +581,19 @@ func _refresh_parliament_diagram() -> void:
 	var entries: Array = []
 	for peer_id in ids:
 		var color: Color = PartyManager.data_of(peer_id).get("bg_color", Color(0.5, 0.5, 0.5))
-		if voting and GovernmentManager.votes.has(peer_id):
-			color = VOTE_COLORS[int(GovernmentManager.votes[peer_id])]
-		entries.append({"seats": int(CardManager.last_seats[peer_id]), "color": color})
+		var seats := int(CardManager.last_seats[peer_id])
+		# İki kişilik partide genel başkan 2/3'ünü, yardımcı 1/3'ünü yönetir:
+		# her parça kendi verdiği oyun rengine bürünür.
+		var deputy := PartyManager.deputy_of(int(peer_id))
+		var parts: Array = [[int(peer_id), seats]]
+		if voting and deputy != -1 and not GovernmentManager.is_coalition_stage():
+			var leader_part := GovernmentManager.vote_weight(int(peer_id))
+			parts = [[int(peer_id), leader_part], [deputy, seats - leader_part]]
+		for part in parts:
+			var part_color := color
+			if voting and GovernmentManager.votes.has(part[0]):
+				part_color = VOTE_COLORS[int(GovernmentManager.votes[part[0]])]
+			entries.append({"seats": int(part[1]), "color": part_color})
 	if entries.is_empty():
 		# İlk seçimden önce: bembeyaz, boş bir meclis (yasa dairesi buraya sürüklenir).
 		entries.append({"seats": CardManager.TOTAL_SEATS, "color": EMPTY_SEAT_COLOR})

@@ -386,56 +386,39 @@ func _layout_preview() -> void:
 static func _is_allowed_bg_color(color: Color) -> bool:
 	return not color.is_equal_approx(ICON_COLOR)
 
-## RENK SEÇİMİ: 8 ana renk; seçili ailenin açık tonu üstte, koyu tonu altta açılır.
-var _open_family := -1
-
 func _build_color_row() -> void:
 	for child in bg_color_row.get_children():
 		child.queue_free()
-	var selected_family := int(PartyPresets.family_of(_selected_bg_color)[0])
-	if _open_family == -1:
-		_open_family = selected_family
-	for f in PartyPresets.FAMILIES.size():
-		var column := VBoxContainer.new()
-		column.add_theme_constant_override("separation", 3)
-		column.size_flags_vertical = SIZE_SHRINK_CENTER
-		for variant in [PartyPresets.LIGHT, PartyPresets.MAIN, PartyPresets.DARK]:
-			var color: Color = PartyPresets.FAMILIES[f][variant]
-			if variant != PartyPresets.MAIN and f != _open_family:
-				# Yer tutucu: açılınca satır kaymasın.
-				var gap := Control.new()
-				gap.custom_minimum_size = Vector2(SWATCH_SIZE, SWATCH_SIZE)
-				gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
-				column.add_child(gap)
-				continue
-			column.add_child(_color_swatch(color, f))
-		bg_color_row.add_child(column)
-
-func _color_swatch(color: Color, family: int) -> Button:
-	var taken := _is_taken_by_player(color)
-	var allowed := _is_allowed_bg_color(color) and not taken
-	var btn := Button.new()
-	btn.custom_minimum_size = Vector2(SWATCH_SIZE, SWATCH_SIZE)
-	btn.size_flags_horizontal = SIZE_SHRINK_CENTER
-	btn.size_flags_vertical = SIZE_SHRINK_CENTER
-	btn.clip_text = true
-	if taken:
-		btn.text = "✕"
-		btn.add_theme_font_size_override("font_size", 12)
-		btn.tooltip_text = "Bu renk başka bir oyuncuda"
-	btn.disabled = not allowed or (_is_locked and not _editing_bot())
-	btn.modulate = Color.WHITE if allowed else Color(0.55, 0.55, 0.55, 1.0)
-	var selected := color.is_equal_approx(_selected_bg_color)
-	var style := UiSkin.color_box(color, UiSkin.BUTTON_TINT_HOVER if selected else UiSkin.BUTTON_TINT_NORMAL)
-	for state in ["normal", "hover", "pressed", "disabled"]:
-		btn.add_theme_stylebox_override(state, style)
-	if selected:
-		var ring := UiSkin.color_surface(UiTheme.GOLD, UiSkin.TARGET)
-		ring.set_anchors_preset(Control.PRESET_FULL_RECT)
-		btn.add_child(ring)
-	if allowed:
-		btn.pressed.connect(_on_bg_color_selected.bind(color, family))
-	return btn
+	for i in PartyPresets.COLORS.size():
+		var color: Color = PartyPresets.COLORS[i]
+		var taken := _is_taken_by_player(color)
+		var allowed := _is_allowed_bg_color(color) and not taken
+		var btn := Button.new()
+		btn.custom_minimum_size = Vector2(SWATCH_SIZE, SWATCH_SIZE)
+		# KARE KALSIN: HFlowContainer çocukları satırın yüksekliğine geriyordu;
+		# "✕" yazılı bir kutu satırı yükseltince bütün renkler dikdörtgen
+		# oluyordu. Shrink ile her kutu kendi kare ölçüsünde kalır.
+		btn.size_flags_horizontal = SIZE_SHRINK_CENTER
+		btn.size_flags_vertical = SIZE_SHRINK_CENTER
+		btn.clip_text = true
+		if taken:
+			btn.text = "✕"
+			btn.add_theme_font_size_override("font_size", 12)
+			btn.tooltip_text = "Bu renk başka bir oyuncuda"
+		btn.disabled = not allowed or (_is_locked and not _editing_bot())
+		btn.modulate = Color.WHITE if allowed else Color(0.55, 0.55, 0.55, 1.0)
+		# Seçili renk altın çerçeveyle ayrılır (pixel tarz: kare, kalın kenar).
+		var selected := color.is_equal_approx(_selected_bg_color)
+		var style := UiSkin.color_box(color, UiSkin.BUTTON_TINT_HOVER if selected else UiSkin.BUTTON_TINT_NORMAL)
+		for state in ["normal", "hover", "pressed", "disabled"]:
+			btn.add_theme_stylebox_override(state, style)
+		if selected:
+			var ring := UiSkin.color_surface(UiTheme.GOLD, UiSkin.TARGET)
+			ring.set_anchors_preset(Control.PRESET_FULL_RECT)
+			btn.add_child(ring)
+		if allowed:
+			btn.pressed.connect(_on_bg_color_selected.bind(i))
+		bg_color_row.add_child(btn)
 
 ## OYUN BAŞI: parti kurulumundan siyasetçi profiline geri dönülebilir.
 var _profile_button: Button
@@ -466,9 +449,8 @@ func _on_icon_selected(index: int) -> void:
 	_update_preview()
 	_push_party()
 
-func _on_bg_color_selected(color: Color, family: int) -> void:
-	_selected_bg_color = color
-	_open_family = int(PartyPresets.family_of(color)[0]) if family >= 0 else family
+func _on_bg_color_selected(index: int) -> void:
+	_selected_bg_color = PartyPresets.COLORS[index]
 	_build_color_row()
 	_update_preview()
 	_push_party()

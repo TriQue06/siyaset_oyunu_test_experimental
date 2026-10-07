@@ -11,37 +11,26 @@ const ICONS_DIR := "res://assets/icons"
 const ICON_NATIVE_SIZE := 24.0  # kaynak SVG'lerin viewBox boyutu (24dp)
 
 # Parti (arka plan) renkleri. İkon rengi her zaman beyazdır.
-# 8 ANA RENK; her birinin koyu ve açık varyantı var: [ana, koyu, açık].
-const FAMILIES: Array = [
-	[Color("F2132A"), Color("A10C1C"), Color("F66171")], # kırmızı
-	[Color("F2741F"), Color("A14D14"), Color("F6A269")], # turuncu
-	[Color("FAC528"), Color("A6831A"), Color("FBD86F")], # sarı
-	[Color("31C440"), Color("20822A"), Color("75D77F")], # yeşil
-	[Color("228DD4"), Color("165E8D"), Color("6BB3E2")], # mavi
-	[Color("193A9E"), Color("102669"), Color("657BBE")], # lacivert
-	[Color("913FD4"), Color("602A8D"), Color("B57FE2")], # mor
-	[Color("E83CA9"), Color("9A2870"), Color("EF7DC5")], # pembe
+const COLORS: Array[Color] = [
+	Color("F2132A"), # kırmızı
+	Color("FA6E66"), # somon kırmızısı
+	Color("F27E1F"), # turuncu
+	Color("F0A824"), # sarı-turuncu
+	Color("FAD028"), # sarı
+	Color("9DC94B"), # limon sarısı
+	Color("31C440"), # yeşil
+	Color("3FB586"), # su yeşili
+	Color("27DBDB"), # turkuaz
+	Color("83B7EB"), # açık mavi
+	Color("22A9D6"), # mavi
+	Color("2569CF"), # koyu mavi
+	Color("244FB3"), # lacivert
+	Color("7647CC"), # indigo
+	Color("AB39DB"), # mor
+	Color("E041D8"), # eflatun
+	Color("F04391"), # fuşya
+	Color("A6325A"), # bordo
 ]
-const MAIN := 0
-const DARK := 1
-const LIGHT := 2
-## Bütün seçilebilir renkler (ana renkler önce).
-static var COLORS: Array[Color] = _all_colors()
-
-static func _all_colors() -> Array[Color]:
-	var list: Array[Color] = []
-	for variant in [MAIN, DARK, LIGHT]:
-		for family in FAMILIES:
-			list.append(family[variant])
-	return list
-
-## Rengin ailesi ve varyantı: [aile, varyant] ya da [-1, -1].
-static func family_of(color: Color) -> Array:
-	for f in FAMILIES.size():
-		for v in 3:
-			if (FAMILIES[f][v] as Color).is_equal_approx(color):
-				return [f, v]
-	return [-1, -1]
 
 ## İkon dosyaları DÜZ .svg: her görüntüleyici/editör açabilsin diye. Godot
 ## bunları dokuya çevirmesin diye her birinin .import dosyası importer="keep"

@@ -21,6 +21,8 @@ const INTEL_COLOR := Color("8CC4FF")
 const MAX_EVENTS := 5
 
 var province_id: String = ""
+## Sol panelin parçası olarak (çerçevesiz) çizilir.
+var embedded_mode := false
 var _body: VBoxContainer
 var _scroll: ScrollContainer
 var _max_height := 600.0
@@ -56,6 +58,7 @@ func refresh() -> void:
 		remove_child(child)
 		child.queue_free()
 	var me := multiplayer.get_unique_id()
+	PopupKit.embedded = embedded_mode
 	var parts := PopupKit.frame(panel_width, UiTheme.PANEL_LIGHT, self)
 	var root: VBoxContainer = parts[1]
 
@@ -84,6 +87,7 @@ func refresh() -> void:
 		_build_own(me)
 	_build_last_election(me)
 	_build_events()
+	PopupKit.embedded = false
 	if is_visible_in_tree():
 		_fit.call_deferred()
 

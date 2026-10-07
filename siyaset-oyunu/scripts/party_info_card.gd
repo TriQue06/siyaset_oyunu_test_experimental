@@ -34,11 +34,13 @@ static func build(peer_id: int, my_id: int, on_action: Callable = Callable(), wi
 	var members: Array = PartyManager.members_of(CardManager.party_of(peer_id))
 	if members.size() >= 2:
 		box.add_child(PopupKit.note("Genel başkan: %s  ·  Yardımcı: %s" % [PoliticianPresets.display_name(int(members[0])),
-			PoliticianPresets.display_name(int(members[1]))], color.lightened(0.45)))
+			PoliticianPresets.display_name(int(members[1]))], color.lightened(0.45), _text_width()))
 
-	# Sayılar: dört eşit kutu.
-	var stats := HBoxContainer.new()
-	stats.add_theme_constant_override("separation", 4)
+	# Sayılar: dört eşit kutu (sol panelde 2x2).
+	var stats := GridContainer.new()
+	stats.columns = 2 if PopupKit.embedded else 4
+	stats.add_theme_constant_override("h_separation", 4)
+	stats.add_theme_constant_override("v_separation", 4)
 	stats.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(stats)
 	var pid := CardManager.party_of(peer_id)
@@ -103,7 +105,7 @@ static func _actions(peer_id: int, my_id: int, on_action: Callable) -> Control:
 	box.add_theme_constant_override("separation", 4)
 	box.add_child(PopupKit.section("Parti"))
 	for note in notes:
-		box.add_child(PopupKit.note(String(note), UiTheme.TEXT_MUTED, _width - 2.0 * PopupKit.PAD))
+		box.add_child(PopupKit.note(String(note), UiTheme.TEXT_MUTED, _text_width()))
 	var any_disabled := false
 	for entry in list:
 		var button := Button.new()
@@ -172,15 +174,18 @@ static func _axis_row(axis: String, value: float, color: Color) -> Control:
 	top.add_child(_label(IdeologyAxes.position_text(axis, value), PopupKit.FS_TEXT, color.lightened(0.35)))
 
 	var scale := HBoxContainer.new()
-	scale.add_theme_constant_override("separation", 6)
+	scale.add_theme_constant_override("separation", 3 if PopupKit.embedded else 6)
 	scale.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(scale)
 	var left := _label(String(info[1]), PopupKit.FS_SECTION, DIM)
-	left.custom_minimum_size = Vector2(64, 0)
+	var side_width := 68.0 if PopupKit.embedded else 64.0
+	var cell_width := 5.0 if PopupKit.embedded else 10.0
+	left.custom_minimum_size = Vector2(side_width, 0)
+
 	left.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	scale.add_child(left)
 	var cells := HBoxContainer.new()
-	cells.add_theme_constant_override("separation", 2)
+	cells.add_theme_constant_override("separation", 1 if PopupKit.embedded else 2)
 	cells.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	cells.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	scale.add_child(cells)
@@ -189,7 +194,7 @@ static func _axis_row(axis: String, value: float, color: Color) -> Control:
 		var v: float = IdeologyAxes.AXIS_MIN + i * IdeologyAxes.STEP
 		var whole := is_equal_approx(v, roundf(v))
 		var cell := Panel.new()
-		cell.custom_minimum_size = Vector2(10, 12)
+		cell.custom_minimum_size = Vector2(cell_width, 12)
 		cell.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var cell_color := color if is_equal_approx(v, value) else (
@@ -202,9 +207,14 @@ static func _axis_row(axis: String, value: float, color: Color) -> Control:
 		cell.add_theme_stylebox_override("panel", cell_style)
 		cells.add_child(cell)
 	var right := _label(String(info[2]), PopupKit.FS_SECTION, DIM)
-	right.custom_minimum_size = Vector2(64, 0)
+	right.custom_minimum_size = Vector2(side_width, 0)
+
 	scale.add_child(right)
 	return box
+
+## Sarmalı notların genişliği (çerçeveli kartta iç boşluk düşülür).
+static func _text_width() -> float:
+	return _width if PopupKit.embedded else _width - 2.0 * PopupKit.PAD
 
 static func _stat(value: String, caption: String, color: Color) -> Control:
 	var tile := PanelContainer.new()

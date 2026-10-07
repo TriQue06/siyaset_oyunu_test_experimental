@@ -17,9 +17,21 @@ const GAP := 6
 const KEY := UiTheme.TEXT_MUTED
 
 ## Çerçeve: [panel, gövde]. accent: üst şeridin rengi.
+## PANEL İÇİ (sol panel): çerçeve, gölge ve şerit yok; içerik panelin
+## parçasıymış gibi doğrudan dar alana yerleşir, uzun yazılar alt satıra iner.
+static var embedded := false
+
 static func frame(width: float, accent: Color, panel: PanelContainer = null) -> Array:
 	if panel == null:
 		panel = PanelContainer.new()
+	if embedded:
+		panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+		panel.custom_minimum_size = Vector2(width, 0)
+		var plain := VBoxContainer.new()
+		plain.add_theme_constant_override("separation", GAP)
+		plain.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		panel.add_child(plain)
+		return [panel, plain]
 	var style := StyleBoxFlat.new()
 	style.bg_color = UiTheme.PANEL_DARK
 	style.border_color = UiTheme.INK
@@ -102,7 +114,7 @@ static func section(title: String, note: String = "") -> Control:
 	line.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(line)
-	if note != "":
+	if note != "" and not embedded:
 		row.add_child(label(note, FS_SECTION, UiTheme.TEXT_DIM))
 	var box := MarginContainer.new()
 	box.add_theme_constant_override("margin_top", 6)
@@ -117,6 +129,9 @@ static func kv(key: String, value: String, value_color: Color = UiTheme.TEXT) ->
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var k := label(key, FS_TEXT, KEY)
 	k.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if embedded:
+		k.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		k.custom_minimum_size.x = 60
 	row.add_child(k)
 	var v := label(value, FS_TEXT, value_color)
 	v.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT

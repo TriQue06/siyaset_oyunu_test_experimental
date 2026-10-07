@@ -56,7 +56,7 @@ func _initialize() -> void:
 		root.get_texture().get_image().save_png("%s/party_setup.png" % OS.get_user_data_dir())
 	# İkonlar: tek kategori, düz .svg dosyaları (importer="keep").
 	var presets = root.get_node("PartyPresets")
-	check("18 parti rengi", colors.size() == 18)
+	check("8 ana renk x 3 ton = 24 parti rengi", colors.size() == 24)
 	check("39 parti ikonu yuklendi (mana.svg haric)", presets.icon_count() == 39, str(presets.icon_count()))
 	check("ikon yollari .svg", String(presets.icon_paths[0]).ends_with(".svg"), String(presets.icon_paths[0]))
 	check("ikon rasterize edilir", presets.get_icon_texture(0, 64) != null)
@@ -80,7 +80,7 @@ func _initialize() -> void:
 		if pm.color_owner(colors[i], edited_bot) == -1:
 			free_index = i
 			break
-	scene._on_bg_color_selected(free_index)
+	scene._on_bg_color_selected(colors[free_index], 0)
 	await _frames(3)
 	var bot_party: Dictionary = pm.parties[edited_bot]
 	check("oda sahibi botun adini, logosunu, rengini degistirdi", bot_party["name"] == "Robotlar" 		and int(bot_party["icon_index"]) == 3 and Color(bot_party["bg_color"]).is_equal_approx(colors[free_index]), str(bot_party))

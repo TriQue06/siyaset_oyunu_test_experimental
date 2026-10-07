@@ -15,7 +15,7 @@ extends Node
 signal parties_updated
 
 const NAME_MIN_LENGTH := 1
-const NAME_MAX_LENGTH := 14
+const NAME_MAX_LENGTH := 15
 
 # peer_id -> {
 #   "name": String, "icon_index": int, "icon_color": Color, "bg_color": Color,
@@ -325,7 +325,7 @@ func add_splinter_party(peer_id: int, parent_id: int, party_name: String) -> voi
 		"name": party_name,
 		"icon_index": int(parent.get("icon_index", 0)),
 		"icon_color": Color.WHITE,
-		"bg_color": similar_color(Color(parent.get("bg_color", Color(0.5, 0.5, 0.5)))),
+		"bg_color": splinter_color(Color(parent.get("bg_color", Color(0.5, 0.5, 0.5)))),
 		"ideology": (parent.get("ideology", IdeologyAxes.default_values()) as Dictionary).duplicate(),
 		"ready": true,
 		"splinter_of": parent_id,
@@ -335,6 +335,28 @@ func add_splinter_party(peer_id: int, parent_id: int, party_name: String) -> voi
 	parties_updated.emit()
 
 ## Ana rengin "akrabası": tonu biraz kayık, açıklığı belirgin farklı.
+## İÇ KARIŞIKLIKLA BÖLÜNEN PARTİ: ana partinin rengi bir ANA renkse onun koyu ya
+## da açık varyantını; açık/koyu bir varyantsa ana rengi (ya da öbür varyantı)
+## alır. Boşta olan tercih edilir.
+func splinter_color(base: Color) -> Color:
+	var fv := PartyPresets.family_of(base)
+	if int(fv[0]) == -1:
+		return similar_color(base)
+	var family: Array = PartyPresets.FAMILIES[int(fv[0])]
+	var options: Array = []
+	match int(fv[1]):
+		PartyPresets.MAIN:
+			options = [family[PartyPresets.DARK], family[PartyPresets.LIGHT]]
+		PartyPresets.LIGHT:
+			options = [family[PartyPresets.MAIN], family[PartyPresets.DARK]]
+		_:
+			options = [family[PartyPresets.MAIN], family[PartyPresets.LIGHT]]
+	options.shuffle()
+	for option in options:
+		if color_owner(option) == -1:
+			return option
+	return options[0]
+
 static func similar_color(base: Color) -> Color:
 	var value := base.v * 0.62 if base.get_luminance() > 0.45 else minf(1.0, base.v * 1.25 + 0.15)
 	return Color.from_hsv(fposmod(base.h + 0.04, 1.0), clampf(base.s * 0.85, 0.25, 1.0), clampf(value, 0.25, 1.0))

@@ -297,6 +297,7 @@ func _ready() -> void:
 	CardManager.inventories_updated.connect(_rebuild_hand)
 	CardManager.card_drawn.connect(_on_card_drawn)
 	CardManager.card_played.connect(_on_card_played)
+	CardManager.event_logged.connect(_pulse_logged_province)
 	CardManager.election_completed.connect(_on_election_completed)
 	CardManager.round_advanced.connect(_on_round_advanced)
 	CardManager.game_over.connect(_on_game_over)
@@ -537,6 +538,15 @@ func _focus_log_entry(entry: Dictionary) -> void:
 	_focus_tween.chain().tween_interval(FOCUS_HOLD)
 	_focus_tween.chain().tween_property(map_holder, "scale", Vector2(base_scale, base_scale), FOCUS_MOVE)
 	_focus_tween.parallel().tween_property(map_holder, "position", Vector2.ZERO, FOCUS_MOVE)
+
+## Haritada bir hamle olunca (ili olan her log kaydı) ilin üstünde, log
+## kaydına dokununca oynayan animasyonun YAKINLAŞTIRMASIZ hâli oynar.
+func _pulse_logged_province(entry: Dictionary) -> void:
+	var province_id := String(entry.get("province", ""))
+	if province_id == "" or map_holder == null or _layer_switching:
+		return
+	var color: Color = PartyManager.data_of(int(entry.get("peer_id", -1))).get("bg_color", UiTheme.GOLD)
+	map_holder.pulse_province(province_id, color, _focus_icon(String(entry.get("kind", ""))), FOCUS_HOLD)
 
 static func _focus_icon(kind: String) -> String:
 	match kind:
@@ -1504,20 +1514,21 @@ func _on_province_clicked(province_id: String) -> void:
 	_ensure_left_dock()
 	if _province_panel == null:
 		_province_panel = ProvincePanel.new()
+		_province_panel.embedded_mode = true
 		_left_dock.add_child(_province_panel)
 		_province_panel.visibility_changed.connect(_update_left_dock)
 	elif _province_panel.visible and _province_panel.province_id == province_id:
 		_province_panel.hide()
 		return
 	_hide_profile()
-	ProvincePanel.panel_width = DOCK_CONTENT_WIDTH
+	ProvincePanel.panel_width = _dock_width()
 	_province_panel.position = Vector2.ZERO
-	_province_panel.scale = Vector2.ONE * _dock_scale()
+	PopupKit.embedded = true
 	_province_panel.show_province(province_id)
+	PopupKit.embedded = false
 	await get_tree().process_frame
 	if _province_panel.visible:
-		_province_panel.scale = Vector2.ONE * _dock_scale()
-		_province_panel.clamp_to_height(_left_dock.size.y / _dock_scale())
+		_province_panel.clamp_to_height(_left_dock.size.y)
 
 ## Hedef seçme modunda dokunulan il: vurgulanır, üstte ne olacağı yazar.
 func _select_target_province(province_id: String) -> void:
@@ -2137,8 +2148,10 @@ func _show_tooltip_for(peer_id: int) -> void:
 	_profile_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_left_dock.add_child(_profile_scroll)
 	_fit_profile_scroll()
+	PopupKit.embedded = true
 	var card := PartyInfoCard.build(peer_id, multiplayer.get_unique_id(), _on_party_action,
-		DOCK_CONTENT_WIDTH, _hide_profile)
+		_dock_width() - 10.0, _hide_profile)
+	PopupKit.embedded = false
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_profile_scroll.add_child(card)
 	_update_left_dock()
@@ -2149,13 +2162,8 @@ func _show_tooltip_for(peer_id: int) -> void:
 
 ## Profil, doğal genişliğinde çizilip sol panele sığacak kadar küçültülür.
 func _fit_profile_scroll() -> void:
-	var natural := DOCK_CONTENT_WIDTH
-	if _profile_scroll.get_child_count() > 0:
-		natural = maxf(natural, (_profile_scroll.get_child(0) as Control).get_combined_minimum_size().x + 12.0)
-	var k := minf(1.0, _dock_width() / natural)
-	_profile_scroll.scale = Vector2.ONE * k
 	_profile_scroll.position = Vector2.ZERO
-	_profile_scroll.size = _left_dock.size / k
+	_profile_scroll.size = _left_dock.size
 
 # --- Hükümet / meclis oylaması ---------------------------------------------
 

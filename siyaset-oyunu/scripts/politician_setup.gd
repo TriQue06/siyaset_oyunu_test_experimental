@@ -44,6 +44,7 @@ func _ready() -> void:
 	# (varsayılan STOP) tıklamaları yutuyordu, memleket seçilemiyordu.
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_build_ui()
+	_restore_previous()
 	if GameMap.province_ids().is_empty():
 		# Tek başına çalıştırılan sahne (oyun yok): örnek bir harita kur.
 		GameMap.generate_new(GameMap.DEFAULT_SEED)
@@ -305,6 +306,20 @@ func _on_name_typed(text: String, edit: LineEdit) -> void:
 		_surname = fixed.strip_edges()
 	if _continue != null:
 		_refresh()
+
+## Parti kurulumundan GERİ dönüldüyse önceki seçimler yerinde durur.
+func _restore_previous() -> void:
+	var data: Dictionary = PartyManager.my_politician
+	if data.is_empty():
+		return
+	_gender = String(data.get("gender", _gender))
+	_first_name = String(data.get("first_name", _first_name))
+	_surname = String(data.get("surname", _surname))
+	_background_id = String(data.get("background", ""))
+	_hometown = String(data.get("hometown", ""))
+	_style_gender_buttons()
+	_first_edit.text = _first_name
+	_surname_edit.text = _surname
 
 func _full_name() -> String:
 	return "%s %s" % [_first_name, _surname]

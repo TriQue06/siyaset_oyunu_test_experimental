@@ -328,8 +328,8 @@ func _initialize() -> void:
 		if not n.ends_with("P") or n.length() < 2 or n.length() > 3:
 			name_ok = false
 	check("bot adlari XP bicimi (1-2 harf + P)", name_ok and bot_name_lengths.has(2) and bot_name_lengths.has(3), str(bot_name_lengths.keys()))
-	check("parti adi 1-14 karakter", pm.NAME_MAX_LENGTH == 14 and pm.is_valid_name("A") and pm.is_valid_name("12345678901234") \
-		and not pm.is_valid_name("123456789012345"))
+	check("parti adi 1-15 karakter", pm.NAME_MAX_LENGTH == 15 and pm.is_valid_name("A") and pm.is_valid_name("123456789012345") \
+		and not pm.is_valid_name("1234567890123456"))
 	mm.players = {10: {"name": "insan"}, 11: {"name": "", "bot": true}, 12: {"name": "", "bot": true}}
 	pm.parties = {10: {"name": "Insan", "bg_color": Color("22A9D6")}}
 	pm.add_bot_party(11)

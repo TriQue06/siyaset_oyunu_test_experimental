@@ -2739,6 +2739,10 @@ func _congress_info(pid: int) -> Dictionary:
 		party_congress[pid] = {"elections": 0, "share": float(last_vote_shares.get(pid, 0.0))}
 	return party_congress[pid]
 
+## Bot, son seçimden olumlu çıktı: sırası gelince kongreye gidecek.
+func bot_congress_due(pid: int) -> bool:
+	return bool(party_congress.get(pid, {}).get("bot_due", false))
+
 func elections_since_congress(pid: int) -> int:
 	return int(party_congress.get(pid, {}).get("elections", 0))
 
@@ -2917,6 +2921,7 @@ func _run_congress(pid: int, kind: String, requester: int = -1) -> void:
 	if bool(winner.get("incumbent", false)):
 		text = "%s KONGRESİ: %s genel başkanlığını korudu." % [party_name, PoliticianPresets.display_name(pid)]
 		_congress_info(pid)["elections"] = 0
+		_congress_info(pid).erase("bot_due")
 		_congress_info(pid)["share"] = float(last_vote_shares.get(pid, 0.0))
 		if requester != -1:
 			text += " Kongre isteyen %s kaybetti." % PoliticianPresets.display_name(requester)
@@ -2957,6 +2962,9 @@ func _run_congress(pid: int, kind: String, requester: int = -1) -> void:
 			text = "%s KONGRESİ: %s genel başkanlığı kaybetti! Yeni genel başkan %s. %s partide üye olarak kalıyor." % [
 				party_name, PoliticianPresets.display_name(old_leader), PoliticianPresets.display_name(bot),
 				PoliticianPresets.display_name(old_leader)]
+	for key in party_congress.keys():
+		if int(key) == pid or int(key) == party_of(pid):
+			party_congress[key].erase("bot_due")
 	# Gösteri herkesin ekranında oynar; o süre boyunca tur akışı durur.
 	var duration := congress_duration(has_human)
 	_congress_time_left = duration
@@ -2987,6 +2995,10 @@ func _count_congress_elections() -> void:
 			continue
 		var info := _congress_info(int(pid))
 		info["elections"] = int(info.get("elections", 0)) + 1
+		# BOT, SEÇİMDEN OLUMLU ÇIKTIYSA (oyu arttıysa) sırası gelince kongreye
+		# gider: başarının ardından iktidarını tazeler.
+		var gained := float(last_vote_shares.get(pid, 0.0)) > float(previous_vote_shares.get(pid, INF))
+		info["bot_due"] = MultiplayerManager.is_bot(int(pid)) and gained
 
 ## Kongre gösterisi bitti: tur akışı yeniden başlar.
 func _finish_congress_show() -> void:

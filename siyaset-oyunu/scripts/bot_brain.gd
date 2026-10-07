@@ -183,10 +183,9 @@ static func choose_action(bot: int) -> Dictionary:
 	# MECLİS KONUŞMASI zorunlu: her şeyden önce.
 	if CardManager.needs_speech(bot):
 		return choose_speech(bot)
-	# GÜÇLÜYKEN ERKEN KONGRE: iktidarını tazeler (zorunlu kongre zayıf anına
-	# denk gelmesin). İki seçimdir kongre yapmadıysa ve gücü yüksekse.
+	# SEÇİMDEN OLUMLU ÇIKAN BOT KONGREYE GİDER (iktidarını tazeler).
 	var pid := CardManager.party_of(bot)
-	if CardManager.can_hold_congress(bot) and CardManager.elections_since_congress(pid) >= 2 			and CardManager.congress_strength(pid) >= 72.0:
+	if CardManager.can_hold_congress(bot) and CardManager.bot_congress_due(pid):
 		return {"type": "congress"}
 	var candidates: Array = []
 	var best := _choose_action_best(bot, candidates)

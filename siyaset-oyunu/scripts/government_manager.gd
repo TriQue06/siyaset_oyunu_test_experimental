@@ -754,8 +754,11 @@ func _resolve_proposal() -> void:
 
 	# Salt çoğunluk = %50 + 1. Bu eşiği AŞAN "hayır" teklifi düşürür; oy
 	# vermeyenler çekimser sayılır.
-	var rejected: bool = totals.y * 2 > total_seats()
-	var reason := "Meclis çoğunluğu HAYIR dedi." if rejected else ""
+	# HAYIR, EVET'ten fazlaysa da teklif düşer (çekimserler sayılmaz):
+	# azınlık hükümeti ancak çekimserlerin desteğiyle kurulabilir.
+	var rejected: bool = totals.y * 2 > total_seats() or totals.y > totals.x
+	var reason := "Meclis çoğunluğu HAYIR dedi." if totals.y * 2 > total_seats() \
+		else ("HAYIR oyları (%d) EVET'ten (%d) fazla." % [totals.y, totals.x] if rejected else "")
 	if kind == KIND_CENSURE:
 		# Gensoru, EVET veren vekiller HAYIR verenlerden fazlaysa geçer (yasalardaki
 		# gibi). Çekimser ve oy vermeyenler sayılmaz; eşitlikte hükümet görevde kalır.

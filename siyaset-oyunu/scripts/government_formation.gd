@@ -47,7 +47,7 @@ func _ready() -> void:
 
 	GovernmentManager.phase_changed.connect(_on_phase_changed)
 
-	_partners = [multiplayer.get_unique_id()]
+	_partners = [PartyManager.party_of(multiplayer.get_unique_id())]
 	_step = Step.PARTNERS
 	_rebuild()
 
@@ -97,7 +97,7 @@ func _rebuild() -> void:
 ## diyagramı. Hükümete seçilen ortaklar diyagramın solunda TAM renkli,
 ## dışarıda kalanlar soluk — koalisyonun meclisteki ağırlığı bir bakışta görünür.
 func _refresh_seat_view() -> void:
-	var ids: Array = GovernmentManager.voter_ids()
+	var ids: Array = GovernmentManager.seated_party_ids()
 	ids.sort_custom(func(a, b):
 		var in_a: bool = _partners.has(a)
 		var in_b: bool = _partners.has(b)
@@ -133,8 +133,8 @@ func _build_partner_bar() -> void:
 	title.text = "Ortaklar (tıkla: ekle/çıkar):"
 	title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	bar.add_child(title)
-	var me := multiplayer.get_unique_id()
-	for peer_id in GovernmentManager.voter_ids():
+	var me := PartyManager.party_of(multiplayer.get_unique_id())
+	for peer_id in GovernmentManager.seated_party_ids():
 		var in_gov: bool = _partners.has(peer_id)
 		var btn := Button.new()
 		UiSkin.skin_button(btn)
@@ -150,8 +150,8 @@ func _build_partner_bar() -> void:
 # --- 1. Aşama: ortak seçimi -------------------------------------------------
 
 func _build_partner_rows() -> void:
-	var me := multiplayer.get_unique_id()
-	for peer_id in GovernmentManager.voter_ids():
+	var me := PartyManager.party_of(multiplayer.get_unique_id())
+	for peer_id in GovernmentManager.seated_party_ids():
 		var is_me: bool = peer_id == me
 		var row := PanelContainer.new()
 		UiSkin.skin_panel(row, UiSkin.PANEL)
@@ -175,7 +175,7 @@ func _build_partner_rows() -> void:
 		name_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		name_label.text = "%s — %s   (%d sandalye)" % [
 			PartyManager.data_of(peer_id).get("name", "?"),
-			MultiplayerManager.players.get(peer_id, {}).get("name", "?"),
+			PoliticianPresets.display_name(int(peer_id)),
 			GovernmentManager.seats_of(peer_id),
 		]
 		hbox.add_child(name_label)
@@ -283,7 +283,7 @@ func _build_party_chip(peer_id: int) -> Control:
 	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	chip.tooltip_text = "%s — %s" % [
 		party.get("name", "?"),
-		MultiplayerManager.players.get(peer_id, {}).get("name", "?"),
+		PoliticianPresets.display_name(int(peer_id)),
 	]
 
 	# Parti rengi olduğu gibi görünsün: koyu 9-slice zemin yerine rozet
@@ -316,7 +316,7 @@ func _refresh_summary() -> void:
 		var total := GovernmentManager.total_seats()
 		summary_label.text = "Ortaklar: %s\nToplam %d/%d sandalye — %s" % [
 			" + ".join(names), seats, total,
-			"salt çoğunluk VAR" if seats * 2 > total else "salt çoğunluk YOK (muhalefet dağınıksa yine de geçebilir)",
+			"salt çoğunluk VAR" if seats * 2 > total else "salt çoğunluk YOK (HAYIR, EVET'ten az kalırsa yine de geçer)",
 		]
 		return
 

@@ -10,6 +10,7 @@ func _check(ok: bool, text: String) -> void:
 		_fails += 1
 
 func _initialize() -> void:
+	load("res://scripts/bot_brain.gd").skill_variance = false
 	await process_frame
 	var sim_script = load("res://scripts/election_night_sim.gd")
 	var model = load("res://scripts/election_model.gd")

@@ -34,6 +34,7 @@ func free_color(except_peer: int) -> Color:
 	return Color.RED
 
 func _initialize() -> void:
+	load("res://scripts/bot_brain.gd").skill_variance = false
 	await process_frame
 	PP = load("res://scripts/politician_presets.gd")
 	mm = root.get_node("MultiplayerManager")

@@ -144,6 +144,7 @@ func _kale_summary() -> String:
 		splits, merges, str(bands), spread, String.num(mm.election_threshold, 1), mm.seat_method]
 
 func _initialize() -> void:
+	load("res://scripts/bot_brain.gd").skill_variance = false
 	await process_frame
 	mm = root.get_node("MultiplayerManager")
 	cm = root.get_node("CardManager")

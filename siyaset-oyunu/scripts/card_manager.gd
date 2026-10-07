@@ -381,16 +381,8 @@ func can_propose_law(peer_id: int, law_type: String = "") -> bool:
 
 ## Yasanın bu partiye bedeli: partinin yerleşik görüşüne ZIT yasa ek mana ister
 ## (bkz. GameRules.LAW_AGAINST_*). law_type boşsa taban bedel.
-func law_mana_cost(peer_id: int, law_type: String = "") -> int:
-	var law := CardPresets.law_data(law_type)
-	if law.is_empty():
-		return GameRules.LAW_MANA_COST
-	var value := float(PartyManager.data_of(peer_id).get("ideology", {}).get(law["axis"], 0.0))
-	if signf(value) == float(-int(law["dir"])):
-		if absf(value) >= GameRules.LAW_AGAINST_LEVEL_2:
-			return GameRules.LAW_MANA_COST + 2
-		if absf(value) >= GameRules.LAW_AGAINST_LEVEL_1:
-			return GameRules.LAW_MANA_COST + 1
+func law_mana_cost(_peer_id: int, _law_type: String = "") -> int:
+	# Görüşe ters yasa için ek bedel KALDIRILDI: her eksen, her yön aynı bedel.
 	return GameRules.LAW_MANA_COST
 
 ## ANAYASA DEĞİŞİKLİĞİ sunulabilir mi? Yasadan farkı: GÜNDEM ŞARTI YOK
@@ -450,6 +442,33 @@ func can_censure(peer_id: int) -> bool:
 	return can_choose_main_action(peer_id) and mana_of(peer_id) >= GameRules.CENSURE_MANA_COST and has_seats(peer_id) \
 		and GovernmentManager.phase == GovernmentManager.Phase.GOVERNING and GovernmentManager.has_government() \
 		and not GovernmentManager.has_majority() and not is_government_party(peer_id)
+
+## ERKEN SEÇİM hamlesi: meclis gerekir, oylama açık olmamalı, zaten erken
+## seçim kararı yoksa.
+func can_early_election(peer_id: int) -> bool:
+	return can_choose_main_action(peer_id) and mana_of(peer_id) >= GameRules.EARLY_ELECTION_MANA_COST \
+		and has_seats(peer_id) and not early_election_pending and GovernmentManager.can_submit_law()
+
+func early_election() -> void:
+	if not can_early_election(multiplayer.get_unique_id()):
+		return
+	if _is_authority():
+		_apply_early_election_move(multiplayer.get_unique_id())
+	else:
+		_request_early_election.rpc_id(1)
+
+func _apply_early_election_move(peer_id: int) -> void:
+	if not can_early_election(peer_id):
+		return
+	mana[peer_id] = mana_of(peer_id) - GameRules.EARLY_ELECTION_MANA_COST
+	_push_state({"type": "early_election", "peer_id": peer_id,
+		"message": "%s erken seçim önergesi verdi: meclis oylaması başladı." % _party_name(peer_id)})
+	GovernmentManager.submit_early_election(peer_id)
+
+@rpc("any_peer", "reliable")
+func _request_early_election() -> void:
+	if MultiplayerManager.is_host:
+		_apply_early_election_move(multiplayer.get_remote_sender_id())
 
 ## Popülizm bonusunun kalan turu (kullanıldığı turda POPULISM_ROUNDS, yoksa 0).
 func populism_rounds_left(peer_id: int) -> int:
@@ -511,9 +530,7 @@ func can_play_card(peer_id: int, card_type: String, target_peer_id: int = -1, ta
 	if mana_of(peer_id) < CardPresets.card_cost(card_type):
 		return false
 	if card_type == CardPresets.EARLY_ELECTION_CARD_TYPE:
-		# Meclis gerekir, oylama açık olmamalı, zaten erken seçim kararı yoksa.
-		return has_seats(peer_id) and not early_election_pending \
-			and GovernmentManager.can_submit_law()
+		return false  # artık hamle (bkz. can_early_election)
 	if CardPresets.needs_target(card_type):
 		return is_valid_steal_target(peer_id, target_peer_id)
 	# Hedef PARTİ (ya da kart çalmada o partinin oyuncusu): kendi partin olamaz.
@@ -980,9 +997,6 @@ func _draw_weights(peer_id: int = -1) -> Dictionary:
 	if not last_seats.is_empty():
 		weights[CardPresets.STEAL_WEAK_CARD_TYPE] = WEIGHT_STEAL_WEAK
 		weights[CardPresets.STEAL_STRONG_CARD_TYPE] = WEIGHT_STEAL_STRONG
-	# Erken seçim ancak meclis varken anlamlı.
-	if not last_seats.is_empty():
-		weights[CardPresets.EARLY_ELECTION_CARD_TYPE] = WEIGHT_EARLY_ELECTION
 	weights[CardPresets.POPULISM_CARD_TYPE] = WEIGHT_POPULISM
 	weights[CardPresets.MANA_BONUS_CARD_TYPE] = WEIGHT_MANA_BONUS
 	weights[CardPresets.MANA_BONUS_STRONG_CARD_TYPE] = WEIGHT_MANA_BONUS_STRONG

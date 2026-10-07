@@ -264,6 +264,16 @@ static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 			_bloc_forming = bloc_active()
 			best_score = censure_score - GameRules.CENSURE_MANA_COST * mana_value
 
+	# ERKEN SEÇİM: kamuoyu bot lehineyse ve hükümette değilse sandığı ister.
+	if CardManager.can_early_election(bot) and not CardManager.is_government_party(bot):
+		var support := CardManager.national_of(bot)
+		var early_score := 1.0 + support * 0.8 - GameRules.EARLY_ELECTION_MANA_COST * mana_value + _jitter(bot)
+		if support > EARLY_ELECTION_SUPPORT:
+			candidates.append({"type": "early_election"})
+			if early_score > best_score:
+				best = {"type": "early_election"}
+				best_score = early_score
+
 	if CardManager.can_miting(bot):
 		var miting := _eval_miting(bot, known)
 		var miting_noise := _jitter(bot)

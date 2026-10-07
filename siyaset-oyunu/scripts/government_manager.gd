@@ -229,6 +229,16 @@ func proposal_partner_ids() -> Array:
 	ids.erase(proposal_peer_id)
 	return ids
 
+## Koalisyon görüşmesinde oy verenler: ortak partilerin TÜM üyeleri (genel
+## başkan ve yardımcı). İki kişilik partide ortaklık iki üyenin de onayını ister.
+func _partner_member_ids() -> Array:
+	var ids: Array = []
+	for partner in proposal_partner_ids():
+		for member in PartyManager.members_of(PartyManager.party_of(int(partner))):
+			if not ids.has(int(member)):
+				ids.append(int(member))
+	return ids
+
 ## Hükümet teklifi koalisyon görüşmesi (1. aşama) aşamasında mı?
 func is_coalition_stage() -> bool:
 	return phase == Phase.VOTING and proposal_kind == KIND_GOVERNMENT and proposal_stage == STAGE_COALITION
@@ -238,7 +248,7 @@ func is_coalition_stage() -> bool:
 ## Sadece OYUNDA OLAN oyuncular sayılır: oylama sürerken feshedilen, başka
 ## partiye katılan ya da oyundan çıkan bir parti/oyuncu sonsuza dek beklenmesin.
 func eligible_voter_ids() -> Array:
-	var ids: Array = proposal_partner_ids() if proposal_kind == KIND_GOVERNMENT and proposal_stage == STAGE_COALITION \
+	var ids: Array = _partner_member_ids() if proposal_kind == KIND_GOVERNMENT and proposal_stage == STAGE_COALITION \
 		else voter_ids()
 	var present: Array = []
 	for peer_id in ids:
@@ -320,8 +330,6 @@ func vote_seat_totals() -> Vector2i:
 ## Oylamada bir oyun temsil ettiği vekil: koalisyon görüşmesinde ortak partinin
 ## kararı genel başkanındır (tüm vekiller), meclis oylamasında bölünür.
 func _vote_seats(voter: int) -> int:
-	if is_coalition_stage():
-		return seats_of(voter)
 	return vote_weight(voter)
 
 func abstain_seats() -> int:
@@ -804,9 +812,11 @@ func _resolve_proposal() -> void:
 ## meclis oylamasına geçer; biri bile EVET demezse teklif hakkı yanar.
 func _resolve_coalition_stage() -> void:
 	var proposer := proposal_peer_id
-	for partner in proposal_partner_ids():
-		if int(votes.get(partner, VOTE_ABSTAIN)) != VOTE_YES:
-			last_resolution_reason = "Koalisyon görüşmesi başarısız: %s ortak olmayı kabul etmedi." % _party_name(partner)
+	for member in eligible_voter_ids():
+		if int(votes.get(member, VOTE_ABSTAIN)) != VOTE_YES:
+			var partner := PartyManager.party_of(int(member))
+			last_resolution_reason = "Koalisyon görüşmesi başarısız: %s ortak olmayı kabul etmedi%s." % [_party_name(partner),
+				"" if int(member) == partner else " (genel başkan yardımcısı HAYIR dedi)"]
 			_fail_attempt()
 			_push_state()
 			if not _is_local_only():

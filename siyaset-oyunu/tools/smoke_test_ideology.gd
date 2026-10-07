@@ -37,6 +37,7 @@ func new_game(ideologies: Dictionary) -> void:
 	cm.current_turn_index = 0
 
 func _initialize() -> void:
+	load("res://scripts/bot_brain.gd").skill_variance = false
 	await process_frame
 	await process_frame
 	mm = root.get_node("MultiplayerManager")
@@ -107,9 +108,9 @@ func _initialize() -> void:
 	new_game({1: ideology(1.5, 1.5, 1.5), 2: ideology(-1.5, -1.5, -1.5)})
 	var cp = root.get_node("CardPresets")
 	check("gorusune uygun yasa bedelsiz", cm.law_mana_cost(1, cp.law_type("economic", 1)) == GameRules.LAW_MANA_COST)
-	check("gorusune aykiri yasa +1 mana", cm.law_mana_cost(1, cp.law_type("economic", -1)) == GameRules.LAW_MANA_COST + 1)
+	check("gorusune aykiri yasa da ek bedel istemez", cm.law_mana_cost(1, cp.law_type("economic", -1)) == GameRules.LAW_MANA_COST)
 	pm.parties[1]["ideology"]["economic"] = 2.5
-	check("koklu gorusune aykiri yasa +2 mana", cm.law_mana_cost(1, cp.law_type("economic", -1)) == GameRules.LAW_MANA_COST + 2)
+	check("koklu gorusune aykiri yasa da ek bedel istemez", cm.law_mana_cost(1, cp.law_type("economic", -1)) == GameRules.LAW_MANA_COST)
 
 	print("")
 	print("=== 3) ILLERIN DONUSUMU ===")

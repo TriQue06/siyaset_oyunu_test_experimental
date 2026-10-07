@@ -10,6 +10,7 @@ func check(label: String, ok: bool, detail: String = "") -> void:
 	print("  [%s]  %s%s" % ["OK" if ok else "HATA", label, ("  -> " + detail) if detail != "" else ""])
 
 func _initialize() -> void:
+	load("res://scripts/bot_brain.gd").skill_variance = false
 	await process_frame
 	var am = root.get_node("AudioManager")
 	var gs = root.get_node("GameSettings")

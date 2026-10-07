@@ -235,6 +235,8 @@ var _miting_button: Button
 var _pending_miting: bool = false
 var _invest_button: Button
 var _censure_button: Button
+var _early_button: Button
+var _pending_early: bool = false
 ## Yatırım hamlesi için il seçme modu.
 var _pending_invest: bool = false
 ## Gensoru: ilk dokunuş onay ister, ikincisi verir.
@@ -586,7 +588,7 @@ func _refresh_parliament_diagram() -> void:
 		# her parça kendi verdiği oyun rengine bürünür.
 		var deputy := PartyManager.deputy_of(int(peer_id))
 		var parts: Array = [[int(peer_id), seats]]
-		if voting and deputy != -1 and not GovernmentManager.is_coalition_stage():
+		if voting and deputy != -1:
 			var leader_part := GovernmentManager.vote_weight(int(peer_id))
 			parts = [[int(peer_id), leader_part], [deputy, seats - leader_part]]
 		for part in parts:
@@ -1427,10 +1429,11 @@ func _cancel_targeting() -> void:
 		_pending_org = false
 		_layer_before_org = -1
 		_refresh_action_buttons()
-	if _pending_miting or _pending_invest or _pending_censure:
+	if _pending_miting or _pending_invest or _pending_censure or _pending_early:
 		_pending_miting = false
 		_pending_invest = false
 		_pending_censure = false
+		_pending_early = false
 		_refresh_action_buttons()
 	if _selected_province != "":
 		_selected_province = ""
@@ -2483,6 +2486,8 @@ func _build_action_buttons() -> void:
 	_invest_button.pressed.connect(_on_invest_button_pressed)
 	_censure_button = _action_button("GENSORU", GameRules.cost_text(GameRules.CENSURE_MANA_COST), UiTheme.RED_DARK)
 	_censure_button.pressed.connect(_on_censure_button_pressed)
+	_early_button = _action_button("ERKEN SEÇİM", GameRules.cost_text(GameRules.EARLY_ELECTION_MANA_COST), UiTheme.GOLD)
+	_early_button.pressed.connect(_on_early_button_pressed)
 	# GRUP TOPLANTISI: bedelsiz hamle; sıra sendeyken açık, sırada bir kez.
 	_speech_button = _action_button("TOPLANTI", "bedelsiz", UiTheme.GOLD_DIM)
 	_speech_button.tooltip_text = "Meclis grup toplantısı: bir görüşü savun, partin yarım adım kayar. Bedelsiz, sırada bir kez."
@@ -2533,6 +2538,7 @@ func _refresh_action_buttons() -> void:
 	_miting_button.modulate.a = 1.0 if miting_ok or _pending_miting else 0.45
 	_invest_button.modulate.a = 1.0 if CardManager.can_invest(me) or _pending_invest else 0.45
 	_censure_button.modulate.a = 1.0 if CardManager.can_censure(me) or _pending_censure else 0.45
+	_early_button.modulate.a = 1.0 if CardManager.can_early_election(me) or _pending_early else 0.45
 	# disabled kullanılmıyor: pasif butona dokununca neden olmadığı uyarı olarak çıksın.
 	_law_button.modulate.a = 1.0 if law_ok else 0.45
 	_org_button.modulate.a = 1.0 if org_ok or _pending_org else 0.45
@@ -2832,9 +2838,7 @@ func _law_circle(axis: String, dir: int) -> Control:
 	circle.mouse_filter = Control.MOUSE_FILTER_STOP
 	circle.mouse_default_cursor_shape = Control.CURSOR_DRAG
 	var label := Label.new()
-	# Görüşüne ZIT yasa ek mana ister: bedel dairenin üstünde yazar.
-	var law_cost := CardManager.law_mana_cost(multiplayer.get_unique_id(), law_type)
-	label.text = String(law["side"]) + ("\n+%d mana" % law_cost if law_cost > 0 else "")
+	label.text = String(law["side"])
 	label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -2849,8 +2853,7 @@ func _law_circle(axis: String, dir: int) -> Control:
 		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
 				_law_info.text = "%s (%s)%s%s" % [law["title"], CardPresets.law_direction_text(law_type),
-					"  ·  gündemde: sunulabilir" if on_agenda else "  ·  gündemde değil",
-					("  ·  görüşüne aykırı: %s" % GameRules.cost_text(law_cost)) if law_cost > 0 else ""]
+					"  ·  gündemde: sunulabilir" if on_agenda else "  ·  gündemde değil", ""]
 				_start_law_drag(law_type)
 			elif _drag_hand_index == LAW_DRAG_INDEX:
 				_finish_drag()
@@ -2953,6 +2956,35 @@ func _on_censure_button_pressed() -> void:
 	_pending_censure = true
 	_refresh_action_buttons()
 	_set_target_hint("Gensoru: hükümeti düşürmek için meclis oylaması (%d mana). Reddedilirse ulusal destek kaybedersin. Onay: butona tekrar dokun" % GameRules.CENSURE_MANA_COST)
+
+## Erken seçim hamlesi: ilk dokunuş onay ister, ikincisi önergeyi meclise getirir.
+func _on_early_button_pressed() -> void:
+	var me := multiplayer.get_unique_id()
+	if _pending_early:
+		_pending_early = false
+		_cancel_targeting()
+		if CardManager.can_early_election(me):
+			CardManager.early_election()
+		_refresh_action_buttons()
+		return
+	_deselect_hand_card()
+	_law_designer.hide()
+	_cancel_targeting()
+	if not CardManager.can_early_election(me):
+		if not CardManager.can_act():
+			_show_toast("Sıran değil.")
+		elif not CardManager.has_seats(me):
+			_show_toast("Mecliste vekilin yok: erken seçim önergesi veremezsin.")
+		elif CardManager.early_election_pending:
+			_show_toast("Erken seçim kararı zaten alındı.")
+		elif not GovernmentManager.can_submit_law():
+			_show_toast("Meclis şu an meşgul (oylama ya da hükümet kurma sürüyor).")
+		else:
+			_show_toast(_action_block_reason(GameRules.EARLY_ELECTION_MANA_COST))
+		return
+	_pending_early = true
+	_refresh_action_buttons()
+	_set_target_hint("Erken seçim: meclis oylaması (%d mana). Kabul edilirse dönem sonunda sandığa gidilir. Onay: butona tekrar dokun" % GameRules.EARLY_ELECTION_MANA_COST)
 
 ## Miting hamlesi: haritadan il seçilir (ilk dokunuş riski gösterir, ikincisi yapar).
 func _on_miting_button_pressed() -> void:

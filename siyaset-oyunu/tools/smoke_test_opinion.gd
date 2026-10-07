@@ -66,6 +66,7 @@ func most_neutral(axis: String) -> String:
 	return best
 
 func _initialize() -> void:
+	load("res://scripts/bot_brain.gd").skill_variance = false
 	await process_frame
 	await process_frame
 	mm = root.get_node("MultiplayerManager")

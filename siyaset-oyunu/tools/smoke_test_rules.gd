@@ -72,6 +72,7 @@ func extreme(voters: Dictionary, axis: String, highest: bool) -> String:
 	return best
 
 func _initialize() -> void:
+	load("res://scripts/bot_brain.gd").skill_variance = false
 	await process_frame
 	await process_frame
 	mm = root.get_node("MultiplayerManager")

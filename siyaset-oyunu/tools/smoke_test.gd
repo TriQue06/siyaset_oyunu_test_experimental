@@ -5,6 +5,7 @@ extends SceneTree
 ## `godot --headless --script res://tools/smoke_test.gd` ile çalıştırılır.
 
 func _initialize() -> void:
+	load("res://scripts/bot_brain.gd").skill_variance = false
 	var scenes := [
 		"res://scenes/Lobby.tscn",
 		"res://scenes/RoomLobby.tscn",

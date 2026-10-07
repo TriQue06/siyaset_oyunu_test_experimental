@@ -105,6 +105,8 @@ static func do_action(bot: int) -> Dictionary:
 			CardManager._apply_invest_move(bot, String(action["province"]))
 		"censure":
 			CardManager._apply_censure_move(bot)
+		"early_election":
+			CardManager._apply_early_election_move(bot)
 		"card":
 			var play := BotBrain.choose_play(bot)
 			if play.is_empty():

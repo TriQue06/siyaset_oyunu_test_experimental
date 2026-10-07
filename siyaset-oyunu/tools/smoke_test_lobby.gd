@@ -25,6 +25,7 @@ func bot_id_of(name: String) -> int:
 	return -1
 
 func _initialize() -> void:
+	load("res://scripts/bot_brain.gd").skill_variance = false
 	await process_frame
 	mm = root.get_node("MultiplayerManager")
 	cm = root.get_node("CardManager")

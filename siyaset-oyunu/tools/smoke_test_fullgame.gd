@@ -16,6 +16,7 @@ func check(label: String, ok: bool, detail: String = "") -> void:
 	print("  [%s]  %s%s" % ["OK" if ok else "HATA", label, ("  -> " + detail) if detail != "" else ""])
 
 func _initialize() -> void:
+	load("res://scripts/bot_brain.gd").skill_variance = false
 	await process_frame
 	mm = root.get_node("MultiplayerManager")
 	pm = root.get_node("PartyManager")
@@ -89,7 +90,7 @@ func _initialize() -> void:
 	check("normal takvim: 16. turda secim var, 11'de yok",
 		GameRules.is_election_round(16) and not GameRules.is_election_round(11))
 	cm.mana[1] = 5.0
-	check("erken secim karti mecliste oynanabilir", cm.can_play_card(1, cp.EARLY_ELECTION_CARD_TYPE))
+	check("erken secim artik kart degil, 2 manalik hamle", not cm.can_play_card(1, cp.EARLY_ELECTION_CARD_TYPE) and GameRules.EARLY_ELECTION_MANA_COST == 2)
 	gm.submit_early_election(1)
 	check("onerge oylamaya acildi", gm.is_voting() and gm.proposal_kind == gm.KIND_EARLY)
 	for voter in gm.eligible_voter_ids():

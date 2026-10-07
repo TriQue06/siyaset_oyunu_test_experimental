@@ -88,10 +88,6 @@ static func cost_text(cost: float) -> String:
 
 ## Yasa sunmak BEDELSİZ (turda 1): meclis oyunun merkezi, mana engel olmasın.
 const LAW_MANA_COST := 0
-## Partinin yerleşik görüşüne ZIT bir yasa sunmak ek mana ister: o eksende
-## |görüş| ≥ LAW_AGAINST_LEVEL_1 ise +1, ≥ LAW_AGAINST_LEVEL_2 ise +2 mana.
-const LAW_AGAINST_LEVEL_1 := 1.0
-const LAW_AGAINST_LEVEL_2 := 2.0
 const LAWS_PER_ROUND := 1
 ## Teşkilat anketinin sapması (her partinin oyu en fazla bu oranda sapar):
 ## 1. seviye YAKLAŞIK oy (±%35), 2. seviye %90 doğruluk (±%10).
@@ -103,6 +99,8 @@ const MITING_MANA_COST := 2
 const INVEST_MANA_COST := 2
 ## Gensoru BEDELSİZ: muhalefetin elindeki tek gerçek silah engellenmemeli.
 const CENSURE_MANA_COST := 0
+## ERKEN SEÇİM hamlesi (eskiden kart): meclise önerge getirir.
+const EARLY_ELECTION_MANA_COST := 2
 ## Popülizm bonusu kartı bu kadar tur sürer. Mana bonusunun iki çeşidi var:
 ## zayıf +MANA_BONUS_WEAK, güçlü +MANA_BONUS_STRONG. Bonus kart BONUS_CARD_DRAW kart çeker.
 const POPULISM_ROUNDS := 3

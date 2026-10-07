@@ -16,7 +16,16 @@ const MAP_FILL_RATIO := 0.98
 ## Sağ sütun: üstte parti logoları, altta deste + Pas Geç + sıra göstergesi.
 ## GameScreen.tscn'deki PlayerPanel/DeckButton/PassButton/TurnIndicator
 ## offset'leri bu genişliğe göre ayarlı.
-const RIGHT_COLUMN_WIDTH := 344.0
+## YENİ DÜZEN (üst parti şeridi): üstte bütün partilerin plaketleri, solda
+## meclis, sağda oyun bilgisi/hükümet/log, altta benim bandım (kartlar,
+## hamleler, mana, Turu Bitir), ortada harita.
+const RIGHT_COLUMN_WIDTH := 250.0
+const TOP_STRIP_HEIGHT := 92.0
+## Sağ üstte Menü düğmesi: şerit oraya kadar uzanmaz.
+const MENU_RESERVE := 140.0
+## Alt bantta kartların, hamlelerin ve sağdaki kontrollerin payı.
+const BAND_HAND_RATIO := 0.40
+const BAND_ACTIONS_RATIO := 0.33
 ## EVRENSEL PARTİ TABLOSU: üstteki üç sekme ve her sekmenin sayı sütunları.
 ## Sütun başlıkları tablonun ilk satırında görünür, satırlarda tekrar etmez.
 const PLAYER_TAB_TITLES := ["SIRA", "SEÇİM", "DURUM"]
@@ -40,7 +49,7 @@ const PLAYER_HEADER_HEIGHT := 20.0
 ## ChamberSplit yalnızca sağa büyüyecek şekilde ayarlıdır (bkz. sahne).
 ## KART BARI: ekranın en altında, TAM GENİŞLİKTE duran kart şeridi. Kartlar
 ## burada yan yana (bitişik değil) dizilir. Diğer her şey bunun üstünde kalır.
-const CARD_BAR_HEIGHT := 80.0
+const CARD_BAR_HEIGHT := 128.0
 const CARD_BAR_PADDING := 8.0
 ## Kartın barda görünen ÜST kısmı. Kalanı ekranın altında bekler; fare
 ## üstüne gelince (ya da dokunulup seçilince) kart bu kadar yukarı kalkıp
@@ -54,7 +63,7 @@ const AVATAR_SIZE := 56.0
 const AVATAR_ICON_PIXEL_SIZE := 144
 ## Soldaki tam boy bilgi panelinin genişliği — GameScreen.tscn'deki
 ## LeftPanel.offset_right ile birebir eşleşmeli.
-const LEFT_PANEL_WIDTH := 260.0
+const LEFT_PANEL_WIDTH := 236.0
 const BADGE_ICON_PIXEL_SIZE := 64
 
 # Kartlar 72x96 piksel native boyutta; Nearest filtre ile piksel-sanat
@@ -384,7 +393,7 @@ func _usable_height() -> float:
 
 ## Üst bölgenin (harita + katman düğmeleri) yüksekliği.
 func _top_area_height() -> float:
-	return _usable_height() * TOP_AREA_HEIGHT_RATIO
+	return _usable_height()
 
 ## KART BARI: ekranın en altında tam genişlikte bir şerit. Kendi zemini var,
 ## kartlar içinde yan yana durur.
@@ -394,12 +403,13 @@ func _place_card_bar() -> void:
 		_card_bar_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		UiSkin.skin_panel(_card_bar_panel, UiSkin.PANEL_DARK)
 		add_child(_card_bar_panel)
-		move_child(_card_bar_panel, hand_area.get_index())
+		# Bandın zemini her şeyin ARKASINDA: hamle paneli, mana ve Turu Bitir üstünde.
+		move_child(_card_bar_panel, 1)
 	var viewport_size := get_viewport_rect().size
 	_card_bar_panel.position = Vector2(0.0, viewport_size.y - CARD_BAR_HEIGHT)
 	_card_bar_panel.size = Vector2(viewport_size.x, CARD_BAR_HEIGHT)
 	hand_area.offset_left = 0.0
-	hand_area.offset_right = 0.0
+	hand_area.offset_right = -viewport_size.x * (1.0 - BAND_HAND_RATIO)
 	hand_area.offset_top = viewport_size.y - CARD_BAR_HEIGHT
 	hand_area.offset_bottom = 0.0
 	# Kartların ÜST KISMI barda durur, gerisi ekranın altında bekler.
@@ -417,11 +427,10 @@ func _apply_layout() -> void:
 	# oyuncu şeridi hariç kalan genişliğe sığacak şekilde ölçekleniyor —
 	# geniş, dikdörtgen bir alanı doldurması hedefleniyor.
 	var available_width := viewport_size.x - RIGHT_COLUMN_WIDTH - LEFT_PANEL_WIDTH
-	var available_height := _top_area_height()
+	var top := TOP_STRIP_HEIGHT
+	var available_height := viewport_size.y - CARD_BAR_HEIGHT - top
 	# Haritanın ALTINDA katman düğmeleri duruyor: o kadar yer haritaya kapalı.
 	var map_area_height: float = maxf(80.0, available_height - LAYER_BAR_RESERVE)
-	# Haritanın doğal boyutu her oyunda üretilen altıgen haritadan gelir
-	# (grid_width/height * MAP_UNIT_SCALE), sabit değildir.
 	var map_native_size: Vector2 = Vector2(map_holder.grid_width, map_holder.grid_height) * map_holder.MAP_UNIT_SCALE
 	var fit_scale: float = minf(available_width / map_native_size.x, map_area_height / map_native_size.y) * MAP_FILL_RATIO
 	_map_fit_scale = fit_scale
@@ -429,9 +438,8 @@ func _apply_layout() -> void:
 		map_holder.scale = Vector2(fit_scale, fit_scale)
 	var map_position := Vector2(
 		LEFT_PANEL_WIDTH + available_width * 0.5 - map_native_size.x * 0.5 * fit_scale,
-		map_area_height * 0.5 - map_native_size.y * 0.5 * fit_scale
+		top + map_area_height * 0.5 - map_native_size.y * 0.5 * fit_scale
 	)
-	# Harita, katman geçişinde yana kayabilsin diye kırpan bir kutunun içinde.
 	_ensure_map_clip()
 	_map_clip.position = map_position
 	_map_clip.size = map_native_size * fit_scale
@@ -439,17 +447,33 @@ func _apply_layout() -> void:
 		map_holder.position = Vector2.ZERO
 	_place_layer_bar()
 
-	# Alt hazne (meclis + hamleler) artık sol panel ile sağ sütun arasındaki
-	# TÜM genişliği kullanıyor: el kartları buradan kart barına taşındı.
-	# EMNİYET: sol panel bir sebeple genişlerse alt hazne de sağa kayar,
-	# diyagram panelin altında kalmaz.
-	bottom_area.offset_left = maxf(LEFT_PANEL_WIDTH, left_panel.size.x)
-	bottom_area.offset_right = -RIGHT_COLUMN_WIDTH
-	bottom_area.offset_top = available_height
-	bottom_area.offset_bottom = -CARD_BAR_HEIGHT
+	# ÜST ŞERİT: bütün partilerin plaketleri (Menü düğmesine kadar).
+	var strip := get_node_or_null("PlayerPanel") as Control
+	if strip != null:
+		strip.anchor_left = 0.0
+		strip.anchor_right = 1.0
+		strip.anchor_top = 0.0
+		strip.anchor_bottom = 0.0
+		strip.offset_left = 8.0
+		strip.offset_right = -MENU_RESERVE
+		strip.offset_top = 6.0
+		strip.offset_bottom = top - 6.0
 
-	# SOL PANEL KART BARININ ÜSTÜNDE BİTER: en altındaki sıra göstergesi
-	# barın arkasında kalmasın.
+	# SOL SÜTUN: meclis (diyagram, oylama düğmeleri, teklif).
+	bottom_area.offset_left = 0.0
+	bottom_area.offset_right = -(viewport_size.x - LEFT_PANEL_WIDTH)
+	bottom_area.offset_top = top
+	bottom_area.offset_bottom = -CARD_BAR_HEIGHT
+	_detach_actions_panel()
+
+	# SAĞ SÜTUN: oyun bilgisi, hükümet, log, sıra (il / profil de burada açılır).
+	left_panel.anchor_left = 1.0
+	left_panel.anchor_right = 1.0
+	left_panel.anchor_top = 0.0
+	left_panel.anchor_bottom = 1.0
+	left_panel.offset_left = -RIGHT_COLUMN_WIDTH
+	left_panel.offset_right = 0.0
+	left_panel.offset_top = top
 	left_panel.offset_bottom = -CARD_BAR_HEIGHT
 
 	# KART BARI: ekranın en altında, tam genişlikte.
@@ -460,8 +484,31 @@ func _apply_layout() -> void:
 	var seat_markers := map_holder.get_node_or_null("SeatMarkers")
 	if seat_markers != null:
 		seat_markers.queue_redraw()
-	# Sağ sütunun yüksekliği değişti: logolar sığacak ölçekte yeniden kurulsun.
+	_place_right_column_controls()
 	_rebuild_player_panel()
+
+## Hamle paneli alt banda, kartların sağına taşınır (sahnede meclisin yanındaydı).
+func _detach_actions_panel() -> void:
+	var panel := bottom_area.get_node_or_null("ChamberSplit/ActionsPanel") as Control
+	if panel == null:
+		panel = get_node_or_null("ActionsPanel") as Control
+	else:
+		panel.get_parent().remove_child(panel)
+		add_child(panel)
+		move_child(panel, hand_area.get_index())
+		var title := panel.get_node_or_null("ActionsMargin/ActionsVBox/ActionsTitle")
+		if title != null:
+			title.hide()
+		var margin := panel.get_node_or_null("ActionsMargin") as MarginContainer
+		if margin != null:
+			for side in ["left", "right", "top", "bottom"]:
+				margin.add_theme_constant_override("margin_" + side, 6)
+	if panel == null:
+		return
+	var viewport_size := get_viewport_rect().size
+	panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	panel.position = Vector2(viewport_size.x * BAND_HAND_RATIO + 4.0, viewport_size.y - CARD_BAR_HEIGHT + 6.0)
+	panel.size = Vector2(viewport_size.x * BAND_ACTIONS_RATIO - 8.0, CARD_BAR_HEIGHT - 12.0)
 
 ## Seçim yapılınca HERKESİN ekranında tetiklenir: ekran kararıp seçim
 ## sonuçları animasyon ekranına geçilir, oradan otomatik olarak buraya (yeni
@@ -820,35 +867,170 @@ func _rebuild_player_panel() -> void:
 	for child in player_panel_list.get_children():
 		player_panel_list.remove_child(child)
 		child.queue_free()
-	player_panel_list.add_child(_build_player_header())
-	var count: int = maxi(1, _ordered_peer_ids().size())
-	# SATIRLAR IZGARAYI PAYLAŞIR: ızgara panelin kalanını kaplar, her satır
-	# EXPAND_FILL ile eşit pay alır. Yükseklik elle hesaplanmıyor, bu yüzden
-	# düzen değişince hesap eskiyemez.
+	if player_tabs != null:
+		player_tabs.hide()
+	var party_ids := _ordered_party_ids()
+	player_panel_list.columns = maxi(1, party_ids.size())
+	player_panel_list.add_theme_constant_override("h_separation", 6)
 	var panel := get_node_or_null("PlayerPanel") as Control
-	# Başlık satırı da ızgaranın içinde: payı düşülmeli.
-	var available: float = player_panel_list.size.y - PLAYER_HEADER_HEIGHT
-	if panel != null:
-		# ÖLÇÜLEN BOY BAYAT OLABİLİR: düzen değiştiği karede liste hâlâ eski
-		# boyunu bildiriyor ve satırlar panelden taşıp kırpılıyordu. Panelin
-		# ÇAPALARINDAN hesaplanan boy üst sınır olarak alınır.
-		var panel_height: float = get_viewport_rect().size.y + panel.offset_bottom - panel.offset_top
-		var by_offsets: float = panel_height - PLAYER_TAB_HEIGHT - 6.0 - PLAYER_HEADER_HEIGHT
-		available = by_offsets if available <= 0.0 else minf(available, by_offsets)
-	var separation: float = AVATAR_SEPARATION if count <= 6 else 2.0
-	player_panel_list.add_theme_constant_override("v_separation", int(separation))
-	_avatar_height = clampf((available - separation * (count - 1)) / count, 16.0, 72.0) if available > 0.0 else 64.0
 	if panel != null:
 		panel.clip_contents = true
-	player_panel_list.columns = 1
-
-	for peer_id in _ordered_peer_ids():
-		var party: Dictionary = PartyManager.data_of(peer_id)
-		var avatar := _build_avatar(peer_id, party)
-		player_panel_list.add_child(avatar)
-
+	var strip_width: float = get_viewport_rect().size.x - 8.0 - MENU_RESERVE
+	var plaque_width: float = (strip_width - 6.0 * (party_ids.size() - 1)) / maxf(1.0, party_ids.size())
+	for pid in party_ids:
+		player_panel_list.add_child(_build_plaque(int(pid), plaque_width))
 	# Panel yeniden kuruldu: hedef seçme vurguları yeni düğümlere uygulanmalı.
 	_refresh_target_highlights()
+
+## Plaket sırası: oyun sırasına göre partiler (iki kişilik parti bir kez).
+func _ordered_party_ids() -> Array:
+	var ids: Array = []
+	for peer_id in _ordered_peer_ids():
+		var pid := CardManager.party_of(int(peer_id))
+		if not ids.has(pid):
+			ids.append(pid)
+	return ids
+
+## PARTİ PLAKETİ (üst şerit): renk şeridi, logo, parti adı, genel başkan ve
+## yardımcı (oylamada her birinin oyu), vekil, oy oranı, hükümetteki yeri.
+## Sırası gelen partinin plaketi altın çerçeveyle nabız gibi atar.
+func _build_plaque(pid: int, width: float) -> Control:
+	var me := multiplayer.get_unique_id()
+	var party: Dictionary = PartyManager.data_of(pid)
+	var color: Color = party.get("bg_color", Color(0.5, 0.5, 0.5))
+	var members: Array = PartyManager.members_of(pid)
+	if members.is_empty():
+		members = [pid]
+	var current := CardManager.current_turn_peer_id()
+	var is_turn := not CardManager.turn_order.is_empty() and members.has(current)
+	var mine := members.has(me)
+	var independent := PartyManager.is_independent(pid)
+
+	var card := PanelContainer.new()
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	card.clip_contents = true
+	var style := UiSkin.stylebox(UiSkin.PANEL if is_turn else UiSkin.PANEL_DARK)
+	style.content_margin_left = 4
+	style.content_margin_right = 4
+	style.content_margin_top = 0
+	style.content_margin_bottom = 2
+	card.add_theme_stylebox_override("panel", style)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 1)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(box)
+	var stripe := ColorRect.new()
+	stripe.color = color
+	stripe.custom_minimum_size = Vector2(0, 4)
+	stripe.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(stripe)
+
+	var inner: float = width - 8.0
+	# 1) logo + parti adı (+ SIRA / SEN / POP etiketleri)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 4)
+	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(head)
+	var badge := PartyBadge.build(party, Vector2(24, 24), BADGE_ICON_PIXEL_SIZE)
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	head.add_child(badge)
+	var tags: Array = []
+	if is_turn:
+		tags.append(["SIRA", UiTheme.TEXT, UiTheme.INK])
+	if mine:
+		tags.append(["SEN", UiTheme.GOLD, UiTheme.INK])
+	var populism_left := CardManager.populism_rounds_left(pid)
+	if populism_left > 0:
+		tags.append(["POP %d" % populism_left, UiTheme.PURPLE, UiTheme.TEXT])
+	var tags_width := 0.0
+	for tag in tags:
+		tags_width += String(tag[0]).length() * 6.0 + 10.0
+	var name_text := "Bağımsız" if independent else String(party.get("name", "?"))
+	var name_label := _avatar_label(name_text, _fit_font_size(name_text, inner - 28.0 - tags_width, UiTheme.FS_SMALL, 9),
+		UiTheme.GOLD if mine else UiTheme.TEXT)
+	name_label.clip_text = false
+	name_label.add_theme_font_override("font", UiTheme.mono(true))
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	head.add_child(name_label)
+	for tag in tags:
+		var tag_control := _avatar_tag(String(tag[0]), tag[1], tag[2])
+		tag_control.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		head.add_child(tag_control)
+
+	# 2) genel başkan ve yardımcı (oylamada her birinin oyu yanında)
+	for i in members.size():
+		var member := int(members[i])
+		var line := HBoxContainer.new()
+		line.add_theme_constant_override("separation", 3)
+		line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(line)
+		var role_text := "" if independent else ("GB " if i == 0 else "YRD ")
+		var person := role_text + PoliticianPresets.display_name(member)
+		var vote_tag: Label = null
+		if GovernmentManager.is_voting() and GovernmentManager.eligible_voter_ids().has(member):
+			var voted: bool = GovernmentManager.votes.has(member)
+			vote_tag = _avatar_label(GovernmentManager.vote_text(GovernmentManager.votes[member]) if voted else "…", 9,
+				VOTE_COLORS[int(GovernmentManager.votes[member])] if voted else UiTheme.TEXT_MUTED)
+			vote_tag.clip_text = false
+		var reserve := 34.0 if vote_tag != null else 0.0
+		var person_label := _avatar_label(person, _fit_font_size(person, inner - reserve, 10, 7),
+			UiTheme.GOLD if member == me else color.lightened(0.5))
+		person_label.clip_text = false
+		person_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		line.add_child(person_label)
+		if vote_tag != null:
+			line.add_child(vote_tag)
+	if members.size() < 2:
+		var spacer := Control.new()
+		spacer.custom_minimum_size = Vector2(0, 12)
+		spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(spacer)
+
+	# 3) vekil · oy · hükümetteki yeri
+	var nums := HBoxContainer.new()
+	nums.add_theme_constant_override("separation", 4)
+	nums.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(nums)
+	var has_seats: bool = CardManager.last_seats.has(pid)
+	var seats_text := ("%d mv  %%%.1f" % [int(CardManager.last_seats.get(pid, 0)), float(CardManager.last_vote_shares.get(pid, 0.0))]) \
+		if has_seats else "seçim yok"
+	var seats_label := _avatar_label(seats_text, 10, UiTheme.TEXT)
+	seats_label.add_theme_font_override("font", UiTheme.mono(true))
+	seats_label.clip_text = false
+	seats_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	nums.add_child(seats_label)
+	if GovernmentManager.has_government() and CardManager.is_government_party(pid):
+		var chip := _avatar_tag("PM" if GovernmentManager.main_gov_peer_id == pid else "HÜK", UiTheme.GREEN, UiTheme.TEXT)
+		chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		chip.tooltip_text = PartyInfoCard.role_text(pid)
+		nums.add_child(chip)
+
+	card.set_meta("peer_id", pid)
+	card.tooltip_text = "%s · dokun: profil" % name_text
+	var halo := Panel.new()
+	halo.name = "TargetHalo"
+	halo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	halo.add_theme_stylebox_override("panel", UiSkin.color_box(UiTheme.GOLD, UiSkin.TARGET))
+	halo.visible = false
+	card.add_child(halo)
+	if is_turn:
+		var frame := Panel.new()
+		frame.name = "TurnFrame"
+		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		frame.add_theme_stylebox_override("panel", UiSkin.color_box(UiTheme.GOLD, UiSkin.TARGET))
+		card.add_child(frame)
+		var pulse := frame.create_tween().set_loops()
+		pulse.tween_property(frame, "modulate:a", 0.35, 0.7).set_trans(Tween.TRANS_SINE)
+		pulse.tween_property(frame, "modulate:a", 1.0, 0.7).set_trans(Tween.TRANS_SINE)
+	card.gui_input.connect(func(event: InputEvent):
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			_on_target_party_clicked(pid)
+	)
+	return card
 
 # --- Tur göstergesi (geçici; kalıcı görseli kullanıcı sonra ekleyecek) -----
 
@@ -1392,7 +1574,7 @@ func _province_under_mouse() -> String:
 	var mouse := get_viewport().get_mouse_position()
 	var viewport_size := get_viewport_rect().size
 	if mouse.x < LEFT_PANEL_WIDTH or mouse.x > viewport_size.x - RIGHT_COLUMN_WIDTH \
-			or mouse.y >= bottom_area.get_global_rect().position.y:
+			or mouse.y < TOP_STRIP_HEIGHT or mouse.y >= viewport_size.y - CARD_BAR_HEIGHT:
 		return ""
 	return map_holder.get_province_id_at(map_holder.get_global_transform().affine_inverse() * mouse)
 
@@ -1648,7 +1830,7 @@ func _set_target_hint(text: String) -> void:
 	_target_hint.text = text
 	_target_hint.visible = text != ""
 	var viewport_size := get_viewport_rect().size
-	_target_hint.position = Vector2(LEFT_PANEL_WIDTH, 44)
+	_target_hint.position = Vector2(LEFT_PANEL_WIDTH, TOP_STRIP_HEIGHT + 4.0)
 	_target_hint.size = Vector2(viewport_size.x - LEFT_PANEL_WIDTH - RIGHT_COLUMN_WIDTH, 24)
 
 func _build_card_info() -> void:
@@ -1787,9 +1969,8 @@ func _on_card_played(peer_id: int, card_type: String) -> void:
 	_play_card_animation(card_type, origin_pos, origin_size)
 
 func _avatar_global_position(peer_id: int, out_size: Vector2) -> Vector2:
-	var idx := _ordered_peer_ids().find(peer_id)
-	if idx != -1 and idx < player_panel_list.get_child_count():
-		var avatar: Control = player_panel_list.get_child(idx)
+	var avatar := _find_avatar_node(peer_id)
+	if avatar != null:
 		return avatar.global_position - (out_size - avatar.size) * 0.5
 	return get_viewport_rect().size / 2.0 - out_size / 2.0
 
@@ -2020,6 +2201,7 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 ## peer_id'ye ait avatar düğümünü bulur (yoksa null). Silinmek üzere işaretli
 ## düğümleri atlar.
 func _find_avatar_node(peer_id: int) -> Control:
+	peer_id = CardManager.party_of(peer_id)  # plaketler parti başına
 	for child in player_panel_list.get_children():
 		if not is_instance_valid(child) or child.is_queued_for_deletion():
 			continue
@@ -2353,30 +2535,27 @@ const LAW_AXIS_COLORS := {
 ## yanında YASA TASARLA / İL BAŞKANLIĞI butonları, mana. Parti kartları üstte
 ## kalan alana sığar.
 func _place_right_column_controls() -> void:
-	# Alt sağ: 6 hamle butonu (2 sütun x 3 satır), altında küçük deste + mana + Turu Bitir.
+	# ALT BANDIN SAĞI: üst sırada mana ve kart bozdurma, altta Turu Bitir.
+	var viewport_size := get_viewport_rect().size
+	var width: float = viewport_size.x * (1.0 - BAND_HAND_RATIO - BAND_ACTIONS_RATIO) - 16.0
+	var half: float = width * 0.5
+	var row_top: float = -CARD_BAR_HEIGHT + 8.0
+	var row_height := 54.0
+	if _mana_plate != null:
+		_mana_plate.offset_left = -(width + 8.0)
+		_mana_plate.offset_right = -(8.0 + half + 4.0)
+		_mana_plate.offset_top = row_top
+		_mana_plate.offset_bottom = row_top + row_height
 	if _trash_panel != null:
-		# Kart bozdurma kutusu, altındaki "Turu Bitir" ile AYNI ÖLÇÜDE.
-		_trash_panel.offset_left = MANA_PLATE_LEFT
-		_trash_panel.offset_right = -16.0
-		_trash_panel.offset_top = TRASH_TOP
-		_trash_panel.offset_bottom = TRASH_TOP + BOTTOM_BUTTON_HEIGHT
-	pass_button.add_theme_font_size_override("font_size", 14)
-	# DİKKAT: konumlanan düğüm PlayerPanel'in KENDİSİ; ızgaranın doğrudan
-	# ebeveyni (sekme + tablo kutusu) panelin içini tamamen kaplıyor.
-	var panel := get_node_or_null("PlayerPanel") as Control
-	if panel != null:
-		panel.offset_top = 72.0  # sağ üstte Menü butonu var
-		panel.offset_left = MANA_PLATE_LEFT
-		# Tablo mana levhasının üstünde biter (hamle butonları artık burada değil).
-		panel.offset_bottom = MANA_PLATE_TOP - 12.0
-	pass_button.offset_left = MANA_PLATE_LEFT
-	pass_button.offset_right = -16.0
-	pass_button.offset_top = PASS_TOP
-	pass_button.offset_bottom = PASS_TOP + BOTTOM_BUTTON_HEIGHT
-	# Panelin yüksekliği burada kesinleşti: kartlar bu yüksekliğe göre yeniden
-	# ölçülmeli, yoksa ilk karede hesaplanan boy taşıp kırpılıyordu.
-	if player_panel_list != null and not player_panel_list.get_children().is_empty():
-		_rebuild_player_panel()
+		_trash_panel.offset_left = -(8.0 + half - 4.0)
+		_trash_panel.offset_right = -8.0
+		_trash_panel.offset_top = row_top
+		_trash_panel.offset_bottom = row_top + row_height
+	pass_button.add_theme_font_size_override("font_size", 16)
+	pass_button.offset_left = -(width + 8.0)
+	pass_button.offset_right = -8.0
+	pass_button.offset_top = row_top + row_height + 8.0
+	pass_button.offset_bottom = -8.0
 
 ## KART BOZDURMA: istemediğin kartı buraya sürükle, bedelinin yarısı mana
 ## olarak geri gelir. Tıklanabilir bir buton değil, BIRAKMA HEDEFİ — bu yüzden
@@ -2404,8 +2583,8 @@ func _build_trash_button() -> void:
 	box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(box)
-	box.add_child(_trash_label("KART BOZDURMA", UiTheme.FS_TINY, UiTheme.TEXT_MUTED))
-	box.add_child(_trash_label("kartı sürükle · bedelin ½'si", UiTheme.FS_TINY, UiTheme.TEXT_DIM))
+	box.add_child(_trash_label("BOZDUR", UiTheme.FS_TINY, UiTheme.TEXT_MUTED))
+	box.add_child(_trash_label("kartı sürükle · ½", UiTheme.FS_TINY, UiTheme.TEXT_DIM))
 	add_child(_trash_panel)
 
 func _trash_label(text: String, size: int, color: Color) -> Label:
@@ -2474,7 +2653,7 @@ func _build_action_buttons() -> void:
 	# genişliğini büyütünce komşusunun üstüne biniyordu. Izgara bunu yapısal
 	# olarak önler.
 	_action_grid = GridContainer.new()
-	_action_grid.columns = 3
+	_action_grid.columns = 4
 	_action_grid.add_theme_constant_override("h_separation", ACTION_BUTTON_GAP)
 	_action_grid.add_theme_constant_override("v_separation", ACTION_BUTTON_GAP)
 	# Izgara panelin ÜSTÜNE oturur; altındaki boşluğu esnek bir ayraç doldurur.

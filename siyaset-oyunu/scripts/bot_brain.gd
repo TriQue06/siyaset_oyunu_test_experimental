@@ -126,12 +126,7 @@ static func _bloc_solidarity() -> bool:
 static func is_ally(bot: int, other: int) -> bool:
 	if other == -1:
 		return false
-	if PartyManager.same_party(bot, other):
-		return true
-	var mine := CardManager.party_of(bot)
-	var info: Dictionary = CardManager.siblings.get(mine, {})
-	return not info.is_empty() and int(info.get("other", -1)) == CardManager.party_of(other) \
-		and CardManager.round_number < int(info.get("until", 0))
+	return PartyManager.same_party(bot, other)
 
 static func _ideology(peer_id: int) -> Dictionary:
 	return PartyManager.data_of(peer_id).get("ideology", IdeologyAxes.default_values())
@@ -188,6 +183,11 @@ static func choose_action(bot: int) -> Dictionary:
 	# MECLİS KONUŞMASI zorunlu: her şeyden önce.
 	if CardManager.needs_speech(bot):
 		return choose_speech(bot)
+	# GÜÇLÜYKEN ERKEN KONGRE: iktidarını tazeler (zorunlu kongre zayıf anına
+	# denk gelmesin). İki seçimdir kongre yapmadıysa ve gücü yüksekse.
+	var pid := CardManager.party_of(bot)
+	if CardManager.can_hold_congress(bot) and CardManager.elections_since_congress(pid) >= 2 			and CardManager.congress_strength(pid) >= 72.0:
+		return {"type": "congress"}
 	var candidates: Array = []
 	var best := _choose_action_best(bot, candidates)
 	var miss := 1.0 - skill(bot)

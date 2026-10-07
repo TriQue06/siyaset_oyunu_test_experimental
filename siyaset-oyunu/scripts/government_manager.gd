@@ -177,12 +177,7 @@ const LEADER_VOTE_SHARE := 2.0 / 3.0
 
 ## Bir oyuncunun (oy verenin) oylamada temsil ettiği vekil sayısı.
 func vote_weight(voter: int) -> int:
-	var pid := PartyManager.party_of(voter)
-	var seats := seats_of(pid)
-	if PartyManager.member_count(pid) < 2:
-		return seats
-	var leader_part := int(round(seats * LEADER_VOTE_SHARE))
-	return leader_part if voter == pid else seats - leader_part
+	return seats_of(voter) if PartyManager.is_leader(voter) else 0
 
 func attempts_left() -> int:
 	return maxi(0, MAX_ATTEMPTS - attempts_used)
@@ -214,9 +209,9 @@ func seated_party_ids() -> Array:
 ## partide genel başkan ve yardımcı ayrı ayrı oy verir, bkz. vote_weight).
 func voter_ids() -> Array:
 	var ids: Array = []
+	# Oy veren GENEL BAŞKANLARDIR (partinin bütün vekillerini yönetir); üye oy vermez.
 	for pid in seated_party_ids():
-		for member in PartyManager.members_of(pid):
-			ids.append(int(member))
+		ids.append(int(pid))
 	return ids
 
 ## Hükümette en az bir görevi olan partiler.
@@ -232,12 +227,7 @@ func proposal_partner_ids() -> Array:
 ## Koalisyon görüşmesinde oy verenler: ortak partilerin TÜM üyeleri (genel
 ## başkan ve yardımcı). İki kişilik partide ortaklık iki üyenin de onayını ister.
 func _partner_member_ids() -> Array:
-	var ids: Array = []
-	for partner in proposal_partner_ids():
-		for member in PartyManager.members_of(PartyManager.party_of(int(partner))):
-			if not ids.has(int(member)):
-				ids.append(int(member))
-	return ids
+	return proposal_partner_ids()
 
 ## Hükümet teklifi koalisyon görüşmesi (1. aşama) aşamasında mı?
 func is_coalition_stage() -> bool:
@@ -386,15 +376,11 @@ func award_formation_scores() -> void:
 
 ## Partiye yazılan puan (hükümet makamları, ceza) üyelerine bölünür: genel
 ## başkan yuvarlamada artanı alır.
+## Parti puanı SİYASETÇİLERE yazılır: partideki herkes (başkan ve üye) aynı
+## miktarı alır.
 func add_party_score(pid: int, points: int) -> void:
-	var members: Array = PartyManager.members_of(PartyManager.party_of(pid))
-	if members.is_empty():
-		return
-	var share := points / members.size()
-	var rest := points - share * members.size()
-	for i in members.size():
-		var member := int(members[i])
-		scores[member] = score_of(member) + share + (rest if i == 0 else 0)
+	for member in PartyManager.members_of(PartyManager.party_of(pid)):
+		scores[int(member)] = score_of(int(member)) + points
 
 func _build_mandate_order() -> void:
 	# Bağımsızlar (tek sandalye) hükümet kuramaz.

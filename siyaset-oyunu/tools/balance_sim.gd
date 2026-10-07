@@ -33,7 +33,6 @@ func _initialize() -> void:
 	pm = root.get_node("PartyManager")
 	cm = root.get_node("CardManager")
 	cm.allow_temporary_parties = false
-	cm.allow_bot_alliances = false
 	gm = root.get_node("GovernmentManager")
 	brain = load("res://scripts/bot_brain.gd")
 	bm = root.get_node("BotManager")

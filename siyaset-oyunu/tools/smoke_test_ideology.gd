@@ -44,7 +44,6 @@ func _initialize() -> void:
 	pm = root.get_node("PartyManager")
 	cm = root.get_node("CardManager")
 	cm.allow_temporary_parties = false
-	cm.allow_bot_alliances = false
 	cm.speech_required = false  # meclis konuşması ayrıca test edilir
 	gm = root.get_node("GovernmentManager")
 	game_map = root.get_node("GameMap")

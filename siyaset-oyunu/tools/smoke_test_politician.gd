@@ -19,7 +19,6 @@ func _initialize() -> void:
 	var mm = root.get_node("MultiplayerManager")
 	var cm = root.get_node("CardManager")
 	cm.allow_temporary_parties = false
-	cm.allow_bot_alliances = false
 	var pm = root.get_node("PartyManager")
 	var gmap = root.get_node("GameMap")
 	root.get_node("BotManager").set_process(false)

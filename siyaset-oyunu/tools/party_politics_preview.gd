@@ -21,7 +21,6 @@ func _initialize() -> void:
 	var bm = root.get_node("BotManager")
 	bm.set_process(false)
 	cm.allow_temporary_parties = false
-	cm.allow_bot_alliances = false
 	mm.start_offline("Barış")
 	for i in 7:
 		mm.add_bot()
@@ -34,19 +33,13 @@ func _initialize() -> void:
 	gm._set_phase(gm.Phase.IDLE)
 	var me: int = mm.owner_id
 	var bots: Array = mm.bot_ids()
-	# Bot 0 benim partime katılsın (birleşme).
-	pm.parties[bots[0]]["ideology"] = pm.parties[me]["ideology"].duplicate()
-	cm.current_turn_index = cm.turn_order.find(me)
-	cm.send_offer(int(bots[0]), "invite")
 	# Bot 1 partisini feshetsin (bağımsız kalır).
 	cm.current_turn_index = cm.turn_order.find(int(bots[1]))
 	cm._apply_dissolve(int(bots[1]))
-	# Bot 2'den bana bir başvuru (birleşme önerisi) gelmiş olsun.
-	cm.offers.append({"id": 99, "from": int(bots[2]), "to": int(bots[3]), "kind": "apply"})
 	cm.current_turn_index = cm.turn_order.find(me)
 	cm.mana[me] = 9.0
 	cm._push_state({"type": "timer"})
-	print("parti: %s, yardımcı %d, bağımsız %s" % [pm.parties[me]["name"], pm.deputy_of(me), str(pm.is_independent(int(bots[1])))])
+	print("parti: %s, bağımsız %s" % [pm.parties[me]["name"], str(pm.is_independent(int(bots[1])))])
 
 	var scene: Node = (load("res://scenes/GameScreen.tscn") as PackedScene).instantiate()
 	root.add_child(scene)
@@ -72,11 +65,28 @@ func _initialize() -> void:
 	await _frames(10)
 	_shot("party_politics_province_dock")
 	scene._province_panel.hide()
-	# Gelen teklif şeridi (bana gelsin).
-	cm.offers.append({"id": 100, "from": int(bots[1]), "to": me, "kind": "apply"})
-	scene._refresh_offer_bar()
-	await _frames(5)
-	_shot("party_politics_offer")
+	# Kongre gecesi (benim partim, zayıf: dört aday, iki tur).
+	cm._congress_info(me)["share"] = float(cm.last_vote_shares.get(me, 0.0)) + 6.0
+	cm.turmoil[me] = 4.0
+	var shown := false
+	for attempt in 20:
+		var result: Dictionary = cm._compute_congress(me, "mandatory")
+		if (result["candidates"] as Array).size() == 4 and not (result["round2"] as Array).is_empty():
+			result["duration"] = 3.0
+			scene._on_congress_started(result)
+			shown = true
+			break
+	if shown:
+		var show_node: Node = scene.get_child(scene.get_child_count() - 1)
+		show_node._t = 0.8
+		await _frames(3)
+		_shot("party_politics_congress_round1")
+		show_node._t = 1.9
+		await _frames(3)
+		_shot("party_politics_congress_round2")
+		show_node._t = 2.6
+		await _frames(3)
+		_shot("party_politics_congress_result")
 	# Parti kurma penceresi.
 	var dialog: Control = load("res://scripts/found_party_dialog.gd").new()
 	scene.add_child(dialog)

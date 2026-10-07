@@ -1,7 +1,7 @@
 extends SceneTree
-## PARTİ SİYASETİ TESTİ: birleşme / katılma, iki kişilik partinin kuralları
-## (mana bölme, ortak yasa hakkı, 2/3-1/3 oy), kongre, ayrılıp parti kurma,
-## fesih, bağımsız siyasetçi ve bağımsızdan parti kurma.
+## PARTİ SİYASETİ TESTİ: tek liderli partiler, KONGRE (zorunlu / isteğe bağlı /
+## üyenin talebi; başkanlığı kaybetme ve geri dönme), üyenin kısıtları, fesih,
+## bağımsız siyasetçi (miting güvenilirliği) ve bağımsızdan parti kurma.
 ##   godot --headless --path . --script res://tools/smoke_test_party_politics.gd
 
 var _failed := 0
@@ -27,6 +27,9 @@ func total_seats() -> int:
 		t += int(cm.last_seats[k])
 	return t
 
+func check_quiet(_result: Dictionary) -> void:
+	pass
+
 func free_color(except_peer: int) -> Color:
 	for color in load("res://scripts/party_presets.gd").COLORS:
 		if not color.is_equal_approx(Color.WHITE) and pm.color_owner(color, except_peer) == -1:
@@ -40,7 +43,6 @@ func _initialize() -> void:
 	mm = root.get_node("MultiplayerManager")
 	cm = root.get_node("CardManager")
 	cm.allow_temporary_parties = false
-	cm.allow_bot_alliances = false
 	gm = root.get_node("GovernmentManager")
 	pm = root.get_node("PartyManager")
 	root.get_node("BotManager").set_process(false)
@@ -99,99 +101,118 @@ func _initialize() -> void:
 	cm.current_turn_index = cm.turn_order.find(me)
 	gm._set_phase(gm.Phase.IDLE)
 
-	print("=== BÖLÜNEN KANAT ===")
-	# Ana parti bölünen kanadını davet ederse kanat yardımcı olmaz, geri döner.
-	var parent_party: int = b3
-	cm.last_seats[parent_party] = maxi(20, int(cm.last_seats.get(parent_party, 0)))
-	cm._split_party(parent_party)
-	var splinter: int = cm.splinter_of(parent_party)
-	check("bölünme oldu", splinter != -1)
-	check("başka parti bölünen kanadı davet edemez", not cm.is_valid_offer(me, splinter, "invite"))
-	check("ana parti geri çağırabilir", cm.is_valid_offer(parent_party, splinter, "invite"))
-	cm.current_turn_index = cm.turn_order.find(parent_party)
-	cm._apply_send_offer(parent_party, splinter, "invite")
-	check("kanat ana partiye geri döndü (yardımcı olmadı)", not cm.turn_order.has(splinter) and pm.deputy_of(parent_party) == -1
-		and not cm.splinters.has(splinter))
-	cm.current_turn_index = cm.turn_order.find(me)
+	print("=== TEK LİDER ===")
+	check("oy veren sadece genel başkanlar", gm.voter_ids().size() == cm.party_ids().size())
+	check("oy ağırlığı partinin bütün vekilleri", gm.vote_weight(me) == int(cm.last_seats.get(me, 0)))
+	check("gelir bölünmez", is_equal_approx(cm.turn_income(me), float(GameRules.MANA_PER_ROUND)) or cm.is_government_party(me))
 
-	print("=== BİRLEŞME ===")
-	pm.parties[b1]["ideology"] = pm.parties[me]["ideology"].duplicate()
-	give_turn(me)
-	var me_seats := int(cm.last_seats.get(me, 0))
-	var b1_seats := int(cm.last_seats.get(b1, 0))
-	cm.send_offer(b1, "invite")
-	check("bot daveti kabul etti, parti birleşti", pm.deputy_of(me) == b1 and not pm.parties.has(b1),
-		str(pm.parties.get(me, {}).get("deputy", -1)))
-	check("vekiller ev sahibine geçti", int(cm.last_seats.get(me, 0)) == me_seats + b1_seats and total_seats() == seats_before,
-		"%d + %d -> %d" % [me_seats, b1_seats, int(cm.last_seats.get(me, 0))])
-	check("yardımcı genel başkanın hemen ardından oynar", cm.turn_order.find(b1) == cm.turn_order.find(me) + 1, str(cm.turn_order))
-	check("party_of yardımcıyı partiye bağlar", cm.party_of(b1) == me and pm.data_of(b1)["name"] == "Yeni Yol")
-	var base := float(GameRules.MANA_PER_ROUND_GOVERNMENT if cm.is_government_party(me) else GameRules.MANA_PER_ROUND)
-	check("mana: genel başkan yarı+1, yardımcı yarı+0,5", is_equal_approx(cm.turn_income(me), base * 0.5 + 1.0)
-		and is_equal_approx(cm.turn_income(b1), base * 0.5 + 0.5), "%s / %s" % [cm.turn_income(me), cm.turn_income(b1)])
-	check("birleşme başlangıç katkısı", cm.contributions.has(me) and cm.contributions.has(b1))
-	check("iki üye de oy verir", gm.voter_ids().has(me) and gm.voter_ids().has(b1))
-	check("oy 2/3 - 1/3 bölünür", gm.vote_weight(me) + gm.vote_weight(b1) == gm.seats_of(me) and gm.vote_weight(me) > gm.vote_weight(b1),
-		"%d / %d" % [gm.vote_weight(me), gm.vote_weight(b1)])
-	cm.law_rounds[me] = cm.round_number
-	check("yasa hakkı ortak", cm.has_proposed_law_this_round(b1))
-	cm.law_rounds.erase(me)
-	cm.speech_rounds[me] = cm.round_number
-	give_turn(b1)
-	cm._grant_turn_income()
-	check("grup toplantısı ortak", not cm.needs_speech(b1))
+	print("=== KONGRE GÜCÜ ===")
+	cm._congress_info(me)["share"] = float(cm.last_vote_shares.get(me, 0.0))
+	var base_strength: float = cm.congress_strength(me)
+	cm._congress_info(me)["share"] = float(cm.last_vote_shares.get(me, 0.0)) + 6.0
+	check("oy kaybı gücü düşürür", cm.congress_strength(me) < base_strength - 20.0, "%.1f -> %.1f" % [base_strength, cm.congress_strength(me)])
+	cm._congress_info(me)["share"] = float(cm.last_vote_shares.get(me, 0.0)) - 6.0
+	check("oy artışı gücü artırır", cm.congress_strength(me) > base_strength + 15.0)
+	cm._congress_info(me)["share"] = float(cm.last_vote_shares.get(me, 0.0))
+	var strong: Dictionary = {}
+	cm._congress_info(me)["share"] = float(cm.last_vote_shares.get(me, 0.0)) - 10.0
+	for attempt in 10:
+		strong = cm._compute_congress(me, "voluntary")
+		check_quiet(strong)
+	check("güçlü başkana en fazla 1 rakip", (strong["candidates"] as Array).size() <= 2, str((strong["candidates"] as Array).size()))
+	cm._congress_info(me)["share"] = float(cm.last_vote_shares.get(me, 0.0)) + 15.0
+	var weak: Dictionary = cm._compute_congress(me, "voluntary")
+	check("zayıf başkana 3 rakip (en fazla 4 aday)", (weak["candidates"] as Array).size() == 4)
+	var total_delegates := 0
+	for d in weak["round1"]:
+		total_delegates += int(d)
+	check("1. turda bütün delegeler", total_delegates == cm.CONGRESS_DELEGATES, str(total_delegates))
+	if not (weak["round2"] as Array).is_empty():
+		check("2. tur iki aday ve bütün delegeler", int(weak["round2"][2]) + int(weak["round2"][3]) == cm.CONGRESS_DELEGATES)
 
-	print("=== KONGRE ===")
-	cm.mana[b1] = 20.0
-	cm.turmoil[me] = 10.0  # kriz: rakip neredeyse kesin kazanır
-	var swapped := false
-	for attempt in 6:
-		var leader: int = pm.party_of(b1)
-		give_turn(b1)
-		cm.round_number += 1
-		cm.mana[b1] = 20.0
-		cm._apply_congress(b1)
-		if pm.party_of(b1) == b1:
-			swapped = true
+	print("=== ZORUNLU KONGRE ===")
+	cm._congress_info(b1)["elections"] = cm.CONGRESS_MAX_ELECTIONS
+	cm.current_turn_index = (cm.turn_order.find(b1) - 1 + cm.turn_order.size()) % cm.turn_order.size()
+	gm._set_phase(gm.Phase.IDLE)
+	cm._advance_turn()
+	check("3 seçimdir kongre yoksa sıra gelince kongre başlar", cm.congress_active and cm.elections_since_congress(cm.party_of(b1)) == 0)
+	check("kongre sürerken tur akışı durur", cm.is_turn_blocked())
+	cm.tick(cm.congress_duration(false) + 0.5)
+	check("gösteri bitince tur akışı devam eder", not cm.congress_active)
+
+	print("=== BAŞKANLIĞI KAYBETMEK ===")
+	var lost := false
+	for attempt in 20:
+		give_turn(me)
+		cm.mana[me] = 10.0
+		cm._congress_info(me)["elections"] = 1
+		cm._congress_info(me)["share"] = float(cm.last_vote_shares.get(me, 0.0)) + 20.0
+		cm.turmoil[me] = 10.0
+		cm.request_congress()
+		cm.tick(30.0)
+		if pm.is_deputy(me):
+			lost = true
 			break
-		cm.turmoil[pm.party_of(b1)] = 10.0
-	check("kongrede yardımcı genel başkan oldu", swapped and pm.deputy_of(b1) == me, str(pm.parties.keys()))
-	check("parti verisi yeni anahtara taşındı", int(cm.last_seats.get(b1, 0)) == me_seats + b1_seats and not cm.last_seats.has(me))
-
-	print("=== AYRILIP PARTİ KURMA ===")
-	# Şimdi me yardımcı (b1 genel başkan). me ayrılıp parti kurar.
-	cm.organizations["px1"] = {b1: 2}
-	cm.organizations["px2"] = {b1: 1}
-	cm.organizations["px3"] = {b1: 1}
+	check("zayıf başkan kongreyi kaybetti, partide üye kaldı", lost)
+	var new_leader: int = cm.party_of(me)
+	check("partinin yeni bot başkanı sırada", new_leader != me and mm.is_bot(new_leader) and cm.turn_order.has(new_leader))
 	give_turn(me)
 	cm.mana[me] = 10.0
-	var seats_party_before := int(cm.last_seats.get(b1, 0))
-	var total_before_split := total_seats()
-	cm.found_party({"name": "Hür Yol", "icon_index": 2, "bg_color": free_color(me)})
-	check("ayrılan pay oranında vekil götürdü", int(cm.last_seats.get(me, 0)) > 0
-		and int(cm.last_seats.get(me, 0)) < seats_party_before and total_seats() == total_before_split,
-		"%d / %d" % [int(cm.last_seats.get(me, 0)), seats_party_before])
-	check("ayrılan yeni parti kurdu", pm.is_leader(me) and pm.parties[me]["name"] == "Hür Yol" and pm.deputy_of(b1) == -1,
-		str(pm.parties.get(me, {})))
-	check("ayrılma 2 mana", is_equal_approx(cm.mana_of(me), 8.0), str(cm.mana_of(me)))
-	var my_orgs := 0
+	var some_province: String = String(root.get_node("GameMap").province_ids()[0])
+	check("üye yasa sunamaz", not cm.can_propose_law(me))
+	check("üye teşkilat kuramaz", not cm.can_build_organization(me, some_province))
+	check("üye kart oynayamaz", not cm.can_play_card(me, "populizm"))
+	check("üye konuşmak zorunda değil", not cm.needs_speech(me))
+	check("üye oy vermez", not gm.voter_ids().has(me) and gm.vote_weight(me) == 0)
+	var org_province := ""
 	for province_id in cm.organizations.keys():
-		if int(cm.organizations[province_id].get(me, 0)) > 0:
-			my_orgs += 1
-	check("teşkilatların bir kısmı ayrılanla gitti", my_orgs >= 1, str(my_orgs))
+		if int(cm.organizations[province_id].get(new_leader, 0)) > 0:
+			org_province = String(province_id)
+	if org_province != "":
+		var cred_before: float = cm.credibility_of(me)
+		cm.credibility[me] = 50.0
+		cm.miting(org_province)
+		check("üye miting yapar, güvenilirliği artar", cm.credibility_of(me) > 50.0)
+		cm.credibility[me] = cred_before
+	var score_me: int = gm.score_of(me)
+	var score_leader: int = gm.score_of(new_leader)
+	gm.add_party_score(new_leader, 4)
+	check("parti puanı başkana da üyeye de aynı yazılır", gm.score_of(me) == score_me + 4 and gm.score_of(new_leader) == score_leader + 4)
 
-	print("=== GENEL BAŞKAN AYRILIR ===")
-	# b1 (genel başkan) b3'ü davet eder; sonra genel başkan ayrılır, parti b3'e kalır.
-	pm.parties[b3]["ideology"] = pm.parties[b1]["ideology"].duplicate()
-	give_turn(b1)
-	cm._apply_send_offer(b1, b3, "invite")
-	check("üçüncü birleşme", pm.deputy_of(b1) == b3)
-	var party_name_before: String = pm.parties[b1]["name"]
-	give_turn(b1)
-	cm.mana[b1] = 10.0
-	cm._apply_found(b1, {"name": "Öz Yol", "icon_index": 6, "bg_color": free_color(b1)})
-	check("genel başkan ayrıldı, parti yardımcıya kaldı", pm.is_leader(b3) and pm.parties[b3]["name"] == party_name_before
-		and pm.parties.has(b1) and pm.parties[b1]["name"] == "Öz Yol")
+	print("=== ÜYENİN KONGRE TALEBİ ===")
+	cm._congress_info(new_leader)["elections"] = 0
+	check("seçim olmadan kongre istenemez", not cm.can_request_congress(me))
+	cm._congress_info(new_leader)["elections"] = 1
+	cm.last_vote_shares[new_leader] = float(cm.party_congress[new_leader]["member_share"]) + 2.0
+	check("bot başkan oyu artırdıysa kongre istenemez", not cm.can_request_congress(me) and cm.congress_block_reason(me) != "")
+	var back := false
+	for attempt in 30:
+		var leader_now: int = cm.party_of(me)
+		if not pm.is_deputy(me):
+			back = true
+			break
+		cm._congress_info(leader_now)["elections"] = 1
+		cm.last_vote_shares[leader_now] = float(cm.party_congress[leader_now]["member_share"]) - 8.0
+		give_turn(me)
+		cm.mana[me] = 10.0
+		cm.request_congress()
+		cm.tick(30.0)
+	check("oy düşünce üye kongreyi kazanıp başkanlığa döndü", back or not pm.is_deputy(me))
+	check("eski bot başkan siyasetten çekildi", not cm.turn_order.has(new_leader) or cm.party_of(new_leader) != cm.party_of(me))
+
+	print("=== BOT BAŞKAN DEĞİŞİR ===")
+	var bot_name: String = PP.display_name(b2)
+	var changed := false
+	for attempt in 20:
+		cm._congress_info(b2)["share"] = float(cm.last_vote_shares.get(b2, 0.0)) + 20.0
+		cm.turmoil[b2] = 10.0
+		cm._run_congress(b2, "mandatory")
+		cm.tick(30.0)
+		if PP.display_name(b2) != bot_name:
+			changed = true
+			break
+	check("zayıf bot başkan kongrede değişti (aynı parti, yeni siyasetçi)", changed and pm.is_leader(b2))
+	give_turn(me)
 
 	print("=== FESİH VE BAĞIMSIZLIK ===")
 	cm.last_seats[me] = 10
@@ -223,75 +244,25 @@ func _initialize() -> void:
 
 	print("=== BAĞIMSIZDAN PARTİ ===")
 	give_turn(me)
+	cm.credibility[me] = 60.0
+	var p1: String = String(root.get_node("GameMap").province_ids()[3])
+	var p2: String = String(root.get_node("GameMap").province_ids()[4])
+	cm.local_support[p1] = {me: 5.0}
+	cm.local_support[p2] = {me: 3.0}
+	cm.mana[me] = 9.0
+	cm.miting(p1)
+	check("bağımsız mitingi güvenilirlik kazandırır", cm.credibility_of(me) > 60.0)
+	give_turn(me)
 	cm.mana[me] = 9.0
 	cm.found_party({"name": "Doğru Yol", "icon_index": 4, "bg_color": free_color(me)})
 	check("bağımsız parti kurdu (8 mana)", not pm.is_independent(me) and pm.parties[me]["name"] == "Doğru Yol"
 		and is_equal_approx(cm.mana_of(me), 1.0), str(cm.mana_of(me)))
+	var opened := 0
+	for province_id in cm.organizations.keys():
+		opened += int(cm.organizations[province_id].get(me, 0))
+	check("güvenilirliğe göre miting yaptığı illerde teşkilatla başladı", int(cm.organizations.get(p1, {}).get(me, 0)) == 1
+		and opened == mini(cm.FOUND_ORG_MAX, int(cm.credibility_of(me) / cm.FOUND_ORG_PER_CREDIBILITY)), str(opened))
 	check("bağımsız sandalyesi partiye geçti", int(cm.last_seats.get(me, 0)) == 1)
-
-	print("=== YARDIMCI OYUNDAN AYRILIR ===")
-	pm.parties[b2]["ideology"] = pm.parties[me]["ideology"].duplicate()
-	give_turn(me)
-	cm.send_offer(b2, "invite")
-	check("ikinci birleşme", pm.deputy_of(me) == b2)
-	mm.players.erase(b2)
-	cm.remove_player(b2)
-	check("yardımcı gidince parti kalır", pm.is_leader(me) and pm.deputy_of(me) == -1 and not cm.turn_order.has(b2))
-
-	print("=== BOT İTTİFAKLARI ===")
-	mm.add_bot()
-	mm.add_bot()
-	var BB = load("res://scripts/bot_brain.gd")
-	cm.allow_bot_alliances = true
-	# İki tek kişilik, aynı görüşte, zayıf bot.
-	var pair: Array = []
-	for peer in cm.party_ids():
-		if cm._is_plain_bot_party(int(peer)) and pm.member_count(int(peer)) == 1 and not cm.is_government_party(int(peer)):
-			pair.append(int(peer))
-	pair = pair.slice(0, 2)
-	var merged := false
-	if pair.size() == 2:
-		pm.parties[pair[1]]["ideology"] = pm.parties[pair[0]]["ideology"].duplicate()
-		cm.passed_threshold.erase(pair[1])
-		for attempt in 40:
-			cm._bot_alliances()
-			if pm.deputy_of(pair[0]) == pair[1] or pm.deputy_of(pair[1]) == pair[0]:
-				merged = true
-				break
-	check("zayıf ve yakın iki bot birleşti", merged, str(pair))
-	if merged:
-		var host: int = pm.party_of(pair[0])
-		var deputy: int = pm.deputy_of(host)
-		check("birleşen botlar birbirine dost", BB.is_ally(host, deputy))
-		pm.parties[host]["merged_elections"] = cm.BOT_MERGE_ELECTIONS
-		cm._bot_alliances()
-		check("birlikte büyüyen botlar ayrıldı", pm.deputy_of(host) == -1 and pm.is_leader(deputy))
-		check("ayrılan botlar kardeş parti", BB.is_ally(host, deputy) and not BB.is_ally(host, me))
-	# İnsanın bot yardımcısı çıkarına bakarak ayrılır.
-	var helper := -1
-	for peer in cm.party_ids():
-		if cm._is_plain_bot_party(int(peer)) and pm.member_count(int(peer)) == 1:
-			helper = int(peer)
-			break
-	if helper != -1 and pm.deputy_of(me) == -1:
-		cm._join_party(me, helper)
-		check("bot insanın yardımcısı oldu", pm.deputy_of(me) == helper)
-		var calm: Array = cm.bot_deputy_leave_chance(me, 100)
-		cm.passed_threshold.erase(me)
-		pm.parties[me]["seats_before"] = int(cm.last_seats.get(me, 0)) + 5
-		cm.contributions[helper] = 100.0
-		var hot: Array = cm.bot_deputy_leave_chance(me, 100)
-		check("kötü gidişte ayrılma ihtimali artar", float(hot[0]) > float(calm[0]) and (hot[1] as Array).size() >= 3, str(hot))
-		var left := false
-		for attempt in 30:
-			cm.passed_threshold.erase(me)
-			pm.parties[me]["seats_before"] = int(cm.last_seats.get(me, 0)) + 5
-			cm._bot_deputies_consider_leaving(100)
-			if pm.deputy_of(me) != helper:
-				left = true
-				break
-		check("bot yardımcı ayrılıp parti kurdu", left and pm.is_leader(helper) and not pm.is_independent(helper))
-	cm.allow_bot_alliances = false
 
 	print("=== GEÇİCİ PARTİLER ===")
 	cm.allow_temporary_parties = true

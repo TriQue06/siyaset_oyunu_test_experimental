@@ -246,6 +246,8 @@ var _invest_button: Button
 var _censure_button: Button
 var _early_button: Button
 var _pending_early: bool = false
+var _congress_button: Button
+var _pending_congress: bool = false
 ## Yatırım hamlesi için il seçme modu.
 var _pending_invest: bool = false
 ## Gensoru: ilk dokunuş onay ister, ikincisi verir.
@@ -306,6 +308,7 @@ func _ready() -> void:
 	CardManager.inventories_updated.connect(_rebuild_hand)
 	CardManager.card_drawn.connect(_on_card_drawn)
 	CardManager.card_played.connect(_on_card_played)
+	CardManager.congress_started.connect(_on_congress_started)
 	CardManager.event_logged.connect(_pulse_logged_province)
 	CardManager.election_completed.connect(_on_election_completed)
 	CardManager.round_advanced.connect(_on_round_advanced)
@@ -344,7 +347,6 @@ func _ready() -> void:
 	_build_target_hint()
 	_build_card_info()
 	_build_action_buttons()
-	_build_offer_bar()
 	_build_trash_button()
 	_build_player_tabs()
 	# Çöp kutusu destenin yanına otursun (yerleşim butonlar kurulduktan sonra).
@@ -585,6 +587,12 @@ func _focus_log_entry(entry: Dictionary) -> void:
 	_focus_tween.chain().tween_interval(FOCUS_HOLD)
 	_focus_tween.chain().tween_property(map_holder, "scale", Vector2(base_scale, base_scale), FOCUS_MOVE)
 	_focus_tween.parallel().tween_property(map_holder, "position", Vector2.ZERO, FOCUS_MOVE)
+
+## KONGRE GECESİ: herkesin ekranında, seçim gecesi tarzında.
+func _on_congress_started(data: Dictionary) -> void:
+	var congress_view: Control = preload("res://scripts/congress_show.gd").new()
+	congress_view.data = data
+	add_child(congress_view)
 
 ## Haritada bir hamle olunca (ili olan her log kaydı) ilin üstünde, log
 ## kaydına dokununca oynayan animasyonun YAKINLAŞTIRMASIZ hâli oynar.
@@ -968,7 +976,7 @@ func _build_plaque(pid: int, width: float) -> Control:
 		line.add_theme_constant_override("separation", 3)
 		line.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		box.add_child(line)
-		var role_text := "" if independent else ("GB " if i == 0 else "YRD ")
+		var role_text := "" if independent else ("GB " if i == 0 else "ÜYE ")
 		var person := role_text + PoliticianPresets.display_name(member)
 		var vote_tag: Label = null
 		if GovernmentManager.is_voting() and GovernmentManager.eligible_voter_ids().has(member):
@@ -1621,7 +1629,8 @@ func _cancel_targeting() -> void:
 		_pending_org = false
 		_layer_before_org = -1
 		_refresh_action_buttons()
-	if _pending_miting or _pending_invest or _pending_censure or _pending_early:
+	if _pending_miting or _pending_invest or _pending_censure or _pending_early or _pending_congress:
+		_pending_congress = false
 		_pending_miting = false
 		_pending_invest = false
 		_pending_censure = false
@@ -1740,71 +1749,7 @@ func _select_target_province(province_id: String) -> void:
 
 # --- Davet / başvuru şeridi ------------------------------------------------------
 
-var _offer_bar: PanelContainer
-var _offer_label: Label
-var _offer_id := -1
-
-## Bana gelen davet/başvuru: ekranın üst ortasında Kabul / Reddet şeridi.
-func _build_offer_bar() -> void:
-	var built := PopupKit.frame(520, UiTheme.GOLD)
-	_offer_bar = built[0]
-	_offer_bar.z_index = 90
-	_offer_bar.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	_offer_bar.position = Vector2(-260, 14)
-	_offer_bar.mouse_filter = Control.MOUSE_FILTER_STOP
-	add_child(_offer_bar)
-	var body: VBoxContainer = built[1]
-	_offer_label = PopupKit.note("", UiTheme.TEXT)
-	body.add_child(_offer_label)
-	var buttons := HBoxContainer.new()
-	buttons.alignment = BoxContainer.ALIGNMENT_END
-	buttons.add_theme_constant_override("separation", 8)
-	body.add_child(buttons)
-	var reject := Button.new()
-	reject.text = "Reddet"
-	reject.custom_minimum_size = Vector2(110, 34)
-	UiSkin.skin_color_button(reject, UiTheme.RED_DARK)
-	reject.pressed.connect(func(): _answer_offer(false))
-	buttons.add_child(reject)
-	var accept := Button.new()
-	accept.text = "Kabul Et"
-	accept.custom_minimum_size = Vector2(130, 34)
-	UiSkin.skin_color_button(accept, UiTheme.GREEN_DARK)
-	accept.pressed.connect(func(): _answer_offer(true))
-	buttons.add_child(accept)
-	_refresh_offer_bar()
-
-func _refresh_offer_bar() -> void:
-	if _offer_bar == null:
-		return
-	var offers := CardManager.offers_for(multiplayer.get_unique_id())
-	if offers.is_empty() or CardManager.game_finished:
-		_offer_bar.hide()
-		_offer_id = -1
-		return
-	var offer: Dictionary = offers[0]
-	_offer_id = int(offer["id"])
-	var from_peer := int(offer["from"])
-	var who := "%s (%s)" % [PoliticianPresets.display_name(from_peer),
-		"bağımsız" if PartyManager.is_independent(from_peer) else _party_name_of(from_peer)]
-	var me := multiplayer.get_unique_id()
-	if String(offer["kind"]) == "invite":
-		_offer_label.text = ("%s seni partisine davet ediyor. Kabul edersen genel başkan yardımcısı olursun%s." % [who,
-			"" if PartyManager.is_independent(me) else "; partin onun partisiyle BİRLEŞİR"])
-	else:
-		_offer_label.text = ("%s partine katılmak istiyor. Kabul edersen senin yardımcın olur%s." % [who,
-			"" if PartyManager.is_independent(from_peer) else "; iki parti BİRLEŞİR"])
-	_offer_label.text += "\nBirlikte iki kat hamle ve fazladan mana; iktidar puanı ikiye bölünür. Güçlenince ayrılıp iki parti olarak iktidarı paylaşabilirsiniz."
-	_offer_bar.show()
-
-func _answer_offer(accept: bool) -> void:
-	if _offer_id == -1:
-		return
-	CardManager.respond_offer(_offer_id, accept)
-	_offer_bar.hide()
-
 func _on_opinion_changed() -> void:
-	_refresh_offer_bar()
 	_refresh_score_panel()
 	_refresh_agenda_banner()
 	if _map_layer != MapLayer.SEATS:
@@ -2226,13 +2171,10 @@ func _on_party_action(kind: String, peer_id: int) -> void:
 			CardManager.dissolve_party()
 		"congress":
 			CardManager.request_congress()
-		"found", "leave":
-			var dialog := FoundPartyDialog.new()
-			dialog.leaving = kind == "leave"
-			add_child(dialog)
-		"invite", "apply":
-			CardManager.send_offer(peer_id, kind)
-			_show_toast("Teklifin %s'ye iletildi." % PoliticianPresets.display_name(peer_id))
+		"resign":
+			CardManager.resign_from_party()
+		"found":
+			add_child(FoundPartyDialog.new())
 
 func _hide_profile() -> void:
 	_profile_peer_id = -1
@@ -2679,6 +2621,10 @@ func _build_action_buttons() -> void:
 	_speech_button = _action_button("TOPLANTI", "bedelsiz", UiTheme.GOLD_DIM)
 	_speech_button.tooltip_text = "Meclis grup toplantısı: bir görüşü savun, partin yarım adım kayar. Bedelsiz, sırada bir kez."
 	_speech_button.pressed.connect(_on_speech_button_pressed)
+	# KONGRE: genel başkan kendi sırasında (en az bir seçim geçtiyse) kongreye
+	# gider; partide üye kalan eski başkan kongre ister.
+	_congress_button = _action_button("KONGRE", "%d/%d mana" % [CardManager.CONGRESS_COST, CardManager.CONGRESS_REQUEST_COST], UiTheme.PURPLE.darkened(0.3))
+	_congress_button.pressed.connect(_on_congress_button_pressed)
 
 ## Hamle butonu: ızgaraya eklenir, sabit kutu boyutunda kalır ve yazı taşarsa
 ## kırpılır — böylece hiçbir buton komşusunu itemez.
@@ -2699,6 +2645,8 @@ func _action_button(title: String, cost_text: String, color: Color) -> Button:
 ## Neden şu an bu hamle yapılamıyor? (Buton ipucu ve uyarı yazısı.)
 func _action_block_reason(cost: int, is_law: bool = false) -> String:
 	var me := multiplayer.get_unique_id()
+	if CardManager.is_party_member(me):
+		return "Partinin genel başkanı değilsin: sadece miting yapabilirsin (partine ve güvenilirliğine yazar)."
 	if is_law and CardManager.last_seats.is_empty():
 		return "İlk seçime kadar meclis yok: yasa yapılamaz."
 	if is_law and not CardManager.has_seats(me):
@@ -2726,6 +2674,7 @@ func _refresh_action_buttons() -> void:
 	_invest_button.modulate.a = 1.0 if CardManager.can_invest(me) or _pending_invest else 0.45
 	_censure_button.modulate.a = 1.0 if CardManager.can_censure(me) or _pending_censure else 0.45
 	_early_button.modulate.a = 1.0 if CardManager.can_early_election(me) or _pending_early else 0.45
+	_congress_button.modulate.a = 1.0 if CardManager.can_call_congress(me) or _pending_congress else 0.45
 	# disabled kullanılmıyor: pasif butona dokununca neden olmadığı uyarı olarak çıksın.
 	_law_button.modulate.a = 1.0 if law_ok else 0.45
 	_org_button.modulate.a = 1.0 if org_ok or _pending_org else 0.45
@@ -3145,6 +3094,34 @@ func _on_censure_button_pressed() -> void:
 	_set_target_hint("Gensoru: hükümeti düşürmek için meclis oylaması (%d mana). Reddedilirse ulusal destek kaybedersin. Onay: butona tekrar dokun" % GameRules.CENSURE_MANA_COST)
 
 ## Erken seçim hamlesi: ilk dokunuş onay ister, ikincisi önergeyi meclise getirir.
+## Kongre hamlesi: ilk dokunuş açıklama ve onay, ikincisi kongreyi başlatır.
+func _on_congress_button_pressed() -> void:
+	var me := multiplayer.get_unique_id()
+	if _pending_congress:
+		_pending_congress = false
+		_cancel_targeting()
+		if CardManager.can_call_congress(me):
+			CardManager.request_congress()
+		_refresh_action_buttons()
+		return
+	_deselect_hand_card()
+	_law_designer.hide()
+	_cancel_targeting()
+	if PartyManager.is_independent(me):
+		_show_toast("Bağımsızsın: kongre yok. Önce parti kur.")
+		return
+	if not CardManager.can_call_congress(me):
+		_show_toast(CardManager.congress_block_reason(me))
+		return
+	_pending_congress = true
+	_refresh_action_buttons()
+	var pid := CardManager.party_of(me)
+	if CardManager.is_party_member(me):
+		_set_target_hint("Kongre iste (%d mana): genel başkanlığa aday olursun; parti oy kaybettiği için şansın var. Onay: butona tekrar dokun" % CardManager.CONGRESS_REQUEST_COST)
+	else:
+		_set_target_hint("Kongreye git (%d mana): gücün %d/100, ne kadar güçlüysen o kadar az rakip çıkar. Onay: butona tekrar dokun" % [
+			CardManager.CONGRESS_COST, int(round(CardManager.congress_strength(pid)))])
+
 func _on_early_button_pressed() -> void:
 	var me := multiplayer.get_unique_id()
 	if _pending_early:

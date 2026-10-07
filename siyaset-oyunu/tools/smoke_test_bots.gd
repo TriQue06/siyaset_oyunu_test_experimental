@@ -23,7 +23,6 @@ func _initialize() -> void:
 	pm = root.get_node("PartyManager")
 	cm = root.get_node("CardManager")
 	cm.allow_temporary_parties = false
-	cm.allow_bot_alliances = false
 	cm.fixed_map_seed = 1950
 	gm = root.get_node("GovernmentManager")
 	# Test betiği autoload'lardan önce derlendiği için sınıf çalışma anında yüklenir.
@@ -59,6 +58,9 @@ func _initialize() -> void:
 	var last_bot := -1
 	while steps < 4000 and not cm.game_finished and cm.round_number <= 14:
 		steps += 1
+		if cm.congress_active:
+			cm.tick(30.0)  # kongre gösterisi: süre dolsun
+			continue
 		if gm.phase == gm.Phase.VOTING:
 			for bot in gm.eligible_voter_ids():
 				if not gm.has_voted(bot):

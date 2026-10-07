@@ -35,7 +35,7 @@ func _ready() -> void:
 	var built := PopupKit.frame(WIDTH, UiTheme.GOLD)
 	center.add_child(built[0])
 	var body: VBoxContainer = built[1]
-	var cost := CardManager.LEAVE_PARTY_COST if leaving else CardManager.FOUND_PARTY_COST
+	var cost := CardManager.FOUND_PARTY_COST
 	body.add_child(PopupKit.header("YENİ PARTİ KUR" if not leaving else "AYRIL VE PARTİ KUR",
 		"Bedel: %d mana · görüşün aynen devam eder" % cost, null, queue_free))
 	if leaving:
@@ -134,7 +134,7 @@ func _refresh() -> void:
 	var badge := PartyBadge.build({"bg_color": _color, "icon_index": _icon_index, "icon_color": Color.WHITE}, Vector2(64, 64), 128)
 	_preview.add_child(badge)
 	var me := multiplayer.get_unique_id()
-	var allowed := CardManager.can_leave_party(me) if leaving else CardManager.can_found_party(me)
+	var allowed := CardManager.can_found_party(me)
 	_found_button.disabled = not allowed or not PartyManager.is_valid_name(_name_edit.text.strip_edges()) or _color.a <= 0.0
 
 func _on_found() -> void:

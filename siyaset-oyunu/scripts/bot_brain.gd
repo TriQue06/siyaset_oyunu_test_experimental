@@ -40,6 +40,45 @@ const COALITION_MIN_POINTS := 2
 ## Hükümete alınmayan bot, azınlık hükümetine ancak bu mesafeden yakınsa güvenoyu verir.
 const MINORITY_TRUST_DISTANCE := 1.0
 
+# --- BOT BECERİSİ ---------------------------------------------------------------
+## Her bot farklı oynar: oyun başında bir BECERİ (0..1) alır.
+##   %25 zayıf (0,10–0,45): sık sık yanlış/kısmen yanlış hamle, il seçimi kötü,
+##   %50 orta (0,60–0,80), %25 usta (0,85–1,00): neredeyse kusursuz.
+## Beceri düşükse her seçeneğin puanına gürültü eklenir (yanlış il, yanlış
+## hamle sırası), ara sıra en iyi yerine rastgele geçerli bir hamle seçilir ya da
+## yapacak iş varken tur boşa geçirilir. Testler `skill_variance = false` ile kapatır.
+static var skill_variance := true
+static var _skills: Dictionary = {}
+const WEAK_BOT_CHANCE := 0.25
+const STRONG_BOT_CHANCE := 0.25
+const SKILL_NOISE := 1.6
+const SKILL_BLUNDER := 0.45
+const SKILL_IDLE := 0.5
+
+static func skill(bot: int) -> float:
+	if not skill_variance:
+		return 1.0
+	if not _skills.has(bot):
+		var roll := randf()
+		if roll < WEAK_BOT_CHANCE:
+			_skills[bot] = randf_range(0.1, 0.45)
+		elif roll < 1.0 - STRONG_BOT_CHANCE:
+			_skills[bot] = randf_range(0.6, 0.8)
+		else:
+			_skills[bot] = randf_range(0.85, 1.0)
+	return float(_skills[bot])
+
+## Yeni oyunda beceriler yeniden dağıtılır.
+static func reset_skills() -> void:
+	_skills.clear()
+
+## Beceriye göre puan gürültüsü (usta bot ~0).
+static func _jitter(bot: int, scale: float = 1.0) -> float:
+	var miss := 1.0 - skill(bot)
+	if miss <= 0.0:
+		return 0.0
+	return randf_range(-1.0, 1.0) * miss * SKILL_NOISE * scale
+
 # --- BOT BLOĞU ------------------------------------------------------------------
 ## Hükümeti bir İNSAN partisi kurduysa muhalefetteki botlar birleşir:
 ##   1. Hepsi vekil çalma kartlarını hükümetin ana partisine yöneltir; bloğun
@@ -149,6 +188,20 @@ static func choose_action(bot: int) -> Dictionary:
 	# MECLİS KONUŞMASI zorunlu: her şeyden önce.
 	if CardManager.needs_speech(bot):
 		return choose_speech(bot)
+	var candidates: Array = []
+	var best := _choose_action_best(bot, candidates)
+	var miss := 1.0 - skill(bot)
+	if miss > 0.0 and not candidates.is_empty():
+		# HATA: ara sıra en iyisi yerine rastgele geçerli bir hamle...
+		if randf() < miss * SKILL_BLUNDER:
+			return candidates[randi() % candidates.size()]
+		# ...ya da yapacak iş varken turu boşa geçirmek.
+		if String(best.get("type", "")) != "pass" and randf() < miss * SKILL_IDLE:
+			return {"type": "pass"}
+	return best
+
+## En iyi hamle (gürültülü puanlarla). Geçerli seçenekler candidates'e eklenir.
+static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 	var known := _known_centers(bot)
 	var best := {"type": "pass"}
 	var best_score := PASS_ACTION_SCORE
@@ -158,7 +211,8 @@ static func choose_action(bot: int) -> Dictionary:
 	var play := choose_play(bot)
 	if not play.is_empty():
 		var card: String = hand[int(play["index"])]
-		var card_score := float(play["score"]) - CardPresets.card_cost(card) * mana_value
+		var card_score := float(play["score"]) - CardPresets.card_cost(card) * mana_value + _jitter(bot)
+		candidates.append({"type": "card"})
 		if card_score > best_score:
 			best = {"type": "card"}
 			best_score = card_score
@@ -170,9 +224,12 @@ static func choose_action(bot: int) -> Dictionary:
 		if not rested:
 			law = {}
 		var law_cost: int = CardManager.law_mana_cost(bot, String(law.get("law", "")))
-		if not law.is_empty() and CardManager.can_propose_law(bot, String(law["law"])) and float(law["score"]) - law_cost * mana_value > best_score:
+		var law_noise := _jitter(bot)
+		if not law.is_empty() and CardManager.can_propose_law(bot, String(law["law"])):
+			candidates.append({"type": "law", "law": law["law"]})
+		if not law.is_empty() and CardManager.can_propose_law(bot, String(law["law"])) and float(law["score"]) - law_cost * mana_value + law_noise > best_score:
 			best = {"type": "law", "law": law["law"]}
-			best_score = float(law["score"]) - law_cost * mana_value
+			best_score = float(law["score"]) - law_cost * mana_value + law_noise
 
 	# Anayasa teklifi yasa hakkını kullanır; o yüzden yasayla yarışır.
 	var constitution := _best_constitution(bot)
@@ -182,15 +239,21 @@ static func choose_action(bot: int) -> Dictionary:
 
 	var org := _best_organization(bot, known)
 	var org_cost := GameRules.org_cost(CardManager.organization_level(String(org.get("province", "")), bot)) if not org.is_empty() else 0
-	if not org.is_empty() and float(org["score"]) - org_cost * mana_value > best_score:
+	var org_noise := _jitter(bot)
+	if not org.is_empty():
+		candidates.append({"type": "organization", "province": org["province"]})
+	if not org.is_empty() and float(org["score"]) - org_cost * mana_value + org_noise > best_score:
 		best = {"type": "organization", "province": org["province"]}
-		best_score = float(org["score"]) - org_cost * mana_value
+		best_score = float(org["score"]) - org_cost * mana_value + org_noise
 
 	if CardManager.can_invest(bot):
 		var invest := _eval_investment(bot, known)
-		if not invest.is_empty() and float(invest["score"]) - GameRules.INVEST_MANA_COST * mana_value > best_score:
+		var invest_noise := _jitter(bot)
+		if not invest.is_empty():
+			candidates.append({"type": "invest", "province": invest["province"]})
+		if not invest.is_empty() and float(invest["score"]) - GameRules.INVEST_MANA_COST * mana_value + invest_noise > best_score:
 			best = {"type": "invest", "province": invest["province"]}
-			best_score = float(invest["score"]) - GameRules.INVEST_MANA_COST * mana_value
+			best_score = float(invest["score"]) - GameRules.INVEST_MANA_COST * mana_value + invest_noise
 
 	if CardManager.can_censure(bot) and _censure_worth_it(bot):
 		# Geçeceği hesaplanan gensoru: hükümet düşer, yeni kurma turu başlar.
@@ -203,9 +266,12 @@ static func choose_action(bot: int) -> Dictionary:
 
 	if CardManager.can_miting(bot):
 		var miting := _eval_miting(bot, known)
-		if not miting.is_empty() and float(miting["score"]) - GameRules.MITING_MANA_COST * mana_value > best_score:
+		var miting_noise := _jitter(bot)
+		if not miting.is_empty():
+			candidates.append({"type": "miting", "province": miting["province"]})
+		if not miting.is_empty() and float(miting["score"]) - GameRules.MITING_MANA_COST * mana_value + miting_noise > best_score:
 			best = {"type": "miting", "province": miting["province"]}
-			best_score = float(miting["score"]) - GameRules.MITING_MANA_COST * mana_value
+			best_score = float(miting["score"]) - GameRules.MITING_MANA_COST * mana_value + miting_noise
 
 	return best
 
@@ -230,6 +296,7 @@ static func choose_speech(bot: int) -> Dictionary:
 				score -= 0.6
 			# Eşitlikte botlar hep aynı konuşmayı yapmasın.
 			score += float((absi(bot) + CardManager.round_number + axis.length() * (dir + 2)) % 7) * 0.01
+			score += _jitter(bot, 2.0)  # zayıf bot bazen yanlış yöne konuşur
 			if score > best_score:
 				best_score = score
 				best = {"type": "speech", "axis": axis, "dir": dir}
@@ -389,7 +456,7 @@ static func _best_organization(bot: int, known: Dictionary) -> Dictionary:
 		var value := float(seats[province_id]) * (0.5 + closeness) / 30.0 * gain / 1.2 * 0.8
 		if level == 0:
 			value += 0.25 + float(seats[province_id]) / 40.0
-		var score := 1.0 + value * (1.3 if _election_soon() else 1.0)
+		var score := 1.0 + value * (1.3 if _election_soon() else 1.0) + _jitter(bot, 0.5)
 		if best.is_empty() or score > float(best["score"]):
 			best = {"province": province_id, "score": score}
 	return best
@@ -408,6 +475,7 @@ static func choose_play(bot: int) -> Dictionary:
 		var option := _evaluate(bot, String(hand[i]), known)
 		if option.is_empty():
 			continue
+		option["score"] = float(option["score"]) + _jitter(bot, 0.6)
 		if float(option["score"]) > best_score:
 			best_score = float(option["score"])
 			best = option
@@ -510,6 +578,7 @@ static func _eval_miting(bot: int, known: Dictionary) -> Dictionary:
 		var diminish := 1.0 / (1.0 + maxf(0.0, CardManager.activity_of(province_id, bot)) / 2.0)
 		var value := (expected / PublicOpinion.MITING_LOCAL * seats / 30.0 * (0.5 + closeness) * diminish \
 			+ (1.0 - risk) * PublicOpinion.MITING_NATIONAL + risk * PublicOpinion.PROVOCATION_NATIONAL) * org_mult
+		value += _jitter(bot, 0.3)  # zayıf bot yanlış ilde miting yapar
 		if value > best_value:
 			best_value = value
 			best_province = province_id

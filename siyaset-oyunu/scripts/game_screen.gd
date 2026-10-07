@@ -185,6 +185,10 @@ var _player_tab_buttons: Array = []
 ## İl seçmeyi bekleyen kartın (miting/yatırım) el içindeki sırası (-1 = yok).
 var _pending_province_hand_index: int = -1
 var _province_panel: ProvincePanel
+## SOL PANEL DİNAMİK: il menüsü ve oyuncu profili, hükümet/log bölümünün
+## yerine sol panelde açılır; ✕ ile kapanınca hükümet ve log geri gelir.
+var _left_dock: Panel
+var _profile_scroll: ScrollContainer
 ## Hedef seçme modundayken üstte görünen yönerge ("... sağ tık: iptal").
 var _target_hint: Label
 ## Eldeki bir kartın üstüne gelince çıkan açıklama kutusu.
@@ -1484,17 +1488,23 @@ func _on_province_clicked(province_id: String) -> void:
 		else:
 			CardManager.play_card(hand_index, -1, province_id)
 		return
+	_ensure_left_dock()
 	if _province_panel == null:
 		_province_panel = ProvincePanel.new()
-		add_child(_province_panel)
+		_left_dock.add_child(_province_panel)
+		_province_panel.visibility_changed.connect(_update_left_dock)
 	elif _province_panel.visible and _province_panel.province_id == province_id:
 		_province_panel.hide()
 		return
-	_province_panel.position = Vector2(LEFT_PANEL_WIDTH + 12, 12)
+	_hide_profile()
+	ProvincePanel.panel_width = DOCK_CONTENT_WIDTH
+	_province_panel.position = Vector2.ZERO
+	_province_panel.scale = Vector2.ONE * _dock_scale()
 	_province_panel.show_province(province_id)
-	# HARİTA BÖLGESİNDEN AŞAĞI TAŞMASIN: aşağıda parlamento diyagramı var.
-	# Menü haritanın altındaki meclis alanının üstüne de uzayabilir (kart barına kadar).
-	_province_panel.clamp_to_height(_usable_height() - 24.0)
+	await get_tree().process_frame
+	if _province_panel.visible:
+		_province_panel.scale = Vector2.ONE * _dock_scale()
+		_province_panel.clamp_to_height(_left_dock.size.y / _dock_scale())
 
 ## Hedef seçme modunda dokunulan il: vurgulanır, üstte ne olacağı yazar.
 func _select_target_province(province_id: String) -> void:
@@ -2022,6 +2032,42 @@ func _hide_profile() -> void:
 	_profile_peer_id = -1
 	if hover_tooltip != null:
 		hover_tooltip.hide()
+	if _profile_scroll != null:
+		_profile_scroll.queue_free()
+		_profile_scroll = null
+	_update_left_dock()
+
+## Sol paneli kaplayan yuva (hükümet ve log bunun altında kalır).
+func _ensure_left_dock() -> void:
+	if _left_dock != null:
+		return
+	_left_dock = Panel.new()
+	_left_dock.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	_left_dock.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_left_dock.mouse_filter = Control.MOUSE_FILTER_STOP
+	_left_dock.clip_contents = true
+	_left_dock.hide()
+	# Sıra göstergesi ve oyun bilgisi yerinde kalır; sadece hükümet + log alanı.
+	government_vbox.get_parent().add_child(_left_dock)
+	government_vbox.get_parent().move_child(_left_dock, government_vbox.get_index())
+
+func _dock_width() -> float:
+	var parent := government_vbox.get_parent() as Control
+	return parent.size.x if parent.size.x > 0.0 else LEFT_PANEL_WIDTH - 28.0
+
+## Sol paneldeki kartların doğal genişliği; panele sığacak kadar ölçeklenir.
+const DOCK_CONTENT_WIDTH := 300.0
+func _dock_scale() -> float:
+	return minf(1.0, _dock_width() / DOCK_CONTENT_WIDTH)
+
+func _update_left_dock() -> void:
+	if _left_dock == null:
+		return
+	var showing := (_province_panel != null and _province_panel.visible) or _profile_scroll != null
+	_left_dock.visible = showing
+	for node in [government_vbox, _event_log, left_panel.get_node_or_null("LeftMargin/LeftVBox/Separator1")]:
+		if node != null:
+			node.visible = not showing
 
 ## Satırdaki metin alanının genişliği (şerit, rozet ve kenar payları hariç).
 func _row_text_width(badge_size: float) -> float:
@@ -2067,37 +2113,36 @@ func _avatar_label(text: String, font_size: int, color: Color) -> Label:
 
 ## Parti profili (bkz. PartyInfoCard): dokunulan oyuncu kartının soluna.
 func _show_tooltip_for(peer_id: int) -> void:
-	hover_tooltip_image.hide()
-	for child in hover_tooltip.get_children():
-		if child != hover_tooltip_image:
-			child.queue_free()
-	var card := PartyInfoCard.build(peer_id, multiplayer.get_unique_id(), _on_party_action)
-	card.modulate.a = 0.0
-	hover_tooltip.add_child(card)
-	hover_tooltip.show()
-	# Kapsayıcıların boyutu bir kare sonra kesinleşir; o zamana kadar görünmez.
+	_ensure_left_dock()
+	if _province_panel != null:
+		_province_panel.hide()
+	var keep_scroll := 0
+	if _profile_scroll != null:
+		keep_scroll = _profile_scroll.scroll_vertical
+		_profile_scroll.queue_free()
+	_profile_scroll = ScrollContainer.new()
+	_profile_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_left_dock.add_child(_profile_scroll)
+	_fit_profile_scroll()
+	var card := PartyInfoCard.build(peer_id, multiplayer.get_unique_id(), _on_party_action,
+		DOCK_CONTENT_WIDTH, _hide_profile)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_profile_scroll.add_child(card)
+	_update_left_dock()
 	await get_tree().process_frame
-	if _profile_peer_id != peer_id or not is_instance_valid(card):
-		return
-	card.reset_size()
-	hover_tooltip.size = card.size
-	card.modulate.a = 1.0
+	if is_instance_valid(_profile_scroll):
+		_fit_profile_scroll()
+		_profile_scroll.scroll_vertical = keep_scroll
 
-	# Profili, dokunulan kartın hemen soluna yerleştir.
-	var avatar := _find_avatar_node(peer_id)
-	if avatar != null:
-		# Dikeyde avatarla ORTALA, yatayda avatarın soluna koy. Ekranın
-		# üstünden/altından taşmasın diye viewport içine sıkıştırılıyor.
-		var viewport_size := get_viewport_rect().size
-		hover_tooltip.global_position = Vector2(
-			avatar.global_position.x - hover_tooltip.size.x - 12.0,
-			clampf(
-				avatar.global_position.y + avatar.size.y * 0.5 - hover_tooltip.size.y * 0.5,
-				8.0,
-				maxf(8.0, viewport_size.y - hover_tooltip.size.y - 8.0)
-			)
-		)
-	hover_tooltip.show()
+## Profil, doğal genişliğinde çizilip sol panele sığacak kadar küçültülür.
+func _fit_profile_scroll() -> void:
+	var natural := DOCK_CONTENT_WIDTH
+	if _profile_scroll.get_child_count() > 0:
+		natural = maxf(natural, (_profile_scroll.get_child(0) as Control).get_combined_minimum_size().x + 12.0)
+	var k := minf(1.0, _dock_width() / natural)
+	_profile_scroll.scale = Vector2.ONE * k
+	_profile_scroll.position = Vector2.ZERO
+	_profile_scroll.size = _left_dock.size / k
 
 # --- Hükümet / meclis oylaması ---------------------------------------------
 
@@ -3093,6 +3138,7 @@ func _apply_map_layer_colors() -> void:
 ## yakın turuncu (bir vekile ne kadar yakın olduğuma göre); vekil çıkarıyorsam
 ## sarı yeşilden, ilin vekillerinin yarısını alıyorsam koyu yeşile.
 func _strength_t(entry: Dictionary, me: int) -> float:
+	me = CardManager.party_of(me)
 	if entry.is_empty() or not entry.has(me):
 		return -1.0
 	var mine: Dictionary = entry[me]

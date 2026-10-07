@@ -66,6 +66,12 @@ func _initialize() -> void:
 	await _frames(10)
 	_shot("party_politics_profile_independent")
 	scene._hide_profile()
+	await _frames(5)
+	_shot("party_politics_profile_closed")
+	scene._on_province_clicked(String(cm._province_ids[0]))
+	await _frames(10)
+	_shot("party_politics_province_dock")
+	scene._province_panel.hide()
 	# Gelen teklif şeridi (bana gelsin).
 	cm.offers.append({"id": 100, "from": int(bots[1]), "to": me, "kind": "apply"})
 	scene._refresh_offer_bar()

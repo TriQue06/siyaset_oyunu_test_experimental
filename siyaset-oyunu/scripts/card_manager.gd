@@ -809,6 +809,7 @@ func init_game() -> void:
 		return
 	inventories.clear()
 	event_log.clear()
+	BotBrain.reset_skills()
 	mana = {}
 	for peer_id in MultiplayerManager.players.keys():
 		inventories[peer_id] = []

@@ -13,6 +13,8 @@ extends PanelContainer
 signal closed
 
 const PANEL_WIDTH := 330.0
+## Sol panelde açılınca panelin genişliğine uyar.
+static var panel_width := PANEL_WIDTH
 const DIM := UiTheme.TEXT_MUTED
 const INTEL_COLOR := Color("8CC4FF")
 ## Son olaylar bölümünde en fazla bu kadar kayıt.
@@ -40,7 +42,7 @@ func _fit() -> void:
 	# Başlık + kaydırılan içerik + kenar boşlukları.
 	var wanted: float = get_combined_minimum_size().y - _scroll.get_combined_minimum_size().y \
 		+ _body.get_combined_minimum_size().y
-	size = Vector2(PANEL_WIDTH, minf(wanted, maxf(140.0, _max_height)))
+	size = Vector2(panel_width, minf(wanted, maxf(140.0, _max_height)))
 
 func show_province(id: String) -> void:
 	province_id = id
@@ -54,7 +56,7 @@ func refresh() -> void:
 		remove_child(child)
 		child.queue_free()
 	var me := multiplayer.get_unique_id()
-	var parts := PopupKit.frame(PANEL_WIDTH, UiTheme.PANEL_LIGHT, self)
+	var parts := PopupKit.frame(panel_width, UiTheme.PANEL_LIGHT, self)
 	var root: VBoxContainer = parts[1]
 
 	var head := PopupKit.header(ElectionNightSim.province_name(province_id),
@@ -77,7 +79,7 @@ func refresh() -> void:
 	_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	gutter.add_child(_body)
 
-	if PartyManager.parties.has(me):
+	if PartyManager.parties.has(CardManager.party_of(me)):
 		_build_intel(me)
 		_build_own(me)
 	_build_last_election(me)
@@ -241,7 +243,7 @@ class SeatDots extends Control:
 		_update_height()
 
 	func _per_row() -> int:
-		return maxi(1, int((maxf(size.x, ProvincePanel.PANEL_WIDTH - 50.0) + GAP) / (DOT + GAP)))
+		return maxi(1, int((maxf(size.x, ProvincePanel.panel_width - 50.0) + GAP) / (DOT + GAP)))
 
 	func _update_height() -> void:
 		var rows := int(ceil(float(colors.size()) / _per_row()))

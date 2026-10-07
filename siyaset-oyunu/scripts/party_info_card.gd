@@ -6,13 +6,17 @@ extends RefCounted
 
 const WIDTH := 320.0
 const DIM := UiTheme.TEXT_MUTED
+## Son build()'in genişliği (notların satır kırma genişliği için).
+static var _width := WIDTH
 
 ## on_action(kind: String, peer_id: int): parti işlemi düğmeleri (fesih,
 ## kongre, davet...) basılınca çağrılır; verilmezse kart sadece bilgi gösterir.
-static func build(peer_id: int, my_id: int, on_action: Callable = Callable()) -> PanelContainer:
+static func build(peer_id: int, my_id: int, on_action: Callable = Callable(), width: float = WIDTH,
+		on_close: Callable = Callable()) -> PanelContainer:
+	_width = width
 	var party: Dictionary = PartyManager.data_of(peer_id)
 	var color: Color = party.get("bg_color", Color(0.5, 0.5, 0.5))
-	var parts := PopupKit.frame(WIDTH, color)
+	var parts := PopupKit.frame(width, color)
 	var card: PanelContainer = parts[0]
 	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var box: VBoxContainer = parts[1]
@@ -25,7 +29,7 @@ static func build(peer_id: int, my_id: int, on_action: Callable = Callable()) ->
 	var sub := "Bağımsız siyasetçi" if independent else String(party.get("name", "?"))
 	if MultiplayerManager.is_bot(peer_id):
 		sub += " · bot"
-	box.add_child(PopupKit.header(title, sub, PartyBadge.build(party, Vector2(40, 40), 64)))
+	box.add_child(PopupKit.header(title, sub, PartyBadge.build(party, Vector2(40, 40), 64), on_close))
 	# İki kişilik parti: kadro.
 	var members: Array = PartyManager.members_of(CardManager.party_of(peer_id))
 	if members.size() >= 2:
@@ -99,7 +103,7 @@ static func _actions(peer_id: int, my_id: int, on_action: Callable) -> Control:
 	box.add_theme_constant_override("separation", 4)
 	box.add_child(PopupKit.section("Parti"))
 	for note in notes:
-		box.add_child(PopupKit.note(String(note), UiTheme.TEXT_MUTED, WIDTH - 2.0 * PopupKit.PAD))
+		box.add_child(PopupKit.note(String(note), UiTheme.TEXT_MUTED, _width - 2.0 * PopupKit.PAD))
 	var any_disabled := false
 	for entry in list:
 		var button := Button.new()

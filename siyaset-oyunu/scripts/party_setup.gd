@@ -469,6 +469,8 @@ func _update_preview() -> void:
 
 func _push_party() -> void:
 	if not PartyManager.is_valid_name(_party_name):
+		if not _editing_bot():
+			PartyManager.set_my_color(_selected_bg_color)
 		return
 	if _editing_bot():
 		PartyManager.set_bot_party(_edit_target, _party_name, _selected_icon_index, _selected_bg_color, _ideology)

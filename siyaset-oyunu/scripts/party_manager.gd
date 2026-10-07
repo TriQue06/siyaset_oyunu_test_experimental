@@ -442,6 +442,33 @@ func _apply_ready(peer_id: int, is_ready_value: bool) -> void:
 	if all_ready():
 		MultiplayerManager.finish_party_setup()
 
+## Parti adı henüz boşken de seçilen renk host'a gider: botlar rengini hemen
+## değiştirir (oyuncu önceliklidir).
+func set_my_color(bg_color: Color) -> void:
+	if MultiplayerManager.is_standalone_preview() or MultiplayerManager.is_host:
+		_apply_color(multiplayer.get_unique_id(), bg_color)
+	else:
+		_request_set_color.rpc_id(1, bg_color)
+
+@rpc("any_peer", "reliable")
+func _request_set_color(bg_color: Color) -> void:
+	if MultiplayerManager.is_host:
+		_apply_color(multiplayer.get_remote_sender_id(), bg_color)
+
+func _apply_color(peer_id: int, bg_color: Color) -> void:
+	if bg_color.is_equal_approx(Color.WHITE) or not _claim_color(peer_id, bg_color):
+		if MultiplayerManager.room_code != "":
+			_broadcast_parties()
+		parties_updated.emit()
+		return
+	if not parties.has(peer_id):
+		parties[peer_id] = {"ready": false}
+	parties[peer_id]["bg_color"] = bg_color
+	_adjust_bot_colors()
+	if MultiplayerManager.room_code != "":
+		_broadcast_parties()
+	parties_updated.emit()
+
 @rpc("any_peer", "reliable")
 func _request_set_party(party_name: String, icon_index: int, icon_color: Color, bg_color: Color, ideology: Dictionary) -> void:
 	if not MultiplayerManager.is_host:

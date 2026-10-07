@@ -171,6 +171,10 @@ func _initialize() -> void:
 		var result := play(seed_value, false)
 		check("seed %d: oyun takilmadan bitti" % seed_value, not result["stall"],
 			"%s (%.0f sn, %d secim)" % [result["where"], result["seconds"], result["elections"]])
+		var shares: Array = []
+		for pid in cm.last_vote_shares.keys():
+			shares.append("%s %.1f (beceri %.2f)" % [cm._party_name(int(pid)), float(cm.last_vote_shares[pid]) * (100.0 if float(cm.last_vote_shares[pid]) <= 1.0 else 1.0), load("res://scripts/bot_brain.gd").skill(int(pid))])
+		print("        son oylar: " + ", ".join(shares))
 
 	print("")
 	print("=== %s ===" % ("TUM TESTLER GECTI" if _failed == 0 else "%d TEST BASARISIZ" % _failed))

@@ -84,7 +84,7 @@ const WEIGHT_CARD_THEFT := 6.0
 const WEIGHT_POPULISM := 12.0
 const WEIGHT_STEAL_STRONG := 6.0
 const WEIGHT_EARLY_ELECTION := 6.0
-const WEIGHT_REPUTATION := 6.0
+const WEIGHT_REPUTATION := 3.0
 const WEIGHT_REBELLION := 18.0
 
 ## Meclis: haritadaki bölgelerin vekilleri (HexGridGenerator.PROVINCE_SEATS)
@@ -789,8 +789,16 @@ func miting_risk(peer_id: int, province_id: String) -> float:
 
 ## Loga kayıt ekler. peer_id: hamleyi yapan parti (-1: sistem), province:
 ## olayın geçtiği il ("" = yok), kind: olay türü (odak simgesi seçilir).
+## Oyuncuların gördüğü logda gösterilmeyen olay türleri (konsolda görünür).
+const PLAYER_HIDDEN_LOG_KINDS := ["mana_bonusu", "mana_bonusu_guclu"]
+
 func log_event(text: String, peer_id: int = -1, province: String = "", kind: String = "system") -> void:
 	if text.strip_edges() == "":
+		return
+	# ANA (geliştirici) LOG: her şey konsola yazılır.
+	print("[LOG r%d] %s" % [round_number, text])
+	# Oyuncu logunda gereksiz olanlar (mana bonusu) gösterilmez.
+	if kind in PLAYER_HIDDEN_LOG_KINDS:
 		return
 	var entry := {"text": text, "peer_id": peer_id, "province": province, "kind": kind, "round": round_number}
 	event_log.append(entry)
@@ -1019,7 +1027,7 @@ func play_card(hand_index: int, target_peer_id: int = -1, target_province: Strin
 		if hand_index < 0 or hand_index >= hand.size():
 			return
 		var card_type: String = hand[hand_index]
-		card_played.emit(id, card_type)
+		card_played.emit(-1 if card_type == CardPresets.REPUTATION_CARD_TYPE and id != multiplayer.get_unique_id() else id, card_type)
 		hand.remove_at(hand_index)
 		_apply_card_effect(id, card_type, target_peer_id, target_province)
 		inventories_updated.emit()
@@ -1142,7 +1150,7 @@ func _apply_play(peer_id: int, hand_index: int, target_peer_id: int = -1, target
 	# Geçersiz hedefle / şartsız oynanan kart elde kalır, boşa harcanmaz.
 	if not can_play_card(peer_id, card_type, target_peer_id, target_province):
 		return
-	card_played.emit(peer_id, card_type)
+	card_played.emit(-1 if card_type == CardPresets.REPUTATION_CARD_TYPE and peer_id != multiplayer.get_unique_id() else peer_id, card_type)
 	hand.remove_at(hand_index)
 	mana[peer_id] = mana_of(peer_id) - CardPresets.card_cost(card_type)
 	_event_message = ""
@@ -1151,6 +1159,10 @@ func _apply_play(peer_id: int, hand_index: int, target_peer_id: int = -1, target
 		"target": target_peer_id, "province": target_province, "seats_changed": seats_changed_now}
 	if _event_message != "":
 		event["message"] = _event_message
+	if card_type == CardPresets.REPUTATION_CARD_TYPE:
+		# Kaset anonim: logda hedefin simgesi görünür, atanın değil.
+		event["peer_id"] = target_peer_id
+		event["actor_hidden"] = peer_id
 	# Hiçbir kart sırayı devretmez; tur sadece "Turu Bitir" ya da süreyle biter.
 	_push_state(event, seats_changed_now)
 	
@@ -1944,8 +1956,9 @@ func _apply_reputation(peer_id: int, target_peer_id: int) -> void:
 		damage *= PoliticianPresets.CLERIC_DAMAGE_MULT
 	_add_turmoil(target_peer_id, PublicOpinion.TURMOIL_REPUTATION)
 	_add_national(target_peer_id, -damage)
-	_event_message = "%s hakkında kaset sızdı: ulusal desteği %.1f puan düştü. (%s)" % [
-		_party_name(target_peer_id), damage, _party_name(peer_id)]
+	# ANONİM: kaseti kimin sızdırdığı hiçbir yerde gösterilmez.
+	_event_message = "%s hakkında kaset sızdı: ulusal desteği %.1f puan düştü." % [
+		_party_name(target_peer_id), damage]
 
 ## GovernmentManager, hükümet güvenoyu alınca çağırır: hükümet partilerine mana.
 func grant_government_mana(peer_ids: Array) -> void:
@@ -3418,7 +3431,8 @@ func _receive_state(state: Dictionary, event: Dictionary) -> void:
 		card_drawn.emit(int(dealt["peer_id"]), str(dealt["card"]))
 	match str(event.get("type", "")):
 		"played":
-			card_played.emit(int(event["peer_id"]), str(event["card"]))
+			var shown := -1 if event.has("actor_hidden") else int(event["peer_id"])
+			card_played.emit(shown, str(event["card"]))
 	_apply_state(state)
 	_emit_post_event(event)
 

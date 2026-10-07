@@ -2480,7 +2480,7 @@ func _build_action_buttons() -> void:
 	_law_button.pressed.connect(_on_law_button_pressed)
 	_miting_button = _action_button("MİTİNG", GameRules.cost_text(GameRules.MITING_MANA_COST), UiTheme.RED)
 	_miting_button.pressed.connect(_on_miting_button_pressed)
-	_org_button = _action_button("TEŞKİLAT", "%d/%d mana" % [GameRules.ORG_MANA_COST, GameRules.ORG_UPGRADE_MANA_COST], UiTheme.BLUE)
+	_org_button = _action_button("TEŞKİLAT", GameRules.cost_text(GameRules.ORG_MANA_COST), UiTheme.BLUE)
 	_org_button.pressed.connect(_on_org_button_pressed)
 	_invest_button = _action_button("YATIRIM", GameRules.cost_text(GameRules.INVEST_MANA_COST), UiTheme.GREEN_DARK)
 	_invest_button.pressed.connect(_on_invest_button_pressed)
@@ -3277,7 +3277,7 @@ func _on_org_button_pressed() -> void:
 		_province_panel.hide()
 	_begin_org_view()
 	_refresh_action_buttons()
-	_set_target_hint("Teşkilatlanma: bir ile dokun, tekrar dokun: kur (%d mana) / geliştir (%d mana)  ·  Butona tekrar dokun: iptal" % [GameRules.ORG_MANA_COST, GameRules.ORG_UPGRADE_MANA_COST])
+	_set_target_hint("Teşkilatlanma: bir ile dokun, tekrar dokun: kur ya da geliştir (%d mana)  ·  Butona tekrar dokun: iptal" % GameRules.ORG_MANA_COST)
 
 ## Teşkilat seviyesinin getirdikleri (kısa).
 static func _org_level_text(level: int) -> String:

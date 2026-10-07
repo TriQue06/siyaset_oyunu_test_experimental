@@ -135,6 +135,7 @@ static func _actions(peer_id: int, my_id: int, on_action: Callable) -> Control:
 
 ## "Hükümet: Başbakanlık, 3 bakanlık" / "Muhalefet" / "Hükümet yok".
 static func role_text(peer_id: int) -> String:
+	peer_id = CardManager.party_of(peer_id)  # yardımcı da partisinin görevlerini görür
 	if not GovernmentManager.has_government():
 		return "Hükümet yok"
 	var posts: Array = []

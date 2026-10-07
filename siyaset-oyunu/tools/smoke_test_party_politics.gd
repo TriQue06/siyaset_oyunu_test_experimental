@@ -266,6 +266,30 @@ func _initialize() -> void:
 		cm._bot_alliances()
 		check("birlikte büyüyen botlar ayrıldı", pm.deputy_of(host) == -1 and pm.is_leader(deputy))
 		check("ayrılan botlar kardeş parti", BB.is_ally(host, deputy) and not BB.is_ally(host, me))
+	# İnsanın bot yardımcısı çıkarına bakarak ayrılır.
+	var helper := -1
+	for peer in cm.party_ids():
+		if cm._is_plain_bot_party(int(peer)) and pm.member_count(int(peer)) == 1:
+			helper = int(peer)
+			break
+	if helper != -1 and pm.deputy_of(me) == -1:
+		cm._join_party(me, helper)
+		check("bot insanın yardımcısı oldu", pm.deputy_of(me) == helper)
+		var calm: Array = cm.bot_deputy_leave_chance(me, 100)
+		cm.passed_threshold.erase(me)
+		pm.parties[me]["seats_before"] = int(cm.last_seats.get(me, 0)) + 5
+		cm.contributions[helper] = 100.0
+		var hot: Array = cm.bot_deputy_leave_chance(me, 100)
+		check("kötü gidişte ayrılma ihtimali artar", float(hot[0]) > float(calm[0]) and (hot[1] as Array).size() >= 3, str(hot))
+		var left := false
+		for attempt in 30:
+			cm.passed_threshold.erase(me)
+			pm.parties[me]["seats_before"] = int(cm.last_seats.get(me, 0)) + 5
+			cm._bot_deputies_consider_leaving(100)
+			if pm.deputy_of(me) != helper:
+				left = true
+				break
+		check("bot yardımcı ayrılıp parti kurdu", left and pm.is_leader(helper) and not pm.is_independent(helper))
 	cm.allow_bot_alliances = false
 
 	print("=== GEÇİCİ PARTİLER ===")

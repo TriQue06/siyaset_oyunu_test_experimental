@@ -2632,6 +2632,8 @@ func _bot_alliances() -> void:
 			"peer_id": deputy, "province": "", "kind": "party_change"})
 		PartyManager.broadcast()
 		break
+	# 1b) İnsanın partisindeki bot yardımcı.
+	_bot_deputies_consider_leaving(total)
 	# 2) Birleşme.
 	if _rng.randf() >= BOT_MERGE_CHANCE:
 		return
@@ -2664,6 +2666,59 @@ func _bot_alliances() -> void:
 	PartyManager.parties[host]["merged_elections"] = 0
 	_pending_log.append({"text": "%s ile %s güçlerini birleştirdi: birlikte daha hızlı büyüyecekler." % [host_name, joiner_name],
 		"peer_id": host, "province": "", "kind": "party_change"})
+
+## İNSAN GENEL BAŞKANIN BOT YARDIMCISI da çıkarına bakar. Her seçimden sonra
+## (en az bir seçim birlikte geçtiyse) ayrılma ihtimali şu nedenlerle birikir:
+##   parti vekil kaybettiyse ("batan gemi")         +0.25
+##   parti barajı geçemediyse                       +0.25
+##   botun katkı payı %55'i aştıysa ("yükü ben çekiyorum") +0.25
+##   parti meclisin %45'ine ulaştıysa (iktidarı ayrı paylaşma zamanı) +0.30
+##   3+ seçimdir birlikteyse                        +0.15
+##   parti hükümetteyse (makam/mana kaybetmek istemez) −0.30
+## Toplam 0..0.8 arası; ayrılınca log nedeni söyler.
+const BOT_DEPUTY_MAX_LEAVE := 0.8
+
+func bot_deputy_leave_chance(pid: int, total: int) -> Array:
+	var deputy := PartyManager.deputy_of(pid)
+	var chance := 0.0
+	var reasons: Array = []
+	var seats := int(last_seats.get(pid, 0))
+	var before := int(PartyManager.parties[pid].get("seats_before", seats))
+	if seats < before:
+		chance += 0.25
+		reasons.append("parti vekil kaybetti")
+	if not passed_threshold.has(pid):
+		chance += 0.25
+		reasons.append("parti barajın altında kaldı")
+	if contribution_share(deputy) > 0.55:
+		chance += 0.25
+		reasons.append("partinin yükünü kendisinin çektiğini düşünüyor")
+	if float(seats) / maxi(1, total) >= BOT_SPLIT_SEAT_SHARE:
+		chance += 0.30
+		reasons.append("parti çoğunluğa yaklaştı, iktidarı ayrı parti olarak paylaşmak istiyor")
+	if int(PartyManager.parties[pid].get("merged_elections", 0)) >= 3:
+		chance += 0.15
+		reasons.append("uzun süredir yardımcı olarak bekliyor")
+	if is_government_party(pid):
+		chance -= 0.30
+	return [clampf(chance, 0.0, BOT_DEPUTY_MAX_LEAVE), reasons]
+
+func _bot_deputies_consider_leaving(total: int) -> void:
+	for pid in party_ids():
+		var deputy := PartyManager.deputy_of(int(pid))
+		if deputy == -1 or MultiplayerManager.is_bot(int(pid)) or not MultiplayerManager.is_bot(deputy):
+			continue
+		var together := int(PartyManager.parties[pid].get("merged_elections", 0)) + 1
+		PartyManager.parties[pid]["merged_elections"] = together
+		var result := bot_deputy_leave_chance(int(pid), total)
+		PartyManager.parties[pid]["seats_before"] = int(last_seats.get(pid, 0))
+		if together < 2 or _rng.randf() >= float(result[0]):
+			continue
+		var reason := ", ".join(result[1])
+		var text := _split_party_by_share(deputy, _random_party_info(deputy))
+		_pending_log.append({"text": "%s %s" % [text, ("Neden: " + reason + ".") if reason != "" else ""],
+			"peer_id": deputy, "province": "", "kind": "party_change"})
+		PartyManager.broadcast()
 
 ## Botun yeni partisi için rastgele ad, logo ve boşta bir renk.
 func _random_party_info(peer_id: int) -> Dictionary:
@@ -3058,6 +3113,9 @@ func _join_party(host: int, joiner: int) -> void:
 	var merging := not PartyManager.is_independent(joiner)
 	var joiner_party_name := _party_name(joiner)
 	var moved := _move_seats(joiner, host, int(last_seats.get(joiner, 0)))
+	if PartyManager.parties.has(host):
+		PartyManager.parties[host]["merged_elections"] = 0
+		PartyManager.parties[host]["seats_before"] = int(last_seats.get(host, 0))
 	election_seats[host] = int(election_seats.get(host, 0)) + int(election_seats.get(joiner, 0))
 	last_vote_shares[host] = float(last_vote_shares.get(host, 0.0)) + float(last_vote_shares.get(joiner, 0.0))
 	if passed_threshold.has(joiner) and not passed_threshold.has(host):

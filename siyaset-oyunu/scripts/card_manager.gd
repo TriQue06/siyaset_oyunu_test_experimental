@@ -3145,6 +3145,10 @@ func _apply_state(state: Dictionary) -> void:
 	game_end_reason = str(state["end_reason"])
 	if state.has("map") and int((state["map"] as Dictionary).get("seed", -1)) != GameMap.seed_value():
 		GameMap.set_data(state["map"])
+	# Vekil sayıları HER durumda haritadan yeniden okunur: istemci haritayı aynı
+	# tohumla kendisi üretince (seed eşit) bu tablo açılıştaki varsayılan
+	# haritadan kalıyordu, her oyuncu ilde farklı vekil sayısı görüyordu.
+	if state.has("map") or _province_seat_counts.size() != GameMap.province_ids().size():
 		_load_province_seat_counts()
 	if state.has("province_results"):
 		last_province_results = state["province_results"]

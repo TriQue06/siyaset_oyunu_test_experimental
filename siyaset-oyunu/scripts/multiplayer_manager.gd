@@ -835,6 +835,7 @@ func _notify_game_start(seed_value: int) -> void:
 		return
 	game_map_seed = seed_value
 	GameMap.generate_new(seed_value)
+	CardManager._load_province_seat_counts()  # vekil sayıları yeni haritadan
 	game_started.emit()
 
 ## Host'tan istemcilere: oda kapatılıyor, herkes lobiden çıkmalı.

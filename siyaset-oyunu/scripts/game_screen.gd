@@ -1457,6 +1457,8 @@ func _process(delta: float) -> void:
 	_refresh_countdowns()
 	if _drag_ghost != null:
 		_update_drag()
+	else:
+		_update_live_province()
 
 	var i := _hand_holders.size() - 1
 	while i >= 0:
@@ -1999,6 +2001,27 @@ func _on_province_clicked(province_id: String) -> void:
 		else:
 			CardManager.play_card(hand_index, -1, province_id)
 		return
+	_show_province_info(province_id)
+
+## İL BİLGİSİ sağ sütunda ("Seçili"). Fare haritada dolaşırken canlı olarak
+## değişir (bkz. _update_live_province); tıklamak da aynı bilgiyi gösterir.
+var _live_province := ""
+
+## Fare haritada bir ilin üstündeyse (hedef seçme yokken) o ilin bilgisi
+## tıklamadan sağda gösterilir. Haritadan çıkınca son il ekranda kalır.
+func _update_live_province() -> void:
+	if _pending_org or _pending_miting or _pending_invest or _pending_province_hand_index != -1 \
+			or _pending_target_hand_index != -1 or _layer_switching or not is_visible_in_tree():
+		return
+	if _parl_bg != null and _parl_bg.get_global_rect().has_point(get_viewport().get_mouse_position()):
+		return
+	var province_id := _province_under_mouse()
+	if province_id == "" or province_id == _live_province and _province_panel != null and _province_panel.visible:
+		return
+	_show_province_info(province_id)
+
+func _show_province_info(province_id: String) -> void:
+	_live_province = province_id
 	_ensure_left_dock()
 	if _province_panel == null:
 		_province_panel = ProvincePanel.new()
@@ -2006,7 +2029,6 @@ func _on_province_clicked(province_id: String) -> void:
 		_left_dock.add_child(_province_panel)
 		_province_panel.visibility_changed.connect(_update_left_dock)
 	elif _province_panel.visible and _province_panel.province_id == province_id:
-		_province_panel.hide()
 		return
 	_hide_profile()
 	ProvincePanel.panel_width = _dock_width()

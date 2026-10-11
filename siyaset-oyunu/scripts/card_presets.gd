@@ -43,7 +43,7 @@ const PROPAGANDA_CARD_TYPE := "karalama"
 ## ve seçim takvimi o tarihten itibaren yeniden işler.
 const EARLY_ELECTION_CARD_TYPE := "erken_secim"
 
-## Hedefsiz bonus kartlar: seçip tekrar dokununca (ya da yukarı sürükleyince) oynanır.
+## Hedefsiz bonus kartlar: seçip tekrar dokununca oynanır.
 const POPULISM_CARD_TYPE := "populizm"
 const MANA_BONUS_CARD_TYPE := "mana_bonusu"
 const MANA_BONUS_STRONG_CARD_TYPE := "mana_bonusu_guclu"
@@ -369,23 +369,23 @@ func _card_effect_text(card_type: String) -> String:
 		var far: Dictionary = STEAL_RANGES_FAR[card_type]
 		var cost_line := "Güçlü varyantta ulusal desteğin biraz düşer; normalde bedel yok." if card_type == STEAL_STRONG_CARD_TYPE \
 			else "Bedeli yok; çalınan parti mağduriyetten biraz destek kazanır."
-		return "Seçtiğin partiden vekil çal: %d-%d; görüşü sana yakınsa %d-%d'e kadar, zıt uçtaysa %d-%d.\n%s\nSağdaki bir parti kartına sürükle." % [
+		return "Seçtiğin partiden vekil çal: %d-%d; görüşü sana yakınsa %d-%d'e kadar, zıt uçtaysa %d-%d.\n%s\nSeç, sonra soldaki bir partiye tıkla." % [
 			int(r["min"]), int(r["max"]), int(close["min"]), int(close["max"]),
 			int(far["min"]), int(far["max"]), cost_line]
 	match card_type:
 		REPUTATION_CARD_TYPE:
 			return ("Seçtiğin partinin itibarını sarsan bir kaset sızar:" + "\n"
 				+ "ulusal desteği %.1f puan düşer, partide karışıklık çıkar." + "\n"
-				+ "Sağdaki bir parti kartına sürükle.") % PublicOpinion.REPUTATION_NATIONAL_DAMAGE
+				+ "Seç, sonra soldaki bir partiye tıkla.") % PublicOpinion.REPUTATION_NATIONAL_DAMAGE
 		REBELLION_CARD_TYPE:
 			return ("Seçtiğin partide iç karışıklık çıkar: ulusal desteği" + "\n"
 				+ "%.1f puan düşer, parti içi huzursuzluk büyür." + "\n"
 				+ "Karışıklık çok birikirse parti BÖLÜNEBİLİR." + "\n"
-				+ "Sağdaki bir parti kartına sürükle.") % PublicOpinion.REBELLION_NATIONAL_DAMAGE
+				+ "Seç, sonra soldaki bir partiye tıkla.") % PublicOpinion.REBELLION_NATIONAL_DAMAGE
 		CARD_THEFT_CARD_TYPE:
 			return ("Seçtiğin partinin elinden rastgele 1 kart çalarsın." + "\n"
 				+ "Elinde hiç kart yoksa kart boşa gider." + "\n"
-				+ "Sağdaki bir parti kartına sürükle.")
+				+ "Seç, sonra soldaki bir partiye tıkla.")
 		BONUS_CARD_TYPE:
 			return "Rastgele %d kart daha çekersin (el doluysa sığdığı kadar).\nSeçmek için dokun, tekrar dokun: kullan." % GameRules.BONUS_CARD_DRAW
 		MANA_BONUS_STRONG_CARD_TYPE:
@@ -394,9 +394,9 @@ func _card_effect_text(card_type: String) -> String:
 			return ("Meclise erken seçim önerisi sunarsın." + "\n"
 				+ "Kabul edilirse dönem sonunda sandığa gidilir ve" + "\n"
 				+ "seçim takvimi o tarihten itibaren yeniden işler." + "\n"
-				+ "Meclis diyagramına sürükle.")
+				+ "Seçmek için dokun, tekrar dokun: kullan.")
 		CENSURE_CARD_TYPE:
-			return "Hükümeti düşürmek için gensoru ver.\nMeclis diyagramına sürükle."
+			return "Hükümeti düşürmek için gensoru ver.\nSeçmek için dokun, tekrar dokun: kullan."
 		MITING_CARD_TYPE:
 			return "Seçtiğin ilde güç kazan (+%.0f).\nİl sana uzaksa provokasyon riski var." % PublicOpinion.MITING_LOCAL
 		INVEST_CARD_TYPE:

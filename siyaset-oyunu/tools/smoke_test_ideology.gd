@@ -298,7 +298,7 @@ func _initialize() -> void:
 	print("")
 	print("=== 10) YENI KARTLAR VE KURALLAR ===")
 	new_game({1: ideology(1.5, 1.5, 1.5), 2: ideology(-1.5, -1.5, -1.5)})
-	check("tur basina mana 40 (hukumet 50)", GameRules.MANA_PER_ROUND == 40 and GameRules.MANA_PER_ROUND_GOVERNMENT == 50)
+	check("tur basina mana 30 (hukumet 40)", GameRules.MANA_PER_ROUND == 30 and GameRules.MANA_PER_ROUND_GOVERNMENT == 40)
 	check("yasa gecirmek +5 puan", cm.law_pass_score(false) == 5 and cm.law_pass_score(true) == 5)
 	check("bakanlik +3, yardimcilik +5, basbakanlik +10", GovernmentPresets.MINISTRY_POINTS == 3 \
 		and GovernmentPresets.DEPUTY_PM_POINTS == 5 and GovernmentPresets.PM_POINTS == 10)

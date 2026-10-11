@@ -30,6 +30,16 @@ static func build(peer_id: int, my_id: int, on_action: Callable = Callable(), wi
 	if MultiplayerManager.is_bot(peer_id):
 		sub += " · bot"
 	box.add_child(PopupKit.header(title, sub, PartyBadge.build(party, Vector2(40, 40), 64), on_close))
+	# GENEL BAŞKANIN PROFİLİ: eski mesleği (ve memleketi).
+	var leader_id := CardManager.party_of(peer_id) if not independent else peer_id
+	var job := PoliticianPresets.title(PoliticianPresets.background_of(leader_id))
+	if job != "":
+		var hometown := String(PoliticianPresets.of(leader_id).get("hometown", ""))
+		var who := "Bağımsız siyasetçi" if independent else "Genel başkan %s" % PoliticianPresets.display_name(leader_id)
+		var line := "%s · eski meslek: %s" % [who, job]
+		if hometown != "":
+			line += " · memleket: %s" % ElectionNightSim.province_name(hometown)
+		box.add_child(PopupKit.note(line, color.lightened(0.45), _text_width()))
 	# İki kişilik parti: kadro.
 	var members: Array = PartyManager.members_of(CardManager.party_of(peer_id))
 	if members.size() >= 2:

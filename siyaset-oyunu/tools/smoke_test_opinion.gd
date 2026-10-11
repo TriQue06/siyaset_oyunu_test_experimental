@@ -318,12 +318,12 @@ func _initialize() -> void:
 	check("il baskanligi ildeki gucu artirir", cm.party_strength(TestProvinces.id("ankara"), 2) > weak)
 
 	cm.current_turn_index = 0
-	cm.mana[3] = 3
+	cm.mana[3] = 30
 	cm.agenda = {"type": "gundem_social_p", "until": cm.round_number + 1}
 	var law_soc: String = cp.law_type("social", 1)
 	cm._apply_law(3, law_soc)
-	check("yasa hamlesi meclise geldi, mana harcanmadi",
-		gm.phase == gm.Phase.VOTING and gm.proposal_law == law_soc and cm.mana_of(3) == 3, "mana %d" % cm.mana_of(3))
+	check("yasa hamlesi meclise geldi, 5 mana harcandi",
+		gm.phase == gm.Phase.VOTING and gm.proposal_law == law_soc and cm.mana_of(3) == 30 - GameRules.LAW_MANA_COST, "mana %d" % cm.mana_of(3))
 	check("oylama sirasinda tur durur", cm.is_turn_blocked())
 	check("yasayi getirenin oyu bastan EVET", int(gm.votes.get(3, 99)) == gm.VOTE_YES and gm.has_voted(3))
 

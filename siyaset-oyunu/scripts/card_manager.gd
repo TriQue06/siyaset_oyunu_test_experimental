@@ -355,7 +355,7 @@ func can_choose_main_action(peer_id: int) -> bool:
 ## sırası tur numarası artmadan başlar, eski dönemin bilgisi taşınıyordu.)
 func needs_speech(peer_id: int) -> bool:
 	return speech_required and not turn_order.is_empty() and peer_id == current_turn_peer_id() and not is_party_member(peer_id) \
-		and int(speech_rounds.get(party_of(peer_id), 0)) != round_number
+		and int(speech_rounds.get(party_of(peer_id), 0)) != round_number and mana_of(peer_id) >= GameRules.SPEECH_MANA_COST
 
 ## Bu oyuncu şu an bir yasa sunabilir mi? (law_type verilirse o yasa geçerli mi.)
 func can_propose_law(peer_id: int, law_type: String = "") -> bool:
@@ -1708,6 +1708,7 @@ func _apply_speech(peer_id: int, axis: String, dir: int) -> void:
 	if not needs_speech(peer_id) or is_turn_blocked() or not IdeologyAxes.AXES.has(axis):
 		return
 	var d := 1 if dir > 0 else -1
+	mana[peer_id] = mana_of(peer_id) - GameRules.SPEECH_MANA_COST
 	speech_done = true
 	speech_rounds[party_of(peer_id)] = round_number
 	var moved := _shift_ideologies([{"peer": party_of(peer_id), "axis": axis, "delta": IdeologyAxes.SPEECH_SHIFT * d}])
@@ -2059,7 +2060,16 @@ func _peek_turn_card(peer_id: int) -> String:
 ## Tur geliri: hükümette görevi olan partiler bir fazla mana alır.
 func turn_income(peer_id: int) -> float:
 	var base := float(GameRules.MANA_PER_ROUND_GOVERNMENT if is_government_party(peer_id) else GameRules.MANA_PER_ROUND)
-	return maxf(0.0, base - bot_mana_penalty(peer_id))
+	return maxf(0.0, base - bot_mana_penalty(peer_id)) + float(org_income(peer_id))
+
+## Partinin teşkilatlarının tur başı geliri (1. seviye +5, 2. seviye +10 / il).
+func org_income(peer_id: int) -> int:
+	var pid := party_of(peer_id)
+	var total := 0
+	for province_id in organizations.keys():
+		var level := int((organizations[province_id] as Dictionary).get(pid, 0))
+		total += int(GameRules.ORG_INCOME[clampi(level, 0, GameRules.ORG_INCOME.size() - 1)])
+	return total
 
 ## Lobi kuralı: botlar tur başında ve mana bonuslarından bu kadar az mana alır.
 func bot_mana_penalty(peer_id: int) -> float:
@@ -2779,7 +2789,7 @@ var congress_active: bool = false
 
 const CONGRESS_MAX_ELECTIONS := 3
 const CONGRESS_COST := 10
-const CONGRESS_REQUEST_COST := 30
+const CONGRESS_REQUEST_COST := 20
 const CONGRESS_DELEGATES := 1200
 ## Gösteri süreleri: oyuncunun partisi seçim gecesinin yarısı, bot partisi dörtte biri.
 static func congress_duration(has_human: bool) -> float:

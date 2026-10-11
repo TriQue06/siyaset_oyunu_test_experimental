@@ -104,7 +104,7 @@ func _initialize() -> void:
 	print("=== TEK LİDER ===")
 	check("oy veren sadece genel başkanlar", gm.voter_ids().size() == cm.party_ids().size())
 	check("oy ağırlığı partinin bütün vekilleri", gm.vote_weight(me) == int(cm.last_seats.get(me, 0)))
-	check("gelir bölünmez", is_equal_approx(cm.turn_income(me), float(GameRules.MANA_PER_ROUND)) or cm.is_government_party(me))
+	check("gelir bölünmez", is_equal_approx(cm.turn_income(me) - cm.org_income(me), float(GameRules.MANA_PER_ROUND)) or cm.is_government_party(me))
 
 	print("=== KONGRE GÜCÜ ===")
 	cm._congress_info(me)["share"] = float(cm.last_vote_shares.get(me, 0.0))
@@ -327,13 +327,27 @@ func _initialize() -> void:
 	var some_bot: int = int(mm.bot_ids()[0])
 	check("varsayılan zayıflatma 5", is_equal_approx(mm.bot_mana_penalty, 5.0))
 	var bot_base := float(GameRules.MANA_PER_ROUND_GOVERNMENT if cm.is_government_party(some_bot) else GameRules.MANA_PER_ROUND)
-	check("bot tur başında 5 az mana alır", is_equal_approx(cm.turn_income(some_bot), bot_base - 5.0))
+	check("bot tur başında 5 az mana alır", is_equal_approx(cm.turn_income(some_bot) - cm.org_income(some_bot), bot_base - 5.0))
 	check("bot mana bonusundan 5 az alır", is_equal_approx(cm.mana_bonus_amount(some_bot, false), GameRules.MANA_BONUS_WEAK - 5.0)
 		and is_equal_approx(cm.mana_bonus_amount(some_bot, true), GameRules.MANA_BONUS_STRONG - 5.0))
 	check("gerçek oyuncu etkilenmez", is_equal_approx(cm.mana_bonus_amount(me, false), float(GameRules.MANA_BONUS_WEAK)))
 	mm.bot_mana_penalty = 15.0
-	check("15 zayıflatma", is_equal_approx(cm.turn_income(some_bot), bot_base - 15.0))
+	check("15 zayıflatma", is_equal_approx(cm.turn_income(some_bot) - cm.org_income(some_bot), bot_base - 15.0))
 	mm.bot_mana_penalty = 5.0
+
+	print("=== TEŞKİLAT GELİRİ VE BEDELLER ===")
+	var org_test_pid: String = String(cm._province_ids[5])
+	var income_before: int = cm.org_income(me)
+	var had: int = cm.organization_level(org_test_pid, me)
+	cm.organizations[org_test_pid] = cm.organizations.get(org_test_pid, {})
+	cm.organizations[org_test_pid][cm.party_of(me)] = 1
+	var lvl1: int = cm.org_income(me)
+	cm.organizations[org_test_pid][cm.party_of(me)] = 2
+	var lvl2: int = cm.org_income(me)
+	check("1. seviye teşkilat +5, 2. seviye +10 mana", lvl1 - income_before == 5 - GameRules.ORG_INCOME[had] and lvl2 - lvl1 == 5, "%d %d %d" % [income_before, lvl1, lvl2])
+	cm.organizations[org_test_pid][cm.party_of(me)] = had
+	check("yasa 5, toplantı 5, kongre 10 / üye 20", GameRules.LAW_MANA_COST == 5 and GameRules.SPEECH_MANA_COST == 5
+		and cm.CONGRESS_COST == 10 and cm.CONGRESS_REQUEST_COST == 20)
 
 	print("=== KRİZ ===")
 	var crisis_bot: int = cm.party_of(int(mm.bot_ids()[1]))

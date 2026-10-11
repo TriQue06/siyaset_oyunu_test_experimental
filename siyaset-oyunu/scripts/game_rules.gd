@@ -73,9 +73,9 @@ static func set_election_anchor(round_number: int) -> void:
 	ELECTION_ANCHOR = FIRST_ELECTION_ROUND if round_number <= 0 else round_number
 
 const MANA_START := 0
-const MANA_PER_ROUND := 40
+const MANA_PER_ROUND := 30
 ## Hükümette görevi olan partiler tur başına 1 fazla mana alır (iktidar avantajı).
-const MANA_PER_ROUND_GOVERNMENT := 50
+const MANA_PER_ROUND_GOVERNMENT := 40
 ## BEDEL YAZISI: ücretsiz hamleler her yerde "bedelsiz" diye geçer ("bedava"
 ## ya da "0 mana" değil). Mana 0,5 katlarıyla birikebildiği için ondalık da
 ## gerekirse basılır.
@@ -87,7 +87,7 @@ static func cost_text(cost: float) -> String:
 	return "%s mana" % String.num(cost, 1)
 
 ## Yasa sunmak BEDELSİZ (turda 1): meclis oyunun merkezi, mana engel olmasın.
-const LAW_MANA_COST := 0
+const LAW_MANA_COST := 5
 const LAWS_PER_ROUND := 1
 ## Teşkilat anketinin sapması (her partinin oyu en fazla bu oranda sapar):
 ## 1. seviye YAKLAŞIK oy (±%35), 2. seviye %90 doğruluk (±%10).
@@ -130,6 +130,11 @@ const GOVERNMENT_MANA_BONUS := 10
 ## Teşkilat: kurmak (1. seviye) ORG_MANA_COST, geliştirmek (2. seviye)
 ## ORG_UPGRADE_MANA_COST. Ucuz teşkilat botların haritayı kaplamasına yol açıyordu.
 const ORG_MANA_COST := 10
+## TEŞKİLAT GELİRİ: her ildeki teşkilat tur başında mana getirir
+## (1. seviye +5, 2. seviye +10).
+const ORG_INCOME := [0, 5, 10]
+## GRUP TOPLANTISI (konuşma) bedeli.
+const SPEECH_MANA_COST := 5
 const ORG_UPGRADE_MANA_COST := ORG_MANA_COST
 
 ## Bu ildeki teşkilatı bir seviye ilerletmenin bedeli (current_level: şu anki seviye).

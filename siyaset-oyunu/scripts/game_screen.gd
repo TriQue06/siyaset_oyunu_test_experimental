@@ -829,6 +829,11 @@ func _place_parliament_badge() -> void:
 		if split != null:
 			split.offset_top = 0
 			split.offset_bottom = 0
+	# Meclis sağ panelin ÜSTÜNDE olmalı (sahne ağacında sonra gelmeli): yoksa
+	# panel tıklamaları yutuyor, EVET/HAYIR düğmelerine basılamıyordu.
+	if _parl_bg.get_index() < left_panel.get_index():
+		move_child(_parl_bg, left_panel.get_index())
+		move_child(bottom_area, _parl_bg.get_index() + 1)
 	bottom_area.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	bottom_area.z_index = 4
 	_parl_bg.z_index = 3
@@ -1054,8 +1059,9 @@ func _refresh_side_tabs() -> void:
 		tab.visible = i != SIDE_TAB_SELECTED or not _window_mode()
 	if not selected_open:
 		government_vbox.visible = _side_tab == 0
+		# Log ayrı sekmede: Hükümet sekmesinde yok.
 		if _event_log != null:
-			_event_log.visible = true
+			_event_log.visible = _side_tab == 1
 	if _parl_slot != null:
 		_parl_slot.visible = not selected_open and _side_tab == 0
 	_sync_parliament_to_slot()
@@ -3191,7 +3197,7 @@ func _build_trash_button() -> void:
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(box)
 	box.add_child(_trash_label("KART BOZDUR", 11, UiTheme.TEXT_MUTED))
-	box.add_child(_trash_label("sürükle · ½ mana", 10, UiTheme.TEXT_DIM))
+	box.add_child(_trash_label("sürükle · yarı bedel", 10, UiTheme.TEXT_DIM))
 	add_child(_trash_panel)
 
 func _trash_label(text: String, size: int, color: Color) -> Label:

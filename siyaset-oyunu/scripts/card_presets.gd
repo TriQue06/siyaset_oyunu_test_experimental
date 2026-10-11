@@ -128,17 +128,17 @@ func steal_range(card_type: String, closeness: float) -> Dictionary:
 
 ## Kartın elden oynanma bedeli (mana).
 const CARD_MANA_COSTS := {
-	"karalama": 1,
-	"populizm": 1,
+	"karalama": 10,
+	"populizm": 10,
 	"mana_bonusu": 0,
 	"mana_bonusu_guclu": 0,
 	"bonus_kart": 0,
-	"kart_calma": 1,
-	"steal_weak": 1,
-	"steal_strong": 3,
-	"kaset": 2,
-	"isyan": 1,
-	"erken_secim": 3,
+	"kart_calma": 10,
+	"steal_weak": 10,
+	"steal_strong": 30,
+	"kaset": 20,
+	"isyan": 10,
+	"erken_secim": 30,
 }
 
 ## Kendi görseli olmayan kartlar geçici olarak başka bir kartın görselini kullanır.

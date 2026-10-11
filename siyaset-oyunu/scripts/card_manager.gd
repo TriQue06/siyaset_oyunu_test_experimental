@@ -2411,7 +2411,7 @@ func remove_player(peer_id: int) -> void:
 ## olur. Başkan isterse (en az bir seçim geçtiyse) kendi sırasında kongreye
 ## gidebilir. Adaylar ve sonuç önceden hesaplanır, herkesin ekranında seçim
 ## gecesi tarzında oynatılır.
-const FOUND_PARTY_COST := 8
+const FOUND_PARTY_COST := 80
 const DISSOLVE_CREDIBILITY := 8.0
 const DISSOLVE_BLOC_SHARE := 0.5
 ## Fesihte partinin ulusal puanının siyasetçiye (kişisel popülerlik) kalan payı.
@@ -2778,8 +2778,8 @@ var _congress_time_left: float = 0.0
 var congress_active: bool = false
 
 const CONGRESS_MAX_ELECTIONS := 3
-const CONGRESS_COST := 1
-const CONGRESS_REQUEST_COST := 3
+const CONGRESS_COST := 10
+const CONGRESS_REQUEST_COST := 30
 const CONGRESS_DELEGATES := 1200
 ## Gösteri süreleri: oyuncunun partisi seçim gecesinin yarısı, bot partisi dörtte biri.
 static func congress_duration(has_human: bool) -> float:

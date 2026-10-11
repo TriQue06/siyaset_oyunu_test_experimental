@@ -88,8 +88,8 @@ func _initialize() -> void:
 	cm.round_number = 11
 	check("normal takvim: 16. turda secim var, 11'de yok",
 		GameRules.is_election_round(16) and not GameRules.is_election_round(11))
-	cm.mana[1] = 5.0
-	check("erken secim artik kart degil, 2 manalik hamle", not cm.can_play_card(1, cp.EARLY_ELECTION_CARD_TYPE) and GameRules.EARLY_ELECTION_MANA_COST == 2)
+	cm.mana[1] = 50.0
+	check("erken secim artik kart degil, 20 manalik hamle", not cm.can_play_card(1, cp.EARLY_ELECTION_CARD_TYPE) and GameRules.EARLY_ELECTION_MANA_COST == 20)
 	gm.submit_early_election(1)
 	check("onerge oylamaya acildi", gm.is_voting() and gm.proposal_kind == gm.KIND_EARLY)
 	for voter in gm.eligible_voter_ids():

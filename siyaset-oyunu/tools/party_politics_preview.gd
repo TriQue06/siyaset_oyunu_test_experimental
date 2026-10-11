@@ -102,6 +102,12 @@ func _initialize() -> void:
 	gm.submit_early_election(me)
 	await _frames(10)
 	_shot("party_politics_voting")
+	var yes_button: Control = scene.vote_yes_button
+	var motion := InputEventMouseMotion.new()
+	motion.position = root.get_final_transform() * yes_button.get_global_rect().get_center()
+	root.push_input(motion)
+	await _frames(2)
+	print("OY DÜĞMESİ ÜSTTE: %s (%s)" % [str(root.gui_get_hovered_control() == yes_button), str(root.gui_get_hovered_control())])
 	gm._set_phase(gm.Phase.IDLE)
 	await _frames(3)
 	# Kongre gecesi (benim partim, zayıf: dört aday, iki tur).

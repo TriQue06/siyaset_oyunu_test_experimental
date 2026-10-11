@@ -73,9 +73,9 @@ static func set_election_anchor(round_number: int) -> void:
 	ELECTION_ANCHOR = FIRST_ELECTION_ROUND if round_number <= 0 else round_number
 
 const MANA_START := 0
-const MANA_PER_ROUND := 4
+const MANA_PER_ROUND := 40
 ## Hükümette görevi olan partiler tur başına 1 fazla mana alır (iktidar avantajı).
-const MANA_PER_ROUND_GOVERNMENT := 5
+const MANA_PER_ROUND_GOVERNMENT := 50
 ## BEDEL YAZISI: ücretsiz hamleler her yerde "bedelsiz" diye geçer ("bedava"
 ## ya da "0 mana" değil). Mana 0,5 katlarıyla birikebildiği için ondalık da
 ## gerekirse basılır.
@@ -93,22 +93,22 @@ const LAWS_PER_ROUND := 1
 ## 1. seviye YAKLAŞIK oy (±%35), 2. seviye %90 doğruluk (±%10).
 const POLL_ERROR_LOW := 0.35
 const POLL_ERROR_HIGH := 0.10
-const MITING_MANA_COST := 2
+const MITING_MANA_COST := 15
 ## Yatırım (sadece hükümet partileri) ve gensoru (sadece muhalefet, hükümet
 ## azınlıktayken) hamleleri.
-const INVEST_MANA_COST := 2
+const INVEST_MANA_COST := 30
 ## Gensoru BEDELSİZ: muhalefetin elindeki tek gerçek silah engellenmemeli.
 const CENSURE_MANA_COST := 0
 ## ERKEN SEÇİM hamlesi (eskiden kart): meclise önerge getirir.
-const EARLY_ELECTION_MANA_COST := 2
+const EARLY_ELECTION_MANA_COST := 20
 ## Popülizm bonusu kartı bu kadar tur sürer. Mana bonusunun iki çeşidi var:
 ## zayıf +MANA_BONUS_WEAK, güçlü +MANA_BONUS_STRONG. Bonus kart BONUS_CARD_DRAW kart çeker.
 const POPULISM_ROUNDS := 3
-const MANA_BONUS_WEAK := 3
-const MANA_BONUS_STRONG := 6
+const MANA_BONUS_WEAK := 30
+const MANA_BONUS_STRONG := 60
 const MANA_BONUS_AMOUNT := MANA_BONUS_WEAK
 const BONUS_CARD_DRAW := 2
-const ELECTION_MANA_BONUS := 1
+const ELECTION_MANA_BONUS := 10
 ## GÜNDEM TAKVİMİ: ilk seçimden hemen sonraki turdan itibaren AGENDA_ROUNDS tur
 ## (6 ay) gündem, AGENDA_GAP tur (12 ay) ara, yine gündem... Gündemli her tur
 ## tek bir eksenin bir ucudur; bir gündem dönemindeki turlar farklı eksenlerdir
@@ -126,10 +126,10 @@ const CENSURE_PASS_SCORE := 5
 ## Meclisten yasa geçirmek +5 puan (hükümet ya da muhalefet fark etmez).
 const LAW_PASS_SCORE := 5
 const LAW_PASS_SCORE_GOV := 5
-const GOVERNMENT_MANA_BONUS := 1
+const GOVERNMENT_MANA_BONUS := 10
 ## Teşkilat: kurmak (1. seviye) ORG_MANA_COST, geliştirmek (2. seviye)
 ## ORG_UPGRADE_MANA_COST. Ucuz teşkilat botların haritayı kaplamasına yol açıyordu.
-const ORG_MANA_COST := 1
+const ORG_MANA_COST := 10
 const ORG_UPGRADE_MANA_COST := ORG_MANA_COST
 
 ## Bu ildeki teşkilatı bir seviye ilerletmenin bedeli (current_level: şu anki seviye).
@@ -167,10 +167,10 @@ static func year_of_round(round_number: int) -> int:
 static func half_of_round(round_number: int) -> int:
 	return (maxi(1, round_number) - 1) % ROUNDS_PER_YEAR
 
-## "1950 · Oca-Haz" gibi okunur dönem etiketi.
+## "1950 · 1. yarı" gibi okunur dönem etiketi.
 static func period_label(round_number: int) -> String:
 	return "%d %s" % [year_of_round(round_number),
-		"Oca-Haz" if half_of_round(round_number) == 0 else "Tem-Ara"]
+		"1. yarı" if half_of_round(round_number) == 0 else "2. yarı"]
 
 ## round_number'uncu turun sonunda yapılan seçimin adı olan yıl.
 static func election_year(round_number: int) -> int:

@@ -152,8 +152,8 @@ func _sync_away_mode(value: String) -> void:
 ## BOT MANA ZAYIFLATMASI: botlar her tur başında ve mana bonusu kartlarından
 ## bu kadar AZ mana alır (lobi kuralı; 0 = kapalı). Gerçek oyuncuları ve
 ## yerine bot oynayan düşmüş oyuncuyu etkilemez.
-const BOT_MANA_PENALTY_OPTIONS := [0.0, 0.5, 1.0, 1.5]
-const BOT_MANA_PENALTY_DEFAULT := 0.5
+const BOT_MANA_PENALTY_OPTIONS := [0.0, 5.0, 10.0, 15.0]
+const BOT_MANA_PENALTY_DEFAULT := 5.0
 var bot_mana_penalty: float = BOT_MANA_PENALTY_DEFAULT
 
 func set_bot_mana_penalty(value: float) -> void:

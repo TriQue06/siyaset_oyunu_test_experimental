@@ -45,9 +45,9 @@ const BALANCE_LOCAL_WEIGHT := 0.25
 
 # --- Yatırım (sadece hükümet partileri) ---------------------------------------
 ## Yatırım mitingden etkilidir (miting il +5, ulusal +0.8; üstelik risksiz).
-const INVEST_LOCAL := 7.0
-const INVEST_NATIONAL := 1.2
-const INVEST_PARTNER_LOCAL := 2.5
+const INVEST_LOCAL := 10.0
+const INVEST_NATIONAL := 2.0
+const INVEST_PARTNER_LOCAL := 4.0
 
 # --- Popülizm bonusu -----------------------------------------------------------
 ## Popülizm süren partinin KENDİ hamlelerinin (miting, yatırım, yasa, oy,
@@ -180,8 +180,8 @@ const STEAL_VICTIM_NATIONAL_LIMIT := 0.35
 ## görüşüne doğru çeker: merkez += (parti − merkez) × oran (eksen başına).
 ## Miting ve teşkilat hem görüşü çeker hem oy getirir; yatırım KISMEN çeker ama
 ## daha çok oy getirir (bkz. INVEST_LOCAL).
-const MITING_PULL := 0.10
-const INVEST_PULL := 0.05
+const MITING_PULL := 0.15
+const INVEST_PULL := 0.08
 ## Teşkilat kurulunca/geliştirilince bir kez, sonra her tur seviye başına.
 const ORG_PULL := 0.06
 const ORG_ROUND_PULL := 0.012

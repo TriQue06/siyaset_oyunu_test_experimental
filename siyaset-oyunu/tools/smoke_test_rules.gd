@@ -263,12 +263,12 @@ func _initialize() -> void:
 	gm.government = {"pm": 1, "ministry_health": 2}
 	check("hukumetteki parti tur basina MANA_PER_ROUND_GOVERNMENT alir", cm.turn_income(1) == GameRules.MANA_PER_ROUND_GOVERNMENT 		and cm.turn_income(2) == GameRules.MANA_PER_ROUND_GOVERNMENT)
 	check("muhalefet normal gelir alir", cm.turn_income(3) == GameRules.MANA_PER_ROUND)
-	check("hukumet geliri 1 fazla", GameRules.MANA_PER_ROUND_GOVERNMENT == GameRules.MANA_PER_ROUND + 1)
+	check("hukumet geliri 10 fazla", GameRules.MANA_PER_ROUND_GOVERNMENT == GameRules.MANA_PER_ROUND + 10)
 	gm.government = gov_before
 
 	check("gozcu destede yok", not cm._draw_pool(1).has("gozcu"))
-	check("miting hamle, destede yok, 2 mana", not cm._draw_pool(1).has("miting") and GameRules.MITING_MANA_COST == 2)
-	check("kart bedelleri: karalama 1, calma 1/3, kaset 2, isyan 1", cp.card_cost("karalama") == 1 		and cp.card_cost("steal_weak") == 1 and cp.card_cost("steal_strong") == 3 and cp.card_cost("kaset") == 2 and cp.card_cost("isyan") == 1)
+	check("miting hamle, destede yok, 15 mana", not cm._draw_pool(1).has("miting") and GameRules.MITING_MANA_COST == 15)
+	check("kart bedelleri: karalama 10, calma 10/30, kaset 20, isyan 10", cp.card_cost("karalama") == 10 		and cp.card_cost("steal_weak") == 10 and cp.card_cost("steal_strong") == 30 and cp.card_cost("kaset") == 20 and cp.card_cost("isyan") == 10)
 
 	var law_type: String = cp.law_type("economic", 1)
 	check("yasa hamlesi turu okunur", cp.is_law_card(law_type) and int(cp.law_data(law_type)["dir"]) == 1 and not cp.is_law_card("miting"))
@@ -326,13 +326,13 @@ func _initialize() -> void:
 	cm.organizations[TestProvinces.id("izmir")][1] = GameRules.ORG_MAX_LEVEL
 	cm.mana[1] = 1
 	check("mana yetmezse miting yapilamaz", not cm.can_miting(1, TestProvinces.id("izmir")))
-	cm.mana[1] = 3
+	cm.mana[1] = GameRules.MITING_MANA_COST + 10
 	var izmir_before: float = cm.local_of(TestProvinces.id("izmir"), 1) + cm.national_of(1)
 	cm._apply_miting_move(1, TestProvinces.id("izmir"))
-	check("miting hamlesi 2 mana, etki yazildi, mana kaldi -> sira devretmedi", cm.mana_of(1) == 1 and cm.current_turn_peer_id() == 1 \
+	check("miting hamlesi 15 mana, etki yazildi, mana kaldi -> sira devretmedi", cm.mana_of(1) == 10 and cm.current_turn_peer_id() == 1 \
 		and not near(cm.local_of(TestProvinces.id("izmir"), 1) + cm.national_of(1), izmir_before))
 	cm.inventories[1] = ["mana_bonusu"]
-	cm.mana[1] = 2
+	cm.mana[1] = GameRules.MITING_MANA_COST
 	cm.organizations[TestProvinces.id("konya")] = {1: 1}
 	cm._apply_miting_move(1, TestProvinces.id("konya"))
 	check("mana bitti -> sira devretmez", cm.mana_of(1) == 0 and cm.current_turn_peer_id() == 1)

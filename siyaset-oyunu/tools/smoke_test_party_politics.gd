@@ -144,7 +144,7 @@ func _initialize() -> void:
 	var lost := false
 	for attempt in 20:
 		give_turn(me)
-		cm.mana[me] = 10.0
+		cm.mana[me] = 100.0
 		cm._congress_info(me)["elections"] = 1
 		cm._congress_info(me)["share"] = float(cm.last_vote_shares.get(me, 0.0)) + 20.0
 		cm.turmoil[me] = 10.0
@@ -157,7 +157,7 @@ func _initialize() -> void:
 	var new_leader: int = cm.party_of(me)
 	check("partinin yeni bot başkanı sırada", new_leader != me and mm.is_bot(new_leader) and cm.turn_order.has(new_leader))
 	give_turn(me)
-	cm.mana[me] = 10.0
+	cm.mana[me] = 100.0
 	var some_province: String = String(root.get_node("GameMap").province_ids()[0])
 	check("üye yasa sunamaz", not cm.can_propose_law(me))
 	check("üye teşkilat kuramaz", not cm.can_build_organization(me, some_province))
@@ -194,7 +194,7 @@ func _initialize() -> void:
 		cm._congress_info(leader_now)["elections"] = 1
 		cm.last_vote_shares[leader_now] = float(cm.party_congress[leader_now]["member_share"]) - 8.0
 		give_turn(me)
-		cm.mana[me] = 10.0
+		cm.mana[me] = 100.0
 		cm.request_congress()
 		cm.tick(30.0)
 	check("oy düşünce üye kongreyi kazanıp başkanlığa döndü", back or not pm.is_deputy(me))
@@ -249,14 +249,14 @@ func _initialize() -> void:
 	var p2: String = String(root.get_node("GameMap").province_ids()[4])
 	cm.local_support[p1] = {me: 5.0}
 	cm.local_support[p2] = {me: 3.0}
-	cm.mana[me] = 9.0
+	cm.mana[me] = 90.0
 	cm.miting(p1)
 	check("bağımsız mitingi güvenilirlik kazandırır", cm.credibility_of(me) > 60.0)
 	give_turn(me)
-	cm.mana[me] = 9.0
+	cm.mana[me] = 90.0
 	cm.found_party({"name": "Doğru Yol", "icon_index": 4, "bg_color": free_color(me)})
-	check("bağımsız parti kurdu (8 mana)", not pm.is_independent(me) and pm.parties[me]["name"] == "Doğru Yol"
-		and is_equal_approx(cm.mana_of(me), 1.0), str(cm.mana_of(me)))
+	check("bağımsız parti kurdu (80 mana)", not pm.is_independent(me) and pm.parties[me]["name"] == "Doğru Yol"
+		and is_equal_approx(cm.mana_of(me), 10.0), str(cm.mana_of(me)))
 	var opened := 0
 	for province_id in cm.organizations.keys():
 		opened += int(cm.organizations[province_id].get(me, 0))
@@ -325,15 +325,15 @@ func _initialize() -> void:
 
 	print("=== BOT MANA ZAYIFLATMASI ===")
 	var some_bot: int = int(mm.bot_ids()[0])
-	check("varsayılan zayıflatma 0,5", is_equal_approx(mm.bot_mana_penalty, 0.5))
+	check("varsayılan zayıflatma 5", is_equal_approx(mm.bot_mana_penalty, 5.0))
 	var bot_base := float(GameRules.MANA_PER_ROUND_GOVERNMENT if cm.is_government_party(some_bot) else GameRules.MANA_PER_ROUND)
-	check("bot tur başında 0,5 az mana alır", is_equal_approx(cm.turn_income(some_bot), bot_base - 0.5))
-	check("bot mana bonusundan 0,5 az alır", is_equal_approx(cm.mana_bonus_amount(some_bot, false), GameRules.MANA_BONUS_WEAK - 0.5)
-		and is_equal_approx(cm.mana_bonus_amount(some_bot, true), GameRules.MANA_BONUS_STRONG - 0.5))
+	check("bot tur başında 5 az mana alır", is_equal_approx(cm.turn_income(some_bot), bot_base - 5.0))
+	check("bot mana bonusundan 5 az alır", is_equal_approx(cm.mana_bonus_amount(some_bot, false), GameRules.MANA_BONUS_WEAK - 5.0)
+		and is_equal_approx(cm.mana_bonus_amount(some_bot, true), GameRules.MANA_BONUS_STRONG - 5.0))
 	check("gerçek oyuncu etkilenmez", is_equal_approx(cm.mana_bonus_amount(me, false), float(GameRules.MANA_BONUS_WEAK)))
-	mm.bot_mana_penalty = 1.5
-	check("1,5 zayıflatma", is_equal_approx(cm.turn_income(some_bot), bot_base - 1.5))
-	mm.bot_mana_penalty = 0.5
+	mm.bot_mana_penalty = 15.0
+	check("15 zayıflatma", is_equal_approx(cm.turn_income(some_bot), bot_base - 15.0))
+	mm.bot_mana_penalty = 5.0
 
 	print("=== KRİZ ===")
 	var crisis_bot: int = cm.party_of(int(mm.bot_ids()[1]))

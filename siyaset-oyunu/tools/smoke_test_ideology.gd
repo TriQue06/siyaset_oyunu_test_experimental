@@ -197,7 +197,7 @@ func _initialize() -> void:
 	new_game({1: ideology(1.5, 1.5, 1.5), 2: ideology(-1.5, -1.5, -1.5), 3: ideology(1.5, -1.5, 1.5)})
 	cm.speech_required = true
 	cm.speech_done = false
-	cm.mana[1] = 10.0
+	cm.mana[1] = 100.0
 	var org_pid: String = game_map.ids[2]
 	cm.organizations[org_pid] = {1: 1}
 	check("sira gelince konusma bekleniyor", cm.needs_speech(1) and not cm.needs_speech(2))
@@ -298,13 +298,13 @@ func _initialize() -> void:
 	print("")
 	print("=== 10) YENI KARTLAR VE KURALLAR ===")
 	new_game({1: ideology(1.5, 1.5, 1.5), 2: ideology(-1.5, -1.5, -1.5)})
-	check("tur basina mana 4 (hukumet 5)", GameRules.MANA_PER_ROUND == 4 and GameRules.MANA_PER_ROUND_GOVERNMENT == 5)
+	check("tur basina mana 40 (hukumet 50)", GameRules.MANA_PER_ROUND == 40 and GameRules.MANA_PER_ROUND_GOVERNMENT == 50)
 	check("yasa gecirmek +5 puan", cm.law_pass_score(false) == 5 and cm.law_pass_score(true) == 5)
 	check("bakanlik +3, yardimcilik +5, basbakanlik +10", GovernmentPresets.MINISTRY_POINTS == 3 \
 		and GovernmentPresets.DEPUTY_PM_POINTS == 5 and GovernmentPresets.PM_POINTS == 10)
 	cm.mana[1] = 0.0
 	cm._apply_card_effect(1, "mana_bonusu_guclu")
-	check("guclu mana bonusu +6", near(cm.mana_of(1), 6.0))
+	check("guclu mana bonusu +60", near(cm.mana_of(1), cm.mana_bonus_amount(1, true)) and GameRules.MANA_BONUS_STRONG == 60)
 	cm.inventories[1] = []
 	cm._apply_card_effect(1, "bonus_kart")
 	check("bonus kart 2 kart ceker", cm.inventories[1].size() == 2, str(cm.inventories[1]))

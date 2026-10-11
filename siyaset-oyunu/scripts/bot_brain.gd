@@ -21,7 +21,7 @@ const PASS_THRESHOLD := 0.4
 ## Ana hamlelerin taban puanları.
 const PASS_ACTION_SCORE := 0.7
 ## Bir mananın puan karşılığı (hamle puanından bedel × bu değer düşülür).
-const MANA_VALUE := 0.3
+const MANA_VALUE := 0.03
 ## Gözcü bilgisinden tahmin edilen eksen değeri (uç biliniyor, büyüklük değil).
 const LEANING_ESTIMATE := 2.0
 ## Yasanın taban puanı: yasa her tur meclisi durdurur, bot onu sadece gerçekten
@@ -174,7 +174,7 @@ static func _election_soon() -> bool:
 
 ## Manası bol olan bot için mana ucuzdur (birikip boşa durmasın), azsa değerlidir.
 static func _mana_value(bot: int) -> float:
-	return MANA_VALUE * clampf(4.0 / maxf(1.0, float(CardManager.mana_of(bot))), 0.2, 1.5)
+	return MANA_VALUE * clampf(40.0 / maxf(10.0, float(CardManager.mana_of(bot))), 0.2, 1.5)
 
 ## Dönüş: {"type": "card"} | {"type": "law", "law"} | {"type": "organization",
 ## "province"} | {"type": "miting", "province"} | |

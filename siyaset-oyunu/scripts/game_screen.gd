@@ -540,6 +540,8 @@ func _on_game_over() -> void:
 		return
 	_game_over_overlay = GameOverOverlay.new()
 	add_child(_game_over_overlay)
+	# Puan tablosu geldiği an jenerik müziği başlar.
+	AudioManager.play_music("credits")
 
 func _on_proposal_resolved(_accepted: bool, _kind: String, _proposer_id: int) -> void:
 	pass  # sonuç metni olay loguna CardManager üzerinden düşer

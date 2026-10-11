@@ -53,6 +53,7 @@ func _ready() -> void:
 	streamer_mode_check.button_pressed = GameSettings.streamer_mode
 	streamer_mode_check.toggled.connect(_on_streamer_mode_toggled)
 
+	_build_province_view_row()
 	_build_volume_rows()
 	_apply_pixel_style()
 
@@ -88,6 +89,34 @@ func _build_volume_rows() -> void:
 	_insert_before_close(box, title)
 	for row in [["master", "Ana ses"], ["music", "Müzik"], ["sfx", "Efektler"]]:
 		_volume_row(box, String(row[0]), String(row[1]))
+
+## İL İNCELEME: panel (sağ sütun, fareyle canlı) ya da pencere (tıklayınca).
+func _build_province_view_row() -> void:
+	var box := panel.get_node("CenterBox") as VBoxContainer
+	var title := UiTheme.section_label("İl inceleme")
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_insert_before_close(box, title)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	_insert_before_close(box, row)
+	var buttons: Array = []
+	var refresh := func():
+		for i in buttons.size():
+			var on: bool = GameSettings.province_view == i
+			UiSkin.skin_color_button(buttons[i], UiTheme.GOLD if on else UiTheme.PANEL_LIGHT)
+			(buttons[i] as Button).add_theme_color_override("font_color", UiTheme.INK if on else UiTheme.TEXT)
+	for i in 2:
+		var button := Button.new()
+		button.text = ["Panel", "Pencere"][i]
+		button.focus_mode = Control.FOCUS_NONE
+		button.custom_minimum_size = Vector2(0, 40)
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.pressed.connect(func():
+			GameSettings.set_province_view(i)
+			refresh.call())
+		row.add_child(button)
+		buttons.append(button)
+	refresh.call()
 
 ## Yeni satırı "Kapat" butonunun hemen üstüne yerleştirir.
 func _insert_before_close(box: VBoxContainer, node: Control) -> void:

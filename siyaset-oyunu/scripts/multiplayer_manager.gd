@@ -99,6 +99,7 @@ func set_random_parties(value: bool) -> void:
 		random_parties = value
 		if room_code != "":
 			_sync_random_parties.rpc(random_parties)
+			_sync_bot_mana_penalty.rpc(bot_mana_penalty)
 		settings_updated.emit()
 	else:
 		_request_set_random_parties.rpc_id(1, value)
@@ -109,6 +110,7 @@ func _request_set_random_parties(value: bool) -> void:
 		return
 	random_parties = value
 	_sync_random_parties.rpc(random_parties)
+	_sync_bot_mana_penalty.rpc(bot_mana_penalty)
 	settings_updated.emit()
 
 @rpc("authority", "reliable")
@@ -145,6 +147,37 @@ func _request_set_away_mode(value: String) -> void:
 @rpc("authority", "reliable")
 func _sync_away_mode(value: String) -> void:
 	away_mode = value
+	settings_updated.emit()
+
+## BOT MANA ZAYIFLATMASI: botlar her tur başında ve mana bonusu kartlarından
+## bu kadar AZ mana alır (lobi kuralı; 0 = kapalı). Gerçek oyuncuları ve
+## yerine bot oynayan düşmüş oyuncuyu etkilemez.
+const BOT_MANA_PENALTY_OPTIONS := [0.0, 0.5, 1.0, 1.5]
+const BOT_MANA_PENALTY_DEFAULT := 0.5
+var bot_mana_penalty: float = BOT_MANA_PENALTY_DEFAULT
+
+func set_bot_mana_penalty(value: float) -> void:
+	if not is_local_owner() or not BOT_MANA_PENALTY_OPTIONS.has(value):
+		return
+	if is_host:
+		bot_mana_penalty = value
+		if room_code != "":
+			_sync_bot_mana_penalty.rpc(bot_mana_penalty)
+		settings_updated.emit()
+	else:
+		_request_set_bot_mana_penalty.rpc_id(1, value)
+
+@rpc("any_peer", "reliable")
+func _request_set_bot_mana_penalty(value: float) -> void:
+	if not is_host or multiplayer.get_remote_sender_id() != owner_id or not BOT_MANA_PENALTY_OPTIONS.has(value):
+		return
+	bot_mana_penalty = value
+	_sync_bot_mana_penalty.rpc(bot_mana_penalty)
+	settings_updated.emit()
+
+@rpc("authority", "reliable")
+func _sync_bot_mana_penalty(value: float) -> void:
+	bot_mana_penalty = value
 	settings_updated.emit()
 
 ## Oyundan düşmüş (bağlantısı kopmuş) oyuncu mu?
@@ -312,6 +345,7 @@ func create_room(player_name: String) -> void:
 	_closing = false
 	map_seed = ""
 	away_mode = AWAY_BOT
+	bot_mana_penalty = BOT_MANA_PENALTY_DEFAULT
 	reset_seat_method()
 	election_threshold = THRESHOLD_DEFAULT
 	election_interval = GameRules.DEFAULT_ELECTION_INTERVAL
@@ -536,6 +570,7 @@ func _broadcast_player_list() -> void:
 		_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count)
 		_sync_map_seed.rpc(map_seed)
 		_sync_random_parties.rpc(random_parties)
+		_sync_bot_mana_penalty.rpc(bot_mana_penalty)
 	player_list_updated.emit()
 
 @rpc("any_peer", "reliable")
@@ -564,6 +599,7 @@ func transfer_ownership(new_owner_id: int) -> void:
 		_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count)
 		_sync_map_seed.rpc(map_seed)
 		_sync_random_parties.rpc(random_parties)
+		_sync_bot_mana_penalty.rpc(bot_mana_penalty)
 		player_list_updated.emit()
 	else:
 		_request_transfer_ownership.rpc_id(1, new_owner_id)
@@ -705,6 +741,7 @@ func _on_peer_disconnected(id: int) -> void:
 	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count)
 	_sync_map_seed.rpc(map_seed)
 	_sync_random_parties.rpc(random_parties)
+	_sync_bot_mana_penalty.rpc(bot_mana_penalty)
 	player_list_updated.emit()
 	if not was_player:
 		return
@@ -796,6 +833,7 @@ func _request_join(code: String, player_name: String, signature: String, uid: St
 	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count)
 	_sync_map_seed.rpc(map_seed)
 	_sync_random_parties.rpc(random_parties)
+	_sync_bot_mana_penalty.rpc(bot_mana_penalty)
 	player_list_updated.emit()
 
 func _away_player_with_uid(uid: String) -> int:
@@ -824,6 +862,7 @@ func _rejoin(old_id: int, new_id: int, player_name: String) -> void:
 	_sync_map_seed.rpc_id(new_id, map_seed)
 	_sync_random_parties.rpc_id(new_id, random_parties)
 	_sync_away_mode.rpc_id(new_id, away_mode)
+	_sync_bot_mana_penalty.rpc_id(new_id, bot_mana_penalty)
 	_sync_seat_method.rpc_id(new_id, seat_method)
 	PartyManager.broadcast()
 	if stage == Stage.IN_GAME:
@@ -874,6 +913,7 @@ func _request_transfer_ownership(new_owner_id: int) -> void:
 	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count)
 	_sync_map_seed.rpc(map_seed)
 	_sync_random_parties.rpc(random_parties)
+	_sync_bot_mana_penalty.rpc(bot_mana_penalty)
 	player_list_updated.emit()
 
 ## Host-olmayan mevcut sahip, baraj değiştirmek istediğinde host'a istek yollar.
@@ -919,6 +959,7 @@ func set_map_seed(text: String) -> void:
 		if room_code != "":
 			_sync_map_seed.rpc(map_seed)
 			_sync_random_parties.rpc(random_parties)
+			_sync_bot_mana_penalty.rpc(bot_mana_penalty)
 		settings_updated.emit()
 	else:
 		_request_set_map_seed.rpc_id(1, clean)
@@ -938,6 +979,7 @@ func _request_set_map_seed(text: String) -> void:
 	map_seed = clean_map_seed(text)
 	_sync_map_seed.rpc(map_seed)
 	_sync_random_parties.rpc(random_parties)
+	_sync_bot_mana_penalty.rpc(bot_mana_penalty)
 	settings_updated.emit()
 
 @rpc("authority", "reliable")

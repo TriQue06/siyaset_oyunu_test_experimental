@@ -1262,8 +1262,9 @@ func _apply_card_effect(peer_id: int, card_type: String, target_peer_id: int = -
 					drawn += 1
 			_event_message = "%s bonus kart kullandı (+%d kart)." % [_party_name(peer_id), drawn]
 		CardPresets.MANA_BONUS_STRONG_CARD_TYPE:
-			mana[peer_id] = mana_of(peer_id) + GameRules.MANA_BONUS_STRONG
-			_event_message = "%s güçlü mana bonusu kullandı (+%d mana)." % [_party_name(peer_id), GameRules.MANA_BONUS_STRONG]
+			var strong_gain := mana_bonus_amount(peer_id, true)
+			mana[peer_id] = mana_of(peer_id) + strong_gain
+			_event_message = "%s güçlü mana bonusu kullandı (+%s mana)." % [_party_name(peer_id), mana_text(strong_gain)]
 		CardPresets.EARLY_ELECTION_CARD_TYPE:
 			GovernmentManager.submit_early_election(peer_id)
 			_event_message = "%s erken seçim önergesi verdi." % _party_name(peer_id)
@@ -1271,8 +1272,9 @@ func _apply_card_effect(peer_id: int, card_type: String, target_peer_id: int = -
 			populism[party_of(peer_id)] = round_number + GameRules.POPULISM_ROUNDS
 			_event_message = "%s popülizme başladı: %d dönem boyunca hamleleri daha etkili." % [_party_name(peer_id), GameRules.POPULISM_ROUNDS]
 		CardPresets.MANA_BONUS_CARD_TYPE:
-			mana[peer_id] = mana_of(peer_id) + GameRules.MANA_BONUS_WEAK
-			_event_message = "%s mana bonusu kullandı (+%d mana)." % [_party_name(peer_id), GameRules.MANA_BONUS_WEAK]
+			var weak_gain := mana_bonus_amount(peer_id, false)
+			mana[peer_id] = mana_of(peer_id) + weak_gain
+			_event_message = "%s mana bonusu kullandı (+%s mana)." % [_party_name(peer_id), mana_text(weak_gain)]
 		CardPresets.PROPAGANDA_CARD_TYPE:
 			_apply_propaganda(peer_id, target_peer_id, target_province)
 	return false
@@ -2022,7 +2024,17 @@ func _peek_turn_card(peer_id: int) -> String:
 
 ## Tur geliri: hükümette görevi olan partiler bir fazla mana alır.
 func turn_income(peer_id: int) -> float:
-	return float(GameRules.MANA_PER_ROUND_GOVERNMENT if is_government_party(peer_id) else GameRules.MANA_PER_ROUND)
+	var base := float(GameRules.MANA_PER_ROUND_GOVERNMENT if is_government_party(peer_id) else GameRules.MANA_PER_ROUND)
+	return maxf(0.0, base - bot_mana_penalty(peer_id))
+
+## Lobi kuralı: botlar tur başında ve mana bonuslarından bu kadar az mana alır.
+func bot_mana_penalty(peer_id: int) -> float:
+	return MultiplayerManager.bot_mana_penalty if MultiplayerManager.is_bot(peer_id) else 0.0
+
+## Mana bonusu kartının bu oyuncuya verdiği mana (botlara zayıflatma uygulanır).
+func mana_bonus_amount(peer_id: int, strong: bool) -> float:
+	var base := float(GameRules.MANA_BONUS_STRONG if strong else GameRules.MANA_BONUS_WEAK)
+	return maxf(0.0, base - bot_mana_penalty(peer_id))
 
 ## Desteden bir kartı doğrudan ele verir. El doluysa verilmez.
 ## Dönen değer: verilen kartın türü ("" = verilmedi).

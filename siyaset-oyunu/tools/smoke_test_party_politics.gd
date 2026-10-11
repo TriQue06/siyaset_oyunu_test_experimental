@@ -323,6 +323,18 @@ func _initialize() -> void:
 	mm.players[me].erase("away")
 	mm.away_mode = mm.AWAY_BOT
 
+	print("=== BOT MANA ZAYIFLATMASI ===")
+	var some_bot: int = int(mm.bot_ids()[0])
+	check("varsayılan zayıflatma 0,5", is_equal_approx(mm.bot_mana_penalty, 0.5))
+	var bot_base := float(GameRules.MANA_PER_ROUND_GOVERNMENT if cm.is_government_party(some_bot) else GameRules.MANA_PER_ROUND)
+	check("bot tur başında 0,5 az mana alır", is_equal_approx(cm.turn_income(some_bot), bot_base - 0.5))
+	check("bot mana bonusundan 0,5 az alır", is_equal_approx(cm.mana_bonus_amount(some_bot, false), GameRules.MANA_BONUS_WEAK - 0.5)
+		and is_equal_approx(cm.mana_bonus_amount(some_bot, true), GameRules.MANA_BONUS_STRONG - 0.5))
+	check("gerçek oyuncu etkilenmez", is_equal_approx(cm.mana_bonus_amount(me, false), float(GameRules.MANA_BONUS_WEAK)))
+	mm.bot_mana_penalty = 1.5
+	check("1,5 zayıflatma", is_equal_approx(cm.turn_income(some_bot), bot_base - 1.5))
+	mm.bot_mana_penalty = 0.5
+
 	print("")
 	print("=== %s ===" % ("TUM TESTLER GECTI" if _failed == 0 else "%d TEST BASARISIZ" % _failed))
 	quit(1 if _failed > 0 else 0)

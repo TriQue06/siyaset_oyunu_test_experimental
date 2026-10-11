@@ -4,16 +4,21 @@ extends Node
 
 signal streamer_mode_changed(enabled: bool)
 signal display_mode_changed(mode: int)
+signal province_view_changed(mode: int)
 
 ## Sadece iki ekran modu var: pencereli veya tam ekran. Çerçevesiz tam ekran
 ## kaldırıldı (kasıtlı — karmaşayı azaltmak için).
 enum DisplayMode { WINDOWED, FULLSCREEN }
+## İL İNCELEME: PANEL = il bilgisi sağ sütundaki "Seçili" sekmesinde (fareyle
+## canlı); PENCERE = ile tıklayınca haritanın üstünde açılan pencere (eski).
+enum ProvinceView { PANEL, WINDOW }
 
 const CONFIG_PATH := "user://settings.cfg"
 const DEFAULT_FPS_LIMIT := 144
 const DEFAULT_VSYNC := true
 const DEFAULT_DISPLAY_MODE := DisplayMode.WINDOWED
 const DEFAULT_STREAMER_MODE := false
+const DEFAULT_PROVINCE_VIEW := ProvinceView.PANEL
 ## Ses seviyeleri 0.0 - 1.0. %100 = oyunun DENGELİ sesi; kaydırıcılar bu
 ## noktanın üstüne çıkmaz (bkz. AudioManager.VOLUME_CEILING). Varsayılan da
 ## %100'dür: oyun kutudan çıktığı gibi doğru seviyede.
@@ -31,6 +36,7 @@ var streamer_mode: bool = DEFAULT_STREAMER_MODE
 var master_volume: float = DEFAULT_MASTER_VOLUME
 var music_volume: float = DEFAULT_MUSIC_VOLUME
 var sfx_volume: float = DEFAULT_SFX_VOLUME
+var province_view: int = DEFAULT_PROVINCE_VIEW
 
 func _ready() -> void:
 	_load()
@@ -67,6 +73,13 @@ func set_volume(kind: String, value: float) -> void:
 	AudioManager.apply_volumes()
 	_save()
 
+func set_province_view(mode: int) -> void:
+	if not mode in [ProvinceView.PANEL, ProvinceView.WINDOW]:
+		return
+	province_view = mode
+	_save()
+	province_view_changed.emit(province_view)
+
 func set_streamer_mode(value: bool) -> void:
 	streamer_mode = value
 	streamer_mode_changed.emit(streamer_mode)
@@ -97,6 +110,7 @@ func _load() -> void:
 		master_volume = float(config.get_value("settings", "master_volume", DEFAULT_MASTER_VOLUME))
 		music_volume = float(config.get_value("settings", "music_volume", DEFAULT_MUSIC_VOLUME))
 		sfx_volume = float(config.get_value("settings", "sfx_volume", DEFAULT_SFX_VOLUME))
+		province_view = int(config.get_value("settings", "province_view", DEFAULT_PROVINCE_VIEW))
 
 func _save() -> void:
 	var config := ConfigFile.new()
@@ -107,4 +121,5 @@ func _save() -> void:
 	config.set_value("settings", "master_volume", master_volume)
 	config.set_value("settings", "music_volume", music_volume)
 	config.set_value("settings", "sfx_volume", sfx_volume)
+	config.set_value("settings", "province_view", province_view)
 	config.save(CONFIG_PATH)

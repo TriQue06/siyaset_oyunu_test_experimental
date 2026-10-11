@@ -25,17 +25,22 @@ const TOP_STRIP_HEIGHT := 64.0
 ##   üst parti şeridi · ortada harita (sol altında meclis rozeti) · sağda
 ##   sekmeli inceleme sütunu · altta "benim masam" (kartlar, hamleler, mana, bitir).
 const DESIGN := Vector2(1280, 720)
-const R_STRIP := Rect2(16, 8, 1112, 48)
-const R_MAP := Rect2(16, 72, 944, 448)
-const R_SIDE := Rect2(976, 72, 288, 448)
+## "HABER STÜDYOSU" (0.0.153): üstte canlı yayın bandı · solda skor tablosu
+## (VEKİL / PUAN) · ortada harita · sağda sekmeli stüdyo masası (HÜKÜMET
+## sekmesinde meclis diyagramı) · altta Meclis Salonu'nun masası.
+const R_BAND := Rect2(0, 0, 1280, 64)
+const R_BOARD := Rect2(16, 72, 272, 448)
+const R_MAP := Rect2(304, 72, 672, 448)
+const R_SIDE := Rect2(992, 72, 272, 448)
 const R_DESK := Rect2(0, 528, 1280, 192)
 const R_HAND := Rect2(16, 560, 504, 128)
 const R_ACTIONS := Rect2(536, 560, 392, 136)
 const R_MANA := Rect2(952, 560, 148, 64)
 const R_TRASH := Rect2(1108, 560, 156, 64)
 const R_PASS := Rect2(952, 632, 312, 72)
-const R_PARL := Rect2(24, 400, 196, 112)
-const R_PARL_VOTE := Rect2(24, 232, 296, 280)
+## Stüdyo masasındaki meclis yuvasının yüksekliği (oylamada büyür).
+const PARL_SLOT_HEIGHT := 150.0
+const PARL_SLOT_VOTE_HEIGHT := 286.0
 ## Sağ üstte Menü düğmesi: şerit oraya kadar uzanmaz.
 const MENU_RESERVE := 140.0
 ## Alt bantta kartların, hamlelerin ve sağdaki kontrollerin payı.
@@ -43,11 +48,10 @@ const BAND_HAND_RATIO := 0.40
 const BAND_ACTIONS_RATIO := 0.33
 ## EVRENSEL PARTİ TABLOSU: üstteki üç sekme ve her sekmenin sayı sütunları.
 ## Sütun başlıkları tablonun ilk satırında görünür, satırlarda tekrar etmez.
-const PLAYER_TAB_TITLES := ["SIRA", "SEÇİM", "DURUM"]
+const PLAYER_TAB_TITLES := ["VEKİL", "PUAN"]
 const PLAYER_TAB_TOOLTIPS := [
-	"Sıra kimde ve senin manan",
-	"Son seçimdeki oy oranı ve kazanılan vekil",
-	"Şu anki vekil, puan ve ulusal puan",
+	"Partilerin vekil sayısı ve son seçimdeki oy oranı",
+	"Siyasetçilerin puanı ve partilerinin ulusal durumu",
 ]
 ## Her sekme için [başlık, genişlik] sütunları (soldan sağa, sağa yaslı).
 const PLAYER_TAB_COLUMNS := [
@@ -331,6 +335,7 @@ func _ready() -> void:
 	CardManager.seats_changed.connect(_on_seats_changed)
 	GovernmentManager.proposal_resolved.connect(_on_proposal_resolved)
 	CardManager.opinion_changed.connect(_on_opinion_changed)
+	GameSettings.province_view_changed.connect(_on_province_view_changed)
 
 	UiSkin.skin_panel(left_panel, UiSkin.PANEL_DARK)
 	# Yıl / sonraki seçim / baraj kendi levhasında dursun (ek UI katmanı).
@@ -505,6 +510,7 @@ func _refresh_desk_labels() -> void:
 	if peer_id != -1 and not CardManager.is_turn_blocked():
 		turn_text += "  ·  %s" % GameRules.format_seconds(CardManager.turn_seconds_left())
 	(_desk_labels["turn"] as Label).text = turn_text
+	_refresh_band_turn()
 
 ## Viewport boyutuna bağlı TÜM mutlak-piksel yerleşim hesapları burada — hem
 ## açılışta hem her yeniden boyutlanmada (tam ekran vb.) çağrılır.
@@ -529,31 +535,34 @@ func _apply_layout() -> void:
 	if (_map_slide_tween == null or not _map_slide_tween.is_running()) and (_focus_tween == null or not _focus_tween.is_running()):
 		map_holder.position = Vector2.ZERO
 	_place_layer_bar()
-	_place_date_chip(map_rect)
 
-	# ÜST ŞERİT: bütün partilerin plaketleri (Menü düğmesine kadar).
+	# CANLI YAYIN BANDI: CANLI · başlık + tarih · sıra kimde (Menü sağda).
 	if _strip_bg == null:
 		_strip_bg = Panel.new()
 		var strip_style := StyleBoxFlat.new()
-		strip_style.bg_color = STRIP_BG
+		strip_style.bg_color = Color("1d1838")
 		strip_style.border_color = UiTheme.INK
 		strip_style.border_width_bottom = 2
 		_strip_bg.add_theme_stylebox_override("panel", strip_style)
 		_strip_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(_strip_bg)
 		move_child(_strip_bg, 1)
-	_set_rect(_strip_bg, _r(Rect2(0, 0, 1280, 64)))
+	_set_rect(_strip_bg, _r(R_BAND))
+	_place_date_chip(map_rect)
+
+	# SKOR TABLOSU (sol): VEKİL ve PUAN sekmeleri.
+	_ensure_board()
+	_set_rect(_board_bg, _r(R_BOARD))
 	var strip := get_node_or_null("PlayerPanel") as Control
 	if strip != null:
-		_set_rect(strip, _r(R_STRIP))
+		_set_rect(strip, _r(R_BOARD).grow(-8.0))
 
-	# MECLİS ROZETİ: haritanın sol altında (oylamada büyür).
 	_detach_actions_panel()
-	_place_parliament_badge()
 
-	# SAĞ İNCELEME SÜTUNU: sekmeler (Hükümet · Log · Seçili).
+	# STÜDYO MASASI (sağ): Hükümet (meclis diyagramıyla) · Log · Seçili.
 	_set_rect(left_panel, _r(R_SIDE))
 	_setup_side_column()
+	_place_parliament_badge()
 
 	# BENİM MASAM: kartlar, hamleler, mana, bozdurma, Turu Bitir.
 	_place_card_bar()
@@ -605,37 +614,111 @@ func _ensure_map_bg(rect: Rect2) -> void:
 		move_child(_map_bg, 1)
 	_set_rect(_map_bg, rect)
 
-## Haritanın sağ üstünde tarih / baraj / sonraki seçim.
-func _place_date_chip(map_rect: Rect2) -> void:
-	if _date_chip == null:
-		_date_chip = PanelContainer.new()
-		var style := StyleBoxFlat.new()
-		style.bg_color = Color(UiTheme.INK, 0.8)
-		style.set_content_margin_all(6)
-		_date_chip.add_theme_stylebox_override("panel", style)
-		_date_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_date_chip.z_index = 6
+## YAYIN BANDI: kırmızı CANLI rozeti, "SİYASET GÜNDEMİ" ve altında tarih /
+## baraj / sonraki seçim; ortada sıranın kimde olduğu ve kalan süre.
+var _band_live: Label
+var _band_title: Label
+var _band_turn: PanelContainer
+var _band_turn_row: HBoxContainer
+var _band_turn_key := ""
+
+func _place_date_chip(_map_rect: Rect2) -> void:
+	if _date_label == null:
+		_band_live = Label.new()
+		_band_live.text = "● CANLI"
+		_band_live.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_band_live.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_band_live.add_theme_font_override("font", UiTheme.mono(true))
+		_band_live.add_theme_font_size_override("font_size", 14)
+		_band_live.add_theme_color_override("font_color", Color.WHITE)
+		var live_style := StyleBoxFlat.new()
+		live_style.bg_color = Color("e0303f")
+		_band_live.add_theme_stylebox_override("normal", live_style)
+		_band_live.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_band_live)
+		_band_title = Label.new()
+		_band_title.text = "SİYASET GÜNDEMİ"
+		_band_title.add_theme_font_override("font", UiTheme.mono(true))
+		_band_title.add_theme_font_size_override("font_size", 20)
+		_band_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_band_title)
 		_date_label = Label.new()
 		_date_label.add_theme_font_override("font", UiTheme.mono(true))
 		_date_label.add_theme_font_size_override("font_size", 11)
 		_date_label.add_theme_color_override("font_color", UiTheme.GOLD)
-		_date_chip.add_child(_date_label)
-		add_child(_date_chip)
+		_date_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_date_label)
+		_band_turn = PanelContainer.new()
+		var turn_style := StyleBoxFlat.new()
+		turn_style.bg_color = Color("2a2350")
+		turn_style.border_color = UiTheme.GOLD
+		turn_style.set_border_width_all(2)
+		turn_style.content_margin_left = 8
+		turn_style.content_margin_right = 8
+		_band_turn.add_theme_stylebox_override("panel", turn_style)
+		_band_turn.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_band_turn.clip_contents = true
+		_band_turn_row = HBoxContainer.new()
+		_band_turn_row.add_theme_constant_override("separation", 8)
+		_band_turn_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_band_turn.add_child(_band_turn_row)
+		add_child(_band_turn)
+	_set_rect(_band_live, _r(Rect2(16, 14, 96, 36)))
+	_band_title.position = _r(Rect2(124, 8, 0, 0)).position
+	_date_label.position = _r(Rect2(124, 36, 0, 0)).position
+	_set_rect(_band_turn, _r(Rect2(700, 14, 420, 36)))
 	_date_label.text = game_settings_label.text.replace("\n", "  ·  ")
-	_date_chip.reset_size()
-	_date_chip.position = Vector2(map_rect.end.x - _date_chip.size.x - 8.0, map_rect.position.y + 8.0)
+	_band_turn_key = ""
+	_refresh_band_turn()
 
-## MECLİS ROZETİ: başlık, yarım daire, hükümet/salt çoğunluk/muhalefet satırı.
-## Oylama sürerken büyür; teklif metni ve EVET/ÇEKİMSER/HAYIR görünür.
+## Banttaki sıra kutusu: logo · SIRA: PARTİ (siyasetçi) · süre.
+func _refresh_band_turn() -> void:
+	if _band_turn_row == null:
+		return
+	var peer_id := CardManager.current_turn_peer_id()
+	var timer := "" if peer_id == -1 or CardManager.is_turn_blocked() else GameRules.format_seconds(CardManager.turn_seconds_left())
+	var key := "%d|%s|%s" % [peer_id, timer, PartyManager.data_of(peer_id).get("name", "")]
+	if key == _band_turn_key:
+		return
+	_band_turn_key = key
+	for child in _band_turn_row.get_children():
+		_band_turn_row.remove_child(child)
+		child.queue_free()
+	_band_turn.visible = peer_id != -1
+	if peer_id == -1:
+		return
+	var badge := PartyBadge.build(PartyManager.data_of(peer_id), Vector2(22, 22), BADGE_ICON_PIXEL_SIZE)
+	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_band_turn_row.add_child(badge)
+	var party_text := "Bağımsız" if PartyManager.is_independent(peer_id) else String(PartyManager.data_of(peer_id).get("name", "?"))
+	var text := "SIRA SENDE" if peer_id == multiplayer.get_unique_id() else "SIRA: %s · %s" % [party_text, PoliticianPresets.display_name(peer_id)]
+	var label := _avatar_label(text, _fit_font_size(text, _r(Rect2(0, 0, 300, 0)).size.x, 14, 8), UiTheme.TEXT)
+	label.add_theme_font_override("font", UiTheme.mono(true))
+	label.clip_text = false
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_band_turn_row.add_child(label)
+	var time_label := _avatar_label(timer, 14, UiTheme.GOLD)
+	time_label.add_theme_font_override("font", UiTheme.mono(true))
+	time_label.clip_text = false
+	time_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_band_turn_row.add_child(time_label)
+
+## MECLİS: stüdyo masasının HÜKÜMET sekmesinde, sekmelerin hemen altındaki
+## yuvada; oylama sürerken büyür, teklif metni ve EVET/ÇEKİMSER/HAYIR görünür (bkz. _parl_slot). Oylama başlayınca Hükümet sekmesi kendiliğinden açılır.
+var _parl_slot: Control
+var _was_voting := false
+
 func _place_parliament_badge() -> void:
 	var voting := GovernmentManager.is_voting()
-	var rect := _r(R_PARL_VOTE if voting else R_PARL)
+	var just_started := voting and not _was_voting
+	_was_voting = voting
 	if _parl_bg == null:
 		_parl_bg = Panel.new()
 		var style := StyleBoxFlat.new()
-		style.bg_color = Color(Color("1d1838"), 0.82)
-		style.border_color = UiTheme.INK
-		style.set_border_width_all(2)
+		style.bg_color = Color("15112b")
+		style.border_color = Color("3f3775")
+		style.set_border_width_all(1)
 		_parl_bg.add_theme_stylebox_override("panel", style)
 		_parl_bg.mouse_filter = Control.MOUSE_FILTER_STOP
 		add_child(_parl_bg)
@@ -661,17 +744,41 @@ func _place_parliament_badge() -> void:
 		if split != null:
 			split.offset_top = 0
 			split.offset_bottom = 0
-	_set_rect(_parl_bg, rect)
 	bottom_area.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	bottom_area.position = rect.position
-	bottom_area.size = rect.size
 	bottom_area.z_index = 4
 	_parl_bg.z_index = 3
+	if just_started and _side_tabs != null:
+		# Oylama herkesin önüne gelsin: Seçili/Log açıksa Hükümet'e dön.
+		_side_tab = 0
+		if _left_dock != null and _left_dock.visible:
+			_hide_profile()
+			if _province_panel != null and _province_panel.embedded_mode:
+				_province_panel.hide()
+		_refresh_side_tabs()
+	if _parl_slot != null:
+		_parl_slot.custom_minimum_size.y = (PARL_SLOT_VOTE_HEIGHT if voting else PARL_SLOT_HEIGHT) * _r(R_SIDE).size.y / R_SIDE.size.y
 	var vote_row := bottom_area.get_node_or_null("ChamberSplit/ParliamentChamber/ParliamentVBox/VoteButtonRow") as Control
 	if vote_row != null:
 		vote_row.visible = voting
 	proposal_label.visible = voting
 	_refresh_parliament_summary()
+	_sync_parliament_to_slot()
+
+## Meclis (zemin + diyagram) her kare yuvanın ekrandaki yerine oturur; yuva
+## görünmüyorsa (Log / Seçili sekmesi) meclis de gizlenir.
+func _sync_parliament_to_slot() -> void:
+	if _parl_bg == null:
+		return
+	var shown := _parl_slot != null and _parl_slot.is_visible_in_tree()
+	_parl_bg.visible = shown
+	bottom_area.visible = shown
+	if not shown:
+		return
+	var rect := _parl_slot.get_global_rect()
+	if _parl_bg.position != rect.position or _parl_bg.size != rect.size:
+		_set_rect(_parl_bg, rect)
+		bottom_area.position = rect.position
+		bottom_area.size = rect.size
 
 func _refresh_parliament_summary() -> void:
 	if _parl_summary == null:
@@ -710,37 +817,61 @@ func _setup_side_column() -> void:
 	if _side_tabs == null:
 		_side_tabs = HBoxContainer.new()
 		_side_tabs.add_theme_constant_override("separation", 4)
-		for i in 4:
+		for i in SIDE_TAB_TITLES.size():
 			var tab := Button.new()
-			tab.text = ["HÜKÜMET", "LOG", "PUAN", "SEÇİLİ"][i]
+			tab.text = SIDE_TAB_TITLES[i]
 			tab.focus_mode = Control.FOCUS_NONE
 			tab.add_theme_font_size_override("font_size", 11)
 			tab.add_theme_font_override("font", UiTheme.mono(true))
 			tab.custom_minimum_size = Vector2(0, 28)
+			tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			tab.pressed.connect(_on_side_tab.bind(i))
 			_side_tabs.add_child(tab)
 		vbox.add_child(_side_tabs)
 		vbox.move_child(_side_tabs, 0)
-		# PUAN TABLOSU: bütün siyasetçilerin puanı ve partilerinin ulusal puanı.
-		_score_scroll = ScrollContainer.new()
-		_score_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		_score_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		_score_scroll.hide()
-		_score_box = VBoxContainer.new()
-		_score_box.add_theme_constant_override("separation", 4)
-		_score_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		_score_box.add_theme_constant_override("separation", 4)
-		var gutter := MarginContainer.new()
-		gutter.add_theme_constant_override("margin_right", 10)
-		gutter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		_score_scroll.add_child(gutter)
-		gutter.add_child(_score_box)
-		vbox.add_child(_score_scroll)
-		vbox.move_child(_score_scroll, 1)
+		# Meclis diyagramının yeri (sadece Hükümet sekmesinde görünür).
+		_parl_slot = Control.new()
+		_parl_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		vbox.add_child(_parl_slot)
+		vbox.move_child(_parl_slot, 1)
 	_refresh_side_tabs()
 
 var _score_scroll: ScrollContainer
 var _score_box: VBoxContainer
+const SIDE_TAB_TITLES := ["HÜKÜMET", "LOG", "SEÇİLİ"]
+const SIDE_TAB_SELECTED := 2
+
+## SKOR TABLOSU (sol sütun): zemin, sekmeler, VEKİL listesi (kaydırılabilir)
+## ve PUAN tablosu.
+var _board_bg: Panel
+var _board_scroll: ScrollContainer
+
+func _ensure_board() -> void:
+	if _board_bg != null:
+		return
+	_board_bg = Panel.new()
+	_board_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiSkin.skin_panel(_board_bg, UiSkin.PANEL_DARK)
+	add_child(_board_bg)
+	move_child(_board_bg, 1)
+	var box := player_panel_list.get_parent() as VBoxContainer
+	_board_scroll = ScrollContainer.new()
+	_board_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_board_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	box.add_child(_board_scroll)
+	box.move_child(_board_scroll, player_panel_list.get_index())
+	box.remove_child(player_panel_list)
+	player_panel_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_board_scroll.add_child(player_panel_list)
+	_score_scroll = ScrollContainer.new()
+	_score_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_score_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_score_scroll.hide()
+	_score_box = VBoxContainer.new()
+	_score_box.add_theme_constant_override("separation", 4)
+	_score_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_score_scroll.add_child(_score_box)
+	box.add_child(_score_scroll)
 
 ## Puan tablosu: siyasetçiler puana göre sıralı; satırda sıra, parti rengi,
 ## siyasetçi ve partisi, puan, partinin ulusal puanı (kamuoyu).
@@ -801,11 +932,11 @@ func _refresh_score_table() -> void:
 		_score_box.add_child(row)
 
 func _on_side_tab(index: int) -> void:
-	if index == 3:
+	if index == SIDE_TAB_SELECTED:
 		return  # "Seçili" bir il ya da partiye dokununca açılır
 	_side_tab = index
 	_hide_profile()
-	if _province_panel != null:
+	if _province_panel != null and _province_panel.embedded_mode:
 		_province_panel.hide()
 	_refresh_side_tabs()
 
@@ -813,19 +944,33 @@ func _refresh_side_tabs() -> void:
 	if _side_tabs == null:
 		return
 	var selected_open := _left_dock != null and _left_dock.visible
-	var active := 3 if selected_open else _side_tab
+	var active := SIDE_TAB_SELECTED if selected_open else _side_tab
 	for i in _side_tabs.get_child_count():
 		var tab := _side_tabs.get_child(i) as Button
 		UiSkin.skin_color_button(tab, UiTheme.GOLD if i == active else UiTheme.PANEL_LIGHT)
 		tab.add_theme_color_override("font_color", UiTheme.INK if i == active else UiTheme.TEXT_MUTED)
-		tab.disabled = i == 3 and not selected_open
-	if _score_scroll != null:
-		_score_scroll.visible = not selected_open and _side_tab == 2
+		tab.disabled = i == SIDE_TAB_SELECTED and not selected_open
+		# Pencere modunda il ve profil pencerede açılır: "Seçili" sekmesine gerek yok.
+		tab.visible = i != SIDE_TAB_SELECTED or not _window_mode()
 	if not selected_open:
 		government_vbox.visible = _side_tab == 0
 		if _event_log != null:
-			_event_log.visible = _side_tab != 2
-	_refresh_score_table()
+			_event_log.visible = true
+	if _parl_slot != null:
+		_parl_slot.visible = not selected_open and _side_tab == 0
+	_sync_parliament_to_slot()
+
+## İl inceleme ayarı: PENCERE ise il ve profil haritanın üstünde pencerede açılır.
+func _window_mode() -> bool:
+	return GameSettings.province_view == GameSettings.ProvinceView.WINDOW
+
+func _on_province_view_changed(_mode: int) -> void:
+	_hide_profile()
+	if _province_panel != null:
+		_province_panel.queue_free()
+		_province_panel = null
+	_update_left_dock()
+	_refresh_side_tabs()
 
 ## Seçim yapılınca HERKESİN ekranında tetiklenir: ekran kararıp seçim
 ## sonuçları animasyon ekranına geçilir, oradan otomatik olarak buraya (yeni
@@ -1055,9 +1200,6 @@ func _refresh_game_settings_label() -> void:
 		game_settings_label.text += "\nSayım: " + ElectionModel.method_title(MultiplayerManager.seat_method)
 	if _date_label != null:
 		_date_label.text = game_settings_label.text.replace("\n", "  ·  ")
-		_date_chip.reset_size()
-		var map_rect := _r(R_MAP)
-		_date_chip.position = Vector2(map_rect.end.x - _date_chip.size.x - 8.0, map_rect.position.y + 8.0)
 
 func _format_threshold(value: float) -> String:
 	if is_equal_approx(value, round(value)):
@@ -1113,7 +1255,7 @@ func _build_player_tabs() -> void:
 		button.tooltip_text = PLAYER_TAB_TOOLTIPS[i]
 		button.focus_mode = Control.FOCUS_NONE
 		button.clip_text = true
-		button.custom_minimum_size = Vector2(0, PLAYER_TAB_HEIGHT)
+		button.custom_minimum_size = Vector2(0, 28)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.add_theme_font_size_override("font_size", UiTheme.FS_TINY)
 		button.pressed.connect(_on_player_tab_pressed.bind(i))
@@ -1130,7 +1272,11 @@ func _on_player_tab_pressed(index: int) -> void:
 
 func _refresh_player_tabs() -> void:
 	for i in _player_tab_buttons.size():
-		UiSkin.skin_color_button(_player_tab_buttons[i], UiTheme.GOLD if i == _player_tab else UiTheme.PANEL_LIGHT)
+		var button := _player_tab_buttons[i] as Button
+		UiSkin.skin_color_button(button, UiTheme.GOLD if i == _player_tab else UiTheme.PANEL_LIGHT)
+		button.add_theme_color_override("font_color", UiTheme.INK if i == _player_tab else UiTheme.TEXT_MUTED)
+		button.add_theme_font_override("font", UiTheme.mono(true))
+		button.add_theme_font_size_override("font_size", 11)
 
 ## Tablonun sütun başlıkları: parti adının sağında, satırlarla aynı hizada.
 func _build_player_header() -> Control:
@@ -1195,21 +1341,28 @@ func _player_row_values(peer_id: int, is_self: bool) -> Array:
 func _rebuild_player_panel() -> void:
 	if player_panel_list == null:
 		return
+	_ensure_board()
 	for child in player_panel_list.get_children():
 		player_panel_list.remove_child(child)
 		child.queue_free()
 	if player_tabs != null:
-		player_tabs.hide()
+		player_tabs.show()
 	var party_ids := _ordered_party_ids()
-	player_panel_list.columns = maxi(1, party_ids.size())
-	player_panel_list.add_theme_constant_override("h_separation", 6)
+	player_panel_list.columns = 1
+	player_panel_list.add_theme_constant_override("v_separation", 4)
 	var panel := get_node_or_null("PlayerPanel") as Control
 	if panel != null:
 		panel.clip_contents = true
-	var strip_width: float = _r(R_STRIP).size.x
-	var plaque_width: float = (strip_width - 6.0 * (party_ids.size() - 1)) / maxf(1.0, party_ids.size())
+	var inner := _r(R_BOARD).grow(-8.0)
+	var list_height: float = inner.size.y - PLAYER_TAB_HEIGHT - 6.0
+	var plaque_height: float = clampf(list_height / maxf(1.0, party_ids.size()) - 4.0, 40.0, 50.0)
 	for pid in party_ids:
-		player_panel_list.add_child(_build_plaque(int(pid), plaque_width))
+		var plaque := _build_plaque(int(pid), inner.size.x)
+		plaque.custom_minimum_size.y = plaque_height
+		player_panel_list.add_child(plaque)
+	_board_scroll.visible = _player_tab == 0
+	_score_scroll.visible = _player_tab == 1
+	_refresh_score_table()
 	# Panel yeniden kuruldu: hedef seçme vurguları yeni düğümlere uygulanmalı.
 	_refresh_target_highlights()
 
@@ -1458,6 +1611,7 @@ func _fit_hand_width(count: int) -> void:
 
 func _process(delta: float) -> void:
 	_refresh_countdowns()
+	_sync_parliament_to_slot()
 	if _drag_ghost != null:
 		_update_drag()
 	else:
@@ -1684,6 +1838,8 @@ func _unplayable_reason(card_type: String) -> String:
 # --- Sürükle-bırak -----------------------------------------------------------
 
 func _start_drag(hand_index: int, card_type: String, holder: Control) -> void:
+	if _player_tab != 0:
+		_on_player_tab_pressed(0)  # parti hedefleri VEKİL sekmesinde
 	if not CardManager.can_act():
 		return
 	_deselect_hand_card()
@@ -1903,9 +2059,11 @@ func _party_under_mouse() -> int:
 
 func _begin_targeting(hand_index: int) -> void:
 	_pending_target_hand_index = hand_index
+	if _player_tab != 0:
+		_on_player_tab_pressed(0)  # hedef plaketler VEKİL sekmesinde
 	_refresh_target_highlights()
 	_hide_profile()
-	_set_target_hint("%s: sağdan bir partiye dokun  ·  Karta tekrar dokun: iptal" % CardPresets.card_title(
+	_set_target_hint("%s: soldan bir partiye dokun  ·  Karta tekrar dokun: iptal" % CardPresets.card_title(
 		String(CardManager.my_inventory()[hand_index])))
 
 ## Hedef seçilen kart bu partiye oynanabilir mi?
@@ -2013,6 +2171,8 @@ var _live_province := ""
 ## Fare haritada bir ilin üstündeyse (hedef seçme yokken) o ilin bilgisi
 ## tıklamadan sağda gösterilir. Haritadan çıkınca son il ekranda kalır.
 func _update_live_province() -> void:
+	if _window_mode():
+		return
 	if _pending_org or _pending_miting or _pending_invest or _pending_province_hand_index != -1 \
 			or _pending_target_hand_index != -1 or _layer_switching or not is_visible_in_tree():
 		return
@@ -2024,6 +2184,13 @@ func _update_live_province() -> void:
 	_show_province_info(province_id)
 
 func _show_province_info(province_id: String) -> void:
+	# Ayar değiştiyse eski türdeki il paneli atılır.
+	if _province_panel != null and _province_panel.embedded_mode == _window_mode():
+		_province_panel.queue_free()
+		_province_panel = null
+	if _window_mode():
+		_show_province_window(province_id)
+		return
 	_live_province = province_id
 	_ensure_left_dock()
 	if _province_panel == null:
@@ -2042,6 +2209,22 @@ func _show_province_info(province_id: String) -> void:
 	await get_tree().process_frame
 	if _province_panel.visible:
 		_province_panel.clamp_to_height(_left_dock.size.y)
+
+## PENCERE MODU (eski mantık): ile tıklayınca haritanın sol üstünde il
+## penceresi açılır; aynı ile tekrar tıklamak kapatır.
+func _show_province_window(province_id: String) -> void:
+	if _province_panel == null:
+		_province_panel = ProvincePanel.new()
+		add_child(_province_panel)
+	elif _province_panel.visible and _province_panel.province_id == province_id:
+		_province_panel.hide()
+		return
+	_hide_profile()
+	ProvincePanel.panel_width = ProvincePanel.PANEL_WIDTH
+	var map_rect := _r(R_MAP)
+	_province_panel.position = map_rect.position + Vector2(12.0, 52.0)
+	_province_panel.show_province(province_id)
+	_province_panel.clamp_to_height(map_rect.size.y - 64.0)
 
 ## Hedef seçme modunda dokunulan il: vurgulanır, üstte ne olacağı yazar.
 func _select_target_province(province_id: String) -> void:
@@ -2533,7 +2716,7 @@ func _dock_scale() -> float:
 func _update_left_dock() -> void:
 	if _left_dock == null:
 		return
-	var showing := (_province_panel != null and _province_panel.visible) or _profile_scroll != null
+	var showing := (_province_panel != null and _province_panel.embedded_mode and _province_panel.visible) or _profile_scroll != null
 	_left_dock.visible = showing
 	for node in [government_vbox, _event_log]:
 		if node != null:
@@ -2584,6 +2767,9 @@ func _avatar_label(text: String, font_size: int, color: Color) -> Label:
 
 ## Parti profili (bkz. PartyInfoCard): dokunulan oyuncu kartının soluna.
 func _show_tooltip_for(peer_id: int) -> void:
+	if _window_mode():
+		_show_profile_window(peer_id)
+		return
 	_ensure_left_dock()
 	if _province_panel != null:
 		_province_panel.hide()
@@ -2606,6 +2792,33 @@ func _show_tooltip_for(peer_id: int) -> void:
 	if is_instance_valid(_profile_scroll):
 		_fit_profile_scroll()
 		_profile_scroll.scroll_vertical = keep_scroll
+
+## PENCERE MODU: parti profili skor tablosunun hemen sağında, plaketle aynı
+## hizada açılır (eski açılır kart).
+func _show_profile_window(peer_id: int) -> void:
+	if _province_panel != null and not _province_panel.embedded_mode:
+		_province_panel.hide()
+	hover_tooltip_image.hide()
+	for child in hover_tooltip.get_children():
+		if child != hover_tooltip_image:
+			child.queue_free()
+	var card := PartyInfoCard.build(peer_id, multiplayer.get_unique_id(), _on_party_action)
+	card.modulate.a = 0.0
+	hover_tooltip.add_child(card)
+	hover_tooltip.show()
+	await get_tree().process_frame
+	if _profile_peer_id != peer_id or not is_instance_valid(card):
+		return
+	card.reset_size()
+	hover_tooltip.size = card.size
+	card.modulate.a = 1.0
+	var viewport_size := get_viewport_rect().size
+	var anchor_y := _r(R_BOARD).position.y
+	var plaque := _find_avatar_node(peer_id)
+	if plaque != null:
+		anchor_y = plaque.global_position.y + plaque.size.y * 0.5 - hover_tooltip.size.y * 0.5
+	hover_tooltip.global_position = Vector2(_r(R_BOARD).end.x + 12.0,
+		clampf(anchor_y, _r(R_BOARD).position.y, maxf(_r(R_BOARD).position.y, viewport_size.y - hover_tooltip.size.y - 8.0)))
 
 ## Profil, doğal genişliğinde çizilip sol panele sığacak kadar küçültülür.
 func _fit_profile_scroll() -> void:

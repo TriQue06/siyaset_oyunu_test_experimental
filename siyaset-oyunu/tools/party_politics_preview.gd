@@ -46,9 +46,13 @@ func _initialize() -> void:
 	root.add_child(scene)
 	await _frames(30)
 	_shot("party_politics_board")
-	scene._on_side_tab(2)
+	scene._on_player_tab_pressed(1)
 	await _frames(5)
 	_shot("party_politics_scores")
+	scene._on_player_tab_pressed(0)
+	scene._on_side_tab(1)
+	await _frames(5)
+	_shot("party_politics_log")
 	scene._on_side_tab(0)
 	var list: Control = scene.player_panel_list
 	print("LISTE boy=%s avatar_h=%.1f" % [str(list.size), scene._avatar_height])
@@ -70,6 +74,27 @@ func _initialize() -> void:
 	await _frames(10)
 	_shot("party_politics_province_dock")
 	scene._province_panel.hide()
+	# İl inceleme: PENCERE modu (ayar sonunda geri alınır).
+	var gs = root.get_node("GameSettings")
+	var old_view: int = gs.province_view
+	gs.set_province_view(1)
+	await _frames(3)
+	scene._on_province_clicked(String(cm._province_ids[3]))
+	await _frames(10)
+	_shot("party_politics_province_window")
+	scene._province_panel.hide()
+	scene._toggle_profile(int(bots[2]))
+	await _frames(10)
+	_shot("party_politics_profile_window")
+	scene._hide_profile()
+	gs.set_province_view(old_view)
+	await _frames(3)
+	# Meclis oylaması: stüdyo masasında büyür.
+	gm.submit_early_election(me)
+	await _frames(10)
+	_shot("party_politics_voting")
+	gm._set_phase(gm.Phase.IDLE)
+	await _frames(3)
 	# Kongre gecesi (benim partim, zayıf: dört aday, iki tur).
 	cm._congress_info(me)["share"] = float(cm.last_vote_shares.get(me, 0.0)) + 6.0
 	cm.turmoil[me] = 4.0

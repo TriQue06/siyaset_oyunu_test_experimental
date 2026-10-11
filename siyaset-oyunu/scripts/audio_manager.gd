@@ -16,6 +16,12 @@ extends Node
 
 const BUS_MUSIC := "Muzik"
 const BUS_SFX := "Efekt"
+## JENERİK (easter egg): oyun sonu müziği ses ayarlarından BAĞIMSIZ çalar —
+## ana ses 0 olsa bile duyulur. Kendi bus'ı var; çalarken Master açık tutulur,
+## diğer bus'lar oyuncunun ayarını korusun diye ana ses onlara katılarak uygulanır.
+const BUS_CREDITS := "Jenerik"
+## Jeneriğin sabit seviyesi (Master tavanının üstüne çarpılır).
+const CREDITS_VOLUME := 0.5
 
 ## Ses adı -> dosya. Yeni ses eklemek için buraya bir satır yeter.
 const SOUNDS := {
@@ -136,6 +142,8 @@ func stop_music() -> void:
 	_music_generation += 1
 	var previous := _music_name
 	_music_name = ""
+	if previous == "credits":
+		apply_volumes.call_deferred()
 	if _music_player.playing:
 		await _fade_music(MUSIC_SILENT_DB, float(MUSIC_FADE_OUT.get(previous, 1.0)))
 		_music_player.stop()
@@ -160,6 +168,8 @@ func _build_music() -> void:
 
 func _start_music(generation: int) -> void:
 	_music_player.stream = _music_streams[_music_name]
+	_music_player.bus = BUS_CREDITS if _music_name == "credits" else BUS_MUSIC
+	apply_volumes()
 	_music_player.volume_db = MUSIC_SILENT_DB
 	_music_player.play(float(MUSIC_START.get(_music_name, 0.0)))
 	_fade_music(float(MUSIC_GAIN.get(_music_name, -6.0)), float(MUSIC_FADE_IN.get(_music_name, 1.0)))
@@ -234,9 +244,18 @@ func play(sound: String) -> void:
 
 ## GameSettings'teki seviyeleri bus'lara uygular.
 func apply_volumes() -> void:
+	if _music_name == "credits":
+		# Jenerik çalıyor: Master sabit açık, oyuncunun ana sesi diğer bus'lara katılır.
+		var master := GameSettings.master_volume
+		_set_bus_volume("Master", float(VOLUME_CEILING["master"]))
+		_set_bus_volume(BUS_MUSIC, master * GameSettings.music_volume * float(VOLUME_CEILING["music"]))
+		_set_bus_volume(BUS_SFX, master * GameSettings.sfx_volume * float(VOLUME_CEILING["sfx"]))
+		_set_bus_volume(BUS_CREDITS, CREDITS_VOLUME)
+		return
 	_set_bus_volume("Master", GameSettings.master_volume * float(VOLUME_CEILING["master"]))
 	_set_bus_volume(BUS_MUSIC, GameSettings.music_volume * float(VOLUME_CEILING["music"]))
 	_set_bus_volume(BUS_SFX, GameSettings.sfx_volume * float(VOLUME_CEILING["sfx"]))
+	_set_bus_volume(BUS_CREDITS, CREDITS_VOLUME)
 
 func _set_bus_volume(bus_name: String, linear: float) -> void:
 	var index := AudioServer.get_bus_index(bus_name)
@@ -247,7 +266,7 @@ func _set_bus_volume(bus_name: String, linear: float) -> void:
 
 ## Bus'ları kod içinde kurarız: ayrı bir bus layout dosyası tutmaya gerek yok.
 func _ensure_buses() -> void:
-	for bus_name in [BUS_MUSIC, BUS_SFX]:
+	for bus_name in [BUS_MUSIC, BUS_SFX, BUS_CREDITS]:
 		if AudioServer.get_bus_index(bus_name) != -1:
 			continue
 		var index := AudioServer.bus_count

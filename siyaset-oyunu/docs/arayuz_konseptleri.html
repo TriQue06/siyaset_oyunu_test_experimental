@@ -1,247 +1,253 @@
 <title>Siyaset Oyunu Arayüz Konseptleri</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
 <style>
-/* Düzen: Risk benzeri "harita sahnenin tamamı" mantığı; her konsept 16:9 bir ekran, partiler hep görünür. Oyunun kendi koyu mor / altın paletiyle tek (koyu) tema. */
+/* Düzen: her konsept 1280x720 sabit bir oyun ekranı (sayfaya ölçeklenir) + altında ızgara ölçüleri ve gerekçe. Oyunun koyu mor / altın paletiyle tek (koyu) tema. */
 :root {
   --bg: #120f24;
   --ink: #0a0816;
-  --panel: rgba(28, 23, 54, .92);
-  --panel-solid: #1c1736;
-  --slot: #262046;
+  --p0: #15112b;
+  --p1: #1d1838;
+  --p2: #272048;
+  --p3: #342b5e;
   --line: #3f3775;
   --text: #f1edff;
   --muted: #a39bd0;
+  --dim: #6f679c;
   --gold: #f2c14e;
-  --sea: #101a33;
+  --green: #31c440;
+  --red: #f2132a;
+  --blue: #22a9d6;
   --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
   --sans: "IBM Plex Sans", system-ui, sans-serif;
   color-scheme: dark;
 }
 html, body { background: var(--bg); color: var(--text); }
-body { font-family: var(--sans); padding-inline: 16px; padding-block: 24px 64px; }
-.wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 44px; }
-header h1 { font-family: var(--mono); color: var(--gold); font-size: 1.6rem; margin: 0 0 8px; letter-spacing: .02em; text-wrap: balance; }
-header p { color: var(--muted); max-width: 72ch; margin: 0; line-height: 1.55; }
+body { font-family: var(--sans); padding-inline: 16px; padding-block: 28px 72px; }
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 52px; }
+header h1 { font-family: var(--mono); color: var(--gold); font-size: 1.7rem; margin: 0 0 10px; letter-spacing: .02em; text-wrap: balance; }
+header p { color: var(--muted); max-width: 78ch; margin: 0 0 8px; line-height: 1.55; }
 nav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
-nav a { font-family: var(--mono); font-size: .85rem; color: var(--text); text-decoration: none; background: var(--slot); border: 2px solid var(--line); padding: 6px 12px; }
+nav a { font-family: var(--mono); font-size: .85rem; color: var(--text); text-decoration: none; background: var(--p2); border: 2px solid var(--line); padding: 6px 12px; }
 nav a:hover, nav a:focus-visible { border-color: var(--gold); outline: none; }
-
 section.concept { display: grid; gap: 14px; scroll-margin-top: 16px; }
-.concept h2 { font-family: var(--mono); font-size: 1.15rem; margin: 0; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.concept h2 { font-family: var(--mono); font-size: 1.2rem; margin: 0; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
 .concept h2 .tag { font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ink); background: var(--gold); padding: 2px 8px; }
-.concept .lead { color: var(--muted); margin: 0; max-width: 78ch; line-height: 1.5; }
-.toggle { display: flex; gap: 6px; flex-wrap: wrap; }
-.toggle button { font-family: var(--mono); font-size: .8rem; background: var(--slot); color: var(--text); border: 2px solid var(--line); padding: 5px 10px; cursor: pointer; }
-.toggle button[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
+.concept .lead { color: var(--muted); margin: 0; max-width: 80ch; line-height: 1.55; }
 
-/* ---- 16:9 ekran ---- */
-.screen { position: relative; width: 100%; aspect-ratio: 16 / 9; max-width: 100%; background: var(--sea); border: 3px solid var(--line); overflow: hidden; font-family: var(--sans); font-size: clamp(5.5px, 1vw, 11px); color: var(--text); container-type: inline-size; }
-.screen.phone { max-width: 560px; justify-self: center; }
-.screen * { box-sizing: border-box; }
-.screen canvas.map { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.hud { position: absolute; background: var(--panel); border: 2px solid var(--ink); box-shadow: 0 0 0 1px var(--line) inset; }
+/* sabit 1280x720 sahne, kapsayıcıya ölçeklenir */
+.stage-wrap { width: 100%; max-width: 100%; aspect-ratio: 16 / 9; position: relative; overflow: hidden; border: 3px solid var(--line); background: var(--ink); }
+.stage { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; transform-origin: 0 0; background: var(--p0); font-family: var(--sans); color: var(--text); font-size: 13px; }
+.stage * { box-sizing: border-box; }
+.abs { position: absolute; }
+.panel { background: var(--p1); border: 2px solid var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+.panel.flat { box-shadow: none; border-color: transparent; background: transparent; }
+.h { font-family: var(--mono); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; font-size: 11px; color: var(--gold); }
 .mono { font-family: var(--mono); }
-.gold { color: var(--gold); }
 .muted { color: var(--muted); }
+.dim { color: var(--dim); }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+canvas.map { position: absolute; display: block; }
+canvas.parl { position: absolute; display: block; }
+.btn { font-family: var(--mono); font-weight: 700; color: #fff; display: grid; place-items: center; text-align: center; line-height: 1.15; border: 2px solid var(--ink); box-shadow: inset 0 -3px 0 rgba(0,0,0,.25); }
+.btn small { display: block; font-weight: 400; font-size: 10px; opacity: .85; }
+.btn.off { filter: saturate(.25) brightness(.55); }
+.endturn { background: var(--gold); color: var(--ink); font-size: 18px; }
+.card { width: 92px; height: 128px; background: #efe6cf; border: 2px solid var(--ink); color: #2a2350; font-weight: 700; font-size: 11px; padding: 6px; text-align: center; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 4px 0 rgba(0,0,0,.35); }
+.card .art { height: 52px; background: repeating-linear-gradient(45deg, #ddd0b0, #ddd0b0 6px, #e8dcc0 6px, #e8dcc0 12px); border: 1px solid #b9a77c; }
+.card .cost { align-self: flex-end; background: #1d1838; color: #6bb3e2; font-family: var(--mono); padding: 0 6px; }
+.chip { font-family: var(--mono); font-size: 10px; font-weight: 700; padding: 1px 5px; display: inline-block; }
+.kv { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 1px dashed var(--line); }
+.logrow { display: grid; grid-template-columns: 18px 1fr; gap: 8px; padding: 5px 0; border-bottom: 1px solid rgba(63,55,117,.45); font-size: 12px; line-height: 1.35; color: #d8d2f5; }
+.logrow i { width: 14px; height: 14px; margin-top: 2px; display: block; }
+.tab { font-family: var(--mono); font-size: 11px; font-weight: 700; padding: 6px 10px; background: var(--p2); color: var(--muted); border: 2px solid var(--ink); }
+.tab.on { background: var(--gold); color: var(--ink); }
+.pin { position: absolute; width: 26px; height: 26px; border-radius: 50%; background: var(--gold); color: var(--ink); display: grid; place-items: center; font-family: var(--mono); font-weight: 700; font-size: 13px; z-index: 20; box-shadow: 0 0 0 3px var(--ink); }
+.ruler { position: absolute; border: 1px dashed rgba(242,193,78,.55); pointer-events: none; z-index: 15; display: none; }
+.ruler span { position: absolute; top: -16px; left: 0; font-family: var(--mono); font-size: 10px; color: var(--gold); background: var(--ink); padding: 0 3px; }
+.show-rulers .ruler { display: block; }
 
-/* parti plaketi */
-.plaque { display: grid; grid-template-columns: auto 1fr; gap: .2em .5em; align-items: center; padding: .35em .5em .4em; background: var(--panel-solid); border: 2px solid var(--ink); border-top: .35em solid var(--c); min-width: 0; position: relative; }
-.plaque .logo { grid-row: span 3; width: 2.8em; height: 2.8em; background: var(--c); display: grid; place-items: center; border: 2px solid var(--ink); }
-.plaque .logo svg { width: 70%; height: 70%; }
-.plaque .pname { font-family: var(--mono); font-weight: 700; font-size: 1.15em; white-space: nowrap; overflow: hidden; text-overflow: clip; }
-.plaque .people { font-size: .82em; color: var(--muted); line-height: 1.25; }
-.plaque .people b { color: var(--text); font-weight: 600; }
-.plaque .nums { grid-column: 1 / -1; display: flex; gap: .6em; font-family: var(--mono); font-size: .9em; margin-top: .15em; }
-.plaque .nums span { background: var(--slot); padding: .1em .35em; }
-.plaque.turn { box-shadow: 0 0 0 2px var(--gold); }
-.plaque.turn::after { content: "SIRA"; position: absolute; top: -.1em; right: .3em; font-family: var(--mono); font-size: .7em; background: var(--gold); color: var(--ink); padding: 0 .3em; font-weight: 700; }
-.plaque .role { font-family: var(--mono); font-size: .72em; padding: 0 .3em; background: #2f7d3b; color: #fff; justify-self: start; }
-.plaque .role.op { background: var(--slot); color: var(--muted); }
-.plaque .vote { position: absolute; bottom: .3em; right: .3em; font-family: var(--mono); font-weight: 700; font-size: .8em; padding: 0 .3em; }
-
-/* düğmeler */
-.act { width: 4.2em; height: 4.2em; border-radius: 50%; display: grid; place-items: center; font-family: var(--mono); font-weight: 700; font-size: .78em; color: #fff; border: .25em solid var(--ink); text-align: center; line-height: 1.05; }
-.act small { display: block; font-weight: 400; font-size: .85em; opacity: .85; }
-.endturn { font-family: var(--mono); font-weight: 700; background: var(--gold); color: var(--ink); border: 2px solid var(--ink); padding: .6em 1.2em; font-size: 1.1em; }
-.mana { font-family: var(--mono); font-weight: 700; color: #6bb3e2; font-size: 1.6em; }
-.cardmini { width: 4.2em; aspect-ratio: 5/7; background: #efe6cf; border: 2px solid var(--ink); color: #2a2350; font-size: .7em; font-weight: 700; display: grid; place-items: center; text-align: center; padding: .2em; }
-.iconbtn { width: 3em; height: 3em; display: grid; place-items: center; background: var(--panel-solid); border: 2px solid var(--ink); box-shadow: 0 0 0 1px var(--line) inset; font-family: var(--mono); font-size: .75em; color: var(--muted); }
-.iconbtn.on { color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
-.pop { position: absolute; background: var(--panel-solid); border: 2px solid var(--gold); padding: .6em .7em; font-size: .9em; }
-.pop h4 { margin: 0 0 .3em; font-family: var(--mono); font-size: 1.1em; }
-.kv { display: flex; justify-content: space-between; gap: 1em; padding: .12em 0; border-bottom: 1px dashed var(--line); }
-.pin { position: absolute; width: 1.9em; height: 1.9em; border-radius: 50%; background: var(--gold); color: var(--ink); display: grid; place-items: center; font-family: var(--mono); font-weight: 700; font-size: 1em; z-index: 9; box-shadow: 0 0 0 2px var(--ink); }
-
-/* açıklama */
-.explain { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
-.explain > div { background: var(--panel-solid); border: 2px solid var(--line); padding: 12px 14px; min-width: 0; }
+.toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.toolbar label { font-family: var(--mono); font-size: .82rem; color: var(--muted); display: flex; gap: 6px; align-items: center; cursor: pointer; }
+.explain { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+.explain > div { background: var(--p1); border: 2px solid var(--line); padding: 12px 14px; min-width: 0; }
 .explain h3 { font-family: var(--mono); font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; margin: 0 0 8px; color: var(--gold); }
 .explain ol, .explain ul { margin: 0; padding-left: 1.2em; line-height: 1.5; }
 .explain li { margin-bottom: 4px; }
 .plus h3 { color: #6ad978; }
 .minus h3 { color: #ff8a94; }
+.grid-note { font-family: var(--mono); font-size: .82rem; color: var(--muted); line-height: 1.6; }
 </style>
 
 <div class="wrap">
 <header>
-  <h1>Ana Oyun Ekranı · Risk Tarzı 3 Konsept</h1>
-  <p>Ortak fikir: harita bütün ekranı kaplar (Risk Global Domination gibi), arayüz onun üstünde yüzer. Bütün partiler tıklamadan hep görünür: logo, renk, parti adı, genel başkan, yardımcı, vekil ve oy. Sıra kimdeyse onun plaketi altın çerçeveyle parlar; oylama sırasında her plakete verdiği oy düşer. Kendi kontrollerin (kartlar, mana, hamleler, Turu Bitir) hep aynı köşede. Her konseptte bilgisayar ve telefon görünümü arasında geçebilirsin.</p>
-  <nav><a href="#r1">1 · Alt parti şeridi</a><a href="#r2">2 · Üst parti şeridi</a><a href="#r3">3 · Masa düzeni</a></nav>
+  <h1>Ana Oyun Ekranı · Masaüstü · 3 Yeni Konsept</h1>
+  <p>Sorun: alanlar ölçüyle değil, “kalan yere sığdır” mantığıyla dağıtılmış; bu yüzden meclis kartı boş, hamleler sıkışık, sağ sütun kalabalık. Üç konseptin hepsi aynı kurala dayanıyor: <b>8 piksellik ızgara, sabit sütun genişlikleri, her bölgenin tek bir işi var</b>. Ekran 1280×720 tasarlanıp ölçekleniyor (oyunun 16:9 kilidiyle birebir).</p>
+  <p>Her maketin üstündeki “Ölçüleri göster” kutusu bölge ölçülerini çizer. Numaralı altın noktalar açıklamadaki maddelerle eşleşir.</p>
+  <nav><a href="#k1">1 · Meclis Salonu</a><a href="#k2">2 · Haber Stüdyosu</a><a href="#k3">3 · Strateji Masası</a></nav>
 </header>
 
-<section class="concept" id="r1">
-  <h2>1 · Alt parti şeridi <span class="tag">önerim</span></h2>
-  <p class="lead">Partiler ekranın altında, yan yana plaketler olarak durur (Risk'teki oyuncu şeridi gibi). Harita üstte geniş. Sağ altta mana, yuvarlak hamle düğmeleri ve Turu Bitir; sol altta kart destesi (dokununca el yelpaze gibi açılır). Meclis, hükümet ve log sağ üstteki küçük düğmelerle açılan panellerde.</p>
-  <div class="toggle" data-for="s1"><button aria-pressed="true" data-mode="pc">Bilgisayar</button><button aria-pressed="false" data-mode="phone">Telefon</button></div>
-  <div class="screen" id="s1" data-layout="1"></div>
+<section class="concept" id="k1">
+  <h2>1 · Meclis Salonu <span class="tag">önerim</span></h2>
+  <p class="lead">Beğendiğin üst parti şeridi kalıyor ama inceliyor. Ekranın kalbi harita; meclis diyagramı haritanın sol altına gömülü küçük bir “rozet” oluyor. Altta tek ve derli toplu bir “benim masam”: kartlar, hamleler, mana ve Turu Bitir aynı yükseklikte yan yana. Sağda tek bir “inceleme” sütunu: varsayılanda hükümet ve log, bir şeye dokununca onun ayrıntısı.</p>
+  <div class="toolbar"><label><input type="checkbox" data-rulers="s1" id="r1"> Ölçüleri göster</label></div>
+  <div class="stage-wrap"><div class="stage" id="s1"></div></div>
   <div class="explain">
-    <div><h3>Ne nerede</h3><ol><li>Partiler: altta tek sıra plaket, hepsi aynı boyda. 8 partide plaketler daralır ama genel başkan/yardımcı iki satıra iner, kesilmez.</li><li>Benim kontrollerim: sağ alt köşe, başparmağın altında.</li><li>Meclis / Hükümet / Log: sağ üstte üç düğme, biri açıkken harita üstünde yarı saydam panel.</li></ol></div>
-    <div class="plus"><h3>Artı</h3><ul><li>Bütün partiler tek bakışta, tıklamadan.</li><li>Harita en büyük alanı alır.</li><li>Telefonda yatay ekranda doğal: iki başparmak iki alt köşede.</li></ul></div>
-    <div class="minus"><h3>Eksi</h3><ul><li>Meclis diyagramı hep açık değil, bir düğmenin arkasında.</li><li>Kartlar kapalı deste; oynamak için bir dokunuş fazla.</li></ul></div>
+    <div><h3>Izgara (1280×720)</h3><div class="grid-note">Üst şerit 0–64 · Harita 16–960 × 72–520 · Sağ sütun 976–1264 × 72–520 · Masa 0–1280 × 536–720 (kartlar 16–520, hamleler 536–936, mana+bitir 952–1264)</div></div>
+    <div><h3>Ne nerede</h3><ol><li>Parti şeridi tek satır: logo, kısa ad, lider, vekil, oy, durum etiketi. Sıra kimdeyse altın alt çizgi.</li><li>Meclis rozeti haritanın üstünde, sol altta: yarım daire + salt çoğunluk çizgisi + hükümet/muhalefet sayısı. Oylama varken büyür.</li><li>Sağ inceleme sütunu: sekmeler (Hükümet · Log · Seçili). İl/parti/kart seçince “Seçili” sekmesi açılır.</li><li>Benim masam: tek bant, üç eşit yükseklikte bölüm.</li></ol></div>
+    <div class="plus"><h3>Artı</h3><ul><li>Hiçbir bölge boş kalmıyor; her şey ızgaraya oturuyor.</li><li>Harita en büyük alanı alıyor (944×448).</li><li>Göz akışı: üst (kim) → orta (nerede) → alt (ne yapıyorum) → sağ (ayrıntı).</li></ul></div>
+    <div class="minus"><h3>Eksi</h3><ul><li>Meclis küçük; oylama anında büyütmek gerekiyor.</li><li>Log sekmede: aynı anda hem log hem hükümet görünmez.</li></ul></div>
   </div>
 </section>
 
-<section class="concept" id="r2">
-  <h2>2 · Üst parti şeridi</h2>
-  <p class="lead">Partiler ekranın üstünde bir “skor tabelası” gibi. Alt kısım tamamen benim: elimdeki kartlar açık, ortada hamleler, sağda mana ve Turu Bitir. Meclis diyagramı sol altta küçük ve hep açık; log sağ kenarda dar bir şerit.</p>
-  <div class="toggle" data-for="s2"><button aria-pressed="true" data-mode="pc">Bilgisayar</button><button aria-pressed="false" data-mode="phone">Telefon</button></div>
-  <div class="screen" id="s2" data-layout="2"></div>
+<section class="concept" id="k2">
+  <h2>2 · Haber Stüdyosu</h2>
+  <p class="lead">Oyun bir siyaset yayını gibi: seçim gecesi ve kongre gecesiyle aynı dil. Üstte “canlı yayın” bandı (tarih, sıra, süre), en altta kayan “son dakika” şeridi = log. Partiler solda dikey bir “skor tablosu”. Sağda meclis ve hükümet bir “stüdyo masası” kartında. Kartlar ve hamleler alt üçte birde.</p>
+  <div class="toolbar"><label><input type="checkbox" data-rulers="s2"> Ölçüleri göster</label></div>
+  <div class="stage-wrap"><div class="stage" id="s2"></div></div>
   <div class="explain">
-    <div><h3>Ne nerede</h3><ol><li>Partiler: üst tabela, sıra solundan sağa oyun sırasıyla.</li><li>Ben: alt bant (kartlar açık + hamleler + mana).</li><li>Meclis hep görünür (sol alt), log sağda dar şerit.</li></ol></div>
-    <div class="plus"><h3>Artı</h3><ul><li>Kartlar açık, oynamak tek dokunuş.</li><li>Meclis ve log hiç kapanmıyor.</li></ul></div>
-    <div class="minus"><h3>Eksi</h3><ul><li>Harita üstten ve alttan sıkışır, telefonda küçülür.</li><li>Üstteki plaketlere telefonda uzanmak zor.</li></ul></div>
+    <div><h3>Izgara (1280×720)</h3><div class="grid-note">Yayın bandı 0–56 · Skor tablosu 16–288 × 72–560 · Harita 304–976 × 72–560 · Stüdyo masası 992–1264 × 72–560 · Alt üçte bir 0–1280 × 568–688 · Son dakika 688–720</div></div>
+    <div><h3>Ne nerede</h3><ol><li>Skor tablosu: her parti bir satır (renk, logo, ad, lider, vekil, oy çubuğu). 8 partiye kadar rahat sığar.</li><li>Stüdyo masası: meclis yarım dairesi büyük, altında hükümet ve teklif.</li><li>Son dakika şeridi: log kayarak akar; tıklanınca log paneli açılır.</li></ol></div>
+    <div class="plus"><h3>Artı</h3><ul><li>Seçim/kongre geceleriyle bütünlüklü, en “karakterli” konsept.</li><li>Partiler dikey listede en okunaklı hâliyle.</li></ul></div>
+    <div class="minus"><h3>Eksi</h3><ul><li>Harita üç sütun arasında daha dar (672 genişlik).</li><li>Log kayan şeritte; eski kayıtlar için panel açmak gerekir.</li></ul></div>
   </div>
 </section>
 
-<section class="concept" id="r3">
-  <h2>3 · Masa düzeni</h2>
-  <p class="lead">Partiler haritanın iki yanında, bir masanın etrafında oturan oyuncular gibi dizilir (sol ve sağ, 4'er tane). Haritanın altında meclis diyagramı ve benim hamle çubuğum. Kartlarım alttan biraz taşan yelpaze olarak durur.</p>
-  <div class="toggle" data-for="s3"><button aria-pressed="true" data-mode="pc">Bilgisayar</button><button aria-pressed="false" data-mode="phone">Telefon</button></div>
-  <div class="screen" id="s3" data-layout="3"></div>
+<section class="concept" id="k3">
+  <h2>3 · Strateji Masası</h2>
+  <p class="lead">Civilization / Risk gibi: harita bütün ekranı kaplar, arayüz köşelerde yüzen paneller. Sağ üstte katlanabilir parti sıralaması, sol üstte tarih ve sıra, sol altta elindeki kartlar yelpaze, sağ altta hamle halkası ve büyük Turu Bitir. Meclis, hükümet ve log sol kenardaki sekmelerden kayarak açılır.</p>
+  <div class="toolbar"><label><input type="checkbox" data-rulers="s3"> Ölçüleri göster</label></div>
+  <div class="stage-wrap"><div class="stage" id="s3"></div></div>
   <div class="explain">
-    <div><h3>Ne nerede</h3><ol><li>Partiler: sol ve sağ kenarda dikey plaketler, geniş ve okunaklı.</li><li>Ortada harita, altında meclis + hamleler.</li><li>Hükümet bilgisi, hükümetteki partilerin plaketinde yeşil etiket olarak; log haritanın sol üstünde son 3 satır.</li></ol></div>
-    <div class="plus"><h3>Artı</h3><ul><li>Plaketler en geniş hâlinde: isimler hiç sıkışmaz.</li><li>Herkesin “masadaki yeri” sabit, takibi kolay.</li></ul></div>
-    <div class="minus"><h3>Eksi</h3><ul><li>Harita iki yandan daralır.</li><li>Telefonda plaketler çok küçük kalabilir.</li></ul></div>
+    <div><h3>Izgara (1280×720)</h3><div class="grid-note">Harita tam ekran · Bilgi kartı 16–336 × 16–88 · Parti sıralaması 944–1264 × 16–400 · Kenar sekmeleri 0–40 × 120–360 · Kartlar 16–560 × 560–720 · Hamleler + Bitir 880–1264 × 488–704</div></div>
+    <div><h3>Ne nerede</h3><ol><li>Parti sıralaması sağ üstte, satır satır; katlanınca sadece renk + vekil.</li><li>Kenar sekmeleri: Meclis / Hükümet / Log, biri açıkken soldan 320 px panel kayar.</li><li>Hamle halkası Turu Bitir'in etrafında.</li></ol></div>
+    <div class="plus"><h3>Artı</h3><ul><li>Harita en büyük, en “oyun” hissi veren düzen.</li><li>Sade: ihtiyacın olmayan panel kapalı.</li></ul></div>
+    <div class="minus"><h3>Eksi</h3><ul><li>Meclis ve log varsayılanda kapalı; bilgi bir tık uzakta.</li><li>Yüzen paneller haritanın kenarlarını kapatır.</li></ul></div>
   </div>
 </section>
 </div>
 
 <script>
-var PARTIES = [
-  {n: "Yeni Yol", gb: "Barış Yılmaz", yrd: "Erkin Karaçiçek", c: "#F2132A", seats: 140, pct: "26.8", role: "Başbakanlık", turn: true, me: true, vote: "EVET"},
-  {n: "SP", gb: "Ceyda Gümüşmeşe", yrd: "", c: "#31C440", seats: 92, pct: "18.1", role: "2 bakanlık", vote: "EVET"},
-  {n: "GP", gb: "Serpil Varol", yrd: "Doruk Tuna", c: "#228DD4", seats: 71, pct: "14.0", role: "", vote: "HAYIR"},
-  {n: "NBP", gb: "Ceyda Baharırmak", yrd: "", c: "#F2741F", seats: 64, pct: "12.6", role: "", vote: "…"},
-  {n: "OKP", gb: "Ayla Alpırmak", yrd: "", c: "#193A9E", seats: 50, pct: "9.9", role: "", vote: "HAYIR"},
-  {n: "Hür Yol", gb: "Tuncay Cevizgöl", yrd: "", c: "#913FD4", seats: 41, pct: "8.2", role: "", vote: "…"},
-  {n: "MEP", gb: "Cem Deniz", yrd: "Aras Kızılbulut", c: "#E83CA9", seats: 31, pct: "6.1", role: "", vote: "…"},
-  {n: "Bağımsız", gb: "Melis Bulgurcu", yrd: "", c: "#6b6590", seats: 1, pct: "2.3", role: "", vote: "…"}
+var P = [
+  {n:"Yeni Yol", l:"Ayla Gökyelken", c:"#F2132A", s:140, v:26.8, st:"PM", me:true, turn:true},
+  {n:"SP", l:"Ceyda Gümüşmeşe", c:"#31C440", s:92, v:18.1, st:"HÜK"},
+  {n:"GP", l:"Serpil Varol", c:"#22A9D6", s:71, v:14.0},
+  {n:"NBP", l:"Kemal Baharırmak", c:"#F27E1F", s:64, v:12.6},
+  {n:"OKP", l:"Ayla Alpırmak", c:"#244FB3", s:50, v:9.9},
+  {n:"Hür Yol", l:"Tuncay Cevizgöl", c:"#AB39DB", s:41, v:8.2},
+  {n:"MEP", l:"Cem Deniz", c:"#F04391", s:31, v:6.1},
+  {n:"Bağımsız", l:"Melis Bulgurcu", c:"#6b6590", s:1, v:2.3}
 ];
-var ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><circle cx="12" cy="12" r="4"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M5 19l3-3M16 8l3-3"/></svg>';
+var LOG = [["#31C440","SP, İzmir'de miting yaptı; il desteği arttı."],["#6b6590","Kaset sızdı: OKP'nin ulusal desteği −1,2."],["#F2132A","Serbest Piyasa Yasası KABUL EDİLDİ (EVET 232 – HAYIR 121)."],["#F27E1F","NBP KONGRESİ: Kemal Baharırmak genel başkanlığını korudu."],["#22A9D6","GP, Ankara'da teşkilat kurdu (seviye 1)."]];
+var ACTS = [["YASA","bedelsiz","#913FD4"],["MİTİNG","2 mana","#E0303F"],["TEŞKİLAT","1 mana","#2479C9"],["YATIRIM","2 mana","#20823A",1],["GENSORU","bedelsiz","#A10C1C",1],["ERKEN SEÇİM","2 mana","#A6831A"],["TOPLANTI","bedelsiz","#7a6420"],["KONGRE","1 mana","#5c3d8a",1]];
+function el(stage, css, html, cls){ var d=document.createElement('div'); d.className='abs '+(cls||''); d.style.cssText=css; if(html) d.innerHTML=html; stage.appendChild(d); return d; }
+function ruler(stage,x,y,w,h,label){ el(stage,'left:'+x+'px;top:'+y+'px;width:'+w+'px;height:'+h+'px','<span>'+label+'</span>','ruler'); }
+function badge(c,size){ return '<span style="display:inline-grid;place-items:center;width:'+size+'px;height:'+size+'px;background:'+c+';border:2px solid #0a0816;flex:none"><svg viewBox="0 0 24 24" width="'+(size*0.62)+'" height="'+(size*0.62)+'" fill="none" stroke="#fff" stroke-width="2.6"><circle cx="12" cy="12" r="4"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg></span>'; }
+function mapCanvas(stage,x,y,w,h,seed){ var c=document.createElement('canvas'); c.className='map'; c.width=w*2; c.height=h*2; c.style.cssText='left:'+x+'px;top:'+y+'px;width:'+w+'px;height:'+h+'px'; stage.appendChild(c);
+  var g=c.getContext('2d'); g.scale(2,2); g.fillStyle='#141a36'; g.fillRect(0,0,w,h);
+  var size=Math.max(9,w/46), hw=size*Math.sqrt(3), vh=size*1.5, s=seed;
+  function rnd(){ s=(s*9301+49297)%233280; return s/233280; }
+  for(var r=0;r*vh<h;r++){ for(var q=0;q*hw<w;q++){ var px=q*hw+(r%2?hw/2:0)+hw/2, py=r*vh+size; var nx=px/w-.5, ny=py/h-.5;
+    var sh=nx*nx*1.05+ny*ny*3.1+Math.sin(nx*9)*.03+Math.cos(ny*7+nx*4)*.03; if(sh>.19) continue;
+    var z=Math.floor((Math.sin(nx*6.3+1)+Math.cos(ny*8.1-nx*3)+2)*1.9+rnd()*.6)%7;
+    g.beginPath(); for(var k=0;k<6;k++){ var a=Math.PI/180*(60*k-30); g.lineTo(px+size*.95*Math.cos(a),py+size*.95*Math.sin(a)); } g.closePath();
+    g.fillStyle=P[z].c; g.globalAlpha=.9; g.fill(); g.globalAlpha=1; g.strokeStyle='rgba(10,8,22,.6)'; g.lineWidth=1; g.stroke();
+    if(rnd()<.18){ for(var d=0;d<3;d++){ g.beginPath(); g.arc(px-5+d*5,py,2.2,0,7); g.fillStyle=P[Math.floor(rnd()*7)].c; g.fill(); g.strokeStyle='#0a0816'; g.stroke(); } }
+  } } }
+function parl(stage,x,y,w,h){ var c=document.createElement('canvas'); c.className='parl'; c.width=w*2; c.height=h*2; c.style.cssText='left:'+x+'px;top:'+y+'px;width:'+w+'px;height:'+h+'px'; stage.appendChild(c);
+  var g=c.getContext('2d'); g.scale(2,2); var cx=w/2, cy=h-6, rows=8, total=500, idx=0, seats=[];
+  P.forEach(function(p){ for(var i=0;i<p.s;i++) seats.push(p.c); }); while(seats.length<total) seats.push('#444');
+  var R=Math.min(w/2-4,h-10), r0=R*.42, per=[]; var sum=0; for(var i=0;i<rows;i++){ var rr=r0+(R-r0)*i/(rows-1); per.push(rr); sum+=rr; }
+  var pts=[]; per.forEach(function(rr){ var n=Math.round(total*rr/sum); for(var j=0;j<n;j++){ var a=Math.PI-(Math.PI*(j+.5)/n); pts.push([cx+rr*Math.cos(a),cy-rr*Math.sin(a),a]); } });
+  pts.sort(function(a,b){return b[2]-a[2];}); var dot=Math.max(1.6,(R-r0)/rows*.38);
+  pts.forEach(function(p,i){ g.beginPath(); g.arc(p[0],p[1],dot,0,7); g.fillStyle=seats[Math.min(i,seats.length-1)]; g.fill(); });
+  g.strokeStyle='#fff'; g.lineWidth=1.5; g.setLineDash([3,3]); g.beginPath(); g.moveTo(cx,cy-R-4); g.lineTo(cx,cy-r0+6); g.stroke(); }
+function hand(stage,x,y,list,fan){ list.forEach(function(t,i){ var rot=fan?(i-(list.length-1)/2)*6:0, dy=fan?Math.abs(i-(list.length-1)/2)*6:0;
+  el(stage,'left:'+(x+i*(fan?64:100))+'px;top:'+(y+dy)+'px;transform:rotate('+rot+'deg)','<div>'+t[0]+'</div><div class="art"></div><div class="cost">◆ '+t[1]+'</div>','card'); }); }
+var CARDS=[["KASET",2],["POPÜLİZM",1],["VEKİL ÇALMA",3],["KARALAMA",1],["MANA BONUSU",0]];
 
-function plaque(p, compact) {
-  var people = '<span class="people">GB <b>' + p.gb + '</b>' + (p.yrd ? '<br>Yrd <b>' + p.yrd + '</b>' : (compact ? '' : '<br><span style="opacity:.55">tek kişilik</span>')) + '</span>';
-  var role = p.role ? '<span class="role">' + p.role + '</span>' : '<span class="role op">muhalefet</span>';
-  var voteColor = p.vote === 'EVET' ? '#31C440' : (p.vote === 'HAYIR' ? '#F2132A' : 'transparent');
-  return '<div class="plaque' + (p.turn ? ' turn' : '') + '" style="--c:' + p.c + '">' +
-    '<div class="logo">' + ICON + '</div>' +
-    '<div class="pname">' + p.n + (p.me ? ' <span class="gold" style="font-size:.7em">SEN</span>' : '') + '</div>' + people + role +
-    '<div class="nums"><span>' + p.seats + ' mv</span><span>%' + p.pct + '</span></div>' +
-    (p.vote !== '…' ? '<span class="vote" style="background:' + voteColor + '">' + p.vote + '</span>' : '') +
-    '</div>';
+function concept1(s){
+  // üst şerit
+  el(s,'left:0;top:0;width:1280px;height:64px;background:#130f27;border-bottom:2px solid #0a0816');
+  var x=16, w=(1280-16-152-7*6)/8;
+  P.forEach(function(p){ var d=el(s,'left:'+x+'px;top:8px;width:'+w+'px;height:48px;background:'+(p.turn?'#2a2350':'#1d1838')+';border:2px solid #0a0816;border-bottom:3px solid '+(p.turn?'#f2c14e':p.c)+';display:flex;gap:7px;align-items:center;padding:0 7px',
+    badge(p.c,28)+'<div style="min-width:0;flex:1"><div class="mono" style="font-weight:700;font-size:13px;white-space:nowrap;color:'+(p.me?'#f2c14e':'#fff')+'">'+p.n+(p.st?' <span class="chip" style="background:#2f7d3b;color:#fff">'+p.st+'</span>':'')+'</div><div class="muted" style="font-size:10.5px;white-space:nowrap;overflow:hidden">'+p.l+'</div></div><div class="num" style="text-align:right;font-size:12px;line-height:1.2"><b>'+p.s+'</b><br><span class="muted">%'+p.v.toFixed(1)+'</span></div>'); x+=w+6; });
+  el(s,'left:1144px;top:12px;width:120px;height:40px','Menü','btn').style.background='#4a3f86';
+  // harita + katman + rozet
+  mapCanvas(s,16,72,944,448,7);
+  el(s,'left:24px;top:80px;display:flex;gap:4px','<span class="tab on">VEKİLLER</span><span class="tab">TEŞKİLAT</span><span class="tab">GÜÇ</span>');
+  el(s,'left:784px;top:80px;width:168px;height:28px;background:rgba(10,8,22,.75);display:flex;align-items:center;justify-content:center;gap:8px','<span class="mono" style="font-size:11px;color:#f2c14e">1950 OCA–HAZ</span><span class="dim">·</span><span class="mono" style="font-size:11px">Baraj %0</span>');
+  el(s,'left:24px;top:368px;width:248px;height:144px','','panel');
+  parl(s,32,388,232,96);
+  el(s,'left:32px;top:374px','<span class="h">Meclis · 500</span>');
+  el(s,'left:32px;top:488px;width:232px;display:flex;justify-content:space-between','<span class="num" style="font-size:11px;color:#6ad978">Hükümet 232</span><span class="num muted" style="font-size:11px">salt çoğ. 251</span><span class="num" style="font-size:11px;color:#ff8a94">Muh. 268</span>');
+  // sağ inceleme sütunu
+  el(s,'left:976px;top:72px;width:288px;height:448px','','panel');
+  el(s,'left:984px;top:80px;display:flex;gap:4px','<span class="tab on">HÜKÜMET</span><span class="tab">LOG</span><span class="tab">SEÇİLİ</span>');
+  el(s,'left:988px;top:120px;width:264px','<div class="h">Hükümet</div><div class="kv"><span>Başbakan</span><span style="color:#F2132A">Yeni Yol</span></div><div class="kv"><span>Ortak</span><span style="color:#31C440">SP · 2 bakanlık</span></div><div class="kv"><span>Vekil</span><span class="num">232 / 500</span></div><div class="kv"><span>Durum</span><span style="color:#f2c14e">azınlık</span></div><div class="h" style="margin-top:14px">Son olaylar</div>'+LOG.slice(0,4).map(function(r){return '<div class="logrow"><i style="background:'+r[0]+'"></i><span>'+r[1]+'</span></div>';}).join(''));
+  // benim masam
+  el(s,'left:0;top:528px;width:1280px;height:192px;background:#130f27;border-top:2px solid #0a0816');
+  el(s,'left:16px;top:540px','<span class="h">Elim · 5 kart</span>');
+  hand(s,16,560,CARDS,false);
+  el(s,'left:536px;top:540px','<span class="h">Hamleler</span>');
+  ACTS.forEach(function(a,i){ var b=el(s,'left:'+(536+(i%4)*100)+'px;top:'+(560+Math.floor(i/4)*72)+'px;width:92px;height:64px;background:'+a[2],a[0]+'<small>'+a[1]+'</small>','btn'+(a[3]?' off':'')); });
+  el(s,'left:952px;top:540px','<span class="h">Sıra sende · 1:30</span>');
+  el(s,'left:952px;top:560px;width:148px;height:64px;background:#13284a;border:2px solid #0a0816;display:flex;align-items:center;justify-content:center;gap:8px','<span style="font-size:26px;color:#6bb3e2">◆</span><span class="num" style="font-size:30px;font-weight:700;color:#6bb3e2">9</span>');
+  el(s,'left:1108px;top:560px;width:156px;height:64px;background:#1d1838;border:2px dashed #3f3775;display:grid;place-items:center;text-align:center','<span class="mono muted" style="font-size:11px">KART BOZDUR<br>sürükle · ½ mana</span>');
+  el(s,'left:952px;top:632px;width:312px;height:72px','TURU BİTİR','btn endturn');
+  [[18,10,'1'],[38,372,'2'],[980,76,'3'],[540,532,'4']].forEach(function(p){ el(s,'left:'+p[0]+'px;top:'+p[1]+'px',p[2],'pin'); });
+  ruler(s,0,0,1280,64,'şerit 64'); ruler(s,16,72,944,448,'harita 944×448'); ruler(s,976,72,288,448,'inceleme 288'); ruler(s,0,528,1280,192,'masa 192');
 }
-function acts(size) {
-  var list = [["YASA","0","#913FD4"],["MİTİNG","2","#F2132A"],["TEŞKİLAT","1","#228DD4"],["YATIRIM","2","#20822A"],["GENSORU","0","#A10C1C"],["ERKEN SEÇ.","2","#A6831A"],["TOPLANTI","0","#6b5a18"]];
-  return list.map(function (a) { return '<div class="act" style="background:' + a[2] + ';font-size:' + size + '">' + a[0] + '<small>' + a[1] + ' mana</small></div>'; }).join('');
+function concept2(s){
+  el(s,'left:0;top:0;width:1280px;height:56px;background:#1d1838;border-bottom:2px solid #0a0816');
+  el(s,'left:16px;top:10px;width:96px;height:36px;background:#e0303f;color:#fff;display:grid;place-items:center','<b class="mono">● CANLI</b>');
+  el(s,'left:124px;top:8px','<div class="mono" style="font-size:20px;font-weight:700">SİYASET GÜNDEMİ</div><div class="mono" style="font-size:11px;color:#f2c14e">1950 OCA–HAZ · BARAJ %0 · SONRAKİ SEÇİM 1952</div>');
+  el(s,'left:760px;top:10px;width:250px;height:36px;background:#2a2350;border:2px solid #f2c14e;display:flex;align-items:center;gap:8px;padding:0 8px',badge('#F2132A',22)+'<span class="mono" style="font-weight:700">SIRA: YENİ YOL</span><span class="num" style="margin-left:auto;color:#f2c14e">1:30</span>');
+  el(s,'left:1144px;top:10px;width:120px;height:36px','Menü','btn').style.background='#4a3f86';
+  el(s,'left:16px;top:72px;width:272px;height:488px','','panel');
+  el(s,'left:28px;top:82px','<span class="h">Skor tablosu · vekil / oy</span>');
+  P.forEach(function(p,i){ el(s,'left:24px;top:'+(104+i*56)+'px;width:256px;height:50px;background:'+(p.turn?'#2a2350':'#15112b')+';border-left:4px solid '+p.c+';display:flex;gap:8px;align-items:center;padding:0 8px'+(p.turn?';box-shadow:inset 0 0 0 2px #f2c14e':''),
+    badge(p.c,26)+'<div style="flex:1;min-width:0"><div class="mono" style="font-weight:700;font-size:12.5px;color:'+(p.me?'#f2c14e':'#fff')+'">'+p.n+'</div><div class="muted" style="font-size:10.5px;white-space:nowrap;overflow:hidden">'+p.l+'</div><div style="height:4px;background:#0a0816;margin-top:3px"><div style="height:4px;width:'+(p.v*3)+'%;background:'+p.c+'"></div></div></div><div class="num" style="text-align:right;font-size:12px"><b>'+p.s+'</b><br><span class="muted">%'+p.v.toFixed(1)+'</span></div>'); });
+  mapCanvas(s,304,72,672,488,21);
+  el(s,'left:312px;top:80px;display:flex;gap:4px','<span class="tab on">VEKİLLER</span><span class="tab">TEŞKİLAT</span><span class="tab">GÜÇ</span>');
+  el(s,'left:992px;top:72px;width:272px;height:488px','','panel');
+  el(s,'left:1004px;top:82px','<span class="h">Stüdyo masası · meclis</span>');
+  parl(s,1004,104,248,124);
+  el(s,'left:1004px;top:234px;width:248px','<div class="kv"><span style="color:#6ad978">Hükümet 232</span><span class="muted">salt çoğ. 251</span><span style="color:#ff8a94">268</span></div><div class="h" style="margin-top:12px">Hükümet</div><div class="kv"><span>Başbakan</span><span style="color:#F2132A">Yeni Yol</span></div><div class="kv"><span>Ortak</span><span style="color:#31C440">SP</span></div><div class="h" style="margin-top:12px">Oylamada</div><div style="background:#15112b;border:1px solid #3f3775;padding:8px;font-size:12px;line-height:1.4">Serbest Piyasa Yasası<br><span class="muted">Yeni Yol getirdi · 0:24</span><div style="display:flex;gap:6px;margin-top:8px"><span class="btn" style="flex:1;height:30px;background:#20823A">EVET</span><span class="btn" style="flex:1;height:30px;background:#5a527f">ÇEKİMSER</span><span class="btn" style="flex:1;height:30px;background:#A10C1C">HAYIR</span></div></div>');
+  el(s,'left:0;top:568px;width:1280px;height:120px;background:#130f27;border-top:2px solid #0a0816');
+  hand(s,16,580,CARDS.slice(0,4),false);
+  ACTS.forEach(function(a,i){ el(s,'left:'+(424+(i%4)*92)+'px;top:'+(580+Math.floor(i/4)*52)+'px;width:86px;height:46px;font-size:11px;background:'+a[2],a[0]+'<small>'+a[1]+'</small>','btn'+(a[3]?' off':'')); });
+  el(s,'left:808px;top:580px;width:120px;height:98px;background:#13284a;border:2px solid #0a0816;display:grid;place-items:center','<div style="text-align:center"><div class="num" style="font-size:34px;font-weight:700;color:#6bb3e2">◆ 9</div><div class="mono muted" style="font-size:10px">MANA</div></div>');
+  el(s,'left:944px;top:580px;width:320px;height:98px','TURU BİTİR','btn endturn');
+  el(s,'left:0;top:688px;width:1280px;height:32px;background:#0a0816;display:flex;align-items:center;gap:12px','<span style="background:#e0303f;color:#fff;padding:6px 10px" class="mono"><b>SON DAKİKA</b></span><span style="white-space:nowrap;font-size:13px">'+LOG.map(function(r){return r[1];}).join('   ◆   ')+'</span>');
+  [[20,76,'1'],[996,76,'2'],[6,692,'3']].forEach(function(p){ el(s,'left:'+p[0]+'px;top:'+p[1]+'px',p[2],'pin'); });
+  ruler(s,16,72,272,488,'skor 272'); ruler(s,304,72,672,488,'harita 672×488'); ruler(s,992,72,272,488,'stüdyo 272'); ruler(s,0,568,1280,120,'alt üçte bir 120');
 }
-
-function drawMap(canvas, seed) {
-  var r = canvas.getBoundingClientRect();
-  var dpr = window.devicePixelRatio || 1;
-  canvas.width = Math.max(1, Math.round(r.width * dpr));
-  canvas.height = Math.max(1, Math.round(r.height * dpr));
-  var g = canvas.getContext('2d');
-  g.scale(dpr, dpr);
-  var W = r.width, H = r.height;
-  g.fillStyle = '#101a33'; g.fillRect(0, 0, W, H);
-  var box = canvas.dataset.box ? canvas.dataset.box.split(',').map(Number) : [0, 0, 1, 1];
-  var bx = box[0] * W, by = box[1] * H, bw = (box[2] - box[0]) * W, bh = (box[3] - box[1]) * H;
-  var size = Math.max(5, bw / 34);
-  var hw = size * Math.sqrt(3), vh = size * 1.5;
-  var cols = PARTIES.map(function (p) { return p.c; });
-  var s = seed;
-  function rnd() { s = (s * 9301 + 49297) % 233280; return s / 233280; }
-  for (var row = 0; row * vh < bh; row++) {
-    for (var col = 0; col * hw < bw; col++) {
-      var x = bx + col * hw + (row % 2 ? hw / 2 : 0) + hw / 2;
-      var y = by + row * vh + size;
-      var nx = (x - bx) / bw - .5, ny = (y - by) / bh - .5;
-      var shape = nx * nx * 1.1 + ny * ny * 3.2 + Math.sin(nx * 9) * .03 + Math.cos(ny * 7 + nx * 4) * .03;
-      if (shape > .2) continue;
-      var zone = Math.floor((Math.sin(nx * 6.3 + 1) + Math.cos(ny * 8.1 - nx * 3) + 2) * 1.9 + rnd() * .6) % 7;
-      g.beginPath();
-      for (var k = 0; k < 6; k++) { var ang = Math.PI / 180 * (60 * k - 30); g.lineTo(x + size * .96 * Math.cos(ang), y + size * .96 * Math.sin(ang)); }
-      g.closePath();
-      g.fillStyle = cols[zone]; g.globalAlpha = .88; g.fill(); g.globalAlpha = 1;
-      g.strokeStyle = 'rgba(10,8,22,.55)'; g.lineWidth = 1; g.stroke();
-    }
-  }
-}
-
-function layout(el, mode) {
-  var phone = mode === 'phone';
-  el.classList.toggle('phone', phone);
-  var id = el.dataset.layout;
-  var h = '';
-  if (id === '1') {
-    h += '<canvas class="map" data-box="0.04,0.1,0.96,0.66"></canvas>';
-    h += '<div class="hud mono" style="left:1%;top:2%;padding:.4em .7em">1950 Oca–Haz · <span class="gold">Sıra: Barış · 1:30</span></div>';
-    h += '<div style="position:absolute;right:1%;top:2%;display:flex;gap:.4em"><div class="iconbtn on">MECLİS</div><div class="iconbtn">HÜK.</div><div class="iconbtn">LOG</div></div>';
-    h += '<div class="pop" style="right:1%;top:12%;width:' + (phone ? '40%' : '26%') + '"><h4>Meclis · 500</h4><div class="muted">◖ diyagram ◗</div><div class="kv"><span>Teklif</span><span>Hükümet güvenoyu</span></div><div class="kv"><span>EVET / HAYIR</span><span>232 / 121</span></div></div>';
-    var shown = phone ? PARTIES.slice(0, 8) : PARTIES;
-    h += '<div style="position:absolute;left:1%;right:' + (phone ? '1%' : '25%') + ';bottom:' + (phone ? '15%' : '1.5%') + ';display:grid;grid-template-columns:repeat(' + (phone ? 4 : 4) + ',minmax(0,1fr));gap:.4em">' + shown.map(function (p) { return plaque(p, true); }).join('') + '</div>';
-    if (phone) {
-      h += '<div style="position:absolute;left:1%;right:1%;bottom:1%;height:12%;display:flex;align-items:center;gap:.5em"><div class="cardmini" style="height:100%;width:auto">DESTE<br>3</div><div style="display:flex;gap:.3em;flex:1;justify-content:center">' + acts('.7em') + '</div><span class="mana">9</span><span class="endturn">Bitir</span></div>';
-    } else {
-      h += '<div class="hud" style="right:1%;bottom:1.5%;width:23%;padding:.5em;display:grid;gap:.5em"><div style="display:flex;justify-content:space-between;align-items:center"><span class="mana">◆ 9</span><span class="endturn">Turu Bitir</span></div><div style="display:flex;flex-wrap:wrap;gap:.35em;justify-content:center">' + acts('.78em') + '</div></div>';
-      h += '<div style="position:absolute;left:3%;top:52%;display:flex;gap:.2em;transform:rotate(-4deg)"><div class="cardmini">KASET</div><div class="cardmini">POPÜLİZM</div><div class="cardmini">VEKİL ÇALMA</div></div>';
-    }
-    h += '<span class="pin" style="left:1%;bottom:' + (phone ? '41%' : '27%') + '">1</span><span class="pin" style="right:1%;bottom:' + (phone ? '13%' : '30%') + '">2</span><span class="pin" style="right:' + (phone ? '42%' : '28%') + ';top:2%">3</span>';
-  }
-  if (id === '2') {
-    h += '<canvas class="map" data-box="0.16,0.28,0.84,0.7"></canvas>';
-    var top = phone ? PARTIES.slice(0, 8) : PARTIES;
-    h += '<div style="position:absolute;left:1%;right:1%;top:1.5%;display:grid;grid-template-columns:repeat(' + (phone ? 4 : 8) + ',minmax(0,1fr));gap:.35em">' + top.map(function (p) { return plaque(p, true); }).join('') + '</div>';
-    h += '<div class="hud" style="left:1%;bottom:' + (phone ? '19%' : '25%') + ';width:' + (phone ? '24%' : '17%') + ';padding:.5em"><div class="mono gold" style="font-size:.85em">MECLİS · 500</div><div class="muted" style="text-align:center;font-size:2.2em;line-height:1">◖◗</div><div class="mono" style="font-size:.8em">EVET 232 · HAYIR 121</div></div>';
-    if (!phone) h += '<div class="hud" style="right:1%;top:' + '24%' + ';bottom:25%;width:15%;padding:.5em;font-size:.85em"><div class="mono gold">LOG</div><div class="muted">SP İzmir\'de miting.<br><br>Kaset sızdı: OKP −1.2<br><br>Yeni Yol ile DNP birleşti.</div></div>';
-    h += '<div class="hud" style="left:0;right:0;bottom:0;height:' + (phone ? '18%' : '23%') + ';display:flex;align-items:center;gap:1em;padding:.5em 1em"><div style="display:flex;gap:.3em">' + '<div class="cardmini">KASET</div><div class="cardmini">POPÜLİZM</div><div class="cardmini">VEKİL ÇALMA</div>' + '</div><div style="display:flex;gap:.3em;flex:1;justify-content:center;flex-wrap:wrap">' + acts(phone ? '.65em' : '.78em') + '</div><span class="mana">◆ 9</span><span class="endturn">Turu Bitir</span></div>';
-    h += '<span class="pin" style="left:1%;top:' + (phone ? '30%' : '17%') + '">1</span><span class="pin" style="left:1%;bottom:' + (phone ? '16%' : '20%') + '">2</span>';
-  }
-  if (id === '3') {
-    h += '<canvas class="map" data-box="0.24,0.06,0.76,0.62"></canvas>';
-    var w = phone ? '21%' : '21%';
-    h += '<div style="position:absolute;left:1%;top:1.5%;bottom:1.5%;width:' + w + ';display:grid;grid-template-rows:repeat(4,minmax(0,1fr));gap:.4em">' + PARTIES.slice(0, 4).map(function (p) { return plaque(p, phone); }).join('') + '</div>';
-    h += '<div style="position:absolute;right:1%;top:1.5%;bottom:1.5%;width:' + w + ';display:grid;grid-template-rows:repeat(4,minmax(0,1fr));gap:.4em">' + PARTIES.slice(4).map(function (p) { return plaque(p, phone); }).join('') + '</div>';
-    h += '<div class="hud" style="left:23%;top:2%;padding:.4em .6em;font-size:.85em"><span class="mono gold">1950 · Sıra: Barış · 1:30</span><br><span class="muted">SP İzmir\'de miting · Kaset sızdı: OKP</span></div>';
-    h += '<div class="hud" style="left:23%;right:23%;bottom:1.5%;height:34%;display:grid;grid-template-columns:1fr 1.6fr;gap:.6em;padding:.5em"><div><div class="mono gold" style="font-size:.85em">MECLİS · 500</div><div class="muted" style="text-align:center;font-size:2.6em;line-height:1.1">◖◗</div><div class="mono" style="font-size:.8em">EVET 232 · HAYIR 121</div></div><div style="display:grid;gap:.4em;align-content:start"><div style="display:flex;flex-wrap:wrap;gap:.3em;justify-content:center">' + acts(phone ? '.62em' : '.72em') + '</div><div style="display:flex;justify-content:space-between;align-items:center"><span class="mana">◆ 9</span><span class="endturn">Turu Bitir</span></div></div></div>';
-    h += '<div style="position:absolute;left:36%;bottom:33%;display:flex;gap:.2em"><div class="cardmini">KASET</div><div class="cardmini">POPÜLİZM</div><div class="cardmini">VEKİL ÇALMA</div></div>';
-    h += '<span class="pin" style="left:1%;top:1%">1</span><span class="pin" style="left:23%;bottom:35%">2</span><span class="pin" style="left:23%;top:9%">3</span>';
-  }
-  el.innerHTML = h;
-  var c = el.querySelector('canvas.map');
-  if (c) requestAnimationFrame(function () { drawMap(c, Number(id) * 37 + 11); });
+function concept3(s){
+  mapCanvas(s,0,0,1280,720,33);
+  el(s,'left:16px;top:16px;width:320px;height:72px;display:flex;align-items:center;gap:10px;padding:0 12px','','panel').innerHTML=badge('#F2132A',40)+'<div><div class="mono" style="font-weight:700;font-size:15px;color:#f2c14e">SIRA SENDE · 1:30</div><div class="muted" style="font-size:12px">1950 Oca–Haz · Baraj %0 · Seçim 1952</div></div>';
+  el(s,'left:944px;top:16px;width:320px;height:384px','','panel');
+  el(s,'left:956px;top:26px;display:flex;justify-content:space-between;width:296px','<span class="h">Partiler</span><span class="mono dim" style="font-size:11px">katla ▴</span>');
+  P.forEach(function(p,i){ el(s,'left:952px;top:'+(50+i*43)+'px;width:304px;height:38px;display:flex;gap:8px;align-items:center;padding:0 6px;background:'+(p.turn?'#2a2350':'transparent')+';border-left:4px solid '+p.c,
+    '<span class="num dim" style="width:14px">'+(i+1)+'</span>'+badge(p.c,24)+'<div style="flex:1;min-width:0"><div class="mono" style="font-size:12px;font-weight:700;color:'+(p.me?'#f2c14e':'#fff')+'">'+p.n+(p.st?' <span class="chip" style="background:#2f7d3b;color:#fff">'+p.st+'</span>':'')+'</div><div class="muted" style="font-size:10px;white-space:nowrap;overflow:hidden">'+p.l+'</div></div><span class="num" style="font-size:12px"><b>'+p.s+'</b> <span class="muted">%'+p.v.toFixed(0)+'</span></span>'); });
+  ['MECLİS','HÜKÜMET','LOG'].forEach(function(t,i){ el(s,'left:0;top:'+(120+i*84)+'px;width:40px;height:78px;background:'+(i==0?'#f2c14e':'#272048')+';color:'+(i==0?'#0a0816':'#a39bd0')+';border:2px solid #0a0816;display:grid;place-items:center','<span class="mono" style="writing-mode:vertical-rl;transform:rotate(180deg);font-weight:700;font-size:11px;letter-spacing:.1em">'+t+'</span>'); });
+  el(s,'left:40px;top:104px;width:300px;height:280px','','panel');
+  el(s,'left:52px;top:114px','<span class="h">Meclis · 500</span>');
+  parl(s,52,138,276,138);
+  el(s,'left:52px;top:286px;width:276px','<div class="kv"><span style="color:#6ad978">Hükümet 232</span><span class="muted">salt çoğ. 251</span></div><div class="kv"><span>Oylamada</span><span>yok</span></div>');
+  hand(s,24,560,CARDS,true);
+  el(s,'left:880px;top:488px;width:384px;height:216px','','panel');
+  var cx=1072, cy=600;
+  ACTS.forEach(function(a,i){ var ang=Math.PI*(1.05+i*0.9/7.0*1.0)+0.0; var px=cx+Math.cos(Math.PI+i*(Math.PI/7))*150-38, py=cy-Math.sin(i*(Math.PI/7))*86-20;
+    el(s,'left:'+px+'px;top:'+py+'px;width:76px;height:40px;font-size:10px;background:'+a[2],a[0]+'<small>'+a[1]+'</small>','btn'+(a[3]?' off':'')); });
+  el(s,'left:1000px;top:600px;width:144px;height:92px','TURU<br>BİTİR','btn endturn');
+  el(s,'left:892px;top:500px','<span class="num" style="font-size:22px;color:#6bb3e2;font-weight:700">◆ 9</span>');
+  [[20,20,'1'],[948,20,'1'],[4,124,'2'],[1004,604,'3']].forEach(function(p){ el(s,'left:'+p[0]+'px;top:'+p[1]+'px',p[2],'pin'); });
+  ruler(s,944,16,320,384,'partiler 320'); ruler(s,40,104,300,280,'kayan panel 300'); ruler(s,880,488,384,216,'hamle halkası 384');
 }
 
-document.querySelectorAll('.screen').forEach(function (el) { layout(el, 'pc'); });
-document.querySelectorAll('.toggle').forEach(function (t) {
-  t.addEventListener('click', function (e) {
-    var b = e.target.closest('button'); if (!b) return;
-    t.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
-    layout(document.getElementById(t.dataset.for), b.dataset.mode);
-  });
-});
-var rt;
-window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () {
-  document.querySelectorAll('.screen').forEach(function (el) { var c = el.querySelector('canvas.map'); if (c) drawMap(c, Number(el.dataset.layout) * 37 + 11); });
-}, 120); });
+var BUILD = {s1:concept1, s2:concept2, s3:concept3};
+Object.keys(BUILD).forEach(function(id){ BUILD[id](document.getElementById(id)); });
+function fit(){ document.querySelectorAll('.stage').forEach(function(st){ var w=st.parentElement.clientWidth; st.style.transform='scale('+(w/1280)+')'; }); }
+fit(); window.addEventListener('resize', fit);
+document.querySelectorAll('[data-rulers]').forEach(function(cb){ cb.addEventListener('change', function(){ document.getElementById(cb.dataset.rulers).classList.toggle('show-rulers', cb.checked); }); });
 </script>

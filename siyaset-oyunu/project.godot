@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="Siyaset Oyunu"
-config/version="0.0.146"
+config/version="0.0.147"
 run/main_scene="res://scenes/Lobby.tscn"
 config/quit_on_go_back=false
 config/features=PackedStringArray("4.7", "Forward Plus")
@@ -41,6 +41,8 @@ SceneTransition="*res://scenes/SceneTransition.tscn"
 
 [display]
 
+window/size/viewport_width=1280
+window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 window/stretch/aspect="keep"
 

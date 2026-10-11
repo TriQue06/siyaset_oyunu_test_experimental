@@ -34,7 +34,7 @@ const R_ACTIONS := Rect2(536, 560, 392, 136)
 const R_MANA := Rect2(952, 560, 148, 64)
 const R_TRASH := Rect2(1108, 560, 156, 64)
 const R_PASS := Rect2(952, 632, 312, 72)
-const R_PARL := Rect2(24, 368, 248, 144)
+const R_PARL := Rect2(24, 400, 196, 112)
 const R_PARL_VOTE := Rect2(24, 232, 296, 280)
 ## Sağ üstte Menü düğmesi: şerit oraya kadar uzanmaz.
 const MENU_RESERVE := 140.0
@@ -347,7 +347,8 @@ func _ready() -> void:
 	# gibi kendi zemini ve sert gölgesi olan bir panelin içinde.
 	var board := get_node_or_null("%ParliamentBoard") as PanelContainer
 	if board != null:
-		UiSkin.skin_panel(board, UiSkin.PANEL)
+		# Rozetin içinde ayrı bir çerçeve olmasın: diyagram rozet zeminine oturur.
+		board.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	var actions_panel := get_node_or_null("%ActionsPanel") as PanelContainer
 	if actions_panel != null:
 		UiSkin.skin_panel(actions_panel, UiSkin.PANEL_DARK)
@@ -438,6 +439,8 @@ func _place_card_bar() -> void:
 	hand_container.offset_left = 0.0
 	hand_container.offset_right = 0.0
 	hand_container.alignment = BoxContainer.ALIGNMENT_BEGIN
+	hand_container.grow_horizontal = Control.GROW_DIRECTION_END
+	hand_area.clip_contents = false
 	hand_container.offset_top = -CARD_DISPLAY_SIZE.y
 	hand_container.offset_bottom = 0.0
 	_fit_hand_width(CardManager.my_inventory().size())
@@ -630,7 +633,7 @@ func _place_parliament_badge() -> void:
 	if _parl_bg == null:
 		_parl_bg = Panel.new()
 		var style := StyleBoxFlat.new()
-		style.bg_color = Color("1d1838")
+		style.bg_color = Color(Color("1d1838"), 0.82)
 		style.border_color = UiTheme.INK
 		style.set_border_width_all(2)
 		_parl_bg.add_theme_stylebox_override("panel", style)
@@ -644,7 +647,7 @@ func _place_parliament_badge() -> void:
 			vbox.move_child(_parl_title, 0)
 			_parl_summary = Label.new()
 			_parl_summary.add_theme_font_override("font", UiTheme.mono(true))
-			_parl_summary.add_theme_font_size_override("font_size", 11)
+			_parl_summary.add_theme_font_size_override("font_size", 10)
 			_parl_summary.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			_parl_summary.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			vbox.add_child(_parl_summary)
@@ -653,7 +656,7 @@ func _place_parliament_badge() -> void:
 		var chamber := bottom_area.get_node_or_null("ChamberSplit/ParliamentChamber") as MarginContainer
 		if chamber != null:
 			for side in ["left", "right", "top", "bottom"]:
-				chamber.add_theme_constant_override("margin_" + side, 8)
+				chamber.add_theme_constant_override("margin_" + side, 5)
 		var split := bottom_area.get_node_or_null("ChamberSplit") as Control
 		if split != null:
 			split.offset_top = 0
@@ -685,8 +688,8 @@ func _refresh_parliament_summary() -> void:
 		_parl_summary.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
 		return
 	var majority := total / 2 + 1
-	_parl_summary.text = ("Hükümet %d  ·  salt çoğ. %d  ·  Muh. %d" % [gov, majority, total - gov]) if GovernmentManager.has_government() \
-		else "Hükümet yok  ·  salt çoğunluk %d" % majority
+	_parl_summary.text = ("Hük %d · çoğ %d · Muh %d" % [gov, majority, total - gov]) if GovernmentManager.has_government() \
+		else "Hükümet yok · çoğunluk %d" % majority
 	_parl_summary.add_theme_color_override("font_color", UiTheme.TEXT)
 
 ## SAĞ SÜTUN: üstte sekmeler; Hükümet (hükümet + son olaylar), Log (sadece
@@ -1361,7 +1364,9 @@ func _rebuild_hand() -> void:
 ## çekilip üst üste bindirilir; sıra göstergesine ve meclis butonlarına taşmaz.
 func _fit_hand_width(count: int) -> void:
 	var separation := HAND_CARD_SEPARATION
-	var available: float = hand_area.size.x - CARD_BAR_PADDING * 2.0
+	# Masadaki el alanının genişliği (düğüm boyu bir kare sonra kesinleşir;
+	# bayat boyla hesaplanınca el iki yana taşıyordu).
+	var available: float = _r(R_HAND).size.x
 	if count > 1 and available > 0.0:
 		var needed: float = count * CARD_DISPLAY_SIZE.x + (count - 1) * HAND_CARD_SEPARATION
 		if needed > available:

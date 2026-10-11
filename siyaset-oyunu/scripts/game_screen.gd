@@ -1273,6 +1273,9 @@ func _build_plaque(pid: int, width: float) -> Control:
 	var populism_left := CardManager.populism_rounds_left(pid)
 	if populism_left > 0:
 		tags.append(["POP %d" % populism_left, UiTheme.PURPLE, UiTheme.TEXT])
+	for member in members:
+		if MultiplayerManager.is_away(int(member)):
+			tags.append(["BOT" if MultiplayerManager.away_mode == MultiplayerManager.AWAY_BOT else "PASİF", UiTheme.RED, UiTheme.TEXT])
 	var vote_member := -1
 	for member in members:
 		if GovernmentManager.is_voting() and GovernmentManager.eligible_voter_ids().has(int(member)):

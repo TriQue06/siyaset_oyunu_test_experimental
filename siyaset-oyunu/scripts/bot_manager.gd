@@ -58,7 +58,10 @@ func step(now: float) -> void:
 
 func _handle_turn(now: float) -> void:
 	var bot := CardManager.current_turn_peer_id()
-	if not MultiplayerManager.is_bot(bot):
+	if MultiplayerManager.is_passive_away(bot):
+		CardManager._apply_pass(bot, false)  # pasif: sırası kendiliğinden geçer
+		return
+	if not MultiplayerManager.is_ai_controlled(bot):
 		_turn_key = ""
 		return
 	var key := "%d:%d:%d" % [CardManager.round_number, CardManager.current_turn_index, bot]
@@ -134,7 +137,11 @@ func _handle_votes(now: float) -> void:
 		_vote_key = key
 		_vote_due.clear()
 	for bot in GovernmentManager.eligible_voter_ids():
-		if not MultiplayerManager.is_bot(bot) or GovernmentManager.has_voted(bot):
+		if MultiplayerManager.is_passive_away(bot) and not GovernmentManager.has_voted(bot):
+			# Pasif: çekimser (koalisyon görüşmesinde çekimser olunamaz: HAYIR).
+			GovernmentManager._apply_vote(bot, GovernmentManager.VOTE_NO if GovernmentManager.is_coalition_stage() else GovernmentManager.VOTE_ABSTAIN)
+			return
+		if not MultiplayerManager.is_ai_controlled(bot) or GovernmentManager.has_voted(bot):
 			continue
 		if not _vote_due.has(bot):
 			_vote_due[bot] = now + _delay(VOTE_SECONDS)
@@ -147,7 +154,7 @@ func _handle_votes(now: float) -> void:
 
 func _handle_formation(now: float) -> void:
 	var bot := GovernmentManager.mandate_peer_id()
-	if not MultiplayerManager.is_bot(bot):
+	if not MultiplayerManager.is_ai_controlled(bot):
 		_form_key = ""
 		return
 	# Seçim gecesi yayını sürüyor (süreye eklenen pay): herkes izlerken teklif gelmesin.

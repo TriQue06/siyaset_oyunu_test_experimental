@@ -292,6 +292,35 @@ func _adjust_bot_colors() -> bool:
 		avoid.append(current)
 	return changed
 
+## Host: parti kurulumunda düşen oyuncu: partisi eksikse rastgele tamamlanır
+## ve hazır sayılır (oyun onu beklemesin).
+func auto_ready_away(peer_id: int) -> void:
+	var party: Dictionary = parties.get(peer_id, {})
+	var used_names: Array = []
+	for other in parties.values():
+		used_names.append(other.get("name", ""))
+	if not is_valid_name(String(party.get("name", ""))):
+		party["name"] = _bot_party_name(used_names)
+	if not party.has("icon_index"):
+		party["icon_index"] = PartyPresets.random_icon_index()
+	party["icon_color"] = Color.WHITE
+	if not party.has("bg_color") or Color(party["bg_color"]).a <= 0.0:
+		var colors: Array = []
+		for other in parties.values():
+			colors.append(Color(other.get("bg_color", Color.TRANSPARENT)))
+		party["bg_color"] = _pick_distinct_color(colors)
+	if not party.has("ideology"):
+		party["ideology"] = IdeologyAxes.random_start_ideology()
+	party["ready"] = true
+	parties[peer_id] = party
+	if not politicians.has(peer_id):
+		var homes := GameMap.province_ids()
+		var person := PoliticianPresets.random_name(PoliticianPresets.used_surnames(peer_id))
+		politicians[peer_id] = PoliticianPresets.make(person["first_name"], person["surname"],
+			PoliticianPresets.random_background(), String(homes[randi() % homes.size()]) if not homes.is_empty() else "", person["gender"])
+	_broadcast_parties()
+	parties_updated.emit()
+
 ## Host: bir bot için hazır (kilitli) rastgele bir parti oluşturur.
 func add_bot_party(peer_id: int) -> void:
 	if MultiplayerManager.room_code != "" and not MultiplayerManager.is_host:

@@ -116,6 +116,65 @@ func _sync_random_parties(value: bool) -> void:
 	random_parties = value
 	settings_updated.emit()
 
+## OYUNDAN DÜŞEN OYUNCU: "bot" (varsayılan) yerine bot oynar, "passive" ise
+## sırası kendiliğinden geçer, oylarda çekimser kalır. Lobi sahibi değiştirir.
+## Oyuncu aynı cihazdan (aynı UID) yeniden katılınca kaldığı yerden devam eder.
+const AWAY_BOT := "bot"
+const AWAY_PASSIVE := "passive"
+var away_mode: String = AWAY_BOT
+
+func set_away_mode(value: String) -> void:
+	if not is_local_owner() or not [AWAY_BOT, AWAY_PASSIVE].has(value):
+		return
+	if is_host:
+		away_mode = value
+		if room_code != "":
+			_sync_away_mode.rpc(away_mode)
+		settings_updated.emit()
+	else:
+		_request_set_away_mode.rpc_id(1, value)
+
+@rpc("any_peer", "reliable")
+func _request_set_away_mode(value: String) -> void:
+	if not is_host or multiplayer.get_remote_sender_id() != owner_id or not [AWAY_BOT, AWAY_PASSIVE].has(value):
+		return
+	away_mode = value
+	_sync_away_mode.rpc(away_mode)
+	settings_updated.emit()
+
+@rpc("authority", "reliable")
+func _sync_away_mode(value: String) -> void:
+	away_mode = value
+	settings_updated.emit()
+
+## Oyundan düşmüş (bağlantısı kopmuş) oyuncu mu?
+func is_away(peer_id: int) -> bool:
+	return bool(players.get(peer_id, {}).get("away", false))
+
+## Bu oyuncunun hamlelerini yapay zekâ mı yapıyor? (bot ya da bot modunda düşmüş oyuncu)
+func is_ai_controlled(peer_id: int) -> bool:
+	return is_bot(peer_id) or (is_away(peer_id) and away_mode == AWAY_BOT)
+
+## Pasif modda düşmüş oyuncu: sırası geçer, oyu çekimser.
+func is_passive_away(peer_id: int) -> bool:
+	return is_away(peer_id) and away_mode == AWAY_PASSIVE
+
+## KALICI OYUNCU KİMLİĞİ: cihazda bir kez üretilir, odaya katılırken gönderilir.
+## Oyundan düşen oyuncu aynı kimlikle dönünce eski yerine oturur.
+const UID_PATH := "user://player_uid.cfg"
+var player_uid: String = ""
+
+func _load_player_uid() -> void:
+	var config := ConfigFile.new()
+	if config.load(UID_PATH) == OK:
+		player_uid = String(config.get_value("player", "uid", ""))
+	if player_uid == "":
+		var rng := RandomNumberGenerator.new()
+		rng.randomize()
+		player_uid = "%08x%08x%08x" % [rng.randi(), rng.randi(), Time.get_ticks_usec() & 0xffffffff]
+		config.set_value("player", "uid", player_uid)
+		config.save(UID_PATH)
+
 ## SAYIM YÖNTEMİ (anayasa değişikliğiyle değişir; yeni oyunda D'Hondt).
 const DEFAULT_SEAT_METHOD := "dhondt"
 var seat_method: String = DEFAULT_SEAT_METHOD
@@ -147,6 +206,7 @@ var stage: int = Stage.LOBBY
 var last_close_reason: String = ""
 
 func _ready() -> void:
+	_load_player_uid()
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	multiplayer.connected_to_server.connect(_on_connected_to_server)
 	multiplayer.connection_failed.connect(_on_connection_failed)
@@ -251,6 +311,7 @@ func create_room(player_name: String) -> void:
 	room_code = ""
 	_closing = false
 	map_seed = ""
+	away_mode = AWAY_BOT
 	reset_seat_method()
 	election_threshold = THRESHOLD_DEFAULT
 	election_interval = GameRules.DEFAULT_ELECTION_INTERVAL
@@ -584,7 +645,7 @@ func _reset_state() -> void:
 # --- Bağlantı olayları -------------------------------------------------
 
 func _on_connected_to_server() -> void:
-	_request_join.rpc_id(1, _pending_code, local_player_name, network_signature())
+	_request_join.rpc_id(1, _pending_code, local_player_name, network_signature(), player_uid)
 
 ## Ağ sürüm imzası = oyun sürümü. Godot RPC'leri SIRA NUMARASIYLA eşler; iki
 ## cihazda farklı sürüm varsa istemcinin istekleri sunucuda yanlış fonksiyona
@@ -620,6 +681,23 @@ func _on_peer_disconnected(id: int) -> void:
 	if not is_host or _closing:
 		return
 	var was_player := players.has(id)
+	# OYUN SÜRERKEN DÜŞEN OYUNCU SİLİNMEZ: "ayrıldı" olarak kalır; yerine bot
+	# oynar ya da pasif kalır (lobi ayarı). Aynı UID ile dönünce devam eder.
+	if was_player and (stage == Stage.IN_GAME or stage == Stage.PARTY_SETUP) and not is_bot(id):
+		players[id]["away"] = true
+		if id == owner_id:
+			owner_id = multiplayer.get_unique_id()
+		_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count)
+		player_list_updated.emit()
+		if stage == Stage.PARTY_SETUP:
+			PartyManager.auto_ready_away(id)
+			if PartyManager.all_ready():
+				finish_party_setup()
+		else:
+			CardManager.log_event("%s oyundan düştü: %s." % [PoliticianPresets.display_name(id),
+				"yerine bot oynuyor" if away_mode == AWAY_BOT else "dönene kadar pasif"], id, "", "party_change")
+			CardManager._push_state({"type": "player_away", "peer_id": id})
+		return
 	players.erase(id)
 	if id == owner_id:
 		# Host olmayan lobi sahibi ayrıldı: oda kapanmaz, sahiplik host'a geçer.
@@ -685,7 +763,7 @@ func _notify_party_setup_finished() -> void:
 # --- RPC'ler -------------------------------------------------------------
 
 @rpc("any_peer", "reliable")
-func _request_join(code: String, player_name: String, signature: String) -> void:
+func _request_join(code: String, player_name: String, signature: String, uid: String = "") -> void:
 	if not is_host:
 		return
 	var sender_id := multiplayer.get_remote_sender_id()
@@ -703,17 +781,68 @@ func _request_join(code: String, player_name: String, signature: String) -> void
 		multiplayer.multiplayer_peer.disconnect_peer(sender_id)
 		return
 	if stage != Stage.LOBBY:
+		# YENİDEN KATILMA: aynı UID'li, oyundan düşmüş bir oyuncu kaldığı yere döner.
+		var old_id := _away_player_with_uid(uid)
+		if old_id != -1:
+			_rejoin(old_id, sender_id, player_name)
+			return
 		_join_rejected.rpc_id(sender_id, "Bu odada oyun zaten başladı.")
 		multiplayer.multiplayer_peer.disconnect_peer(sender_id)
 		return
 	# Oda botlarla doluysa en son eklenen bot insan oyuncuya yer açar.
 	if players.size() >= MAX_PLAYERS:
 		players.erase(bot_ids().back())
-	players[sender_id] = {"name": player_name}
+	players[sender_id] = {"name": player_name, "uid": uid}
 	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count)
 	_sync_map_seed.rpc(map_seed)
 	_sync_random_parties.rpc(random_parties)
 	player_list_updated.emit()
+
+func _away_player_with_uid(uid: String) -> int:
+	if uid == "":
+		return -1
+	for peer_id in players.keys():
+		if is_away(int(peer_id)) and String(players[peer_id].get("uid", "")) == uid:
+			return int(peer_id)
+	return -1
+
+## Host: düşmüş oyuncu yeni bağlantısıyla döndü. Eski peer id'ye bağlı bütün
+## kayıtlar (sıra, mana, el, parti, siyasetçi, puan, oylar) yeni id'ye taşınır;
+## istemciye tam durum gönderilir ve oyun ekranına geçer.
+func _rejoin(old_id: int, new_id: int, player_name: String) -> void:
+	var entry: Dictionary = players[old_id].duplicate()
+	entry.erase("away")
+	entry["name"] = player_name if player_name != "" else String(entry.get("name", "Oyuncu"))
+	players.erase(old_id)
+	players[new_id] = entry
+	if owner_id == old_id:
+		owner_id = new_id
+	CardManager.rekey_player(old_id, new_id)
+	# Önce istemciye "geri döndün" denir (lobi ekranına gitmesin), sonra her şey.
+	_notify_rejoined.rpc_id(new_id, stage, game_map_seed)
+	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count)
+	_sync_map_seed.rpc_id(new_id, map_seed)
+	_sync_random_parties.rpc_id(new_id, random_parties)
+	_sync_away_mode.rpc_id(new_id, away_mode)
+	_sync_seat_method.rpc_id(new_id, seat_method)
+	PartyManager.broadcast()
+	if stage == Stage.IN_GAME:
+		CardManager.send_full_state(new_id)
+		GovernmentManager._push_state()
+		CardManager.log_event("%s oyuna geri döndü." % PoliticianPresets.display_name(new_id), new_id, "", "party_change")
+		CardManager._push_state({"type": "player_back", "peer_id": new_id})
+	player_list_updated.emit()
+
+## İstemci: oyuna geri döndük. Haritayı kur, doğru ekrana geç.
+@rpc("authority", "reliable")
+func _notify_rejoined(rejoin_stage: int, seed_value: int) -> void:
+	_has_synced_once = true
+	stage = rejoin_stage
+	game_map_seed = seed_value
+	GameMap.generate_new(seed_value)
+	CardManager._load_province_seat_counts()
+	var scene := "res://scenes/GameScreen.tscn" if rejoin_stage == Stage.IN_GAME else "res://scenes/PartySetup.tscn"
+	get_tree().change_scene_to_file(scene)
 
 @rpc("authority", "reliable")
 func _join_rejected(reason: String) -> void:

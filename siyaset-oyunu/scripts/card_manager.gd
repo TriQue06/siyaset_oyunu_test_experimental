@@ -2983,6 +2983,34 @@ func _run_congress(pid: int, kind: String, requester: int = -1) -> void:
 	_push_state({"type": "congress", "peer_id": int(result["pid"]) if PartyManager.parties.has(int(result["pid"])) else -1,
 		"congress": show, "message": text}, true)
 
+## YENİDEN KATILMA: oyuncunun bütün kayıtları eski peer id'den yenisine taşınır.
+func rekey_player(old_id: int, new_id: int) -> void:
+	if PartyManager.parties.has(old_id):
+		_rekey_party(old_id, new_id, PartyManager.deputy_of(old_id))
+	else:
+		for pid in PartyManager.parties.keys():
+			if int(PartyManager.parties[pid].get("deputy", -1)) == old_id:
+				PartyManager.parties[pid]["deputy"] = new_id
+	if PartyManager.politicians.has(old_id):
+		PartyManager.politicians[new_id] = PartyManager.politicians[old_id]
+		PartyManager.politicians.erase(old_id)
+	var idx := turn_order.find(old_id)
+	if idx != -1:
+		turn_order[idx] = new_id
+	for table in [mana, inventories, credibility]:
+		if table.has(old_id):
+			table[new_id] = table[old_id]
+			table.erase(old_id)
+	for table in [GovernmentManager.scores, GovernmentManager.votes]:
+		if table.has(old_id):
+			table[new_id] = table[old_id]
+			table.erase(old_id)
+
+## Host: tek bir istemciye tam oyun durumu (yeniden katılan oyuncu).
+func send_full_state(peer_id: int) -> void:
+	if MultiplayerManager.is_host and not _is_local_only():
+		_receive_state.rpc_id(peer_id, _pack_state(true), {"type": "full"})
+
 ## Kongreyi kaybeden bot başkan oyundan çıkar (parti oyuncuya döndü).
 func _remove_bot_leader(bot: int) -> void:
 	for table in [inventories, mana, credibility]:
@@ -3173,7 +3201,7 @@ func _push_state(event: Dictionary, include_results: bool = false) -> void:
 		_pending_dealt = {}
 	state_version += 1
 	if not _is_local_only():
-		_receive_state.rpc(_pack_state(include_results or event.get("type", "") in ["full", "election", "player_left", "party_split", "party_merge", "party_change"]), event)
+		_receive_state.rpc(_pack_state(include_results or event.get("type", "") in ["full", "election", "player_left", "player_away", "player_back", "party_split", "party_merge", "party_change"]), event)
 	_emit_post_event(event)
 
 func _emit_post_event(event: Dictionary) -> void:
@@ -3185,7 +3213,7 @@ func _emit_post_event(event: Dictionary) -> void:
 	if type == "congress":
 		congress_started.emit(event.get("congress", {}))
 	inventories_updated.emit()
-	if type in ["full", "player_left", "party_split", "party_merge", "party_change"]:
+	if type in ["full", "player_left", "player_away", "player_back", "party_split", "party_merge", "party_change"]:
 		turn_order_updated.emit()
 	turn_changed.emit(current_turn_peer_id())
 	opinion_changed.emit()

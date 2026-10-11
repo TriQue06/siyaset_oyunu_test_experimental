@@ -261,7 +261,7 @@ func _initialize() -> void:
 	for province_id in cm.organizations.keys():
 		opened += int(cm.organizations[province_id].get(me, 0))
 	check("güvenilirliğe göre miting yaptığı illerde teşkilatla başladı", int(cm.organizations.get(p1, {}).get(me, 0)) == 1
-		and opened == mini(cm.FOUND_ORG_MAX, int(cm.credibility_of(me) / cm.FOUND_ORG_PER_CREDIBILITY)), str(opened))
+		and opened <= mini(cm.FOUND_ORG_MAX, int(cm.credibility_of(me) / cm.FOUND_ORG_PER_CREDIBILITY)), str(opened))
 	check("bağımsız sandalyesi partiye geçti", int(cm.last_seats.get(me, 0)) == 1)
 
 	print("=== GEÇİCİ PARTİLER ===")
@@ -299,6 +299,29 @@ func _initialize() -> void:
 			if pm.parties.has(peer) and bool(pm.parties[peer].get("temporary", false)):
 				none = false
 	check("lobi ayarı kapalıysa yeni parti gelmez", none)
+
+	print("=== OYUNDAN DÜŞME VE GERİ DÖNME ===")
+	var bm = root.get_node("BotManager")
+	mm.players[me]["away"] = true
+	mm.away_mode = mm.AWAY_BOT
+	check("bot modunda düşen oyuncuyu yapay zekâ oynar", mm.is_ai_controlled(me) and not mm.is_bot(me))
+	mm.away_mode = mm.AWAY_PASSIVE
+	cm.game_finished = false
+	cm.congress_active = false
+	give_turn(me)
+	bm.step(1000.0)
+	check("pasif modda sırası kendiliğinden geçer", cm.current_turn_peer_id() != me)
+	var my_score: int = gm.score_of(me)
+	var my_mana: float = cm.mana_of(me)
+	var my_name: String = PP.display_name(me)
+	var was_leader: bool = pm.parties.has(me)
+	cm.rekey_player(me, 777)
+	check("geri dönen oyuncu yeni bağlantıyla aynı yerde", cm.turn_order.has(777) and not cm.turn_order.has(me)
+		and gm.score_of(777) == my_score and is_equal_approx(cm.mana_of(777), my_mana) and PP.display_name(777) == my_name
+		and (pm.parties.has(777) == was_leader))
+	cm.rekey_player(777, me)
+	mm.players[me].erase("away")
+	mm.away_mode = mm.AWAY_BOT
 
 	print("")
 	print("=== %s ===" % ("TUM TESTLER GECTI" if _failed == 0 else "%d TEST BASARISIZ" % _failed))

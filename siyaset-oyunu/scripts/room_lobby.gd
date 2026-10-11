@@ -33,6 +33,7 @@ var game_length_summary: Label
 var threshold_slider: HSlider
 var map_seed_edit: LineEdit
 var random_parties_check: CheckButton
+var away_bot_check: CheckButton
 var threshold_value_label: Label
 
 var _settings_open: bool = false
@@ -107,6 +108,8 @@ func _refresh() -> void:
 	threshold_slider.editable = am_owner
 	map_seed_edit.editable = am_owner
 	random_parties_check.disabled = not am_owner
+	if away_bot_check != null:
+		away_bot_check.disabled = not am_owner
 	for button in [interval_minus, interval_plus, count_minus, count_plus]:
 		button.disabled = not am_owner
 	_refresh_settings_display()
@@ -267,6 +270,8 @@ func _refresh_settings_display() -> void:
 		map_seed_edit.text = MultiplayerManager.map_seed
 	if random_parties_check != null:
 		random_parties_check.set_pressed_no_signal(MultiplayerManager.random_parties)
+	if away_bot_check != null:
+		away_bot_check.set_pressed_no_signal(MultiplayerManager.away_mode == MultiplayerManager.AWAY_BOT)
 	var t := MultiplayerManager.election_threshold
 	var interval := MultiplayerManager.election_interval
 	var count := MultiplayerManager.election_count
@@ -341,6 +346,14 @@ func _build_settings_panel() -> void:
 	random_parties_check.focus_mode = Control.FOCUS_NONE
 	random_parties_check.toggled.connect(func(on: bool): MultiplayerManager.set_random_parties(on))
 	parties_box.add_child(random_parties_check)
+
+	var away_box := _section("OYUNDAN DÜŞEN OYUNCU", "Bağlantısı kopan oyuncunun yerine bot oynar ya da dönene kadar pasif kalır (sırası geçer, oylarda çekimser). Aynı cihazdan odaya yeniden katılınca kaldığı yerden devam eder.")
+	away_bot_check = CheckButton.new()
+	away_bot_check.text = "Yerine bot oynasın"
+	away_bot_check.focus_mode = Control.FOCUS_NONE
+	away_bot_check.toggled.connect(func(on: bool): MultiplayerManager.set_away_mode(
+		MultiplayerManager.AWAY_BOT if on else MultiplayerManager.AWAY_PASSIVE))
+	away_box.add_child(away_bot_check)
 
 ## Başlıklı, çerçeveli bir ayar bölümü; içeriğin ekleneceği kutuyu döner.
 func _section(title_text: String, note_text: String) -> VBoxContainer:

@@ -1,6 +1,6 @@
 extends Control
 
-const SETTINGS_SHIFT := 150.0
+const SETTINGS_SHIFT := 220.0
 const SLIDE_DURATION := 0.2
 
 @onready var code_label: Label = %CodeLabel
@@ -38,6 +38,7 @@ var bot_mana_buttons: Array = []
 var threshold_value_label: Label
 
 var _settings_open: bool = false
+var _sections_box: VBoxContainer
 var _center_base_x: float = 0.0
 
 func _ready() -> void:
@@ -320,6 +321,25 @@ func _build_settings_panel() -> void:
 	settings_vbox.add_theme_constant_override("separation", 8)
 	var title := settings_vbox.get_node("HeaderRow/TitleLabel") as Label
 	title.add_theme_font_size_override("font_size", 20)
+	# Bölümler kaydırılabilir bir alanda: başlık ve ✕ hep görünür kalır.
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	settings_vbox.add_child(scroll)
+	_sections_box = VBoxContainer.new()
+	_sections_box.add_theme_constant_override("separation", 8)
+	_sections_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var gutter := MarginContainer.new()
+	gutter.add_theme_constant_override("margin_right", 12)
+	gutter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(gutter)
+	gutter.add_child(_sections_box)
+	var close_bottom := Button.new()
+	close_bottom.text = "Kapat"
+	close_bottom.custom_minimum_size = Vector2(0, 40)
+	close_bottom.focus_mode = Control.FOCUS_NONE
+	close_bottom.pressed.connect(_close_settings_panel)
+	settings_vbox.add_child(close_bottom)
 
 	var length := _section("OYUN SÜRESİ", "")
 	var interval_row := _stepper_row(length, "Seçimler kaç yılda bir")
@@ -386,7 +406,7 @@ func _section(title_text: String, note_text: String) -> VBoxContainer:
 	var style := UiSkin.stylebox(UiSkin.PANEL_DARK)
 	style.set_content_margin_all(UiTheme.PAD_M)
 	panel.add_theme_stylebox_override("panel", style)
-	settings_vbox.add_child(panel)
+	_sections_box.add_child(panel)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 4)
 	panel.add_child(box)

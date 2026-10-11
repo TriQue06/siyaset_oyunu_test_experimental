@@ -58,6 +58,11 @@ func _initialize() -> void:
 	check("secim sayisi +1 -> 9 secim, 72 tur", mm.election_count == 9 and GameRules.MAX_ROUNDS == 72 and GameRules.is_election_round(72))
 	check("ozet yaziyor", String(scene.game_length_summary.text).find("36") != -1, scene.game_length_summary.text)
 	root.get_texture().get_image().save_png("%s/lobby_settings.png" % OS.get_user_data_dir())
+	var sc := scene.settings_vbox.get_child(1) as ScrollContainer
+	sc.scroll_vertical = 100000
+	for i in 5:
+		await process_frame
+	root.get_texture().get_image().save_png("%s/lobby_settings_bottom.png" % OS.get_user_data_dir())
 	scene.count_minus.pressed.emit()
 	# Doldur: 8 kart dolunca buton kalmamalı; başlat yine ekranda.
 	mm.room_code = ""

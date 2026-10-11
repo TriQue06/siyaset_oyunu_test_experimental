@@ -710,9 +710,9 @@ func _setup_side_column() -> void:
 	if _side_tabs == null:
 		_side_tabs = HBoxContainer.new()
 		_side_tabs.add_theme_constant_override("separation", 4)
-		for i in 3:
+		for i in 4:
 			var tab := Button.new()
-			tab.text = ["HÜKÜMET", "LOG", "SEÇİLİ"][i]
+			tab.text = ["HÜKÜMET", "LOG", "PUAN", "SEÇİLİ"][i]
 			tab.focus_mode = Control.FOCUS_NONE
 			tab.add_theme_font_size_override("font_size", 11)
 			tab.add_theme_font_override("font", UiTheme.mono(true))
@@ -721,10 +721,87 @@ func _setup_side_column() -> void:
 			_side_tabs.add_child(tab)
 		vbox.add_child(_side_tabs)
 		vbox.move_child(_side_tabs, 0)
+		# PUAN TABLOSU: bütün siyasetçilerin puanı ve partilerinin ulusal puanı.
+		_score_scroll = ScrollContainer.new()
+		_score_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		_score_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		_score_scroll.hide()
+		_score_box = VBoxContainer.new()
+		_score_box.add_theme_constant_override("separation", 4)
+		_score_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_score_box.add_theme_constant_override("separation", 4)
+		var gutter := MarginContainer.new()
+		gutter.add_theme_constant_override("margin_right", 10)
+		gutter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_score_scroll.add_child(gutter)
+		gutter.add_child(_score_box)
+		vbox.add_child(_score_scroll)
+		vbox.move_child(_score_scroll, 1)
 	_refresh_side_tabs()
 
+var _score_scroll: ScrollContainer
+var _score_box: VBoxContainer
+
+## Puan tablosu: siyasetçiler puana göre sıralı; satırda sıra, parti rengi,
+## siyasetçi ve partisi, puan, partinin ulusal puanı (kamuoyu).
+func _refresh_score_table() -> void:
+	if _score_box == null or not _score_scroll.visible:
+		return
+	for child in _score_box.get_children():
+		child.queue_free()
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 6)
+	var title := _section_label("SİYASETÇİ")
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(title)
+	for column in ["PUAN", "ULUSAL"]:
+		var label := _section_label(column)
+		label.custom_minimum_size = Vector2(46, 0)
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		header.add_child(label)
+	_score_box.add_child(header)
+	var ids: Array = _ordered_peer_ids().duplicate()
+	ids.sort_custom(func(a, b): return GovernmentManager.score_of(int(a)) > GovernmentManager.score_of(int(b)))
+	var me := multiplayer.get_unique_id()
+	for i in ids.size():
+		var peer_id := int(ids[i])
+		var pid := CardManager.party_of(peer_id)
+		var party: Dictionary = PartyManager.data_of(pid)
+		var row := PanelContainer.new()
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color("2a2350") if peer_id == me else Color("15112b")
+		style.border_color = party.get("bg_color", Color.GRAY)
+		style.border_width_left = 4
+		style.content_margin_left = 6
+		style.content_margin_right = 6
+		style.content_margin_top = 3
+		style.content_margin_bottom = 3
+		row.add_theme_stylebox_override("panel", style)
+		var line := HBoxContainer.new()
+		line.add_theme_constant_override("separation", 6)
+		row.add_child(line)
+		var rank := _table_value(str(i + 1), 16.0, UiTheme.TEXT_DIM, 11)
+		line.add_child(rank)
+		var names := VBoxContainer.new()
+		names.add_theme_constant_override("separation", -3)
+		names.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		line.add_child(names)
+		var person := PoliticianPresets.display_name(peer_id)
+		var name_label := _avatar_label(person, _fit_font_size(person, 150.0, 12, 8), UiTheme.GOLD if peer_id == me else UiTheme.TEXT)
+		name_label.clip_text = false
+		name_label.add_theme_font_override("font", UiTheme.mono(true))
+		names.add_child(name_label)
+		var party_text := "Bağımsız" if PartyManager.is_independent(pid) else String(party.get("name", "?"))
+		if CardManager.is_party_member(peer_id):
+			party_text += " · üye"
+		names.add_child(_avatar_label(party_text, 10, UiTheme.TEXT_MUTED))
+		line.add_child(_table_value(str(GovernmentManager.score_of(peer_id)), 40.0, UiTheme.GOLD, 13))
+		var national := CardManager.national_of(pid)
+		line.add_child(_table_value("%+.1f" % national, 46.0, ProvincePanel._opinion_color(national), 12))
+		_score_box.add_child(row)
+
 func _on_side_tab(index: int) -> void:
-	if index == 2:
+	if index == 3:
 		return  # "Seçili" bir il ya da partiye dokununca açılır
 	_side_tab = index
 	_hide_profile()
@@ -736,16 +813,19 @@ func _refresh_side_tabs() -> void:
 	if _side_tabs == null:
 		return
 	var selected_open := _left_dock != null and _left_dock.visible
-	var active := 2 if selected_open else _side_tab
+	var active := 3 if selected_open else _side_tab
 	for i in _side_tabs.get_child_count():
 		var tab := _side_tabs.get_child(i) as Button
 		UiSkin.skin_color_button(tab, UiTheme.GOLD if i == active else UiTheme.PANEL_LIGHT)
 		tab.add_theme_color_override("font_color", UiTheme.INK if i == active else UiTheme.TEXT_MUTED)
-		tab.disabled = i == 2 and not selected_open
+		tab.disabled = i == 3 and not selected_open
+	if _score_scroll != null:
+		_score_scroll.visible = not selected_open and _side_tab == 2
 	if not selected_open:
 		government_vbox.visible = _side_tab == 0
 		if _event_log != null:
-			_event_log.visible = true
+			_event_log.visible = _side_tab != 2
+	_refresh_score_table()
 
 ## Seçim yapılınca HERKESİN ekranında tetiklenir: ekran kararıp seçim
 ## sonuçları animasyon ekranına geçilir, oradan otomatik olarak buraya (yeni
@@ -2677,6 +2757,7 @@ func _refresh_government_panel() -> void:
 ## Puan tablosu da aynı evrensel tabloda (DURUM sekmesi).
 func _refresh_score_panel() -> void:
 	_rebuild_player_panel()
+	_refresh_score_table()
 
 # --- Hamleler: yasa tasarla, teşkilat, karalama hedefi -------------------
 

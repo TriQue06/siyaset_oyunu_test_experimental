@@ -52,7 +52,7 @@ const MUSIC := {
 const GAME_TRACKS := ["game", "game2"]
 ## Parça başına ses kazancı (dB) ve fade süreleri (saniye). game2 kaynakta
 ## ~1,7 dB daha yüksek: kazancı ona göre eşitlendi.
-const MUSIC_GAIN := {"game": -10.0, "game2": -11.7, "election": -3.0, "credits": -5.0}
+const MUSIC_GAIN := {"game": -10.0, "game2": -11.7, "election": -3.0, "credits": 0.0}
 const MUSIC_FADE_IN := {"game": 3.0, "game2": 3.0, "election": 0.35, "credits": 0.5}
 const MUSIC_FADE_OUT := {"game": 3.0, "game2": 3.0, "election": 0.4, "credits": 3.0}
 ## Parçaların ilk saniyesi atlanır (giriş vuruşu/sessizliği istenmiyor).

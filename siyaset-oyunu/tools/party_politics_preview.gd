@@ -46,6 +46,10 @@ func _initialize() -> void:
 	root.add_child(scene)
 	await _frames(30)
 	_shot("party_politics_board")
+	scene._on_side_tab(2)
+	await _frames(5)
+	_shot("party_politics_scores")
+	scene._on_side_tab(0)
 	var list: Control = scene.player_panel_list
 	print("LISTE boy=%s avatar_h=%.1f" % [str(list.size), scene._avatar_height])
 	print("VIEWPORT %s  panel=%s" % [str(scene.get_viewport_rect().size), str((scene.get_node("PlayerPanel") as Control).get_global_rect())])

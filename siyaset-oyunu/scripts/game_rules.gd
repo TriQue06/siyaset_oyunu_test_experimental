@@ -115,6 +115,10 @@ const ELECTION_MANA_BONUS := 1
 ## (eksenler her dönemde rastgele). YASA sadece gündemdeki eksende sunulabilir.
 const AGENDA_ROUNDS := 1
 const AGENDA_GAP := 2
+## KRİZ: yeni bir gündem açıldığında bu olasılıkla ülke krize de girer. Kriz
+## gündemin ekseninin bir ucunu seçer; o dönem görüşünü bu uca kaydıran (yasa
+## sunarak ya da oyuyla) her parti, kayma başına kısmi ulusal destek kazanır.
+const CRISIS_CHANCE := 0.5
 ## Kabul edilen yasa, getiren partiye puan tablosunda bu kadar puan yazar
 ## (hükümet partisinin yasası daha çok).
 ## Kabul edilen gensoru, getiren partiye puan tablosunda bu kadar puan yazar.

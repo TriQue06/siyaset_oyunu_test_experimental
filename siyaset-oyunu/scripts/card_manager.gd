@@ -128,6 +128,11 @@ var previous_vote_shares: Dictionary = {}
 var speech_required: bool = true
 ## GÜNDEM: {"type": gündem türü, "until": bittiği tur} (boş = gündem yok).
 var agenda: Dictionary = {}
+## KRİZ: {"type": "kriz_<eksen>_<p|n>", "until": tur}. Gündemle birlikte açılır.
+var crisis: Dictionary = {}
+var _crisis_rng := RandomNumberGenerator.new()
+## Son görüş kaymasında krize yanıt verip ulusal destek kazanan partiler.
+var _crisis_gainers: Array = []
 ## Sadece host: bu üçlemenin eksen sırası (her üçlemede karıştırılır).
 var _agenda_axes: Array = []
 var _last_agenda_axis: String = ""
@@ -234,6 +239,7 @@ func _is_authority() -> bool:
 ## Testlerde rastgeleliği sabitlemek için.
 func set_rng_seed(value: int) -> void:
 	_rng.seed = value
+	_crisis_rng.seed = value + 7919
 
 ## Host'un zamanlayıcıları (tur süresi, heartbeat). _process çağırır; testler
 ## doğrudan çağırabilir.
@@ -845,6 +851,7 @@ func init_game() -> void:
 	turmoil = {}
 	splinters = {}
 	agenda = {}
+	crisis = {}
 	_agenda_axes = []
 	national_list = {}
 	round_number = 1
@@ -1435,6 +1442,8 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 			shaken.append(_party_name(int(peer)))
 	if not shaken.is_empty():
 		notes += " Görüş değişimi tabanı sarstı: %s." % ", ".join(PackedStringArray(shaken))
+	if not _crisis_gainers.is_empty():
+		notes += " Krize yanıt verdi (ulusal destek): %s." % ", ".join(PackedStringArray(_crisis_gainers))
 	# Yasa, illerin seçmenini kendi ekseninde sunanın görüşüne doğru çeker.
 	var proposer_ideology: Dictionary = PartyManager.data_of(proposer_party).get("ideology", {})
 	for province_id in _province_ids:
@@ -1467,6 +1476,16 @@ static func law_pass_score(proposer_in_gov: bool) -> int:
 # --- Gündem ------------------------------------------------------------------------
 
 ## Şu an gündemdeki konu (gündem kartı türü) ya da "".
+func crisis_type() -> String:
+	if crisis.is_empty() or round_number >= int(crisis.get("until", 0)):
+		return ""
+	return String(crisis.get("type", ""))
+
+## Kriz bu kaymayı ister mi? (eksen ve yön tutuyorsa)
+func crisis_wants(axis: String, delta: float) -> bool:
+	var data := CardPresets.crisis_data(crisis_type())
+	return not data.is_empty() and String(data["axis"]) == axis and delta * float(data["dir"]) > 0.0
+
 func agenda_type() -> String:
 	if agenda.is_empty() or round_number >= int(agenda.get("until", 0)):
 		return ""
@@ -1525,8 +1544,15 @@ func _schedule_agenda() -> void:
 	var type := "gundem_%s_%s" % [axis, "p" if _rng.randf() < 0.5 else "n"]
 	agenda = {"type": type, "until": round_number + 1, "index": pos + 1}
 	var data := CardPresets.agenda_data(type)
-	_push_state({"type": "agenda", "message": "GÜNDEM (%d/%d): %s — bu dönem %s." % [pos + 1, GameRules.AGENDA_ROUNDS,
-		data["title"], CardPresets.agenda_effect_text(type)]})
+	crisis = {}
+	var message := "GÜNDEM (%d/%d): %s — bu dönem %s." % [pos + 1, GameRules.AGENDA_ROUNDS,
+		data["title"], CardPresets.agenda_effect_text(type)]
+	if _crisis_rng.randf() < GameRules.CRISIS_CHANCE:
+		var crisis_kind := "kriz_%s_%s" % [axis, "p" if _crisis_rng.randf() < 0.5 else "n"]
+		crisis = {"type": crisis_kind, "until": round_number + 1}
+		var info := CardPresets.crisis_data(crisis_kind)
+		message += " KRİZ: %s — görüşünü %s yönüne kaydıran partiler ulusal destek kazanır." % [info["title"], info["side"]]
+	_push_state({"type": "agenda", "message": message})
 
 ## GovernmentManager, reddedilen gensorudan sonra (host) çağırır: getiren parti
 ## ulusal destek kaybeder. Durum GovernmentManager'ın yayınıyla birlikte gider.
@@ -1643,6 +1669,14 @@ func _shift_ideologies(changes: Array) -> Array:
 			var delta := float(after.get(axis, 0.0)) - float(before[peer].get(axis, 0.0))
 			if not is_zero_approx(delta):
 				actual.append({"peer": int(peer), "axis": axis, "delta": delta})
+	# KRİZE YANIT: krizin istediği uca kayan parti kısmi ulusal destek kazanır.
+	_crisis_gainers = []
+	for change in actual:
+		if crisis_wants(String(change["axis"]), float(change["delta"])):
+			_add_national(int(change["peer"]), PublicOpinion.CRISIS_NATIONAL_PER_UNIT * absf(float(change["delta"])))
+			var gainer := _party_name(int(change["peer"]))
+			if not _crisis_gainers.has(gainer):
+				_crisis_gainers.append(gainer)
 	if actual.is_empty() or shares.is_empty():
 		return actual
 	for province_id in _province_ids:
@@ -3122,6 +3156,7 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"party_congress": party_congress,
 		"congress_active": congress_active,
 		"agenda": agenda,
+		"crisis": crisis,
 		"national_list": national_list,
 		"round": round_number,
 		"turn_time_left": _turn_time_left,
@@ -3165,6 +3200,7 @@ func _apply_state(state: Dictionary) -> void:
 	party_congress = state.get("party_congress", {})
 	congress_active = bool(state.get("congress_active", false))
 	agenda = state.get("agenda", {})
+	crisis = state.get("crisis", {})
 	national_list = state.get("national_list", {})
 	round_number = int(state["round"])
 	_turn_deadline_ms = Time.get_ticks_msec() + int(float(state["turn_time_left"]) * 1000.0)

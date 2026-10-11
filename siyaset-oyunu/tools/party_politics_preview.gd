@@ -46,6 +46,15 @@ func _initialize() -> void:
 	root.add_child(scene)
 	await _frames(30)
 	_shot("party_politics_board")
+	cm.agenda = {"type": "gundem_economic_p", "until": cm.round_number + 1}
+	cm.crisis = {"type": "kriz_economic_n", "until": cm.round_number + 1}
+	cm._turn_time_left = 40.0
+	scene._refresh_agenda_banner()
+	await _frames(5)
+	_shot("party_politics_crisis")
+	cm.crisis = {}
+	cm.agenda = {}
+	scene._refresh_agenda_banner()
 	scene._on_player_tab_pressed(1)
 	await _frames(5)
 	_shot("party_politics_scores")

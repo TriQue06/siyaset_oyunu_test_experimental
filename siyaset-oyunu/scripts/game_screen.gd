@@ -622,32 +622,46 @@ var _band_turn: PanelContainer
 var _band_turn_row: HBoxContainer
 var _band_turn_key := ""
 
+var _band_period: Label
+var _band_crisis: PanelContainer
+var _band_crisis_title: Label
+var _band_crisis_text: Label
+var _timer_bar_bg: ColorRect
+var _timer_bar: ColorRect
+
 func _place_date_chip(_map_rect: Rect2) -> void:
 	if _date_label == null:
-		_band_live = Label.new()
-		_band_live.text = "● CANLI"
-		_band_live.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		_band_live.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		_band_live.add_theme_font_override("font", UiTheme.mono(true))
-		_band_live.add_theme_font_size_override("font_size", 14)
-		_band_live.add_theme_color_override("font_color", Color.WHITE)
-		var live_style := StyleBoxFlat.new()
-		live_style.bg_color = Color("e0303f")
-		_band_live.add_theme_stylebox_override("normal", live_style)
-		_band_live.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		add_child(_band_live)
-		_band_title = Label.new()
-		_band_title.text = "SİYASET GÜNDEMİ"
-		_band_title.add_theme_font_override("font", UiTheme.mono(true))
-		_band_title.add_theme_font_size_override("font_size", 20)
-		_band_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		add_child(_band_title)
+		_band_period = Label.new()
+		_band_period.add_theme_font_override("font", UiTheme.mono(true))
+		_band_period.add_theme_font_size_override("font_size", 18)
+		_band_period.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_band_period)
 		_date_label = Label.new()
 		_date_label.add_theme_font_override("font", UiTheme.mono(true))
 		_date_label.add_theme_font_size_override("font_size", 11)
 		_date_label.add_theme_color_override("font_color", UiTheme.GOLD)
 		_date_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(_date_label)
+		# KRİZ / GÜNDEM kutusu.
+		_band_crisis = PanelContainer.new()
+		_band_crisis.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_band_crisis.clip_contents = true
+		var crisis_box := Control.new()
+		crisis_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_band_crisis.add_child(crisis_box)
+		_band_crisis_title = Label.new()
+		_band_crisis_title.add_theme_font_override("font", UiTheme.mono(true))
+		_band_crisis_title.add_theme_font_size_override("font_size", 13)
+		_band_crisis_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		crisis_box.add_child(_band_crisis_title)
+		_band_crisis_text = Label.new()
+		_band_crisis_text.add_theme_font_size_override("font_size", 10)
+		_band_crisis_text.add_theme_color_override("font_color", UiTheme.TEXT)
+		_band_crisis_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		crisis_box.add_child(_band_crisis_text)
+		_band_crisis_title.position = Vector2(0, 2)
+		_band_crisis_text.position = Vector2(0, 24)
+		add_child(_band_crisis)
 		_band_turn = PanelContainer.new()
 		var turn_style := StyleBoxFlat.new()
 		turn_style.bg_color = Color("2a2350")
@@ -663,13 +677,84 @@ func _place_date_chip(_map_rect: Rect2) -> void:
 		_band_turn_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_band_turn.add_child(_band_turn_row)
 		add_child(_band_turn)
-	_set_rect(_band_live, _r(Rect2(16, 14, 96, 36)))
-	_band_title.position = _r(Rect2(124, 8, 0, 0)).position
-	_date_label.position = _r(Rect2(124, 36, 0, 0)).position
-	_set_rect(_band_turn, _r(Rect2(700, 14, 420, 36)))
-	_date_label.text = game_settings_label.text.replace("\n", "  ·  ")
+		# SÜRE ŞERİDİ: ekranın en üstünde, sırası gelenin renginde, süre
+		# azaldıkça soldan sağa uzar (dolunca süre biter).
+		_timer_bar_bg = ColorRect.new()
+		_timer_bar_bg.color = Color("0a0816")
+		_timer_bar_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_timer_bar_bg.z_index = 7
+		add_child(_timer_bar_bg)
+		_timer_bar = ColorRect.new()
+		_timer_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_timer_bar.z_index = 8
+		add_child(_timer_bar)
+	_band_period.position = _r(Rect2(16, 12, 0, 0)).position
+	_date_label.position = _r(Rect2(16, 38, 0, 0)).position
+	_set_rect(_band_crisis, _r(Rect2(300, 11, 444, 46)))
+	_set_rect(_band_turn, _r(Rect2(760, 16, 380, 38)))
+	_set_rect(_timer_bar_bg, _r(Rect2(0, 0, 1280, TIMER_BAR_HEIGHT)))
+	_refresh_band_date()
+	_refresh_band_crisis()
 	_band_turn_key = ""
 	_refresh_band_turn()
+	_refresh_timer_bar()
+
+const TIMER_BAR_HEIGHT := 7.0
+
+func _refresh_band_date() -> void:
+	if _band_period == null:
+		return
+	var next_election := GameRules.next_election_round(CardManager.round_number)
+	_band_period.text = GameRules.period_label(mini(CardManager.round_number, GameRules.MAX_ROUNDS))
+	var parts := ["Baraj %%%s" % _format_threshold(MultiplayerManager.election_threshold),
+		("Sonraki seçim %d" % GameRules.election_year(next_election)) if next_election != -1 else "Başka seçim yok"]
+	if MultiplayerManager.seat_method != MultiplayerManager.DEFAULT_SEAT_METHOD:
+		parts.append(ElectionModel.method_title(MultiplayerManager.seat_method))
+	_date_label.text = "  ·  ".join(PackedStringArray(parts))
+
+## KRİZ (kırmızı) ya da sadece GÜNDEM (altın) bantta; ikisi de yoksa gizli.
+func _refresh_band_crisis() -> void:
+	if _band_crisis == null:
+		return
+	var crisis := CardManager.crisis_type()
+	var agenda := CardManager.agenda_type()
+	_band_crisis.visible = crisis != "" or agenda != ""
+	if not _band_crisis.visible:
+		return
+	var style := StyleBoxFlat.new()
+	style.content_margin_left = 10
+	style.content_margin_right = 10
+	style.border_width_left = 6
+	style.content_margin_top = 0
+	style.content_margin_bottom = 0
+	if crisis != "":
+		var data := CardPresets.crisis_data(crisis)
+		style.bg_color = Color("4a1020")
+		style.border_color = Color("ff3b4e")
+		_band_crisis_title.text = "⚠ KRİZ · %s" % data["title"]
+		_band_crisis_title.add_theme_color_override("font_color", Color("ff8a94"))
+		_band_crisis_text.text = "%s yönüne dönen partiler ulusal destek kazanır (%s)" % [String(data["side"]).to_upper(), data["axis_title"]]
+	else:
+		var data := CardPresets.agenda_data(agenda)
+		style.bg_color = Color("2a2350")
+		style.border_color = UiTheme.GOLD
+		_band_crisis_title.text = "GÜNDEM · %s" % data["title"]
+		_band_crisis_title.add_theme_color_override("font_color", UiTheme.GOLD)
+		_band_crisis_text.text = "Yasa: sadece %s ekseni" % data["axis_title"]
+	_band_crisis.add_theme_stylebox_override("panel", style)
+
+func _refresh_timer_bar() -> void:
+	if _timer_bar == null:
+		return
+	var peer_id := CardManager.current_turn_peer_id()
+	var full := _r(Rect2(0, 0, 1280, TIMER_BAR_HEIGHT))
+	if peer_id == -1 or CardManager.is_turn_blocked() or CardManager.game_finished:
+		_timer_bar.size = Vector2(0, full.size.y)
+		return
+	var elapsed := clampf(1.0 - CardManager.turn_seconds_left() / GameRules.TURN_TIMEOUT, 0.0, 1.0)
+	_timer_bar.position = full.position
+	_timer_bar.size = Vector2(full.size.x * elapsed, full.size.y)
+	_timer_bar.color = PartyManager.data_of(CardManager.party_of(peer_id)).get("bg_color", UiTheme.GOLD)
 
 ## Banttaki sıra kutusu: logo · SIRA: PARTİ (siyasetçi) · süre.
 func _refresh_band_turn() -> void:
@@ -763,6 +848,21 @@ func _place_parliament_badge() -> void:
 	proposal_label.visible = voting
 	_refresh_parliament_summary()
 	_sync_parliament_to_slot()
+
+## OYLAMA SÜRERKEN sağ panel hep Hükümet'te: Log / Seçili / profil açıksa
+## kapanır ve meclis (oy düğmeleriyle) görünür.
+func _enforce_voting_tab() -> void:
+	if _side_tabs == null or not GovernmentManager.is_voting():
+		return
+	var dock_open := _left_dock != null and _left_dock.visible
+	if _side_tab == 0 and not dock_open:
+		return
+	_side_tab = 0
+	if dock_open:
+		_hide_profile()
+		if _province_panel != null and _province_panel.embedded_mode:
+			_province_panel.hide()
+	_refresh_side_tabs()
 
 ## Meclis (zemin + diyagram) her kare yuvanın ekrandaki yerine oturur; yuva
 ## görünmüyorsa (Log / Seçili sekmesi) meclis de gizlenir.
@@ -1198,8 +1298,7 @@ func _refresh_game_settings_label() -> void:
 	]
 	if MultiplayerManager.seat_method != MultiplayerManager.DEFAULT_SEAT_METHOD:
 		game_settings_label.text += "\nSayım: " + ElectionModel.method_title(MultiplayerManager.seat_method)
-	if _date_label != null:
-		_date_label.text = game_settings_label.text.replace("\n", "  ·  ")
+	_refresh_band_date()
 
 func _format_threshold(value: float) -> String:
 	if is_equal_approx(value, round(value)):
@@ -1355,7 +1454,7 @@ func _rebuild_player_panel() -> void:
 		panel.clip_contents = true
 	var inner := _r(R_BOARD).grow(-8.0)
 	var list_height: float = inner.size.y - PLAYER_TAB_HEIGHT - 6.0
-	var plaque_height: float = clampf(list_height / maxf(1.0, party_ids.size()) - 4.0, 40.0, 50.0)
+	var plaque_height: float = clampf(list_height / maxf(1.0, party_ids.size()) - 4.0, 50.0, 60.0)
 	for pid in party_ids:
 		var plaque := _build_plaque(int(pid), inner.size.x)
 		plaque.custom_minimum_size.y = plaque_height
@@ -1392,32 +1491,40 @@ func _build_plaque(pid: int, width: float) -> Control:
 
 	var card := PanelContainer.new()
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	card.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	card.clip_contents = true
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color("2a2350") if is_turn else Color("1d1838")
-	# Alt çizgi: parti rengi (sıradaysa altın).
-	style.border_color = UiTheme.GOLD if is_turn else color
-	style.border_width_bottom = 3
+	style.border_color = color
+	style.border_width_left = 5
+	if is_turn:
+		style.border_color = UiTheme.GOLD
+		style.set_border_width_all(2)
+		style.border_width_left = 5
 	style.content_margin_left = 6
 	style.content_margin_right = 6
+	style.content_margin_top = 3
+	style.content_margin_bottom = 4
 	card.add_theme_stylebox_override("panel", style)
-	# İKİ SATIR: üstte logo · parti (+etiketler) · vekil; altta plaketin tam
-	# genişliğinde genel başkan · oy oranı (ad kısaltılmaz, gerekirse küçülür).
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 7)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(row)
+	# BÜYÜK LOGO.
+	var badge := PartyBadge.build(party, Vector2(PLAQUE_BADGE, PLAQUE_BADGE), BADGE_ICON_PIXEL_SIZE)
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(badge)
 	var stack := VBoxContainer.new()
-	stack.add_theme_constant_override("separation", -2)
+	stack.add_theme_constant_override("separation", 0)
 	stack.alignment = BoxContainer.ALIGNMENT_CENTER
+	stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_child(stack)
+	row.add_child(stack)
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 4)
 	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	stack.add_child(head)
-	var badge := PartyBadge.build(party, Vector2(20, 20), BADGE_ICON_PIXEL_SIZE)
-	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	head.add_child(badge)
 	var tags: Array = []
 	if GovernmentManager.has_government() and CardManager.is_government_party(pid):
 		tags.append(["PM" if GovernmentManager.main_gov_peer_id == pid else "HÜK", UiTheme.GREEN, UiTheme.TEXT])
@@ -1443,8 +1550,8 @@ func _build_plaque(pid: int, width: float) -> Control:
 	var has_seats: bool = CardManager.last_seats.has(pid)
 	var seats_text := str(int(CardManager.last_seats.get(pid, 0))) if has_seats else "—"
 	var name_text := "Bağımsız" if independent else String(party.get("name", "?"))
-	var inner: float = width - 12.0
-	var name_label := _avatar_label(name_text, _fit_font_size(name_text, inner - 24.0 - tags_width - 30.0, 13, 8),
+	var inner: float = width - 12.0 - PLAQUE_BADGE - 7.0
+	var name_label := _avatar_label(name_text, _fit_font_size(name_text, inner - tags_width - 34.0, 14, 8),
 		UiTheme.GOLD if mine else UiTheme.TEXT)
 	name_label.clip_text = false
 	name_label.add_theme_font_override("font", UiTheme.mono(true))
@@ -1454,7 +1561,7 @@ func _build_plaque(pid: int, width: float) -> Control:
 		var tag_control := _avatar_tag(String(tag[0]), tag[1], tag[2])
 		tag_control.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		head.add_child(tag_control)
-	var seats_label := _avatar_label(seats_text, 13, UiTheme.TEXT)
+	var seats_label := _avatar_label(seats_text, 15, UiTheme.TEXT)
 	seats_label.add_theme_font_override("font", UiTheme.mono(true))
 	seats_label.clip_text = false
 	head.add_child(seats_label)
@@ -1466,15 +1573,36 @@ func _build_plaque(pid: int, width: float) -> Control:
 	var leader_text := PoliticianPresets.display_name(pid)
 	if members.size() > 1:
 		leader_text += " · üye " + PoliticianPresets.display_name(int(members[1]))
-	var share_text := ("%%%.1f" % float(CardManager.last_vote_shares.get(pid, 0.0))) if has_seats else ""
-	var leader := _avatar_label(leader_text, _fit_font_size(leader_text, inner - 40.0, 11, 7), UiTheme.TEXT_MUTED)
+	var share: float = float(CardManager.last_vote_shares.get(pid, 0.0))
+	var share_text := ("%%%.1f" % share) if has_seats else ""
+	var leader := _avatar_label(leader_text, _fit_font_size(leader_text, inner - 44.0, 11, 7), UiTheme.TEXT_MUTED)
 	leader.clip_text = false
 	leader.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	foot.add_child(leader)
-	var share_label := _avatar_label(share_text, 10, UiTheme.TEXT_MUTED)
-	share_label.add_theme_font_override("font", UiTheme.mono())
+	var share_label := _avatar_label(share_text, 12, UiTheme.TEXT)
+	share_label.add_theme_font_override("font", UiTheme.mono(true))
 	share_label.clip_text = false
 	foot.add_child(share_label)
+	# KALIN OY ÇUBUĞU: en çok oy alan parti tam dolu, diğerleri ona oranla.
+	var top_share := 0.0
+	for value in CardManager.last_vote_shares.values():
+		top_share = maxf(top_share, float(value))
+	var bar := Control.new()
+	bar.custom_minimum_size = Vector2(0, PLAQUE_BAR)
+	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var bar_bg := ColorRect.new()
+	bar_bg.color = Color("0a0816")
+	bar_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bar_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.add_child(bar_bg)
+	var fill := ColorRect.new()
+	fill.color = color
+	fill.anchor_bottom = 1.0
+	fill.anchor_right = clampf(share / top_share, 0.0, 1.0) if top_share > 0.0 else 0.0
+	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.add_child(fill)
+	stack.add_child(bar)
 
 	card.set_meta("peer_id", pid)
 	card.tooltip_text = "%s · dokun: profil" % name_text
@@ -1490,6 +1618,9 @@ func _build_plaque(pid: int, width: float) -> Control:
 	)
 	return card
 
+const PLAQUE_BADGE := 34.0
+const PLAQUE_BAR := 9.0
+
 # --- Tur göstergesi (geçici; kalıcı görseli kullanıcı sonra ekleyecek) -----
 
 func _on_turn_changed(_peer_id: int) -> void:
@@ -1500,6 +1631,7 @@ func _on_turn_changed(_peer_id: int) -> void:
 			_show_toast("Sıra sende: +%s mana (toplam %s)." % [CardManager.mana_text(CardManager.turn_income(current)), CardManager.mana_text(CardManager.mana_of(current))])
 			AudioManager.play("turn_start")
 	_update_turn_indicator()
+	_refresh_band_crisis()
 	_refresh_speech_panel()
 	_refresh_pass_button()
 	_refresh_hand_interactivity()
@@ -1611,7 +1743,9 @@ func _fit_hand_width(count: int) -> void:
 
 func _process(delta: float) -> void:
 	_refresh_countdowns()
+	_enforce_voting_tab()
 	_sync_parliament_to_slot()
+	_refresh_timer_bar()
 	if _drag_ghost != null:
 		_update_drag()
 	else:
@@ -2171,7 +2305,7 @@ var _live_province := ""
 ## Fare haritada bir ilin üstündeyse (hedef seçme yokken) o ilin bilgisi
 ## tıklamadan sağda gösterilir. Haritadan çıkınca son il ekranda kalır.
 func _update_live_province() -> void:
-	if _window_mode():
+	if _window_mode() or GovernmentManager.is_voting():
 		return
 	if _pending_org or _pending_miting or _pending_invest or _pending_province_hand_index != -1 \
 			or _pending_target_hand_index != -1 or _layer_switching or not is_visible_in_tree():
@@ -2179,7 +2313,15 @@ func _update_live_province() -> void:
 	if _parl_bg != null and _parl_bg.get_global_rect().has_point(get_viewport().get_mouse_position()):
 		return
 	var province_id := _province_under_mouse()
-	if province_id == "" or province_id == _live_province and _province_panel != null and _province_panel.visible:
+	if province_id == "":
+		# Fare ilden çıktı: il bilgisi kapanır, sağ panel Hükümet'e döner
+		# (fare sağ paneldeyse açık kalır, kaydırılabilsin).
+		if _province_panel != null and _province_panel.embedded_mode and _province_panel.visible \
+				and not left_panel.get_global_rect().has_point(get_viewport().get_mouse_position()):
+			_side_tab = 0
+			_province_panel.hide()
+		return
+	if province_id == _live_province and _province_panel != null and _province_panel.visible:
 		return
 	_show_province_info(province_id)
 
@@ -3227,10 +3369,12 @@ func _build_agenda_banner() -> void:
 	_refresh_agenda_banner()
 
 func _refresh_agenda_banner() -> void:
+	_refresh_band_crisis()
 	if _agenda_banner == null:
 		return
 	var current := CardManager.agenda_type()
-	_agenda_banner.visible = current != ""
+	# Gündem ve kriz artık üst bantta.
+	_agenda_banner.visible = false
 	if current == "":
 		return
 	var data := CardPresets.agenda_data(current)

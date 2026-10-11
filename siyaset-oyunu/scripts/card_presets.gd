@@ -187,6 +187,31 @@ func is_parliament_card(card_type: String) -> bool:
 	return card_type == EARLY_ELECTION_CARD_TYPE or is_law_card(card_type)
 
 ## {"axis", "dir", "title", "text", "side"} ya da boş sözlük.
+## KRİZLER: eksenin bir ucunu isteyen olaylar (bkz. CardManager.crisis).
+const CRISES := {
+	"kriz_economic_n": {"axis": "economic", "dir": -1, "title": "Ekonomik Çöküş",
+		"text": "Fabrikalar kapanıyor, halk devletten kurtarma bekliyor."},
+	"kriz_economic_p": {"axis": "economic", "dir": 1, "title": "Bütçe Krizi",
+		"text": "Kamu borcu patladı, piyasa reformu isteniyor."},
+	"kriz_social_n": {"axis": "social", "dir": -1, "title": "Gençlik Protestoları",
+		"text": "Gençler özgürlük talebiyle meydanlarda."},
+	"kriz_social_p": {"axis": "social", "dir": 1, "title": "Ahlak Paniği",
+		"text": "Toplum geleneklere dönülmesini istiyor."},
+	"kriz_administrative_n": {"axis": "administrative", "dir": -1, "title": "Bölgesel Ayaklanma",
+		"text": "Bölgeler yerinden yönetim talebiyle sokakta."},
+	"kriz_administrative_p": {"axis": "administrative", "dir": 1, "title": "Güvenlik Krizi",
+		"text": "Olaylar güçlü bir merkezî devlet talebini artırdı."},
+}
+
+func crisis_data(crisis_type: String) -> Dictionary:
+	if not CRISES.has(crisis_type):
+		return {}
+	var data: Dictionary = CRISES[crisis_type].duplicate()
+	var info: Dictionary = AXIS_TITLES[data["axis"]]
+	data["side"] = info["pos"] if int(data["dir"]) > 0 else info["neg"]
+	data["axis_title"] = info["title"]
+	return data
+
 func agenda_data(card_type: String) -> Dictionary:
 	if not AGENDAS.has(card_type):
 		return {}

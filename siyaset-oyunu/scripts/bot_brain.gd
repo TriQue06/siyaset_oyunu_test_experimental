@@ -313,6 +313,10 @@ static func choose_speech(bot: int) -> Dictionary:
 
 ## Seçim desteğini en çok artıracak yasa: bilinen illerdeki etkiler (geçme
 ## ihtimaliyle) + partinin görüş kaymasının seçmene yaklaştırması.
+## Krizin istediği yöne kayma botlar için de cazip (ulusal destek getirir).
+const CRISIS_LAW_BONUS := 0.4
+const CRISIS_VOTE_BONUS := 0.2
+
 static func _best_law(bot: int, known: Dictionary) -> Dictionary:
 	var seats := _seats()
 	var in_parliament := not CardManager.last_seats.is_empty()
@@ -337,6 +341,8 @@ static func _best_law(bot: int, known: Dictionary) -> Dictionary:
 				var alignment := PublicOpinion.law_alignment(known[province_id], axis, dir)
 				sum += float(seats[province_id]) * PublicOpinion.law_proposer_delta(alignment, false)
 			var value := sum / known_seats * confidence * CardManager.agenda_law_mult(law_type)
+			if CardManager.crisis_wants(axis, float(dir)):
+				value += CRISIS_LAW_BONUS
 			if in_parliament:
 				var pass_chance := _law_pass_chance(bot, law_type, known)
 				value *= 1.0 + pass_chance * (PublicOpinion.LAW_PASSED_MULT - 1.0)
@@ -432,7 +438,10 @@ static func _law_vote_value(voter: int, law_type: String, choice: int, proposer:
 	for province_id in seats.keys():
 		var alignment := PublicOpinion.law_alignment(known.get(province_id, {}), law["axis"], int(law["dir"]))
 		sum += float(seats[province_id]) * PublicOpinion.law_vote_delta(alignment, choice, gov_ids.has(voter), gov_ids.has(proposer))
-	return sum / _total_seats()
+	var value := sum / _total_seats()
+	if CardManager.crisis_wants(String(law["axis"]), float(int(law["dir"]) * choice)):
+		value += CRISIS_VOTE_BONUS
+	return value
 
 static func _best_law_vote(voter: int, law_type: String, proposer: int, gov_ids: Array, known: Dictionary) -> int:
 	var best := GovernmentManager.VOTE_ABSTAIN

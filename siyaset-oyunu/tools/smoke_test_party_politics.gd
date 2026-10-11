@@ -335,6 +335,19 @@ func _initialize() -> void:
 	check("1,5 zayıflatma", is_equal_approx(cm.turn_income(some_bot), bot_base - 1.5))
 	mm.bot_mana_penalty = 0.5
 
+	print("=== KRİZ ===")
+	var crisis_bot: int = cm.party_of(int(mm.bot_ids()[1]))
+	cm.crisis = {"type": "kriz_economic_n", "until": cm.round_number + 1}
+	check("kriz açık", cm.crisis_type() == "kriz_economic_n" and cm.crisis_wants("economic", -0.5) and not cm.crisis_wants("economic", 0.5))
+	var before_national: float = cm.national_of(crisis_bot)
+	cm._shift_ideologies([{"peer": crisis_bot, "axis": "economic", "delta": -0.5}])
+	var gained: float = cm.national_of(crisis_bot) - before_national
+	check("krizin ucuna dönen kısmi ulusal destek kazanır", gained > 0.0 and gained <= 1.0, str(gained))
+	before_national = cm.national_of(crisis_bot)
+	cm._shift_ideologies([{"peer": crisis_bot, "axis": "economic", "delta": 0.5}])
+	check("ters yöne giden kazanmaz", cm.national_of(crisis_bot) <= before_national + 0.0001)
+	cm.crisis = {}
+
 	print("")
 	print("=== %s ===" % ("TUM TESTLER GECTI" if _failed == 0 else "%d TEST BASARISIZ" % _failed))
 	quit(1 if _failed > 0 else 0)

@@ -1017,7 +1017,7 @@ func play_card(hand_index: int, target_peer_id: int = -1, target_province: Strin
 		if hand_index < 0 or hand_index >= hand.size():
 			return
 		var card_type: String = hand[hand_index]
-		card_played.emit(-1 if card_type == CardPresets.REPUTATION_CARD_TYPE and id != multiplayer.get_unique_id() else id, card_type)
+		card_played.emit(-1 if is_anonymous_card(card_type) and id != multiplayer.get_unique_id() else id, card_type)
 		hand.remove_at(hand_index)
 		_apply_card_effect(id, card_type, target_peer_id, target_province)
 		inventories_updated.emit()
@@ -1140,7 +1140,7 @@ func _apply_play(peer_id: int, hand_index: int, target_peer_id: int = -1, target
 	# Geçersiz hedefle / şartsız oynanan kart elde kalır, boşa harcanmaz.
 	if not can_play_card(peer_id, card_type, target_peer_id, target_province):
 		return
-	card_played.emit(-1 if card_type == CardPresets.REPUTATION_CARD_TYPE and peer_id != multiplayer.get_unique_id() else peer_id, card_type)
+	card_played.emit(-1 if is_anonymous_card(card_type) and peer_id != multiplayer.get_unique_id() else peer_id, card_type)
 	hand.remove_at(hand_index)
 	mana[peer_id] = mana_of(peer_id) - CardPresets.card_cost(card_type)
 	_event_message = ""
@@ -1149,8 +1149,8 @@ func _apply_play(peer_id: int, hand_index: int, target_peer_id: int = -1, target
 		"target": target_peer_id, "province": target_province, "seats_changed": seats_changed_now}
 	if _event_message != "":
 		event["message"] = _event_message
-	if card_type == CardPresets.REPUTATION_CARD_TYPE:
-		# Kaset anonim: logda hedefin simgesi görünür, atanın değil.
+	if is_anonymous_card(card_type):
+		# Kaset ve iç karışıklık anonim: logda hedefin simgesi görünür, atanın değil.
 		event["peer_id"] = target_peer_id
 		event["actor_hidden"] = peer_id
 	# Hiçbir kart sırayı devretmez; tur sadece "Turu Bitir" ya da süreyle biter.
@@ -1234,6 +1234,11 @@ func _apply_miting_move(peer_id: int, province_id: String) -> void:
 		credibility_add(peer_id, MITING_CREDIBILITY)
 	_push_state({"type": "miting", "peer_id": peer_id, "province": province_id, "message": _event_message})
 
+## ANONİM KARTLAR: kaset ve iç karışıklık. Oynayanın adı mesajda, log
+## simgesinde ve kart animasyonunda gizlidir (hedef görünür).
+static func is_anonymous_card(card_type: String) -> bool:
+	return card_type in [CardPresets.REPUTATION_CARD_TYPE, CardPresets.REBELLION_CARD_TYPE]
+
 ## Kartın etkisini uygular. Milletvekili dağılımı değiştiyse true döner.
 ## Herkese duyurulacak bir sonuç varsa _event_message'a yazar.
 func _apply_card_effect(peer_id: int, card_type: String, target_peer_id: int = -1, target_province: String = "") -> bool:
@@ -1246,8 +1251,8 @@ func _apply_card_effect(peer_id: int, card_type: String, target_peer_id: int = -
 			# İÇ KARIŞIKLIK: ulusal destek düşer, partide (gizli) karışıklık büyür.
 			_add_national(target_peer_id, -PublicOpinion.REBELLION_NATIONAL_DAMAGE)
 			_add_turmoil(target_peer_id, PublicOpinion.TURMOIL_REBELLION)
-			_event_message = "%s'da iç karışıklık çıktı: parti sarsıldı, ulusal desteği düştü. (%s)" % [
-				_party_name(target_peer_id), _party_name(peer_id)]
+			# ANONİM: iç karışıklığı kimin kışkırttığı hiçbir yerde gösterilmez.
+			_event_message = "%s'da iç karışıklık çıktı: parti sarsıldı, ulusal desteği düştü." % _party_name(target_peer_id)
 		CardPresets.CARD_THEFT_CARD_TYPE:
 			_apply_card_theft(peer_id, target_peer_id)
 		CardPresets.BONUS_CARD_TYPE:

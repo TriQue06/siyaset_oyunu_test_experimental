@@ -1,6 +1,6 @@
 extends Control
 ## SİYASETÇİ PROFİLİ ekranı — parti kurulumundan ÖNCE, her oyuncuya özel.
-## Solda siyasetçinin adı ve 6 geçmiş (her biri bir eksen ucuyla uyumlu),
+## Solda siyasetçinin adı ve 6 geçmiş (her biri bir seçmen grubuyla bağlantılı),
 ## sağda bu oyunun haritası: tıklanan il memleket olur. Geçmiş ve memleket
 ## seçilince "Partini Kur" açılır; seçimler PartyManager.set_my_politician ile
 ## gider ve oyuncu Parti Kurulum ekranına geçer. Kurallar: PoliticianPresets.
@@ -8,14 +8,8 @@ extends Control
 
 const MAP_SCENE := preload("res://scenes/Map.tscn")
 const LEFT_WIDTH := 540.0
-const CARD_SIZE := Vector2(258, 112)
+const CARD_SIZE := Vector2(258, 132)
 const MAP_PADDING := 12.0
-## Eksen renkleri (parti profil kartındaki işaretlerle aynı aile).
-const AXIS_COLORS := {
-	"economic": Color("E67324"),
-	"social": Color("70EC98"),
-	"administrative": Color("AA67F4"),
-}
 const HOME_COLOR := Color("FFC93C")
 ## Cinsiyet düğmeleri: erkek mavi, kadın pembe.
 const GENDER_STYLE := {"m": {"text": "Erkek", "color": Color("3A8DE0")},
@@ -126,7 +120,7 @@ func _build_left() -> Control:
 		dice_row.add_child(dice)
 	_reroll_name(true, true)
 
-	body.add_child(PopupKit.section("Geçmiş", "görüşünü bir uca biraz daha iter"))
+	body.add_child(PopupKit.section("Geçmiş", "partini bir seçmen grubuna biraz yaklaştırır"))
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -142,7 +136,7 @@ func _build_left() -> Control:
 		_cards[id] = card
 	return built[0]
 
-## Bir geçmiş kartı: ad, eksen ucu çipi, kısa hikâye, avantaj.
+## Bir geçmiş kartı: ad, seçmen grubu çipi, kısa hikâye, avantaj.
 func _background_card(id: String) -> Button:
 	var info := PoliticianPresets.background(id)
 	var button := Button.new()
@@ -179,7 +173,13 @@ func _background_card(id: String) -> Button:
 	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(t)
-	head.add_child(PopupKit.chip(PoliticianPresets.side_text(id).to_upper(), AXIS_COLORS[info["axis"]]))
+	var group := PoliticianPresets.group_of(id)
+	var group_row := HBoxContainer.new()
+	group_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	group_row.add_theme_constant_override("separation", 4)
+	group_row.add_child(VoterGroupIcon.make(group, 16.0))
+	group_row.add_child(PopupKit.chip(VoterGroups.title(group), VoterGroups.color(group)))
+	box.add_child(group_row)
 	var blurb := PopupKit.note(String(info["blurb"]), UiTheme.TEXT_MUTED)
 	box.add_child(blurb)
 	var perk := PopupKit.note("★ " + String(info["perk"]), UiTheme.GREEN)
@@ -194,7 +194,7 @@ func _build_right() -> Control:
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var body: VBoxContainer = built[1]
 	body.add_child(PopupKit.section("Memleket", "haritadan bir il seç"))
-	body.add_child(PopupKit.note("Memleketinde güçlü bir teşkilatla başlarsın; hemşehrilerin sana sahip çıkar ve görüşüne yakınlaşır.",
+	body.add_child(PopupKit.note("Memleketinde güçlü bir teşkilatla başlarsın; hemşehrilerin sana sahip çıkar.",
 		UiTheme.TEXT_MUTED))
 
 	_map_clip = Control.new()

@@ -1,16 +1,14 @@
 class_name BotBrain
 extends RefCounted
 ## Botların KARARLARI (zamanlaması BotManager'da). Basit fayda puanı: her olası
-## hamle oyunun kendi formülleriyle (seçim desteği, il gücü, miting riski,
-## yasanın il etkileri...) kabaca puanlanır, en yükseği seçilir.
+## hamle oyunun kendi formülleriyle (grup uyumu, il gücü, miting riski, yasanın
+## grup etkileri...) kabaca puanlanır, en yükseği seçilir.
 ##
-## BİLGİ KISITI: botlar da insanlar gibi illerin görüşünü BİLMEZ. Sadece
-## teşkilat kurdukları illerde her eksenin hangi uçta ya da ortada olduğunu bilirler
-## (bkz. _known_centers; gözcünün süresi bitse de görüş hatırlanır), bilmedikleri
-## illeri nötr (0) sayarlar. Önce
-## kimliklerini güçlendiren yasalar sunar, öğrendikçe yasalarını illere göre
-## seçerler. Bu yüzden gözcü hamlesi botlar için de değerlidir. Miting riski
-## ise insanlara da gösterilen bir ipucu olduğu için doğrudan kullanılır.
+## SEÇMEN GRUPLARI: botlar insanlarla AYNI açık bilgiyi kullanır (illerin
+## seçmen grubu dağılımı herkese açık, kendi grup yakınlıkları). Bir hamlenin
+## değeri çoğunlukla "ülke genelinde (vekil ağırlıklı) grup uyumum ne kadar
+## artar" sorusudur (bkz. _appeal_gain): yasa ve miting yakınlıkları kalıcı
+## değiştirir, toplantı seçime yakın turlarda değerlidir. Gizli bonus yok.
 ##
 ## HAMLE SINIRI YOK: BotManager, choose_action "pass" (turu bitir) diyene kadar
 ## hamle yaptırır. Her seçeneğin puanından mana bedeli × MANA_VALUE düşülür;
@@ -22,14 +20,22 @@ const PASS_THRESHOLD := 0.4
 const PASS_ACTION_SCORE := 0.7
 ## Bir mananın puan karşılığı (hamle puanından bedel × bu değer düşülür).
 const MANA_VALUE := 0.03
-## Gözcü bilgisinden tahmin edilen eksen değeri (uç biliniyor, büyüklük değil).
-const LEANING_ESTIMATE := 2.0
+## Grup uyumundaki 1 puanlık ülke geneli artışın ulusal puan karşılığı
+## (SHARPNESS / EFFECT_PER_POINT: ikisi de oy ağırlığını aynı ölçüde büyütür).
+const APPEAL_TO_POINTS := 1.4
+## Yasa ve mitingin grup kazancı KALICIDIR (ulusal puan gibi her tur sönmez):
+## bot onu birkaç turluk etki olarak değerlendirir.
+const PERMANENT_GAIN_VALUE := 3.0
+## Grup toplantısı puanı: uyum kazancı × bu + kriz grubuysa CRISIS_MEETING_BONUS.
+const MEETING_VALUE := 1.5
+const CRISIS_MEETING_BONUS := 0.9
 ## Yasanın taban puanı: yasa her tur meclisi durdurur, bot onu sadece gerçekten
 ## işe yarayacaksa sunsun (miting / il başkanlığı / kartlar öne geçebilsin).
 const LAW_BASE_SCORE := 1.0
 ## Bot bir yasayı en fazla bu kadar turda bir sunar.
 const LAW_EVERY_ROUNDS := 2
-## Muhalefetteki bot, hükümete bu mesafeden yakınsa gensoruda çekimser kalır.
+## Muhalefetteki bot, hükümete bu mesafeden yakınsa gensoruda çekimser kalır
+## (mesafe: VoterGroups.party_distance, grup yakınlıkları arasında).
 const CENSURE_LOYALTY_DISTANCE := 1.2
 ## Erken seçime EVET demek için gereken ulusal kamuoyu eşiği.
 const EARLY_ELECTION_SUPPORT := 1.0
@@ -84,7 +90,7 @@ static func _jitter(bot: int, scale: float = 1.0) -> float:
 ##   1. Hepsi vekil çalma kartlarını hükümetin ana partisine yöneltir; bloğun
 ##      en büyük botunu birinci parti yapmak (hükümet kurma yetkisi sırası
 ##      sandalyeye göre) ve hükümeti azınlığa düşürmek ek puan kazandırır.
-##   2. Gensoruyu blok olarak hesaplar ve oylar (ideolojik yakınlık fark etmez).
+##   2. Gensoruyu blok olarak hesaplar ve oylar (grup yakınlığı fark etmez).
 ##   3. Gensoru geçince kurulacak hükümette bloğun botları birbirini destekler
 ##      ve ortak olarak önce birbirini seçer.
 ## Blokta gensoru ile düşen hükümetin ardından kurma süreci işaretlenir.
@@ -128,8 +134,12 @@ static func is_ally(bot: int, other: int) -> bool:
 		return false
 	return PartyManager.same_party(bot, other)
 
-static func _ideology(peer_id: int) -> Dictionary:
-	return PartyManager.data_of(peer_id).get("ideology", IdeologyAxes.default_values())
+static func _groups(peer_id: int) -> Dictionary:
+	return PartyManager.groups_of(CardManager.party_of(peer_id))
+
+## İki partinin seçmen grubu profilleri arasındaki mesafe.
+static func _distance(a: int, b: int) -> float:
+	return VoterGroups.party_distance(_groups(a), _groups(b))
 
 static func _seats() -> Dictionary:
 	return CardManager._province_seat_counts
@@ -137,34 +147,43 @@ static func _seats() -> Dictionary:
 static func _total_seats() -> float:
 	return float(maxi(1, CardManager.TOTAL_SEATS))
 
-## Botun bildiği il görüşleri: province_id -> tahmini merkez. Gözcü gönderilmemiş
-## iller boş sözlük (= nötr) döner.
-static func _known_centers(bot: int) -> Dictionary:
+## Partinin ülke geneli (vekil ağırlıklı) grup uyumu (0..100). Uyum her çiftte
+## doğrusal olduğu için illerin ortalaması = ülkenin vekil ağırlıklı ortalama
+## profiliyle hesaplanan uyum: iller tek tek dolaşılmaz (bot hızlı düşünür).
+static func _national_appeal(affinities: Dictionary) -> float:
+	var shares := _national_shares()
+	var sum := 0.0
+	for pair in VoterGroups.PAIR_IDS:
+		var groups: Array = VoterGroups.PAIRS[pair]
+		var s := float(shares.get(pair, 0.5))
+		sum += s * float(affinities.get(groups[0], VoterGroups.AFFINITY_NEUTRAL)) \
+			+ (1.0 - s) * float(affinities.get(groups[1], VoterGroups.AFFINITY_NEUTRAL))
+	return sum / VoterGroups.PAIR_IDS.size()
+
+## Çift -> ilk grubun ülke geneli (vekil ağırlıklı) payı. İl profilleri oyun
+## boyunca sabit olduğu için profil tablosu değişene kadar önbellekte kalır.
+static var _shares_cache: Dictionary = {}
+static var _shares_key: Variant = null
+static func _national_shares() -> Dictionary:
+	var profiles := CardManager.province_voters()
+	if is_same(profiles, _shares_key) and not _shares_cache.is_empty():
+		return _shares_cache
+	var seats := _seats()
 	var result := {}
-	for province_id in _seats().keys():
-		if not CardManager.knows_leaning(bot, province_id):
-			result[province_id] = {}
-			continue
-		var center := CardManager.province_center(province_id)
-		var estimate := {}
-		for axis in IdeologyAxes.AXES:
-			# Teşkilat raporu gibi kaba: yarım adıma yuvarlanmış görüş.
-			estimate[axis] = snappedf(float(center.get(axis, 0.0)), 0.5)
-		result[province_id] = estimate
+	for pair in VoterGroups.PAIR_IDS:
+		result[pair] = VoterGroups.national_share(profiles, seats, VoterGroups.PAIRS[pair][0])
+	_shares_cache = result
+	_shares_key = profiles
 	return result
 
-## İdeolojinin tüm ülkedeki (bilinen) seçmen desteği (milletvekili ağırlıklı).
-## Görüşü bilinmeyen iller sayılmaz: onları nötr saymak her yasayı (nötrden
-## uzaklaştırdığı için) zararlı gösterir, botlar hep aynı yedek yasaya düşerdi.
-static func _electoral_strength(ideology: Dictionary, known: Dictionary) -> float:
-	var seats := _seats()
-	var weighted := 0.0
-	for province_id in seats.keys():
-		var center: Dictionary = known.get(province_id, {})
-		if center.is_empty():
-			continue
-		weighted += ElectionModel.support(ideology, center) * float(seats[province_id])
-	return weighted / _total_seats()
+## Kalıcı grup değişikliklerinin ([{"group", "amount"}]) partinin ülke geneli
+## uyumuna etkisi (azalan getiri dahil, gerçek kuralla).
+static func _appeal_gain(bot: int, changes: Array) -> float:
+	var before := _groups(bot)
+	var after := before.duplicate()
+	for change in changes:
+		VoterGroups.apply_delta(after, String(change["group"]), float(change["amount"]))
+	return _national_appeal(after) - _national_appeal(before)
 
 static func _election_soon() -> bool:
 	var next := GameRules.next_election_round(CardManager.round_number)
@@ -177,12 +196,14 @@ static func _mana_value(bot: int) -> float:
 	return MANA_VALUE * clampf(40.0 / maxf(10.0, float(CardManager.mana_of(bot))), 0.2, 1.5)
 
 ## Dönüş: {"type": "card"} | {"type": "law", "law"} | {"type": "organization",
-## "province"} | {"type": "miting", "province"} | |
+## "province"} | {"type": "miting", "province"} | {"type": "speech", "group"} |
 ## {"type": "pass"}
 static func choose_action(bot: int) -> Dictionary:
-	# MECLİS KONUŞMASI zorunlu: her şeyden önce.
+	# GRUP TOPLANTISI isteğe bağlı: değerliyse (seçime yakın / kriz) önce yapılır.
 	if CardManager.needs_speech(bot):
-		return choose_speech(bot)
+		var meeting := choose_speech(bot)
+		if not meeting.is_empty() and float(meeting["score"]) - GameRules.SPEECH_MANA_COST * _mana_value(bot) > PASS_ACTION_SCORE:
+			return {"type": "speech", "group": meeting["group"]}
 	# SEÇİMDEN OLUMLU ÇIKAN BOT KONGREYE GİDER (iktidarını tazeler).
 	var pid := CardManager.party_of(bot)
 	if CardManager.can_hold_congress(bot) and CardManager.bot_congress_due(pid):
@@ -201,7 +222,6 @@ static func choose_action(bot: int) -> Dictionary:
 
 ## En iyi hamle (gürültülü puanlarla). Geçerli seçenekler candidates'e eklenir.
 static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
-	var known := _known_centers(bot)
 	var best := {"type": "pass"}
 	var best_score := PASS_ACTION_SCORE
 	var mana_value := _mana_value(bot)
@@ -217,7 +237,7 @@ static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 			best_score = card_score
 
 	if CardManager.can_propose_law(bot):
-		var law := _best_law(bot, known)
+		var law := _best_law(bot)
 		# Yasa sıklığı sınırı (her gündem turunda herkes yasa sunup meclisi kilitlemesin).
 		var rested: bool = CardManager.round_number - int(CardManager.law_rounds.get(bot, -99)) >= LAW_EVERY_ROUNDS
 		if not rested:
@@ -236,7 +256,7 @@ static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 		best = {"type": "constitution", "payload": constitution["payload"]}
 		best_score = float(constitution["score"])
 
-	var org := _best_organization(bot, known)
+	var org := _best_organization(bot)
 	var org_cost := GameRules.org_cost(CardManager.organization_level(String(org.get("province", "")), bot)) if not org.is_empty() else 0
 	var org_noise := _jitter(bot)
 	if not org.is_empty():
@@ -246,7 +266,7 @@ static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 		best_score = float(org["score"]) - org_cost * mana_value + org_noise
 
 	if CardManager.can_invest(bot):
-		var invest := _eval_investment(bot, known)
+		var invest := _eval_investment(bot)
 		var invest_noise := _jitter(bot)
 		if not invest.is_empty():
 			candidates.append({"type": "invest", "province": invest["province"]})
@@ -274,7 +294,7 @@ static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 				best_score = early_score
 
 	if CardManager.can_miting(bot):
-		var miting := _eval_miting(bot, known)
+		var miting := _eval_miting(bot)
 		var miting_noise := _jitter(bot)
 		if not miting.is_empty():
 			candidates.append({"type": "miting", "province": miting["province"]})
@@ -284,114 +304,63 @@ static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 
 	return best
 
-## MECLİS KONUŞMASI: 6 uçtan, bilinen illerde desteği en çok artıran; bot
-## kendi tarafında ılımlı-belirgin (|1,5| civarı) bir çizgide durmayı sever ve
-## taraf değiştirmekten kaçınır.
+## GRUP TOPLANTISI: geçici bonus seçime kaç tur kaldığına göre değerlidir
+## (seçim bu tur sonundaysa +10, bir tur sonraysa +3...). Grup, ülkede en
+## kalabalık olan ve bot için en çok uyum getiren gruptur; kriz grubu ek puan.
+## Dönüş: {"group", "score"} (boş: toplantı hiç değmez).
 static func choose_speech(bot: int) -> Dictionary:
-	var known := _known_centers(bot)
-	var mine := _ideology(bot)
-	var base := _electoral_strength(mine, known)
+	var next := GameRules.next_election_round(CardManager.round_number)
+	var age := next - CardManager.round_number if next != -1 else 99
+	var bonus := PublicOpinion.meeting_bonus(age)
+	var crisis := CardManager.crisis_group()
+	var base := _national_appeal(CardManager.effective_groups(bot))
 	var best := {}
-	var best_score := -INF
-	for axis in IdeologyAxes.AXES:
-		for dir in [-1, 1]:
-			var v := float(mine.get(axis, 0.0))
-			var moved := mine.duplicate()
-			moved[axis] = IdeologyAxes.clamp_value(v + IdeologyAxes.SPEECH_SHIFT * dir)
-			var nv := float(moved[axis])
-			var score := (_electoral_strength(moved, known) - base) * 20.0
-			score -= absf(absf(nv) - 1.5) * 0.4
-			if absf(v) > 0.25 and signf(nv) != signf(v):
-				score -= 0.6
-			# Eşitlikte botlar hep aynı konuşmayı yapmasın.
-			score += float((absi(bot) + CardManager.round_number + axis.length() * (dir + 2)) % 7) * 0.01
-			score += _jitter(bot, 2.0)  # zayıf bot bazen yanlış yöne konuşur
-			if score > best_score:
-				best_score = score
-				best = {"type": "speech", "axis": axis, "dir": dir}
+	for group in VoterGroups.GROUP_IDS:
+		var score := 0.0
+		if bonus > 0.0:
+			var boosted := VoterGroups.with_bonus(CardManager.effective_groups(bot), {group: bonus})
+			score = (_national_appeal(boosted) - base) * MEETING_VALUE
+		if group == crisis:
+			score += CRISIS_MEETING_BONUS
+		# Eşitlikte botlar hep aynı grubu seçmesin.
+		score += float((absi(bot) + CardManager.round_number + group.length()) % 7) * 0.005
+		score += _jitter(bot, 0.5)  # zayıf bot bazen yanlış grupla toplanır
+		if best.is_empty() or score > float(best["score"]):
+			best = {"group": group, "score": score}
 	return best
 
-## Seçim desteğini en çok artıracak yasa: bilinen illerdeki etkiler (geçme
-## ihtimaliyle) + partinin görüş kaymasının seçmene yaklaştırması.
-## Krizin istediği yöne kayma botlar için de cazip (ulusal destek getirir).
+## Seçim desteğini en çok artıracak yasa: gündemdeki iki grup için, geçme
+## ihtimaliyle beklenen grup kazancının ülke geneli uyuma etkisi + krize yanıt +
+## kabul edilirse puan tablosu.
 const CRISIS_LAW_BONUS := 0.4
 const CRISIS_VOTE_BONUS := 0.2
 
-static func _best_law(bot: int, known: Dictionary) -> Dictionary:
-	var seats := _seats()
+static func _law_changes(law_type: String, gain: float) -> Array:
+	var law := CardPresets.law_data(law_type)
+	if law.is_empty():
+		return []
+	var backlash := float(VoterGroups.data(String(law["group"])).get("law_backlash", 0.4))
+	return [{"group": law["group"], "amount": gain}, {"group": law["opposite"], "amount": -gain * backlash}]
+
+static func _best_law(bot: int) -> Dictionary:
 	var in_parliament := not CardManager.last_seats.is_empty()
-	var mine := _ideology(bot)
 	var best := {}
-	# Sadece gözcü gönderilmiş illerden çıkarım yapılır: ortalama etki × güven
-	# (bilinen vekil oranı arttıkça bot yasaya daha çok güvenir).
-	var known_seats := 0.0
-	for province_id in seats.keys():
-		if not (known.get(province_id, {}) as Dictionary).is_empty():
-			known_seats += float(seats[province_id])
-	if known_seats <= 0.0:
-		return _exploration_law(bot, mine)
-	var confidence := clampf(known_seats / 60.0, 0.3, 1.0)
-	for axis in _law_axes():
-		for dir in [-1, 1]:
-			var law_type := CardPresets.law_type(axis, dir)
-			var sum := 0.0
-			for province_id in seats.keys():
-				if (known.get(province_id, {}) as Dictionary).is_empty():
-					continue
-				var alignment := PublicOpinion.law_alignment(known[province_id], axis, dir)
-				sum += float(seats[province_id]) * PublicOpinion.law_proposer_delta(alignment, false)
-			var value := sum / known_seats * confidence * CardManager.agenda_law_mult(law_type)
-			if CardManager.crisis_wants(axis, float(dir)):
-				value += CRISIS_LAW_BONUS
-			if in_parliament:
-				var pass_chance := _law_pass_chance(bot, law_type, known)
-				value *= 1.0 + pass_chance * (PublicOpinion.LAW_PASSED_MULT - 1.0)
-				# Kabul edilen yasa puan tablosuna ciddi puan yazar.
-				value += pass_chance * CardManager.law_pass_score(CardManager.is_government_party(bot)) * 0.12
-			var moved := mine.duplicate()
-			moved[axis] = IdeologyAxes.clamp_value(float(mine.get(axis, 0)) + IdeologyAxes.LAW_PROPOSE_SHIFT * dir)
-			value += (_electoral_strength(moved, known) - _electoral_strength(mine, known)) * 20.0
-			var score := LAW_BASE_SCORE + value * 5.0 - _repeat_penalty(bot, law_type)
-			if best.is_empty() or score > float(best["score"]):
-				best = {"law": law_type, "score": score}
-	# Tahmin gürültülü ya da bütün yasalar zararlı görünüyorsa kimlik yasası
-	# (partinin belirgin ekseni) yedek seçenektir: meclis oyunu durmasın.
-	var exploration := _exploration_law(bot, mine)
-	if known_seats >= 60.0:
-		exploration["score"] = 0.8
-	if float(exploration["score"]) > float(best["score"]):
-		return exploration
+	for group in CardManager.agenda_groups():
+		var law_type := CardPresets.law_type(String(group))
+		var pass_chance := _law_pass_chance(bot, law_type) if in_parliament else 0.0
+		var expected_gain := pass_chance * PublicOpinion.LAW_GROUP_GAIN_PASSED \
+			+ (1.0 - pass_chance) * PublicOpinion.LAW_GROUP_GAIN_REJECTED
+		var value := _appeal_gain(bot, _law_changes(law_type, expected_gain)) * APPEAL_TO_POINTS * PERMANENT_GAIN_VALUE
+		if CardManager.crisis_group() == group:
+			value += CRISIS_LAW_BONUS
+		# Kabul edilen yasa puan tablosuna ciddi puan yazar.
+		value += pass_chance * CardManager.law_pass_score(CardManager.is_government_party(bot)) * 0.12
+		var score := LAW_BASE_SCORE + value * 3.0 - _repeat_penalty(bot, law_type)
+		if best.is_empty() or score > float(best["score"]):
+			best = {"law": law_type, "score": score}
 	return best
 
-## Hiç il bilinmiyorken: parti kimliğini güçlendiren (en belirgin ekseninde)
-## yasa; kimlik yoksa bota ve tura göre bir eksen. Çok iyi bir kart (ör. büyük
-## ilde gözcü) varsa o önce gelir. Yasa partiyi kaydırdıkça kimlik oluşur.
-static func _exploration_law(bot: int, mine: Dictionary) -> Dictionary:
-	# En az kullandığı eksen; yön partinin o eksendeki eğilimi (yoksa bota göre).
-	var best_law := ""
-	var best_penalty := INF
-	var offset := absi(bot) + CardManager.round_number
-	var axes := _law_axes()
-	for i in axes.size():
-		var axis: String = axes[(i + offset) % axes.size()]
-		var v := float(mine.get(axis, 0))
-		var dir := 1 if v > 0 else (-1 if v < 0 else (1 if (absi(bot) / 7 + i) % 2 == 0 else -1))
-		var law_type := CardPresets.law_type(axis, dir)
-		var penalty := _repeat_penalty(bot, law_type)
-		if penalty < best_penalty:
-			best_penalty = penalty
-			best_law = law_type
-	return {"law": best_law, "score": 1.0}
-
-## Yasa sunulabilecek eksenler: sadece gündemdeki eksen (gündem yoksa hepsi;
-## zaten yasa sunulamaz).
-static func _law_axes() -> Array:
-	var current := CardManager.agenda_type()
-	if current == "":
-		return IdeologyAxes.AXES
-	return [CardPresets.agenda_data(current)["axis"]]
-
-## Botun son sunduğu yasalar: aynı yasayı (ve aynı ekseni) üst üste sunmasın.
+## Botun son sunduğu yasalar: aynı yasayı (ve karşıt grubun yasasını) üst üste sunmasın.
 static var _recent_laws: Dictionary = {}
 const RECENT_LAW_MEMORY := 4
 
@@ -408,68 +377,73 @@ static func _repeat_penalty(bot: int, law_type: String) -> float:
 	for previous in _recent_laws.get(bot, []):
 		if previous == law_type:
 			penalty += 0.9
-		elif not law.is_empty() and CardPresets.law_data(previous).get("axis", "") == law["axis"]:
-			penalty += 0.35
+		elif not law.is_empty() and CardPresets.law_data(previous).get("group", "") == law["opposite"]:
+			penalty += 0.35  # aynı çiftte bir o yana bir bu yana yasa tutarsız görünür
 	return penalty
 
-## Kaba geçme ihtimali: diğer partilerin oyu, botun kendi bilgisiyle tahmin edilir.
-static func _law_pass_chance(bot: int, law_type: String, known: Dictionary) -> float:
+## Kaba geçme ihtimali: diğer partilerin oyu, aynı oy kuralıyla tahmin edilir.
+static func _law_pass_chance(bot: int, law_type: String) -> float:
 	var gov_ids := GovernmentManager.government_party_ids()
 	var yes := GovernmentManager.seats_of(bot)
 	var no := 0
 	for peer_id in GovernmentManager.voter_ids():
 		if peer_id == bot:
 			continue
-		match _best_law_vote(peer_id, law_type, bot, gov_ids, known):
+		match _best_law_vote(peer_id, law_type, bot, gov_ids):
 			GovernmentManager.VOTE_YES:
 				yes += GovernmentManager.seats_of(peer_id)
 			GovernmentManager.VOTE_NO:
 				no += GovernmentManager.seats_of(peer_id)
 	return 0.85 if yes > no else 0.15
 
-## Bir partinin bir yasaya EVET/HAYIR demesinin (bilinen) il etkilerinin vekil
-## ağırlıklı toplamı.
-static func _law_vote_value(voter: int, law_type: String, choice: int, proposer: int, gov_ids: Array, known: Dictionary) -> float:
+## Bir partinin bir yasaya EVET/HAYIR demesinin grup uyumuna etkisi (ulusal
+## puan cinsinden) + krize yanıt + iktidarın muhalefet yasasına EVET bedeli.
+static func _law_vote_value(voter: int, law_type: String, choice: int, proposer: int, gov_ids: Array) -> float:
 	var law := CardPresets.law_data(law_type)
 	if law.is_empty() or choice == GovernmentManager.VOTE_ABSTAIN:
 		return 0.0
-	var seats := _seats()
-	var sum := 0.0
-	for province_id in seats.keys():
-		var alignment := PublicOpinion.law_alignment(known.get(province_id, {}), law["axis"], int(law["dir"]))
-		sum += float(seats[province_id]) * PublicOpinion.law_vote_delta(alignment, choice, gov_ids.has(voter), gov_ids.has(proposer))
-	var value := sum / _total_seats()
-	if CardManager.crisis_wants(String(law["axis"]), float(int(law["dir"]) * choice)):
-		value += CRISIS_VOTE_BONUS
+	var group := String(law["group"])
+	var opposite := String(law["opposite"])
+	var backlash := float(VoterGroups.data(group).get("law_backlash", 0.4))
+	var changes: Array = []
+	if choice == GovernmentManager.VOTE_YES:
+		changes = [{"group": group, "amount": PublicOpinion.LAW_VOTE_YES_GAIN},
+			{"group": opposite, "amount": -PublicOpinion.LAW_VOTE_YES_GAIN * backlash}]
+	else:
+		changes = [{"group": opposite, "amount": PublicOpinion.LAW_VOTE_NO_GAIN},
+			{"group": group, "amount": -PublicOpinion.LAW_VOTE_NO_GAIN * backlash}]
+	var value := _appeal_gain(voter, changes) * APPEAL_TO_POINTS * PERMANENT_GAIN_VALUE
+	if choice == GovernmentManager.VOTE_YES:
+		if gov_ids.has(voter) and not gov_ids.has(proposer):
+			value += PublicOpinion.LAW_GOV_YES_ON_OPPOSITION
+		if CardManager.crisis_group() == group:
+			value += CRISIS_VOTE_BONUS
 	return value
 
-static func _best_law_vote(voter: int, law_type: String, proposer: int, gov_ids: Array, known: Dictionary) -> int:
+static func _best_law_vote(voter: int, law_type: String, proposer: int, gov_ids: Array) -> int:
 	var best := GovernmentManager.VOTE_ABSTAIN
 	var best_value := 0.0
 	for choice in [GovernmentManager.VOTE_YES, GovernmentManager.VOTE_NO]:
-		var value := _law_vote_value(voter, law_type, choice, proposer, gov_ids, known)
+		var value := _law_vote_value(voter, law_type, choice, proposer, gov_ids)
 		if value > best_value + 0.01:
 			best_value = value
 			best = choice
-	# İktidar muhalefetin yasasını genelde reddeder: yasa geçerse getiren 2 kat güçlenir.
+	# İktidar muhalefetin yasasını genelde reddeder: yasa geçerse getiren daha çok kazanır.
 	if gov_ids.has(voter) and not gov_ids.has(proposer) and best == GovernmentManager.VOTE_ABSTAIN:
 		best = GovernmentManager.VOTE_NO
 	return best
 
-## Vekili çok, partiye (bilindiği kadarıyla) yakın ve henüz teşkilatı zayıf il.
-static func _best_organization(bot: int, known: Dictionary) -> Dictionary:
+## Vekili çok, seçmen profili partiye uyumlu ve henüz teşkilatı zayıf il.
+static func _best_organization(bot: int) -> Dictionary:
 	var seats := _seats()
-	var mine := _ideology(bot)
 	var best := {}
 	for province_id in seats.keys():
 		if not CardManager.can_build_organization(bot, province_id):
 			continue
 		var level := CardManager.organization_level(province_id, bot)
 		# 2 mana: kalıcı ama pahalı — büyük illerde bile yasa/kartla yarışacak kadar.
-		var center: Dictionary = known.get(province_id, {})
-		# Bilinmeyen il: yakınlık orta varsayılır (nötr merkez parti için aldatıcı derecede yakın görünürdü).
-		var closeness := ElectionModel.support(mine, center) if not center.is_empty() else 0.5
-		# Kalıcı oy bonusu (seviye farkı) + bilgi: 1. seviye ilin görüşünü, 2-3 anketi açar.
+		var closeness := PublicOpinion.appeal_closeness(CardManager.appeal_of(province_id, bot))
+		# Kalıcı oy bonusu (seviye farkı) + bilgi: 1. seviye kaba, 2. seviye isabetli anket.
 		var gain := PublicOpinion.org_activity(level + 1) - PublicOpinion.org_activity(level)
 		var value := float(seats[province_id]) * (0.5 + closeness) / 30.0 * gain / 1.2 * 0.8
 		if level == 0:
@@ -483,14 +457,13 @@ static func _best_organization(bot: int, known: Dictionary) -> Dictionary:
 
 ## Dönüş: {"index", "peer", "province", "score"} ya da boş sözlük (= oynama).
 static func choose_play(bot: int) -> Dictionary:
-	var known := _known_centers(bot)
 	var hand: Array = CardManager.inventories.get(bot, [])
 	var best := {}
 	var best_score := PASS_THRESHOLD
 	if hand.size() >= CardManager.MAX_HAND_SIZE:
 		best_score = -INF  # el dolu: en iyisini oyna, desteyi tıkama
 	for i in hand.size():
-		var option := _evaluate(bot, String(hand[i]), known)
+		var option := _evaluate(bot, String(hand[i]))
 		if option.is_empty():
 			continue
 		option["score"] = float(option["score"]) + _jitter(bot, 0.6)
@@ -500,7 +473,7 @@ static func choose_play(bot: int) -> Dictionary:
 			best["index"] = i
 	return best
 
-static func _evaluate(bot: int, card_type: String, known: Dictionary) -> Dictionary:
+static func _evaluate(bot: int, card_type: String) -> Dictionary:
 	if CardManager.mana_of(bot) < CardPresets.card_cost(card_type):
 		return {}
 	match card_type:
@@ -518,7 +491,7 @@ static func _evaluate(bot: int, card_type: String, known: Dictionary) -> Diction
 		CardPresets.CARD_THEFT_CARD_TYPE:
 			return _eval_card_theft(bot)
 		CardPresets.PROPAGANDA_CARD_TYPE:
-			return _eval_propaganda(bot, known)
+			return _eval_propaganda(bot)
 	if CardPresets.needs_target(card_type):
 		return _eval_steal(bot, card_type)
 	if card_type == CardPresets.REPUTATION_CARD_TYPE:
@@ -577,9 +550,11 @@ static func _attack_target(bot: int) -> int:
 			target = peer_id
 	return target
 
-## Beklenen il gücü kazancı × ilin vekil sayısı × partinin o ildeki (bilinen) şansı.
-static func _eval_miting(bot: int, known: Dictionary) -> Dictionary:
-	var ideology := _ideology(bot)
+## Beklenen il gücü kazancı × ilin vekil sayısı × partinin o ildeki uyumu +
+## mitingin siyasi hitabının (ilin baskın gruplarına kayma) ülke geneli değeri.
+static func _eval_miting(bot: int) -> Dictionary:
+	var pid := CardManager.party_of(bot)
+	var fatigue: Dictionary = CardManager.miting_fatigue.get(pid, {})
 	var best_province := ""
 	var best_value := -INF
 	for province_id in _seats().keys():
@@ -590,12 +565,18 @@ static func _eval_miting(bot: int, known: Dictionary) -> Dictionary:
 		var org_mult := PublicOpinion.org_action_mult(org_level)
 		var risk := CardManager.miting_risk(bot, province_id)
 		var seats := float(CardManager.province_seat_count(province_id))
-		var closeness := ElectionModel.support(ideology, known.get(province_id, {}))
+		var closeness := PublicOpinion.appeal_closeness(CardManager.appeal_of(province_id, bot))
 		var expected := (1.0 - risk) * PublicOpinion.MITING_LOCAL + risk * PublicOpinion.PROVOCATION_LOCAL
+		var changes: Array = []
+		for effect in PublicOpinion.miting_positioning(CardManager.province_profile(province_id), org_mult):
+			var damp := PublicOpinion.miting_fatigue_mult(float(fatigue.get(String(effect["group"]), 0.0)))
+			changes.append({"group": effect["group"], "amount": float(effect["gain"]) * damp})
+			changes.append({"group": effect["loss_group"], "amount": -float(effect["loss"]) * damp})
+		var positioning := _appeal_gain(bot, changes) * APPEAL_TO_POINTS * PERMANENT_GAIN_VALUE
 		# İl başkanlığıyla aynı ölçek (vekil/30). Zaten güçlü olduğu ilde getirisi azalır.
 		var diminish := 1.0 / (1.0 + maxf(0.0, CardManager.activity_of(province_id, bot)) / 2.0)
 		var value := (expected / PublicOpinion.MITING_LOCAL * seats / 30.0 * (0.5 + closeness) * diminish \
-			+ (1.0 - risk) * PublicOpinion.MITING_NATIONAL + risk * PublicOpinion.PROVOCATION_NATIONAL) * org_mult
+			+ risk * PublicOpinion.PROVOCATION_NATIONAL) * org_mult + (1.0 - risk) * positioning
 		value += _jitter(bot, 0.3)  # zayıf bot yanlış ilde miting yapar
 		if value > best_value:
 			best_value = value
@@ -605,15 +586,17 @@ static func _eval_miting(bot: int, known: Dictionary) -> Dictionary:
 	var score := best_value * 1.4 * (1.4 if _election_soon() else 1.0)
 	return {"score": score, "peer": -1, "province": best_province}
 
-static func _eval_investment(bot: int, known: Dictionary) -> Dictionary:
+## Yatırım: yerel memnuniyet. Büyük, partiye uyumlu ve aktivitesi henüz
+## tavana dayanmamış il (azalan getiri: il puanı LIMIT'te durur).
+static func _eval_investment(bot: int) -> Dictionary:
 	if not CardManager.is_government_party(bot):
 		return {}
-	var ideology := _ideology(bot)
 	var best_province := ""
 	var best_value := -INF
 	for province_id in _seats().keys():
+		var room := clampf((PublicOpinion.LIMIT - CardManager.local_of(province_id, bot)) / PublicOpinion.INVEST_LOCAL, 0.0, 1.0)
 		var value := float(CardManager.province_seat_count(province_id)) \
-			* (0.5 + ElectionModel.support(ideology, known.get(province_id, {})))
+			* (0.5 + PublicOpinion.appeal_closeness(CardManager.appeal_of(province_id, bot))) * room
 		if value > best_value:
 			best_value = value
 			best_province = province_id
@@ -621,7 +604,7 @@ static func _eval_investment(bot: int, known: Dictionary) -> Dictionary:
 	return {"score": 0.8 + best_value / 30.0 * 1.2 * (1.3 if _election_soon() else 1.0), "peer": -1, "province": best_province}
 
 ## En büyük rakibi, en çok vekilli ve onun zayıf, botun güçlü olduğu ilde karala.
-static func _eval_propaganda(bot: int, known: Dictionary) -> Dictionary:
+static func _eval_propaganda(bot: int) -> Dictionary:
 	var best := {}
 	var best_value := -INF
 	for province_id in _seats().keys():
@@ -630,14 +613,11 @@ static func _eval_propaganda(bot: int, known: Dictionary) -> Dictionary:
 		if org_level < 1:
 			continue
 		var seats := float(CardManager.province_seat_count(province_id)) * PublicOpinion.org_action_mult(org_level)
-		var center: Dictionary = known.get(province_id, {})
-		var gain := PublicOpinion.propaganda_gain(PublicOpinion.party_strength(
-			_ideology(bot), center, CardManager.activity_of(province_id, bot)))
+		var gain := PublicOpinion.propaganda_gain(CardManager.party_strength(province_id, bot))
 		for target in CardManager.party_ids():
 			if is_ally(bot, int(target)):
 				continue
-			var damage := PublicOpinion.propaganda_damage(PublicOpinion.party_strength(
-				_ideology(target), center, CardManager.activity_of(province_id, target)))
+			var damage := PublicOpinion.propaganda_damage(CardManager.party_strength(province_id, target))
 			# Zayıfı ezmek yerine öndekini hedef al: değer ağırlıkla rakibin büyüklüğünden.
 			var rival := 0.3 + float(GovernmentManager.seats_of(target)) / _total_seats() * 4.0
 			var value := (gain + damage * 0.6 * rival) * seats / 6.0
@@ -717,7 +697,7 @@ static func _censure_worth_it(bot: int) -> bool:
 			yes += GovernmentManager.seats_of(peer_id)  # blok üyesi: kesin evet
 		elif not MultiplayerManager.is_bot(peer_id):
 			continue  # insanın oyu bilinmez: hesaba katılmaz
-		elif ElectionModel.distance(_ideology(peer_id), _ideology(main_gov)) < 2.0:
+		elif _distance(peer_id, main_gov) < 2.0:
 			continue  # çekimser
 		else:
 			yes += GovernmentManager.seats_of(peer_id)
@@ -753,7 +733,7 @@ static func choose_vote(bot: int) -> int:
 			if bot == GovernmentManager.proposal_peer_id:
 				return GovernmentManager.VOTE_YES
 			return _best_law_vote(bot, GovernmentManager.proposal_law, GovernmentManager.proposal_peer_id,
-				GovernmentManager.proposal_gov_ids, _known_centers(bot))
+				GovernmentManager.proposal_gov_ids)
 		GovernmentManager.KIND_EARLY:
 			if bot == GovernmentManager.proposal_peer_id:
 				return GovernmentManager.VOTE_YES
@@ -936,11 +916,11 @@ static func _coalition_offer_vote(bot: int) -> int:
 	return GovernmentManager.VOTE_YES
 
 ## HÜKÜMETE ALINMAYAN BOT (meclis oylaması): azınlık hükümetine kolay geçit
-## vermez — ideolojik olarak çok yakın değilse reddeder. Çoğunluğu olan
-## hükümeti ise durduramayacağı için ideolojik yakınlığa göre oylar.
+## vermez — seçmen grupları çok yakın değilse reddeder. Çoğunluğu olan
+## hükümeti ise durduramayacağı için grup yakınlığına göre oylar.
 static func _government_confidence_vote(bot: int) -> int:
 	var pm := int(GovernmentManager.proposal_assignments.get(GovernmentPresets.POST_PM, GovernmentManager.proposal_peer_id))
-	var d := ElectionModel.distance(_ideology(bot), _ideology(pm))
+	var d := _distance(bot, pm)
 	var gov_seats := GovernmentManager.seats_of(GovernmentManager.proposal_peer_id)
 	for peer_id in GovernmentManager.proposal_partner_ids():
 		gov_seats += GovernmentManager.seats_of(peer_id)
@@ -961,14 +941,14 @@ static func _government_confidence_vote(bot: int) -> int:
 ## Muhalefetteki botun gensoru oyu. Hükümetin düşmesi ona yeni bir hükümet
 ## şansı verir: kendisi ya da kendisine hükümetten DAHA YAKIN olan gensoru
 ## sahibi hükümet kurabilir. Bu yüzden varsayılan EVET'tir; sadece hükümet
-## ideolojik olarak çok yakınken ve gensoruyu veren belirgin biçimde uzakken
+## seçmen grupları açısından çok yakınken ve gensoruyu veren belirgin biçimde uzakken
 ## çekimser kalır.
 static func _censure_vote(bot: int) -> int:
 	var gov := GovernmentManager.main_gov_peer_id
 	if gov == -1:
 		return GovernmentManager.VOTE_YES
-	var d_gov := ElectionModel.distance(_ideology(bot), _ideology(gov))
-	var d_prop := ElectionModel.distance(_ideology(bot), _ideology(GovernmentManager.proposal_peer_id))
+	var d_gov := _distance(bot, gov)
+	var d_prop := _distance(bot, GovernmentManager.proposal_peer_id)
 	# Muhalefetin en büyük partisiyse hükümet kurma sırası ona gelebilir.
 	var biggest_in_opposition := true
 	for peer_id in GovernmentManager.voter_ids():
@@ -986,12 +966,11 @@ static func _censure_vote(bot: int) -> int:
 
 # --- Hükümet kurma -------------------------------------------------------------
 
-## İdeolojik olarak en yakın partilerle salt çoğunluğa ulaşana kadar koalisyon;
+## Seçmen grupları en yakın partilerle salt çoğunluğa ulaşana kadar koalisyon;
 ## bakanlıklar sandalyeyle orantılı. Reddedilince sonraki teklifte aday sırası
 ## kaydırılır (aynı teklifi tekrar tekrar sunmasın).
 static func build_government(bot: int) -> Dictionary:
 	var total := GovernmentManager.total_seats()
-	var mine := _ideology(bot)
 	# Ortak adayları PARTİLER (bağımsızlar hükümete giremez), kardeş parti önce.
 	var candidates: Array = []
 	for pid in GovernmentManager.seated_party_ids():
@@ -1004,7 +983,7 @@ static func build_government(bot: int) -> Dictionary:
 		# Blok dayanışmasında önce diğer botlar ortak seçilir.
 		if bloc and MultiplayerManager.is_bot(a) != MultiplayerManager.is_bot(b):
 			return MultiplayerManager.is_bot(a)
-		return ElectionModel.distance(mine, _ideology(a)) < ElectionModel.distance(mine, _ideology(b)))
+		return _distance(bot, a) < _distance(bot, b))
 	var shift := GovernmentManager.attempts_used % maxi(1, candidates.size())
 	candidates = candidates.slice(shift) + candidates.slice(0, shift)
 	# Döndürme blok dayanışmasını bozmasın: blok varken botlar yine önde kalır

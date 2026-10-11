@@ -3,8 +3,8 @@ extends Control
 ## OYUN İÇİNDE PARTİ KURMA penceresi (parti kurulum ekranının küçük hâli):
 ## ad, logo ve renk seçilir, bedel ödenip parti kurulur. Bağımsız siyasetçi
 ## kurar (CardManager.FOUND_PARTY_COST) ya da yardımcı partisinden ayrılıp
-## kurar (leaving = true, CardManager.LEAVE_PARTY_COST). Görüş siyasetçinin
-## mevcut görüşüdür; siyasetçi profili aynen devam eder.
+## kurar (leaving = true, CardManager.LEAVE_PARTY_COST). Seçmen grubu
+## yakınlıkları siyasetçinin mevcut yakınlıklarıdır; siyasetçi profili aynen devam eder.
 
 const WIDTH := 560.0
 const ICON_SIZE := 30.0
@@ -37,7 +37,7 @@ func _ready() -> void:
 	var body: VBoxContainer = built[1]
 	var cost := CardManager.FOUND_PARTY_COST
 	body.add_child(PopupKit.header("YENİ PARTİ KUR" if not leaving else "AYRIL VE PARTİ KUR",
-		"Bedel: %d mana · görüşün aynen devam eder" % cost, null, queue_free))
+		"Bedel: %d mana · seçmen gruplarındaki desteğin aynen devam eder" % cost, null, queue_free))
 	if leaving:
 		body.add_child(PopupKit.note("Katkına göre (biraz da şansla) vekillerin, teşkilatların ve desteğin bir kısmını götürürsün; memleketindeki teşkilat seninle gelir. Seçime yaklaştıkça ayrılık iki partiye de daha çok oy kaybettirir.", UiTheme.TEXT_MUTED))
 	else:

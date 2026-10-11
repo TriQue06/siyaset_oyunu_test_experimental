@@ -3,8 +3,10 @@ extends Control
 ## partinin kocaman bir önizlemesi, sağda ayar paneli (isim, ikon, arka plan
 ## rengi). İkon rengi seçilmez, her zaman beyazdır.
 ##
-## İDEOLOJİ SEÇİLMEZ: her parti nötr başlar, görüşü oyunda sunduğu yasalarla
-## oluşur (bkz. IdeologyAxes). Sahnedeki ideoloji düğümleri gizlenir.
+## ÇEKİRDEK SEÇMEN GRUPLARI: parti 8 seçmen grubundan 2'sini (aynı çiftten
+## olmayan) çekirdek seçer; o gruplarda yüksek, karşıtlarında düşük, kalanlarda
+## nötr destekle başlar (bkz. VoterGroups.start_affinities). Sahnedeki
+## "CoreGroupContainer" düğümü bu seçim için kullanılır.
 ##
 ## Süre sınırsızdır (eski süre ayarı kaldırıldı); herkes hazır olunca
 ## HOST otomatik olarak herkesi Oyun Ekranı'na geçirir. Bir oyuncu
@@ -13,7 +15,7 @@ extends Control
 ## başlar. İptal ederse tekrar düzenleyebilir.
 ##
 ## Görsel yerleşim (panel/konteynerler) sahnede editörle düzenlenebilir;
-## ikon/renk butonları ile eksen satırları, veri kataloğuna bağlı olduğundan
+## ikon/renk butonları ile seçmen grubu düğmeleri, veri kataloğuna bağlı olduğundan
 ## çalışma zamanında üretilir.
 
 const SWATCH_SIZE := 24.0
@@ -32,12 +34,6 @@ const PREVIEW_MAX_SIDE := 420.0
 ## İkon, kare kenarının bu oranı kadar yer kaplar (0.68 = kenarda rahat pay).
 const PREVIEW_ICON_RATIO := 0.68
 
-# Eksen başına görünen başlık + uç etiketleri (- ve + yönü).
-const AXIS_LABELS := {
-	"economic": {"title": "Ekonomi", "neg": "Devletçi", "pos": "Piyasacı"},
-	"social": {"title": "Toplum", "neg": "İlerici", "pos": "Muhafazakâr"},
-	"administrative": {"title": "İdare", "neg": "Federal / Çoğulcu", "pos": "Üniter / Milliyetçi"},
-}
 
 @onready var countdown_label: Label = %CountdownLabel
 @onready var ready_count_label: Label = %ReadyCountLabel
@@ -47,14 +43,15 @@ const AXIS_LABELS := {
 @onready var name_hint_label: Label = %NameHintLabel
 @onready var icon_grid: GridContainer = %IconGrid
 @onready var bg_color_row: HFlowContainer = %BgColorRow
-@onready var ideology_container: VBoxContainer = %IdeologyContainer
+@onready var core_container: VBoxContainer = %CoreGroupContainer
 @onready var ready_button: Button = %ReadyButton
 
 var _party_name: String = ""
 var _selected_icon_index: int = 0
 var _selected_bg_color: Color = PartyPresets.COLORS[0]     # kırmızı
-var _ideology: Dictionary = {}
-var _ideology_buttons: Dictionary = {}   # axis -> [sol düğme, sağ düğme]
+## Seçilen çekirdek gruplar (seçim sırasıyla; en fazla VoterGroups.CORE_COUNT).
+var _core: Array = []
+var _core_note: Label
 
 var _time_left: float = 60.0
 var _unlimited_time: bool = false
@@ -73,7 +70,7 @@ func _ready() -> void:
 	_time_left = 0.0
 	# Parti adı BOŞ gelir; ad yazılmadan hazır verilemez.
 	_party_name = ""
-	_ideology = IdeologyAxes.random_start_ideology()
+	_core = VoterGroups.random_core()
 
 	name_edit.text = _party_name
 	name_edit.placeholder_text = "Parti adını yaz"
@@ -86,8 +83,8 @@ func _ready() -> void:
 		_party_name = String(draft["name"])
 		name_edit.text = _party_name
 		_selected_icon_index = int(draft.get("icon_index", _selected_icon_index))
-		if draft.has("ideology"):
-			_ideology = (draft["ideology"] as Dictionary).duplicate()
+		if VoterGroups.is_valid_core(draft.get("core", [])):
+			_core = (draft["core"] as Array).duplicate()
 	if draft.has("bg_color"):
 		_selected_bg_color = draft["bg_color"]
 	_selected_bg_color = _first_free_color(_selected_bg_color)
@@ -95,11 +92,11 @@ func _ready() -> void:
 	_build_players_panel()
 	_build_icon_grid()
 	_build_color_row()
-	# Başlangıç görüşü: her eksende iki uçtan biri (sayı gösterilmez).
-	var ideology_title := ideology_container.get_parent().get_node_or_null("IdeologyLabel")
-	if ideology_title is Label:
-		ideology_title.text = "Parti görüşü"
-	_build_ideology_rows()
+	# Çekirdek seçmen grupları: 8 gruptan 2'si.
+	var core_title := core_container.get_parent().get_node_or_null("CoreGroupLabel")
+	if core_title is Label:
+		core_title.text = "Çekirdek seçmen grupları (2 seç)"
+	_build_core_buttons()
 	_build_bot_profile_button()
 	ready_button.pressed.connect(_on_ready_pressed)
 	MultiplayerManager.party_setup_finished.connect(_on_party_setup_finished)
@@ -455,43 +452,71 @@ func _on_bg_color_selected(index: int) -> void:
 	_update_preview()
 	_push_party()
 
-## Her eksen için: başlık + iki uç düğmesi (ör. "Devletçi" | "Piyasacı").
-## Oyuncu SADECE kelimeleri görür; arkadaki değer ±IdeologyAxes.START_MAGNITUDE.
-func _build_ideology_rows() -> void:
-	for child in ideology_container.get_children():
+## SEKİZ SEÇMEN GRUBU (iki sütun, çiftler yan yana): partinin 2 çekirdek grubu
+## seçilir. Aynı çiftten iki grup seçilemez (ör. işçi + işveren): çiftin öbür
+## tarafına basmak seçimi o tarafa taşır; 2 seçiliyken üçüncüye basmak en eski
+## seçimi bırakır.
+func _build_core_buttons() -> void:
+	for child in core_container.get_children():
+		core_container.remove_child(child)
 		child.queue_free()
-	_ideology_buttons.clear()
-	for axis in IdeologyAxes.AXES:
-		var info: Dictionary = IdeologyAxes.AXIS_SIDES[axis]
-		var title := Label.new()
-		title.text = info["title"]
-		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		title.add_theme_font_size_override("font_size", 11)
-		title.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
-		ideology_container.add_child(title)
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 4)
-		var group := ButtonGroup.new()
-		var pair: Array = []
-		for dir in [-1, 1]:
-			var button := Button.new()
-			button.text = info["neg"] if dir < 0 else info["pos"]
-			button.toggle_mode = true
-			button.button_group = group
-			button.focus_mode = Control.FOCUS_NONE
-			button.size_flags_horizontal = SIZE_EXPAND_FILL
-			button.custom_minimum_size = Vector2(0, 26)
-			button.add_theme_font_size_override("font_size", 11)
-			button.button_pressed = (float(_ideology.get(axis, 0.0)) > 0.0) == (dir > 0)
-			button.disabled = _is_locked and not _editing_bot()
-			button.pressed.connect(_on_ideology_side_pressed.bind(axis, dir))
-			row.add_child(button)
-			pair.append(button)
-		ideology_container.add_child(row)
-		_ideology_buttons[axis] = pair
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 4)
+	grid.add_theme_constant_override("v_separation", 4)
+	core_container.add_child(grid)
+	for group in VoterGroups.GROUP_IDS:
+		grid.add_child(_core_button(group))
+	_core_note = Label.new()
+	_core_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_core_note.add_theme_font_size_override("font_size", 10)
+	_core_note.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
+	_core_note.text = "Çekirdek gruplarda %%%d, karşıtlarında %%%d, diğerlerinde %%%d destekle başlarsın. Oyunda yasa, miting ve toplantıyla değişir." % [
+		int(VoterGroups.CORE_START), int(VoterGroups.CORE_OPPOSITE_START), int(VoterGroups.AFFINITY_NEUTRAL)]
+	core_container.add_child(_core_note)
 
-func _on_ideology_side_pressed(axis: String, dir: int) -> void:
-	_ideology[axis] = IdeologyAxes.START_MAGNITUDE * dir
+func _core_button(group: String) -> Button:
+	var button := Button.new()
+	button.toggle_mode = true
+	button.focus_mode = Control.FOCUS_NONE
+	button.size_flags_horizontal = SIZE_EXPAND_FILL
+	button.custom_minimum_size = Vector2(0, 30)
+	button.button_pressed = _core.has(group)
+	button.disabled = _is_locked and not _editing_bot()
+	button.tooltip_text = "%s\n%s\nTalepler: %s" % [VoterGroups.title(group), String(VoterGroups.data(group).get("blurb", "")),
+		VoterGroups.issues_text(group)]
+	UiSkin.skin_color_button(button, VoterGroups.color(group).darkened(0.2) if _core.has(group) else UiTheme.PANEL)
+	var row := HBoxContainer.new()
+	row.set_anchors_preset(Control.PRESET_FULL_RECT)
+	row.offset_left = 4
+	row.add_theme_constant_override("separation", 4)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(row)
+	var icon := VoterGroupIcon.make(group, 18.0)
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(icon)
+	var label := Label.new()
+	label.text = VoterGroups.title(group)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.size_flags_vertical = SIZE_EXPAND_FILL
+	label.add_theme_font_size_override("font_size", 10)
+	label.add_theme_color_override("font_color", UiTheme.TEXT)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(label)
+	button.pressed.connect(_on_core_pressed.bind(group))
+	return button
+
+func _on_core_pressed(group: String) -> void:
+	if _core.has(group):
+		return  # her zaman 2 grup seçili kalır: başka birine basarak değiştir
+	var other := VoterGroups.opposite(group)
+	if _core.has(other):
+		_core[_core.find(other)] = group
+	else:
+		_core.append(group)
+		while _core.size() > VoterGroups.CORE_COUNT:
+			_core.pop_front()
+	_build_core_buttons()
 	_push_party()
 
 func _update_preview() -> void:
@@ -507,9 +532,9 @@ func _push_party() -> void:
 			PartyManager.set_my_color(_selected_bg_color)
 		return
 	if _editing_bot():
-		PartyManager.set_bot_party(_edit_target, _party_name, _selected_icon_index, _selected_bg_color, _ideology)
+		PartyManager.set_bot_party(_edit_target, _party_name, _selected_icon_index, _selected_bg_color, _core)
 		return
-	PartyManager.set_my_party(_party_name, _selected_icon_index, ICON_COLOR, _selected_bg_color, _ideology)
+	PartyManager.set_my_party(_party_name, _selected_icon_index, ICON_COLOR, _selected_bg_color, _core)
 
 ## Oda sahibi: bir botun partisini düzenlemeye başla ya da kendi partine dön
 ## (bot_id = -1). Kendi seçimlerin saklanır, geri dönünce yerine konur.
@@ -519,13 +544,13 @@ func _start_editing(bot_id: int) -> void:
 		return
 	if not _editing_bot():
 		_own_backup = {"name": _party_name, "icon": _selected_icon_index, "color": _selected_bg_color,
-			"ideology": _ideology.duplicate()}
+			"core": _core.duplicate()}
 	if bot_id == -1 or bot_id == me:
 		_edit_target = -1
 		_party_name = String(_own_backup.get("name", _party_name))
 		_selected_icon_index = int(_own_backup.get("icon", _selected_icon_index))
 		_selected_bg_color = _own_backup.get("color", _selected_bg_color)
-		_ideology = (_own_backup.get("ideology", _ideology) as Dictionary).duplicate()
+		_core = (_own_backup.get("core", _core) as Array).duplicate()
 		title_label.text = "PARTİNİ KUR"
 		_set_controls_disabled(_is_locked)
 		_refresh_ready_button()
@@ -535,7 +560,8 @@ func _start_editing(bot_id: int) -> void:
 		_party_name = String(party.get("name", ""))
 		_selected_icon_index = int(party.get("icon_index", 0))
 		_selected_bg_color = party.get("bg_color", _selected_bg_color)
-		_ideology = (party.get("ideology", IdeologyAxes.random_start_ideology()) as Dictionary).duplicate()
+		var bot_core: Array = party.get("core", [])
+		_core = bot_core.duplicate() if VoterGroups.is_valid_core(bot_core) else VoterGroups.random_core()
 		title_label.text = "BOT PARTİSİ: %s" % MultiplayerManager.players.get(bot_id, {}).get("name", "Bot")
 		_set_controls_disabled(false)
 		ready_button.disabled = true  # hazır butonu sadece kendi partin için
@@ -544,7 +570,7 @@ func _start_editing(bot_id: int) -> void:
 	_selected_icon_index = PartyPresets.clamp_icon_index(_selected_icon_index)
 	_refresh_icon_grid_selection()
 	_build_color_row()
-	_build_ideology_rows()
+	_build_core_buttons()
 	_update_preview()
 	_refresh_players_panel()
 
@@ -563,7 +589,7 @@ func _on_ready_pressed() -> void:
 	ready_button.text = "✕ İptal Et" if _is_locked else "🔒 Kilitle ve Hazır Ver"
 	if _is_locked:
 		if PartyManager.is_valid_name(_party_name):
-			PartyManager.set_party_and_ready(_party_name, _selected_icon_index, ICON_COLOR, _selected_bg_color, _ideology, true)
+			PartyManager.set_party_and_ready(_party_name, _selected_icon_index, ICON_COLOR, _selected_bg_color, _core, true)
 	else:
 		PartyManager.set_ready(false)
 
@@ -572,7 +598,7 @@ func _set_controls_disabled(disabled: bool) -> void:
 	for btn in icon_grid.get_children():
 		btn.disabled = disabled
 	_build_color_row()
-	_build_ideology_rows()
+	_build_core_buttons()
 
 func _on_party_setup_finished() -> void:
 	SceneTransition.fade_to_scene("res://scenes/GameScreen.tscn")

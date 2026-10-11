@@ -35,7 +35,7 @@ func _initialize() -> void:
 		var id: int = me if i == 0 else 100 + i
 		mm.players[id] = {"name": "Oyuncu %d" % i, "bot": i > 0}
 		pm.parties[id] = {"name": "Partim%d" % i, "icon_index": i * 3, "icon_color": Color.WHITE,
-			"bg_color": Color(COLORS[i]), "ideology": {"economic": 0, "social": 0, "administrative": 0}, "ready": true}
+			"bg_color": Color(COLORS[i]), "groups": VoterGroups.neutral_affinities(), "ready": true}
 	cm.init_game()
 	var scene: Node = (load("res://scenes/GameScreen.tscn") as PackedScene).instantiate()
 	root.add_child(scene)
@@ -116,7 +116,7 @@ func _initialize() -> void:
 			break
 	scene._on_province_clicked(target)
 	scene._on_province_clicked(target)
-	check("teskilat kuruldu, 2 mana, il gorusu acildi", cm.organization_level(target, me) == 1 and cm.mana_of(me) == 3 and cm.knows_leaning(me, target))
+	check("teskilat kuruldu, 2 mana, anket acildi", cm.organization_level(target, me) == 1 and cm.mana_of(me) == 3 and not cm.province_poll(me, target).is_empty())
 	await create_timer(0.3).timeout
 	check("kurunca bir an teskilat katmaninda kalir", scene._map_layer == 1)
 	await create_timer(1.6).timeout
@@ -156,11 +156,11 @@ func _initialize() -> void:
 	check("karalama menusunde her rakip partinin rozeti var", badges == cm.turn_order.size() - 1, str(badges))
 	scene._propaganda_menu.hide()
 	# Gündem bandı ve yasa paneli.
-	cm.agenda = {"type": "gundem_economic_n", "until": cm.round_number + 2}
+	cm.agenda = {"type": "gundem_isci", "until": cm.round_number + 2}
 	cm._push_state({"type": "timer"})
 	await _frames(3)
 	check("gundem bandi gorunur", scene._agenda_banner.visible)
-	check("gundem sadece ekseni belirler (carpan yok)", cm.law_on_agenda("law:economic:-1") and cm.law_on_agenda("law:economic:1") 		and not cm.law_on_agenda("law:social:1"))
+	check("gundem sadece cifti belirler", cm.law_on_agenda("law:isci") and cm.law_on_agenda("law:isveren") 		and not cm.law_on_agenda("law:dindar"))
 	scene._on_law_button_pressed()
 	await create_timer(0.3).timeout
 	_shot("law_designer")
@@ -175,7 +175,7 @@ func _initialize() -> void:
 	for id in ids:
 		if scouted == "" and cm.organization_level(id, me) >= 2 and cm.province_seat_count(id) >= 8:
 			scouted = id
-		if plain == "" and not cm.knows_leaning(me, id):
+		if plain == "" and cm.province_poll(me, id).is_empty():
 			plain = id
 	scene._on_province_clicked(scouted)
 	await _frames(5)

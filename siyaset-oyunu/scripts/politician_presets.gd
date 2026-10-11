@@ -2,13 +2,14 @@ class_name PoliticianPresets
 extends RefCounted
 ## SİYASETÇİ PROFİLİ: oyun bir siyasetçinin parti kurmasıyla başlar. Parti
 ## kurulmadan önce her oyuncu siyasetçisini seçer (bkz. politician_setup.gd):
-##   - GEÇMİŞ: 6 meslek, her biri bir siyasi eksenin bir ucuyla uyumlu. Görüş
-##     parti kurulumunda serbestçe seçilir; oyun başlarken geçmişin ekseni o
-##     uca BACKGROUND_SHIFT kadar daha kayar (iş insanı + Devletçi seçim:
-##     −1,5 yerine −1). Geçmişin kalıcı bir oyun avantajı da vardır (perk).
+##   - GEÇMİŞ: 6 meslek, her biri bir SEÇMEN GRUBUYLA bağlantılı (sendikacı →
+##     işçiler, iş insanı → işverenler...). Partinin çekirdek grupları parti
+##     kurulumunda serbestçe seçilir; oyun başlarken partinin geçmişin grubundaki
+##     yakınlığı BACKGROUND_GROUP_BONUS kadar artar. Geçmişin kalıcı bir oyun
+##     avantajı da vardır (perk).
 ##   - MEMLEKET: haritadan seçilen il. Oyuna orada 2. seviye teşkilatla
-##     başlanır, il seçmeni partinin görüşüne çekilir ve memlekette kalıcı
-##     "hemşehri" desteği vardır. Komşu iller ETKİLENMEZ.
+##     başlanır ve memlekette kalıcı "hemşehri" desteği vardır (il aktivitesi;
+##     ilin seçmen profili değişmez). Komşu iller ETKİLENMEZ.
 ## ARAYÜZ METİNLERİ SAYI İÇERMEZ (özet anlatım); sayılar sadece burada.
 ## Veri PartyManager.politicians[peer] içinde durur (partiden bağımsız) =
 ##   {"gender", "first_name", "surname", "name" (ad + soyad), "background", "hometown"}
@@ -17,24 +18,24 @@ extends RefCounted
 ## gerçek siyasetçi soyadları BANNED_SURNAMES ile ayrıca engellenir.
 ## (bkz. PartyManager.set_my_politician). Kişisel özellikler sonra eklenecek.
 
-## Geçmiş -> {title, axis, dir, blurb, perk}. Sıra ekranda da bu sıra.
+## Geçmiş -> {title, group, blurb, perk}. Sıra ekranda da bu sıra.
 const BACKGROUNDS := {
-	"sendikaci": {"title": "Sendikacı", "axis": "economic", "dir": -1,
+	"sendikaci": {"title": "Sendikacı", "group": "isci",
 		"blurb": "Fabrika kapılarında büyüdün, grevleri sen örgütledin.",
 		"perk": "Mitinglerin daha güçlü yankı bulur."},
-	"is_insani": {"title": "İş İnsanı", "axis": "economic", "dir": 1,
+	"is_insani": {"title": "İş İnsanı", "group": "isveren",
 		"blurb": "Kendi şirketini kurdun, sermaye çevreleri seni tanır.",
 		"perk": "Oyuna daha fazla kaynakla başlarsın."},
-	"akademisyen": {"title": "Akademisyen", "axis": "social", "dir": -1,
+	"akademisyen": {"title": "Akademisyen", "group": "genc",
 		"blurb": "Kürsüden siyasete indin; fikirlerin tartışma başlatır.",
-		"perk": "Sunduğun yasalar illerde daha çok ses getirir."},
-	"ilahiyatci": {"title": "İlahiyatçı", "axis": "social", "dir": 1,
+		"perk": "Sunduğun yasalar daha çok ses getirir."},
+	"ilahiyatci": {"title": "İlahiyatçı", "group": "dindar",
 		"blurb": "Cemaatin saygın bir siması; sözüne güvenilir.",
 		"perk": "Karalama ve kasetler sana daha az işler."},
-	"belediye_baskani": {"title": "Belediye Başkanı", "axis": "administrative", "dir": -1,
+	"belediye_baskani": {"title": "Belediye Başkanı", "group": "ozerkci",
 		"blurb": "Şehrini yıllarca yönettin, yerel ağları iyi bilirsin.",
 		"perk": "Teşkilatların daha çok oy getirir."},
-	"emekli_subay": {"title": "Emekli Subay", "axis": "administrative", "dir": 1,
+	"emekli_subay": {"title": "Emekli Subay", "group": "milliyetci",
 		"blurb": "Disiplin ve birlik senin için her şeyden önce gelir.",
 		"perk": "Partinde iç karışıklık daha zor büyür."},
 }
@@ -54,11 +55,8 @@ const OFFICER_TURMOIL_MULT := 0.6
 const HOMETOWN_ORG_LEVEL := 2
 ## Kalıcı hemşehri desteği (aktivite puanı, sönmez): sadece memleket.
 const HOMETOWN_ACTIVITY := 4.0
-## Geçmişin ekseninde oyun başında ek kayma (o ucun yönünde).
-const BACKGROUND_SHIFT := 0.5
-## Oyun başında memleket seçmeninin görüşü partiye bu oranda çekilir (kalıcı:
-## ilin "kökeni" de çekilir, zamanla geri dönmez).
-const HOMETOWN_PULL := 0.4
+## Oyun başında partinin geçmişin grubundaki yakınlığına eklenen puan.
+const BACKGROUND_GROUP_BONUS := 4.0
 
 # --- Rastgele isim ----------------------------------------------------------------
 ## CİNSİYET oyuncu tarafından seçilir ("m" erkek / "f" kadın); ad o cinsiyetin
@@ -143,27 +141,21 @@ static func background(id: String) -> Dictionary:
 static func title(id: String) -> String:
 	return String(BACKGROUNDS.get(id, {}).get("title", ""))
 
-## Geçmişin eksen ucunun adı ("Devletçi").
+## Geçmişin bağlı olduğu seçmen grubu ("isci") ya da "".
+static func group_of(id: String) -> String:
+	return String(BACKGROUNDS.get(id, {}).get("group", ""))
+
+## Geçmişin grubunun adı ("İşçiler ve Sendikalar").
 static func side_text(id: String) -> String:
-	var info: Dictionary = BACKGROUNDS.get(id, {})
-	if info.is_empty():
-		return ""
-	var sides: Dictionary = IdeologyAxes.AXIS_SIDES[info["axis"]]
-	return String(sides["pos"] if int(info["dir"]) > 0 else sides["neg"])
+	var group := group_of(id)
+	return VoterGroups.title(group) if group != "" else ""
 
-## Geçmişin oyun başında görüşe kattığı kayma: {"axis", "delta"} ya da boş.
-static func ideology_shift(id: String) -> Dictionary:
-	var info: Dictionary = BACKGROUNDS.get(id, {})
-	if info.is_empty():
-		return {}
-	return {"axis": String(info["axis"]), "delta": BACKGROUND_SHIFT * int(info["dir"])}
-
-## Görüşe geçmiş kaymasını uygulanmış hâliyle döndürür (önizleme/test için).
-static func shifted_ideology(id: String, ideology: Dictionary) -> Dictionary:
-	var result := ideology.duplicate()
-	var shift := ideology_shift(id)
-	if not shift.is_empty():
-		result[shift["axis"]] = IdeologyAxes.clamp_value(float(result.get(shift["axis"], 0.0)) + float(shift["delta"]))
+## Yakınlıklara geçmiş bonusunu uygulanmış hâliyle döndürür (önizleme/test için).
+static func boosted_affinities(id: String, affinities: Dictionary) -> Dictionary:
+	var result := affinities.duplicate()
+	var group := group_of(id)
+	if group != "":
+		VoterGroups.apply_delta(result, group, BACKGROUND_GROUP_BONUS)
 	return result
 
 static func random_background(rng: RandomNumberGenerator = null) -> String:

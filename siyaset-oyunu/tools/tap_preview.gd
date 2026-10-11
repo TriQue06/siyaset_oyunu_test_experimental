@@ -37,7 +37,7 @@ func _initialize() -> void:
 	for i in 3:
 		mm.players[ids[i]] = {"name": "Oyuncu %d" % i, "bot": i > 0}
 		pm.parties[ids[i]] = {"name": names[i], "icon_index": i * 5, "icon_color": Color.WHITE,
-			"bg_color": Color(colors[i]), "ideology": {"economic": 0, "social": 0, "administrative": 0}, "ready": true}
+			"bg_color": Color(colors[i]), "groups": VoterGroups.neutral_affinities(), "ready": true}
 	cm.set_rng_seed(11)
 	cm.init_game()
 	cm.turn_order = ids.duplicate()

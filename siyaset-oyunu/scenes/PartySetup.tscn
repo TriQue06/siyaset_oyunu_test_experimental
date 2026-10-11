@@ -222,12 +222,12 @@ alignment = 1
 [node name="HSeparator3" type="HSeparator" parent="RightPanel/Margin/Scroll/VBox" unique_id=459483643]
 layout_mode = 2
 
-[node name="IdeologyLabel" type="Label" parent="RightPanel/Margin/Scroll/VBox" unique_id=979430651]
+[node name="CoreGroupLabel" type="Label" parent="RightPanel/Margin/Scroll/VBox" unique_id=979430651]
 layout_mode = 2
-text = "İdeoloji"
+text = "Çekirdek seçmen grupları (2 seç)"
 horizontal_alignment = 1
 
-[node name="IdeologyContainer" type="VBoxContainer" parent="RightPanel/Margin/Scroll/VBox" unique_id=481483727]
+[node name="CoreGroupContainer" type="VBoxContainer" parent="RightPanel/Margin/Scroll/VBox" unique_id=481483727]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 6

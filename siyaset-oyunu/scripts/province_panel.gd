@@ -2,12 +2,13 @@ class_name ProvincePanel
 extends PanelContainer
 ## Haritada bir ile TIKLAYINCA açılan il menüsü (görünüm: PopupKit).
 ##   - başlık: il adı, vekil sayısı,
-##   - SENİN TEŞKİLATIN (sadece bu oyuncu): seviye, ilin görüşü, seçmen
-##     yakınlığı ve anket (1. seviye yaklaşık, 2. seviye
-##     %90 doğru). Teşkilat yoksa bilgi yok,
+##   - SEÇMEN PROFİLİ (herkese açık): 4 ikili dağılım (her çift toplam %100),
+##   - PARTİN BU İLDE: grup uyumu, ilin kalabalık gruplarında partinin desteği,
+##     mitingin bu ilde partiyi hangi gruplara yaklaştıracağı (potansiyel),
+##   - SENİN TEŞKİLATIN (sadece bu oyuncu): seviye ve anket (1. seviye
+##     yaklaşık, 2. seviye %90 doğru),
 ##   - SEN BU İLDE: güç, teşkilat bonusu, miting riski, sonraki teşkilat bedeli,
-##   - SON SEÇİM (herkese açık) ve SON OLAYLAR.
-## İlin gerçek görüşü burada ASLA doğrudan gösterilmez — teşkilatla öğrenilir.
+##   - SON SEÇİM (herkese açık) ve SON OLAYLAR (miting, yatırım...).
 ## Durum değiştikçe GameScreen refresh() çağırır.
 
 signal closed
@@ -82,7 +83,9 @@ func refresh() -> void:
 	_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	gutter.add_child(_body)
 
+	_build_profile()
 	if PartyManager.parties.has(CardManager.party_of(me)):
+		_build_appeal(me)
 		_build_intel(me)
 		_build_own(me)
 	_build_last_election(me)
@@ -96,18 +99,55 @@ func _build_intel(me: int) -> void:
 	_body.add_child(PopupKit.section("Senin teşkilatın", "sadece sen görürsün"))
 	_body.add_child(_level_row(level))
 	if level == 0:
-		_body.add_child(PopupKit.note("Burada teşkilatın yok. Kurmak %d mana: ilin görüşünü ve yaklaşık anketi açar, oy bonusu verir. Miting ve karalama da teşkilat ister." % GameRules.ORG_MANA_COST))
+		_body.add_child(PopupKit.note("Burada teşkilatın yok. Kurmak %d mana: yaklaşık anketi açar, oy bonusu verir. Miting ve karalama da teşkilat ister." % GameRules.ORG_MANA_COST))
 		return
-	var center := CardManager.province_center(province_id)
-	for axis in IdeologyAxes.AXES:
-		_body.add_child(PopupKit.kv(IdeologyAxes.AXIS_SIDES[axis]["title"],
-			IdeologyAxes.position_text(axis, float(center.get(axis, 0.0))), INTEL_COLOR))
-	var closeness := CardManager.voter_closeness(province_id, me)
+	_build_poll(me, level)
+
+## İLİN SEÇMEN PROFİLİ: dört ikili dağılım (herkese açık, oyun boyunca sabit).
+func _build_profile() -> void:
+	var profile := CardManager.province_profile(province_id)
+	if profile.is_empty():
+		return
+	_body.add_child(PopupKit.section("Seçmen profili", "her çift toplam %100"))
+	for pair in VoterGroups.PAIR_IDS:
+		_body.add_child(VoterGroupUI.pair_rows(pair, profile))
+
+## PARTİN BU İLDE: grup uyumu, kalabalık gruplardaki desteğin ve mitingin
+## buradaki siyasi hitap etkisi (gerçek kuralla hesaplanan önizleme).
+func _build_appeal(me: int) -> void:
+	var profile := CardManager.province_profile(province_id)
+	if profile.is_empty():
+		return
+	var appeal := CardManager.appeal_of(province_id, me)
+	var closeness := PublicOpinion.appeal_closeness(appeal)
 	var closeness_text := "çok yakın" if closeness >= 0.75 else ("yakın" if closeness >= PublicOpinion.CLOSENESS_NEAR \
 		else ("uzak" if closeness >= 0.3 else "çok uzak"))
 	var closeness_color := UiTheme.GREEN if closeness >= PublicOpinion.CLOSENESS_NEAR else (UiTheme.GOLD if closeness >= 0.3 else UiTheme.RED)
+	_body.add_child(PopupKit.section("Partin bu ilde", "seçmen grupları"))
 	_body.add_child(PopupKit.kv("Seçmen sana", closeness_text, closeness_color))
-	_build_poll(me, level)
+	_body.add_child(PopupKit.kv("Grup uyumu", "%d/100" % int(round(appeal)), closeness_color))
+	var groups := CardManager.effective_groups(me)
+	var leaders: Array = []
+	for pair in VoterGroups.PAIR_IDS:
+		var pair_groups: Array = VoterGroups.PAIRS[pair]
+		var lead: String = pair_groups[0] if VoterGroups.percent(profile, pair_groups[0]) >= 50 else pair_groups[1]
+		leaders.append(lead)
+	leaders.sort_custom(func(a, b): return VoterGroups.percent(profile, a) > VoterGroups.percent(profile, b))
+	_body.add_child(PopupKit.note("İlin kalabalık grupları: ildeki pay / partinin ulusal desteği", DIM))
+	for group in leaders:
+		_body.add_child(VoterGroupUI.name_row(group, "%%%d / %s" % [VoterGroups.percent(profile, group),
+			VoterGroups.percent_text(float(groups.get(group, 50.0)))], UiTheme.TEXT))
+	var effects := PublicOpinion.miting_positioning(profile, PublicOpinion.org_action_mult(CardManager.organization_level(province_id, me)))
+	if effects.is_empty():
+		return
+	_body.add_child(PopupKit.note("Burada miting yaparsan hitabın şu gruplara kayar (ulusal, kalıcı, azalan getirili):", DIM))
+	var fatigue: Dictionary = CardManager.miting_fatigue.get(CardManager.party_of(me), {})
+	for effect in effects:
+		var damp := PublicOpinion.miting_fatigue_mult(float(fatigue.get(String(effect["group"]), 0.0)))
+		_body.add_child(VoterGroupUI.effect_row(String(effect["group"]),
+			VoterGroups.effective_delta(groups, String(effect["group"]), float(effect["gain"]) * damp)))
+		_body.add_child(VoterGroupUI.effect_row(String(effect["loss_group"]),
+			VoterGroups.effective_delta(groups, String(effect["loss_group"]), -float(effect["loss"]) * damp)))
 
 ## Teşkilat seviyesi: dolu/boş kareler + seviye adı.
 func _level_row(level: int) -> Control:

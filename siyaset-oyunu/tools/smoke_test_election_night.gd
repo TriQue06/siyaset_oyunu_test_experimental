@@ -16,12 +16,12 @@ func _initialize() -> void:
 	var model = load("res://scripts/election_model.gd")
 	var seats: Dictionary = root.get_node("GameMap").seat_counts()
 	var parties := {
-		1: {"economic": 1, "social": 1, "administrative": 2},
-		2: {"economic": -2, "social": -1, "administrative": 1},
-		3: {"economic": 1, "social": 2, "administrative": 2},
-		4: {"economic": 2, "social": -2, "administrative": -1},
-		5: {"economic": -1, "social": -2, "administrative": -2},
-		6: {"economic": -1, "social": 2, "administrative": -2},
+		1: VoterGroups.start_affinities(["isveren", "milliyetci"]),
+		2: VoterGroups.start_affinities(["isci", "milliyetci"]),
+		3: VoterGroups.start_affinities(["dindar", "milliyetci"]),
+		4: VoterGroups.start_affinities(["isveren", "ilerici"]),
+		5: VoterGroups.start_affinities(["isci", "ozerkci"]),
+		6: VoterGroups.start_affinities(["dindar", "ozerkci"]),
 	}
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7

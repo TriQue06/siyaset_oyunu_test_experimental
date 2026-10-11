@@ -42,7 +42,7 @@ func _initialize() -> void:
 		mm.players[ids[i]] = {"name": p[1], "bot": i > 0}
 		pm.parties[ids[i]] = {
 			"name": p[0], "icon_index": p[3], "icon_color": Color.WHITE,
-			"bg_color": Color(p[2]), "ideology": {"economic": 0, "social": 0, "administrative": 0}, "ready": true,
+			"bg_color": Color(p[2]), "groups": VoterGroups.neutral_affinities(), "ready": true,
 		}
 	cm.set_rng_seed(2026)
 	cm.init_game()

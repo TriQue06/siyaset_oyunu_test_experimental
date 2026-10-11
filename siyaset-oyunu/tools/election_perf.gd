@@ -4,12 +4,12 @@ extends SceneTree
 ## Parçaları tek tek devre dışı bırakıp hangisinin kare süresini yediğini bulur.
 
 const PARTIES := [
-	{"name": "Yeni Yol", "color": "F20C1F", "icon": 0, "ideology": {"economic": 1, "social": 1, "administrative": 2}},
-	{"name": "Halkçı", "color": "1C48C9", "icon": 5, "ideology": {"economic": -2, "social": -1, "administrative": 1}},
-	{"name": "Millet", "color": "F2920C", "icon": 12, "ideology": {"economic": 1, "social": 2, "administrative": 2}},
-	{"name": "Özgürlük", "color": "8C21C2", "icon": 20, "ideology": {"economic": 2, "social": -2, "administrative": -1}},
-	{"name": "Yeşiller", "color": "29A33D", "icon": 6, "ideology": {"economic": -1, "social": -2, "administrative": -2}},
-	{"name": "Anadolu", "color": "13DBED", "icon": 30, "ideology": {"economic": -1, "social": 2, "administrative": -2}},
+	{"name": "Yeni Yol", "color": "F20C1F", "icon": 0, "core": ["isveren", "milliyetci"]},
+	{"name": "Halkçı", "color": "1C48C9", "icon": 5, "core": ["isci", "milliyetci"]},
+	{"name": "Millet", "color": "F2920C", "icon": 12, "core": ["dindar", "milliyetci"]},
+	{"name": "Özgürlük", "color": "8C21C2", "icon": 20, "core": ["isveren", "ilerici"]},
+	{"name": "Yeşiller", "color": "29A33D", "icon": 6, "core": ["isci", "ozerkci"]},
+	{"name": "Anadolu", "color": "13DBED", "icon": 30, "core": ["dindar", "ozerkci"]},
 ]
 
 var _scene: Node
@@ -47,7 +47,7 @@ func _initialize() -> void:
 		var p: Dictionary = PARTIES[i]
 		mm.players[i + 1] = {"name": "Bot %d" % i, "bot": true}
 		pm.parties[i + 1] = {"name": p["name"], "icon_index": p["icon"], "icon_color": Color.WHITE,
-			"bg_color": Color(p["color"]), "ideology": p["ideology"].duplicate(), "ready": true}
+			"bg_color": Color(p["color"]), "core": (p["core"] as Array).duplicate(), "groups": VoterGroups.start_affinities(p["core"]), "ready": true}
 	cm.init_game()
 	cm.turn_order = [1, 2, 3, 4, 5, 6]
 	cm._hold_election(1, false)

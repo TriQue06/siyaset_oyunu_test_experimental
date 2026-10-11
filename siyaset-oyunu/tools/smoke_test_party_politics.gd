@@ -53,7 +53,7 @@ func _initialize() -> void:
 	mm.start_game()
 	pm.set_my_politician(PP.make("Ayla", "Gökyelken", "is_insani", String(root.get_node("GameMap").province_ids()[0])))
 	pm.set_party_and_ready("Yeni Yol", 3, Color.WHITE, Color("F20C1F"),
-		{"economic": 1.5, "social": -1.5, "administrative": 1.5}, true)
+		["isveren", "ilerici"], true)
 	cm.set_rng_seed(7)
 	var me: int = mm.owner_id
 	var bots: Array = mm.bot_ids()
@@ -71,19 +71,19 @@ func _initialize() -> void:
 	var first: int = cm.turn_order[0]
 	cm.current_turn_index = 0
 	gm._set_phase(gm.Phase.IDLE)
-	cm._apply_speech(first, "economic", 1)
-	check("konuşunca bu dönem tekrar konuşamaz", not cm.needs_speech(first))
+	cm._apply_speech(first, "isci")
+	check("toplanınca bu dönem tekrar toplanamaz", not cm.needs_speech(first))
 	for i in cm.turn_order.size():
 		cm._apply_pass(cm.current_turn_peer_id(), true)
 		gm._set_phase(gm.Phase.IDLE)
-	check("yeni dönemde ilk oyuncu tekrar konuşabilir", cm.current_turn_peer_id() == first and cm.needs_speech(first),
+	check("yeni dönemde ilk oyuncu tekrar toplanabilir", cm.current_turn_peer_id() == first and cm.needs_speech(first),
 		"sira %d, donem %d" % [cm.current_turn_peer_id(), cm.round_number])
 
 	print("=== OYLAMA TAKILMASI ===")
 	# Yasa oylaması açıkken bir oyuncu oyundan çıkar; kalanlar oy vermişse sonuç açıklanmalı.
 	cm.current_turn_index = cm.turn_order.find(me)
 	gm._set_phase(gm.Phase.IDLE)
-	gm.submit_law(me, "law:economic:1")
+	gm.submit_law(me, "law:isveren")
 	var leaver := -1
 	for voter in gm.eligible_voter_ids():
 		if int(voter) != me and not gm.has_voted(int(voter)):
@@ -351,15 +351,15 @@ func _initialize() -> void:
 
 	print("=== KRİZ ===")
 	var crisis_bot: int = cm.party_of(int(mm.bot_ids()[1]))
-	cm.crisis = {"type": "kriz_economic_n", "until": cm.round_number + 1}
-	check("kriz açık", cm.crisis_type() == "kriz_economic_n" and cm.crisis_wants("economic", -0.5) and not cm.crisis_wants("economic", 0.5))
+	cm.crisis = {"type": "kriz_isci", "until": cm.round_number + 1}
+	check("kriz açık, işçileri istiyor", cm.crisis_type() == "kriz_isci" and cm.crisis_group() == "isci")
 	var before_national: float = cm.national_of(crisis_bot)
-	cm._shift_ideologies([{"peer": crisis_bot, "axis": "economic", "delta": -0.5}])
+	cm.apply_law_result(crisis_bot, "law:isci", {}, false, [])
 	var gained: float = cm.national_of(crisis_bot) - before_national
-	check("krizin ucuna dönen kısmi ulusal destek kazanır", gained > 0.0 and gained <= 1.0, str(gained))
+	check("krizin grubuna yasa sunan kısmi ulusal destek kazanır", is_equal_approx(gained, PublicOpinion.CRISIS_RESPONSE_NATIONAL), str(gained))
 	before_national = cm.national_of(crisis_bot)
-	cm._shift_ideologies([{"peer": crisis_bot, "axis": "economic", "delta": 0.5}])
-	check("ters yöne giden kazanmaz", cm.national_of(crisis_bot) <= before_national + 0.0001)
+	cm.apply_law_result(crisis_bot, "law:isveren", {}, false, [])
+	check("karşıt gruba yasa sunan kriz desteği almaz", cm.national_of(crisis_bot) <= before_national + 0.0001)
 	cm.crisis = {}
 
 	print("")

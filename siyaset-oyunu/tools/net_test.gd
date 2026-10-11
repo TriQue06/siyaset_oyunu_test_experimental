@@ -95,9 +95,9 @@ func run_host() -> void:
 	mm.stage = mm.Stage.PARTY_SETUP
 	pm.parties = {
 		1: {"name": "HostP", "icon_index": 0, "icon_color": Color.WHITE, "bg_color": Color.RED,
-			"ideology": {"economic": 1, "social": 1, "administrative": 2}, "ready": true},
+			"core": ["isveren", "milliyetci"], "ready": true},
 		client_id: {"name": "ClientP", "icon_index": 1, "icon_color": Color.WHITE, "bg_color": Color.BLUE,
-			"ideology": {"economic": -1, "social": -1, "administrative": 1}, "ready": true},
+			"core": ["isci", "milliyetci"], "ready": true},
 	}
 	pm._broadcast_parties()
 	mm.finish_party_setup()
@@ -156,7 +156,7 @@ func run_client() -> void:
 	var card: String = cm.my_inventory()[0]
 	# Hamle sınırı yok: önce teşkilat (2 mana), sonra manası yeterse çekilen kart.
 	cm.build_organization(TestProvinces.id("izmir"))
-	if not await wait_until(func(): return cm.organization_level(TestProvinces.id("izmir"), me) == 1 and cm.knows_leaning(me, TestProvinces.id("izmir")), "teşkilat hamlesi RPC'si"):
+	if not await wait_until(func(): return cm.organization_level(TestProvinces.id("izmir"), me) == 1 and not cm.province_poll(me, TestProvinces.id("izmir")).is_empty(), "teşkilat hamlesi RPC'si"):
 		return
 	if cm.mana_of(me) < root.get_node("CardPresets").card_cost(card):
 		log_line("kart için mana yetmiyor (%s), tur bitiriliyor" % card)
@@ -179,7 +179,7 @@ func run_client() -> void:
 	# Mana bonusu sırayı kendisi devreder; diğerlerinde turu bitir.
 	if card != "atlandi":
 		cm.pass_turn()
-	if not await wait_until(func(): return cm.province_ideology.size() == 67, "illerin görüşü senkronlandı"):
+	if not await wait_until(func(): return cm.province_profiles.size() == 67, "illerin seçmen profilleri senkronlandı"):
 		return
 	if not await wait_until(func(): return cm.last_election_round == 1 and cm.last_province_results.size() == 67,
 			"seçim sonucu (67 il, büyük paket) alındı"):

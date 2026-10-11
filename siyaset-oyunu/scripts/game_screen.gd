@@ -102,14 +102,16 @@ const TAP_MAX_MOVE_PX := 10.0
 ## Oylamada parlamento koltuklarının ve profil etiketlerinin rengi.
 const VOTE_COLORS := {1: UiTheme.GREEN, 0: UiTheme.GOLD, -1: UiTheme.RED}
 
-## HARİTA KATMANLARI: aynı Türkiye haritasının üç ayrı görünümü; butonlarla
+## HARİTA KATMANLARI: aynı Türkiye haritasının dört ayrı görünümü; butonlarla
 ## geçilir, harita yan yana dizilmiş sayfalar gibi yana kayar.
 ##   SEATS        : son seçim (il kazananları + vekil daireleri)
 ##   ORGANIZATION : teşkilat seviyem (0 beyaz → en üst seviyede parti rengi)
-##   STRENGTH     : tüm faktörlerle (ilin görüşü, bütün partilerin gücü) şimdi
+##   STRENGTH     : tüm faktörlerle (ilin seçmen profili, bütün partilerin gücü) şimdi
 ##                  seçim olsa bu ilde durumum; her ilde, ilk turdan itibaren
-enum MapLayer { SEATS, ORGANIZATION, STRENGTH }
-const MAP_LAYER_TITLES := ["Vekiller", "Teşkilat", "Güç"]
+##   GROUPS       : seçilen SEÇMEN GRUBUNUN illerdeki yoğunluğu (soluk = az,
+##                  grubun renginde koyu = çok); 8 grup simgesiyle seçilir.
+enum MapLayer { SEATS, ORGANIZATION, STRENGTH, GROUPS }
+const MAP_LAYER_TITLES := ["Vekiller", "Teşkilat", "Güç", "Seçmen"]
 const MAP_UNKNOWN_COLOR := Color(0.62, 0.62, 0.64)
 const MAP_SLIDE_DURATION := 0.38
 ## Olay logundan odaklanma: yakınlaşma, bekleme (parıltı) ve dönüş süreleri.
@@ -198,6 +200,9 @@ var _queued_layer: int = -1
 var _layer_bar: HBoxContainer
 var _layer_buttons: Array = []
 var _layer_legend: Control
+## Seçmen katmanında gösterilen grup ve grup seçici düğmeler.
+var _map_group: String = "isci"
+var _group_picker: HBoxContainer
 var _game_over_overlay: Control
 ## Sol paneldeki canlı olay logu ve harita odak animasyonu.
 var _event_log: EventLogPanel
@@ -281,8 +286,10 @@ var _circle_textures: Dictionary = {}
 ## Mana göstergesine dokununca gösterilen kural özeti.
 var _mana_rules: String = ""
 ## Yasa panelinde seçilen dairenin açıklaması (dokununca güncellenir).
-var _law_info: Label
-var _law_rows: VBoxContainer
+var _law_rows: GridContainer
+## Yasa panelinde seçili seçmen grubu ("" = seçim yok) ve ayrıntı kutusu.
+var _law_group: String = ""
+var _law_detail: VBoxContainer
 var _law_agenda_label: Label
 var _law_points_label: Label
 ## Haritanın sağ üstünde gündem bandı.
@@ -291,9 +298,10 @@ var _agenda_label: Label
 
 ## MECLİS KONUŞMASI paneli (sıra gelince, hamleden önce zorunlu).
 ## Eksen sütunu genişliği (panel = 3 sütun).
-const SPEECH_COLUMN_WIDTH := 118.0
+const SPEECH_COLUMN_WIDTH := 150.0
 var _speech_panel: PanelContainer
-var _speech_rows: HBoxContainer
+var _speech_rows: GridContainer
+var _speech_note: Label
 var _speech_key: String = ""
 ## GRUP TOPLANTISI hamle düğmesiyle bu sırada (tur:sıra) açıldı mı?
 var _speech_open_key: String = ""
@@ -733,14 +741,15 @@ func _refresh_band_crisis() -> void:
 		style.border_color = Color("ff3b4e")
 		_band_crisis_title.text = "⚠ KRİZ · %s" % data["title"]
 		_band_crisis_title.add_theme_color_override("font_color", Color("ff8a94"))
-		_band_crisis_text.text = "%s yönüne dönen partiler ulusal destek kazanır (%s)" % [String(data["side"]).to_upper(), data["axis_title"]]
+		_band_crisis_text.text = "%s için yasa / toplantı ulusal destek getirir" % data["group_title"]
 	else:
 		var data := CardPresets.agenda_data(agenda)
 		style.bg_color = Color("2a2350")
 		style.border_color = UiTheme.GOLD
 		_band_crisis_title.text = "GÜNDEM · %s" % data["title"]
 		_band_crisis_title.add_theme_color_override("font_color", UiTheme.GOLD)
-		_band_crisis_text.text = "Yasa: sadece %s ekseni" % data["axis_title"]
+		var pair: Array = CardPresets.agenda_groups(agenda)
+		_band_crisis_text.text = "Yasa: %s ya da %s" % [VoterGroups.title(pair[0]), VoterGroups.title(pair[1])] if pair.size() == 2 else ""
 	_band_crisis.add_theme_stylebox_override("panel", style)
 
 func _refresh_timer_bar() -> void:
@@ -1975,7 +1984,7 @@ func _start_drag(hand_index: int, card_type: String, holder: Control) -> void:
 	_drag_ghost = TextureRect.new()
 	# Yasa dairesi sürüklenirken kart yerine renkli bir daire imleci izler.
 	var law := CardPresets.law_data(card_type)
-	_drag_ghost.texture = _circle_texture(_law_color(law["axis"], int(law["dir"]))) if not law.is_empty() \
+	_drag_ghost.texture = _circle_texture(VoterGroups.color(String(law["group"]))) if not law.is_empty() \
 		else CardPresets.get_card_texture(card_type)
 	_drag_ghost.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_drag_ghost.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -2085,8 +2094,8 @@ func _drop_target(card_type: String) -> Dictionary:
 		elif CardManager.is_valid_steal_target(me, peer):
 			result["valid"] = true
 			var r := CardManager.steal_range(me, peer, card_type)
-			result["label"] = "Bırak: %s partisinden %d-%d vekil çal (ideolojik yakınlık %%%d)" % [_party_name_of(peer),
-				int(r["min"]), int(r["max"]), int(round(CardManager.ideological_closeness(me, peer) * 100.0))]
+			result["label"] = "Bırak: %s partisinden %d-%d vekil çal (seçmen grubu yakınlığı %%%d)" % [_party_name_of(peer),
+				int(r["min"]), int(r["max"]), int(round(CardManager.group_closeness(me, peer) * 100.0))]
 		else:
 			result["label"] = "Bu partiden vekil çalınamaz"
 			result["error"] = result["label"]
@@ -2373,6 +2382,21 @@ func _show_province_window(province_id: String) -> void:
 	_province_panel.show_province(province_id)
 	_province_panel.clamp_to_height(map_rect.size.y - 64.0)
 
+## Mitingin bu ildeki seçmen grubu etkisinin kısa özeti (gerçek kuralla,
+## yorgunluk ve azalan getiri dahil): " · hitap: İşçiler ve Sendikalar +1,8, ...".
+func _miting_group_preview(me: int, province_id: String) -> String:
+	var groups := PartyManager.groups_of(CardManager.party_of(me))
+	var fatigue: Dictionary = CardManager.miting_fatigue.get(CardManager.party_of(me), {})
+	var mult := PublicOpinion.org_action_mult(CardManager.organization_level(province_id, me))
+	var parts: PackedStringArray = []
+	for effect in PublicOpinion.miting_positioning(CardManager.province_profile(province_id), mult):
+		var damp := PublicOpinion.miting_fatigue_mult(float(fatigue.get(String(effect["group"]), 0.0)))
+		parts.append("%s %s" % [VoterGroups.title(String(effect["group"])),
+			_signed(VoterGroups.effective_delta(groups, String(effect["group"]), float(effect["gain"]) * damp))])
+	if parts.is_empty():
+		return " · ilin grupları dengeli: ulusal hitap etkisi yok"
+	return " · hitap: " + ", ".join(parts)
+
 ## Hedef seçme modunda dokunulan il: vurgulanır, üstte ne olacağı yazar.
 func _select_target_province(province_id: String) -> void:
 	_selected_province = province_id
@@ -2381,11 +2405,12 @@ func _select_target_province(province_id: String) -> void:
 	var pname := ElectionNightSim.province_name(province_id)
 	var detail := ""
 	if _pending_invest:
-		detail = "%s: hükümet yatırımı (%d mana) · sen +%.0f, ortakların +%.1f güç" % [pname, GameRules.INVEST_MANA_COST,
+		detail = "%s: hükümet yatırımı (%d mana) · sen +%.0f, ortakların +%.1f güç · seçmen grubu desteğin değişmez" % [pname, GameRules.INVEST_MANA_COST,
 			PublicOpinion.INVEST_LOCAL, PublicOpinion.INVEST_PARTNER_LOCAL]
 	elif _pending_miting:
-		detail = "%s: miting (%d mana) · provokasyon riski %%%d · gücün %+.1f" % [pname, GameRules.MITING_MANA_COST,
-			int(round(CardManager.miting_risk(me, province_id) * 100.0)), CardManager.activity_of(province_id, me)]
+		detail = "%s: miting (%d mana) · provokasyon riski %%%d · gücün %+.1f%s" % [pname, GameRules.MITING_MANA_COST,
+			int(round(CardManager.miting_risk(me, province_id) * 100.0)), CardManager.activity_of(province_id, me),
+			_miting_group_preview(me, province_id)]
 	elif _pending_org:
 		var level := CardManager.organization_level(province_id, me)
 		detail = "%s: teşkilat zaten en üst seviyede" % pname if level >= GameRules.ORG_MAX_LEVEL \
@@ -3156,11 +3181,6 @@ const LAW_DRAG_INDEX := -2
 const MANA_COLOR := UiTheme.BLUE
 const MANA_ICON := preload("res://assets/icons/mana_icon.png")
 const EMPTY_SEAT_COLOR := UiTheme.TEXT
-const LAW_AXIS_COLORS := {
-	"economic": UiTheme.GOLD,
-	"social": UiTheme.PURPLE,
-	"administrative": UiTheme.BLUE,
-}
 
 ## Sağ sütunun alt kısmı (aşağıdan yukarı): sıra göstergesi, pas, deste ve
 ## yanında YASA TASARLA / İL BAŞKANLIĞI butonları, mana. Parti kartları üstte
@@ -3272,7 +3292,7 @@ func _build_action_buttons() -> void:
 	_mana_plate.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_show_toast(_mana_rules))
-	_mana_rules = "Sıran gelince +%d mana (hükümette görevin varsa +%d), her teşkilattan +5/+10 ve 1 kart; manan yettikçe istediğin kadar hamle yap, biriken mana kalır.\nHamleler: yasa %s (dönemde 1), miting %s, teşkilat %s (seviye başına), yatırım %s, gensoru %s.\nKart oynamak sınırsız; istemediğin kartı bozdurup bedelinin yarısını mana olarak alabilirsin. Kart bedelleri: karalama %d, vekil çalma %d/%d, kaset %d, iç karışıklık %d, popülizm %d, mana bonusu %d (zayıf +%d, güçlü +%d), bonus kart %d, kart çalma %d.\nTOPLANTI hamlesi (%d mana, sırada bir kez): grup toplantısında bir görüşü savun, partin yarım adım kayar; konuşmadan biten sırada ulusal destek çok az düşer.\nTur kendiliğinden bitmez: \"Turu Bitir\"e bas. Seçimden sonra herkese +%d kart ve +%d mana, yeni hükümete +%d mana." % [
+	_mana_rules = "Sıran gelince +%d mana (hükümette görevin varsa +%d), her teşkilattan +5/+10 ve 1 kart; manan yettikçe istediğin kadar hamle yap, biriken mana kalır.\nHamleler: yasa %s (dönemde 1), miting %s, teşkilat %s (seviye başına), yatırım %s, gensoru %s.\nKart oynamak sınırsız; istemediğin kartı bozdurup bedelinin yarısını mana olarak alabilirsin. Kart bedelleri: karalama %d, vekil çalma %d/%d, kaset %d, iç karışıklık %d, popülizm %d, mana bonusu %d (zayıf +%d, güçlü +%d), bonus kart %d, kart çalma %d.\nTOPLANTI hamlesi (%d mana, dönemde partide bir kez, isteğe bağlı): bir seçmen grubuyla toplan; o grupta bu dönem +10, sonraki dönem +3, ondan sonra +1 geçici destek. Yapmamanın cezası yok, seçime yakın zamanlamak önemli.\nTur kendiliğinden bitmez: \"Turu Bitir\"e bas. Seçimden sonra herkese +%d kart ve +%d mana, yeni hükümete +%d mana." % [
 		GameRules.MANA_PER_ROUND, GameRules.MANA_PER_ROUND_GOVERNMENT,
 		GameRules.cost_text(GameRules.LAW_MANA_COST), GameRules.cost_text(GameRules.MITING_MANA_COST),
 		GameRules.cost_text(GameRules.ORG_MANA_COST), GameRules.cost_text(GameRules.INVEST_MANA_COST),
@@ -3299,16 +3319,16 @@ func _build_action_buttons() -> void:
 	actions_vbox.add_child(filler)
 	_law_button = _action_button("YASA", GameRules.cost_text(GameRules.LAW_MANA_COST), UiTheme.PURPLE)
 	_law_button.pressed.connect(_on_law_button_pressed)
-	_law_button.tooltip_text = "Meclise yasa sun: geçerse puan ve ideolojik çekim, partin o yöne kayar. Dönemde bir kez."
+	_law_button.tooltip_text = "Meclise bir seçmen grubu için yasa sun: o grupta ulusal destek (kabul edilirse çok, edilmezse az), karşıt grupta daha küçük kayıp; geçerse puan. Dönemde bir kez."
 	_miting_button = _action_button("MİTİNG", GameRules.cost_text(GameRules.MITING_MANA_COST), UiTheme.RED)
 	_miting_button.pressed.connect(_on_miting_button_pressed)
-	_miting_button.tooltip_text = "Kuvvetli ideolojik yakınlaşma, oy kazanımı (teşkilatlı ilde)."
+	_miting_button.tooltip_text = "İlde oy kazanımı + partin ilin kalabalık seçmen gruplarına yaklaşır (ulusal, kalıcı, azalan getirili); karşıt gruplarda biraz kaybeder (teşkilatlı ilde)."
 	_org_button = _action_button("TEŞKİLAT", GameRules.cost_text(GameRules.ORG_MANA_COST), UiTheme.BLUE)
 	_org_button.pressed.connect(_on_org_button_pressed)
 	_org_button.tooltip_text = "Kalıcı yerel güç ve il anketi; her tur mana getirir (1. seviye +5, 2. seviye +10)."
 	_invest_button = _action_button("YATIRIM", GameRules.cost_text(GameRules.INVEST_MANA_COST), UiTheme.GREEN_DARK)
 	_invest_button.pressed.connect(_on_invest_button_pressed)
-	_invest_button.tooltip_text = "Kısmi ideolojik yakınlaşma, kuvvetli oy kazanımı (sadece hükümet partileri)."
+	_invest_button.tooltip_text = "Kuvvetli yerel oy kazanımı: ildeki bütün seçmen memnun olur; seçmen grubu desteğini değiştirmez (sadece hükümet partileri)."
 	_censure_button = _action_button("GENSORU", GameRules.cost_text(GameRules.CENSURE_MANA_COST), UiTheme.RED_DARK)
 	_censure_button.pressed.connect(_on_censure_button_pressed)
 	_censure_button.tooltip_text = "Hükümeti düşürmeye çalış: meclis oylar, reddedilirse çok az ulusal destek kaybedersin."
@@ -3317,7 +3337,7 @@ func _build_action_buttons() -> void:
 	_early_button.tooltip_text = "Erken seçim önergesi: kabul edilirse dönem sonunda sandık kurulur."
 	# GRUP TOPLANTISI: sıra sendeyken açık, sırada bir kez.
 	_speech_button = _action_button("TOPLANTI", GameRules.cost_text(GameRules.SPEECH_MANA_COST), UiTheme.GOLD_DIM)
-	_speech_button.tooltip_text = "Grup toplantısı: bir görüşü savun, partin o yöne yarım adım kayar. Sırada bir kez."
+	_speech_button.tooltip_text = "Grup toplantısı: bir seçmen grubunun sorunlarını konuş. O grupta kısa süreli destek (bu dönem +10, sonra +3, +1). Dönemde bir kez, isteğe bağlı."
 	_speech_button.pressed.connect(_on_speech_button_pressed)
 	# KONGRE: genel başkan kendi sırasında (en az bir seçim geçtiyse) kongreye
 	# gider; partide üye kalan eski başkan kongre ister.
@@ -3357,7 +3377,7 @@ func _action_block_reason(cost: int, is_law: bool = false) -> String:
 	if is_law and not CardManager.has_seats(me):
 		return "Mecliste vekilin yok: yasa teklif edemezsin."
 	if is_law and CardManager.agenda_type() == "":
-		return "Gündem yok: yasa sadece gündemdeki eksende sunulabilir."
+		return "Gündem yok: yasa sadece gündemdeki seçmen grupları için sunulabilir."
 	if not CardManager.can_act():
 		return "Sıran değil."
 	if is_law and CardManager.has_proposed_law_this_round(me):
@@ -3421,7 +3441,7 @@ func _refresh_agenda_banner() -> void:
 		return
 	var data := CardPresets.agenda_data(current)
 	# Kısa tut: sol panelde olay loguna yer kalsın.
-	_agenda_label.text = "GÜNDEM: %s\nYasa: sadece %s ekseni" % [data["title"], data["axis_title"]]
+	_agenda_label.text = "GÜNDEM: %s\n%s" % [data["title"], CardPresets.agenda_effect_text(current)]
 
 func _build_law_designer() -> void:
 	_law_designer = PanelContainer.new()
@@ -3460,23 +3480,16 @@ func _build_law_designer() -> void:
 	_law_agenda_label.add_theme_font_size_override("font_size", 11)
 	_law_agenda_label.add_theme_color_override("font_color", UiTheme.GOLD)
 	box.add_child(_law_agenda_label)
-	_law_rows = VBoxContainer.new()
-	_law_rows.add_theme_constant_override("separation", 3)
+	# SEKİZ SEÇMEN GRUBU (iki sütun): gündemdeki çiftin grupları seçilebilir.
+	_law_rows = GridContainer.new()
+	_law_rows.columns = 2
+	_law_rows.add_theme_constant_override("h_separation", 4)
+	_law_rows.add_theme_constant_override("v_separation", 4)
 	box.add_child(_law_rows)
-	var hint := Label.new()
-	hint.text = "Bir eksen ucuna tıkla: yasa meclise sunulur. Yakın illerde güç kazandırır, zıt illerde kaybettirir."
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hint.custom_minimum_size = Vector2(240, 0)
-	hint.add_theme_font_size_override("font_size", 10)
-	hint.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
-	box.add_child(hint)
-	_law_info = Label.new()
-	_law_info.text = "Bir daireye dokun: ne yaptığı burada yazar."
-	_law_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_law_info.custom_minimum_size = Vector2(240, 0)
-	_law_info.add_theme_font_size_override("font_size", 10)
-	_law_info.add_theme_color_override("font_color", UiTheme.GOLD)
-	box.add_child(_law_info)
+	_law_detail = VBoxContainer.new()
+	_law_detail.add_theme_constant_override("separation", 3)
+	_law_detail.custom_minimum_size = Vector2(300, 0)
+	box.add_child(_law_detail)
 	box.add_child(UiTheme.rule())
 	_build_constitution_section(box)
 	_law_designer.hide()
@@ -3592,7 +3605,7 @@ func _refresh_constitution_section() -> void:
 	else:
 		_constitution_info.text = _action_block_reason(0, true)
 
-## Yasa panelinin değişen kısımları: puan, gündem, her eksende partinin yeri
+## Yasa panelinin değişen kısımları: puan, gündem, seçmen grupları, seçili grubun etkisi
 ## ve gündem çarpanı rozetleri. Panel her açılışta tazelenir.
 func _refresh_law_designer() -> void:
 	_refresh_constitution_section()
@@ -3606,124 +3619,115 @@ func _refresh_law_designer() -> void:
 		_law_agenda_label.text = "Gündem yok: bu dönem yasa sunulamaz."
 	else:
 		var data := CardPresets.agenda_data(current)
-		_law_agenda_label.text = "Gündem: %s — sadece %s yasaları" % [data["title"], data["axis_title"]]
+		_law_agenda_label.text = "Gündem: %s — %s." % [data["title"], CardPresets.agenda_effect_text(current)]
+		var crisis_group := CardManager.crisis_group()
+		if crisis_group != "":
+			_law_agenda_label.text += " KRİZ: %s için yasa ulusal destek getirir." % VoterGroups.title(crisis_group)
 	for child in _law_rows.get_children():
 		child.queue_free()
-	var ideology: Dictionary = PartyManager.data_of(me).get("ideology", {})
-	for axis in IdeologyAxes.AXES:
-		var info: Dictionary = CardPresets.AXIS_TITLES[axis]
-		var row := HBoxContainer.new()
-		row.alignment = BoxContainer.ALIGNMENT_CENTER
-		row.add_theme_constant_override("separation", 6)
-		row.add_child(_law_circle(axis, -1))
-		var middle := VBoxContainer.new()
-		middle.alignment = BoxContainer.ALIGNMENT_CENTER
-		middle.add_theme_constant_override("separation", 0)
-		middle.custom_minimum_size = Vector2(110, 0)
-		var axis_label := Label.new()
-		axis_label.text = String(info["title"]).to_upper()
-		axis_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		axis_label.add_theme_font_size_override("font_size", 10)
-		axis_label.add_theme_color_override("font_color", UiTheme.TEXT)
-		middle.add_child(axis_label)
-		middle.add_child(_ideology_bar(axis, float(ideology.get(axis, 0))))
-		var pos_label := Label.new()
-		pos_label.text = "partin: %s" % IdeologyAxes.position_text(axis, float(ideology.get(axis, 0)))
-		pos_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		pos_label.add_theme_font_size_override("font_size", 9)
-		pos_label.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
-		middle.add_child(pos_label)
-		row.add_child(middle)
-		row.add_child(_law_circle(axis, 1))
-		_law_rows.add_child(row)
+	var groups_on_agenda := CardManager.agenda_groups()
+	if _law_group != "" and not groups_on_agenda.has(_law_group):
+		_law_group = ""
+	if _law_group == "" and not groups_on_agenda.is_empty():
+		_law_group = String(groups_on_agenda[0])
+	for group in VoterGroups.GROUP_IDS:
+		_law_rows.add_child(_law_group_button(group, groups_on_agenda.has(group)))
+	_refresh_law_detail()
 
-## Eksende partinin yeri: −3..+3 çubuğu ve üstünde işaret.
-func _ideology_bar(axis: String, value: float) -> Control:
-	var bar := Control.new()
-	bar.custom_minimum_size = Vector2(110, 12)
-	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var left := _law_color(axis, -1)
-	var right := _law_color(axis, 1)
-	var mine: Color = PartyManager.data_of(multiplayer.get_unique_id()).get("bg_color", Color.WHITE)
-	bar.draw.connect(func():
-		var w := bar.size.x
-		var y := bar.size.y * 0.5
-		var steps := 24
-		for i in steps:
-			var x0 := w * i / steps
-			var x1 := w * (i + 1) / steps
-			bar.draw_rect(Rect2(x0, y - 2.0, x1 - x0 + 0.5, 4.0), left.lerp(right, float(i) / (steps - 1)))
-		bar.draw_line(Vector2(w * 0.5, y - 6.0), Vector2(w * 0.5, y + 6.0), UiTheme.TEXT_MUTED, 2.0)
-		var x := w * (clampf(value, IdeologyAxes.AXIS_MIN, IdeologyAxes.AXIS_MAX) - IdeologyAxes.AXIS_MIN) \
-			/ (IdeologyAxes.AXIS_MAX - IdeologyAxes.AXIS_MIN)
-		bar.draw_circle(Vector2(x, y), 5.5, Color.BLACK, true, -1.0, true)
-		bar.draw_circle(Vector2(x, y), 4.0, mine, true, -1.0, true))
-	return bar
-
-func _law_color(axis: String, dir: int) -> Color:
-	var base: Color = LAW_AXIS_COLORS.get(axis, Color.GRAY)
-	return base.darkened(0.3) if dir < 0 else base.lightened(0.08)
-
-## Sürüklenebilir yasa dairesi (bir eksenin bir ucu).
-func _law_circle(axis: String, dir: int) -> Control:
-	var law_type := CardPresets.law_type(axis, dir)
-	var law := CardPresets.law_data(law_type)
-	var circle := Panel.new()
-	circle.custom_minimum_size = Vector2(54, 54)
-	var on_agenda := CardManager.law_on_agenda(law_type)
-	if not on_agenda:
-		circle.modulate = Color(1, 1, 1, 0.3)  # gündemde değil: sunulamaz
-	circle.add_theme_stylebox_override("panel",
-		UiSkin.color_box(_law_color(axis, dir), UiSkin.BUTTON_TINT_NORMAL))
-	if on_agenda:
-		# Gündemdeki eksen altın çerçeveyle ayrılır.
-		var ring := UiSkin.color_surface(UiTheme.GOLD, UiSkin.TARGET)
-		ring.set_anchors_preset(Control.PRESET_FULL_RECT)
-		circle.add_child(ring)
-	circle.mouse_filter = Control.MOUSE_FILTER_STOP
-	circle.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+## Yasa panelinde bir seçmen grubu düğmesi: simge + tam ad. Gündemde değilse
+## sönük ve seçilemez; seçiliyse altın çerçeve.
+func _law_group_button(group: String, on_agenda: bool) -> Control:
+	var button := Button.new()
+	button.focus_mode = Control.FOCUS_NONE
+	button.custom_minimum_size = Vector2(150, 30)
+	button.clip_text = false
+	var tint := VoterGroups.color(group)
+	UiSkin.skin_color_button(button, tint.darkened(0.45) if group != _law_group else tint.darkened(0.15))
+	button.disabled = not on_agenda
+	button.tooltip_text = "%s\nTalepler: %s%s" % [VoterGroups.title(group), VoterGroups.issues_text(group),
+		"" if on_agenda else "\nGündemde değil: bu dönem bu grup için yasa sunulamaz."]
+	var row := HBoxContainer.new()
+	row.set_anchors_preset(Control.PRESET_FULL_RECT)
+	row.offset_left = 4
+	row.add_theme_constant_override("separation", 4)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(row)
+	var icon := VoterGroupIcon.make(group, 18.0)
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(icon)
 	var label := Label.new()
-	label.text = String(law["side"])
-	label.set_anchors_preset(Control.PRESET_FULL_RECT)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.text = VoterGroups.title(group)
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	label.add_theme_font_size_override("font_size", 9)
-	label.add_theme_color_override("font_outline_color", UiTheme.INK)
-	label.add_theme_constant_override("outline_size", 3)
+	label.add_theme_color_override("font_color", UiTheme.GOLD if group == _law_group else UiTheme.TEXT)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	circle.add_child(label)
-	if on_agenda:
-		label.add_theme_color_override("font_color", UiTheme.GOLD)
-	circle.gui_input.connect(func(event: InputEvent):
-		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-			if event.pressed:
-				_law_info.text = "%s (%s)%s%s" % [law["title"], CardPresets.law_direction_text(law_type),
-					"  ·  gündemde: sunulabilir" if on_agenda else "  ·  gündemde değil", ""]
-				_propose_law_clicked(law_type)
-	)
-	return circle
+	row.add_child(label)
+	if not on_agenda:
+		button.modulate = Color(1, 1, 1, 0.4)
+	button.pressed.connect(func():
+		_law_group = group
+		_refresh_law_designer())
+	return button
+
+## "+3,9" / "−2,5" gibi işaretli kısa sayı.
+static func _signed(value: float) -> String:
+	return ("+" if value >= 0.0 else "−") + String.num(snappedf(absf(value), 0.1), 1).replace(".", ",")
+
+## Seçili grubun ayrıntısı: talepler, sorun, gerçek kurallarla hesaplanan
+## beklenen etkiler (kabul / ret), kapsam, kabul koşulu ve SUN düğmesi.
+func _refresh_law_detail() -> void:
+	if _law_detail == null:
+		return
+	for child in _law_detail.get_children():
+		child.queue_free()
+	if _law_group == "":
+		return
+	var me := multiplayer.get_unique_id()
+	var law_type := CardPresets.law_type(_law_group)
+	var law := CardPresets.law_data(law_type)
+	var groups := PartyManager.groups_of(CardManager.party_of(me))
+	var opposite := String(law["opposite"])
+	var backlash := float(VoterGroups.data(_law_group).get("law_backlash", 0.4))
+	var mult := PoliticianPresets.ACADEMIC_LAW_MULT if PoliticianPresets.has_background(me, "akademisyen") else 1.0
+	_law_detail.add_child(VoterGroupUI.name_row(_law_group, "", UiTheme.TEXT, 13, 20.0))
+	var title := PopupKit.label(String(law["title"]), 12, UiTheme.GOLD)
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.custom_minimum_size = Vector2(300, 0)
+	_law_detail.add_child(title)
+	_law_detail.add_child(PopupKit.note("Sorun: %s. Talepler: %s." % [law["problem"], VoterGroups.issues_text(_law_group)], UiTheme.TEXT_MUTED, 300))
+	# Etki tablosu: her grup tek satır, "kabul / ret" (kalıcı, ulusal; gerçek kuralla).
+	var passed := PublicOpinion.LAW_GROUP_GAIN_PASSED * mult
+	var rejected := PublicOpinion.LAW_GROUP_GAIN_REJECTED * mult
+	_law_detail.add_child(PopupKit.note("Ulusal etki, kalıcı (kabul / ret ya da vaat):", UiTheme.TEXT, 300))
+	_law_detail.add_child(VoterGroupUI.name_row(_law_group, "%s / %s" % [_signed(VoterGroups.effective_delta(groups, _law_group, passed)),
+		_signed(VoterGroups.effective_delta(groups, _law_group, rejected))], UiTheme.GREEN))
+	_law_detail.add_child(VoterGroupUI.name_row(opposite, "%s / %s" % [_signed(VoterGroups.effective_delta(groups, opposite, -passed * backlash)),
+		_signed(VoterGroups.effective_delta(groups, opposite, -rejected * backlash))], UiTheme.RED))
+	var crisis_note := " Kriz bu grubu istiyor: +%s ulusal destek." % String.num(PublicOpinion.CRISIS_RESPONSE_NATIONAL, 1).replace(".", ",") \
+		if CardManager.crisis_group() == _law_group else ""
+	_law_detail.add_child(PopupKit.note("Kabul: meclis çoğunluğu. Grubun yoğun olduğu illerde daha çok oya döner.%s" % crisis_note,
+		UiTheme.TEXT_DIM, 300))
+	var submit := Button.new()
+	submit.focus_mode = Control.FOCUS_NONE
+	submit.custom_minimum_size = Vector2(0, 32)
+	submit.text = "TEKLİFİ SUN · %d mana" % CardManager.law_mana_cost(me, law_type)
+	UiSkin.skin_color_button(submit, UiTheme.GREEN_DARK)
+	submit.disabled = not CardManager.can_propose_law(me, law_type)
+	submit.pressed.connect(func(): _propose_law_clicked(law_type))
+	_law_detail.add_child(submit)
 
 ## Eksen ucuna TIKLAMAK yasayı doğrudan meclise sunar (sürükleme yok).
 func _propose_law_clicked(law_type: String) -> void:
 	var current := CardManager.agenda_type()
-	if current != "" and CardPresets.law_data(law_type)["axis"] != CardPresets.agenda_data(current)["axis"]:
-		_show_toast("Bu eksen gündemde değil: bu dönem sadece %s yasaları sunulabilir." % CardPresets.agenda_data(current)["axis_title"])
+	if current != "" and not CardManager.law_on_agenda(law_type):
+		_show_toast("Bu grup gündemde değil: bu dönem %s." % CardPresets.agenda_effect_text(current))
 		return
 	if not CardManager.can_propose_law(multiplayer.get_unique_id(), law_type):
 		_show_toast(_action_block_reason(CardManager.law_mana_cost(multiplayer.get_unique_id(), law_type), true))
 		return
 	_law_designer.hide()
 	CardManager.propose_law(law_type)
-
-func _start_law_drag(law_type: String) -> void:
-	var current := CardManager.agenda_type()
-	if current != "" and CardPresets.law_data(law_type)["axis"] != CardPresets.agenda_data(current)["axis"]:
-		_show_toast("Bu eksen gündemde değil: bu dönem sadece %s yasaları sunulabilir." % CardPresets.agenda_data(current)["axis_title"])
-		return
-	if not CardManager.can_propose_law(multiplayer.get_unique_id(), law_type):
-		_show_toast(_action_block_reason(CardManager.law_mana_cost(multiplayer.get_unique_id(), law_type), true))
-		return
-	_start_drag(LAW_DRAG_INDEX, law_type, null)
 
 func _circle_texture(color: Color) -> Texture2D:
 	var key := color.to_html()
@@ -3927,6 +3931,26 @@ func _build_layer_bar() -> void:
 	(_layer_legend as HBoxContainer).add_theme_constant_override("separation", 4)
 	_layer_legend.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_layer_legend)
+	# Seçmen katmanı: 8 grup simgesi (katman açıkken düğmelerin altında).
+	_group_picker = HBoxContainer.new()
+	_group_picker.add_theme_constant_override("separation", 2)
+	_group_picker.z_index = 6
+	add_child(_group_picker)
+	for group in VoterGroups.GROUP_IDS:
+		var pick := Button.new()
+		pick.focus_mode = Control.FOCUS_NONE
+		pick.custom_minimum_size = Vector2(30, 30)
+		pick.tooltip_text = VoterGroups.title(group)
+		var icon := VoterGroupIcon.make(group, 22.0)
+		icon.position = Vector2(4, 4)
+		icon.size = Vector2(22, 22)
+		pick.add_child(icon)
+		pick.set_meta("group", group)
+		pick.pressed.connect(func():
+			_map_group = group
+			_refresh_layer_bar()
+			_apply_map_layer_colors())
+		_group_picker.add_child(pick)
 	_refresh_layer_bar()
 
 func _place_layer_bar() -> void:
@@ -3941,6 +3965,13 @@ func _place_layer_bar() -> void:
 	# Gösterge düğmelerin sağında, aynı satırda ortalı.
 	_layer_legend.position = Vector2(_layer_bar.position.x + _layer_bar.size.x + 12.0,
 		_layer_bar.position.y + _layer_bar.size.y * 0.5 - _layer_legend.size.y * 0.5)
+	if _group_picker != null:
+		_group_picker.reset_size()
+		_group_picker.position = _layer_bar.position + Vector2(0.0, _layer_bar.size.y + 4.0)
+		# Gösterge (grup adı + ölçek) seçicinin sağına, ikinci satıra iner.
+		if _map_layer == MapLayer.GROUPS:
+			_layer_legend.position = Vector2(_group_picker.position.x + _group_picker.size.x + 10.0,
+				_group_picker.position.y + _group_picker.size.y * 0.5 - _layer_legend.size.y * 0.5)
 
 ## Harita katman düğmesi (Vekiller / Teşkilat / Güç). Köşe yarıçapı yok:
 ## pixel tarzda hepsi kare, seçili olan altın.
@@ -3965,6 +3996,14 @@ func _refresh_layer_bar() -> void:
 		button.add_theme_color_override("font_color", UiTheme.INK if active else UiTheme.TEXT)
 		button.add_theme_color_override("font_hover_color", UiTheme.INK if active else UiTheme.TEXT)
 		button.add_theme_color_override("font_pressed_color", UiTheme.INK)
+	if _group_picker != null:
+		_group_picker.visible = _map_layer == MapLayer.GROUPS
+		for pick in _group_picker.get_children():
+			var group := String(pick.get_meta("group"))
+			var selected := group == _map_group
+			var tint := VoterGroups.color(group) if selected else UiTheme.PANEL
+			for state in ["normal", "hover", "pressed", "focus"]:
+				(pick as Button).add_theme_stylebox_override(state, UiSkin.color_box(tint, UiSkin.BUTTON_TINT_NORMAL))
 	_rebuild_layer_legend()
 
 ## Katmanın küçük açıklaması (renk anahtarı), butonların hemen üstünde.
@@ -3983,6 +4022,13 @@ func _rebuild_layer_legend() -> void:
 			for i in STRENGTH_STOPS.size():
 				swatches.append([STRENGTH_STOPS[i], ""])
 			swatches.append([null, "ilin yarısı"])
+		MapLayer.GROUPS:
+			var span := _group_layer_span()
+			swatches.append([null, VoterGroups.title(_map_group)])
+			swatches.append([null, "%%%d" % int(span.x)])
+			for i in 4:
+				swatches.append([MAP_BLANK_COLOR.lerp(_group_layer_color(), float(i) / 3.0), ""])
+			swatches.append([null, "%%%d" % int(span.y)])
 	_layer_legend.visible = not swatches.is_empty()
 	for entry in swatches:
 		if entry[0] == null:
@@ -4039,8 +4085,13 @@ func _apply_map_layer_colors() -> void:
 		gradient.offsets = PackedFloat32Array([0.0, 0.25, 0.5, 0.75, 1.0])
 		gradient.colors = PackedColorArray(STRENGTH_STOPS)
 		var projection: Dictionary = CardManager.projection_all() if _map_layer == MapLayer.STRENGTH else {}
+		var span := _group_layer_span()
 		for province_id in map_holder.get_all_province_ids():
 			match _map_layer:
+				MapLayer.GROUPS:
+					var pct := float(VoterGroups.percent(CardManager.province_profile(province_id), _map_group))
+					var t := clampf((pct - span.x) / maxf(1.0, span.y - span.x), 0.0, 1.0)
+					colors[province_id] = MAP_BLANK_COLOR.lerp(_group_layer_color(), t)
 				MapLayer.ORGANIZATION:
 					colors[province_id] = MAP_BLANK_COLOR.lerp(mine, float(CardManager.organization_level(province_id, me)) / GameRules.ORG_MAX_LEVEL)
 				MapLayer.STRENGTH:
@@ -4058,6 +4109,23 @@ func _apply_map_layer_colors() -> void:
 		var selected := _hovered_province_id
 		_hovered_province_id = ""
 		_highlight_province(selected)
+
+## Seçmen katmanının en yoğun ucu: grubun rengi, biraz koyu (soluk illerden belirgin ayrılsın).
+func _group_layer_color() -> Color:
+	return VoterGroups.color(_map_group).darkened(0.25)
+
+## Seçmen katmanında seçili grubun illerdeki en düşük ve en yüksek yüzdesi
+## (renk ölçeği bu aralığa yayılır, gösterge de bu sayıları yazar).
+func _group_layer_span() -> Vector2:
+	var low := 100.0
+	var high := 0.0
+	for province_id in CardManager.province_voters().keys():
+		var pct := float(VoterGroups.percent(CardManager.province_profile(province_id), _map_group))
+		low = minf(low, pct)
+		high = maxf(high, pct)
+	if high < low:
+		return Vector2(0, 100)
+	return Vector2(low, high)
 
 ## Güç katmanı: TÜM partilerin gücüyle, şimdi seçim olsa bu ilde durumum.
 ## −1 (koyu kırmızı) .. +1 (koyu yeşil). Vekil çıkaramıyorsam en fazla sarıya
@@ -4167,17 +4235,17 @@ func _on_org_button_pressed() -> void:
 static func _org_level_text(level: int) -> String:
 	match level:
 		1:
-			return "az oy bonusu, ilin görüşü, yaklaşık oy"
+			return "az oy bonusu, yaklaşık oy"
 		2:
 			return "yüksek oy bonusu, %90 doğru oy"
 		3:
 			return "yüksek oy bonusu, yüksek isabetli anket"
 	return ""
 
-# --- Meclis konuşması ----------------------------------------------------------------
+# --- Grup toplantısı -----------------------------------------------------------------
 
-## Sıra gelince hamleden önce ZORUNLU konuşma paneli: KOMPAKT bir şerit,
-## haritanın üst kenarında. 3 sütun (eksen) × 2 küçük düğme (uç).
+## GRUP TOPLANTISI paneli (TOPLANTI düğmesiyle açılır): haritanın üst
+## kenarında 8 seçmen grubu (4 × 2). Bir gruba basınca toplantı yapılır.
 func _build_speech_panel() -> void:
 	_speech_panel = PanelContainer.new()
 	var style := UiSkin.stylebox(UiSkin.PANEL)
@@ -4192,7 +4260,7 @@ func _build_speech_panel() -> void:
 	var header := HBoxContainer.new()
 	header.add_theme_constant_override("separation", 6)
 	box.add_child(header)
-	title.text = "MECLİS GRUP TOPLANTISI · bir görüşü savun (partin yarım adım kayar)"
+	title.text = "GRUP TOPLANTISI · bir seçmen grubunun sorunlarını gündeme getir"
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 11)
@@ -4208,8 +4276,14 @@ func _build_speech_panel() -> void:
 		_speech_open_key = ""
 		_speech_panel.hide())
 	header.add_child(skip)
-	_speech_rows = HBoxContainer.new()
-	_speech_rows.add_theme_constant_override("separation", 6)
+	_speech_note = Label.new()
+	_speech_note.add_theme_font_size_override("font_size", 10)
+	_speech_note.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
+	box.add_child(_speech_note)
+	_speech_rows = GridContainer.new()
+	_speech_rows.columns = 4
+	_speech_rows.add_theme_constant_override("h_separation", 4)
+	_speech_rows.add_theme_constant_override("v_separation", 4)
 	box.add_child(_speech_rows)
 	_speech_panel.hide()
 	add_child(_speech_panel)
@@ -4236,8 +4310,8 @@ func _refresh_speech_panel() -> void:
 		_speech_panel.hide()
 		_speech_key = ""
 		return
-	var ideology: Dictionary = PartyManager.data_of(me).get("ideology", {})
-	var key := "%d:%d:%s" % [CardManager.round_number, CardManager.current_turn_index, str(ideology)]
+	var groups := CardManager.effective_groups(me)
+	var key := "%d:%d:%s:%s" % [CardManager.round_number, CardManager.current_turn_index, str(groups), CardManager.crisis_group()]
 	if key != _speech_key:
 		_speech_key = key
 		# Eski sütunlar HEMEN çıkarılır: queue_free kare sonuna kadar beklerken panel
@@ -4245,8 +4319,9 @@ func _refresh_speech_panel() -> void:
 		for child in _speech_rows.get_children():
 			_speech_rows.remove_child(child)
 			child.queue_free()
-		for axis in IdeologyAxes.AXES:
-			_speech_rows.add_child(_speech_row(axis, float(ideology.get(axis, 0.0))))
+		_speech_note.text = _meeting_timing_text()
+		for group in VoterGroups.GROUP_IDS:
+			_speech_rows.add_child(_speech_row(group, float(groups.get(group, VoterGroups.AFFINITY_NEUTRAL))))
 	if not _speech_panel.visible:
 		_speech_panel.show()
 		if _province_panel != null:
@@ -4264,34 +4339,64 @@ func _place_speech_panel() -> void:
 	# Haritanın üst kenarı: harita görünür kalsın.
 	_speech_panel.position = Vector2((left + right - _speech_panel.size.x) * 0.5, 8.0)
 
-## Bir eksen sütunu: eksen ve şu anki konum, altında iki ucun küçük düğmesi.
-## Düğmenin üstüne gelince konuşmanın sonucu ("→ Ilımlı Devletçi") görünür.
-func _speech_row(axis: String, value: float) -> Control:
-	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 2)
-	column.custom_minimum_size = Vector2(SPEECH_COLUMN_WIDTH, 0)
-	var info: Dictionary = IdeologyAxes.AXIS_SIDES[axis]
-	var caption := Label.new()
-	caption.text = "%s: %s" % [info["title"], IdeologyAxes.position_text(axis, value)]
-	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	caption.clip_text = true
-	caption.add_theme_font_size_override("font_size", 10)
-	caption.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
-	column.add_child(caption)
-	for dir in [-1, 1]:
-		var after := IdeologyAxes.clamp_value(value + IdeologyAxes.SPEECH_SHIFT * dir)
-		var button := Button.new()
-		button.text = IdeologyAxes.speech_title(axis, dir)
-		button.tooltip_text = "zaten en uçta" if is_equal_approx(after, value) else "→ " + IdeologyAxes.position_text(axis, after)
-		button.custom_minimum_size = Vector2(SPEECH_COLUMN_WIDTH, 26)
-		button.clip_text = true
-		button.add_theme_font_size_override("font_size", 11)
-		UiSkin.skin_color_button(button, _law_color(axis, dir))
-		button.pressed.connect(func():
-			_speech_panel.hide()
-			CardManager.make_speech(axis, dir))
-		column.add_child(button)
-	return column
+## Toplantının seçime göre zamanlaması: bonus seçimde ne kadar olur?
+func _meeting_timing_text() -> String:
+	var next := GameRules.next_election_round(CardManager.round_number)
+	var bonus_text := "Geçici destek: bu dönem +%d, sonraki +%d, sonraki +%d, sonra biter. Kalıcı desteği değiştirmez." % [
+		int(PublicOpinion.MEETING_BONUS[0]), int(PublicOpinion.MEETING_BONUS[1]), int(PublicOpinion.MEETING_BONUS[2])]
+	if next == -1:
+		return bonus_text
+	var age := next - CardManager.round_number
+	var at_election := PublicOpinion.meeting_bonus(age)
+	if at_election > 0.0:
+		return bonus_text + " Seçimde: +%d." % int(at_election)
+	return bonus_text + " Seçime %d dönem var: seçime kadar söner." % age
+
+## Bir seçmen grubu düğmesi: simge + tam ad + partinin şu anki desteği.
+## Kriz bu grubu istiyorsa kırmızı çerçeveli not.
+func _speech_row(group: String, value: float) -> Control:
+	var button := Button.new()
+	button.focus_mode = Control.FOCUS_NONE
+	button.custom_minimum_size = Vector2(SPEECH_COLUMN_WIDTH, 38)
+	button.clip_text = false
+	UiSkin.skin_color_button(button, VoterGroups.color(group).darkened(0.4))
+	var crisis := CardManager.crisis_group() == group
+	button.tooltip_text = "%s\nKonu: %s\nPartinin bu gruptaki desteği %s → toplantıyla bu dönem +%d.%s" % [
+		VoterGroups.title(group), String(VoterGroups.data(group).get("meeting", "")), VoterGroups.percent_text(value),
+		int(PublicOpinion.MEETING_BONUS[0]),
+		"\nKRİZ bu grubu istiyor: +%s ulusal destek." % String.num(PublicOpinion.CRISIS_RESPONSE_NATIONAL, 1).replace(".", ",") if crisis else ""]
+	var row := HBoxContainer.new()
+	row.set_anchors_preset(Control.PRESET_FULL_RECT)
+	row.offset_left = 4
+	row.offset_right = -2
+	row.add_theme_constant_override("separation", 4)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(row)
+	var icon := VoterGroupIcon.make(group, 20.0)
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(icon)
+	var texts := VBoxContainer.new()
+	texts.alignment = BoxContainer.ALIGNMENT_CENTER
+	texts.add_theme_constant_override("separation", -2)
+	texts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	texts.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(texts)
+	var name := Label.new()
+	name.text = VoterGroups.title(group)
+	name.add_theme_font_size_override("font_size", 9)
+	name.add_theme_color_override("font_color", UiTheme.TEXT)
+	name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	texts.add_child(name)
+	var sub := Label.new()
+	sub.text = "destek %s%s" % [VoterGroups.percent_text(value), " · KRİZ" if crisis else ""]
+	sub.add_theme_font_size_override("font_size", 9)
+	sub.add_theme_color_override("font_color", Color("ff8a94") if crisis else UiTheme.TEXT_MUTED)
+	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	texts.add_child(sub)
+	button.pressed.connect(func():
+		_speech_panel.hide()
+		CardManager.make_speech(group))
+	return button
 
 func _build_propaganda_menu() -> void:
 	_propaganda_menu = PanelContainer.new()

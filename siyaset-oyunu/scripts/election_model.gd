@@ -3,39 +3,41 @@ extends RefCounted
 ## Seçim hesabı. Saf (durumsuz) fonksiyonlar — ağdan ve sahneden bağımsız,
 ## doğrudan test edilebilir (bkz. tools/smoke_test_rules.gd).
 ##
-## MODEL
-##   1. Her ilin bir SEÇMEN MERKEZİ var: 3 eksende ortalama eğilim
-##      (her oyunda ProvinceIdeology üretir; komşu bölgeler benzer düşünür).
-##   2. Bir partinin o ildeki desteği, ideolojisinin seçmen merkezine
-##      MESAFESİYLE düşer: exp(-d² / 2σ²). Seçmene yakın parti oy toplar;
-##      aynı noktada duran iki parti oyu BÖLER — konumlanma stratejisi buradan
-##      doğar. İdeoloji kartlarının seçime etkisi de böyle ortaya çıkar.
-##   3. Küçük rastgelelik: parti başına ulusal dalga + il başına sapma.
+## MODEL (seçmen grupları, bkz. VoterGroups)
+##   1. Her ilin bir SEÇMEN PROFİLİ var: 4 ikili dağılım (işçi/işveren,
+##      genç/emekli, dindar/ilerici, özerkçi/milliyetçi). Profil oyun başında
+##      üretilir (komşu iller benzer) ve oyun boyunca değişmez.
+##   2. Her partinin 8 grupta ULUSAL YAKINLIĞI var (0..100) + grup toplantısının
+##      geçici bonusu. Partinin ildeki UYUMU = 4 çiftte (pay × yakınlık)
+##      toplamlarının ortalaması; ham destek = exp(SHARPNESS × (uyum − 50)).
+##      Aynı gruplara hitap eden iki parti o gruptaki oyu BÖLER.
+##   3. Ham destek KAMUOYU çarpanıyla (ulusal puan + il aktivitesi: miting,
+##      yatırım, teşkilat, karalama) çarpılır, sonra partiler arasında
+##      normalize edilir (il payları toplam %100, negatif olamaz).
+##   4. Küçük rastgelelik: parti başına ulusal dalga + il başına sapma.
 ##   4b. ÜLKE GENELİ KARIŞIMI: il payı = NATIONAL_BLEND × ulusal pay +
-##      (1 - NATIONAL_BLEND) × il payı. Bir yerde %70 alıp başka yerde %0
-##      almak olmasın: partinin illerdeki oyu ülke genelindeki oyu etrafında
-##      dalgalanır (ağırlıklı ortalama, yani ulusal oy, değişmez).
+##      (1 - NATIONAL_BLEND) × il payı. Ulusal pay aynı il paylarının vekil
+##      ağırlıklı ortalamasıdır (ek bir grup etkisi DEĞİL): grup yakınlığı
+##      bir kez sayılır, karışım sadece illerdeki uçları yumuşatır.
 ##   5. Ulusal oy oranı, il paylarının milletvekili sayısıyla ağırlıklı
 ##      ortalamasıdır (milletvekili sayısı nüfusun vekili).
 ##   6. BARAJ: ulusal oyu barajın altında kalan parti hiçbir ilde vekil
 ##      çıkaramaz (hiçbir parti geçemezse baraj uygulanmaz).
-##   7. Vekiller her ilde, barajı geçenler arasında D'HONDT ile dağıtılır.
+##   7. Vekiller her ilde, barajı geçenler arasında geçerli sayım yöntemiyle
+##      (D'Hondt / Hare / kazanan hepsini alır) dağıtılır.
+##
+## parties: peer_id -> grup yakınlıkları {grup: 0..100} (bonuslar eklenmiş)
+## voters : province_id -> il profili {çift: ilk grubun yüzdesi}
 
-const AXES := ["economic", "social", "administrative"]
-
-const SUPPORT_SIGMA := 2.0
-## Ne kadar uzak olursa olsun her partinin il başına alabileceği asgari destek.
-const SUPPORT_FLOOR := 0.03
-## Şans "yemeğin tuzu" kadar: denge simülasyonuyla kısıldı (0.15 / 0.10'dan).
 const PROVINCE_NOISE := 0.07
 const NATIONAL_SWING := 0.04
 
 static var _voters_cache: Dictionary = {}
 static var _voters_cache_seed: int = -1
 
-## Oyun kurulmamışken (menü, testler) kullanılan ÖRNEK il görüşleri: o anki
-## haritanın bölgeleri için sabit tohumla üretilir. Oyunda asıl görüşler
-## CardManager.province_ideology'dedir.
+## Oyun kurulmamışken (menü, testler) kullanılan ÖRNEK il profilleri: o anki
+## haritanın bölgeleri için sabit tohumla üretilir. Oyunda asıl profiller
+## CardManager.province_profiles'tadır.
 static func load_province_voters() -> Dictionary:
 	var map = Engine.get_main_loop().root.get_node_or_null("GameMap") if Engine.get_main_loop() is SceneTree else null
 	if map == null:
@@ -44,25 +46,17 @@ static func load_province_voters() -> Dictionary:
 		return _voters_cache
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 1950
-	_voters_cache = ProvinceIdeology.generate(rng, map.province_ids())
+	_voters_cache = VoterGroups.generate_profiles(rng, map.province_ids())
 	_voters_cache_seed = map.seed_value()
 	return _voters_cache
 
-static func distance(a: Dictionary, b: Dictionary) -> float:
-	var sum_sq := 0.0
-	for axis in AXES:
-		var diff: float = float(a.get(axis, 0.0)) - float(b.get(axis, 0.0))
-		sum_sq += diff * diff
-	return sqrt(sum_sq)
-
-## Bir partinin bir seçmen merkezindeki ham desteği (0..1].
-static func support(party_ideology: Dictionary, voter_center: Dictionary) -> float:
-	var d := distance(party_ideology, voter_center)
-	return SUPPORT_FLOOR + exp(-(d * d) / (2.0 * SUPPORT_SIGMA * SUPPORT_SIGMA))
+## Bir partinin bir ildeki ham desteği (> 0): il uyumunun oy ağırlığı.
+static func support(affinities: Dictionary, profile: Dictionary) -> float:
+	return VoterGroups.vote_weight(VoterGroups.appeal(affinities, profile))
 
 ## Rastgelelik OLMADAN beklenen ulusal paylar (karışımdan önce; toplam 1).
-## centers: province_id -> seçmen merkezi, local_mod: province_id -> {peer -> puan}.
-static func expected_national(parties: Dictionary, centers: Dictionary, province_seats: Dictionary,
+## profiles: province_id -> il profili, local_mod: province_id -> {peer -> puan}.
+static func expected_national(parties: Dictionary, profiles: Dictionary, province_seats: Dictionary,
 		national_mod: Dictionary = {}, local_mod: Dictionary = {}) -> Dictionary:
 	var national := {}
 	var total := 0.0
@@ -70,7 +64,7 @@ static func expected_national(parties: Dictionary, centers: Dictionary, province
 		var n := float(province_seats[province_id])
 		if n <= 0.0:
 			continue
-		var shares := expected_shares(parties, centers.get(province_id, {}), national_mod, local_mod.get(province_id, {}))
+		var shares := expected_shares(parties, profiles.get(province_id, {}), national_mod, local_mod.get(province_id, {}))
 		for peer_id in shares.keys():
 			national[peer_id] = float(national.get(peer_id, 0.0)) + float(shares[peer_id]) / 100.0 * n
 		total += n
@@ -82,7 +76,7 @@ static func expected_national(parties: Dictionary, centers: Dictionary, province
 ## Rastgelelik OLMADAN bir ildeki beklenen oy payları (peer_id -> yüzde).
 ## Anket kartı kullanır (hata payını CardManager ekler).
 ## national: ulusal paylar (bkz. expected_national); verilirse il payı onunla karışır.
-static func expected_shares(parties: Dictionary, center: Dictionary,
+static func expected_shares(parties: Dictionary, profile: Dictionary,
 		national_mod: Dictionary = {}, local_here: Dictionary = {}, national: Dictionary = {}) -> Dictionary:
 	var peer_ids: Array = parties.keys()
 	peer_ids.sort()
@@ -90,7 +84,7 @@ static func expected_shares(parties: Dictionary, center: Dictionary,
 	var raw_total := 0.0
 	for peer_id in peer_ids:
 		var opinion: float = PublicOpinion.multiplier(float(national_mod.get(peer_id, 0.0)), float(local_here.get(peer_id, 0.0)))
-		var w: float = support(parties[peer_id], center) * opinion
+		var w: float = support(parties[peer_id], profile) * opinion
 		raw[peer_id] = w
 		raw_total += w
 	var result := {}
@@ -103,9 +97,9 @@ static func expected_shares(parties: Dictionary, center: Dictionary,
 		result[peer_id] = float(result[peer_id]) * 100.0
 	return result
 
-## parties: peer_id -> ideoloji sözlüğü
+## parties: peer_id -> grup yakınlıkları
 ## province_seats: province_id -> milletvekili sayısı
-## voters: province_id -> seçmen merkezi (ideoloji sözlüğü)
+## voters: province_id -> il profili
 ## Dönüş:
 ##   "vote_shares":      peer_id -> ulusal oy yüzdesi (toplam 100)
 ##   "seats":            peer_id -> toplam milletvekili
@@ -191,13 +185,13 @@ static func compute(parties: Dictionary, province_seats: Dictionary, voters: Dic
 
 	for province_id in province_ids:
 		var seats_here: int = int(province_seats[province_id])
-		var center: Dictionary = voters.get(province_id, {})
+		var profile: Dictionary = voters.get(province_id, {})
 		var local_here: Dictionary = local_mod.get(province_id, {})
 		var raw: Dictionary = {}
 		var raw_total := 0.0
 		for peer_id in peer_ids:
 			var opinion: float = PublicOpinion.multiplier(float(national_mod.get(peer_id, 0.0)), float(local_here.get(peer_id, 0.0)))
-			var w: float = support(parties[peer_id], center) * float(swing[peer_id]) * opinion \
+			var w: float = support(parties[peer_id], profile) * float(swing[peer_id]) * opinion \
 				* rng.randf_range(1.0 - PROVINCE_NOISE, 1.0 + PROVINCE_NOISE)
 			raw[peer_id] = w
 			raw_total += w

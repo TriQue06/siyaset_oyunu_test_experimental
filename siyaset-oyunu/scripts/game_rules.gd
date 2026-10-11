@@ -24,8 +24,8 @@ extends RefCounted
 ##     HAMLELER: miting MITING_MANA_COST, il başkanlığı ORG_MANA_COST, gözcü
 ##     yasa oyuncu başına turda LAWS_PER_ROUND kez.
 ##   - TEŞKİLATLANMA (eski il başkanlığı + gözcü) il başına 2 seviye; her
-##     seviye ORG_MANA_COST. 1: az oy bonusu + ilin görüşü (her eksende hangi uç),
-##     2: yüksek bonus + isabetli anket.
+##     seviye ORG_MANA_COST. 1: az oy bonusu + kaba anket, 2: yüksek bonus +
+##     isabetli anket. (İllerin seçmen grubu dağılımı herkese açıktır.)
 ##     KART ÇEKME HAMLESİ YOK: sıra gelince otomatik olarak 1 kart dağıtılır
 ##     (el doluysa verilmez); kart oynamak sınırsız (kartların kendi bedeli
 ##     var). Her seçimden sonra da herkese 1 kart hediye.
@@ -111,13 +111,15 @@ const BONUS_CARD_DRAW := 2
 const ELECTION_MANA_BONUS := 10
 ## GÜNDEM TAKVİMİ: ilk seçimden hemen sonraki turdan itibaren AGENDA_ROUNDS tur
 ## (6 ay) gündem, AGENDA_GAP tur (12 ay) ara, yine gündem... Gündemli her tur
-## tek bir eksenin bir ucudur; bir gündem dönemindeki turlar farklı eksenlerdir
-## (eksenler her dönemde rastgele). YASA sadece gündemdeki eksende sunulabilir.
+## bir SEÇMEN GRUBU ÇİFTİNİN (işçi/işveren, genç/emekli, dindar/ilerici,
+## özerkçi/milliyetçi) bir tarafının sıcak konusudur; art arda gelen gündemler
+## farklı çiftlerden olur. YASA sadece gündemdeki çiftin iki grubundan biri
+## için sunulabilir.
 const AGENDA_ROUNDS := 1
 const AGENDA_GAP := 2
 ## KRİZ: yeni bir gündem açıldığında bu olasılıkla ülke krize de girer. Kriz
-## gündemin ekseninin bir ucunu seçer; o dönem görüşünü bu uca kaydıran (yasa
-## sunarak ya da oyuyla) her parti, kayma başına kısmi ulusal destek kazanır.
+## gündemdeki çiftin bir grubunu seçer; o dönem bu gruba yasa sunan, o yasaya
+## EVET diyen ya da bu grupla toplantı yapan parti kısmi ulusal destek kazanır.
 const CRISIS_CHANCE := 0.5
 ## Kabul edilen yasa, getiren partiye puan tablosunda bu kadar puan yazar
 ## (hükümet partisinin yasası daha çok).
@@ -133,14 +135,14 @@ const ORG_MANA_COST := 10
 ## TEŞKİLAT GELİRİ: her ildeki teşkilat tur başında mana getirir
 ## (1. seviye +5, 2. seviye +10).
 const ORG_INCOME := [0, 5, 10]
-## GRUP TOPLANTISI (konuşma) bedeli.
+## GRUP TOPLANTISI bedeli (sırada bir kez; bir seçmen grubuyla, geçici destek).
 const SPEECH_MANA_COST := 5
 const ORG_UPGRADE_MANA_COST := ORG_MANA_COST
 
 ## Bu ildeki teşkilatı bir seviye ilerletmenin bedeli (current_level: şu anki seviye).
 static func org_cost(current_level: int) -> int:
 	return ORG_MANA_COST if current_level <= 0 else ORG_UPGRADE_MANA_COST
-## En fazla 2 seviye: 1 = ilin görüşü + az bonus, 2 = isabetli anket + yüksek bonus.
+## En fazla 2 seviye: 1 = kaba anket + az bonus, 2 = isabetli anket + yüksek bonus.
 const ORG_MAX_LEVEL := 2
 
 ## Süre sınırları (saniye). AFK kalan tek bir oyuncu oyunu kilitleyemesin diye.

@@ -184,7 +184,7 @@ static func _fill_cabinet(box: VBoxContainer, government: Dictionary) -> void:
 		UiTheme.FS_TINY, UiTheme.TEXT_MUTED if majority else UiTheme.RED))
 
 ## Yasa oylaması: 1. satır yasa ve oy durumu, 2. satır bu oyuncu için oyların
-## genel etkisi (il il değişir; illerin görüşü gizli olduğu için sayı verilmez).
+## genel etkisi (yasanın hedef seçmen grubu ve karşıtı).
 static func _law_status_text(my_id: int, time_text: String) -> String:
 	var law_type := GovernmentManager.proposal_law
 	var totals := GovernmentManager.vote_seat_totals()

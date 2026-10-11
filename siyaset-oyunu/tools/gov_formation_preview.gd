@@ -19,7 +19,7 @@ func _initialize() -> void:
 		mm.players[ids[i]] = {"name": "Lider %d" % i, "bot": i != 0}
 		pm.parties[ids[i]] = {
 			"name": "Parti %d" % i, "icon_index": i, "icon_color": Color.WHITE,
-			"bg_color": colors[i], "ideology": {"economic": 0, "social": 0, "administrative": 0}, "ready": true,
+			"bg_color": colors[i], "groups": VoterGroups.neutral_affinities(), "ready": true,
 		}
 	cm.init_game()
 	cm.last_seats = {me: 150, 2: 110, 3: 80, 4: 60}

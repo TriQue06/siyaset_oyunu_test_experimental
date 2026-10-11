@@ -26,7 +26,7 @@ func _initialize() -> void:
 		mm.add_bot()
 	mm.start_game()
 	pm.set_party_and_ready("Yeni Yol", 0, Color.WHITE, Color("F20C1F"),
-		{"economic": 1.5, "social": -1.5, "administrative": 1.5}, true)
+		["isveren", "ilerici"], true)
 	cm.set_rng_seed(4242)
 	gm.result_hold_seconds = 0.0
 	cm._hold_election(cm.round_number, false)
@@ -46,8 +46,8 @@ func _initialize() -> void:
 	root.add_child(scene)
 	await _frames(30)
 	_shot("party_politics_board")
-	cm.agenda = {"type": "gundem_economic_p", "until": cm.round_number + 1}
-	cm.crisis = {"type": "kriz_economic_n", "until": cm.round_number + 1}
+	cm.agenda = {"type": "gundem_isveren", "until": cm.round_number + 1}
+	cm.crisis = {"type": "kriz_isci", "until": cm.round_number + 1}
 	cm._turn_time_left = 40.0
 	scene._refresh_agenda_banner()
 	await _frames(5)

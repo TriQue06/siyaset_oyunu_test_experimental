@@ -20,7 +20,7 @@ func _initialize() -> void:
 		mm.add_bot()
 	mm.start_game()
 	pm.set_party_and_ready("Yeni Yol", 0, Color.WHITE, Color("F20C1F"),
-		{"economic": 1.5, "social": -1.5, "administrative": 1.5}, true)
+		["isveren", "ilerici"], true)
 	cm.set_rng_seed(4242)
 	bm._rng.seed = 4242
 	gm.result_hold_seconds = 0.2
@@ -39,7 +39,7 @@ func _initialize() -> void:
 
 	# YASA OYLAMASI AÇIK: teklifi veren parti rozeti bu sırada görünür.
 	gm.result_hold_seconds = 999.0
-	gm.submit_law(mm.owner_id, "law:economic:1")
+	gm.submit_law(mm.owner_id, "law:isveren")
 	print("yasa oylamasi: %s / teklif veren %d" % [gm.proposal_kind, gm.proposal_peer_id])
 
 	var scene: Node = (load("res://scenes/GameScreen.tscn") as PackedScene).instantiate()
@@ -63,7 +63,7 @@ func _initialize() -> void:
 		print("screenshot: midgame")
 		var cmx = root.get_node("CardManager")
 		var saved_agenda: Dictionary = cmx.agenda
-		cmx.agenda = {"type": "gundem_social_p", "until": cmx.round_number + 1, "index": 1}
+		cmx.agenda = {"type": "gundem_isveren", "until": cmx.round_number + 1, "index": 1}
 		scene._refresh_agenda_banner()
 		await create_timer(0.2).timeout
 		root.get_texture().get_image().save_png("%s/midgame_agenda.png" % OS.get_user_data_dir())
@@ -105,7 +105,7 @@ func _initialize() -> void:
 		var first_width: float = scene._speech_panel.size.x
 		cms.speech_done = true
 		cms._push_state({"type": "timer"})
-		pm.parties[mm.owner_id]["ideology"]["economic"] = 2.0
+		pm.parties[mm.owner_id]["groups"]["isveren"] = 75.0
 		cms.speech_done = false
 		cms._push_state({"type": "timer"})
 		scene._speech_open_key = "%d:%d" % [cms.round_number, cms.current_turn_index]

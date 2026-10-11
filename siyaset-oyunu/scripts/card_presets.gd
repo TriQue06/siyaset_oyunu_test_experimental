@@ -12,8 +12,8 @@ extends Node
 ##   - YATIRIM   : sadece hükümet partilerine gelir; seçilen ile yatırım.
 ##   - KARALAMA  : bir ilde bir partiyi karalar: ona eksi, oynayana artı.
 ##   - VEKİL ÇALMA / GENSORU : koşullu özel kartlar.
-## YASA bir kart DEĞİL, bir hamle türüdür (bkz. CardManager.propose_law): eksen
-## ve yön seçilir. Meclis akışı metin tabanlı olduğu için yasa "law:eksen:yön"
+## YASA bir kart DEĞİL, bir hamle türüdür (bkz. CardManager.propose_law): bir
+## SEÇMEN GRUBU seçilir. Meclis akışı metin tabanlı olduğu için yasa "law:grup"
 ## biçiminde bir metinle taşınır (bkz. law_type / law_data).
 ## Hangi kartın ne olasılıkla çekileceği CardManager._draw_weights'te.
 
@@ -49,20 +49,25 @@ const MANA_BONUS_CARD_TYPE := "mana_bonusu"
 const MANA_BONUS_STRONG_CARD_TYPE := "mana_bonusu_guclu"
 const BONUS_CARD_TYPE := "bonus_kart"
 
-## GÜNDEMLER: her eksenin her ucu için bir sıcak konu (bkz. GameRules gündem
-## takvimi). Artık kart değil; oyun takvime göre kendisi seçer.
+## GÜNDEMLER: her seçmen grubu için bir sıcak konu (bkz. GameRules gündem
+## takvimi). Gündem bir grubun derdidir ama yasa o grubun ÇİFTİNDEKİ iki
+## gruptan biri için sunulabilir (ör. "Hayat Pahalılığı": işçi ya da işveren).
 const AGENDAS := {
-	"gundem_economic_n": {"axis": "economic", "dir": -1, "title": "Hayat Pahalılığı",
-		"text": "Fiyatlar uçtu, seçmen devletten koruma bekliyor."},
-	"gundem_economic_p": {"axis": "economic", "dir": 1, "title": "Vergi ve Bürokrasi Yükü",
+	"gundem_isci": {"group": "isci", "title": "Hayat Pahalılığı",
+		"text": "Maaşlar eriyor, çalışanlar ücret artışı bekliyor."},
+	"gundem_isveren": {"group": "isveren", "title": "Vergi ve Bürokrasi Yükü",
 		"text": "Esnaf ve sanayici vergi ve kırtasiyeden bunaldı."},
-	"gundem_social_n": {"axis": "social", "dir": -1, "title": "Özgürlükler Tartışması",
-		"text": "İfade ve yaşam tarzı özgürlüğü ülkenin gündeminde."},
-	"gundem_social_p": {"axis": "social", "dir": 1, "title": "Aile ve Değerler",
-		"text": "Aile ve gelenekler ülkenin en çok konuşulan konusu."},
-	"gundem_administrative_n": {"axis": "administrative", "dir": -1, "title": "Yerelden Yönetim Talebi",
+	"gundem_genc": {"group": "genc", "title": "Genç İşsizliği",
+		"text": "Mezunlar iş bulamıyor, yurtlar dolu."},
+	"gundem_emekli": {"group": "emekli", "title": "Emekli Maaşları",
+		"text": "Emekliler aylıkların geçinmeye yetmediğini söylüyor."},
+	"gundem_dindar": {"group": "dindar", "title": "İnanç ve Eğitim Tartışması",
+		"text": "Din eğitimi ve inanç özgürlüğü ülkenin gündeminde."},
+	"gundem_ilerici": {"group": "ilerici", "title": "Ayrımcılık Tartışması",
+		"text": "Eşit yurttaşlık ve ayrımcılık yasağı tartışılıyor."},
+	"gundem_ozerkci": {"group": "ozerkci", "title": "Yerelden Yönetim Talebi",
 		"text": "Şehirler kendi kararlarını kendileri vermek istiyor."},
-	"gundem_administrative_p": {"axis": "administrative", "dir": 1, "title": "Güvenlik ve Birlik",
+	"gundem_milliyetci": {"group": "milliyetci", "title": "Güvenlik ve Birlik",
 		"text": "Güvenlik kaygısı güçlü bir merkez talebini büyüttü."},
 }
 
@@ -82,18 +87,6 @@ const CARD_TYPES: Array[String] = [
 	"kart_calma",
 ]
 
-const AXIS_TITLES := {
-	"economic": {"title": "Ekonomi", "neg": "Devletçi", "pos": "Piyasacı"},
-	"social": {"title": "Toplum", "neg": "İlerici", "pos": "Muhafazakâr"},
-	"administrative": {"title": "İdare", "neg": "Federal", "pos": "Üniter"},
-}
-
-## Yasa hamlesinin 6 seçeneği: eksen -> yön -> başlık.
-const LAW_TITLES := {
-	"economic": {-1: "Kamu Ekonomisi Yasası", 1: "Serbest Piyasa Yasası"},
-	"social": {-1: "Özgürlükler Yasası", 1: "Aile ve Gelenek Yasası"},
-	"administrative": {-1: "Yerel Yönetim Yasası", 1: "Güçlü Merkez Yasası"},
-}
 const LAW_PREFIX := "law:"
 
 const CARD_NATIVE_SIZE := Vector2(72, 96)
@@ -104,9 +97,10 @@ const STEAL_RANGES := {
 	"steal_strong": {"min": 10, "max": 16},
 }
 
-## İdeolojik yakınlığa göre aralık: yukarıdaki STEAL_RANGES NÖTR hâl (orta
-## yakınlık); ideolojiler birebir aynıysa STEAL_RANGES_CLOSE (2 kat), iki parti
-## zıt radikal uçlardaysa STEAL_RANGES_FAR. Arası doğrusal (bkz. steal_range).
+## Seçmen grubu yakınlığına göre aralık (bkz. VoterGroups.party_closeness):
+## yukarıdaki STEAL_RANGES NÖTR hâl (orta yakınlık); iki partinin grup
+## yakınlıkları birebir aynıysa STEAL_RANGES_CLOSE (2 kat), çok farklıysa
+## STEAL_RANGES_FAR. Arası doğrusal (bkz. steal_range).
 const STEAL_RANGES_CLOSE := {
 	"steal_weak": {"min": 4, "max": 8},
 	"steal_strong": {"min": 20, "max": 32},
@@ -116,7 +110,7 @@ const STEAL_RANGES_FAR := {
 	"steal_strong": {"min": 6, "max": 9},
 }
 
-## closeness: 0 (en uzak) .. 0.5 (nötr) .. 1 (aynı ideoloji) -> {"min", "max"}.
+## closeness: 0 (en uzak) .. 0.5 (nötr) .. 1 (aynı grup profili) -> {"min", "max"}.
 func steal_range(card_type: String, closeness: float) -> Dictionary:
 	var mid: Dictionary = STEAL_RANGES.get(card_type, {})
 	if mid.is_empty():
@@ -186,70 +180,80 @@ func is_self_card(card_type: String) -> bool:
 func is_parliament_card(card_type: String) -> bool:
 	return card_type == EARLY_ELECTION_CARD_TYPE or is_law_card(card_type)
 
-## {"axis", "dir", "title", "text", "side"} ya da boş sözlük.
-## KRİZLER: eksenin bir ucunu isteyen olaylar (bkz. CardManager.crisis).
+## KRİZLER: bir seçmen grubunun acil talebi (bkz. CardManager.crisis).
+## Gündemle birlikte açılır, gündemdeki çiftten bir grubu seçer.
 const CRISES := {
-	"kriz_economic_n": {"axis": "economic", "dir": -1, "title": "Ekonomik Çöküş",
-		"text": "Fabrikalar kapanıyor, halk devletten kurtarma bekliyor."},
-	"kriz_economic_p": {"axis": "economic", "dir": 1, "title": "Bütçe Krizi",
-		"text": "Kamu borcu patladı, piyasa reformu isteniyor."},
-	"kriz_social_n": {"axis": "social", "dir": -1, "title": "Gençlik Protestoları",
-		"text": "Gençler özgürlük talebiyle meydanlarda."},
-	"kriz_social_p": {"axis": "social", "dir": 1, "title": "Ahlak Paniği",
-		"text": "Toplum geleneklere dönülmesini istiyor."},
-	"kriz_administrative_n": {"axis": "administrative", "dir": -1, "title": "Bölgesel Ayaklanma",
+	"kriz_isci": {"group": "isci", "title": "Fabrika Kapanmaları",
+		"text": "Fabrikalar kapanıyor, işçiler meydanlarda."},
+	"kriz_isveren": {"group": "isveren", "title": "İflas Dalgası",
+		"text": "Küçük işletmeler peş peşe kepenk kapatıyor."},
+	"kriz_genc": {"group": "genc", "title": "Gençlik Protestoları",
+		"text": "Öğrenciler barınma ve iş talebiyle sokakta."},
+	"kriz_emekli": {"group": "emekli", "title": "Sağlık Sistemi Krizi",
+		"text": "Hastaneler doldu, emekliler ilaç bulamıyor."},
+	"kriz_dindar": {"group": "dindar", "title": "İnanç Gerginliği",
+		"text": "İbadet yerlerine yönelik kısıtlamalar tepki çekiyor."},
+	"kriz_ilerici": {"group": "ilerici", "title": "Nefret Saldırıları",
+		"text": "Ayrımcı saldırılar eşit yurttaşlık talebini büyüttü."},
+	"kriz_ozerkci": {"group": "ozerkci", "title": "Bölgesel Ayaklanma",
 		"text": "Bölgeler yerinden yönetim talebiyle sokakta."},
-	"kriz_administrative_p": {"axis": "administrative", "dir": 1, "title": "Güvenlik Krizi",
-		"text": "Olaylar güçlü bir merkezî devlet talebini artırdı."},
+	"kriz_milliyetci": {"group": "milliyetci", "title": "Güvenlik Krizi",
+		"text": "Olaylar güçlü bir devlet talebini artırdı."},
 }
 
+## {"group", "title", "text", "group_title", "opposite", "pair"} ya da boş sözlük.
 func crisis_data(crisis_type: String) -> Dictionary:
 	if not CRISES.has(crisis_type):
 		return {}
-	var data: Dictionary = CRISES[crisis_type].duplicate()
-	var info: Dictionary = AXIS_TITLES[data["axis"]]
-	data["side"] = info["pos"] if int(data["dir"]) > 0 else info["neg"]
-	data["axis_title"] = info["title"]
+	return _with_group_info(CRISES[crisis_type])
+
+func agenda_data(agenda_type: String) -> Dictionary:
+	if not AGENDAS.has(agenda_type):
+		return {}
+	return _with_group_info(AGENDAS[agenda_type])
+
+func _with_group_info(source: Dictionary) -> Dictionary:
+	var data: Dictionary = source.duplicate()
+	var group := String(data["group"])
+	data["group_title"] = VoterGroups.title(group)
+	data["opposite"] = VoterGroups.opposite(group)
+	data["pair"] = VoterGroups.pair_of(group)
 	return data
 
-func agenda_data(card_type: String) -> Dictionary:
-	if not AGENDAS.has(card_type):
-		return {}
-	var data: Dictionary = AGENDAS[card_type].duplicate()
-	var info: Dictionary = AXIS_TITLES[data["axis"]]
-	data["side"] = info["pos"] if int(data["dir"]) > 0 else info["neg"]
-	data["axis_title"] = info["title"]
-	return data
+## Gündemde yasa sunulabilecek iki grup (gündemin çifti).
+func agenda_groups(agenda_type: String) -> Array:
+	var data := agenda_data(agenda_type)
+	if data.is_empty():
+		return []
+	return (VoterGroups.PAIRS[data["pair"]] as Array).duplicate()
 
 ## Gündemin yasalar üzerindeki etkisini anlatan kısa metin.
-func agenda_effect_text(card_type: String) -> String:
-	var data := agenda_data(card_type)
-	if data.is_empty():
+func agenda_effect_text(agenda_type: String) -> String:
+	var groups := agenda_groups(agenda_type)
+	if groups.size() != 2:
 		return ""
-	return "sadece %s ekseninde yasa sunulabilir (%s ya da %s)" % [data["axis_title"], data["side"],
-		String(AXIS_TITLES[data["axis"]]["pos" if int(data["dir"]) < 0 else "neg"])]
+	return "sadece %s ya da %s için yasa sunulabilir" % [VoterGroups.title(groups[0]), VoterGroups.title(groups[1])]
 
 func is_censure_card(card_type: String) -> bool:
 	return card_type == CENSURE_CARD_TYPE
 
-## Yasa hamlesinin türü: "law:economic:1".
-func law_type(axis: String, dir: int) -> String:
-	return "%s%s:%d" % [LAW_PREFIX, axis, 1 if dir > 0 else -1]
+## Yasa hamlesinin türü: "law:isci".
+func law_type(group: String) -> String:
+	return LAW_PREFIX + group
 
 func is_law_card(card_type: String) -> bool:
 	return not law_data(card_type).is_empty()
 
-## {"axis", "dir", "title", "side"} ya da (yasa değilse) boş sözlük.
+## {"group", "title", "group_title", "opposite", "problem"} ya da (yasa değilse) boş sözlük.
 func law_data(card_type: String) -> Dictionary:
 	if not card_type.begins_with(LAW_PREFIX):
 		return {}
-	var parts := card_type.substr(LAW_PREFIX.length()).split(":")
-	if parts.size() != 2 or not LAW_TITLES.has(parts[0]):
+	var group := card_type.substr(LAW_PREFIX.length())
+	if not VoterGroups.is_group(group):
 		return {}
-	var axis: String = parts[0]
-	var dir := 1 if int(parts[1]) > 0 else -1
-	var info: Dictionary = AXIS_TITLES[axis]
-	return {"axis": axis, "dir": dir, "title": LAW_TITLES[axis][dir], "side": info["pos"] if dir > 0 else info["neg"]}
+	var info := VoterGroups.data(group)
+	return {"group": group, "title": String(info["law_title"]), "group_title": VoterGroups.title(group),
+		"opposite": VoterGroups.opposite(group), "problem": String(info["law_problem"])}
 
 func card_cost(card_type: String) -> int:
 	return int(CARD_MANA_COSTS.get(card_type, 0))
@@ -327,30 +331,25 @@ func card_title(card_type: String) -> String:
 			return "Erken Seçim"
 	return card_type
 
-## Yasanın yönünü okunur yazar: "Ekonomi → Piyasacı".
+## Yasanın hedef grubu: "İşçiler ve Sendikalar".
 func law_direction_text(card_type: String) -> String:
 	var law := law_data(card_type)
 	if law.is_empty():
 		return ""
-	return "%s → %s" % [AXIS_TITLES[law["axis"]]["title"], law["side"]]
+	return String(law["group_title"])
 
-## Gözcü bilgisi: "Ekonomi: Devletçi" / "Ekonomi: Orta".
-func leaning_text(axis: String, value: int) -> String:
-	var info: Dictionary = AXIS_TITLES.get(axis, {"title": axis, "neg": "-", "pos": "+"})
-	var side: String = "Orta"
-	if value < 0:
-		side = info["neg"]
-	elif value > 0:
-		side = info["pos"]
-	return "%s: %s" % [info["title"], side]
-
-## Yasa dairesinin üstüne gelince gösterilen kısa açıklama.
+## Yasanın kabul / ret etkisini anlatan metin (gerçek kurallardan).
 func law_description(card_type: String) -> String:
 	var law := law_data(card_type)
 	if law.is_empty():
 		return ""
-	return "Bu görüşe yakın illerde güç kazanırsın, zıt illerde kaybedersin.\nKabul edilirse etkisi 2 katı. Partin %s yönüne 1 adım kayar;
-EVET diyenler bu yöne, HAYIR diyenler ters yöne yarım adım kayar." % law["side"]
+	var group := String(law["group"])
+	var backlash := float(VoterGroups.data(group).get("law_backlash", 0.4))
+	return ("Sorun: %s.\nKabul edilirse %s yakınlığın +%.1f, %s −%.1f (ulusal, kalıcı; azalan getirili).\n"
+		+ "Reddedilirse vaat olarak kalır: +%.1f / −%.1f. EVET diyenler bu gruba, HAYIR diyenler karşıt gruba biraz yaklaşır.") % [
+		law["problem"], law["group_title"], PublicOpinion.LAW_GROUP_GAIN_PASSED,
+		VoterGroups.title(String(law["opposite"])), PublicOpinion.LAW_GROUP_GAIN_PASSED * backlash,
+		PublicOpinion.LAW_GROUP_GAIN_REJECTED, PublicOpinion.LAW_GROUP_GAIN_REJECTED * backlash]
 
 ## Karta dokununca gösterilen açıklama (kısa ve somut) + mana bedeli.
 func card_description(card_type: String) -> String:
@@ -369,7 +368,7 @@ func _card_effect_text(card_type: String) -> String:
 		var far: Dictionary = STEAL_RANGES_FAR[card_type]
 		var cost_line := "Güçlü varyantta ulusal desteğin biraz düşer; normalde bedel yok." if card_type == STEAL_STRONG_CARD_TYPE \
 			else "Bedeli yok; çalınan parti mağduriyetten biraz destek kazanır."
-		return "Seçtiğin partiden vekil çal: %d-%d; görüşü sana yakınsa %d-%d'e kadar, zıt uçtaysa %d-%d.\n%s\nSeç, sonra soldaki bir partiye tıkla." % [
+		return "Seçtiğin partiden vekil çal: %d-%d; aynı seçmen gruplarına hitap ediyorsa %d-%d'e kadar, çok farklıysa %d-%d.\n%s\nSeç, sonra soldaki bir partiye tıkla." % [
 			int(r["min"]), int(r["max"]), int(close["min"]), int(close["max"]),
 			int(far["min"]), int(far["max"]), cost_line]
 	match card_type:
@@ -398,9 +397,9 @@ func _card_effect_text(card_type: String) -> String:
 		CENSURE_CARD_TYPE:
 			return "Hükümeti düşürmek için gensoru ver.\nSeçmek için dokun, tekrar dokun: kullan."
 		MITING_CARD_TYPE:
-			return "Seçtiğin ilde güç kazan (+%.0f).\nİl sana uzaksa provokasyon riski var." % PublicOpinion.MITING_LOCAL
+			return "Seçtiğin ilde güç kazan (+%.0f); partin ilin kalabalık seçmen gruplarına yaklaşır (ulusal), karşıt gruplarda biraz kaybeder.\nİlin seçmeni sana uzaksa provokasyon riski var." % PublicOpinion.MITING_LOCAL
 		INVEST_CARD_TYPE:
-			return "Hükümet: seçtiğin ile yatırım.\nSen +%.0f, ortakların +%.1f güç kazanır." % [PublicOpinion.INVEST_LOCAL, PublicOpinion.INVEST_PARTNER_LOCAL]
+			return "Hükümet: seçtiğin ile yatırım (yerel memnuniyet, grup yakınlığını değiştirmez).\nSen +%.0f, ortakların +%.1f güç kazanır." % [PublicOpinion.INVEST_LOCAL, PublicOpinion.INVEST_PARTNER_LOCAL]
 		PROPAGANDA_CARD_TYPE:
 			return "Bir ilde bir partiyi karala: ona eksi, sana artı.\nİlde güçlü olan partiye az işler."
 		POPULISM_CARD_TYPE:

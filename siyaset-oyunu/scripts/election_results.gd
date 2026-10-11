@@ -48,7 +48,8 @@ var _refresh_left := 0.0
 var _map_refresh_left := 0.0
 var _last_map_key := ""
 var _last_parliament_key := ""
-## Meclis diyagramında partilerin sabit sırası (ekonomik eksen: soldan sağa).
+## Meclis diyagramında partilerin sabit sırası: işçi desteği yüksek olanlar
+## solda, işveren desteği yüksek olanlar sağda (sadece görsel sıralama).
 var _party_order: Array = []
 ## peer_id -> {"percent", "rank"} ekranda gösterilen (yumuşatılmış) değerler.
 var _display: Dictionary = {}
@@ -102,10 +103,10 @@ func _ready() -> void:
 		CardManager.passed_threshold, MultiplayerManager.election_threshold, _seed(), DURATION)
 	_party_order = _sim.peer_ids.duplicate()
 	_party_order.sort_custom(func(a, b):
-		var ia: Dictionary = _party(a).get("ideology", {})
-		var ib: Dictionary = _party(b).get("ideology", {})
-		var ea := float(ia.get("economic", 0))
-		var eb := float(ib.get("economic", 0))
+		var ia: Dictionary = _party(a).get("groups", {})
+		var ib: Dictionary = _party(b).get("groups", {})
+		var ea := float(ia.get("isveren", 50)) - float(ia.get("isci", 50))
+		var eb := float(ib.get("isveren", 50)) - float(ib.get("isci", 50))
 		if ea != eb:
 			return ea < eb
 		return int(a) < int(b))

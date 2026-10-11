@@ -91,7 +91,7 @@ static func do_action(bot: int) -> Dictionary:
 	var speech_before := CardManager.speech_done
 	match String(action["type"]):
 		"speech":
-			CardManager._apply_speech(bot, String(action["axis"]), int(action["dir"]))
+			CardManager._apply_speech(bot, String(action["group"]))
 		"law":
 			CardManager._apply_law(bot, String(action["law"]))
 			if CardManager.has_proposed_law_this_round(bot):

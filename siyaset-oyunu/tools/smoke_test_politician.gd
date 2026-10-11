@@ -24,7 +24,7 @@ func _initialize() -> void:
 	root.get_node("BotManager").set_process(false)
 
 	print("=== SIYASETCI PROFILI ===")
-	check("6 gecmis, her eksen ucu bir kez", _covers_all_sides())
+	check("6 gecmis, her biri farkli bir secmen grubuyla", _covers_all_sides())
 	mm.start_offline("Barış")
 	for i in 3:
 		mm.add_bot()
@@ -33,9 +33,12 @@ func _initialize() -> void:
 	var map_before: Array = gmap.province_ids().duplicate()
 	var home := String(gmap.province_ids()[0])
 	pm.set_my_politician(PP.make("Ayla", "Gökyelken", "is_insani", home))
-	var ideology: Dictionary = {"economic": -1.5, "social": -1.5, "administrative": 1.5}
-	check("is insani + devletci secim -1 olur", is_equal_approx(float(PP.shifted_ideology("is_insani", ideology)["economic"]), -1.0))
-	pm.set_party_and_ready("Yeni Yol", 3, Color.WHITE, Color("F20C1F"), ideology, true)
+	var core: Array = ["isci", "ilerici"]
+	var start: Dictionary = VoterGroups.start_affinities(core)
+	var boosted: Dictionary = PP.boosted_affinities("is_insani", start)
+	check("is insani isverenlere biraz yaklastirir (isci cekirdekli partide bile)", float(boosted["isveren"]) > float(start["isveren"]) \
+		and float(boosted["isveren"]) <= float(start["isveren"]) + PP.BACKGROUND_GROUP_BONUS)
+	pm.set_party_and_ready("Yeni Yol", 3, Color.WHITE, Color("F20C1F"), core, true)
 	var me: int = mm.owner_id
 	check("oyun basladi", mm.stage == mm.Stage.IN_GAME)
 	check("oyun ayni haritada", gmap.province_ids() == map_before)
@@ -48,19 +51,21 @@ func _initialize() -> void:
 	var neighbor := String(gmap.neighbors().get(home, [""])[0])
 	check("hemsehri destegi memlekette", is_equal_approx(PP.hometown_activity(home, me), PP.HOMETOWN_ACTIVITY))
 	check("komsu il etkilenmez", PP.hometown_activity(neighbor, me) == 0.0)
-	check("oyun basinda geçmis kaymasi uygulandi", is_equal_approx(float(pm.parties[me]["ideology"]["economic"]), -1.0),
-		str(pm.parties[me]["ideology"]))
+	check("oyun basinda gecmis bonusu uygulandi", is_equal_approx(float(pm.parties[me]["groups"]["isveren"]), float(boosted["isveren"])),
+		str(pm.parties[me]["groups"]))
+	check("cekirdek gruplar korundu", is_equal_approx(float(pm.parties[me]["groups"]["isci"]), VoterGroups.CORE_START))
 	check("aktiviteye eklendi", cm.activity_of(home, me) >= PublicOpinion.org_activity(2) + PP.HOMETOWN_ACTIVITY - 0.01,
 		"%.2f" % cm.activity_of(home, me))
 	var all_bots_ok := true
 	for bot in mm.bot_ids():
 		var bh: String = PP.hometown_of(bot)
 		var bg: Dictionary = PP.background(PP.background_of(bot))
-		var bot_ideology: Dictionary = pm.parties[bot]["ideology"]
+		var bot_groups: Dictionary = pm.parties[bot]["groups"]
+		var bot_start: Dictionary = VoterGroups.start_affinities(pm.parties[bot]["core"])
 		if bh == "" or cm.organization_level(bh, bot) != PP.HOMETOWN_ORG_LEVEL \
-				or not [1.0, 2.0].has(absf(float(bot_ideology[bg["axis"]]))):
+				or float(bot_groups[bg["group"]]) <= float(bot_start[bg["group"]]):
 			all_bots_ok = false
-	check("botlarin da siyasetcisi, memleketi ve gecmis kaymasi var", all_bots_ok)
+	check("botlarin da siyasetcisi, memleketi ve gecmis bonusu var", all_bots_ok)
 
 	# Geçmiş avantajları.
 	var bot: int = mm.bot_ids()[0]
@@ -128,5 +133,6 @@ func _covers_all_sides() -> bool:
 	var seen := {}
 	for id in PP.BACKGROUND_ORDER:
 		var info: Dictionary = PP.background(id)
-		seen["%s%d" % [info["axis"], int(info["dir"])]] = true
+		if VoterGroups.is_group(String(info.get("group", ""))):
+			seen[info["group"]] = true
 	return PP.BACKGROUNDS.size() == 6 and seen.size() == 6

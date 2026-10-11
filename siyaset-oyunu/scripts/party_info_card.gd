@@ -1,8 +1,9 @@
 class_name PartyInfoCard
 extends RefCounted
 ## Sağdaki oyuncu kartının üstüne gelince çıkan parti profili: parti ve oyuncu
-## adı, meclis / oy / puan / kamuoyu bilgisi, hükümetteki yeri ve ideoloji
-## tablosu (her eksende -3..+3 arası 7 kutu, partinin konumu kendi renginde).
+## adı, meclis / oy / puan / kamuoyu bilgisi, hükümetteki yeri ve 8 seçmen
+## grubundaki ULUSAL desteği (grup renginde çubuklar, son seçimden beri değişim,
+## varsa geçici toplantı desteği).
 
 const WIDTH := 320.0
 const DIM := UiTheme.TEXT_MUTED
@@ -67,10 +68,7 @@ static func build(peer_id: int, my_id: int, on_action: Callable = Callable(), wi
 	role_row.add_child(PopupKit.chip(role, UiTheme.GREEN if role.begins_with("Hükümet:") else UiTheme.TEXT_MUTED))
 	box.add_child(role_row)
 
-	box.add_child(PopupKit.section("İdeoloji"))
-	var ideology: Dictionary = party.get("ideology", IdeologyAxes.default_values())
-	for axis in IdeologyAxes.AXES:
-		box.add_child(_axis_row(axis, float(ideology.get(axis, 0)), color))
+	_add_group_section(box, peer_id)
 	if on_action.is_valid():
 		var actions := _actions(peer_id, my_id, on_action)
 		if actions != null:
@@ -163,60 +161,25 @@ static func role_text(peer_id: int) -> String:
 		return "Muhalefet"
 	return "Hükümet: " + ", ".join(PackedStringArray(posts))
 
-## value: 0.5 adımlı; ölçekte her yarım adım bir hücre (−3 … +3 = 13 hücre).
-static func _axis_row(axis: String, value: float, color: Color) -> Control:
-	var titles: Dictionary = CardPresets.AXIS_TITLES.get(axis, {"title": axis, "neg": "-", "pos": "+"})
-	var info: Array = [titles["title"], titles["neg"], titles["pos"]]
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 2)
-	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	var top := HBoxContainer.new()
-	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(top)
-	var title := _label(String(info[0]), PopupKit.FS_TEXT, UiTheme.TEXT)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top.add_child(title)
-	top.add_child(_label(IdeologyAxes.position_text(axis, value), PopupKit.FS_TEXT, color.lightened(0.35)))
-
-	var scale := HBoxContainer.new()
-	scale.add_theme_constant_override("separation", 3 if PopupKit.embedded else 6)
-	scale.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(scale)
-	var left := _label(String(info[1]), PopupKit.FS_SECTION, DIM)
-	var side_width := 68.0 if PopupKit.embedded else 64.0
-	var cell_width := 5.0 if PopupKit.embedded else 10.0
-	left.custom_minimum_size = Vector2(side_width, 0)
-
-	left.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	scale.add_child(left)
-	var cells := HBoxContainer.new()
-	cells.add_theme_constant_override("separation", 1 if PopupKit.embedded else 2)
-	cells.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	cells.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	scale.add_child(cells)
-	var steps := int(roundf((IdeologyAxes.AXIS_MAX - IdeologyAxes.AXIS_MIN) / IdeologyAxes.STEP))
-	for i in steps + 1:
-		var v: float = IdeologyAxes.AXIS_MIN + i * IdeologyAxes.STEP
-		var whole := is_equal_approx(v, roundf(v))
-		var cell := Panel.new()
-		cell.custom_minimum_size = Vector2(cell_width, 12)
-		cell.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var cell_color := color if is_equal_approx(v, value) else (
-			UiTheme.PANEL_LIGHT if is_zero_approx(v) else (UiTheme.PANEL if whole else UiTheme.SLOT))
-		var cell_style := StyleBoxFlat.new()
-		cell_style.bg_color = cell_color
-		if is_equal_approx(v, value):
-			cell_style.border_color = Color.WHITE
-			cell_style.set_border_width_all(1)
-		cell.add_theme_stylebox_override("panel", cell_style)
-		cells.add_child(cell)
-	var right := _label(String(info[2]), PopupKit.FS_SECTION, DIM)
-	right.custom_minimum_size = Vector2(side_width, 0)
-
-	scale.add_child(right)
-	return box
+## SEÇMEN GRUPLARI: partinin 8 gruptaki ulusal desteği + en güçlü / en zayıf özeti.
+static func _add_group_section(box: VBoxContainer, peer_id: int) -> void:
+	var pid := CardManager.party_of(peer_id)
+	var groups := PartyManager.groups_of(pid)
+	var bonuses := CardManager.meeting_bonuses(pid)
+	var before: Dictionary = CardManager.election_groups.get(pid, {})
+	box.add_child(PopupKit.section("Seçmen grupları", "ulusal destek"))
+	var ranked := VoterGroups.ranked_groups(groups)
+	box.add_child(PopupKit.note("En güçlü: %s · en zayıf: %s" % [VoterGroups.title(ranked[0]), VoterGroups.title(ranked[-1])],
+		UiTheme.TEXT_MUTED, _text_width()))
+	var list := VBoxContainer.new()
+	list.add_theme_constant_override("separation", 3)
+	list.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(list)
+	for group in VoterGroups.GROUP_IDS:
+		var value := float(groups.get(group, VoterGroups.AFFINITY_NEUTRAL))
+		var delta := value - float(before[group]) if before.has(group) else 0.0
+		list.add_child(VoterGroupUI.affinity_row(group, value, float(bonuses.get(group, 0.0)), delta))
+	box.add_child(PopupKit.note("Destek, grubun ülkedeki nüfus payı değildir. ▲▼: son seçimden beri.", DIM, _text_width()))
 
 ## Sarmalı notların genişliği (çerçeveli kartta iç boşluk düşülür).
 static func _text_width() -> float:

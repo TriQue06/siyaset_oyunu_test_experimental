@@ -192,7 +192,7 @@ func _record_election(g: int, round_snapshot: Dictionary, prev_seats: Dictionary
 	for s in LUCK_RESEEDS:
 		var rng := RandomNumberGenerator.new()
 		rng.seed = 100000 + g * 100 + s
-		var r := ElectionModel.compute(inputs["ideologies"], seat_counts, inputs["voters"], float(inputs["threshold"]),
+		var r := ElectionModel.compute(inputs["groups"], seat_counts, inputs["voters"], float(inputs["threshold"]),
 			rng, mods)
 		if _top_party(r["seats"]) != base_top:
 			top_changes += 1

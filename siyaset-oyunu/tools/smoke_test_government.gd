@@ -25,7 +25,7 @@ func setup_parties(seats: Dictionary) -> void:
 		pm.parties[peer_id] = {
 			"name": "Parti%d" % peer_id, "icon_index": i % 6,
 			"icon_color": Color.WHITE, "bg_color": Color(0.2 * i, 0.4, 0.6),
-			"ideology": {"economic": 0, "social": 0, "administrative": 0}, "ready": true,
+			"groups": VoterGroups.neutral_affinities(), "ready": true,
 		}
 		cm.last_seats[peer_id] = seats[peer_id]
 		cm.last_vote_shares[peer_id] = float(seats[peer_id])
@@ -125,7 +125,7 @@ func _initialize() -> void:
 	cm.election_seats = {1: 0, 3: 110}
 	check("meclis disi parti de calabilir", cm.is_valid_steal_target(1, 3))
 	check("meclis disi yari verim", is_equal_approx(cm.steal_efficiency(1), 0.5), str(cm.steal_efficiency(1)))
-	var full: Dictionary = cp.steal_range("steal_strong", cm.ideological_closeness(1, 3))
+	var full: Dictionary = cp.steal_range("steal_strong", cm.group_closeness(1, 3))
 	var halved: Dictionary = cm.steal_range(1, 3, "steal_strong")
 	check("araliklar yariya indi", int(halved["max"]) <= int(full["max"]) / 2 + 1, "%s vs %s" % [halved, full])
 	cm.election_seats = {1: 150, 3: 110}

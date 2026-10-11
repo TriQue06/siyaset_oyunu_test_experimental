@@ -36,7 +36,7 @@ func _initialize() -> void:
 		var p: Dictionary = PARTIES[i]
 		mm.players[ids[i]] = {"name": p["leader"], "bot": i != 0}
 		pm.parties[ids[i]] = {"name": p["name"], "icon_index": p["icon"], "icon_color": Color.WHITE,
-			"bg_color": Color(p["color"]), "ideology": {"economic": 0, "social": 0, "administrative": 0}, "ready": true}
+			"bg_color": Color(p["color"]), "groups": VoterGroups.neutral_affinities(), "ready": true}
 	cm.init_game()
 	gm.result_hold_seconds = 0.0
 	cm.turn_order = ids.duplicate()

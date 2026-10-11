@@ -34,7 +34,7 @@ func _initialize() -> void:
 	for i in ids.size():
 		mm.players[ids[i]] = {"name": "Lider %d" % i, "bot": i != 0}
 		pm.parties[ids[i]] = {"name": "Parti %d" % i, "icon_index": i, "icon_color": Color.WHITE,
-			"bg_color": Color.RED, "ideology": {"economic": 0, "social": 0, "administrative": 0}, "ready": true}
+			"bg_color": Color.RED, "groups": VoterGroups.neutral_affinities(), "ready": true}
 	cm.init_game()
 	gm.result_hold_seconds = 0.0
 	cm.turn_order = ids.duplicate()

@@ -1,6 +1,7 @@
 extends Node
 ## Autoload. Parti kurulum ekranındaki her oyuncunun kendi parti verisini
-## (isim, ikon index'i, ikon rengi, arka plan rengi, ideoloji, hazır mı) tutar
+## (isim, ikon index'i, ikon rengi, arka plan rengi, çekirdek seçmen grupları,
+## hazır mı) tutar
 ## ve senkronize eder.
 ##
 ## Herkes SADECE KENDİ verisini değiştirebilir. MultiplayerManager'daki
@@ -19,7 +20,8 @@ const NAME_MAX_LENGTH := 15
 
 # peer_id -> {
 #   "name": String, "icon_index": int, "icon_color": Color, "bg_color": Color,
-#   "ideology": {"economic": int, "social": int, "administrative": int},
+#   "core": Array[String] (kuruluşta seçilen 2 çekirdek seçmen grubu),
+#   "groups": {grup_id: 0..100} (8 seçmen grubundaki ULUSAL yakınlık; bkz. VoterGroups),
 #   "ready": bool,
 # }
 var parties: Dictionary = {}
@@ -148,26 +150,26 @@ static func is_valid_name(party_name: String) -> bool:
 static func is_valid_colors(icon_color: Color, bg_color: Color) -> bool:
 	return not icon_color.is_equal_approx(bg_color)
 
-## Bu oyuncunun parti verisini ayarlar (isim/ikon/renk/ideoloji seçimi
-## değiştikçe çağrılır). ideology: IdeologyAxes.is_valid_start_ideology()'yi
-## geçmeli (kuruluşta uç/nötr yasak).
-func set_my_party(party_name: String, icon_index: int, icon_color: Color, bg_color: Color, ideology: Dictionary) -> void:
+## Bu oyuncunun parti verisini ayarlar (isim/ikon/renk/çekirdek grup seçimi
+## değiştikçe çağrılır). core: VoterGroups.is_valid_core()'u geçmeli (farklı
+## çiftlerden 2 grup).
+func set_my_party(party_name: String, icon_index: int, icon_color: Color, bg_color: Color, core: Array) -> void:
 	if not is_valid_name(party_name):
 		return
 	if not is_valid_colors(icon_color, bg_color):
 		return
-	if not IdeologyAxes.is_valid_start_ideology(ideology):
+	if not VoterGroups.is_valid_core(core):
 		return
 	if MultiplayerManager.is_standalone_preview():
 		# Aktif bir oyun yok (örn. sahne editörde tek başına çalıştırılıyor)
 		# — RPC atmadan sadece yerel önizlemeye izin ver.
-		_apply_party_local_only(party_name, icon_index, icon_color, bg_color, ideology)
+		_apply_party_local_only(party_name, icon_index, icon_color, bg_color, core)
 		return
 	var my_id := multiplayer.get_unique_id()
 	if MultiplayerManager.is_host:
-		_apply_party(my_id, party_name, icon_index, icon_color, bg_color, ideology)
+		_apply_party(my_id, party_name, icon_index, icon_color, bg_color, core)
 	else:
-		_request_set_party.rpc_id(1, party_name, icon_index, icon_color, bg_color, ideology)
+		_request_set_party.rpc_id(1, party_name, icon_index, icon_color, bg_color, core)
 
 ## Parti verisini ve hazır durumunu AYNI ANDA, TEK bir RPC ile ayarlar.
 ## "Kilitle ve Hazır Ver"e basınca kullanılmalı — set_my_party() sonra ayrı
@@ -175,18 +177,18 @@ func set_my_party(party_name: String, icon_index: int, icon_color: Color, bg_col
 ## hızlıca art arda basılırsa) host'un "hazır" bayrağını partinin SON
 ## değişikliği ulaşmadan uygulayıp oyunu erken başlatma riski olurdu — bu
 ## fonksiyon ikisini TEK mesajda birleştirerek bunu imkansız kılar.
-func set_party_and_ready(party_name: String, icon_index: int, icon_color: Color, bg_color: Color, ideology: Dictionary, is_ready_value: bool) -> void:
+func set_party_and_ready(party_name: String, icon_index: int, icon_color: Color, bg_color: Color, core: Array, is_ready_value: bool) -> void:
 	if not is_valid_name(party_name):
 		return
 	if not is_valid_colors(icon_color, bg_color):
 		return
-	if not IdeologyAxes.is_valid_start_ideology(ideology):
+	if not VoterGroups.is_valid_core(core):
 		return
 	# ÇEVRİM DIŞI OYUN BURAYA GİRMEZ: girdiğinde "hazır" bayrağı sadece
 	# yerelde işaretlenip finish_party_setup() hiç çağrılmıyordu, yani
 	# hazır verince oyun başlamıyordu.
 	if MultiplayerManager.is_standalone_preview():
-		_apply_party_local_only(party_name, icon_index, icon_color, bg_color, ideology)
+		_apply_party_local_only(party_name, icon_index, icon_color, bg_color, core)
 		var id := multiplayer.get_unique_id()
 		if parties.has(id):
 			parties[id]["ready"] = is_ready_value
@@ -194,9 +196,9 @@ func set_party_and_ready(party_name: String, icon_index: int, icon_color: Color,
 		return
 	var my_id := multiplayer.get_unique_id()
 	if MultiplayerManager.is_host:
-		_apply_party_and_ready(my_id, party_name, icon_index, icon_color, bg_color, ideology, is_ready_value)
+		_apply_party_and_ready(my_id, party_name, icon_index, icon_color, bg_color, core, is_ready_value)
 	else:
-		_request_set_party_and_ready.rpc_id(1, party_name, icon_index, icon_color, bg_color, ideology, is_ready_value)
+		_request_set_party_and_ready.rpc_id(1, party_name, icon_index, icon_color, bg_color, core, is_ready_value)
 
 ## Bu oyuncunun hazır durumunu ayarlar ("Kilitle ve Hazır Ver" / iptal).
 func set_ready(is_ready_value: bool) -> void:
@@ -309,8 +311,9 @@ func auto_ready_away(peer_id: int) -> void:
 		for other in parties.values():
 			colors.append(Color(other.get("bg_color", Color.TRANSPARENT)))
 		party["bg_color"] = _pick_distinct_color(colors)
-	if not party.has("ideology"):
-		party["ideology"] = IdeologyAxes.random_start_ideology()
+	if not VoterGroups.is_valid_core(party.get("core", [])):
+		party["core"] = VoterGroups.random_core()
+		party["groups"] = VoterGroups.start_affinities(party["core"])
 	party["ready"] = true
 	parties[peer_id] = party
 	if not politicians.has(peer_id):
@@ -333,9 +336,11 @@ func add_bot_party(peer_id: int) -> void:
 		"icon_index": PartyPresets.random_icon_index(),
 		"icon_color": Color.WHITE,
 		"bg_color": Color.TRANSPARENT,
-		"ideology": IdeologyAxes.random_start_ideology(),
 		"ready": true,
 	}
+	var bot_core := VoterGroups.random_core()
+	parties[peer_id]["core"] = bot_core
+	parties[peer_id]["groups"] = VoterGroups.start_affinities(bot_core)
 	var background := PoliticianPresets.random_background()
 	var homes := GameMap.province_ids()
 	var bot_name := PoliticianPresets.random_name(PoliticianPresets.used_surnames(peer_id))
@@ -346,7 +351,7 @@ func add_bot_party(peer_id: int) -> void:
 		_broadcast_parties()
 	parties_updated.emit()
 
-## BÖLÜNEN PARTİ: ana partiyle BİREBİR aynı görüş ve logo, BENZER (aynı değil)
+## BÖLÜNEN PARTİ: ana partiyle BİREBİR aynı grup yakınlıkları ve logo, BENZER (aynı değil)
 ## renk. Host çağırır (bkz. CardManager._split_party).
 func add_splinter_party(peer_id: int, parent_id: int, party_name: String) -> void:
 	var parent: Dictionary = parties.get(parent_id, {})
@@ -355,7 +360,8 @@ func add_splinter_party(peer_id: int, parent_id: int, party_name: String) -> voi
 		"icon_index": int(parent.get("icon_index", 0)),
 		"icon_color": Color.WHITE,
 		"bg_color": similar_color(Color(parent.get("bg_color", Color(0.5, 0.5, 0.5)))),
-		"ideology": (parent.get("ideology", IdeologyAxes.default_values()) as Dictionary).duplicate(),
+		"core": (parent.get("core", []) as Array).duplicate(),
+		"groups": (parent.get("groups", VoterGroups.neutral_affinities()) as Dictionary).duplicate(),
 		"ready": true,
 		"splinter_of": parent_id,
 	}
@@ -377,38 +383,40 @@ func remove_party(peer_id: int) -> void:
 		_broadcast_parties()
 	parties_updated.emit()
 
-## Oyun sırasında (kart oynanınca vb.) bir partinin ideoloji eksenini kaydırır.
-## Sadece host çağırır (bkz. CardManager._apply_play). Oyun ortasında uç/nötr
-## yasağı YOKTUR, 0.5 adıma yuvarlanıp [-3, 3] aralığına sıkıştırılır.
-func apply_ideology_delta(peer_id: int, axis: String, delta: float) -> void:
-	apply_ideology_deltas([{"peer": peer_id, "axis": axis, "delta": delta}])
+## Partinin 8 seçmen grubundaki ulusal yakınlığı (yoksa nötr).
+func groups_of(peer_id: int) -> Dictionary:
+	return data_of(peer_id).get("groups", VoterGroups.neutral_affinities())
 
-## Birden çok kaydırmayı tek yayınla uygular (yasa oylamasında herkes kayar).
-## changes: [{"peer": int, "axis": String, "delta": float}]
-func apply_ideology_deltas(changes: Array) -> void:
+## Oyun sırasında (yasa, miting...) partilerin GRUP YAKINLIKLARINI değiştirir.
+## Sadece host çağırır. Azalan getiri ve çift dengesi VoterGroups.apply_delta'da.
+## changes: [{"peer": int, "group": String, "amount": float}]
+## Dönüş: gerçekleşen değişimler [{"peer", "group", "delta"}].
+func apply_group_deltas(changes: Array) -> Array:
+	var actual: Array = []
 	# room_code == "" : aktif oda yok (örn. sahne editörde tek başına test) —
 	# yerel önizleme için host kontrolünü atla.
 	if MultiplayerManager.room_code != "" and not MultiplayerManager.is_host:
-		return
-	var changed := false
+		return actual
 	for change in changes:
 		var peer_id := int(change["peer"])
-		if not parties.has(peer_id) or is_zero_approx(float(change["delta"])):
+		var group := String(change["group"])
+		if not parties.has(peer_id) or is_zero_approx(float(change["amount"])) or not VoterGroups.is_group(group):
 			continue
-		var axis := String(change["axis"])
-		var ideology: Dictionary = parties[peer_id].get("ideology", IdeologyAxes.default_values())
-		ideology[axis] = IdeologyAxes.clamp_value(float(ideology.get(axis, 0)) + float(change["delta"]))
-		parties[peer_id]["ideology"] = ideology
-		changed = true
-	if not changed:
-		return
+		var groups: Dictionary = (parties[peer_id].get("groups", VoterGroups.neutral_affinities()) as Dictionary).duplicate()
+		var delta := VoterGroups.apply_delta(groups, group, float(change["amount"]))
+		parties[peer_id]["groups"] = groups
+		if not is_zero_approx(delta):
+			actual.append({"peer": peer_id, "group": group, "delta": delta})
+	if actual.is_empty():
+		return actual
 	if MultiplayerManager.room_code == "":
 		parties_updated.emit()
-		return
+		return actual
 	_broadcast_parties()
 	parties_updated.emit()
+	return actual
 
-func _apply_party_local_only(party_name: String, icon_index: int, icon_color: Color, bg_color: Color, ideology: Dictionary) -> void:
+func _apply_party_local_only(party_name: String, icon_index: int, icon_color: Color, bg_color: Color, core: Array) -> void:
 	var id := multiplayer.get_unique_id()
 	if not _claim_color(id, bg_color):
 		parties_updated.emit()
@@ -419,13 +427,14 @@ func _apply_party_local_only(party_name: String, icon_index: int, icon_color: Co
 		"icon_index": icon_index,
 		"icon_color": icon_color,
 		"bg_color": bg_color,
-		"ideology": ideology,
+		"core": core.duplicate(),
+		"groups": VoterGroups.start_affinities(core),
 		"ready": was_ready,
 	}
 	_adjust_bot_colors()
 	parties_updated.emit()
 
-func _apply_party(peer_id: int, party_name: String, icon_index: int, icon_color: Color, bg_color: Color, ideology: Dictionary) -> void:
+func _apply_party(peer_id: int, party_name: String, icon_index: int, icon_color: Color, bg_color: Color, core: Array) -> void:
 	if not _claim_color(peer_id, bg_color):
 		_broadcast_parties()  # reddedildi: istemci güncel renkleri görsün
 		parties_updated.emit()
@@ -436,14 +445,15 @@ func _apply_party(peer_id: int, party_name: String, icon_index: int, icon_color:
 		"icon_index": icon_index,
 		"icon_color": icon_color,
 		"bg_color": bg_color,
-		"ideology": ideology,
+		"core": core.duplicate(),
+		"groups": VoterGroups.start_affinities(core),
 		"ready": was_ready,
 	}
 	_adjust_bot_colors()
 	_broadcast_parties()
 	parties_updated.emit()
 
-func _apply_party_and_ready(peer_id: int, party_name: String, icon_index: int, icon_color: Color, bg_color: Color, ideology: Dictionary, is_ready_value: bool) -> void:
+func _apply_party_and_ready(peer_id: int, party_name: String, icon_index: int, icon_color: Color, bg_color: Color, core: Array, is_ready_value: bool) -> void:
 	if not _claim_color(peer_id, bg_color):
 		_broadcast_parties()
 		parties_updated.emit()
@@ -453,7 +463,8 @@ func _apply_party_and_ready(peer_id: int, party_name: String, icon_index: int, i
 		"icon_index": icon_index,
 		"icon_color": icon_color,
 		"bg_color": bg_color,
-		"ideology": ideology,
+		"core": core.duplicate(),
+		"groups": VoterGroups.start_affinities(core),
 		"ready": is_ready_value,
 	}
 	_adjust_bot_colors()
@@ -499,17 +510,17 @@ func _apply_color(peer_id: int, bg_color: Color) -> void:
 	parties_updated.emit()
 
 @rpc("any_peer", "reliable")
-func _request_set_party(party_name: String, icon_index: int, icon_color: Color, bg_color: Color, ideology: Dictionary) -> void:
+func _request_set_party(party_name: String, icon_index: int, icon_color: Color, bg_color: Color, core: Array) -> void:
 	if not MultiplayerManager.is_host:
 		return
 	if not is_valid_name(party_name):
 		return
 	if not is_valid_colors(icon_color, bg_color):
 		return
-	if not IdeologyAxes.is_valid_start_ideology(ideology):
+	if not VoterGroups.is_valid_core(core):
 		return
 	var sender_id := multiplayer.get_remote_sender_id()
-	_apply_party(sender_id, party_name, icon_index, icon_color, bg_color, ideology)
+	_apply_party(sender_id, party_name, icon_index, icon_color, bg_color, core)
 
 @rpc("any_peer", "reliable")
 func _request_set_ready(is_ready_value: bool) -> void:
@@ -519,17 +530,17 @@ func _request_set_ready(is_ready_value: bool) -> void:
 	_apply_ready(sender_id, is_ready_value)
 
 @rpc("any_peer", "reliable")
-func _request_set_party_and_ready(party_name: String, icon_index: int, icon_color: Color, bg_color: Color, ideology: Dictionary, is_ready_value: bool) -> void:
+func _request_set_party_and_ready(party_name: String, icon_index: int, icon_color: Color, bg_color: Color, core: Array, is_ready_value: bool) -> void:
 	if not MultiplayerManager.is_host:
 		return
 	if not is_valid_name(party_name):
 		return
 	if not is_valid_colors(icon_color, bg_color):
 		return
-	if not IdeologyAxes.is_valid_start_ideology(ideology):
+	if not VoterGroups.is_valid_core(core):
 		return
 	var sender_id := multiplayer.get_remote_sender_id()
-	_apply_party_and_ready(sender_id, party_name, icon_index, icon_color, bg_color, ideology, is_ready_value)
+	_apply_party_and_ready(sender_id, party_name, icon_index, icon_color, bg_color, core, is_ready_value)
 
 # --- Siyasetçi profili (bkz. PoliticianPresets) ---------------------------------------
 
@@ -593,21 +604,21 @@ func _request_set_politician(data: Dictionary) -> void:
 # --- Oda sahibi: bot partilerini düzenleme ------------------------------------------
 
 ## Oda sahibi bir botun partisinin adını, logosunu ve rengini değiştirir
-## (ideolojisi ve hazır durumu korunur). Renk başka bir partideyse reddedilir.
-## ideology boş verilirse botun görüşü değişmez.
-func set_bot_party(bot_id: int, party_name: String, icon_index: int, bg_color: Color, ideology: Dictionary = {}) -> void:
+## (çekirdek grupları ve hazır durumu korunur). Renk başka bir partideyse reddedilir.
+## core boş verilirse botun çekirdek grupları değişmez.
+func set_bot_party(bot_id: int, party_name: String, icon_index: int, bg_color: Color, core: Array = []) -> void:
 	if not MultiplayerManager.is_local_owner() or not MultiplayerManager.is_bot(bot_id):
 		return
 	if not is_valid_name(party_name) or not is_valid_colors(Color.WHITE, bg_color):
 		return
-	if not ideology.is_empty() and not IdeologyAxes.is_valid_start_ideology(ideology):
+	if not core.is_empty() and not VoterGroups.is_valid_core(core):
 		return
 	if MultiplayerManager.room_code == "" or MultiplayerManager.is_host:
-		_apply_bot_party(bot_id, party_name, icon_index, bg_color, ideology)
+		_apply_bot_party(bot_id, party_name, icon_index, bg_color, core)
 	else:
-		_request_set_bot_party.rpc_id(1, bot_id, party_name, icon_index, bg_color, ideology)
+		_request_set_bot_party.rpc_id(1, bot_id, party_name, icon_index, bg_color, core)
 
-func _apply_bot_party(bot_id: int, party_name: String, icon_index: int, bg_color: Color, ideology: Dictionary = {}) -> void:
+func _apply_bot_party(bot_id: int, party_name: String, icon_index: int, bg_color: Color, core: Array = []) -> void:
 	if not parties.has(bot_id) or icon_index < 0 or icon_index >= PartyPresets.icon_count():
 		return
 	if color_owner(bg_color, bot_id) != -1:
@@ -620,23 +631,24 @@ func _apply_bot_party(bot_id: int, party_name: String, icon_index: int, bg_color
 	if not Color(parties[bot_id].get("bg_color", Color.TRANSPARENT)).is_equal_approx(bg_color):
 		parties[bot_id]["color_locked"] = true
 	parties[bot_id]["bg_color"] = bg_color
-	if not ideology.is_empty():
-		parties[bot_id]["ideology"] = ideology.duplicate()
+	if not core.is_empty():
+		parties[bot_id]["core"] = core.duplicate()
+		parties[bot_id]["groups"] = VoterGroups.start_affinities(core)
 	if MultiplayerManager.room_code != "":
 		_broadcast_parties()
 	parties_updated.emit()
 
 @rpc("any_peer", "reliable")
-func _request_set_bot_party(bot_id: int, party_name: String, icon_index: int, bg_color: Color, ideology: Dictionary = {}) -> void:
+func _request_set_bot_party(bot_id: int, party_name: String, icon_index: int, bg_color: Color, core: Array = []) -> void:
 	if not MultiplayerManager.is_host:
 		return
 	if multiplayer.get_remote_sender_id() != MultiplayerManager.owner_id or not MultiplayerManager.is_bot(bot_id):
 		return
 	if not is_valid_name(party_name) or not is_valid_colors(Color.WHITE, bg_color):
 		return
-	if not ideology.is_empty() and not IdeologyAxes.is_valid_start_ideology(ideology):
+	if not core.is_empty() and not VoterGroups.is_valid_core(core):
 		return
-	_apply_bot_party(bot_id, party_name, icon_index, bg_color, ideology)
+	_apply_bot_party(bot_id, party_name, icon_index, bg_color, core)
 
 func _broadcast_parties() -> void:
 	state_version += 1

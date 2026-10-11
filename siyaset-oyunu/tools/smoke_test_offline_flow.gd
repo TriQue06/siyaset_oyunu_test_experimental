@@ -52,7 +52,7 @@ func play(seed_value: int, human_votes: bool) -> Dictionary:
 		mm.add_bot()
 	mm.start_game()
 	pm.set_party_and_ready("Yeni Yol", 3, Color.WHITE, Color("F20C1F"),
-		{"economic": 1.5, "social": -1.5, "administrative": 1.5}, true)
+		["isveren", "ilerici"], true)
 	if mm.stage != mm.Stage.IN_GAME:
 		return {"stall": true, "where": "oyun hic baslamadi", "seconds": 0.0, "elections": 0}
 	cm.set_rng_seed(seed_value)
@@ -136,11 +136,11 @@ func _kale_summary() -> String:
 				band += 1
 		bands[band] += 1
 	var spread := 0.0
-	for province_id in cm.province_ideology.keys():
-		for axis in IdeologyAxes.AXES:
-			spread += absf(float(cm.province_ideology[province_id][axis]))
-	spread /= maxf(1.0, cm.province_ideology.size() * 3.0)
-	return "bolunme %d, donus %d · il birincisi bantlari %s · illerin ort. |eksen| %.2f · baraj %%%s, sayim %s" % [
+	for province_id in cm.province_profiles.keys():
+		for pair in VoterGroups.PAIR_IDS:
+			spread += absf(float(cm.province_profiles[province_id][pair]) - 50.0)
+	spread /= maxf(1.0, cm.province_profiles.size() * VoterGroups.PAIR_IDS.size())
+	return "bolunme %d, donus %d · il birincisi bantlari %s · illerin ort. cift sapmasi %.1f puan · baraj %%%s, sayim %s" % [
 		splits, merges, str(bands), spread, String.num(mm.election_threshold, 1), mm.seat_method]
 
 func _initialize() -> void:

@@ -22,7 +22,7 @@ func _initialize() -> void:
 	var me: int = root.multiplayer.get_unique_id()
 	mm.room_code = ""
 	mm.players = {me: {"name": "Barış"}, 77: {"name": "Ayşe"}}
-	pm.parties = {77: {"name": "Yeşiller", "icon_index": 2, "icon_color": Color.WHITE, "bg_color": colors[0], "ideology": {}, "ready": true}}
+	pm.parties = {77: {"name": "Yeşiller", "icon_index": 2, "icon_color": Color.WHITE, "bg_color": colors[0], "core": ["isci", "dindar"], "groups": VoterGroups.start_affinities(["isci", "dindar"]), "ready": true}}
 	for i in 3:
 		var id: int = mm.BOT_ID_BASE - i
 		mm.players[id] = {"name": "Bot %d" % i, "bot": true}
@@ -39,12 +39,12 @@ func _initialize() -> void:
 	check("benim rengim Ayse'ninkinden farkli", not Color(pm.parties[me]["bg_color"]).is_equal_approx(colors[0]))
 	check("panelde 5 oyuncu", scene._players_list.get_child_count() == 5, str(scene._players_list.get_child_count()))
 
-	pm.set_my_party("Deneme", 1, Color.WHITE, colors[0], scene._ideology)
+	pm.set_my_party("Deneme", 1, Color.WHITE, colors[0], scene._core)
 	check("baskasinin rengi reddedildi", not Color(pm.parties[me]["bg_color"]).is_equal_approx(colors[0]))
 
 	var bot: int = mm.BOT_ID_BASE
 	var bot_color: Color = pm.parties[bot]["bg_color"]
-	pm.set_my_party("Deneme", 1, Color.WHITE, bot_color, scene._ideology)
+	pm.set_my_party("Deneme", 1, Color.WHITE, bot_color, scene._core)
 	check("botun rengini aldim", Color(pm.parties[me]["bg_color"]).is_equal_approx(bot_color))
 	check("bot baska renge gecti", not Color(pm.parties[bot]["bg_color"]).is_equal_approx(bot_color))
 	scene._selected_bg_color = bot_color

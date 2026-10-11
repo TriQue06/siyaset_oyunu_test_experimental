@@ -84,7 +84,7 @@ func _initialize() -> void:
 	# Kullanıcının şikâyeti: çevrim dışında "Kilitle ve Hazır Ver" oyunu
 	# başlatmıyordu (hazır bayrağı sadece yerelde işaretleniyordu).
 	pm.set_party_and_ready("Deneme", 0, Color.WHITE, Color.RED,
-		{"economic": 1.5, "social": -1.5, "administrative": 1.5}, true)
+		["isveren", "ilerici"], true)
 	check("herkes hazir", pm.all_ready(), str(pm.parties))
 	check("OYUN BASLADI", mm.stage == mm.Stage.IN_GAME, str(mm.stage))
 	check("kartlar dagitildi", not cm.turn_order.is_empty(), str(cm.turn_order))

@@ -841,6 +841,7 @@ func _place_parliament_badge() -> void:
 		# Oylama herkesin önüne gelsin: Seçili/Log açıksa Hükümet'e dön.
 		_side_tab = 0
 		if _left_dock != null and _left_dock.visible:
+			_pinned = false
 			_hide_profile()
 			if _province_panel != null and _province_panel.embedded_mode:
 				_province_panel.hide()
@@ -853,21 +854,6 @@ func _place_parliament_badge() -> void:
 	proposal_label.visible = voting
 	_refresh_parliament_summary()
 	_sync_parliament_to_slot()
-
-## OYLAMA SÜRERKEN sağ panel hep Hükümet'te: Log / Seçili / profil açıksa
-## kapanır ve meclis (oy düğmeleriyle) görünür.
-func _enforce_voting_tab() -> void:
-	if _side_tabs == null or not GovernmentManager.is_voting():
-		return
-	var dock_open := _left_dock != null and _left_dock.visible
-	if _side_tab == 0 and not dock_open:
-		return
-	_side_tab = 0
-	if dock_open:
-		_hide_profile()
-		if _province_panel != null and _province_panel.embedded_mode:
-			_province_panel.hide()
-	_refresh_side_tabs()
 
 ## Meclis (zemin + diyagram) her kare yuvanın ekrandaki yerine oturur; yuva
 ## görünmüyorsa (Log / Seçili sekmesi) meclis de gizlenir.
@@ -1749,7 +1735,6 @@ func _fit_hand_width(count: int) -> void:
 
 func _process(delta: float) -> void:
 	_refresh_countdowns()
-	_enforce_voting_tab()
 	_sync_parliament_to_slot()
 	_refresh_timer_bar()
 	if _drag_ghost != null:
@@ -2187,11 +2172,13 @@ func _province_under_mouse() -> String:
 ## Fare şu an sağdaki parti panelinde hangi partinin üstünde?
 func _party_under_mouse() -> int:
 	var mouse_pos := get_viewport().get_mouse_position()
+	if _board_scroll != null and not _board_scroll.get_global_rect().has_point(mouse_pos):
+		return -1
 	for child in player_panel_list.get_children():
 		if not is_instance_valid(child) or child.is_queued_for_deletion():
 			continue
 		var avatar := child as Control
-		if avatar == null:
+		if avatar == null or not avatar.is_visible_in_tree():
 			continue
 		if Rect2(avatar.global_position, avatar.size).has_point(mouse_pos):
 			return avatar.get_meta("peer_id", -1)
@@ -2303,6 +2290,7 @@ func _on_province_clicked(province_id: String) -> void:
 			CardManager.play_card(hand_index, -1, province_id)
 		return
 	_show_province_info(province_id)
+	_pinned = true
 
 ## İL BİLGİSİ sağ sütunda ("Seçili"). Fare haritada dolaşırken canlı olarak
 ## değişir (bkz. _update_live_province); tıklamak da aynı bilgiyi gösterir.
@@ -2310,26 +2298,38 @@ var _live_province := ""
 
 ## Fare haritada bir ilin üstündeyse (hedef seçme yokken) o ilin bilgisi
 ## tıklamadan sağda gösterilir. Haritadan çıkınca son il ekranda kalır.
+## FAREYLE İNCELEME (panel modu): ilin ya da parti plaketinin üstüne gelince
+## bilgisi sağ panelde GEÇİCİ açılır, fare çekilince kapanır ve Hükümet'e
+## dönülür. TIKLAMA kalıcı açar (_pinned): fare gezinse de değişmez.
+var _pinned := false
+
 func _update_live_province() -> void:
-	if _window_mode() or GovernmentManager.is_voting():
+	if _window_mode() or _pinned:
 		return
-	if _pending_org or _pending_miting or _pending_invest or _pending_province_hand_index != -1 \
-			or _pending_target_hand_index != -1 or _layer_switching or not is_visible_in_tree():
+	if _pending_org or _pending_miting or _pending_invest or _pending_province_hand_index != -1 			or _pending_target_hand_index != -1 or _layer_switching or not is_visible_in_tree():
 		return
-	if _parl_bg != null and _parl_bg.get_global_rect().has_point(get_viewport().get_mouse_position()):
+	var mouse := get_viewport().get_mouse_position()
+	# Fare sağ paneldeyse açık olan bilgi kalır (kaydırılabilsin).
+	if left_panel.get_global_rect().has_point(mouse):
+		return
+	var party := _party_under_mouse()
+	if party != -1:
+		if _profile_peer_id != party:
+			_profile_peer_id = party
+			_show_tooltip_for(party)
 		return
 	var province_id := _province_under_mouse()
-	if province_id == "":
-		# Fare ilden çıktı: il bilgisi kapanır, sağ panel Hükümet'e döner
-		# (fare sağ paneldeyse açık kalır, kaydırılabilsin).
-		if _province_panel != null and _province_panel.embedded_mode and _province_panel.visible \
-				and not left_panel.get_global_rect().has_point(get_viewport().get_mouse_position()):
-			_side_tab = 0
+	if province_id != "":
+		if not (province_id == _live_province and _province_panel != null and _province_panel.visible):
+			_show_province_info(province_id)
+		return
+	# Hiçbir şeyin üstünde değil: geçici bilgi kapanır, Hükümet'e dönülür.
+	if _left_dock != null and _left_dock.visible:
+		_side_tab = 0
+		if _profile_peer_id != -1:
+			_hide_profile()
+		if _province_panel != null and _province_panel.embedded_mode and _province_panel.visible:
 			_province_panel.hide()
-		return
-	if province_id == _live_province and _province_panel != null and _province_panel.visible:
-		return
-	_show_province_info(province_id)
 
 func _show_province_info(province_id: String) -> void:
 	# Ayar değiştiyse eski türdeki il paneli atılır.
@@ -2810,11 +2810,14 @@ func _find_avatar_node(peer_id: int) -> Control:
 
 ## Parti kartına dokununca profil açılır; aynı karta tekrar dokununca kapanır.
 func _toggle_profile(peer_id: int) -> void:
-	if _profile_peer_id == peer_id:
+	if _profile_peer_id == peer_id and (_pinned or _window_mode()):
 		_hide_profile()
 		return
-	_profile_peer_id = peer_id
-	_show_tooltip_for(peer_id)
+	if _profile_peer_id != peer_id:
+		_profile_peer_id = peer_id
+		_show_tooltip_for(peer_id)
+	# Tıklayınca KALICI: fare çekilince kapanmaz (✕, sekme ya da tekrar tıklama kapatır).
+	_pinned = true
 
 ## Profil kartındaki parti işlemleri (bkz. PartyInfoCard._actions).
 func _on_party_action(kind: String, peer_id: int) -> void:
@@ -2865,6 +2868,8 @@ func _update_left_dock() -> void:
 	if _left_dock == null:
 		return
 	var showing := (_province_panel != null and _province_panel.embedded_mode and _province_panel.visible) or _profile_scroll != null
+	if not showing:
+		_pinned = false
 	_left_dock.visible = showing
 	for node in [government_vbox, _event_log]:
 		if node != null:

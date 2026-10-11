@@ -68,6 +68,21 @@ func _initialize() -> void:
 	print("VIEWPORT %s  panel=%s" % [str(scene.get_viewport_rect().size), str((scene.get_node("PlayerPanel") as Control).get_global_rect())])
 	for child in list.get_children():
 		print("  satir %s" % str(child.get_global_rect()))
+	# TIKLAMA KALICI açar (fare hareketi gerçek imleçle çalıştığı için burada simüle edilmiyor).
+	var plaque: Control = list.get_child(2)
+	var mv: InputEventMouseMotion
+	scene._side_tab = 1
+	scene._refresh_side_tabs()
+	scene._toggle_profile(int(plaque.get_meta("peer_id")))
+	await _frames(3)
+	mv = InputEventMouseMotion.new()
+	mv.position = root.get_final_transform() * Vector2(640, 90)
+	root.push_input(mv)
+	await _frames(4)
+	print("TIKLAMA KALICI: açık=%s pinned=%s" % [str(scene._left_dock.visible), str(scene._pinned)])
+	scene._hide_profile()
+	await _frames(2)
+	print("KAPATINCA: pinned=%s" % str(scene._pinned))
 	# Profilim: parti işlemleri.
 	scene._toggle_profile(me)
 	await _frames(10)

@@ -71,7 +71,7 @@ const GOVERNMENT_FATIGUE := 1.1
 
 # --- Gensoru ------------------------------------------------------------------
 ## Reddedilen gensoruyu getiren parti bu kadar ulusal destek kaybeder.
-const CENSURE_REJECTED_NATIONAL := -1.0
+const CENSURE_REJECTED_NATIONAL := -0.25
 ## KRİZE YANIT: krizin istediği uca doğru 1 birimlik görüş kayması bu kadar
 ## ulusal puan getirir (yarım adımlık oy = 0,4). Kısmi: oyunu tek başına çevirmez.
 const CRISIS_NATIONAL_PER_UNIT := 0.8

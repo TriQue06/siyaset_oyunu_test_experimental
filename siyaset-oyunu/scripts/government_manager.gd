@@ -789,8 +789,8 @@ func _resolve_proposal() -> void:
 			_set_phase(Phase.GOVERNING)
 			# Başarısız gensoru getiren partinin ulusal desteğine eksi yazar (puan tablosuna değil).
 			CardManager.apply_censure_rejected(proposer)
-			last_resolution_reason = "Gensoru reddedildi, hükümet görevde. %s ulusal destek %.0f." % [
-				_party_name(proposer), PublicOpinion.CENSURE_REJECTED_NATIONAL]
+			last_resolution_reason = "Gensoru reddedildi, hükümet görevde. %s ulusal destek %s." % [
+				_party_name(proposer), String.num(PublicOpinion.CENSURE_REJECTED_NATIONAL, 2).replace(".", ",")]
 
 	_push_state()
 	if not _is_local_only():

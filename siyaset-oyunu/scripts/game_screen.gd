@@ -3311,7 +3311,7 @@ func _build_action_buttons() -> void:
 	_invest_button.tooltip_text = "Kısmi ideolojik yakınlaşma, kuvvetli oy kazanımı (sadece hükümet partileri)."
 	_censure_button = _action_button("GENSORU", GameRules.cost_text(GameRules.CENSURE_MANA_COST), UiTheme.RED_DARK)
 	_censure_button.pressed.connect(_on_censure_button_pressed)
-	_censure_button.tooltip_text = "Hükümeti düşürmeye çalış: meclis oylar, reddedilirse ulusal destek kaybedersin."
+	_censure_button.tooltip_text = "Hükümeti düşürmeye çalış: meclis oylar, reddedilirse çok az ulusal destek kaybedersin."
 	_early_button = _action_button("ERKEN SEÇİM", GameRules.cost_text(GameRules.EARLY_ELECTION_MANA_COST), UiTheme.GOLD)
 	_early_button.pressed.connect(_on_early_button_pressed)
 	_early_button.tooltip_text = "Erken seçim önergesi: kabul edilirse dönem sonunda sandık kurulur."
@@ -3810,7 +3810,7 @@ func _on_censure_button_pressed() -> void:
 		return
 	_pending_censure = true
 	_refresh_action_buttons()
-	_set_target_hint("Gensoru: hükümeti düşürmek için meclis oylaması (%d mana). Reddedilirse ulusal destek kaybedersin. Onay: butona tekrar dokun" % GameRules.CENSURE_MANA_COST)
+	_set_target_hint("Gensoru: hükümeti düşürmek için meclis oylaması (%d mana). Reddedilirse çok az ulusal destek kaybedersin. Onay: butona tekrar dokun" % GameRules.CENSURE_MANA_COST)
 
 ## Erken seçim hamlesi: ilk dokunuş onay ister, ikincisi önergeyi meclise getirir.
 ## Kongre hamlesi: ilk dokunuş açıklama ve onay, ikincisi kongreyi başlatır.

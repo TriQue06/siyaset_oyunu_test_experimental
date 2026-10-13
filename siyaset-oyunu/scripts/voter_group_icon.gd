@@ -32,9 +32,23 @@ func _draw() -> void:
 	if bare:
 		ink = VoterGroups.color(group)
 	else:
-		draw_circle(c, r, VoterGroups.color(group))
-		draw_arc(c, r - 0.5, 0.0, TAU, 32, Color(0, 0, 0, 0.35), 1.0, true)
-	draw_symbol(self, VoterGroups.icon(group), c, r * (0.62 if not bare else 0.9), ink)
+		r = draw_medallion(self, c, r, VoterGroups.color(group))
+	draw_symbol(self, VoterGroups.icon(group), c, r * (0.6 if not bare else 0.9), ink)
+
+## MADALYON: grubun renginde dolu daire, koyu kontur, dışta grubun renginde
+## yarı saydam hale (16 px ve üstünde) ve üstte hafif parlama. İç dairenin
+## yarıçapını döndürür (sembol buna göre ölçeklenir).
+static func draw_medallion(canvas: CanvasItem, c: Vector2, r: float, color: Color) -> float:
+	var body := r
+	if r * 2.0 >= 16.0:
+		var halo := maxf(1.5, r * 0.12)
+		canvas.draw_arc(c, r - halo * 0.5, 0.0, TAU, 40, Color(color, 0.45), halo, true)
+		body = r - halo - 1.0
+	canvas.draw_circle(c, body, Color("#0b0f16"))
+	var inner := body - maxf(1.0, body * 0.1)
+	canvas.draw_circle(c, inner, color)
+	canvas.draw_arc(c, inner * 0.82, PI * 1.15, PI * 1.85, 16, Color(1, 1, 1, 0.22), maxf(1.0, inner * 0.12), true)
+	return inner
 
 ## Sembolü başka bir CanvasItem'a da çizebilmek için (harita lejantı vb.).
 static func draw_symbol(canvas: CanvasItem, icon_name: String, c: Vector2, s: float, ink: Color) -> void:

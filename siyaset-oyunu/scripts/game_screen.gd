@@ -4186,14 +4186,27 @@ func _build_layer_bar() -> void:
 	_group_picker.z_index = 6
 	add_child(_group_picker)
 	for group in VoterGroups.GROUP_IDS:
+		# Hap düğme: madalyon + (seçiliyse) grubun tam adı.
 		var pick := Button.new()
 		pick.focus_mode = Control.FOCUS_NONE
-		pick.custom_minimum_size = Vector2(30, 30)
+		pick.custom_minimum_size = Vector2(34, 34)
 		pick.tooltip_text = VoterGroups.title(group)
-		var icon := VoterGroupIcon.make(group, 22.0)
-		icon.position = Vector2(4, 4)
-		icon.size = Vector2(22, 22)
+		var icon := VoterGroupIcon.make(group, 28.0)
+		icon.position = Vector2(3, 3)
+		icon.size = Vector2(28, 28)
 		pick.add_child(icon)
+		var name_label := Label.new()
+		name_label.name = "Title"
+		name_label.text = VoterGroups.title(group)
+		name_label.add_theme_font_size_override("font_size", 12)
+		name_label.add_theme_color_override("font_color", Color.WHITE)
+		name_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.45))
+		name_label.add_theme_constant_override("outline_size", 3)
+		name_label.position = Vector2(36, 0)
+		name_label.size = Vector2(0, 34)
+		name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pick.add_child(name_label)
 		pick.set_meta("group", group)
 		pick.pressed.connect(func():
 			_map_group = group
@@ -4250,9 +4263,26 @@ func _refresh_layer_bar() -> void:
 		for pick in _group_picker.get_children():
 			var group := String(pick.get_meta("group"))
 			var selected := group == _map_group
-			var tint := VoterGroups.color(group) if selected else UiTheme.PANEL
+			var color := VoterGroups.color(group)
+			var title: Label = pick.get_node("Title")
+			title.visible = selected
+			var width := 34.0
+			if selected:
+				width = 36.0 + title.get_theme_font("font").get_string_size(title.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x + 14.0
+			(pick as Button).custom_minimum_size = Vector2(width, 34)
+			(pick as Button).size = Vector2(width, 34)
 			for state in ["normal", "hover", "pressed", "focus"]:
-				(pick as Button).add_theme_stylebox_override(state, UiSkin.color_box(tint, UiSkin.BUTTON_TINT_NORMAL))
+				var pill := StyleBoxFlat.new()
+				pill.set_corner_radius_all(17)
+				pill.anti_aliasing = true
+				if selected:
+					pill.bg_color = color.darkened(0.1)
+					pill.border_color = color.lightened(0.25)
+				else:
+					pill.bg_color = Color("#222a38") if state != "hover" else Color("#2c3648")
+					pill.border_color = Color(color, 0.0 if state != "hover" else 0.6)
+				pill.set_border_width_all(1)
+				(pick as Button).add_theme_stylebox_override(state, pill)
 	_rebuild_layer_legend()
 
 ## Katmanın küçük açıklaması (renk anahtarı), butonların hemen üstünde.
@@ -4273,7 +4303,6 @@ func _rebuild_layer_legend() -> void:
 			swatches.append([null, "ilin yarısı"])
 		MapLayer.GROUPS:
 			var span := _group_layer_span()
-			swatches.append([null, VoterGroups.title(_map_group)])
 			swatches.append([null, "%%%d" % int(span.x)])
 			for i in 4:
 				swatches.append([MAP_BLANK_COLOR.lerp(_group_layer_color(), float(i) / 3.0), ""])

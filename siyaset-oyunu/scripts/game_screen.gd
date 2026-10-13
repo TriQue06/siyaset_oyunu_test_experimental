@@ -1996,6 +1996,9 @@ func _card_cost_badge(cost: int) -> Control:
 ## engellenmemişken) bir kez. Elle kayıttan ayrı yuvaya yazılır.
 var _autosaved_round := -1
 func _maybe_autosave() -> void:
+	# Test / önizleme betikleri (özel SceneTree) oyuncunun kayıtlarına yazmasın.
+	if get_tree().get_script() != null:
+		return
 	if not MultiplayerManager.offline_mode or CardManager.round_number == _autosaved_round \
 			or CardManager.is_turn_blocked() or SaveGame.block_reason() != "":
 		return

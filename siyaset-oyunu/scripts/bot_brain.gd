@@ -283,6 +283,14 @@ static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 			best = {"type": "invest", "province": invest["province"]}
 			best_score = float(invest["score"]) - GameRules.INVEST_MANA_COST * mana_value + invest_noise
 
+	var inquiry := _eval_inquiry(bot)
+	if not inquiry.is_empty():
+		var inquiry_score := float(inquiry["score"]) - Economy.INQUIRY_MANA_COST * mana_value + _jitter(bot)
+		candidates.append({"type": "inquiry", "target": inquiry["target"]})
+		if inquiry_score > best_score:
+			best = {"type": "inquiry", "target": inquiry["target"]}
+			best_score = inquiry_score
+
 	if CardManager.can_censure(bot) and _censure_worth_it(bot):
 		# Geçeceği hesaplanan gensoru: hükümet düşer, yeni kurma turu başlar.
 		# Blokta gensoru planın son adımı: çok daha değerli.
@@ -418,6 +426,41 @@ static func _best_tax_law(bot: int) -> Dictionary:
 	if _law_pass_chance(bot, law_type) < 0.5:
 		return {}
 	return {"law": law_type, "score": TAX_LAW_SCORE}
+
+## FİNANSMAN SORUŞTURMASI (oyuncuyla aynı kurallar; gizli tutarlara bakmaz):
+##   - KENDİ kayıtları (botun kendi bildiği harcamaları): kendi kasasından
+##     ödenmiş yeterli harcama birikmişse kendini denetletir (şeffaflık).
+##   - RAKİP: muhalefetteyken, kapsamda en çok mitingi olan hükümet partisi
+##     (miting sayısı herkese açıktır; kimin parasıyla yapıldığı değil).
+const INQUIRY_SELF_MIN := 60.0
+const INQUIRY_RIVAL_MITINGS := 2
+const INQUIRY_RIVAL_SCORE := 0.9
+
+static func _eval_inquiry(bot: int) -> Dictionary:
+	if not CardManager.can_open_inquiry(bot) or CardManager.mana_of(bot) < 60.0:
+		return {}
+	var best := {}
+	var own := 0.0
+	for entry in CardManager.inquiry_records(bot):
+		own += Economy.transparency_amount(entry)
+	if own >= INQUIRY_SELF_MIN:
+		best = {"target": CardManager.party_of(bot), "score": 0.6 + Economy.transparency_gain(own) * Economy.SELF_AUDIT_FACTOR * 2.0}
+	if not CardManager.is_government_party(bot):
+		var rival := -1
+		var most := INQUIRY_RIVAL_MITINGS - 1
+		for pid in GovernmentManager.government_party_ids():
+			if is_ally(bot, int(pid)):
+				continue
+			var mitings := 0
+			for entry in CardManager.inquiry_records(int(pid)):
+				if String(entry["kind"]) == "miting":
+					mitings += 1
+			if mitings > most:
+				most = mitings
+				rival = int(pid)
+		if rival != -1 and (best.is_empty() or INQUIRY_RIVAL_SCORE > float(best["score"])):
+			best = {"target": rival, "score": INQUIRY_RIVAL_SCORE}
+	return best
 
 ## Vergi yasasına oy: hükümet (genelde) destekler; ortak seçime yakın vergi
 ## artırımına destek vermez (sonucunu o da taşır). Muhalefet artırıma HAYIR,

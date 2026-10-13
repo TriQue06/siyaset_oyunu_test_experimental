@@ -84,7 +84,22 @@ static func _actions(peer_id: int, my_id: int, on_action: Callable) -> Control:
 	var list: Array = []  # [metin, tür, basılabilir mi, onay ister mi]
 	var notes: Array = []
 	if peer_id != my_id and CardManager.party_of(peer_id) != CardManager.party_of(my_id):
-		return null
+		# Başka bir parti: FİNANSMAN SORUŞTURMASI açılabilir (meclis kurulduysa).
+		if CardManager.last_seats.is_empty() or PartyManager.is_independent(peer_id) or CardManager.is_party_member(my_id):
+			return null
+		var other := VBoxContainer.new()
+		other.add_theme_constant_override("separation", 4)
+		other.add_child(PopupKit.section("Meclis"))
+		var inquiry := Button.new()
+		inquiry.text = "Finansman Soruşturması Aç…"
+		inquiry.focus_mode = Control.FOCUS_NONE
+		inquiry.custom_minimum_size = Vector2(0, 32)
+		inquiry.add_theme_font_size_override("font_size", 13)
+		UiSkin.skin_color_button(inquiry, UiTheme.PURPLE.darkened(0.3))
+		inquiry.pressed.connect(func(): on_action.call("inquiry", peer_id))
+		other.add_child(inquiry)
+		other.add_child(PopupKit.note("Harcamalarının hangi kasadan ödendiğini meclise inceletir.", DIM, _text_width()))
+		return other
 	var pid := CardManager.party_of(my_id)
 	if PartyManager.is_independent(my_id):
 		list.append(["Yeni Parti Kur · %d mana" % CardManager.FOUND_PARTY_COST, "found", CardManager.can_found_party(my_id), false])
@@ -106,6 +121,8 @@ static func _actions(peer_id: int, my_id: int, on_action: Callable) -> Control:
 	else:
 		list.append(["Kongreye Git · %d mana" % CardManager.CONGRESS_COST, "congress", CardManager.can_hold_congress(my_id), false])
 		list.append(["Partiyi Feshet", "dissolve", CardManager.can_dissolve(my_id), true])
+		if not CardManager.last_seats.is_empty():
+			list.append(["Harcamalarımı Denetlet (soruşturma)…", "inquiry", true, false])
 		var left := CardManager.CONGRESS_MAX_ELECTIONS - CardManager.elections_since_congress(pid)
 		notes.append("Zorunlu kongreye %s. Güç: %d/100 (oy değişimi, hükümet, karışıklık, güvenilirlik); güç ne kadar yüksekse rakip o kadar az." % [
 			"bu seçimden sonra sıran gelince gidilecek" if left <= 0 else "%d seçim kaldı" % left, int(round(CardManager.congress_strength(pid)))])

@@ -71,6 +71,10 @@ signal congress_started(data: Dictionary)
 ## yatırım, {"kind": "round", "revenue"} tur sonu geliri. Arayüz bununla
 ## hazine/gösterge animasyonlarını oynatır (değerler zaten durumda).
 signal economy_event(data: Dictionary)
+## FİNANSMAN SORUŞTURMASI sonuçlandı (herkeste): {"peer_id", "target", "result"
+## ("clean" / "scandal" / "none"), "examined", "party_million", "public_million",
+## "improper_million", "gain", "damage"}.
+signal inquiry_resolved(data: Dictionary)
 
 const MAX_HAND_SIZE := 9
 ## Bağımsız siyasetçinin (teşkilatsız) mitinginde provokasyon riski çarpanı.
@@ -474,10 +478,170 @@ func has_proposed_law_this_round(peer_id: int) -> bool:
 
 ## Yatırım hamlesi: sadece hükümet partileri; DEVLET HAZİNESİNDEN ödenir
 ## (Economy.INVEST_COST) + partiden küçük bir mana bedeli.
-func can_invest(peer_id: int, province_id: String = "") -> bool:
-	return can_choose_main_action(peer_id) and is_government_party(peer_id) and not is_party_member(peer_id) \
-		and mana_of(peer_id) >= GameRules.INVEST_MANA_COST and state_treasury() >= Economy.INVEST_COST \
-		and (province_id == "" or has_province(province_id))
+## state: devletin payı (0..1); -1 = uygun bir paylaşım var mı.
+func can_invest(peer_id: int, province_id: String = "", state: float = -1.0) -> bool:
+	if not (can_choose_main_action(peer_id) and is_government_party(peer_id) and not is_party_member(peer_id)
+			and mana_of(peer_id) >= GameRules.INVEST_MANA_COST and (province_id == "" or has_province(province_id))):
+		return false
+	return _funding_ok(funding_range(peer_id, "invest"), state)
+
+# --- Finansman paylaşımı ------------------------------------------------------
+
+## Hamlenin finansman seçenekleri: {"kind", "total" (milyon ₺), "fee" (sabit
+## mana bedeli), "min", "max" (devlet payının izinli aralığı), "default",
+## "state_allowed"}. min > max ise hiçbir paylaşım ödenemez.
+func funding_range(peer_id: int, kind: String) -> Dictionary:
+	var total := Economy.INVEST_COST if kind == "invest" else float(GameRules.MITING_MANA_COST) * Economy.MILLION_PER_MANA
+	var fee := float(GameRules.INVEST_MANA_COST) if kind == "invest" else 0.0
+	var state_allowed := is_government_party(peer_id) and not is_party_member(peer_id) and not PartyManager.is_independent(peer_id)
+	var party_cap := maxf(0.0, mana_of(peer_id) - fee) * Economy.MILLION_PER_MANA
+	var lo := clampf(1.0 - party_cap / total, 0.0, 1.0)
+	var hi := clampf(state_treasury() / total, 0.0, 1.0) if state_allowed else 0.0
+	# %5 adımlara oturt: alt sınır yukarı, üst sınır aşağı yuvarlanır (aşım olmaz).
+	lo = ceilf(lo / Economy.FUND_STEP - 0.0001) * Economy.FUND_STEP
+	hi = floorf(hi / Economy.FUND_STEP + 0.0001) * Economy.FUND_STEP
+	var preferred := 1.0 if kind == "invest" else 0.0
+	return {"kind": kind, "total": total, "fee": fee, "min": lo, "max": hi,
+		"default": clampf(preferred, lo, hi), "state_allowed": state_allowed}
+
+static func _funding_ok(r: Dictionary, state: float) -> bool:
+	if float(r["min"]) > float(r["max"]) + 0.0001:
+		return false
+	if state < 0.0:
+		return true
+	var s := Economy.snap_share(state)
+	return s >= float(r["min"]) - 0.0001 and s <= float(r["max"]) + 0.0001
+
+## Paylaşım neden ödenemiyor ("" = ödenebilir).
+func funding_block_reason(peer_id: int, kind: String, state: float) -> String:
+	var r := funding_range(peer_id, kind)
+	var split := Economy.split_cost(float(r["total"]), state)
+	if float(split["state"]) > state_treasury() + 0.001:
+		return "Devlet hazinesi yetmiyor (%s var)." % Economy.money_full(state_treasury())
+	if float(split["state"]) > 0.0 and not bool(r["state_allowed"]):
+		return "Devlet hazinesini sadece hükümet partileri kullanabilir."
+	if float(split["mana"]) + float(r["fee"]) > mana_of(peer_id) + 0.001:
+		return "Parti kasası yetmiyor (%s gerekir)." % GameRules.cost_text(float(split["mana"]) + float(r["fee"]))
+	return ""
+
+## Gerçek finansmanı kaydeder (soruşturmanın tek kaynağı).
+func _record_funding(peer_id: int, kind: String, province_id: String, split: Dictionary, total: float) -> void:
+	var ledger: Array = economy.get("ledger", [])
+	var id := int(economy.get("next_id", 1))
+	economy["next_id"] = id + 1
+	ledger.append({"id": id, "round": round_number, "party": party_of(peer_id), "kind": kind, "province": province_id,
+		"total": total, "party_million": float(split["party"]), "party_mana": float(split["mana"]),
+		"state_million": float(split["state"]), "investigated": false})
+	while ledger.size() > Economy.LEDGER_LIMIT:
+		ledger.pop_front()
+	economy["ledger"] = ledger
+
+## Partinin henüz incelenmemiş, kapsam içindeki işlemleri (sadece SAYI ve tür
+## herkese açıktır; tutarlar soruşturmada açıklanır).
+func inquiry_records(target: int) -> Array:
+	var pid := party_of(target)
+	var result: Array = []
+	for entry in economy.get("ledger", []):
+		if int(entry["party"]) == pid and not bool(entry.get("investigated", false)) \
+				and round_number - int(entry["round"]) <= Economy.INQUIRY_SCOPE_ROUNDS:
+			result.append(entry)
+	return result
+
+## FİNANSMAN SORUŞTURMASI açılabilir mi? Meclis kurulmuş, soruşturan partinin
+## vekili var, sırası ve manası var, partisi bu dönem soruşturma açmamış.
+## Hükümet de muhalefet de açabilir; hedef herhangi bir parti (kendi dahil).
+func inquiry_block_reason(peer_id: int, target: int = -1) -> String:
+	if last_seats.is_empty():
+		return "İlk seçime kadar meclis yok: soruşturma açılamaz."
+	if is_party_member(peer_id):
+		return "Soruşturmayı partinin genel başkanı açar."
+	if not has_seats(peer_id):
+		return "Mecliste vekilin yok."
+	if int(economy.get("inquiries", {}).get(party_of(peer_id), -1)) == round_number:
+		return "Partin bu dönem bir soruşturma açtı."
+	if not can_choose_main_action(peer_id):
+		return "Sıra sende değil."
+	if mana_of(peer_id) < Economy.INQUIRY_MANA_COST:
+		return "Yetersiz mana (%s gerekir)." % GameRules.cost_text(Economy.INQUIRY_MANA_COST)
+	if target != -1 and (not party_ids().has(party_of(target)) or PartyManager.is_independent(target)):
+		return "Bu parti soruşturulamaz."
+	return ""
+
+func can_open_inquiry(peer_id: int, target: int = -1) -> bool:
+	return inquiry_block_reason(peer_id, target) == ""
+
+func open_inquiry(target: int) -> void:
+	if not can_open_inquiry(multiplayer.get_unique_id(), target):
+		return
+	if _is_authority():
+		_apply_inquiry(multiplayer.get_unique_id(), target)
+	else:
+		_request_inquiry.rpc_id(1, target)
+
+@rpc("any_peer", "reliable")
+func _request_inquiry(target: int) -> void:
+	if not MultiplayerManager.is_host:
+		return
+	_apply_inquiry(multiplayer.get_remote_sender_id(), target)
+
+## Soruşturma: hedefin kapsamdaki incelenmemiş işlemleri GERÇEK kayıtlarla
+## sınıflanır ve hepsi "incelendi" olur (aynı işlem ikinci kez ödül ya da
+## skandal üretmez):
+##   parti kasasından ödenen  → şeffaflık (hedefe sınırlı ulusal destek)
+##   devletten ödenen yatırım → meşru kamu harcaması (etki yok)
+##   devletten ödenen miting  → usulsüzlük (kaset benzeri skandal)
+## Kanıt yoksa kimse ödül ya da ceza almaz.
+func _apply_inquiry(peer_id: int, target: int) -> void:
+	if not can_open_inquiry(peer_id, target):
+		return
+	var tpid := party_of(target)
+	mana[peer_id] = mana_of(peer_id) - Economy.INQUIRY_MANA_COST
+	var inquiries: Dictionary = economy.get("inquiries", {})
+	inquiries[party_of(peer_id)] = round_number
+	economy["inquiries"] = inquiries
+	var records := inquiry_records(tpid)
+	var party_million := 0.0
+	var eligible := 0.0
+	var public_million := 0.0
+	var improper_million := 0.0
+	for entry in records:
+		entry["investigated"] = true
+		party_million += float(entry["party_million"])
+		eligible += Economy.transparency_amount(entry)
+		if Economy.is_partisan(String(entry["kind"])):
+			improper_million += float(entry["state_million"])
+		else:
+			public_million += float(entry["state_million"])
+	var gain := Economy.transparency_gain(eligible) * (Economy.SELF_AUDIT_FACTOR if party_of(peer_id) == tpid else 1.0)
+	var damage := Economy.scandal_damage(improper_million)
+	if gain > 0.0:
+		_add_national(tpid, gain)
+	if damage > 0.0:
+		_add_national(tpid, -damage)
+		_add_turmoil(tpid, PublicOpinion.TURMOIL_REPUTATION)
+		if party_of(peer_id) != tpid:
+			credibility_add(peer_id, Economy.INQUIRY_CREDIBILITY)
+	var result := "scandal" if damage > 0.0 else ("clean" if gain > 0.0 else "none")
+	var who := _party_name(tpid)
+	var text := ""
+	match result:
+		"scandal":
+			text = "USULSÜZLÜK — Finansman soruşturması: %s partizan faaliyetler için devlet hazinesinden %s kullandı. Ulusal destek −%s." % [
+				who, Economy.money_full(improper_million), _num(damage)]
+			if gain > 0.0:
+				text += " Kendi kasasından ödediği %s ise doğrulandı (+%s)." % [Economy.money_full(party_million), _num(gain)]
+		"clean":
+			text = "ŞEFFAF — Finansman soruşturması: %s %d işlemde %s'yi kendi kasasından ödediği doğrulandı. Ulusal destek +%s." % [
+				who, records.size(), Economy.money_full(party_million), _num(gain)]
+		_:
+			text = "KANIT YOK — Finansman soruşturması %s hakkında %s." % [who,
+				"incelenecek yeni bir işlem bulamadı" if records.is_empty() else "%d işlemi inceledi; ödül ya da usulsüzlük gerektiren bir bulgu çıkmadı" % records.size()]
+	if public_million > 0.0:
+		text += " %s devlet yatırımı meşru kamu harcaması sayıldı." % Economy.money_full(public_million)
+	var data := {"peer_id": peer_id, "target": tpid, "result": result, "examined": records.size(),
+		"party_million": party_million, "public_million": public_million, "improper_million": improper_million,
+		"gain": gain, "damage": damage}
+	_push_state({"type": "inquiry", "peer_id": peer_id, "message": text, "inquiry": data})
 
 ## Mecliste en az bir vekili var mı? (Vekilsiz parti oy veremez, yasa ve
 ## gensoru veremez, vekil çalamaz.)
@@ -522,8 +686,10 @@ func populism_rounds_left(peer_id: int) -> int:
 	return maxi(0, int(populism.get(party_of(peer_id), 0)) - round_number)
 
 ## Miting hamlesi: seçilen ilde güç (provokasyon riskiyle).
-func can_miting(peer_id: int, province_id: String = "") -> bool:
-	if not can_choose_main_action(peer_id) or mana_of(peer_id) < GameRules.MITING_MANA_COST:
+## state: mitingin devletten ödenen payı (0..1; sadece hükümet partisi
+## seçebilir ve PARTİZAN HARCAMA sayılır); -1 = uygun bir paylaşım var mı.
+func can_miting(peer_id: int, province_id: String = "", state: float = -1.0) -> bool:
+	if not can_choose_main_action(peer_id) or not _funding_ok(funding_range(peer_id, "miting"), state):
 		return false
 	# BAĞIMSIZ siyasetçinin teşkilatı yoktur: her ilde miting yapabilir.
 	if PartyManager.is_independent(peer_id):
@@ -1216,13 +1382,13 @@ func build_organization(province_id: String) -> void:
 		_request_organization.rpc_id(1, province_id)
 
 ## Yatırım hamlesi: seçilen ile hükümet yatırımı (INVEST_MANA_COST).
-func invest(province_id: String) -> void:
-	if not can_invest(multiplayer.get_unique_id(), province_id):
+func invest(province_id: String, state: float = 1.0) -> void:
+	if not can_invest(multiplayer.get_unique_id(), province_id, state):
 		return
 	if _is_authority():
-		_apply_invest_move(multiplayer.get_unique_id(), province_id)
+		_apply_invest_move(multiplayer.get_unique_id(), province_id, state)
 	else:
-		_request_invest.rpc_id(1, province_id)
+		_request_invest.rpc_id(1, province_id, state)
 
 ## Gensoru hamlesi (CENSURE_MANA_COST): meclis oylaması açılır.
 func censure() -> void:
@@ -1234,13 +1400,13 @@ func censure() -> void:
 		_request_censure.rpc_id(1)
 
 ## Miting hamlesi: seçilen ilde miting (MITING_MANA_COST).
-func miting(province_id: String) -> void:
-	if not can_miting(multiplayer.get_unique_id(), province_id):
+func miting(province_id: String, state: float = 0.0) -> void:
+	if not can_miting(multiplayer.get_unique_id(), province_id, state):
 		return
 	if _is_authority():
-		_apply_miting_move(multiplayer.get_unique_id(), province_id)
+		_apply_miting_move(multiplayer.get_unique_id(), province_id, state)
 	else:
-		_request_miting.rpc_id(1, province_id)
+		_request_miting.rpc_id(1, province_id, state)
 
 ## "Turu Bitir": sırayı bir sonraki oyuncuya devreder.
 func pass_turn() -> void:
@@ -1331,17 +1497,22 @@ func _apply_organization(peer_id: int, province_id: String) -> void:
 	_push_state({"type": "organization", "peer_id": peer_id, "province": province_id,
 		"message": "%s, %s'da teşkilat %s (seviye %d)." % [_actor_name(peer_id), _province_name(province_id), verb, level]})
 
-func _apply_invest_move(peer_id: int, province_id: String) -> void:
-	if not can_invest(peer_id, province_id):
+## state: devletin payı (varsayılan tamamı devletten, eski kural). Bedel
+## TEK SEFER düşer: devlet payı hazineden, parti payı (+ sabit hamle bedeli)
+## manadan; gerçek paylaşım kayda geçer.
+func _apply_invest_move(peer_id: int, province_id: String, state: float = 1.0) -> void:
+	if not can_invest(peer_id, province_id, state):
 		return
-	mana[peer_id] = mana_of(peer_id) - GameRules.INVEST_MANA_COST
+	var split := Economy.split_cost(Economy.INVEST_COST, state)
+	mana[peer_id] = mana_of(peer_id) - GameRules.INVEST_MANA_COST - float(split["mana"])
 	var before := state_treasury()
-	economy["treasury"] = before - Economy.INVEST_COST
+	economy["treasury"] = before - float(split["state"])
+	_record_funding(peer_id, "invest", province_id, split, Economy.INVEST_COST)
 	_event_message = ""
 	_apply_investment(peer_id, province_id)
 	_push_state({"type": "invest", "peer_id": peer_id, "province": province_id, "message": _event_message,
-		"econ": {"kind": "invest", "peer_id": peer_id, "province": province_id, "cost": Economy.INVEST_COST,
-			"before": before, "after": state_treasury()}})
+		"econ": {"kind": "invest", "peer_id": peer_id, "province": province_id, "cost": float(split["state"]),
+			"party_mana": float(split["mana"]), "before": before, "after": state_treasury()}})
 
 func _apply_censure_move(peer_id: int) -> void:
 	if not can_censure(peer_id):
@@ -1351,10 +1522,17 @@ func _apply_censure_move(peer_id: int) -> void:
 		"message": "%s hükümete gensoru verdi: meclis oylaması başladı." % _party_name(peer_id)})
 	GovernmentManager.submit_censure(peer_id)
 
-func _apply_miting_move(peer_id: int, province_id: String) -> void:
-	if not can_miting(peer_id, province_id):
+func _apply_miting_move(peer_id: int, province_id: String, state: float = 0.0) -> void:
+	if not can_miting(peer_id, province_id, state):
 		return
-	mana[peer_id] = mana_of(peer_id) - GameRules.MITING_MANA_COST
+	var total := float(GameRules.MITING_MANA_COST) * Economy.MILLION_PER_MANA
+	var split := Economy.split_cost(total, state)
+	mana[peer_id] = mana_of(peer_id) - float(split["mana"])
+	var before := state_treasury()
+	economy["treasury"] = before - float(split["state"])
+	_record_funding(peer_id, "miting", province_id, split, total)
+	if float(split["state"]) > 0.0:
+		economy_event.emit({"kind": "invest", "cost": float(split["state"]), "before": before, "after": state_treasury()})
 	_event_message = ""
 	_apply_miting(peer_id, province_id)
 	# Bağımsızın ve üyenin mitingi kendi güvenilirliğini de artırır.
@@ -3393,6 +3571,13 @@ func _rekey_party(old_id: int, new_id: int, new_member: int) -> void:
 	for politician in former_parties.keys():
 		if int(former_parties[politician].get("party", -1)) == old_id:
 			former_parties[politician]["party"] = new_id
+	for entry in economy.get("ledger", []):
+		if int(entry.get("party", -1)) == old_id:
+			entry["party"] = new_id
+	var inquiries: Dictionary = economy.get("inquiries", {})
+	if inquiries.has(old_id):
+		inquiries[new_id] = inquiries[old_id]
+		inquiries.erase(old_id)
 	for entry in economy.get("investments", []):
 		if int(entry.get("party", -1)) == old_id:
 			entry["party"] = new_id
@@ -3572,6 +3757,8 @@ func _emit_post_event(event: Dictionary) -> void:
 		event_log.clear()  # yeni oyun (istemci tarafı)
 	if event.has("econ"):
 		economy_event.emit(event["econ"])
+	if event.has("inquiry"):
+		inquiry_resolved.emit(event["inquiry"])
 	if event.has("message"):
 		opinion_event.emit(str(event["message"]))
 		log_event(str(event["message"]), int(event.get("peer_id", -1)), String(event.get("province", "")), _log_kind(event))
@@ -3630,10 +3817,10 @@ func _request_organization(province_id: String) -> void:
 	_apply_organization(multiplayer.get_remote_sender_id(), province_id)
 
 @rpc("any_peer", "reliable")
-func _request_invest(province_id: String) -> void:
+func _request_invest(province_id: String, state: float = 1.0) -> void:
 	if not MultiplayerManager.is_host:
 		return
-	_apply_invest_move(multiplayer.get_remote_sender_id(), province_id)
+	_apply_invest_move(multiplayer.get_remote_sender_id(), province_id, state)
 
 @rpc("any_peer", "reliable")
 func _request_censure() -> void:
@@ -3642,10 +3829,10 @@ func _request_censure() -> void:
 	_apply_censure_move(multiplayer.get_remote_sender_id())
 
 @rpc("any_peer", "reliable")
-func _request_miting(province_id: String) -> void:
+func _request_miting(province_id: String, state: float = 0.0) -> void:
 	if not MultiplayerManager.is_host:
 		return
-	_apply_miting_move(multiplayer.get_remote_sender_id(), province_id)
+	_apply_miting_move(multiplayer.get_remote_sender_id(), province_id, state)
 
 @rpc("any_peer", "reliable")
 func _request_pass() -> void:

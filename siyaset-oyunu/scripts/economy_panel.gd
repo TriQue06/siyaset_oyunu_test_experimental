@@ -399,6 +399,9 @@ func play_event(data: Dictionary) -> void:
 		return
 	match String(data.get("kind", "")):
 		"invest":
+			if float(data.get("cost", 0.0)) <= 0.0:
+				refresh()
+				return  # tamamı parti kasasından: hazine değişmedi
 			_count_treasury(float(data.get("before", CardManager.state_treasury())), float(data.get("after", CardManager.state_treasury())))
 			_float_text("treasury", "−%s" % Economy.money_text(float(data.get("cost", 0.0))), UiTheme.RED)
 			_flash("treasury", UiTheme.RED)
@@ -629,6 +632,179 @@ static func _fill_policy_detail(detail: VBoxContainer, me: int, level: int, curr
 	detail.add_child(button)
 	if reason != "":
 		detail.add_child(PopupKit.note(reason, UiTheme.RED, 380))
+
+# --- Finansman Soruşturması paneli ------------------------------------------------
+
+## Sonuç türünün etiketi ve rengi (renk tek başına taşımaz: metin de ayrı).
+const INQUIRY_TAGS := {
+	"clean": ["✓ ŞEFFAF · DOĞRULANDI", UiTheme.GREEN],
+	"scandal": ["! USULSÜZLÜK", UiTheme.RED],
+	"none": ["— KANIT YOK", UiTheme.TEXT_MUTED],
+}
+
+static func inquiry_tag(result: String) -> Array:
+	return INQUIRY_TAGS.get(result, INQUIRY_TAGS["none"])
+
+## Panel: hedef parti, bedel, kapsam (sadece herkese açık bilgi: kaç işlem,
+## hangi tür; TUTARLAR soruşturma sonuçlanınca açıklanır), incelenen kanıt
+## türleri, olası sonuçlar ve SORUŞTURMA AÇ düğmesi (kapalıysa nedeni).
+static func fill_inquiry(box: VBoxContainer, me: int, target: int, on_open: Callable, on_close: Callable) -> void:
+	for child in box.get_children():
+		box.remove_child(child)
+		child.queue_free()
+	var party: Dictionary = PartyManager.data_of(target)
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 8)
+	box.add_child(header)
+	var badge := PartyBadge.build(party, Vector2(34, 34), 64)
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	header.add_child(badge)
+	var titles := VBoxContainer.new()
+	titles.add_theme_constant_override("separation", -2)
+	titles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(titles)
+	titles.add_child(UiTheme.mono_label("FİNANSMAN SORUŞTURMASI", 14, UiTheme.TEXT, true))
+	var own := CardManager.party_of(target) == CardManager.party_of(me)
+	titles.add_child(PopupKit.label("%s%s" % [String(party.get("name", "?")), " · kendi harcamaların (bağımsız denetim)" if own else ""],
+		12, Color(party.get("bg_color", UiTheme.TEXT)).lightened(0.4)))
+	var close := Button.new()
+	close.text = "Kapat"
+	UiSkin.skin_button(close)
+	close.add_theme_font_size_override("font_size", 11)
+	close.pressed.connect(on_close)
+	header.add_child(close)
+	var records := CardManager.inquiry_records(target)
+	var invests := 0
+	var mitings := 0
+	for entry in records:
+		if String(entry["kind"]) == "invest":
+			invests += 1
+		else:
+			mitings += 1
+	box.add_child(PopupKit.kv("Bedel", "%s (partinden)" % GameRules.cost_text(Economy.INQUIRY_MANA_COST)))
+	box.add_child(PopupKit.kv("Kapsam", "son %d dönem · %d yatırım, %d miting" % [Economy.INQUIRY_SCOPE_ROUNDS, invests, mitings]))
+	box.add_child(PopupKit.note("Tutarlar ve kimin kasasından ödendiği soruşturma sonuçlanınca açıklanır. Daha önce incelenen işlemler yeniden incelenmez.",
+		UiTheme.TEXT_DIM, 380))
+	box.add_child(PopupKit.section("İncelenen kanıt"))
+	for row in [["clean", "Parti kasasından ödenen harcamalar", "Doğrulanırsa hedef partiye şeffaflık desteği (ulusal en fazla +%s)." % _signed(Economy.TRANSPARENCY_MAX).substr(1)],
+			["none", "Devletten ödenen yatırımlar", "Meşru kamu harcaması: yolsuzluk sayılmaz, etkisi yok."],
+			["scandal", "Devletten ödenen mitingler", "Partizan harcama: usulsüzlük skandalı (ulusal en fazla −%s, parti içi karışıklık)." % _signed(Economy.SCANDAL_MAX).substr(1)]]:
+		box.add_child(_evidence_row(String(row[0]), String(row[1]), String(row[2])))
+	box.add_child(PopupKit.note("Kanıt yoksa kimse ödül ya da ceza almaz. Ödül doğrulanan partiye gider, soruşturana değil; usulsüzlüğü ortaya çıkaran güvenilirlik kazanır.",
+		UiTheme.TEXT_MUTED, 380))
+	var reason := CardManager.inquiry_block_reason(me, target)
+	var button := Button.new()
+	button.focus_mode = Control.FOCUS_NONE
+	button.custom_minimum_size = Vector2(0, 36)
+	button.add_theme_font_override("font", UiTheme.mono(true))
+	button.add_theme_font_size_override("font_size", 14)
+	if reason == "":
+		button.text = "SORUŞTURMA AÇ · %s" % GameRules.cost_text(Economy.INQUIRY_MANA_COST)
+		UiSkin.skin_color_button(button, UiTheme.PURPLE.darkened(0.25))
+		button.pressed.connect(func(): on_open.call(target))
+	else:
+		button.text = "AÇILAMAZ"
+		UiSkin.skin_color_button(button, UiTheme.PANEL_DARK)
+		button.add_theme_color_override("font_color", UiTheme.TEXT_DIM)
+		button.disabled = true
+	box.add_child(button)
+	if reason != "":
+		box.add_child(PopupKit.note(reason, UiTheme.RED, 380))
+
+static func _evidence_row(result: String, title: String, text: String) -> Control:
+	var tag: Array = inquiry_tag(result)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var stripe := ColorRect.new()
+	stripe.color = tag[1]
+	stripe.custom_minimum_size = Vector2(3, 0)
+	row.add_child(stripe)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", -2)
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(col)
+	col.add_child(PopupKit.label(title, 12, UiTheme.TEXT))
+	var note := PopupKit.label(text, 10, UiTheme.TEXT_MUTED)
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	note.custom_minimum_size = Vector2(360, 0)
+	col.add_child(note)
+	return row
+
+## Sonuç kartı (herkes görür): damga gibi etiket, hedef, doğrulanan tutarlar
+## ve etkisi. Sadece kayıtlı gerçek tutarlar yazılır.
+static func inquiry_result_card(data: Dictionary) -> PanelContainer:
+	var result := String(data.get("result", "none"))
+	var tag: Array = inquiry_tag(result)
+	var color: Color = tag[1]
+	var card := PanelContainer.new()
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("15112b")
+	style.border_color = color
+	style.set_border_width_all(2)
+	style.border_width_left = 6
+	style.content_margin_left = 14
+	style.content_margin_right = 12
+	style.content_margin_top = 8
+	style.content_margin_bottom = 10
+	style.shadow_color = Color(UiTheme.INK, 0.7)
+	style.shadow_size = 6
+	card.add_theme_stylebox_override("panel", style)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 3)
+	card.add_child(box)
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 8)
+	box.add_child(top)
+	top.add_child(UiTheme.mono_label("SORUŞTURMA SONUCU", 10, UiTheme.TEXT_DIM, true))
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(spacer)
+	var stamp := PanelContainer.new()
+	var stamp_style := StyleBoxFlat.new()
+	stamp_style.bg_color = Color(color, 0.15)
+	stamp_style.border_color = color
+	stamp_style.set_border_width_all(2)
+	stamp_style.content_margin_left = 8
+	stamp_style.content_margin_right = 8
+	stamp.add_theme_stylebox_override("panel", stamp_style)
+	stamp.add_child(UiTheme.mono_label(String(tag[0]), 12, color.lightened(0.2), true))
+	stamp.rotation_degrees = -2.0
+	top.add_child(stamp)
+	var target := int(data.get("target", -1))
+	var party: Dictionary = PartyManager.data_of(target)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 8)
+	box.add_child(head)
+	var badge := PartyBadge.build(party, Vector2(28, 28), 48)
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	head.add_child(badge)
+	head.add_child(UiTheme.mono_label(String(party.get("name", "?")), 16, UiTheme.TEXT, true))
+	var lines := PackedStringArray()
+	var party_million := float(data.get("party_million", 0.0))
+	var improper := float(data.get("improper_million", 0.0))
+	var public := float(data.get("public_million", 0.0))
+	match result:
+		"scandal":
+			lines.append("Partizan faaliyetler için devlet hazinesinden %s." % Economy.money_full(improper))
+			lines.append("Ulusal destek −%s · parti içinde karışıklık." % _signed(float(data.get("damage", 0.0))).substr(1))
+			if float(data.get("gain", 0.0)) > 0.0:
+				lines.append("Kendi kasasından %s doğrulandı (+%s)." % [Economy.money_full(party_million), _signed(float(data["gain"])).substr(1)])
+		"clean":
+			lines.append("%d işlemde %s kendi kasasından ödendi." % [int(data.get("examined", 0)), Economy.money_full(party_million)])
+			lines.append("Ulusal destek +%s (şeffaflık)." % _signed(float(data.get("gain", 0.0))).substr(1))
+		_:
+			lines.append("İncelenen işlem: %d. İddiayı destekleyen bir bulgu çıkmadı; ödül ya da ceza yok." % int(data.get("examined", 0)))
+	if public > 0.0:
+		lines.append("Devletten %s yatırım: meşru kamu harcaması." % Economy.money_full(public))
+	for line in lines:
+		var l := PopupKit.label(line, 12, UiTheme.TEXT)
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.custom_minimum_size = Vector2(340, 0)
+		box.add_child(l)
+	box.add_child(PopupKit.label("Soruşturmayı açan: %s" % PartyManager.data_of(int(data.get("peer_id", -1))).get("name", "?"), 10, UiTheme.TEXT_DIM))
+	return card
 
 static func _signed(value: float) -> String:
 	return ("+" if value > 0.0 else "−") + String.num(snappedf(absf(value), 0.1), 1).replace(".", ",")

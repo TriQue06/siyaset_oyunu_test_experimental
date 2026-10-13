@@ -45,8 +45,12 @@ func _initialize() -> void:
 	check("siyasetci parti verisinde korundu", PP.background_of(me) == "is_insani",
 		str(pm.politicians.get(me, {})))
 	check("memlekette 2. seviye teskilat", cm.organization_level(home, me) == PP.HOMETOWN_ORG_LEVEL)
-	var first_income: int = cm.turn_income(me) if cm.current_turn_peer_id() == me else 0
-	check("is insani +2 mana ile basladi", cm.mana_of(me) == GameRules.MANA_START + PP.BUSINESS_START_MANA + first_income,
+	# Sıra oyunda ilk bendeyse ilk tur geliri memleket teşkilatı kurulmadan
+	# verilir (teşkilat geliri yok): iki durum da geçerli.
+	var first_income: float = cm.turn_income(me) - cm.org_income(me) if cm.current_turn_peer_id() == me else 0.0
+	var base: float = GameRules.MANA_START + PP.BUSINESS_START_MANA
+	check("is insani +2 mana ile basladi", is_equal_approx(cm.mana_of(me), base + first_income)
+		or is_equal_approx(cm.mana_of(me), base + cm.turn_income(me)),
 		str(cm.mana_of(me)))
 	var neighbor := String(gmap.neighbors().get(home, [""])[0])
 	check("hemsehri destegi memlekette", is_equal_approx(PP.hometown_activity(home, me), PP.HOMETOWN_ACTIVITY))

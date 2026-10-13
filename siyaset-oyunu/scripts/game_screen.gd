@@ -313,6 +313,13 @@ var _economy_panel: EconomyPanel
 var _tax_panel: PanelContainer
 var _tax_box: VBoxContainer
 var _tax_selected: int = -1
+## FİNANSMAN: yatırım / miting için il seçilince açılan kaydırıcılı panel;
+## finansman soruşturması paneli ve sonuç kartı.
+var _funding_panel: FundingPanel
+var _inquiry_panel: PanelContainer
+var _inquiry_box: VBoxContainer
+var _inquiry_target: int = -1
+var _inquiry_card: Control
 
 func _ready() -> void:
 	AudioManager.play_game_music()
@@ -351,6 +358,7 @@ func _ready() -> void:
 	GovernmentManager.proposal_resolved.connect(_on_proposal_resolved)
 	CardManager.opinion_changed.connect(_on_opinion_changed)
 	CardManager.economy_event.connect(_on_economy_event)
+	CardManager.inquiry_resolved.connect(_show_inquiry_result)
 	GameSettings.province_view_changed.connect(_on_province_view_changed)
 
 	UiSkin.skin_panel(left_panel, UiSkin.PANEL_DARK)
@@ -390,6 +398,7 @@ func _ready() -> void:
 	_place_right_column_controls()
 	_build_law_designer()
 	_build_tax_panel()
+	_build_funding_ui()
 	_build_agenda_banner()
 	_build_propaganda_menu()
 	_build_speech_panel()
@@ -2236,6 +2245,8 @@ func _begin_province_targeting(hand_index: int) -> void:
 
 func _cancel_targeting() -> void:
 	_pending_province_hand_index = -1
+	if _funding_panel != null:
+		_funding_panel.hide()
 	if _pending_org:
 		# Harita teşkilat katmanında KALIR (oyuncu isterse kendisi değiştirir).
 		_pending_org = false
@@ -2266,12 +2277,8 @@ func _on_province_clicked(province_id: String) -> void:
 	if (_pending_org or _pending_miting or _pending_invest) and _selected_province != province_id:
 		_select_target_province(province_id)
 		return
-	if _pending_invest:
-		_cancel_targeting()
-		if CardManager.can_invest(me, province_id):
-			CardManager.invest(province_id)
-		else:
-			_show_toast(_invest_block_reason())
+	if _pending_invest or (_pending_miting and _funding_panel.visible):
+		_on_funding_confirmed(_funding_panel.current_share())
 		return
 	if _pending_miting:
 		_cancel_targeting()
@@ -2421,6 +2428,10 @@ func _select_target_province(province_id: String) -> void:
 	var me := multiplayer.get_unique_id()
 	var pname := ElectionNightSim.province_name(province_id)
 	var detail := ""
+	if _pending_invest or (_pending_miting and _miting_has_choice()):
+		_open_funding(province_id)
+		_set_target_hint("%s: finansmanı aşağıdan ayarla, ONAYLA'ya bas (ya da ile tekrar dokun)  ·  Butona tekrar dokun: iptal" % pname)
+		return
 	if _pending_invest:
 		detail = _invest_preview(pname)
 	elif _pending_miting:
@@ -2872,6 +2883,8 @@ func _on_party_action(kind: String, peer_id: int) -> void:
 			CardManager.resign_from_party()
 		"found":
 			add_child(FoundPartyDialog.new())
+		"inquiry":
+			_open_inquiry_panel(peer_id)
 
 func _hide_profile() -> void:
 	_profile_peer_id = -1
@@ -3848,6 +3861,116 @@ func _propose_tax(law_type: String) -> void:
 	_tax_panel.hide()
 	CardManager.propose_law(law_type)
 
+# --- Finansman paylaşımı ve soruşturma ----------------------------------------
+
+func _build_funding_ui() -> void:
+	_funding_panel = FundingPanel.new()
+	_funding_panel.hide()
+	_funding_panel.confirmed.connect(_on_funding_confirmed)
+	_funding_panel.cancelled.connect(_cancel_targeting)
+	add_child(_funding_panel)
+	_inquiry_panel = PanelContainer.new()
+	var style := UiSkin.stylebox(UiSkin.PANEL)
+	style.set_content_margin_all(UiTheme.PAD_M)
+	_inquiry_panel.add_theme_stylebox_override("panel", style)
+	_inquiry_panel.z_index = 108
+	_inquiry_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	_inquiry_box = VBoxContainer.new()
+	_inquiry_box.add_theme_constant_override("separation", 5)
+	_inquiry_box.custom_minimum_size = Vector2(404, 0)
+	_inquiry_panel.add_child(_inquiry_box)
+	_inquiry_panel.hide()
+	add_child(_inquiry_panel)
+
+## Hükümetteki parti mitingini devlet parasıyla da yapabilir: seçim varsa panel açılır.
+func _miting_has_choice() -> bool:
+	return bool(CardManager.funding_range(multiplayer.get_unique_id(), "miting")["state_allowed"])
+
+func _open_funding(province_id: String) -> void:
+	_funding_panel.open(multiplayer.get_unique_id(), "invest" if _pending_invest else "miting", province_id)
+	_place_funding_panel.call_deferred()
+
+## Haritanın alt kenarına ortalı; haritanın dışına taşmaz.
+func _place_funding_panel() -> void:
+	if not _funding_panel.visible:
+		return
+	_funding_panel.reset_size()
+	var map := _r(R_MAP)
+	var panel_size := _funding_panel.size
+	_funding_panel.position = Vector2(map.position.x + (map.size.x - panel_size.x) * 0.5,
+		maxf(map.position.y + 40.0, map.end.y - panel_size.y - 8.0))
+
+func _on_funding_confirmed(share: float) -> void:
+	var me := multiplayer.get_unique_id()
+	var province_id := _selected_province
+	var investing := _pending_invest
+	_cancel_targeting()
+	if province_id == "":
+		return
+	if investing:
+		if CardManager.can_invest(me, province_id, share):
+			CardManager.invest(province_id, share)
+		else:
+			_show_toast(CardManager.funding_block_reason(me, "invest", share) if CardManager.can_invest(me, province_id) else _invest_block_reason())
+	else:
+		if CardManager.can_miting(me, province_id, share):
+			CardManager.miting(province_id, share)
+		else:
+			_show_toast(CardManager.funding_block_reason(me, "miting", share))
+
+func _open_inquiry_panel(target: int) -> void:
+	_inquiry_target = CardManager.party_of(target)
+	_law_designer.hide()
+	_tax_panel.hide()
+	_cancel_targeting()
+	_fill_inquiry_panel()
+	_inquiry_panel.show()
+	_place_inquiry_panel.call_deferred()
+
+func _fill_inquiry_panel() -> void:
+	EconomyPanel.fill_inquiry(_inquiry_box, multiplayer.get_unique_id(), _inquiry_target, _on_inquiry_open, _inquiry_panel.hide)
+
+func _place_inquiry_panel() -> void:
+	_inquiry_panel.reset_size()
+	var viewport_size := get_viewport_rect().size
+	_inquiry_panel.position = Vector2(viewport_size.x - RIGHT_COLUMN_WIDTH - _inquiry_panel.size.x - 12.0,
+		clampf(_top_area_height() - _inquiry_panel.size.y, 12.0, maxf(12.0, viewport_size.y - _inquiry_panel.size.y - 12.0)))
+
+func _on_inquiry_open(target: int) -> void:
+	var me := multiplayer.get_unique_id()
+	if not CardManager.can_open_inquiry(me, target):
+		_show_toast(CardManager.inquiry_block_reason(me, target))
+		return
+	_inquiry_panel.hide()
+	CardManager.open_inquiry(target)
+
+## SONUÇ KARTI: haritanın üstünde ortada belirir, birkaç saniye kalır (dokununca
+## kapanır). Ton etiketle (✓ ŞEFFAF / ! USULSÜZLÜK / — KANIT YOK) ve renkle.
+func _show_inquiry_result(data: Dictionary) -> void:
+	if _inquiry_card != null and is_instance_valid(_inquiry_card):
+		_inquiry_card.queue_free()
+	if _inquiry_panel != null and _inquiry_panel.visible:
+		_fill_inquiry_panel()
+	var card := EconomyPanel.inquiry_result_card(data)
+	card.z_index = 109
+	add_child(card)
+	_inquiry_card = card
+	card.gui_input.connect(func(event: InputEvent):
+		if event is InputEventMouseButton and event.pressed and is_instance_valid(card):
+			card.queue_free())
+	card.reset_size()
+	var map := _r(R_MAP)
+	var target := Vector2(map.position.x + (map.size.x - card.size.x) * 0.5, map.position.y + 46.0)
+	card.position = target + Vector2(0, -16)
+	card.modulate.a = 0.0
+	var tween := card.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(card, "position", target, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(card, "modulate:a", 1.0, 0.2)
+	tween.chain().tween_interval(6.0)
+	tween.chain().tween_property(card, "modulate:a", 0.0, 0.5)
+	tween.chain().tween_callback(card.queue_free)
+
 func _circle_texture(color: Color) -> Texture2D:
 	var key := color.to_html()
 	if _circle_textures.has(key):
@@ -3887,9 +4010,10 @@ func _on_law_button_pressed() -> void:
 func _invest_block_reason() -> String:
 	if CardManager.can_act() and not CardManager.is_government_party(multiplayer.get_unique_id()):
 		return "Yatırımı sadece hükümet partileri yapabilir."
-	if CardManager.can_act() and CardManager.state_treasury() < Economy.INVEST_COST:
-		return "Devlet hazinesi yetmiyor: yatırım %s, hazinede %s. Vergi geliri dönem sonunda girer." % [
-			Economy.money_full(Economy.INVEST_COST), Economy.money_full(CardManager.state_treasury())]
+	if CardManager.can_act() and not CardManager.can_invest(multiplayer.get_unique_id()):
+		return "Yatırım ödenemiyor: hazinede %s, kasanda %s; ikisi birlikte %s + %s hamle bedelini karşılamalı." % [
+			Economy.money_full(CardManager.state_treasury()), GameRules.cost_text(CardManager.mana_of(multiplayer.get_unique_id())),
+			Economy.money_full(Economy.INVEST_COST), GameRules.cost_text(GameRules.INVEST_MANA_COST)]
 	return _action_block_reason(GameRules.INVEST_MANA_COST)
 
 ## Yatırım hamlesi: haritadan il seçilir (ilk dokunuş ayrıntı, ikincisi yapar).
@@ -3908,8 +4032,8 @@ func _on_invest_button_pressed() -> void:
 	if _province_panel != null:
 		_province_panel.hide()
 	_refresh_action_buttons()
-	_set_target_hint("Yatırım: devlet hazinesinden %s (hazine %s) + %s  ·  Haritada bir ile dokun  ·  Butona tekrar dokun: iptal" % [
-		Economy.money_full(Economy.INVEST_COST), Economy.money_full(CardManager.state_treasury()), GameRules.cost_text(GameRules.INVEST_MANA_COST)])
+	_set_target_hint("Yatırım (%s, parti kasası ve devlet hazinesi arasında bölünebilir): haritada bir ile dokun  ·  Butona tekrar dokun: iptal" %
+		Economy.money_full(Economy.INVEST_COST))
 
 ## Gensoru hamlesi: sadece hükümet azınlıktayken muhalefete açık. İlk dokunuş
 ## onay ister, ikinci dokunuş meclis oylamasını başlatır.

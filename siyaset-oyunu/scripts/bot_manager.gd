@@ -108,6 +108,8 @@ static func do_action(bot: int) -> Dictionary:
 			CardManager._apply_invest_move(bot, String(action["province"]))
 		"censure":
 			CardManager._apply_censure_move(bot)
+		"inquiry":
+			CardManager._apply_inquiry(bot, int(action["target"]))
 		"congress":
 			CardManager._apply_congress(bot)
 		"early_election":

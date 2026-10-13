@@ -106,7 +106,8 @@ const PARTNER_SHARE := 0.6
 static func start_state() -> Dictionary:
 	return {"tax": START_TAX, "pressure": float(TAX_PRESSURE[START_TAX]), "index": START_INDEX, "boost": 0.0,
 		"treasury": START_TREASURY, "revenue": 0.0, "prev": {}, "tax_round": 0, "tax_from": START_TAX,
-		"pressure_from": float(TAX_PRESSURE[START_TAX]), "investments": []}
+		"pressure_from": float(TAX_PRESSURE[START_TAX]), "investments": [], "ledger": [], "next_id": 1,
+		"inquiries": {}}
 
 ## Eski sürüm durumunda eksik alanlar güvenli varsayılanla doldurulur.
 static func normalized(state) -> Dictionary:
@@ -224,6 +225,72 @@ static func tax_mood_at(level: int) -> Dictionary:
 		if absf(value) >= 0.05:
 			result[group] = value
 	return result
+
+# --- Finansman paylaşımı ----------------------------------------------------------
+## İki AYRI kaynak: PARTİ KASASI (mana) ve DEVLET HAZİNESİ (milyon ₺). Bir
+## hamlenin toplam bedeli milyon ₺ cinsinden yazılır; partinin payı manayla
+## ödenir: 1 mana = MILLION_PER_MANA milyon ₺.
+const MILLION_PER_MANA := 2.0
+## Kaydırıcı %5'lik adımlarla durur (0/100 ve 100/0 dahil).
+const FUND_STEP := 0.05
+
+## state: devletin payı (0..1) → {"state": milyon ₺, "party": milyon ₺, "mana": mana}.
+static func split_cost(total: float, state: float) -> Dictionary:
+	var s := snap_share(state)
+	var state_million := total * s
+	var party_million := total - state_million
+	return {"share": s, "state": state_million, "party": party_million, "mana": party_million / MILLION_PER_MANA}
+
+static func snap_share(state: float) -> float:
+	return clampf(snappedf(state, FUND_STEP), 0.0, 1.0)
+
+# --- İşlem kaydı ve Finansman Soruşturması -------------------------------------------
+## Her yatırım ve miting GERÇEK finansmanıyla kaydedilir (economy["ledger"]):
+## {"id", "round", "party", "kind", "province", "total", "party_million",
+##  "party_mana", "state_million", "investigated"}. Kayıt sayısı sınırlı.
+const LEDGER_LIMIT := 80
+## Soruşturma bedeli (soruşturan partinin manası), kapsamı (son kaç tur).
+const INQUIRY_MANA_COST := 15
+const INQUIRY_SCOPE_ROUNDS := 8
+## ŞEFFAFLIK ÖDÜLÜ (hedefe, ulusal destek): kendi kasasından ödenmiş toplam
+## T milyon ₺ için min(MAX, PER_SQRT × √T); T < MIN ise ödül yok (küçük
+## harcamalarla oy toplanamaz). Her işlem bir kez incelenir.
+const TRANSPARENCY_MIN := 20.0
+const TRANSPARENCY_PER_SQRT := 0.12
+const TRANSPARENCY_MAX := 1.5
+## Kendi kasasından MİTİNG olağan parti faaliyetidir: ödüle çeyrek ağırlıkla
+## girer (kendi parasıyla YATIRIM olağanüstüdür, tam ağırlık). Partinin kendini
+## denetletmesi daha az inandırıcıdır: ödülün yarısı. (Sürekli öz denetimle
+## oy toplanamasın.)
+const MITING_TRANSPARENCY_WEIGHT := 0.25
+const SELF_AUDIT_FACTOR := 0.5
+
+## İşlemin şeffaflık ödülüne giren tutarı (milyon ₺).
+static func transparency_amount(entry: Dictionary) -> float:
+	var weight := MITING_TRANSPARENCY_WEIGHT if is_partisan(String(entry.get("kind", ""))) else 1.0
+	return float(entry.get("party_million", 0.0)) * weight
+## USULSÜZLÜK (partizan bir faaliyete devlet parası): ulusal kayıp
+## min(MAX, PER_MILLION × tutar) + kaset kadar karışıklık; soruşturana
+## güvenilirlik.
+const SCANDAL_PER_MILLION := 0.06
+const SCANDAL_MAX := 4.0
+const INQUIRY_CREDIBILITY := 5.0
+
+## Bir işlemin hangi sınıfa girdiği: devletten ödenen MİTİNG partizan
+## harcamadır (usulsüzlük); devletten ödenen YATIRIM meşru kamu harcamasıdır;
+## parti kasasından ödenen her şey parti finansmanıdır.
+static func is_partisan(kind: String) -> bool:
+	return kind == "miting"
+
+static func transparency_gain(party_million: float) -> float:
+	if party_million < TRANSPARENCY_MIN:
+		return 0.0
+	return minf(TRANSPARENCY_MAX, TRANSPARENCY_PER_SQRT * sqrt(party_million))
+
+static func scandal_damage(improper_million: float) -> float:
+	if improper_million <= 0.0:
+		return 0.0
+	return minf(SCANDAL_MAX, SCANDAL_PER_MILLION * improper_million)
 
 ## "1.240" gibi binlik ayraçlı tam sayı.
 static func money_text(value: float) -> String:

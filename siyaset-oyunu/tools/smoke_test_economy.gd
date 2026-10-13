@@ -179,7 +179,11 @@ func _initialize() -> void:
 	check("kalan dilimler bekliyor", cm.pending_investments(1).size() == 1 and int(cm.pending_investments(1)[0]["rounds_left"]) == Economy.INVEST_DELAY_ROUNDS)
 	check("muhalefet yatırımdan pay almaz", cm.pending_investments(3).is_empty() and near(cm.local_of(province, 3), 0.0))
 	cm.economy["treasury"] = Economy.INVEST_COST - 1.0
-	check("hazine yetmezse yatırım yapılamaz", not cm.can_invest(1, province))
+	check("hazine yetmezse tamamı devletten ödenemez", not cm.can_invest(1, province, 1.0))
+	var keep_mana: float = cm.mana_of(1)
+	cm.mana[1] = 12.0
+	check("hazine ve kasa birlikte yetmezse yatırım yapılamaz", not cm.can_invest(1, province))
+	cm.mana[1] = keep_mana
 	cm.economy["treasury"] = 1000.0
 	var tranche: float = PublicOpinion.INVEST_LOCAL * (1.0 - Economy.INVEST_IMMEDIATE) / Economy.INVEST_DELAY_ROUNDS
 	var local_before: float = cm.local_of(province, 1)
@@ -354,8 +358,135 @@ func _initialize() -> void:
 	check("bot ortak: indirime EVET", bb._tax_law_vote(2, cp.tax_law_type(Economy.TAX_NORMAL), 1, [1, 2]) == gm.VOTE_YES)
 	cm.early_election_pending = false
 	cm.economy["treasury"] = 0.0
+	cm.mana[1] = 20.0
 	give_turn(1)
-	check("botlar da hazinesiz yatırım yapamaz (aynı kural)", not cm.can_invest(1))
+	check("botlar da hazinesiz ve kasasız yatırım yapamaz (aynı kural)", not cm.can_invest(1))
+
+	print("")
+	print("=== 12) FİNANSMAN PAYLAŞIMI ===")
+	new_game()
+	give_turn(1)
+	cm.mana[1] = 100.0
+	cm.economy["treasury"] = 1000.0
+	var r: Dictionary = cm.funding_range(1, "invest")
+	check("yatırım: 0/100 ve 100/0 serbest (yeterli bakiye)", near(float(r["min"]), 0.0) and near(float(r["max"]), 1.0))
+	var sp := Economy.split_cost(Economy.INVEST_COST, 0.3)
+	check("paylaşım: devlet %30 = 30 milyon ₺, parti 70 milyon ₺ = 35 mana", near(float(sp["state"]), 30.0) and near(float(sp["party"]), 70.0)
+		and near(float(sp["mana"]), 70.0 / Economy.MILLION_PER_MANA))
+	check("paylaşım %5 adıma oturur", near(float(Economy.split_cost(100.0, 0.33)["share"]), 0.35))
+	cm.economy["treasury"] = 40.0
+	r = cm.funding_range(1, "invest")
+	check("hazine 40 iken devlet payı en fazla %40", near(float(r["max"]), 0.4), str(r))
+	check("hazineyi aşan paylaşım reddedilir", not cm.can_invest(1, String(cm._province_ids[1]), 0.5)
+		and cm.funding_block_reason(1, "invest", 0.5).contains("hazine"))
+	cm.economy["treasury"] = 1000.0
+	cm.mana[1] = 30.0
+	r = cm.funding_range(1, "invest")
+	check("kasa 30 mana (bedel 10): parti en fazla 40 milyon ₺ → devlet en az %60", near(float(r["min"]), 0.6), str(r))
+	check("kasayı aşan paylaşım reddedilir", not cm.can_invest(1, String(cm._province_ids[1]), 0.3))
+	cm.mana[1] = 100.0
+	var prov2 := String(cm._province_ids[2])
+	var t0: float = cm.state_treasury()
+	var m0: float = cm.mana_of(1)
+	cm._apply_invest_move(1, prov2, 0.3)
+	check("seçilen paylaşım tam bir kez uygulandı (hazine −30)", near(cm.state_treasury(), t0 - 30.0))
+	check("parti kasası: 35 mana pay + 10 hamle bedeli", near(cm.mana_of(1), m0 - 35.0 - GameRules.INVEST_MANA_COST))
+	var ledger: Array = cm.economy["ledger"]
+	var rec: Dictionary = ledger[-1]
+	check("işlem kaydı doğru", int(rec["party"]) == 1 and String(rec["kind"]) == "invest" and String(rec["province"]) == prov2
+		and near(float(rec["party_million"]), 70.0) and near(float(rec["state_million"]), 30.0) and int(rec["round"]) == cm.round_number
+		and not bool(rec["investigated"]), str(rec))
+	check("yatırımın etkisi paylaşımdan bağımsız (aynı il etkisi)", near(cm.local_of(prov2, 1), PublicOpinion.INVEST_LOCAL * Economy.INVEST_IMMEDIATE))
+	give_turn(3)
+	cm.mana[3] = 100.0
+	var opp_province := ""
+	for pid in cm._province_ids:
+		cm.organizations[String(pid)] = {3: 1}
+		opp_province = String(pid)
+		break
+	r = cm.funding_range(3, "miting")
+	check("muhalefet devlet hazinesini kullanamaz (miting %100 parti)", near(float(r["max"]), 0.0) and not bool(r["state_allowed"]))
+	check("muhalefete devlet paylı miting reddedilir", not cm.can_miting(3, opp_province, 0.5))
+
+	print("")
+	print("=== 13) FİNANSMAN SORUŞTURMASI ===")
+	new_game()
+	cm.economy["treasury"] = 2000.0
+	var p_inv := String(cm._province_ids[4])
+	# 1: tamamen devletten yatırım (meşru), 2: kendi kasasından yatırım.
+	give_turn(1)
+	cm._apply_invest_move(1, p_inv, 1.0)
+	give_turn(2)
+	cm._apply_invest_move(2, p_inv, 0.0)
+	var nat1: float = cm.national_of(1)
+	var nat2: float = cm.national_of(2)
+	give_turn(3)
+	check("muhalefet soruşturma açabilir", cm.can_open_inquiry(3, 1))
+	cm._apply_inquiry(3, 1)
+	check("meşru devlet yatırımı usulsüzlük sayılmaz (ceza yok)", near(cm.national_of(1), nat1) and near(cm.turmoil_of(1), 0.0))
+	check("kanıt yoksa ödül de uydurulmaz", near(cm.national_of(1), nat1))
+	check("bedel soruşturandan düştü", near(cm.mana_of(3), 500.0 - Economy.INQUIRY_MANA_COST))
+	check("partin dönemde tek soruşturma açar", not cm.can_open_inquiry(3, 2))
+	cm.economy["inquiries"] = {}
+	cm._apply_inquiry(3, 2)
+	var gain: float = cm.national_of(2) - nat2
+	check("kendi kasasından yatırım doğrulandı: sınırlı şeffaflık ödülü", gain > 0.0 and gain <= Economy.TRANSPARENCY_MAX + 0.001
+		and near(gain, Economy.transparency_gain(100.0)), "%.2f" % gain)
+	check("ödül soruşturana değil hedefe", near(cm.national_of(3), 0.0))
+	cm.economy["inquiries"] = {}
+	cm._apply_inquiry(3, 2)
+	check("aynı işlem ikinci kez ödül vermez", near(cm.national_of(2) - nat2, gain))
+	var mit_entry := {"kind": "miting", "party_million": 30.0}
+	check("kendi parasıyla miting ödüle çeyrek ağırlıkla girer", near(Economy.transparency_amount(mit_entry), 7.5)
+		and Economy.transparency_gain(Economy.transparency_amount(mit_entry) * 2.0) == 0.0)
+	check("ödül üst sınırı ve azalan getiri", Economy.transparency_gain(10000.0) <= Economy.TRANSPARENCY_MAX
+		and Economy.transparency_gain(400.0) < 4.0 * Economy.transparency_gain(100.0) and Economy.transparency_gain(10.0) == 0.0)
+	# Usulsüzlük: hükümet partisi mitingi devlet parasıyla.
+	var p_mit := String(cm._province_ids[6])
+	cm.organizations[p_mit] = {1: 1}
+	give_turn(1)
+	check("hükümet partisi mitingi devletten ödeyebilir", cm.can_miting(1, p_mit, 1.0))
+	var tm_before: float = cm.state_treasury()
+	var mana_mit: float = cm.mana_of(1)
+	cm._apply_miting_move(1, p_mit, 1.0)
+	check("devletten miting: hazine −30, mana değişmedi", near(cm.state_treasury(), tm_before - 30.0) and near(cm.mana_of(1), mana_mit))
+	var nat_before: float = cm.national_of(1)
+	var cred_before: float = cm.credibility_of(3)
+	cm.economy["inquiries"] = {}
+	give_turn(3)
+	cm._apply_inquiry(3, 1)
+	check("partizan kamu harcaması usulsüzlük olarak bulundu", cm.national_of(1) < nat_before - 0.5 and cm.turmoil_of(1) > 0.0,
+		"%.2f -> %.2f" % [nat_before, cm.national_of(1)])
+	check("usulsüzlüğü bulan güvenilirlik kazanır", cm.credibility_of(3) >= cred_before or near(cred_before, cm.CREDIBILITY_MAX))
+	var nat_after: float = cm.national_of(1)
+	cm.economy["inquiries"] = {}
+	cm._apply_inquiry(3, 1)
+	check("aynı usulsüzlük ikinci kez ceza vermez", near(cm.national_of(1), nat_after))
+	# Hükümet partisi de açabilir (kendini denetletme dahil).
+	cm.economy["inquiries"] = {}
+	give_turn(1)
+	check("hükümet partisi de soruşturma açabilir", cm.can_open_inquiry(1, 3) and cm.can_open_inquiry(1, 1))
+	cm.last_seats = {}
+	check("meclis yokken soruşturma açılmaz", not cm.can_open_inquiry(1, 3))
+	cm.last_seats = {1: 250, 2: 100, 3: 150}
+	# Kayıt ve yükleme: defter durumla gider; eski durumda boş başlar.
+	var packed_ledger: Dictionary = cm._pack_state(false).duplicate(true)
+	var ledger_size: int = (cm.economy["ledger"] as Array).size()
+	cm.economy = Economy.start_state()
+	cm._apply_state(packed_ledger)
+	check("işlem defteri durumla taşınır", (cm.economy["ledger"] as Array).size() == ledger_size and ledger_size >= 3)
+	# Bot: gizli tutarlara bakmaz; kendi kasasından harcadıysa kendini denetletir.
+	new_game()
+	cm.economy["treasury"] = 2000.0
+	give_turn(1)
+	cm._apply_invest_move(1, String(cm._province_ids[3]), 0.0)
+	cm.economy["inquiries"] = {}
+	give_turn(1)
+	var inquiry_choice: Dictionary = bb._eval_inquiry(1)
+	check("bot kendi kasasından ödediği harcamayı denetletir", int(inquiry_choice.get("target", -1)) == 1, str(inquiry_choice))
+	give_turn(3)
+	cm.mana[3] = 5.0
+	check("bot da manası yetmeden soruşturma açamaz", bb._eval_inquiry(3).is_empty())
 
 	print("")
 	if fails == 0:

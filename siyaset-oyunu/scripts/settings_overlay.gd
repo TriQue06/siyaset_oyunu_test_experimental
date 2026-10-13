@@ -31,6 +31,7 @@ var _seed_row: HBoxContainer
 var _seed_label: Label
 var _seed_copy: Button
 var _leave_note: Label
+var _save_button: Button
 ## "Oyundan Ayrıl" iki adımlı: ilk basış onay ister.
 var _leave_armed: bool = false
 
@@ -203,6 +204,10 @@ func _build_menu() -> void:
 		_seed_copy.text = "Kopyalandı!")
 	_seed_row.add_child(_seed_copy)
 	box.add_child(_seed_row)
+	_save_button = _menu_button("Oyunu Kaydet", func():
+		var err := SaveGame.save(SaveGame.MANUAL_SLOT)
+		_leave_note.text = "Oyun kaydedildi. Ana menüden \"Kayıtlı Oyuna Devam Et\" ile dönebilirsin." if err == "" else err)
+	box.add_child(_save_button)
 	_leave_button = _menu_button("Oyundan Ayrıl", _on_leave_pressed)
 	box.add_child(_leave_button)
 
@@ -250,6 +255,9 @@ func open_menu() -> void:
 	_seed_row.visible = scene_path in ["res://scenes/GameScreen.tscn", "res://scenes/GovernmentFormation.tscn",
 		"res://scenes/ElectionResults.tscn"]
 	_seed_label.text = "Harita tohumu: %d" % GameMap.seed_value()
+	# Kayıt sadece çevrim dışı oyunun oyun ekranında.
+	_save_button.visible = scene_path == "res://scenes/GameScreen.tscn" and MultiplayerManager.offline_mode
+	_save_button.disabled = SaveGame.block_reason() != ""
 	_seed_copy.text = "Kopyala"
 	_menu.show()
 

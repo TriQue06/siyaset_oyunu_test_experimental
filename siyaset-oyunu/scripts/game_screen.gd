@@ -1655,6 +1655,7 @@ const PLAQUE_BAR := 9.0
 
 func _on_turn_changed(_peer_id: int) -> void:
 	var current := CardManager.current_turn_peer_id()
+	_maybe_autosave()
 	if current != _last_turn_peer:
 		_last_turn_peer = current
 		if current == multiplayer.get_unique_id() and not CardManager.game_finished:
@@ -1990,6 +1991,16 @@ func _card_cost_badge(cost: int) -> Control:
 	badge.position = Vector2(CARD_DISPLAY_SIZE.x - badge.get_combined_minimum_size().x - 6.0 * CARD_ART_RATIO,
 		56.0 * CARD_ART_RATIO)
 	return badge
+
+## OTOMATİK KAYIT: çevrim dışı oyunda her yeni dönemin başında (tur akışı
+## engellenmemişken) bir kez. Elle kayıttan ayrı yuvaya yazılır.
+var _autosaved_round := -1
+func _maybe_autosave() -> void:
+	if not MultiplayerManager.offline_mode or CardManager.round_number == _autosaved_round \
+			or CardManager.is_turn_blocked() or SaveGame.block_reason() != "":
+		return
+	_autosaved_round = CardManager.round_number
+	(func(): SaveGame.save(SaveGame.AUTOSAVE_SLOT)).call_deferred()
 
 ## Oynanamayan bir karta tıklanınca neden oynanamadığı.
 func _unplayable_reason(card_type: String) -> String:

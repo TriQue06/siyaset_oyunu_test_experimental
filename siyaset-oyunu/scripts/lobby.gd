@@ -182,6 +182,22 @@ Sadece sen ve eklediğin botlar.")
 	_offline_button = _button("Botlarla Oyna", UiTheme.GREEN_DARK, 42.0)
 	_offline_button.pressed.connect(_on_offline_pressed)
 	_offline_box.add_child(_offline_button)
+	# KAYITLI OYUN: elle kayıt ya da otomatik kayıt varsa en yenisinden devam.
+	var slot := _latest_save()
+	if slot != "":
+		var info := SaveGame.summary(slot)
+		var resume := _button("Kayıtlı Oyuna Devam Et", UiTheme.BLUE.darkened(0.2), 42.0)
+		resume.tooltip_text = "%s · %s · %s" % [String(info.get("party", "")), String(info.get("period", "")), String(info.get("saved_at", ""))]
+		resume.pressed.connect(func():
+			resume.disabled = true
+			var err := SaveGame.load_game(get_tree(), slot)
+			if err != "":
+				resume.disabled = false
+				_set_status(err, true))
+		_offline_box.add_child(resume)
+		var when := _small_label("%s · %s" % [String(info.get("party", "")), String(info.get("period", ""))])
+		when.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_offline_box.add_child(when)
 
 	_online_box = VBoxContainer.new()
 	_online_box.add_theme_constant_override("separation", 10)
@@ -290,6 +306,18 @@ func _on_code_text_changed(new_text: String) -> void:
 func _player_name() -> String:
 	var trimmed := name_edit.text.strip_edges()
 	return trimmed if trimmed != "" else PlayerProfile.player_name
+
+## En yeni kayıt yuvası (elle kayıt ya da otomatik kayıt; yoksa "").
+static func _latest_save() -> String:
+	var best := ""
+	var best_time := -1
+	for slot in [SaveGame.MANUAL_SLOT, SaveGame.AUTOSAVE_SLOT]:
+		if SaveGame.exists(slot):
+			var t := FileAccess.get_modified_time(SaveGame.path_of(slot))
+			if t > best_time:
+				best_time = t
+				best = slot
+	return best
 
 ## ÇEVRİM DIŞI: ağa hiç çıkılmaz, doğrudan lobiye geçilir.
 func _on_offline_pressed() -> void:

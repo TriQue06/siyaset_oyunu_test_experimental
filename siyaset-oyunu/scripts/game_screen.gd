@@ -434,6 +434,56 @@ func _ready() -> void:
 	_on_government_phase_changed()
 	if CardManager.game_finished:
 		_on_game_over()
+	_build_tutorial()
+
+# --- İlk oyun rehberi -------------------------------------------------------------
+
+var _tutorial: TutorialGuide
+
+## Rehberin adımları: koşul (ne zaman anlamlı) ve hedef (ekranda hangi alan).
+## Oyun akışını durdurmaz; görülenler cihazda saklanır (TutorialGuide).
+func _build_tutorial() -> void:
+	# Test / önizleme betiklerinde rehber açılmaz (ekran görüntülerini kapatmasın).
+	if get_tree().get_script() != null and not TutorialGuide.allow_in_scripts:
+		return
+	_tutorial = TutorialGuide.new()
+	add_child(_tutorial)
+	var mine := func() -> bool: return CardManager.can_act() and not CardManager.game_finished
+	var me := multiplayer.get_unique_id()
+	_tutorial.add_step("ekran", "Siyaset stüdyosuna hoş geldin",
+		"Solda partiler ve vekilleri, ortada ülke haritası, sağda hükümet, haber akışı (LOG) ve seçtiğin il. Altta elindeki kartlar, hamleler ve parti kasan. Sıran gelince hamlelerini yap, sonra Turu Bitir'e bas.",
+		func() -> Rect2: return _r(R_MAP), func() -> bool: return true)
+	_tutorial.add_step("kasa", "Parti kasası ve devlet hazinesi",
+		"Bu senin partinin parası: sıran geldikçe dolar, hamleler buradan ödenir. Sağdaki EKONOMİ'de görünen DEVLET HAZİNESİ ayrıdır; onu sadece hükümet, yatırım için kullanır.",
+		func() -> Rect2: return _r(R_FUNDS), mine)
+	_tutorial.add_step("hamleler", "Hamleler",
+		"Bir hamle seç, sonra haritada il seç; aynı ile ikinci dokunuş onaylar. Soluk düğme şu an yapılamaz: üstüne gelince nedenini görürsün. Bedeller düğmelerin altında.",
+		func() -> Rect2: return _r(R_ACTIONS), mine)
+	_tutorial.add_step("secmen", "Seçmen grupları",
+		"Oylar 8 seçmen grubundan gelir. Seçmen katmanı her grubun hangi illerde yoğun olduğunu gösterir; partin hangi gruplara yakınsa o illerde güçlüdür. Bir ile tıkla: oradaki durumunu görürsün.",
+		func() -> Rect2: return (_layer_buttons[MapLayer.GROUPS] as Control).get_global_rect() if _layer_buttons.size() > MapLayer.GROUPS else _r(R_MAP),
+		func() -> bool: return mine.call() and _tutorial.seen_count() >= 3)
+	_tutorial.add_step("teskilat", "Teşkilat",
+		"İlde teşkilat kalıcı oy, anket ve yerel bağış getirir; miting ve karalama ancak teşkilatlı ilde yapılır. Beş ilden sonra her yeni teşkilat biraz daha pahalıdır: nerede kuracağını seç.",
+		func() -> Rect2: return _org_button.get_global_rect(), func() -> bool: return mine.call() and _tutorial.seen_count() >= 4)
+	_tutorial.add_step("kartlar", "Kartlar",
+		"Karta dokun, ne yaptığını oku; hedef isterse bir parti ya da il seç. İstemediğin kartı KART BOZDUR yuvasına sürükle: bedelinin yarısı kasana döner.",
+		func() -> Rect2: return _r(R_HAND),
+		func() -> bool: return mine.call() and not CardManager.my_inventory().is_empty() and _tutorial.seen_count() >= 5)
+	_tutorial.add_step("secim", "Seçim yapıldı",
+		"Vekil sayıları solda. En çok vekili olan parti hükümeti kurmaya çalışır; güvenoyu için meclisin çoğunluğu (251) gerekir. Gerekirse ortak bulunur.",
+		func() -> Rect2: return _r(R_BOARD), func() -> bool: return CardManager.last_election_round > 0 and not CardManager.is_turn_blocked())
+	_tutorial.add_step("hukumet", "Hükümet ve koalisyon",
+		"Hükümet kuruldu. Makamlar (başbakanlık, bakanlıklar) puan yazar; küçük ortak olmak da değerlidir. Muhalefet gensoruyla hükümeti düşürmeye, ortaklar koalisyondan çekilmeye karar verebilir.",
+		func() -> Rect2: return _r(R_SIDE), func() -> bool: return GovernmentManager.has_government() and not CardManager.is_turn_blocked())
+	_tutorial.add_step("ekonomi", "Vergi ve yatırım",
+		"Hükümettesin: vergi kademesini meclise sunabilir, devlet hazinesinden il yatırımı yapabilirsin. Vergi indirimi seçmene yavaş yansır, seçimden birkaç dönem önce yap. Devlet parasını partinin mitinginde kullanmak usulsüzlüktür ve soruşturmada ortaya çıkar.",
+		func() -> Rect2: return _economy_panel.get_global_rect() if _economy_panel != null and _economy_panel.is_visible_in_tree() else _r(R_SIDE),
+		func() -> bool: return mine.call() and CardManager.is_government_party(me))
+	_tutorial.add_step("puan", "Nasıl kazanılır?",
+		"Kazanan oy oranıyla değil PUANLA belirlenir: hükümette makam, geçen yasa ve başarılı gensoru puan yazar. Sıralamayı PUAN sekmesinden izle.",
+		func() -> Rect2: return (_player_tab_buttons[1] as Control).get_global_rect() if _player_tab_buttons.size() > 1 else _r(R_BOARD),
+		func() -> bool: return GovernmentManager.has_government() and not CardManager.is_turn_blocked() and _tutorial.seen_count() >= 7)
 
 ## Ekranın kart barı DIŞINDA kalan yüksekliği. Harita, alt hazne ve sağ
 ## sütun hep bunun içinde yerleşir.

@@ -34,7 +34,7 @@ var threshold_slider: HSlider
 var map_seed_edit: LineEdit
 var random_parties_check: CheckButton
 var away_bot_check: CheckButton
-var bot_mana_buttons: Array = []
+var bot_funds_buttons: Array = []
 var threshold_value_label: Label
 
 var _settings_open: bool = false
@@ -112,7 +112,7 @@ func _refresh() -> void:
 	random_parties_check.disabled = not am_owner
 	if away_bot_check != null:
 		away_bot_check.disabled = not am_owner
-	for button in bot_mana_buttons:
+	for button in bot_funds_buttons:
 		(button as Button).disabled = not am_owner
 	for button in [interval_minus, interval_plus, count_minus, count_plus]:
 		button.disabled = not am_owner
@@ -276,8 +276,8 @@ func _refresh_settings_display() -> void:
 		random_parties_check.set_pressed_no_signal(MultiplayerManager.random_parties)
 	if away_bot_check != null:
 		away_bot_check.set_pressed_no_signal(MultiplayerManager.away_mode == MultiplayerManager.AWAY_BOT)
-	for button in bot_mana_buttons:
-		var on: bool = is_equal_approx(float((button as Button).get_meta("value")), MultiplayerManager.bot_mana_penalty)
+	for button in bot_funds_buttons:
+		var on: bool = is_equal_approx(float((button as Button).get_meta("value")), MultiplayerManager.bot_funds_penalty)
 		(button as Button).set_pressed_no_signal(on)
 		UiSkin.skin_color_button(button, UiTheme.GOLD if on else UiTheme.PANEL_LIGHT)
 		(button as Button).add_theme_color_override("font_color", UiTheme.INK if on else UiTheme.TEXT)
@@ -383,12 +383,12 @@ func _build_settings_panel() -> void:
 		MultiplayerManager.AWAY_BOT if on else MultiplayerManager.AWAY_PASSIVE))
 	away_box.add_child(away_bot_check)
 
-	var bot_box := _section("BOT MANA ZAYIFLATMASI", "Botlar her turun başında ve mana bonusu kartlarından seçilen miktar kadar daha az mana alır. 0 = zayıflatma yok.")
+	var bot_box := _section("BOT GELİR ZAYIFLATMASI", "Botların dönemlik geliri ve bağış kampanyaları seçilen tutar kadar (milyon ₺) azalır. 0 = zayıflatma yok.")
 	var bot_row := HBoxContainer.new()
 	bot_row.add_theme_constant_override("separation", 6)
 	bot_box.add_child(bot_row)
-	bot_mana_buttons.clear()
-	for value in MultiplayerManager.BOT_MANA_PENALTY_OPTIONS:
+	bot_funds_buttons.clear()
+	for value in MultiplayerManager.BOT_FUNDS_PENALTY_OPTIONS:
 		var button := Button.new()
 		button.toggle_mode = true
 		button.focus_mode = Control.FOCUS_NONE
@@ -396,9 +396,9 @@ func _build_settings_panel() -> void:
 		button.custom_minimum_size = Vector2(56, 34)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.set_meta("value", float(value))
-		button.pressed.connect(func(): MultiplayerManager.set_bot_mana_penalty(float(value)))
+		button.pressed.connect(func(): MultiplayerManager.set_bot_funds_penalty(float(value)))
 		bot_row.add_child(button)
-		bot_mana_buttons.append(button)
+		bot_funds_buttons.append(button)
 
 ## Başlıklı, çerçeveli bir ayar bölümü; içeriğin ekleneceği kutuyu döner.
 func _section(title_text: String, note_text: String) -> VBoxContainer:

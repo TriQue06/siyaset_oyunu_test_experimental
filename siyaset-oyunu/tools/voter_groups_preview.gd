@@ -32,7 +32,7 @@ func _initialize() -> void:
 	gm._set_phase(gm.Phase.IDLE)
 	var me: int = mm.owner_id
 	cm.current_turn_index = cm.turn_order.find(me)
-	cm.mana[me] = 120.0
+	cm.funds[me] = 120.0
 	cm.speech_rounds = {}
 	cm.agenda = {"type": "gundem_isci", "until": cm.round_number + 1}
 	cm.crisis = {"type": "kriz_isveren", "until": cm.round_number + 1}

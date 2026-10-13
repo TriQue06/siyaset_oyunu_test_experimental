@@ -104,7 +104,7 @@ func _initialize() -> void:
 	print("=== TEK LİDER ===")
 	check("oy veren sadece genel başkanlar", gm.voter_ids().size() == cm.party_ids().size())
 	check("oy ağırlığı partinin bütün vekilleri", gm.vote_weight(me) == int(cm.last_seats.get(me, 0)))
-	check("gelir bölünmez", is_equal_approx(cm.turn_income(me) - cm.org_income(me), float(GameRules.MANA_PER_ROUND)) or cm.is_government_party(me))
+	check("gelir bölünmez", is_equal_approx(cm.turn_income(me) - cm.org_income(me), float(GameRules.FUNDS_PER_ROUND)) or cm.is_government_party(me))
 
 	print("=== KONGRE GÜCÜ ===")
 	cm._congress_info(me)["share"] = float(cm.last_vote_shares.get(me, 0.0))
@@ -144,7 +144,7 @@ func _initialize() -> void:
 	var lost := false
 	for attempt in 20:
 		give_turn(me)
-		cm.mana[me] = 100.0
+		cm.funds[me] = 100.0
 		cm._congress_info(me)["elections"] = 1
 		cm._congress_info(me)["share"] = float(cm.last_vote_shares.get(me, 0.0)) + 20.0
 		cm.turmoil[me] = 10.0
@@ -157,7 +157,7 @@ func _initialize() -> void:
 	var new_leader: int = cm.party_of(me)
 	check("partinin yeni bot başkanı sırada", new_leader != me and mm.is_bot(new_leader) and cm.turn_order.has(new_leader))
 	give_turn(me)
-	cm.mana[me] = 100.0
+	cm.funds[me] = 100.0
 	var some_province: String = String(root.get_node("GameMap").province_ids()[0])
 	check("üye yasa sunamaz", not cm.can_propose_law(me))
 	check("üye teşkilat kuramaz", not cm.can_build_organization(me, some_province))
@@ -194,7 +194,7 @@ func _initialize() -> void:
 		cm._congress_info(leader_now)["elections"] = 1
 		cm.last_vote_shares[leader_now] = float(cm.party_congress[leader_now]["member_share"]) - 8.0
 		give_turn(me)
-		cm.mana[me] = 100.0
+		cm.funds[me] = 100.0
 		cm.request_congress()
 		cm.tick(30.0)
 	check("oy düşünce üye kongreyi kazanıp başkanlığa döndü", back or not pm.is_deputy(me))
@@ -232,7 +232,7 @@ func _initialize() -> void:
 	check("fesih: teşkilatlar silindi", not any_org)
 	var snapshot: Dictionary = cm.former_parties.get(me, {}).get("orgs", {})
 	check("fesih: dağılan teşkilatlar eski parti kaydında", cm.former_parties.has(me) and not snapshot.is_empty(), str(cm.former_parties.get(me, {})))
-	check("bağımsız her ilde miting yapabilir", cm.can_miting(me, String(root.get_node("GameMap").province_ids()[5])) or cm.mana_of(me) < GameRules.MITING_MANA_COST)
+	check("bağımsız her ilde miting yapabilir", cm.can_miting(me, String(root.get_node("GameMap").province_ids()[5])) or cm.funds_of(me) < GameRules.MITING_FUNDS_COST)
 	check("bağımsız teşkilat kuramaz", not cm.can_build_organization(me, String(root.get_node("GameMap").province_ids()[5])))
 	check("blok oy vermez", not gm.voter_ids().has(pm.BLOC_ID))
 
@@ -251,17 +251,17 @@ func _initialize() -> void:
 	var p2: String = String(root.get_node("GameMap").province_ids()[4])
 	cm.local_support[p1] = {me: 5.0}
 	cm.local_support[p2] = {me: 3.0}
-	cm.mana[me] = 90.0
+	cm.funds[me] = 90.0
 	cm.miting(p1)
 	check("bağımsız mitingi güvenilirlik kazandırır", cm.credibility_of(me) > 60.0)
 	give_turn(me)
-	cm.mana[me] = 90.0
+	cm.funds[me] = 90.0
 	var expect_moved: int = cm.former_org_count(me)
 	var expect_share: float = cm.former_org_share(me)
 	check("geçiş payı %10-%90 arasında", expect_share >= 0.1 and expect_share <= 0.9 and expect_moved >= 1, "%.2f / %d" % [expect_share, expect_moved])
 	cm.found_party({"name": "Doğru Yol", "icon_index": 4, "bg_color": free_color(me)})
-	check("bağımsız parti kurdu (80 mana)", not pm.is_independent(me) and pm.parties[me]["name"] == "Doğru Yol"
-		and is_equal_approx(cm.mana_of(me), 10.0), str(cm.mana_of(me)))
+	check("bağımsız parti kurdu (80 milyon)", not pm.is_independent(me) and pm.parties[me]["name"] == "Doğru Yol"
+		and is_equal_approx(cm.funds_of(me), 10.0), str(cm.funds_of(me)))
 	var opened := 0
 	for province_id in cm.organizations.keys():
 		opened += int(cm.organizations[province_id].get(me, 0))
@@ -381,41 +381,45 @@ func _initialize() -> void:
 	bm.step(1000.0)
 	check("pasif modda sırası kendiliğinden geçer", cm.current_turn_peer_id() != me)
 	var my_score: int = gm.score_of(me)
-	var my_mana: float = cm.mana_of(me)
+	var my_funds: float = cm.funds_of(me)
 	var my_name: String = PP.display_name(me)
 	var was_leader: bool = pm.parties.has(me)
 	cm.rekey_player(me, 777)
 	check("geri dönen oyuncu yeni bağlantıyla aynı yerde", cm.turn_order.has(777) and not cm.turn_order.has(me)
-		and gm.score_of(777) == my_score and is_equal_approx(cm.mana_of(777), my_mana) and PP.display_name(777) == my_name
+		and gm.score_of(777) == my_score and is_equal_approx(cm.funds_of(777), my_funds) and PP.display_name(777) == my_name
 		and (pm.parties.has(777) == was_leader))
 	cm.rekey_player(777, me)
 	mm.players[me].erase("away")
 	mm.away_mode = mm.AWAY_BOT
 
-	print("=== BOT MANA ZAYIFLATMASI ===")
+	print("=== BOT GELIR ZAYIFLATMASI ===")
 	var some_bot: int = int(mm.bot_ids()[0])
-	check("varsayılan zayıflatma 5", is_equal_approx(mm.bot_mana_penalty, 5.0))
-	var bot_base := float(GameRules.MANA_PER_ROUND_GOVERNMENT if cm.is_government_party(some_bot) else GameRules.MANA_PER_ROUND)
-	check("bot tur başında 5 az mana alır", is_equal_approx(cm.turn_income(some_bot) - cm.org_income(some_bot), bot_base - 5.0))
-	check("bot mana bonusundan 5 az alır", is_equal_approx(cm.mana_bonus_amount(some_bot, false), GameRules.MANA_BONUS_WEAK - 5.0)
-		and is_equal_approx(cm.mana_bonus_amount(some_bot, true), GameRules.MANA_BONUS_STRONG - 5.0))
-	check("gerçek oyuncu etkilenmez", is_equal_approx(cm.mana_bonus_amount(me, false), float(GameRules.MANA_BONUS_WEAK)))
-	mm.bot_mana_penalty = 15.0
+	check("varsayılan zayıflatma 5", is_equal_approx(mm.bot_funds_penalty, 5.0))
+	var bot_base := float(GameRules.FUNDS_PER_ROUND_GOVERNMENT if cm.is_government_party(some_bot) else GameRules.FUNDS_PER_ROUND)
+	check("bot tur başında 5 az para alır", is_equal_approx(cm.turn_income(some_bot) - cm.org_income(some_bot), bot_base - 5.0))
+	check("bot bagis kampanyasindan 5 az alır", is_equal_approx(cm.funds_bonus_amount(some_bot, false), GameRules.FUNDS_BONUS_WEAK - 5.0)
+		and is_equal_approx(cm.funds_bonus_amount(some_bot, true), GameRules.FUNDS_BONUS_STRONG - 5.0))
+	check("gerçek oyuncu etkilenmez", is_equal_approx(cm.funds_bonus_amount(me, false), float(GameRules.FUNDS_BONUS_WEAK)))
+	mm.bot_funds_penalty = 15.0
 	check("15 zayıflatma", is_equal_approx(cm.turn_income(some_bot) - cm.org_income(some_bot), bot_base - 15.0))
-	mm.bot_mana_penalty = 5.0
+	mm.bot_funds_penalty = 5.0
 
 	print("=== TEŞKİLAT GELİRİ VE BEDELLER ===")
+	# Teşkilat geliri il başına 5 / 10 milyon ₺, toplamı en fazla ORG_INCOME_CAP.
+	var saved_orgs: Dictionary = cm.organizations.duplicate(true)
+	cm.organizations = {}
 	var org_test_pid: String = String(cm._province_ids[5])
 	var income_before: int = cm.org_income(me)
-	var had: int = cm.organization_level(org_test_pid, me)
-	cm.organizations[org_test_pid] = cm.organizations.get(org_test_pid, {})
-	cm.organizations[org_test_pid][cm.party_of(me)] = 1
+	cm.organizations[org_test_pid] = {cm.party_of(me): 1}
 	var lvl1: int = cm.org_income(me)
 	cm.organizations[org_test_pid][cm.party_of(me)] = 2
 	var lvl2: int = cm.org_income(me)
-	check("1. seviye teşkilat +5, 2. seviye +10 mana", lvl1 - income_before == 5 - GameRules.ORG_INCOME[had] and lvl2 - lvl1 == 5, "%d %d %d" % [income_before, lvl1, lvl2])
-	cm.organizations[org_test_pid][cm.party_of(me)] = had
-	check("yasa 5, toplantı 5, kongre 10 / üye 20", GameRules.LAW_MANA_COST == 5 and GameRules.SPEECH_MANA_COST == 5
+	check("1. seviye teşkilat +5, 2. seviye +10 milyon ₺", income_before == 0 and lvl1 == 5 and lvl2 == 10, "%d %d %d" % [income_before, lvl1, lvl2])
+	for i in 20:
+		cm.organizations[String(cm._province_ids[i])] = {cm.party_of(me): 2}
+	check("teşkilat geliri üst sınırı (sınırsız para yok)", cm.org_income(me) == GameRules.ORG_INCOME_CAP, str(cm.org_income(me)))
+	cm.organizations = saved_orgs
+	check("yasa 5, toplantı 5, kongre 10 / üye 20", GameRules.LAW_FUNDS_COST == 5 and GameRules.SPEECH_FUNDS_COST == 5
 		and cm.CONGRESS_COST == 10 and cm.CONGRESS_REQUEST_COST == 20)
 
 	print("=== KRİZ ===")

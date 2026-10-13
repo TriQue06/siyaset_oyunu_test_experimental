@@ -60,7 +60,7 @@ static func build(peer_id: int, my_id: int, on_action: Callable = Callable(), wi
 	stats.add_child(_stat("%%%.1f" % float(CardManager.last_vote_shares.get(pid, 0.0)) if has_seats else "—", "oy", UiTheme.TEXT))
 	stats.add_child(_stat(str(GovernmentManager.score_of(peer_id)), "puan", UiTheme.GOLD))
 	var opinion := CardManager.national_of(peer_id)
-	stats.add_child(_stat("%+.1f" % opinion, "kamuoyu", ProvincePanel._opinion_color(opinion)))
+	stats.add_child(_stat(EffectWords.standing(opinion), "kamuoyu", ProvincePanel._opinion_color(opinion)))
 
 	var role := role_text(peer_id)
 	var role_row := HBoxContainer.new()
@@ -78,7 +78,7 @@ static func build(peer_id: int, my_id: int, on_action: Callable = Callable(), wi
 
 ## PARTİ İŞLEMLERİ (bkz. CardManager "Parti siyaseti"). Sadece kendi kartında:
 ## genel başkan: kongreye git, partiyi feshet; üye: kongre iste, istifa et;
-## bağımsız: yeni parti kur. Sırası gelmeyen ya da manası yetmeyen için düğme
+## bağımsız: yeni parti kur. Sırası gelmeyen ya da kasası yetmeyen için düğme
 ## sönük durur; neden yapılamadığı not olarak yazar.
 static func _actions(peer_id: int, my_id: int, on_action: Callable) -> Control:
 	var list: Array = []  # [metin, tür, basılabilir mi, onay ister mi]
@@ -102,30 +102,29 @@ static func _actions(peer_id: int, my_id: int, on_action: Callable) -> Control:
 		return other
 	var pid := CardManager.party_of(my_id)
 	if PartyManager.is_independent(my_id):
-		list.append(["Yeni Parti Kur · %d mana" % CardManager.FOUND_PARTY_COST, "found", CardManager.can_found_party(my_id), false])
-		notes.append("Bağımsızken her yerde teşkilatsız miting yapabilirsin; mitingler güvenilirliğini artırır. Parti kurduğunda güvenilirliğin kadar ilde teşkilatla başlarsın (şu an %d il)." %
+		list.append(["Yeni Parti Kur · %s" % GameRules.cost_text(CardManager.FOUND_PARTY_COST), "found", CardManager.can_found_party(my_id), false])
+		notes.append("Bağımsızken teşkilatsız miting yapabilirsin; mitingler güvenilirliğini artırır. Parti kurarsan şu an %d ilde teşkilatla başlarsın." %
 			mini(CardManager.FOUND_ORG_MAX, int(CardManager.credibility_of(my_id) / CardManager.FOUND_ORG_PER_CREDIBILITY)))
 		var former: Dictionary = CardManager.former_parties.get(my_id, {})
 		var moving := CardManager.former_org_count(my_id)
 		if moving > 0:
-			notes.append("Eski partin %s'nin %d teşkilatından şu an %d tanesi (%%%d) yeni partine geçer. Pay ayrılıştan beri geçen süre (her tur azalır), puanın, ulusal desteğin ve güvenilirliğinle belirlenir (%%10-90)." % [
-				String(former.get("name", "")), CardManager.former_org_source(my_id).size(), moving,
-				int(round(CardManager.former_org_share(my_id) * 100.0))])
+			notes.append("Eski partin %s'nin %d teşkilatından %d tanesi yeni partine geçer; beklersen bu sayı azalır." % [
+				String(former.get("name", "")), CardManager.former_org_source(my_id).size(), moving])
 	elif CardManager.is_party_member(my_id):
-		list.append(["Kongre İste · %d mana" % CardManager.CONGRESS_REQUEST_COST, "congress", CardManager.can_request_congress(my_id), false])
+		list.append(["Kongre İste · %s" % GameRules.cost_text(CardManager.CONGRESS_REQUEST_COST), "congress", CardManager.can_request_congress(my_id), false])
 		list.append(["Partiden İstifa Et", "resign", CardManager.can_resign(my_id), true])
 		notes.append("Partinin üyesisin: sadece miting yapabilirsin (partine ve güvenilirliğine yazar). Parti hükümetteyse başkanla aynı puanı alırsın.")
 		var reason := CardManager.congress_block_reason(my_id)
 		if reason != "":
 			notes.append("Kongre: " + reason)
 	else:
-		list.append(["Kongreye Git · %d mana" % CardManager.CONGRESS_COST, "congress", CardManager.can_hold_congress(my_id), false])
+		list.append(["Kongreye Git · %s" % GameRules.cost_text(CardManager.CONGRESS_COST), "congress", CardManager.can_hold_congress(my_id), false])
 		list.append(["Partiyi Feshet", "dissolve", CardManager.can_dissolve(my_id), true])
 		if not CardManager.last_seats.is_empty():
-			list.append(["Harcamalarımı Denetlet (soruşturma)…", "inquiry", true, false])
+			list.append(["Harcamalarımı Denetlet…", "inquiry", true, false])
 		var left := CardManager.CONGRESS_MAX_ELECTIONS - CardManager.elections_since_congress(pid)
-		notes.append("Zorunlu kongreye %s. Güç: %d/100 (oy değişimi, hükümet, karışıklık, güvenilirlik); güç ne kadar yüksekse rakip o kadar az." % [
-			"bu seçimden sonra sıran gelince gidilecek" if left <= 0 else "%d seçim kaldı" % left, int(round(CardManager.congress_strength(pid)))])
+		notes.append("Zorunlu kongreye %s. Partideki gücün %s: güçlüysen rakip az çıkar." % [
+			"bu seçimden sonra sıran gelince gidilecek" if left <= 0 else "%d seçim kaldı" % left, EffectWords.strength(CardManager.congress_strength(pid))])
 	if list.is_empty():
 		return null
 	var box := VBoxContainer.new()
@@ -137,6 +136,7 @@ static func _actions(peer_id: int, my_id: int, on_action: Callable) -> Control:
 	for entry in list:
 		var button := Button.new()
 		button.text = String(entry[0])
+		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		button.focus_mode = Control.FOCUS_NONE
 		button.custom_minimum_size = Vector2(0, 32)
 		button.add_theme_font_size_override("font_size", 13)
@@ -159,7 +159,7 @@ static func _actions(peer_id: int, my_id: int, on_action: Callable) -> Control:
 			button.pressed.connect(func(): on_action.call(kind, peer_id))
 		box.add_child(button)
 	if any_disabled:
-		box.add_child(PopupKit.note("Sıran gelince ve manan yetince yapabilirsin.", DIM))
+		box.add_child(PopupKit.note("Sıran gelince ve kasan yetince yapabilirsin.", DIM))
 	return box
 
 ## "Hükümet: Başbakanlık, 3 bakanlık" / "Muhalefet" / "Hükümet yok".
@@ -202,19 +202,18 @@ static func _add_group_section(box: VBoxContainer, peer_id: int) -> void:
 		var value := float(groups.get(group, VoterGroups.AFFINITY_NEUTRAL))
 		var delta := value - float(before[group]) if before.has(group) else 0.0
 		list.add_child(VoterGroupUI.affinity_row(group, value, float(bonuses.get(group, 0.0)), delta))
-	box.add_child(PopupKit.note("Destek, grubun ülkedeki nüfus payı değildir. ▲▼: son seçimden beri.", DIM, _text_width()))
+	box.add_child(PopupKit.note("▲▼ son seçimden beri", DIM, _text_width()))
 	# HÜKÜMETTE: ekonomi (vergi, büyüme, enflasyon) seçimde bu desteklere
 	# geçici olarak eklenir (kalıcı desteğe yazılmaz).
 	var mood := CardManager.economy_mood(pid)
 	if not mood.is_empty():
 		var share := CardManager.economy_share(pid)
-		box.add_child(PopupKit.section("Ekonomi etkisi", "başbakan" if share >= 1.0 else "ortak %%%d" % int(round(share * 100.0))))
+		box.add_child(PopupKit.section("Ekonomi etkisi", "başbakan" if share >= 1.0 else "ortak"))
 		var by_size: Array = mood.keys()
 		by_size.sort_custom(func(a, b): return absf(float(mood[a])) > absf(float(mood[b])))
 		for i in mini(4, by_size.size()):
 			box.add_child(VoterGroupUI.effect_row(String(by_size[i]), float(mood[by_size[i]])))
-		box.add_child(PopupKit.note("Vergi %s · ekonomi %d · enflasyon %s. Hükümetteyken seçimde grup desteğine eklenir; hükümetten çıkınca kalkar." % [
-			Economy.tax_title(CardManager.tax_level()), int(round(CardManager.economy_index())), Economy.percent_text(CardManager.inflation())],
+		box.add_child(PopupKit.note("Vergi %s. Hükümette kaldıkça seçimde bu gruplara yansır." % Economy.tax_title(CardManager.tax_level()).to_lower(),
 			DIM, _text_width()))
 
 ## Sarmalı notların genişliği (çerçeveli kartta iç boşluk düşülür).
@@ -234,7 +233,7 @@ static func _stat(value: String, caption: String, color: Color) -> Control:
 	box.add_theme_constant_override("separation", -2)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tile.add_child(box)
-	var value_label := UiTheme.mono_label(value, 16, color, true)
+	var value_label := UiTheme.mono_label(value, 16 if value.length() <= 6 else 12, color, true)
 	value_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(value_label)

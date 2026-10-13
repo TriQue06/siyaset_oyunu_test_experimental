@@ -99,7 +99,7 @@ static func color_surface(color: Color, path: String = PANEL) -> NinePatchRect:
 ## KONTURLU İKON: ikonun arkasına aynı ikonun koyu kopyaları kaydırılarak
 ## çizilir, böylece PNG'ye dokunmadan yeni tarzın kalın dış çizgisi olur.
 ## Büyük bir ikon küçük gösterilirken kenarlar kırılmasın diye mipmap'li
-## LINEAR süzgeç kullanılır (bkz. mana_icon.png.import).
+## LINEAR süzgeç kullanılır (simge dokuları).
 static func outlined_icon(texture: Texture2D, size: float, outline: float = 2.0,
 		tint: Color = Color.WHITE, outline_color: Color = UiTheme.INK) -> Control:
 	var wrap := Control.new()

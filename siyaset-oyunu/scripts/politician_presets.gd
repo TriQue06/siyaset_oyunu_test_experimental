@@ -44,7 +44,7 @@ const BACKGROUND_ORDER := ["sendikaci", "is_insani", "akademisyen", "ilahiyatci"
 
 # --- Geçmiş avantajları -------------------------------------------------------------
 const UNION_MITING_MULT := 1.25
-const BUSINESS_START_MANA := 20
+const BUSINESS_START_FUNDS := 20
 const ACADEMIC_LAW_MULT := 1.3
 const CLERIC_DAMAGE_MULT := 0.7
 const MAYOR_ORG_MULT := 1.25

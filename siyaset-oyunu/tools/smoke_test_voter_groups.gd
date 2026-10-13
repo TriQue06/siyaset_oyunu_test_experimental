@@ -191,7 +191,7 @@ func _initialize() -> void:
 	cm.province_profiles[mid] = {"emek": 80, "kusak": 50, "inanc": 30, "yonetim": 50}
 	var profile_before := str(cm.province_profiles)
 	cm.organizations[mid] = {1: 1}
-	cm.mana[1] = 500
+	cm.funds[1] = 500
 	cm.current_turn_index = 0
 	var g_before: Dictionary = pm.parties[1]["groups"].duplicate()
 	var nat_before: float = cm.national_of(1)
@@ -226,7 +226,7 @@ func _initialize() -> void:
 	print("=== 3c) YATIRIM: SADECE YEREL MEMNUNIYET ===")
 	new_game({1: groups(["isci", "dindar"]), 2: groups(["isveren", "ilerici"])})
 	var inv: String = game_map.ids[1]
-	cm.mana[1] = 500
+	cm.funds[1] = 500
 	cm.current_turn_index = 0
 	gm.government = {"pm": 1}
 	gm.main_gov_peer_id = 1
@@ -248,7 +248,7 @@ func _initialize() -> void:
 	cm.last_seats = {1: 260, 2: 240}
 	cm.election_seats = cm.last_seats.duplicate()
 	cm.agenda = {"type": "gundem_isci", "until": cm.round_number + 1}
-	cm.mana[1] = 100
+	cm.funds[1] = 100
 	cm.current_turn_index = 0
 	var gl: Dictionary = pm.parties[1]["groups"].duplicate()
 	cm._apply_law(1, cp.law_type("isci"))
@@ -256,7 +256,7 @@ func _initialize() -> void:
 	gm._apply_vote(2, gm.VOTE_NO)
 	check("oylama bitince hedef grupta destek artti", float(pm.parties[1]["groups"]["isci"]) > float(gl["isci"]),
 		"%.1f -> %.1f" % [float(gl["isci"]), float(pm.parties[1]["groups"]["isci"])])
-	check("gorusune aykiri yasa ek bedel istemez", cm.law_mana_cost(1, cp.law_type("isveren")) == GameRules.LAW_MANA_COST)
+	check("gorusune aykiri yasa ek bedel istemez", cm.law_funds_cost(1, cp.law_type("isveren")) == GameRules.LAW_FUNDS_COST)
 
 	print("")
 	print("=== 5) ANAYASA (2/3 YA DA RET) ===")
@@ -283,7 +283,7 @@ func _initialize() -> void:
 	check("300 EVET (2/3 alti): REDDEDILIR, referandum yok", is_equal_approx(mm.election_threshold, 0.0)
 		and gm.last_resolution_reason.find("REDDEDİLDİ") != -1 and not "referendum" in cm, gm.last_resolution_reason)
 	cm.law_rounds = {}
-	cm.mana[1] = 20.0
+	cm.funds[1] = 20.0
 	cm._apply_constitution_proposal(1, change)
 	gm._apply_vote(2, gm.VOTE_YES)
 	gm._apply_vote(3, gm.VOTE_YES)
@@ -321,12 +321,12 @@ func _initialize() -> void:
 	cm.speech_required = true
 	cm.speech_done = false
 	cm.crisis = {}
-	cm.mana[1] = 100.0
+	cm.funds[1] = 100.0
 	var org_pid: String = game_map.ids[2]
 	cm.organizations[org_pid] = {1: 1}
 	check("sira gelince toplanti hakki var", cm.needs_speech(1) and not cm.needs_speech(2))
 	check("toplantisiz da hamle yapilabilir", cm.can_choose_main_action(1) and cm.can_miting(1, org_pid) \
-		and cm.can_play_card(1, "mana_bonusu"))
+		and cm.can_play_card(1, "bagis_kampanyasi"))
 	cm._apply_speech(2, "isci")
 	check("sirasi olmayan toplanamaz", not cm.speech_done)
 	var permanent: Dictionary = pm.parties[1]["groups"].duplicate()
@@ -334,7 +334,7 @@ func _initialize() -> void:
 	cm._apply_speech(1, "emekli")
 	check("toplanti bu tur +10 gecici destek", cm.speech_done and near(float(cm.effective_groups(1)["emekli"]), float(permanent["emekli"]) + 10.0))
 	check("kalici destek degismez", str(pm.parties[1]["groups"]) == str(permanent))
-	check("bedel %d mana" % GameRules.SPEECH_MANA_COST, near(cm.mana_of(1), 100.0 - GameRules.SPEECH_MANA_COST))
+	check("bedel %d para" % GameRules.SPEECH_FUNDS_COST, near(cm.funds_of(1), 100.0 - GameRules.SPEECH_FUNDS_COST))
 	cm._apply_speech(1, "genc")
 	check("turda tek toplanti", cm.meeting_bonuses(1).size() == 1)
 	check("sonraki tur +3, sonraki +1, sonra 0", near(float(cm.meeting_bonuses(1, r0 + 1).get("emekli", 0.0)), 3.0) \
@@ -357,7 +357,7 @@ func _initialize() -> void:
 	cm.speech_rounds = {}
 	cm.current_turn_index = cm.turn_order.find(3)
 	var nat3: float = cm.national_of(3)
-	cm.mana[3] = 50.0
+	cm.funds[3] = 50.0
 	cm._apply_speech(3, "emekli")
 	check("krizin grubuyla toplanti ulusal destek getirir", near(cm.national_of(3) - nat3, PublicOpinion.CRISIS_RESPONSE_NATIONAL))
 	cm.speech_required = false
@@ -430,13 +430,13 @@ func _initialize() -> void:
 	print("")
 	print("=== 10) YENI KARTLAR VE KURALLAR ===")
 	new_game({1: groups(["isveren", "dindar"]), 2: groups(["isci", "ilerici"])})
-	check("tur basina mana 30 (hukumet 40)", GameRules.MANA_PER_ROUND == 30 and GameRules.MANA_PER_ROUND_GOVERNMENT == 40)
+	check("tur basina para 30 (hukumet 40)", GameRules.FUNDS_PER_ROUND == 30 and GameRules.FUNDS_PER_ROUND_GOVERNMENT == 40)
 	check("yasa gecirmek +5 puan", cm.law_pass_score(false) == 5 and cm.law_pass_score(true) == 5)
 	check("bakanlik +3, yardimcilik +5, basbakanlik +10", GovernmentPresets.MINISTRY_POINTS == 3 \
 		and GovernmentPresets.DEPUTY_PM_POINTS == 5 and GovernmentPresets.PM_POINTS == 10)
-	cm.mana[1] = 0.0
-	cm._apply_card_effect(1, "mana_bonusu_guclu")
-	check("guclu mana bonusu +60", near(cm.mana_of(1), cm.mana_bonus_amount(1, true)) and GameRules.MANA_BONUS_STRONG == 60)
+	cm.funds[1] = 0.0
+	cm._apply_card_effect(1, "bagis_kampanyasi_guclu")
+	check("guclu bagis kampanyasi +60", near(cm.funds_of(1), cm.funds_bonus_amount(1, true)) and GameRules.FUNDS_BONUS_STRONG == 60)
 	cm.inventories[1] = []
 	cm._apply_card_effect(1, "bonus_kart")
 	check("bonus kart 2 kart ceker", cm.inventories[1].size() == 2, str(cm.inventories[1]))

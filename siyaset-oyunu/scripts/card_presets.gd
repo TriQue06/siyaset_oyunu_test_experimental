@@ -1,10 +1,10 @@
 extends Node
 ## Autoload. Kart ve hamle katalogu. Görseller normal PNG'ler (assets/cards/).
 ##
-## KARTLAR: sırası gelen oyuncuya oyun bir kart verir; oynamanın bedeli CARD_MANA_COSTS.
+## KARTLAR: sırası gelen oyuncuya oyun bir kart verir; oynamanın bedeli CARD_FUNDS_COSTS.
 ## YATIRIM ve GENSORU da artık hamle (bkz. CardManager.invest / censure).
 ##   - POPÜLİZM BONUSU : POPULISM_ROUNDS tur kendi hamlelerinin iyi etkisi artar, kötüsü azalır.
-##   - MANA BONUSU     : zayıf +MANA_BONUS_WEAK, güçlü +MANA_BONUS_STRONG mana.
+##   - PARA BONUSU     : zayıf +FUNDS_BONUS_WEAK, güçlü +FUNDS_BONUS_STRONG para.
 ##   - BONUS KART      : rastgele BONUS_CARD_DRAW kart daha çekilir.
 ##   - KART ÇALMA      : seçilen partinin elinden rastgele 1 kart çalınır (eli boşsa boşa gider).
 ## MİTİNG, YATIRIM, GENSORU kart değil, hamle; türleri hamlenin kimliği olarak durur.
@@ -45,8 +45,8 @@ const EARLY_ELECTION_CARD_TYPE := "erken_secim"
 
 ## Hedefsiz bonus kartlar: seçip tekrar dokununca oynanır.
 const POPULISM_CARD_TYPE := "populizm"
-const MANA_BONUS_CARD_TYPE := "mana_bonusu"
-const MANA_BONUS_STRONG_CARD_TYPE := "mana_bonusu_guclu"
+const FUNDS_BONUS_CARD_TYPE := "bagis_kampanyasi"
+const FUNDS_BONUS_STRONG_CARD_TYPE := "bagis_kampanyasi_guclu"
 const BONUS_CARD_TYPE := "bonus_kart"
 
 ## GÜNDEMLER: her seçmen grubu için bir sıcak konu (bkz. GameRules gündem
@@ -81,8 +81,8 @@ const CARD_TYPES: Array[String] = [
 	"yatirim",
 	"karalama",
 	"populizm",
-	"mana_bonusu",
-	"mana_bonusu_guclu",
+	"bagis_kampanyasi",
+	"bagis_kampanyasi_guclu",
 	"bonus_kart",
 	"kart_calma",
 ]
@@ -123,12 +123,12 @@ func steal_range(card_type: String, closeness: float) -> Dictionary:
 	return {"min": int(round(lerpf(float(mid["min"]), float(other["min"]), t))),
 		"max": int(round(lerpf(float(mid["max"]), float(other["max"]), t)))}
 
-## Kartın elden oynanma bedeli (mana).
-const CARD_MANA_COSTS := {
+## Kartın elden oynanma bedeli (para).
+const CARD_FUNDS_COSTS := {
 	"karalama": 10,
 	"populizm": 10,
-	"mana_bonusu": 0,
-	"mana_bonusu_guclu": 0,
+	"bagis_kampanyasi": 0,
+	"bagis_kampanyasi_guclu": 0,
 	"bonus_kart": 0,
 	"kart_calma": 10,
 	"steal_weak": 10,
@@ -143,7 +143,7 @@ const CARD_ART_ALIAS := {
 	"kaset": "steal_medium",
 	"isyan": "gensoru",
 	"erken_secim": "gensoru",
-	"mana_bonusu_guclu": "mana_bonusu",
+	"bagis_kampanyasi_guclu": "bagis_kampanyasi",
 	"bonus_kart": "anket",
 	"kart_calma": "gozcu",
 }
@@ -174,9 +174,9 @@ func needs_party_target(card_type: String) -> bool:
 func needs_province_target(card_type: String) -> bool:
 	return card_type in [MITING_CARD_TYPE, INVEST_CARD_TYPE, PROPAGANDA_CARD_TYPE]
 
-## Hedef gerektirmeyen bonus kart mı? (popülizm, mana bonusu)
+## Hedef gerektirmeyen bonus kart mı? (popülizm, bağış kampanyası)
 func is_self_card(card_type: String) -> bool:
-	return card_type in [POPULISM_CARD_TYPE, MANA_BONUS_CARD_TYPE, MANA_BONUS_STRONG_CARD_TYPE, BONUS_CARD_TYPE,
+	return card_type in [POPULISM_CARD_TYPE, FUNDS_BONUS_CARD_TYPE, FUNDS_BONUS_STRONG_CARD_TYPE, BONUS_CARD_TYPE,
 		EARLY_ELECTION_CARD_TYPE]
 
 ## Meclise sunulan (oylanan) kart mı?
@@ -271,7 +271,7 @@ func law_data(card_type: String) -> Dictionary:
 		"opposite": VoterGroups.opposite(group), "problem": String(info["law_problem"])}
 
 func card_cost(card_type: String) -> int:
-	return int(CARD_MANA_COSTS.get(card_type, 0))
+	return int(CARD_FUNDS_COSTS.get(card_type, 0))
 
 ## weights: card_type -> ağırlık (>0). Ağırlıkla orantılı rastgele seçim.
 func weighted_pick(weights: Dictionary, rng: RandomNumberGenerator) -> String:
@@ -292,10 +292,10 @@ func card_short_title(card_type: String) -> String:
 	match card_type:
 		"populizm":
 			return "POPÜLİZM\nBONUSU"
-		"mana_bonusu":
-			return "MANA BONUSU\nZAYIF"
-		"mana_bonusu_guclu":
-			return "MANA BONUSU\nGÜÇLÜ"
+		"bagis_kampanyasi":
+			return "BAĞIŞ\nKAMPANYASI"
+		"bagis_kampanyasi_guclu":
+			return "BÜYÜK BAĞIŞ\nKAMPANYASI"
 		"bonus_kart":
 			return "BONUS\nKART"
 		"kart_calma":
@@ -332,8 +332,8 @@ func card_title(card_type: String) -> String:
 			return "Kart Çalma"
 		"bonus_kart":
 			return "Bonus Kart"
-		"mana_bonusu_guclu":
-			return "Mana Bonusu (Güçlü)"
+		"bagis_kampanyasi_guclu":
+			return "Büyük Bağış Kampanyası"
 		"gensoru":
 			return "Gensoru"
 		"miting":
@@ -344,8 +344,8 @@ func card_title(card_type: String) -> String:
 			return "Karalama"
 		"populizm":
 			return "Popülizm Bonusu"
-		"mana_bonusu":
-			return "Mana Bonusu"
+		"bagis_kampanyasi":
+			return "Bağış Kampanyası"
 		"erken_secim":
 			return "Erken Seçim"
 	return card_type
@@ -359,75 +359,64 @@ func law_direction_text(card_type: String) -> String:
 		return ""
 	return String(law["group_title"])
 
-## Yasanın kabul / ret etkisini anlatan metin (gerçek kurallardan).
+## Yasanın kabul / ret etkisini anlatan kısa metin (büyüklükler gerçek
+## kurallardan, nitel dille).
 func law_description(card_type: String) -> String:
 	var law := law_data(card_type)
 	if law.is_empty():
 		return ""
 	var group := String(law["group"])
 	var backlash := float(VoterGroups.data(group).get("law_backlash", 0.4))
-	return ("Sorun: %s.\nKabul edilirse %s yakınlığın +%.1f, %s −%.1f (ulusal, kalıcı; azalan getirili).\n"
-		+ "Reddedilirse vaat olarak kalır: +%.1f / −%.1f. EVET diyenler bu gruba, HAYIR diyenler karşıt gruba biraz yaklaşır.") % [
-		law["problem"], law["group_title"], PublicOpinion.LAW_GROUP_GAIN_PASSED,
-		VoterGroups.title(String(law["opposite"])), PublicOpinion.LAW_GROUP_GAIN_PASSED * backlash,
-		PublicOpinion.LAW_GROUP_GAIN_REJECTED, PublicOpinion.LAW_GROUP_GAIN_REJECTED * backlash]
+	return "Sorun: %s.\nKabul edilirse %s arasında %s, %s arasında %s. Reddedilse de vaat olarak küçük bir kazanç kalır." % [
+		law["problem"], law["group_title"], EffectWords.change(PublicOpinion.LAW_GROUP_GAIN_PASSED, "group"),
+		VoterGroups.title(String(law["opposite"])), EffectWords.change(-PublicOpinion.LAW_GROUP_GAIN_PASSED * backlash, "group")]
 
-## Karta dokununca gösterilen açıklama (kısa ve somut) + mana bedeli.
+## Karta dokununca gösterilen açıklama (kısa ve somut) + para bedeli.
 func card_description(card_type: String) -> String:
 	var text := _card_effect_text(card_type)
 	var cost := card_cost(card_type)
 	if cost > 0 and not is_law_card(card_type):
-		text += "\nBedel: %d mana" % cost
+		text += "\nBedel: %s" % GameRules.cost_text(cost)
 	return text
 
+## Kartın ETKİSİ: ne olur, ne kadar güçlü (nitel), kritik kısıt. Kesin
+## formüller kartta yazmaz; büyüklükler EffectWords ile sözcüğe çevrilir.
 func _card_effect_text(card_type: String) -> String:
 	if is_law_card(card_type):
 		return law_description(card_type)
 	if needs_target(card_type):
 		var r: Dictionary = STEAL_RANGES[card_type]
-		var close: Dictionary = STEAL_RANGES_CLOSE[card_type]
-		var far: Dictionary = STEAL_RANGES_FAR[card_type]
-		var cost_line := "Güçlü varyantta ulusal desteğin biraz düşer; normalde bedel yok." if card_type == STEAL_STRONG_CARD_TYPE \
-			else "Bedeli yok; çalınan parti mağduriyetten biraz destek kazanır."
-		return "Seçtiğin partiden vekil çal: %d-%d; aynı seçmen gruplarına hitap ediyorsa %d-%d'e kadar, çok farklıysa %d-%d.\n%s\nSeç, sonra soldaki bir partiye tıkla." % [
-			int(r["min"]), int(r["max"]), int(close["min"]), int(close["max"]),
-			int(far["min"]), int(far["max"]), cost_line]
+		var cost_line := "Bedeli: biraz ulusal destek kaybedersin." if card_type == STEAL_STRONG_CARD_TYPE \
+			else "Çalınan parti mağduriyetten biraz destek kazanır."
+		return "Seçtiğin partiden %d–%d vekil çal; aynı seçmen gruplarına hitap ediyorsanız daha çok.\n%s\nSeç, sonra soldaki bir partiye tıkla." % [
+			int(r["min"]), int(r["max"]), cost_line]
 	match card_type:
 		REPUTATION_CARD_TYPE:
-			return ("Seçtiğin partinin itibarını sarsan bir kaset sızar:" + "\n"
-				+ "ulusal desteği %.1f puan düşer, partide karışıklık çıkar." + "\n"
-				+ "Seç, sonra soldaki bir partiye tıkla.") % PublicOpinion.REPUTATION_NATIONAL_DAMAGE
+			return "Seçtiğin partinin itibarını sarsan bir kaset sızar: %s ve parti içi karışıklık.\nSeç, sonra soldaki bir partiye tıkla." % \
+				EffectWords.change(-PublicOpinion.REPUTATION_NATIONAL_DAMAGE)
 		REBELLION_CARD_TYPE:
-			return ("Seçtiğin partide iç karışıklık çıkar: ulusal desteği" + "\n"
-				+ "%.1f puan düşer, parti içi huzursuzluk büyür." + "\n"
-				+ "Karışıklık çok birikirse parti BÖLÜNEBİLİR." + "\n"
-				+ "Seç, sonra soldaki bir partiye tıkla.") % PublicOpinion.REBELLION_NATIONAL_DAMAGE
+			return "Seçtiğin partide iç karışıklık çıkar: %s. Karışıklık birikirse parti bölünebilir.\nSeç, sonra soldaki bir partiye tıkla." % \
+				EffectWords.change(-PublicOpinion.REBELLION_NATIONAL_DAMAGE)
 		CARD_THEFT_CARD_TYPE:
-			return ("Seçtiğin partinin elinden rastgele 1 kart çalarsın." + "\n"
-				+ "Elinde hiç kart yoksa kart boşa gider." + "\n"
-				+ "Seç, sonra soldaki bir partiye tıkla.")
+			return "Seçtiğin partinin elinden rastgele bir kart çalarsın (eli boşsa kart boşa gider).\nSeç, sonra soldaki bir partiye tıkla."
 		BONUS_CARD_TYPE:
-			return "Rastgele %d kart daha çekersin (el doluysa sığdığı kadar).\nSeçmek için dokun, tekrar dokun: kullan." % GameRules.BONUS_CARD_DRAW
-		MANA_BONUS_STRONG_CARD_TYPE:
-			return "+%d mana kazan.\nSeçmek için dokun, tekrar dokun: kullan." % GameRules.MANA_BONUS_STRONG
+			return "%d kart daha çekersin (el doluysa sığdığı kadar).\nSeçmek için dokun, tekrar dokun: kullan." % GameRules.BONUS_CARD_DRAW
+		FUNDS_BONUS_STRONG_CARD_TYPE:
+			return "Büyük bir bağış kampanyası: kasana %s girer.\nSeçmek için dokun, tekrar dokun: kullan." % GameRules.cost_text(GameRules.FUNDS_BONUS_STRONG)
 		EARLY_ELECTION_CARD_TYPE:
-			return ("Meclise erken seçim önerisi sunarsın." + "\n"
-				+ "Kabul edilirse dönem sonunda sandığa gidilir ve" + "\n"
-				+ "seçim takvimi o tarihten itibaren yeniden işler." + "\n"
-				+ "Seçmek için dokun, tekrar dokun: kullan.")
+			return "Meclise erken seçim önerisi sunarsın; kabul edilirse dönem sonunda sandığa gidilir.\nSeçmek için dokun, tekrar dokun: kullan."
 		CENSURE_CARD_TYPE:
 			return "Hükümeti düşürmek için gensoru ver.\nSeçmek için dokun, tekrar dokun: kullan."
 		MITING_CARD_TYPE:
-			return "Seçtiğin ilde güç kazan (+%.0f); partin ilin kalabalık seçmen gruplarına yaklaşır (ulusal), karşıt gruplarda biraz kaybeder.\nİlin seçmeni sana uzaksa provokasyon riski var." % PublicOpinion.MITING_LOCAL
+			return "Seçtiğin ilde %s; partin ilin kalabalık seçmen gruplarına yaklaşır. Seçmen sana uzaksa provokasyon riski var." % \
+				EffectWords.change(PublicOpinion.MITING_LOCAL, "local", "yerel güç")
 		INVEST_CARD_TYPE:
-			return "Hükümet: seçtiğin ile devlet hazinesinden yatırım (%s; yerel memnuniyet, grup yakınlığını değiştirmez).\nSen +%.0f, ortakların +%.1f güç kazanır: yarısı hemen, kalanı sonraki %d dönemde." % [
-				Economy.money_full(Economy.INVEST_COST), PublicOpinion.INVEST_LOCAL, PublicOpinion.INVEST_PARTNER_LOCAL, Economy.INVEST_DELAY_ROUNDS]
+			return "Hükümet: seçtiğin ile devlet hazinesinden %s yatırım. İlde %s; etkinin yarısı hemen, kalanı sonraki dönemlerde." % [
+				Economy.money_full(Economy.INVEST_COST), EffectWords.change(PublicOpinion.INVEST_LOCAL, "local", "yerel güç")]
 		PROPAGANDA_CARD_TYPE:
 			return "Bir ilde bir partiyi karala: ona eksi, sana artı.\nİlde güçlü olan partiye az işler."
 		POPULISM_CARD_TYPE:
-			return "%d dönem boyunca her şey güçlenir: miting, yasa, karalama hasarı ve teşkilat bonusu %d kat, vekil çalma %.1f kat; kötü sonuçlar %%%d azalır; bu sürede seçim olursa ulusal +%.1f.\nSeçmek için dokun, tekrar dokun: kullan." % [
-				GameRules.POPULISM_ROUNDS, int(PublicOpinion.POPULISM_GOOD_MULT), PublicOpinion.POPULISM_STEAL_MULT,
-				int(round((1.0 - PublicOpinion.POPULISM_BAD_MULT) * 100)), PublicOpinion.POPULISM_ELECTION_NATIONAL]
-		MANA_BONUS_CARD_TYPE:
-			return "+%d mana kazan.\nSeçmek için dokun, tekrar dokun: kullan." % GameRules.MANA_BONUS_WEAK
+			return "%d dönem boyunca hamlelerin çok daha etkili, kötü sonuçlar hafifler; bu sürede seçim olursa ek ulusal destek.\nSeçmek için dokun, tekrar dokun: kullan." % GameRules.POPULISM_ROUNDS
+		FUNDS_BONUS_CARD_TYPE:
+			return "Bağış kampanyası: kasana %s girer.\nSeçmek için dokun, tekrar dokun: kullan." % GameRules.cost_text(GameRules.FUNDS_BONUS_WEAK)
 	return ""

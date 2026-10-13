@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dn285ch5p7l11"
-path="res://.godot/imported/mana.svg-07bdafdb384e3942fc63496b94834d91.ctex"
+uid="uid://b4wu76q25lehm"
+path="res://.godot/imported/politic_card_bagis_kampanyasi.png-a1e710ec57c6dba0200e794a5d197348.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/icons/mana.svg"
-dest_files=["res://.godot/imported/mana.svg-07bdafdb384e3942fc63496b94834d91.ctex"]
+source_file="res://assets/cards/politic_card_bagis_kampanyasi.png"
+dest_files=["res://.godot/imported/politic_card_bagis_kampanyasi.png-a1e710ec57c6dba0200e794a5d197348.ctex"]
 
 [params]
 
@@ -38,6 +38,3 @@ process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
 detect_3d/compress_to=1
-svg/scale=1.0
-editor/scale_with_editor_scale=false
-editor/convert_colors_with_editor_theme=false

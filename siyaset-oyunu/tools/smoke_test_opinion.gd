@@ -158,7 +158,7 @@ func _initialize() -> void:
 	gm._apply_vote(2, true)
 	gm._apply_vote(3, false)
 	check("hukumet (1+2) kuruldu", gm.has_government() and gm.government_party_ids().size() == 2)
-	cm.mana = {1: 100, 2: 100, 3: 100}
+	cm.funds = {1: 100, 2: 100, 3: 100}
 	cm.turn_order = [3, 1, 2]
 	cm.current_turn_index = 0
 	check("muhalefet yatirim yapamaz", not cm.can_invest(3, TestProvinces.id("izmir")))
@@ -168,7 +168,7 @@ func _initialize() -> void:
 	cm.local_support = {}
 	cm.national_support = {}
 	cm._apply_invest_move(1, TestProvinces.id("izmir"))
-	check("yatirim hamlesi mana bedeli", cm.mana_of(1) == 100 - GameRules.INVEST_MANA_COST)
+	check("yatirim hazineden: parti kasasi degismedi", cm.funds_of(1) == 100)
 	check("getiren parti il: etkinin hemen gelen payi", near(cm.local_of(TestProvinces.id("izmir"), 1), PublicOpinion.INVEST_LOCAL * Economy.INVEST_IMMEDIATE))
 	check("ortak il: hemen gelen pay", near(cm.local_of(TestProvinces.id("izmir"), 2), PublicOpinion.INVEST_PARTNER_LOCAL * Economy.INVEST_IMMEDIATE))
 	check("muhalefet etkilenmez", near(cm.local_of(TestProvinces.id("izmir"), 3), 0.0))
@@ -249,7 +249,7 @@ func _initialize() -> void:
 
 	print("")
 	print("=== 7) GENSORU HAMLESI ===")
-	cm.mana = {1: 100, 2: 100, 3: 100}
+	cm.funds = {1: 100, 2: 100, 3: 100}
 	cm.turn_order = [3, 1, 2]
 	cm.current_turn_index = 0
 	check("gensoru destede degil (hamle)", not cm._draw_weights(3).has("gensoru"))
@@ -261,7 +261,7 @@ func _initialize() -> void:
 	cm.current_turn_index = 0
 	cm.national_support = {}
 	cm._apply_censure_move(3)
-	check("gensoru hamlesi 2 mana, oylama acildi", cm.mana_of(3) == 100 - GameRules.CENSURE_MANA_COST and gm.phase == gm.Phase.VOTING)
+	check("gensoru hamlesi bedeli, oylama acildi", cm.funds_of(3) == 100 - GameRules.CENSURE_FUNDS_COST and gm.phase == gm.Phase.VOTING)
 	cm.last_seats = {1: 200, 2: 100, 3: 90}
 	var score3_before: int = gm.score_of(3)
 	gm._apply_vote(3, gm.VOTE_YES)
@@ -291,7 +291,7 @@ func _initialize() -> void:
 	print("=== 9) TESKILAT BILGISI, KARALAMA ===")
 	var w: Dictionary = cm._draw_weights(3)
 	check("karalama destede; anket ve gozcu destede degil", not w.has("anket") and not w.has("gozcu") and w.has("karalama"))
-	cm.mana[3] = 50
+	cm.funds[3] = 50
 	cm.organizations = {}
 	cm.local_support = {}
 	cm.turn_order = [3, 1, 2]
@@ -328,28 +328,28 @@ func _initialize() -> void:
 	check("il baskanligi ildeki gucu artirir", cm.party_strength(TestProvinces.id("ankara"), 2) > weak)
 
 	cm.current_turn_index = 0
-	cm.mana[3] = 30
+	cm.funds[3] = 30
 	cm.agenda = {"type": "gundem_dindar", "until": cm.round_number + 1}
 	var law_soc: String = cp.law_type("dindar")
 	cm._apply_law(3, law_soc)
-	check("yasa hamlesi meclise geldi, 5 mana harcandi",
-		gm.phase == gm.Phase.VOTING and gm.proposal_law == law_soc and cm.mana_of(3) == 30 - GameRules.LAW_MANA_COST, "mana %d" % cm.mana_of(3))
+	check("yasa hamlesi meclise geldi, 5 milyon harcandi",
+		gm.phase == gm.Phase.VOTING and gm.proposal_law == law_soc and cm.funds_of(3) == 30 - GameRules.LAW_FUNDS_COST, "kasa %d" % cm.funds_of(3))
 	check("oylama sirasinda tur durur", cm.is_turn_blocked())
 	check("yasayi getirenin oyu bastan EVET", int(gm.votes.get(3, 99)) == gm.VOTE_YES and gm.has_voted(3))
 
 	print("")
-	print("=== 10) BONUS KARTLAR: POPULIZM, MANA BONUSU ===")
+	print("=== 10) BONUS KARTLAR: POPULIZM, BAGIS KAMPANYASI ===")
 	gm._clear_proposal()
 	gm._set_phase(gm.Phase.GOVERNING)
 	cm.turn_order = [3, 1, 2]
 	cm.current_turn_index = 0
-	cm.mana = {1: 100, 2: 100, 3: 100}
+	cm.funds = {1: 100, 2: 100, 3: 100}
 	cm.local_support = {}
 	cm.national_support = {}
-	check("populizm ve mana bonusu destede", cm._draw_weights(3).has("populizm") and cm._draw_weights(3).has("mana_bonusu"))
-	cm.inventories[3] = ["populizm", "mana_bonusu"]
+	check("populizm ve bagis kampanyasi destede", cm._draw_weights(3).has("populizm") and cm._draw_weights(3).has("bagis_kampanyasi"))
+	cm.inventories[3] = ["populizm", "bagis_kampanyasi"]
 	cm._apply_play(3, 0)
-	check("populizm 10 mana, 3 yil", cm.mana_of(3) == 90 and cm.populism_rounds_left(3) == GameRules.POPULISM_ROUNDS)
+	check("populizm 10 milyon, 3 yil", cm.funds_of(3) == 90 and cm.populism_rounds_left(3) == GameRules.POPULISM_ROUNDS)
 	check("populizmde sira devretmez", cm.current_turn_peer_id() == 3)
 	cm._apply_miting(3, TestProvinces.id("konya"))
 	var pop_gain: float = cm.local_of(TestProvinces.id("konya"), 3)
@@ -361,8 +361,8 @@ func _initialize() -> void:
 	cm._add_local(TestProvinces.id("konya"), 3, -2.0)
 	check("populizm: baskasinin karalamasi etkilenmez", near(cm.local_of(TestProvinces.id("konya"), 3), -2.0 * PublicOpinion.POPULISM_BAD_MULT - 2.0))
 	cm._apply_play(3, 0)
-	check("mana bonusu (zayif) +30 mana", cm.mana_of(3) == 90 + GameRules.MANA_BONUS_WEAK and GameRules.MANA_BONUS_WEAK == 30)
-	check("mana bonusu sirayi devretmez", cm.current_turn_peer_id() == 3)
+	check("bagis kampanyasi (zayif) +30 milyon", cm.funds_of(3) == 90 + GameRules.FUNDS_BONUS_WEAK and GameRules.FUNDS_BONUS_WEAK == 30)
+	check("bagis kampanyasi sirayi devretmez", cm.current_turn_peer_id() == 3)
 	cm.round_number += GameRules.POPULISM_ROUNDS
 	check("populizm 5 tur sonra biter", cm.populism_rounds_left(3) == 0)
 

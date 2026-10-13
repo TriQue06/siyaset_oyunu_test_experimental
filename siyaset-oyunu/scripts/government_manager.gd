@@ -504,9 +504,9 @@ func _apply_withdraw(peer_id: int) -> void:
 			CardManager.add_national_points(int(ally), ally_penalty)
 	abandoned = true
 	var alone := government_party_ids().size() == 1
-	var text := "%s koalisyondan çekildi (ulusal %.1f puan).%s%s%s" % [
-		_party_name(peer_id), penalty,
-		(" Büyük ortak gitti: kalan hükümet ortakları da %.1f puan kaybetti." % ally_penalty) if ally_penalty < 0.0 else "",
+	var text := "%s koalisyondan çekildi: %s.%s%s%s" % [
+		_party_name(peer_id), EffectWords.change(penalty),
+		" Büyük ortak gitti: koalisyon baskı altında, kalan ortaklar da destek kaybetti." if ally_penalty < 0.0 else "",
 		(" %s hükümeti tek başına kaldı." % _party_name(main_gov_peer_id)) if alone else "",
 		" Hükümet salt çoğunluğu kaybetti!" if not has_majority() else ""]
 	last_resolution_reason = text
@@ -760,7 +760,7 @@ func _resolve_proposal() -> void:
 			_set_phase(Phase.GOVERNING)
 			formed_round = CardManager.round_number
 			last_resolution_reason = "%s hükümeti güvenoyu aldı." % _party_name(main_gov_peer_id)
-			CardManager.grant_government_mana(government_party_ids())
+			CardManager.grant_government_funds(government_party_ids())
 			# Makam puanları TEK SEFER, hükümetin kurulduğu anda yazılır.
 			award_formation_scores()
 		else:

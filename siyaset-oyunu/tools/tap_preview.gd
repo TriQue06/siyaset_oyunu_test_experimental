@@ -43,7 +43,7 @@ func _initialize() -> void:
 	cm.turn_order = ids.duplicate()
 	cm.current_turn_index = 0
 	cm.inventories[me] = ["karalama", "karalama", "karalama"]
-	cm.mana[me] = 20
+	cm.funds[me] = 20
 	cm._push_state({"type": "full"}, true)
 
 	var scene: Node = (load("res://scenes/GameScreen.tscn") as PackedScene).instantiate()

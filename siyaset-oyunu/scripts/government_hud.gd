@@ -123,7 +123,7 @@ static func fill_government_panel(box: VBoxContainer) -> void:
 		UiSkin.skin_button(withdraw)
 		withdraw.text = "Koalisyondan Çekil"
 		withdraw.add_theme_font_size_override("font_size", 12)
-		withdraw.tooltip_text = "Görevlerin ana iktidar partisine geçer. Puan tablon etkilenmez; sonraki seçime yansıyan ulusal puanın bıraktığın görev sayısına göre biraz düşer. Ortağın yalnız kalıp gensoruyla düşerse o %d puan kaybeder." % GovernmentPresets.ABANDONED_FALL_PENALTY
+		withdraw.tooltip_text = "Görevlerin ana iktidar partisine geçer. Puan tablon etkilenmez ama kamuoyunda bir miktar destek kaybedersin. Ortağın yalnız kalıp gensoruyla düşerse o %d puan kaybeder." % GovernmentPresets.ABANDONED_FALL_PENALTY
 		withdraw.pressed.connect(func():
 			if bool(withdraw.get_meta("armed", false)):
 				GovernmentManager.withdraw_from_coalition()
@@ -206,8 +206,7 @@ static func law_vote_hint(my_id: int) -> Dictionary:
 		var now := Economy.tax_title(CardManager.tax_level())
 		return {"yes": "EVET: vergi %s olur (gelir %s / dönem)" % [Economy.tax_title(level), Economy.money_full(CardManager.expected_revenue(level))],
 			"no": "HAYIR: vergi %s kalır" % now,
-			"short": "Vergi %s → %s: seçmen etkisini hükümet partileri taşır (ortaklar %%%d), %%%d'i hemen gelir" % [
-				now, Economy.tax_title(level), int(round(Economy.PARTNER_SHARE * 100.0)), int(round(Economy.TAX_IMMEDIATE * 100.0))]}
+			"short": "Vergi %s → %s: seçmen tepkisi kademeli gelir, en çok başbakanın partisi hisseder" % [now, Economy.tax_title(level)]}
 	var no_text := "HAYIR: yasaya yakın illerde güç kaybı, zıt illerde kazanç"
 	if my_id == proposer:
 		return {"yes": "EVET: kabul edilirse yasanın etkisi 2 katına çıkar", "no": no_text,

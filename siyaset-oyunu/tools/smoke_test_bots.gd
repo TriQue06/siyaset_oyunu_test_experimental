@@ -135,11 +135,11 @@ func _initialize() -> void:
 	var meeting: Dictionary = brain.choose_speech(bot0)
 	check("bot toplanti degerini grup adiyla hesaplar", VoterGroups.is_group(String(meeting.get("group", ""))), str(meeting))
 	check("botlar farkli hamle turleri yapti", played.size() >= 5, str(played))
-	var mana_ok := true
-	for peer_id in cm.mana.keys():
-		if cm.mana_of(peer_id) < 0:
-			mana_ok = false
-	check("mana hic eksiye dusmedi", mana_ok, str(cm.mana))
+	var funds_ok := true
+	for peer_id in cm.funds.keys():
+		if cm.funds_of(peer_id) < 0:
+			funds_ok = false
+	check("para hic eksiye dusmedi", funds_ok, str(cm.funds))
 
 	print("")
 	print("=== BOT BLOGU ===")

@@ -146,7 +146,7 @@ static func note(text: String, color: Color = KEY, width: float = 0.0) -> Label:
 		l.custom_minimum_size = Vector2(width, 0)
 	return l
 
-## Küçük renkli etiket ("KALE", "GİZLİ", "2 mana").
+## Küçük renkli etiket ("KALE", "GİZLİ", "2 para").
 static func chip(text: String, color: Color) -> Control:
 	var panel := PanelContainer.new()
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE

@@ -48,10 +48,10 @@ func _initialize() -> void:
 	# Sıra oyunda ilk bendeyse ilk tur geliri memleket teşkilatı kurulmadan
 	# verilir (teşkilat geliri yok): iki durum da geçerli.
 	var first_income: float = cm.turn_income(me) - cm.org_income(me) if cm.current_turn_peer_id() == me else 0.0
-	var base: float = GameRules.MANA_START + PP.BUSINESS_START_MANA
-	check("is insani +2 mana ile basladi", is_equal_approx(cm.mana_of(me), base + first_income)
-		or is_equal_approx(cm.mana_of(me), base + cm.turn_income(me)),
-		str(cm.mana_of(me)))
+	var base: float = GameRules.FUNDS_START + PP.BUSINESS_START_FUNDS
+	check("is insani +2 milyon ile basladi", is_equal_approx(cm.funds_of(me), base + first_income)
+		or is_equal_approx(cm.funds_of(me), base + cm.turn_income(me)),
+		str(cm.funds_of(me)))
 	var neighbor := String(gmap.neighbors().get(home, [""])[0])
 	check("hemsehri destegi memlekette", is_equal_approx(PP.hometown_activity(home, me), PP.HOMETOWN_ACTIVITY))
 	check("komsu il etkilenmez", PP.hometown_activity(neighbor, me) == 0.0)

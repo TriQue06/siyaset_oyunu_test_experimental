@@ -37,7 +37,7 @@ func _ready() -> void:
 	var body: VBoxContainer = built[1]
 	var cost := CardManager.FOUND_PARTY_COST
 	body.add_child(PopupKit.header("YENİ PARTİ KUR" if not leaving else "AYRIL VE PARTİ KUR",
-		"Bedel: %d mana · seçmen gruplarındaki desteğin aynen devam eder" % cost, null, queue_free))
+		"Bedel: %s · seçmen gruplarındaki desteğin aynen devam eder" % GameRules.cost_text(cost), null, queue_free))
 	if leaving:
 		body.add_child(PopupKit.note("Katkına göre (biraz da şansla) vekillerin, teşkilatların ve desteğin bir kısmını götürürsün; memleketindeki teşkilat seninle gelir. Seçime yaklaştıkça ayrılık iki partiye de daha çok oy kaybettirir.", UiTheme.TEXT_MUTED))
 	else:
@@ -110,7 +110,7 @@ func _ready() -> void:
 	cancel.pressed.connect(queue_free)
 	buttons.add_child(cancel)
 	_found_button = Button.new()
-	_found_button.text = "Partiyi Kur · %d mana" % cost
+	_found_button.text = "Partiyi Kur · %s" % GameRules.cost_text(cost)
 	_found_button.custom_minimum_size = Vector2(200, 40)
 	UiSkin.skin_color_button(_found_button, UiTheme.GREEN_DARK)
 	_found_button.pressed.connect(_on_found)

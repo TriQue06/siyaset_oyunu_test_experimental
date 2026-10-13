@@ -11,15 +11,15 @@ extends RefCounted
 ## değiştirir, toplantı seçime yakın turlarda değerlidir. Gizli bonus yok.
 ##
 ## HAMLE SINIRI YOK: BotManager, choose_action "pass" (turu bitir) diyene kadar
-## hamle yaptırır. Her seçeneğin puanından mana bedeli × MANA_VALUE düşülür;
-## böylece bot ucuz ama değersiz hamlelere manasını dağıtmaz, biriktirir.
+## hamle yaptırır. Her seçeneğin puanından para bedeli × FUNDS_VALUE düşülür;
+## böylece bot ucuz ama değersiz hamlelere kasasını dağıtmaz, biriktirir.
 
 ## En iyi kartın puanı bunun altındaysa bot kart oynamaz (el doluysa oynar).
 const PASS_THRESHOLD := 0.4
 ## Ana hamlelerin taban puanları.
 const PASS_ACTION_SCORE := 0.7
-## Bir mananın puan karşılığı (hamle puanından bedel × bu değer düşülür).
-const MANA_VALUE := 0.03
+## 1 milyon ₺ bedelin puan karşılığı (hamle puanından bedel × bu değer düşülür).
+const FUNDS_VALUE := 0.03
 ## Grup uyumundaki 1 puanlık ülke geneli artışın ulusal puan karşılığı
 ## (SHARPNESS / EFFECT_PER_POINT: ikisi de oy ağırlığını aynı ölçüde büyütür).
 const APPEAL_TO_POINTS := 1.4
@@ -191,9 +191,9 @@ static func _election_soon() -> bool:
 
 # --- Ana hamle ------------------------------------------------------------------
 
-## Manası bol olan bot için mana ucuzdur (birikip boşa durmasın), azsa değerlidir.
-static func _mana_value(bot: int) -> float:
-	return MANA_VALUE * clampf(40.0 / maxf(10.0, float(CardManager.mana_of(bot))), 0.2, 1.5)
+## Kasası bol olan bot için para ucuzdur (birikip boşa durmasın), azsa değerlidir.
+static func _funds_value(bot: int) -> float:
+	return FUNDS_VALUE * clampf(40.0 / maxf(10.0, float(CardManager.funds_of(bot))), 0.2, 1.5)
 
 ## Dönüş: {"type": "card"} | {"type": "law", "law"} | {"type": "organization",
 ## "province"} | {"type": "miting", "province"} | {"type": "speech", "group"} |
@@ -202,7 +202,7 @@ static func choose_action(bot: int) -> Dictionary:
 	# GRUP TOPLANTISI isteğe bağlı: değerliyse (seçime yakın / kriz) önce yapılır.
 	if CardManager.needs_speech(bot):
 		var meeting := choose_speech(bot)
-		if not meeting.is_empty() and float(meeting["score"]) - GameRules.SPEECH_MANA_COST * _mana_value(bot) > PASS_ACTION_SCORE:
+		if not meeting.is_empty() and float(meeting["score"]) - GameRules.SPEECH_FUNDS_COST * _funds_value(bot) > PASS_ACTION_SCORE:
 			return {"type": "speech", "group": meeting["group"]}
 	# SEÇİMDEN OLUMLU ÇIKAN BOT KONGREYE GİDER (iktidarını tazeler).
 	var pid := CardManager.party_of(bot)
@@ -224,13 +224,13 @@ static func choose_action(bot: int) -> Dictionary:
 static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 	var best := {"type": "pass"}
 	var best_score := PASS_ACTION_SCORE
-	var mana_value := _mana_value(bot)
+	var funds_value := _funds_value(bot)
 
 	var hand: Array = CardManager.inventories.get(bot, [])
 	var play := choose_play(bot)
 	if not play.is_empty():
 		var card: String = hand[int(play["index"])]
-		var card_score := float(play["score"]) - CardPresets.card_cost(card) * mana_value + _jitter(bot)
+		var card_score := float(play["score"]) - CardPresets.card_cost(card) * funds_value + _jitter(bot)
 		candidates.append({"type": "card"})
 		if card_score > best_score:
 			best = {"type": "card"}
@@ -242,18 +242,18 @@ static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 		var rested: bool = CardManager.round_number - int(CardManager.law_rounds.get(bot, -99)) >= LAW_EVERY_ROUNDS
 		if not rested:
 			law = {}
-		var law_cost: int = CardManager.law_mana_cost(bot, String(law.get("law", "")))
+		var law_cost: int = CardManager.law_funds_cost(bot, String(law.get("law", "")))
 		var law_noise := _jitter(bot)
 		if not law.is_empty() and CardManager.can_propose_law(bot, String(law["law"])):
 			candidates.append({"type": "law", "law": law["law"]})
-		if not law.is_empty() and CardManager.can_propose_law(bot, String(law["law"])) and float(law["score"]) - law_cost * mana_value + law_noise > best_score:
+		if not law.is_empty() and CardManager.can_propose_law(bot, String(law["law"])) and float(law["score"]) - law_cost * funds_value + law_noise > best_score:
 			best = {"type": "law", "law": law["law"]}
-			best_score = float(law["score"]) - law_cost * mana_value + law_noise
+			best_score = float(law["score"]) - law_cost * funds_value + law_noise
 
 	# VERGİ YASASI (sadece başbakanın partisi): aynı yasa hakkını kullanır.
 	var tax := _best_tax_law(bot)
 	if not tax.is_empty():
-		var tax_score := float(tax["score"]) - GameRules.LAW_MANA_COST * mana_value + _jitter(bot)
+		var tax_score := float(tax["score"]) - GameRules.LAW_FUNDS_COST * funds_value + _jitter(bot)
 		candidates.append({"type": "law", "law": tax["law"]})
 		if tax_score > best_score:
 			best = {"type": "law", "law": tax["law"]}
@@ -270,22 +270,22 @@ static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 	var org_noise := _jitter(bot)
 	if not org.is_empty():
 		candidates.append({"type": "organization", "province": org["province"]})
-	if not org.is_empty() and float(org["score"]) - org_cost * mana_value + org_noise > best_score:
+	if not org.is_empty() and float(org["score"]) - org_cost * funds_value + org_noise > best_score:
 		best = {"type": "organization", "province": org["province"]}
-		best_score = float(org["score"]) - org_cost * mana_value + org_noise
+		best_score = float(org["score"]) - org_cost * funds_value + org_noise
 
 	if CardManager.can_invest(bot):
 		var invest := _eval_investment(bot)
 		var invest_noise := _jitter(bot)
 		if not invest.is_empty():
 			candidates.append({"type": "invest", "province": invest["province"]})
-		if not invest.is_empty() and float(invest["score"]) - GameRules.INVEST_MANA_COST * mana_value + invest_noise > best_score:
+		if not invest.is_empty() and float(invest["score"]) - GameRules.INVEST_FUNDS_COST * funds_value + invest_noise > best_score:
 			best = {"type": "invest", "province": invest["province"]}
-			best_score = float(invest["score"]) - GameRules.INVEST_MANA_COST * mana_value + invest_noise
+			best_score = float(invest["score"]) - GameRules.INVEST_FUNDS_COST * funds_value + invest_noise
 
 	var inquiry := _eval_inquiry(bot)
 	if not inquiry.is_empty():
-		var inquiry_score := float(inquiry["score"]) - Economy.INQUIRY_MANA_COST * mana_value + _jitter(bot)
+		var inquiry_score := float(inquiry["score"]) - Economy.INQUIRY_FUNDS_COST * funds_value + _jitter(bot)
 		candidates.append({"type": "inquiry", "target": inquiry["target"]})
 		if inquiry_score > best_score:
 			best = {"type": "inquiry", "target": inquiry["target"]}
@@ -295,15 +295,15 @@ static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 		# Geçeceği hesaplanan gensoru: hükümet düşer, yeni kurma turu başlar.
 		# Blokta gensoru planın son adımı: çok daha değerli.
 		var censure_score := 7.0 if bloc_active() else 4.0
-		if censure_score - GameRules.CENSURE_MANA_COST * mana_value > best_score:
+		if censure_score - GameRules.CENSURE_FUNDS_COST * funds_value > best_score:
 			best = {"type": "censure"}
 			_bloc_forming = bloc_active()
-			best_score = censure_score - GameRules.CENSURE_MANA_COST * mana_value
+			best_score = censure_score - GameRules.CENSURE_FUNDS_COST * funds_value
 
 	# ERKEN SEÇİM: kamuoyu bot lehineyse ve hükümette değilse sandığı ister.
 	if CardManager.can_early_election(bot) and not CardManager.is_government_party(bot):
 		var support := CardManager.national_of(bot)
-		var early_score := 1.0 + support * 0.8 - GameRules.EARLY_ELECTION_MANA_COST * mana_value + _jitter(bot)
+		var early_score := 1.0 + support * 0.8 - GameRules.EARLY_ELECTION_FUNDS_COST * funds_value + _jitter(bot)
 		if support > EARLY_ELECTION_SUPPORT:
 			candidates.append({"type": "early_election"})
 			if early_score > best_score:
@@ -315,9 +315,9 @@ static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 		var miting_noise := _jitter(bot)
 		if not miting.is_empty():
 			candidates.append({"type": "miting", "province": miting["province"]})
-		if not miting.is_empty() and float(miting["score"]) - GameRules.MITING_MANA_COST * mana_value + miting_noise > best_score:
+		if not miting.is_empty() and float(miting["score"]) - GameRules.MITING_FUNDS_COST * funds_value + miting_noise > best_score:
 			best = {"type": "miting", "province": miting["province"]}
-			best_score = float(miting["score"]) - GameRules.MITING_MANA_COST * mana_value + miting_noise
+			best_score = float(miting["score"]) - GameRules.MITING_FUNDS_COST * funds_value + miting_noise
 
 	return best
 
@@ -437,7 +437,7 @@ const INQUIRY_RIVAL_MITINGS := 2
 const INQUIRY_RIVAL_SCORE := 0.9
 
 static func _eval_inquiry(bot: int) -> Dictionary:
-	if not CardManager.can_open_inquiry(bot) or CardManager.mana_of(bot) < 60.0:
+	if not CardManager.can_open_inquiry(bot) or CardManager.funds_of(bot) < 60.0:
 		return {}
 	var best := {}
 	var own := 0.0
@@ -559,7 +559,7 @@ static func _best_organization(bot: int) -> Dictionary:
 		if not CardManager.can_build_organization(bot, province_id):
 			continue
 		var level := CardManager.organization_level(province_id, bot)
-		# 2 mana: kalıcı ama pahalı — büyük illerde bile yasa/kartla yarışacak kadar.
+		# 2 para: kalıcı ama pahalı — büyük illerde bile yasa/kartla yarışacak kadar.
 		var closeness := PublicOpinion.appeal_closeness(CardManager.appeal_of(province_id, bot))
 		# Kalıcı oy bonusu (seviye farkı) + bilgi: 1. seviye kaba, 2. seviye isabetli anket.
 		var gain := PublicOpinion.org_activity(level + 1) - PublicOpinion.org_activity(level)
@@ -592,7 +592,7 @@ static func choose_play(bot: int) -> Dictionary:
 	return best
 
 static func _evaluate(bot: int, card_type: String) -> Dictionary:
-	if CardManager.mana_of(bot) < CardPresets.card_cost(card_type):
+	if CardManager.funds_of(bot) < CardPresets.card_cost(card_type):
 		return {}
 	match card_type:
 		CardPresets.POPULISM_CARD_TYPE:
@@ -600,9 +600,9 @@ static func _evaluate(bot: int, card_type: String) -> Dictionary:
 			if CardManager.populism_rounds_left(bot) > 0:
 				return {}
 			return {"score": 2.2 if _election_soon() else 1.4, "peer": -1, "province": ""}
-		CardPresets.MANA_BONUS_CARD_TYPE, CardPresets.MANA_BONUS_STRONG_CARD_TYPE:
-			# Manası azken, yapacak başka şey yokken kullanılır.
-			return {"score": 0.9 if CardManager.mana_of(bot) < GameRules.MITING_MANA_COST else 0.3, "peer": -1, "province": ""}
+		CardPresets.FUNDS_BONUS_CARD_TYPE, CardPresets.FUNDS_BONUS_STRONG_CARD_TYPE:
+			# Kasası azken, yapacak başka şey yokken kullanılır.
+			return {"score": 0.9 if CardManager.funds_of(bot) < GameRules.MITING_FUNDS_COST else 0.3, "peer": -1, "province": ""}
 		CardPresets.BONUS_CARD_TYPE:
 			var room := CardManager.MAX_HAND_SIZE - hand_size(bot) + 1
 			return {} if room < 2 else {"score": 1.1, "peer": -1, "province": ""}

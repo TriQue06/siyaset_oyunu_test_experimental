@@ -221,9 +221,8 @@ func refresh() -> void:
 		_shown_treasury = CardManager.state_treasury()
 		_show_treasury(_shown_treasury)
 	_set_delta("treasury", prev, "treasury", CardManager.state_treasury(), true, false)
-	(_tiles["treasury"]["panel"] as Control).tooltip_text = "Devlet hazinesi: %s (partilerin manasından ayrıdır).\nBu dönemin sonunda %s vergi geliri girer (vergi %s, ekonomi %d). Bir yatırım %s.\n▲▼: bir önceki dönem sonuna göre." % [
-		Economy.money_full(CardManager.state_treasury()), Economy.money_full(CardManager.expected_revenue()),
-		Economy.tax_title(level), int(round(CardManager.economy_index())), Economy.money_full(Economy.INVEST_COST)]
+	(_tiles["treasury"]["panel"] as Control).tooltip_text = "Devlet hazinesi: %s. Dönem sonunda %s vergi geliri girer. Bir yatırım %s." % [
+		Economy.money_full(CardManager.state_treasury()), Economy.money_full(CardManager.expected_revenue()), Economy.money_full(Economy.INVEST_COST)]
 	_income_label.text = "+%s / dönem" % Economy.money_text(CardManager.expected_revenue())
 	var election := not election_headline().is_empty()
 	# Sandık öncesi: özet göstergelerin yerini alır (hazine ve vergi özette).
@@ -250,7 +249,8 @@ func _set_delta(key: String, prev: Dictionary, prev_key: String, now: float, up_
 		label.text = "="
 		label.add_theme_color_override("font_color", UiTheme.TEXT_DIM)
 		return
-	var number := String.num(absf(shown), 1).replace(".", ",") if decimal else Economy.money_text(absf(shown))
+	# Göstergelerde sadece yön; hazinede tutar da yazar (gerçek para hareketi).
+	var number := Economy.money_text(absf(shown)) if key == "treasury" else ""
 	label.text = ("▲" if shown > 0.0 else "▼") + number
 	label.add_theme_color_override("font_color", UiTheme.GREEN if (shown > 0.0) == up_good else UiTheme.RED)
 
@@ -265,10 +265,9 @@ func _refresh_transition(econ: Dictionary) -> void:
 	var cutting := Economy.target_pressure(int(econ["tax"])) < float(econ.get("pressure_from", 0.0))
 	_transition_title.text = "İNDİRİM ETKİSİ" if cutting else "ARTIRIM ETKİSİ"
 	_transition_ratio = Economy.settle_ratio(econ)
-	_transition_text.text = "%%%d · ~%d dönem" % [int(round(_transition_ratio * 100.0)), Economy.rounds_to_settle(econ)]
-	_transition.tooltip_text = "Vergi %s → %s. Seçmen memnuniyetindeki değişimin %%%d'i şimdiye kadar yerleşti; kalanı yaklaşık %d dönemde gelir. Seçim olursa sadece yerleşen kısım sayılır." % [
-		Economy.tax_title(int(econ.get("tax_from", econ["tax"]))), Economy.tax_title(int(econ["tax"])),
-		int(round(_transition_ratio * 100.0)), Economy.rounds_to_settle(econ)]
+	_transition_text.text = "~%d dönem" % Economy.rounds_to_settle(econ)
+	_transition.tooltip_text = "Vergi %s → %s. Seçmen değişimi kademeli hissediyor; tamamen yerleşmesi yaklaşık %d dönem sürer. Seçim olursa sadece yerleşen kısım sayılır." % [
+		Economy.tax_title(int(econ.get("tax_from", econ["tax"]))), Economy.tax_title(int(econ["tax"])), Economy.rounds_to_settle(econ)]
 	_transition_bar.queue_redraw()
 
 # --- Sandık öncesi özet ---------------------------------------------------------------
@@ -323,8 +322,8 @@ static func _fill_summary(box: VBoxContainer, headline: Array) -> void:
 	box.add_child(title)
 	var tax_text := Economy.tax_title(int(econ["tax"]))
 	if not Economy.is_settled(econ):
-		tax_text += " (%s'den) · %%%d yerleşti" % [Economy.tax_title(int(econ.get("tax_from", econ["tax"]))),
-			int(round(Economy.settle_ratio(econ) * 100.0))]
+		tax_text += " (%s'den) · %s" % [Economy.tax_title(int(econ.get("tax_from", econ["tax"]))),
+			"büyük ölçüde yerleşti" if Economy.settle_ratio(econ) >= 0.7 else "etkisi yerleşiyor"]
 	else:
 		tax_text += " · yerleşik"
 	box.add_child(_summary_row("Vergi", tax_text))
@@ -344,6 +343,7 @@ static func _fill_summary(box: VBoxContainer, headline: Array) -> void:
 		box.add_child(PopupKit.label("Hükümet yok: ekonomi kimsenin hanesine yazılmıyor.", 10, UiTheme.TEXT_MUTED))
 		return
 	var mood := CardManager.economy_mood(pm)
+	box.add_child(_summary_row("Gidişat", economy_verdict(mood)))
 	var next_state: Dictionary = econ.duplicate(true)
 	Economy.advance(next_state)
 	var next_mood := Economy.group_mood(next_state, CardManager.economy_share(pm))
@@ -368,14 +368,25 @@ static func _fill_summary(box: VBoxContainer, headline: Array) -> void:
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(icon)
-		var arrow := ("▲" if trend > 0.0 else "▼") if absf(trend) >= 0.05 else ""
-		row.add_child(UiTheme.mono_label(_signed(now) + arrow, 9, UiTheme.GREEN if now > 0.0 else UiTheme.RED, true))
-		tip.append("%s %s%s" % [VoterGroups.title(group), _signed(now),
-			(" (gelecek dönem %s)" % ("toparlanıyor" if trend > 0.0 else "kötüleşiyor")) if arrow != "" else ""])
-	row.tooltip_text = "%s hükümetinin ekonomiden (vergi, büyüme, enflasyon) gelen seçmen desteği:\n%s" % [
+		row.add_child(UiTheme.mono_label(EffectWords.arrows(now, "group"), 9, UiTheme.GREEN if now > 0.0 else UiTheme.RED, true))
+		tip.append("%s: %s%s" % [VoterGroups.title(group), EffectWords.change(now, "group"),
+			(" (%s)" % ("toparlanıyor" if trend > 0.0 else "kötüleşiyor")) if absf(trend) >= 0.05 else ""])
+	row.tooltip_text = "%s hükümetinin ekonomi politikasına seçmen tepkisi:\n%s" % [
 		PartyManager.data_of(pm).get("name", "?"), "\n".join(tip)]
 	box.add_child(row)
-	box.add_child(PopupKit.label("Görünen durumun özeti; seçim tahmini değildir.", 9, UiTheme.TEXT_DIM))
+
+## Hükümetin ekonomiden gelen seçmen tepkisinin TEK CÜMLELİK yorumu (gerçek
+## Economy.group_mood değerlerinin toplamından; büyüklük EffectWords ile).
+static func economy_verdict(mood: Dictionary) -> String:
+	var total := 0.0
+	for group in mood.keys():
+		total += float(mood[group])
+	var level := EffectWords.level(total, "group")
+	if level <= 1:
+		return "Ekonomi seçmen üzerinde belirleyici değil."
+	if total > 0.0:
+		return "Ekonomi hükümete destek kazandırıyor." if level <= 2 else "Ekonomi hükümetin en güçlü kozu."
+	return "Ekonomi hükümet için yük olmaya başladı." if level <= 2 else "Ekonomi politikası hükümete ağır siyasi bedel ödetiyor."
 
 static func _summary_row(key: String, value: String) -> Control:
 	var row := HBoxContainer.new()
@@ -559,7 +570,7 @@ static func _policy_card(me: int, level: int, current: int, selected: int, on_se
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		icons.add_child(icon)
 		var amount := float(effects[group])
-		icons.add_child(PopupKit.label(_signed(amount), 10, UiTheme.GREEN if amount > 0.0 else UiTheme.RED))
+		icons.add_child(PopupKit.label(EffectWords.arrows(amount, "group"), 10, UiTheme.GREEN if amount > 0.0 else UiTheme.RED))
 	if ranked.is_empty():
 		icons.add_child(PopupKit.label("seçmen: dengeli", 10, UiTheme.TEXT_MUTED))
 	var growth := float(Economy.TAX_GROWTH[level]) - float(Economy.TAX_GROWTH[current])
@@ -597,9 +608,8 @@ static func _fill_policy_detail(detail: VBoxContainer, me: int, level: int, curr
 		UiTheme.GREEN if revenue_new > revenue_now else UiTheme.RED))
 	var after := Economy.pressure_after_change(float(CardManager.economy["pressure"]), level)
 	var probe := {"tax": level, "pressure": after}
-	detail.add_child(PopupKit.kv("Seçmene yansıma", "%%%d hemen · kalanı ~%d dönemde" % [int(round(Economy.TAX_IMMEDIATE * 100.0)),
-		Economy.rounds_to_settle(probe)], UiTheme.GOLD))
-	detail.add_child(PopupKit.kv("Kimi etkiler", "hükümet partileri (ortaklar %%%d)" % int(round(Economy.PARTNER_SHARE * 100.0))))
+	detail.add_child(PopupKit.kv("Seçmene yansıma", "kademeli · ~%d dönemde" % Economy.rounds_to_settle(probe), UiTheme.GOLD))
+	detail.add_child(PopupKit.kv("Kimi etkiler", "en çok başbakanın partisi"))
 	var effects := _tax_mood_change(level, current)
 	var ranked: Array = effects.keys()
 	ranked.sort_custom(func(a, b): return absf(float(effects[a])) > absf(float(effects[b])))
@@ -612,8 +622,6 @@ static func _fill_policy_detail(detail: VBoxContainer, me: int, level: int, curr
 		var row := VoterGroupUI.effect_row(String(ranked[i]), float(effects[ranked[i]]), 10)
 		row.custom_minimum_size = Vector2(180, 0)
 		grid.add_child(row)
-	detail.add_child(PopupKit.note("Değerler tam yerleşince başbakanın partisinin grup desteğindeki değişimdir; seçim erken gelirse sadece yerleşen kısım sayılır.",
-		UiTheme.TEXT_DIM, 380))
 	var reason := CardManager.tax_law_block_reason(me, level)
 	var button := Button.new()
 	button.focus_mode = Control.FOCUS_NONE
@@ -621,7 +629,7 @@ static func _fill_policy_detail(detail: VBoxContainer, me: int, level: int, curr
 	button.add_theme_font_override("font", UiTheme.mono(true))
 	button.add_theme_font_size_override("font_size", 14)
 	if reason == "":
-		button.text = "MECLİSE SUN · %s" % GameRules.cost_text(GameRules.LAW_MANA_COST)
+		button.text = "MECLİSE SUN · %s" % GameRules.cost_text(GameRules.LAW_FUNDS_COST)
 		UiSkin.skin_color_button(button, UiTheme.GREEN_DARK)
 		button.pressed.connect(func(): on_propose.call(law_type))
 	else:
@@ -681,17 +689,14 @@ static func fill_inquiry(box: VBoxContainer, me: int, target: int, on_open: Call
 			invests += 1
 		else:
 			mitings += 1
-	box.add_child(PopupKit.kv("Bedel", "%s (partinden)" % GameRules.cost_text(Economy.INQUIRY_MANA_COST)))
+	box.add_child(PopupKit.kv("Bedel", "%s (partinden)" % GameRules.cost_text(Economy.INQUIRY_FUNDS_COST)))
 	box.add_child(PopupKit.kv("Kapsam", "son %d dönem · %d yatırım, %d miting" % [Economy.INQUIRY_SCOPE_ROUNDS, invests, mitings]))
-	box.add_child(PopupKit.note("Tutarlar ve kimin kasasından ödendiği soruşturma sonuçlanınca açıklanır. Daha önce incelenen işlemler yeniden incelenmez.",
-		UiTheme.TEXT_DIM, 380))
-	box.add_child(PopupKit.section("İncelenen kanıt"))
-	for row in [["clean", "Parti kasasından ödenen harcamalar", "Doğrulanırsa hedef partiye şeffaflık desteği (ulusal en fazla +%s)." % _signed(Economy.TRANSPARENCY_MAX).substr(1)],
-			["none", "Devletten ödenen yatırımlar", "Meşru kamu harcaması: yolsuzluk sayılmaz, etkisi yok."],
-			["scandal", "Devletten ödenen mitingler", "Partizan harcama: usulsüzlük skandalı (ulusal en fazla −%s, parti içi karışıklık)." % _signed(Economy.SCANDAL_MAX).substr(1)]]:
+	box.add_child(PopupKit.note("Tutarlar sonuçta açıklanır; incelenmiş işlemler yeniden incelenmez.", UiTheme.TEXT_DIM, 380))
+	box.add_child(PopupKit.section("Olası bulgular"))
+	for row in [["clean", "Parti kasasından ödenmiş", "Şeffaflık: hedef parti itibar kazanır."],
+			["none", "Devletten ödenmiş yatırım", "Meşru kamu harcaması: etkisi yok."],
+			["scandal", "Devletten ödenmiş miting", "Usulsüzlük: hedef parti ağır baskı altına girer."]]:
 		box.add_child(_evidence_row(String(row[0]), String(row[1]), String(row[2])))
-	box.add_child(PopupKit.note("Kanıt yoksa kimse ödül ya da ceza almaz. Ödül doğrulanan partiye gider, soruşturana değil; usulsüzlüğü ortaya çıkaran güvenilirlik kazanır.",
-		UiTheme.TEXT_MUTED, 380))
 	var reason := CardManager.inquiry_block_reason(me, target)
 	var button := Button.new()
 	button.focus_mode = Control.FOCUS_NONE
@@ -699,7 +704,7 @@ static func fill_inquiry(box: VBoxContainer, me: int, target: int, on_open: Call
 	button.add_theme_font_override("font", UiTheme.mono(true))
 	button.add_theme_font_size_override("font_size", 14)
 	if reason == "":
-		button.text = "SORUŞTURMA AÇ · %s" % GameRules.cost_text(Economy.INQUIRY_MANA_COST)
+		button.text = "SORUŞTURMA AÇ · %s" % GameRules.cost_text(Economy.INQUIRY_FUNDS_COST)
 		UiSkin.skin_color_button(button, UiTheme.PURPLE.darkened(0.25))
 		button.pressed.connect(func(): on_open.call(target))
 	else:
@@ -721,13 +726,12 @@ static func _evidence_row(result: String, title: String, text: String) -> Contro
 	stripe.custom_minimum_size = Vector2(3, 0)
 	row.add_child(stripe)
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", -2)
+	col.add_theme_constant_override("separation", 0)
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(col)
 	col.add_child(PopupKit.label(title, 12, UiTheme.TEXT))
-	var note := PopupKit.label(text, 10, UiTheme.TEXT_MUTED)
-	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	note.custom_minimum_size = Vector2(360, 0)
+	var note := PopupKit.label(text, 11, UiTheme.TEXT_MUTED)
+	note.custom_minimum_size = Vector2(360, 18)
 	col.add_child(note)
 	return row
 
@@ -787,17 +791,18 @@ static func inquiry_result_card(data: Dictionary) -> PanelContainer:
 	var public := float(data.get("public_million", 0.0))
 	match result:
 		"scandal":
-			lines.append("Partizan faaliyetler için devlet hazinesinden %s." % Economy.money_full(improper))
-			lines.append("Ulusal destek −%s · parti içinde karışıklık." % _signed(float(data.get("damage", 0.0))).substr(1))
-			if float(data.get("gain", 0.0)) > 0.0:
-				lines.append("Kendi kasasından %s doğrulandı (+%s)." % [Economy.money_full(party_million), _signed(float(data["gain"])).substr(1)])
+			lines.append("Partizan harcama tespit edildi: mitingler için devlet hazinesinden %s." % Economy.money_full(improper))
+			lines.append("Skandal partiyi %s baskı altına sokuyor." % ("ağır" if EffectWords.level(float(data.get("damage", 0.0))) >= 3 else "ciddi"))
+			if party_million > 0.0:
+				lines.append("Kendi kasasından ödediği %s ise doğrulandı." % Economy.money_full(party_million))
 		"clean":
-			lines.append("%d işlemde %s kendi kasasından ödendi." % [int(data.get("examined", 0)), Economy.money_full(party_million)])
-			lines.append("Ulusal destek +%s (şeffaflık)." % _signed(float(data.get("gain", 0.0))).substr(1))
+			lines.append("Finansman doğrulandı: parti %s harcamayı kendi kaynağıyla yaptı." % Economy.money_full(party_million))
+			var gain := float(data.get("gain", 0.0))
+			lines.append("Parti kamuoyu nezdinde itibar kazanıyor." if gain > 0.0 else "Tutar küçük: belirgin bir siyasi etkisi yok.")
 		_:
-			lines.append("İncelenen işlem: %d. İddiayı destekleyen bir bulgu çıkmadı; ödül ya da ceza yok." % int(data.get("examined", 0)))
+			lines.append("Soruşturma nitelikli bir kanıt bulamadı; siyasi etkisi yok.")
 	if public > 0.0:
-		lines.append("Devletten %s yatırım: meşru kamu harcaması." % Economy.money_full(public))
+		lines.append("Devletten %s yatırım: meşru kamu harcaması, usulsüzlük yok." % Economy.money_full(public))
 	for line in lines:
 		var l := PopupKit.label(line, 12, UiTheme.TEXT)
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

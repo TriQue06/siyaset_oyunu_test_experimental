@@ -53,7 +53,7 @@ func _scan_icons() -> void:
 		dir.list_dir_begin()
 		var file_name := dir.get_next()
 		while file_name != "":
-			# Sadece icon_NN.svg: klasördeki başka SVG'ler (ör. mana.svg) parti
+			# Sadece icon_NN.svg: klasördeki başka SVG'ler (ör. para.svg) parti
 			# logosu olarak listelenmesin.
 			if not dir.current_is_dir() and file_name.begins_with("icon_") \
 					and file_name.get_extension().to_lower() == ICON_EXTENSION:

@@ -11,25 +11,23 @@ extends RefCounted
 ##     sonunda, sonra her ELECTION_INTERVAL turda bir (5, 10, 15 ... 30). Arada
 ##     kalan turlarda kurulu hükümet görevde kalır. MAKAM PUANLARI hükümet
 ##     KURULDUĞU ANDA tek sefer yazılır, her tur tekrarlanmaz.
-##   - HAMLE SINIRI YOK: sırası gelen oyuncu manası yettiğince hamle yapar,
-##     "Turu Bitir" ile sırayı devreder. Mana birikir, üst sınır yok. Manası
-##     biten oyuncunun sırası kendiliğinden devreder.
-##   - Her seçimden sonra herkes +ELECTION_MANA_BONUS, göreve başlayan hükümetin
-##     partileri +GOVERNMENT_MANA_BONUS mana alır (gensoruyla düşen hükümetin
-##     yerine kurulan hükümet dahil).
-##   - MANA: herkes MANA_START ile başlar; SIRASI GELDİĞİNDE +MANA_PER_ROUND alır
-##     (tur sonunda değil: harcadığın mana turu bitirince geri dolmuş görünmez).
-##     Hükümette görevi olan partiler bunun yerine +MANA_PER_ROUND_GOVERNMENT.
+##   - HAMLE SINIRI YOK: sırası gelen oyuncu PARTİ KASASI yettiğince hamle
+##     yapar, "Turu Bitir" ile sırayı devreder. Kasa birikir, üst sınır yok.
+##   - PARTİ KASASI (milyon ₺): herkes FUNDS_START ile başlar; SIRASI
+##     GELDİĞİNDE bağış ve aidat geliri +FUNDS_PER_ROUND (hükümette görevi
+##     olan partiler +FUNDS_PER_ROUND_GOVERNMENT) ve teşkilat geliri (en fazla
+##     ORG_INCOME_CAP) girer. Her seçimden sonra herkes +ELECTION_FUNDS_BONUS
+##     (devlet hazine yardımı), göreve başlayan hükümetin partileri
+##     +GOVERNMENT_FUNDS_BONUS alır. DEVLET HAZİNESİ ayrıdır (economy.gd).
 ##   - YASA ilk seçimden önce yapılamaz: meclis yok, saf propaganda dönemi.
-##     HAMLELER: miting MITING_MANA_COST, il başkanlığı ORG_MANA_COST, gözcü
-##     yasa oyuncu başına turda LAWS_PER_ROUND kez.
+##     Yasa oyuncu başına turda LAWS_PER_ROUND kez.
 ##   - TEŞKİLATLANMA (eski il başkanlığı + gözcü) il başına 2 seviye; her
-##     seviye ORG_MANA_COST. 1: az oy bonusu + kaba anket, 2: yüksek bonus +
+##     seviye ORG_FUNDS_COST. 1: az oy bonusu + kaba anket, 2: yüksek bonus +
 ##     isabetli anket. (İllerin seçmen grubu dağılımı herkese açıktır.)
 ##     KART ÇEKME HAMLESİ YOK: sıra gelince otomatik olarak 1 kart dağıtılır
 ##     (el doluysa verilmez); kart oynamak sınırsız (kartların kendi bedeli
 ##     var). Her seçimden sonra da herkese 1 kart hediye.
-##     Kartları oynamanın bedeli CardPresets.CARD_MANA_COSTS.
+##     Kartları oynamanın bedeli CardPresets.CARD_FUNDS_COSTS.
 ##   - Hükümet kurulamazsa (tüm görev hakları biterse) o turun sonunda ERKEN
 ##     SEÇİM yapılır.
 ##   - MAX_ROUNDS'uncu turun sonunda SON SEÇİM yapılır; kurulan hükümet makam
@@ -72,44 +70,55 @@ static func configure(interval_years: int, count: int) -> void:
 static func set_election_anchor(round_number: int) -> void:
 	ELECTION_ANCHOR = FIRST_ELECTION_ROUND if round_number <= 0 else round_number
 
-const MANA_START := 0
-const MANA_PER_ROUND := 30
-## Hükümette görevi olan partiler tur başına 1 fazla mana alır (iktidar avantajı).
-const MANA_PER_ROUND_GOVERNMENT := 40
+## PARA ÖLÇEĞİ: bütün parti bedelleri ve gelirleri MİLYON ₺. Bir partinin
+## dönemlik geliri (30–40) devletin dönemlik vergi gelirinin (70–140) üçte
+## biri kadardır; tek bir kamu yatırımı (100) bir partinin üç dönemlik
+## gelirine denk gelir. Eski "mana" değerleri bu ölçeğe birebir taşındı
+## (kayıt göçü için bkz. CardManager._apply_state); yatırımın ayrı hamle
+## bedeli kaldırıldı, mitingin toplam bedeli MITING_FUNDS_COST oldu.
+const FUNDS_START := 0
+const FUNDS_PER_ROUND := 30
+## Hükümette görevi olan partiler dönemde 10 milyon ₺ fazla alır (iktidar avantajı).
+const FUNDS_PER_ROUND_GOVERNMENT := 40
 ## BEDEL YAZISI: ücretsiz hamleler her yerde "bedelsiz" diye geçer ("bedava"
-## ya da "0 mana" değil). Mana 0,5 katlarıyla birikebildiği için ondalık da
+## ya da "0 milyon ₺" değil). Kart bozdurma yarım iade ettiği için ondalık da
 ## gerekirse basılır.
 static func cost_text(cost: float) -> String:
 	if cost <= 0.0:
 		return "bedelsiz"
-	if is_equal_approx(cost, roundf(cost)):
-		return "%d mana" % int(roundf(cost))
-	return "%s mana" % String.num(cost, 1)
+	return "%s milyon ₺" % money_text(cost)
 
-## Yasa sunmak BEDELSİZ (turda 1): meclis oyunun merkezi, mana engel olmasın.
-const LAW_MANA_COST := 5
+## Tutar yazısı (milyon ₺, birimsiz): tam sayıysa "15", değilse "2,5".
+static func money_text(value: float) -> String:
+	if is_equal_approx(value, roundf(value)):
+		return str(int(roundf(value)))
+	return String.num(value, 1).replace(".", ",")
+
+## Yasa sunmak ucuz (turda 1): meclis oyunun merkezi, para engel olmasın.
+const LAW_FUNDS_COST := 5
 const LAWS_PER_ROUND := 1
 ## Teşkilat anketinin sapması (her partinin oyu en fazla bu oranda sapar):
 ## 1. seviye YAKLAŞIK oy (±%35), 2. seviye %90 doğruluk (±%10).
 const POLL_ERROR_LOW := 0.35
 const POLL_ERROR_HIGH := 0.10
-const MITING_MANA_COST := 15
+const MITING_FUNDS_COST := 15
 ## Yatırım (sadece hükümet partileri) ve gensoru (sadece muhalefet, hükümet
 ## azınlıktayken) hamleleri. Yatırımın asıl bedeli DEVLET HAZİNESİNDEN
-## ödenir (Economy.INVEST_COST); partiden sadece bu küçük mana bedeli.
-const INVEST_MANA_COST := 10
+## ödenir (Economy.INVEST_COST); ayrı bir hamle bedeli YOK (hazine ve dönemde
+## tek yatırım hakkı yeterli sınır).
+const INVEST_FUNDS_COST := 0
 ## Gensoru BEDELSİZ: muhalefetin elindeki tek gerçek silah engellenmemeli.
-const CENSURE_MANA_COST := 0
+const CENSURE_FUNDS_COST := 0
 ## ERKEN SEÇİM hamlesi (eskiden kart): meclise önerge getirir.
-const EARLY_ELECTION_MANA_COST := 20
-## Popülizm bonusu kartı bu kadar tur sürer. Mana bonusunun iki çeşidi var:
-## zayıf +MANA_BONUS_WEAK, güçlü +MANA_BONUS_STRONG. Bonus kart BONUS_CARD_DRAW kart çeker.
+const EARLY_ELECTION_FUNDS_COST := 20
+## Popülizm bonusu kartı bu kadar tur sürer. BAĞIŞ KAMPANYASI kartının iki
+## çeşidi var: zayıf +FUNDS_BONUS_WEAK, güçlü +FUNDS_BONUS_STRONG milyon ₺. Bonus kart BONUS_CARD_DRAW kart çeker.
 const POPULISM_ROUNDS := 3
-const MANA_BONUS_WEAK := 30
-const MANA_BONUS_STRONG := 60
-const MANA_BONUS_AMOUNT := MANA_BONUS_WEAK
+const FUNDS_BONUS_WEAK := 30
+const FUNDS_BONUS_STRONG := 60
+const FUNDS_BONUS_AMOUNT := FUNDS_BONUS_WEAK
 const BONUS_CARD_DRAW := 2
-const ELECTION_MANA_BONUS := 10
+const ELECTION_FUNDS_BONUS := 10
 ## GÜNDEM TAKVİMİ: ilk seçimden hemen sonraki turdan itibaren AGENDA_ROUNDS tur
 ## (6 ay) gündem, AGENDA_GAP tur (12 ay) ara, yine gündem... Gündemli her tur
 ## bir SEÇMEN GRUBU ÇİFTİNİN (işçi/işveren, genç/emekli, dindar/ilerici,
@@ -129,20 +138,22 @@ const CENSURE_PASS_SCORE := 5
 ## Meclisten yasa geçirmek +5 puan (hükümet ya da muhalefet fark etmez).
 const LAW_PASS_SCORE := 5
 const LAW_PASS_SCORE_GOV := 5
-const GOVERNMENT_MANA_BONUS := 10
-## Teşkilat: kurmak (1. seviye) ORG_MANA_COST, geliştirmek (2. seviye)
-## ORG_UPGRADE_MANA_COST. Ucuz teşkilat botların haritayı kaplamasına yol açıyordu.
-const ORG_MANA_COST := 10
-## TEŞKİLAT GELİRİ: her ildeki teşkilat tur başında mana getirir
-## (1. seviye +5, 2. seviye +10).
+const GOVERNMENT_FUNDS_BONUS := 10
+## Teşkilat: kurmak (1. seviye) ORG_FUNDS_COST, geliştirmek (2. seviye)
+## ORG_UPGRADE_FUNDS_COST. Ucuz teşkilat botların haritayı kaplamasına yol açıyordu.
+const ORG_FUNDS_COST := 10
+## TEŞKİLAT GELİRİ: her ildeki teşkilat tur başında yerel bağış getirir
+## (1. seviye +5, 2. seviye +10 milyon ₺), ama toplamı ORG_INCOME_CAP'i aşmaz:
+## teşkilat sınırsız para makinesi olmasın (eskiden üst sınır yoktu).
 const ORG_INCOME := [0, 5, 10]
+const ORG_INCOME_CAP := 25
 ## GRUP TOPLANTISI bedeli (sırada bir kez; bir seçmen grubuyla, geçici destek).
-const SPEECH_MANA_COST := 5
-const ORG_UPGRADE_MANA_COST := ORG_MANA_COST
+const SPEECH_FUNDS_COST := 5
+const ORG_UPGRADE_FUNDS_COST := ORG_FUNDS_COST
 
 ## Bu ildeki teşkilatı bir seviye ilerletmenin bedeli (current_level: şu anki seviye).
 static func org_cost(current_level: int) -> int:
-	return ORG_MANA_COST if current_level <= 0 else ORG_UPGRADE_MANA_COST
+	return ORG_FUNDS_COST if current_level <= 0 else ORG_UPGRADE_FUNDS_COST
 ## En fazla 2 seviye: 1 = kaba anket + az bonus, 2 = isabetli anket + yüksek bonus.
 const ORG_MAX_LEVEL := 2
 

@@ -37,8 +37,8 @@ func _initialize() -> void:
 	cm.current_turn_index = cm.turn_order.find(int(bots[1]))
 	cm._apply_dissolve(int(bots[1]))
 	cm.current_turn_index = cm.turn_order.find(me)
-	cm.mana[me] = 9.0
-	cm.inventories[me] = ["kaset", "populizm", "steal_weak", "karalama", "mana_bonusu", "bonus_kart", "steal_strong", "isyan"]
+	cm.funds[me] = 9.0
+	cm.inventories[me] = ["kaset", "populizm", "steal_weak", "karalama", "bagis_kampanyasi", "bonus_kart", "steal_strong", "isyan"]
 	cm._push_state({"type": "timer"})
 	print("parti: %s, bağımsız %s" % [pm.parties[me]["name"], str(pm.is_independent(int(bots[1])))])
 

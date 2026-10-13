@@ -1,6 +1,6 @@
 extends SceneTree
 ## 8 oyunculu oyun ekranı: seçimden önce (boş beyaz meclis) ve sonra.
-## Menü butonu / oyuncu kartları / mana çakışmalarını kontrol eder.
+## Menü butonu / oyuncu kartları / para çakışmalarını kontrol eder.
 ##   godot --resolution 1280x720 --script res://tools/crowded_preview.gd
 
 const COLORS := ["F20C1F", "1C48C9", "F2920C", "8C21C2", "29A33D", "13DBED", "E619A8", "59BD28"]
@@ -98,7 +98,7 @@ func _initialize() -> void:
 	scene._on_layer_button_pressed(2)
 	await create_timer(0.6).timeout
 	cm.current_turn_index = cm.turn_order.find(me)
-	cm.mana[me] = 5
+	cm.funds[me] = 5
 	cm._push_state({"type": "timer"})
 	await _frames(5)
 	scene._on_org_button_pressed()
@@ -107,7 +107,7 @@ func _initialize() -> void:
 	_shot("org_pending")
 	scene._on_org_button_pressed()
 	await create_timer(0.6).timeout
-	check("iptal: onceki katmana (guc) doner, mana harcanmaz", scene._map_layer == 2 and cm.mana_of(me) == 5)
+	check("iptal: onceki katmana (guc) doner, para harcanmaz", scene._map_layer == 2 and cm.funds_of(me) == 5)
 	scene._on_org_button_pressed()
 	var target := ""
 	for id in ids:
@@ -116,7 +116,7 @@ func _initialize() -> void:
 			break
 	scene._on_province_clicked(target)
 	scene._on_province_clicked(target)
-	check("teskilat kuruldu, 2 mana, anket acildi", cm.organization_level(target, me) == 1 and cm.mana_of(me) == 3 and not cm.province_poll(me, target).is_empty())
+	check("teskilat kuruldu, 2 milyon, anket acildi", cm.organization_level(target, me) == 1 and cm.funds_of(me) == 3 and not cm.province_poll(me, target).is_empty())
 	await create_timer(0.3).timeout
 	check("kurunca bir an teskilat katmaninda kalir", scene._map_layer == 1)
 	await create_timer(1.6).timeout
@@ -128,16 +128,16 @@ func _initialize() -> void:
 	_shot("miting_pending")
 	check("miting: ilk dokunus riski gosterir", String(scene._target_hint.text).find("provokasyon") != -1)
 	scene._on_province_clicked(TestProvinces.id("konya"))
-	check("miting hamlesi yapildi (2 mana)", cm.mana_of(me) == 3 - GameRules.MITING_MANA_COST)
-	cm.mana[me] = 10
-	cm.inventories[me] = ["populizm", "mana_bonusu", "karalama"]
+	check("miting hamlesi yapildi (2 milyon)", cm.funds_of(me) == 3 - GameRules.MITING_FUNDS_COST)
+	cm.funds[me] = 10
+	cm.inventories[me] = ["populizm", "bagis_kampanyasi", "karalama"]
 	cm._push_state({"type": "timer"})
 	await _frames(5)
 	scene._on_hand_card_clicked(0)
 	await _frames(3)
 	scene._on_hand_card_clicked(0)
 	await _frames(5)
-	check("populizm karti iki dokunusla kullanildi", cm.populism_rounds_left(me) == GameRules.POPULISM_ROUNDS and cm.mana_of(me) == 9)
+	check("populizm karti iki dokunusla kullanildi", cm.populism_rounds_left(me) == GameRules.POPULISM_ROUNDS and cm.funds_of(me) == 9)
 	scene._on_censure_button_pressed()
 	await _frames(3)
 	check("cogunluk yokken bile hukumet yoksa gensoru acilmaz", not scene._pending_censure)
@@ -205,5 +205,5 @@ func _layout_checks(scene: Node) -> void:
 	if menu != null:
 		check("menu butonu ilk oyuncuyla cakismiyor", not menu.get_global_rect().intersects(first), "%s / %s" % [menu.get_global_rect(), first])
 	print("panel ", (list.get_parent() as Control).get_global_rect(), " list ", list.get_global_rect(), " h ", scene._avatar_height)
-	var mana: Control = scene._mana_box
-	check("mana son oyuncuyla cakismiyor", not mana.get_global_rect().intersects(last), "%s / %s" % [mana.get_global_rect(), last])
+	var funds: Control = scene._funds_box
+	check("para son oyuncuyla cakismiyor", not funds.get_global_rect().intersects(last), "%s / %s" % [funds.get_global_rect(), last])

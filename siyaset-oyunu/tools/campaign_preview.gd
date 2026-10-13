@@ -1,5 +1,5 @@
 extends SceneTree
-## Kampanya dönemi (meclis yok) oyun ekranı önizlemesi: nötr partiler, mana,
+## Kampanya dönemi (meclis yok) oyun ekranı önizlemesi: nötr partiler, para,
 ## hamle butonları, açık yasa tasarlama paneli, gözcü + anket bilgisi ve il
 ## başkanlıkları. Ekran görüntüleri user:// altına kaydedilir.
 ##   godot --resolution 1600x900 --script res://tools/campaign_preview.gd
@@ -51,7 +51,7 @@ func _initialize() -> void:
 	# Biraz geçmiş: rakip il başkanlıkları, bir vaat, benim istihbaratım.
 	cm.organizations = {TestProvinces.id("istanbul"): {2: 2, me: 1}, TestProvinces.id("ankara"): {3: 1}, TestProvinces.id("izmir"): {4: 3}}
 	cm._add_local(TestProvinces.id("istanbul"), me, 3.0)
-	cm.mana[me] = 4
+	cm.funds[me] = 4
 	cm.inventories[me] = ["karalama", "populizm"]
 	cm._apply_poll(me, TestProvinces.id("istanbul"))
 	cm._apply_scout(me, TestProvinces.id("istanbul"))

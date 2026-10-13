@@ -1,5 +1,5 @@
 extends SceneTree
-## Seçim modeli, tur/seçim döngüsü, mana ve hamleler, süre sınırları, koalisyon
+## Seçim modeli, tur/seçim döngüsü, para ve hamleler, süre sınırları, koalisyon
 ## rızası, ayrılan oyuncular, illerin seçmen profilleri ve oyun sonu kurallarının uçtan uca
 ## testi (yerel mod, RPC yok).
 ## `godot --headless --script res://tools/smoke_test_rules.gd`
@@ -151,21 +151,21 @@ func _initialize() -> void:
 	print("=== 4) KAMPANYA DONEMI + ILK SECIM ===")
 	new_game({1: groups(["isveren", "milliyetci"]), 2: groups(["isci", "milliyetci"]), 3: groups(["isveren", "dindar"])})
 	check("tur 1, meclis yok", cm.round_number == 1 and cm.last_seats.is_empty())
-	var mana_before_election: Dictionary = {}
+	var funds_before_election: Dictionary = {}
 	for i in 9:
 		pass_round()
 	check("9 tur sonunda henuz secim yok", cm.last_seats.is_empty() and cm.round_number == 10)
-	mana_before_election = cm.mana.duplicate()
+	funds_before_election = cm.funds.duplicate()
 	pass_round()
 	check("10. tur sonunda ilk secim yapildi", cm.last_election_round == 10 and int(sum_values(cm.last_seats)) == cm.TOTAL_SEATS, str(cm.last_seats))
 	check("tur 11'e gecildi", cm.round_number == 11)
 	var election_bonus_ok := true
 	for id in cm.turn_order:
 		# Turdaki herkes sira gelirini (+3) aldi, ustune secim bonusu (+1).
-		var expected_mana: int = int(mana_before_election[id]) + GameRules.MANA_PER_ROUND + GameRules.ELECTION_MANA_BONUS
-		if cm.mana_of(id) != expected_mana:
+		var expected_funds: int = int(funds_before_election[id]) + GameRules.FUNDS_PER_ROUND + GameRules.ELECTION_FUNDS_BONUS
+		if cm.funds_of(id) != expected_funds:
 			election_bonus_ok = false
-	check("secim sonrasi herkese +1 mana", election_bonus_ok, "%s -> %s" % [mana_before_election, cm.mana])
+	check("secim sonrasi herkese +1 milyon", election_bonus_ok, "%s -> %s" % [funds_before_election, cm.funds])
 	check("secimde kazanilan vekiller momentum icin kaydedildi", cm.election_seats == cm.last_seats)
 	check("hukumet kurma asamasi", gm.phase == gm.Phase.FORMING)
 	var idx_before: int = cm.current_turn_index
@@ -189,12 +189,12 @@ func _initialize() -> void:
 	gm._apply_government_proposal(1, coalition)
 	gm._apply_vote(2, true)
 	check("ortak kabul -> meclis oylamasi, herkes oy verene kadar bekler", gm.phase == gm.Phase.VOTING and not gm.is_coalition_stage())
-	var gov_mana_before: Dictionary = cm.mana.duplicate()
+	var gov_funds_before: Dictionary = cm.funds.duplicate()
 	gm._apply_vote(3, false)
 	check("herkes oy verdi -> kabul", gm.has_government() and gm.phase == gm.Phase.GOVERNING)
-	check("yeni hukumetin partilerine +1 mana, digerlerine yok", cm.mana_of(1) == int(gov_mana_before[1]) + GameRules.GOVERNMENT_MANA_BONUS \
-		and cm.mana_of(2) == int(gov_mana_before[2]) + GameRules.GOVERNMENT_MANA_BONUS and cm.mana_of(3) == int(gov_mana_before[3]),
-		"%s -> %s" % [gov_mana_before, cm.mana])
+	check("yeni hukumetin partilerine +1 milyon, digerlerine yok", cm.funds_of(1) == int(gov_funds_before[1]) + GameRules.GOVERNMENT_FUNDS_BONUS \
+		and cm.funds_of(2) == int(gov_funds_before[2]) + GameRules.GOVERNMENT_FUNDS_BONUS and cm.funds_of(3) == int(gov_funds_before[3]),
+		"%s -> %s" % [gov_funds_before, cm.funds])
 
 	print("")
 	print("=== 6) SECIMSIZ TURLAR: HUKUMET GOREVDE, PUAN BIRIKIR ===")
@@ -223,7 +223,7 @@ func _initialize() -> void:
 	var round_before: int = cm.round_number
 	# Hükümet azınlıkta olmalı ve gensoruyu muhalefet verir.
 	cm.last_seats = {1: 150, 2: 140, 3: 100}
-	cm.mana[last_peer] = 10
+	cm.funds[last_peer] = 10
 	cm._apply_censure_move(last_peer)
 	check("gensoru oylamasi acildi", gm.phase == gm.Phase.VOTING)
 	check("gensoruyu verenin oyu baştan EVET", int(gm.votes.get(last_peer, 99)) == gm.VOTE_YES and gm.has_voted(last_peer))
@@ -250,43 +250,43 @@ func _initialize() -> void:
 	check("oylama suresi doldu -> oy vermeyen cekimser, teklif gecti", gm.has_government(), gm.last_resolution_reason)
 
 	print("")
-	print("=== 9) MANA VE HAMLELER ===")
+	print("=== 9) PARTI KASASI VE HAMLELER ===")
 	new_game({1: groups(), 2: groups(), 3: groups()})
-	cm.mana = {1: GameRules.MANA_START, 2: GameRules.MANA_START, 3: GameRules.MANA_START}
+	cm.funds = {1: GameRules.FUNDS_START, 2: GameRules.FUNDS_START, 3: GameRules.FUNDS_START}
 	cm._grant_turn_income()
-	check("sirasi gelen +MANA_PER_ROUND alir, digerleri almaz", cm.mana_of(1) == GameRules.MANA_START + GameRules.MANA_PER_ROUND 		and cm.mana_of(2) == GameRules.MANA_START, str(cm.mana))
-	cm.mana[1] = 1
+	check("sirasi gelen +FUNDS_PER_ROUND alir, digerleri almaz", cm.funds_of(1) == GameRules.FUNDS_START + GameRules.FUNDS_PER_ROUND 		and cm.funds_of(2) == GameRules.FUNDS_START, str(cm.funds))
+	cm.funds[1] = 1
 	cm._apply_pass(1)
-	check("turu bitirmek mana vermez: harcanan mana geri dolmaz", cm.mana_of(1) == 1, str(cm.mana))
-	check("sirasi gelen 2 gelirini aldi", cm.mana_of(2) == GameRules.MANA_START + GameRules.MANA_PER_ROUND)
+	check("turu bitirmek para vermez: harcanan para geri dolmaz", cm.funds_of(1) == 1, str(cm.funds))
+	check("sirasi gelen 2 gelirini aldi", cm.funds_of(2) == GameRules.FUNDS_START + GameRules.FUNDS_PER_ROUND)
 	var hand3_before: int = cm.inventories[3].size()
 	cm.tick(GameRules.TURN_TIMEOUT + 1.0)
 	check("sure dolunca sira devreder", cm.current_turn_peer_id() == 3)
 	# KART ÇEKME HAMLESİ YOK: sıra gelince otomatik TAM 1 kart dağıtılır.
 	check("sira gelince otomatik 1 kart dagitildi", cm.inventories[3].size() == hand3_before + 1,
 		"%d -> %d" % [hand3_before, cm.inventories[3].size()])
-	cm.mana[3] = 0
-	check("mana yoksa teskilat yok", not cm.can_build_organization(3, TestProvinces.id("ankara")))
+	cm.funds[3] = 0
+	check("para yoksa teskilat yok", not cm.can_build_organization(3, TestProvinces.id("ankara")))
 	cm._apply_pass(3)
-	check("tur bitti: 1 birikmis manasina gelir ekledi (1 + gelir)", cm.round_number == 2 and cm.mana_of(1) == 1 + GameRules.MANA_PER_ROUND 		and cm.mana_of(3) == 0, str(cm.mana))
+	check("tur bitti: 1 birikmis kasasina gelir ekledi (1 + gelir)", cm.round_number == 2 and cm.funds_of(1) == 1 + GameRules.FUNDS_PER_ROUND 		and cm.funds_of(3) == 0, str(cm.funds))
 	var gov_before: Dictionary = gm.government.duplicate()
 	gm.government = {"pm": 1, "ministry_health": 2}
-	check("hukumetteki parti tur basina MANA_PER_ROUND_GOVERNMENT alir", cm.turn_income(1) == GameRules.MANA_PER_ROUND_GOVERNMENT 		and cm.turn_income(2) == GameRules.MANA_PER_ROUND_GOVERNMENT)
-	check("muhalefet normal gelir alir", cm.turn_income(3) == GameRules.MANA_PER_ROUND)
-	check("hukumet geliri 10 fazla", GameRules.MANA_PER_ROUND_GOVERNMENT == GameRules.MANA_PER_ROUND + 10)
+	check("hukumetteki parti tur basina FUNDS_PER_ROUND_GOVERNMENT alir", cm.turn_income(1) == GameRules.FUNDS_PER_ROUND_GOVERNMENT 		and cm.turn_income(2) == GameRules.FUNDS_PER_ROUND_GOVERNMENT)
+	check("muhalefet normal gelir alir", cm.turn_income(3) == GameRules.FUNDS_PER_ROUND)
+	check("hukumet geliri 10 fazla", GameRules.FUNDS_PER_ROUND_GOVERNMENT == GameRules.FUNDS_PER_ROUND + 10)
 	gm.government = gov_before
 
 	check("gozcu destede yok", not cm._draw_pool(1).has("gozcu"))
-	check("miting hamle, destede yok, 15 mana", not cm._draw_pool(1).has("miting") and GameRules.MITING_MANA_COST == 15)
+	check("miting hamle, destede yok, 15 milyon", not cm._draw_pool(1).has("miting") and GameRules.MITING_FUNDS_COST == 15)
 	check("kart bedelleri: karalama 10, calma 10/30, kaset 20, isyan 10", cp.card_cost("karalama") == 10 		and cp.card_cost("steal_weak") == 10 and cp.card_cost("steal_strong") == 30 and cp.card_cost("kaset") == 20 and cp.card_cost("isyan") == 10)
 
 	var law_type: String = cp.law_type("isveren")
 	check("yasa hamlesi turu okunur", cp.is_law_card(law_type) and cp.law_data(law_type)["group"] == "isveren" \
 		and cp.law_data(law_type)["opposite"] == "isci" and not cp.is_law_card("miting") and not cp.is_law_card("law:yok"))
-	cm.mana[1] = 10
+	cm.funds[1] = 10
 	check("ilk secimden once yasa yapilamaz (meclis yok)", not cm.can_propose_law(1))
 	cm._apply_law(1, law_type)
-	check("secim oncesi yasa reddedildi: mana ve grup destegi degismedi", cm.mana_of(1) == 10 and near(float(pm.parties[1]["groups"]["isveren"]), 50.0))
+	check("secim oncesi yasa reddedildi: para ve grup destegi degismedi", cm.funds_of(1) == 10 and near(float(pm.parties[1]["groups"]["isveren"]), 50.0))
 	cm.last_seats = {1: 150, 2: 140, 3: 100}
 	cm.agenda = {}
 	check("gundem yokken yasa sunulamaz", not cm.can_propose_law(1))
@@ -295,12 +295,12 @@ func _initialize() -> void:
 	cm.agenda = {"type": "gundem_isci", "until": cm.round_number + 1}
 	check("gundem ciftinin iki grubu icin de yasa sunulabilir", cm.can_propose_law(1, law_type) and cm.can_propose_law(1, cp.law_type("isci")))
 	cm._apply_law(1, law_type)
-	check("yasa bedava, meclis oylamasi acildi, sira devretmedi", cm.mana_of(1) == 10 - GameRules.LAW_MANA_COST and gm.phase == gm.Phase.VOTING 		and cm.current_turn_peer_id() == 1)
+	check("yasa bedava, meclis oylamasi acildi, sira devretmedi", cm.funds_of(1) == 10 - GameRules.LAW_FUNDS_COST and gm.phase == gm.Phase.VOTING 		and cm.current_turn_peer_id() == 1)
 	for id in [1, 2, 3]:
 		gm._apply_vote(id, gm.VOTE_ABSTAIN)
 	check("turda ikinci yasa yok", not cm.can_propose_law(1))
 	cm.last_seats = {}
-	var mana1: int = cm.mana_of(1)
+	var funds1: int = cm.funds_of(1)
 
 	check("teskilat yokken anket yok", cm.province_poll(1, TestProvinces.id("ankara")).is_empty())
 	var projection: Dictionary = cm.province_projection(TestProvinces.id("ankara"))
@@ -308,21 +308,21 @@ func _initialize() -> void:
 	for id in projection.keys():
 		projected += int(projection[id]["seats"])
 	check("anlik vekil tahmini ilin vekil sayisina esit", projected == cm.province_seat_count(TestProvinces.id("ankara")), str(projection))
-	cm.mana[1] = GameRules.ORG_MANA_COST
+	cm.funds[1] = GameRules.ORG_FUNDS_COST
 	cm.inventories[1] = []
 	check("teskilat kurulabilir", cm.can_build_organization(1, TestProvinces.id("ankara")))
 	cm._apply_organization(1, TestProvinces.id("ankara"))
-	check("teskilat kuruldu, mana harcandi; mana bitti -> sira devretmez", cm.organization_level(TestProvinces.id("ankara"), 1) == 1 		and cm.mana_of(1) == 0 and cm.current_turn_peer_id() == 1)
+	check("teskilat kuruldu, para harcandi; para bitti -> sira devretmez", cm.organization_level(TestProvinces.id("ankara"), 1) == 1 		and cm.funds_of(1) == 0 and cm.current_turn_peer_id() == 1)
 	cm.current_turn_index = cm.turn_order.find(1)
 	check("teskilat 1: az oy bonusu + yaklasik anket (sadece kurana)", near(cm.activity_of(TestProvinces.id("ankara"), 1) - cm.local_of(TestProvinces.id("ankara"), 1), PublicOpinion.org_activity(1)) \
 		and cm.poll_error(1, TestProvinces.id("ankara")) == GameRules.POLL_ERROR_LOW \
 		and not cm.province_poll(1, TestProvinces.id("ankara")).is_empty() and cm.province_poll(2, TestProvinces.id("ankara")).is_empty())
-	check("mana yetmezse kurulamaz", not cm.can_build_organization(1, TestProvinces.id("izmir")))
-	cm.mana[1] = 20
+	check("para yetmezse kurulamaz", not cm.can_build_organization(1, TestProvinces.id("izmir")))
+	cm.funds[1] = 20
 	for i in 5:
 		cm._apply_organization(1, TestProvinces.id("izmir"))
-	check("en fazla ORG_MAX_LEVEL", cm.organization_level(TestProvinces.id("izmir"), 1) == GameRules.ORG_MAX_LEVEL and cm.mana_of(1) == 20 - GameRules.ORG_MANA_COST - GameRules.ORG_UPGRADE_MANA_COST,
-		"seviye %d, mana %d" % [cm.organization_level(TestProvinces.id("izmir"), 1), cm.mana_of(1)])
+	check("en fazla ORG_MAX_LEVEL", cm.organization_level(TestProvinces.id("izmir"), 1) == GameRules.ORG_MAX_LEVEL and cm.funds_of(1) == 20 - GameRules.ORG_FUNDS_COST - GameRules.ORG_UPGRADE_FUNDS_COST,
+		"seviye %d, para %d" % [cm.organization_level(TestProvinces.id("izmir"), 1), cm.funds_of(1)])
 	check("seviye arttikca oy bonusu artar", PublicOpinion.org_activity(1) < PublicOpinion.org_activity(2))
 	var poll3: Dictionary = cm.province_poll(1, TestProvinces.id("izmir"))
 	var poll_seats := 0
@@ -335,24 +335,24 @@ func _initialize() -> void:
 	check("teskilat 1: yaklasik anket (2. seviyeden az isabetli)", cm.poll_error(1, TestProvinces.id("izmir")) == GameRules.POLL_ERROR_LOW \
 		and GameRules.POLL_ERROR_LOW > GameRules.POLL_ERROR_HIGH and cm.poll_error(2, TestProvinces.id("izmir")) < 0.0)
 	cm.organizations[TestProvinces.id("izmir")][1] = GameRules.ORG_MAX_LEVEL
-	cm.mana[1] = 1
-	check("mana yetmezse miting yapilamaz", not cm.can_miting(1, TestProvinces.id("izmir")))
-	cm.mana[1] = GameRules.MITING_MANA_COST + 10
+	cm.funds[1] = 1
+	check("para yetmezse miting yapilamaz", not cm.can_miting(1, TestProvinces.id("izmir")))
+	cm.funds[1] = GameRules.MITING_FUNDS_COST + 10
 	var izmir_before: float = cm.local_of(TestProvinces.id("izmir"), 1) + cm.national_of(1)
 	cm._apply_miting_move(1, TestProvinces.id("izmir"))
-	check("miting hamlesi 15 mana, etki yazildi, mana kaldi -> sira devretmedi", cm.mana_of(1) == 10 and cm.current_turn_peer_id() == 1 \
+	check("miting hamlesi 15 milyon, etki yazildi, para kaldi -> sira devretmedi", cm.funds_of(1) == 10 and cm.current_turn_peer_id() == 1 \
 		and not near(cm.local_of(TestProvinces.id("izmir"), 1) + cm.national_of(1), izmir_before))
-	cm.inventories[1] = ["mana_bonusu"]
-	cm.mana[1] = GameRules.MITING_MANA_COST
+	cm.inventories[1] = ["bagis_kampanyasi"]
+	cm.funds[1] = GameRules.MITING_FUNDS_COST
 	cm.organizations[TestProvinces.id("konya")] = {1: 1}
 	cm._apply_miting_move(1, TestProvinces.id("konya"))
-	check("mana bitti -> sira devretmez", cm.mana_of(1) == 0 and cm.current_turn_peer_id() == 1)
+	check("para bitti -> sira devretmez", cm.funds_of(1) == 0 and cm.current_turn_peer_id() == 1)
 	cm.inventories[1] = []
-	cm.mana[1] = 2
+	cm.funds[1] = 2
 	var next_peer: int = cm.turn_order[(cm.turn_order.find(1) + 1) % cm.turn_order.size()]
 	cm.organizations[TestProvinces.id("sivas")] = {1: 1}
 	cm._apply_miting_move(1, TestProvinces.id("sivas"))
-	check("mana bitse de sira kendiliginden devretmez", cm.current_turn_peer_id() == 1)
+	check("para bitse de sira kendiliginden devretmez", cm.current_turn_peer_id() == 1)
 	cm._apply_pass(1)
 	check("turu bitir -> sira devreder", cm.current_turn_peer_id() == next_peer)
 	cm.current_turn_index = cm.turn_order.find(1)
@@ -404,7 +404,7 @@ func _initialize() -> void:
 	cm.current_turn_index = 1  # sira 2'de
 	cm.remove_player(2)
 	check("siradaki oyuncu ayrildi -> sira sonrakine gecti", cm.current_turn_peer_id() == 3, str(cm.current_turn_peer_id()))
-	check("sirada 2 oyuncu kaldi, manasi silindi", cm.turn_order == [1, 3] and not cm.mana.has(2), str(cm.turn_order))
+	check("sirada 2 oyuncu kaldi, kasasi silindi", cm.turn_order == [1, 3] and not cm.funds.has(2), str(cm.turn_order))
 	new_game({1: groups(["isveren", "milliyetci"]), 2: groups(["isci", "milliyetci"]), 3: groups(["isveren", "dindar"])})
 	pass_round()
 	cm.last_seats = {1: 150, 2: 140, 3: 100}
@@ -572,7 +572,7 @@ func _initialize() -> void:
 	check("ayni tohum ayni profiller", str(VoterGroups.generate_profiles(r1, ids)) == str(VoterGroups.generate_profiles(r2, ids)))
 	var before_profiles := str(cm.province_profiles)
 	cm.organizations[TestProvinces.id("ankara")] = {1: 2}
-	cm.mana[1] = 200
+	cm.funds[1] = 200
 	cm.current_turn_index = cm.turn_order.find(1)
 	cm._apply_miting_move(1, TestProvinces.id("ankara"))
 	cm._decay_opinion()
@@ -648,7 +648,7 @@ func _initialize() -> void:
 	var kaset_target: int = cm.turn_order[1]
 	var kaset_player: int = cm.turn_order[0]
 	cm.current_turn_index = 0
-	cm.mana[kaset_player] = 9
+	cm.funds[kaset_player] = 9
 	cm.last_seats[kaset_target] = maxi(20, int(cm.last_seats.get(kaset_target, 0)))
 	cm.last_seats[kaset_player] = maxi(20, int(cm.last_seats.get(kaset_player, 0)))
 	cm.turmoil = {}

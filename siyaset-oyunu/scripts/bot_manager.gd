@@ -84,7 +84,7 @@ func _handle_turn(now: float) -> void:
 ## istiyorsa ya da hamle reddedildiyse boş sözlük.
 static func do_action(bot: int) -> Dictionary:
 	var action := BotBrain.choose_action(bot)
-	var mana_before := CardManager.mana_of(bot)
+	var funds_before := CardManager.funds_of(bot)
 	var hand_before: int = CardManager.inventories.get(bot, []).size()
 	var laws_before := CardManager.has_proposed_law_this_round(bot)
 	var blocked_before := CardManager.is_turn_blocked()
@@ -125,7 +125,7 @@ static func do_action(bot: int) -> Dictionary:
 		_:
 			return {}
 	# Hamle gerçekten uygulandı mı? (Reddedilen hamlede döngüye girmesin.)
-	var applied: bool = CardManager.mana_of(bot) != mana_before or CardManager.current_turn_peer_id() != bot \
+	var applied: bool = CardManager.funds_of(bot) != funds_before or CardManager.current_turn_peer_id() != bot \
 		or CardManager.inventories.get(bot, []).size() != hand_before \
 		or CardManager.has_proposed_law_this_round(bot) != laws_before \
 		or CardManager.is_turn_blocked() != blocked_before or CardManager.speech_done != speech_before

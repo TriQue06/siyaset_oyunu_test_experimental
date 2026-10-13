@@ -53,16 +53,16 @@ static func affinity_row(group: String, value: float, bonus: float = 0.0, delta:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 1)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Değer: destek oranı; değişim sadece yön oku (büyüklüğü ipucunda).
 	var text := VoterGroups.percent_text(value)
-	if bonus > 0.0:
-		text += " +%d" % int(round(bonus))
 	if absf(delta) >= 0.5:
-		text += " %s%d" % ["▲" if delta > 0.0 else "▼", int(round(absf(delta)))]
+		text += " " + ("▲" if delta > 0.0 else "▼")
 	box.add_child(name_row(group, text, UiTheme.TEXT))
 	box.add_child(bar(value / 100.0, VoterGroups.color(group), BAR_HEIGHT, bonus / 100.0, VoterGroups.color(group).lightened(0.55)))
-	box.tooltip_text = "%s: partinin bu gruptaki ulusal desteği %s%s.\nBu, grubun ülkedeki nüfus payı DEĞİLDİR." % [
+	box.tooltip_text = "%s: partinin bu gruptaki desteği %s%s%s.\nBu, grubun ülkedeki nüfus payı değildir." % [
 		VoterGroups.title(group), VoterGroups.percent_text(value),
-		(" (+%d geçici toplantı desteği)" % int(round(bonus))) if bonus > 0.0 else ""]
+		" (toplantıdan geçici destek dahil)" if bonus > 0.0 else "",
+		("; son dönemde " + EffectWords.change(delta, "group")) if absf(delta) >= 0.5 else ""]
 	return box
 
 ## İl profilinde bir ÇİFT: üstte ilk grup ve yüzdesi, ortada iki renkli
@@ -92,8 +92,8 @@ static func pair_rows(pair: String, profile: Dictionary) -> Control:
 		VoterGroups.title(a), pa, VoterGroups.title(b), 100 - pa]
 	return box
 
-## Etki satırı (önizlemeler için): [simge] Grup adı  +3,5 / −1,2
+## Etki satırı (önizlemeler için): [simge] Grup adı   hafif artış / orta kayıp
 static func effect_row(group: String, amount: float, font_size: int = FS_NAME) -> Control:
 	var color := UiTheme.GREEN if amount > 0.0 else UiTheme.RED
-	var text := ("+" if amount > 0.0 else "−") + String.num(snappedf(absf(amount), 0.1), 1).replace(".", ",")
+	var text := "%s %s" % [EffectWords.adjective(amount, "group"), "artış" if amount > 0.0 else "kayıp"]
 	return name_row(group, text, color, font_size, 14.0)

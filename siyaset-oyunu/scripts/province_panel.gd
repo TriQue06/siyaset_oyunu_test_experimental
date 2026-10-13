@@ -137,7 +137,7 @@ func _build_intel(me: int) -> void:
 	_body.add_child(PopupKit.section("Senin teşkilatın", "sadece sen görürsün"))
 	_body.add_child(_level_row(level))
 	if level == 0:
-		_body.add_child(PopupKit.note("Burada teşkilatın yok. Kurmak %d mana: yaklaşık anketi açar, oy bonusu verir. Miting ve karalama da teşkilat ister." % GameRules.ORG_MANA_COST))
+		_body.add_child(PopupKit.note("Burada teşkilatın yok. Kurmak %s: anketi açar, oy kazandırır. Miting ve karalama teşkilat ister." % GameRules.cost_text(GameRules.ORG_FUNDS_COST)))
 		return
 	_build_poll(me, level)
 
@@ -163,22 +163,11 @@ func _build_appeal(me: int) -> void:
 	var closeness_color := UiTheme.GREEN if closeness >= PublicOpinion.CLOSENESS_NEAR else (UiTheme.GOLD if closeness >= 0.3 else UiTheme.RED)
 	_body.add_child(PopupKit.section("Partin bu ilde", "seçmen grupları"))
 	_body.add_child(PopupKit.kv("Seçmen sana", closeness_text, closeness_color))
-	_body.add_child(PopupKit.kv("Grup uyumu", "%d/100" % int(round(appeal)), closeness_color))
 	var groups := CardManager.effective_groups(me)
-	var leaders: Array = []
-	for pair in VoterGroups.PAIR_IDS:
-		var pair_groups: Array = VoterGroups.PAIRS[pair]
-		var lead: String = pair_groups[0] if VoterGroups.percent(profile, pair_groups[0]) >= 50 else pair_groups[1]
-		leaders.append(lead)
-	leaders.sort_custom(func(a, b): return VoterGroups.percent(profile, a) > VoterGroups.percent(profile, b))
-	_body.add_child(PopupKit.note("İlin kalabalık grupları: ildeki pay / partinin ulusal desteği", DIM))
-	for group in leaders:
-		_body.add_child(VoterGroupUI.name_row(group, "%%%d / %s" % [VoterGroups.percent(profile, group),
-			VoterGroups.percent_text(float(groups.get(group, 50.0)))], UiTheme.TEXT))
 	var effects := PublicOpinion.miting_positioning(profile, PublicOpinion.org_action_mult(CardManager.organization_level(province_id, me)))
 	if effects.is_empty():
 		return
-	_body.add_child(PopupKit.note("Burada miting yaparsan hitabın şu gruplara kayar (ulusal, kalıcı, azalan getirili):", DIM))
+	_body.add_child(PopupKit.note("Burada miting yaparsan:", DIM))
 	var fatigue: Dictionary = CardManager.miting_fatigue.get(CardManager.party_of(me), {})
 	for effect in effects:
 		var damp := PublicOpinion.miting_fatigue_mult(float(fatigue.get(String(effect["group"]), 0.0)))
@@ -233,7 +222,7 @@ func _build_poll(me: int, level: int) -> void:
 		_body.add_child(PopupKit.party_row(PartyManager.data_of(peer_id), int(peer_id) == CardManager.party_of(me),
 			["%%%.0f" % float(entry["percent"]), str(int(entry["seats"]))], [44, 30]))
 	if level < 2:
-		_body.add_child(PopupKit.note("2. seviye teşkilat (%d mana) %%90 doğru anket verir." % GameRules.ORG_UPGRADE_MANA_COST, UiTheme.TEXT_DIM))
+		_body.add_child(PopupKit.note("2. seviye teşkilat (%s) çok daha isabetli anket verir." % GameRules.cost_text(GameRules.ORG_UPGRADE_FUNDS_COST), UiTheme.TEXT_DIM))
 
 func _columns_header() -> Control:
 	var row := HBoxContainer.new()
@@ -252,20 +241,20 @@ func _build_own(me: int) -> void:
 	var level := CardManager.organization_level(province_id, me)
 	_body.add_child(PopupKit.section("Sen bu ilde"))
 	var power := CardManager.activity_of(province_id, me)
-	_body.add_child(PopupKit.kv("Yerel güç", "%+.1f" % power, _opinion_color(power)))
+	_body.add_child(PopupKit.kv("Yerel güç", EffectWords.amount(power, "local"), _opinion_color(power)))
 	if level > 0:
-		_body.add_child(PopupKit.kv("Teşkilat oy bonusu", "%+.1f" % CardManager.org_bonus(province_id, me), UiTheme.GREEN))
+		_body.add_child(PopupKit.kv("Teşkilat desteği", EffectWords.amount(CardManager.org_bonus(province_id, me), "local"), UiTheme.GREEN))
 		var risk := CardManager.miting_risk(me, province_id)
-		var color := UiTheme.GREEN if risk < 0.15 else (UiTheme.GOLD if risk < 0.3 else UiTheme.RED)
-		_body.add_child(PopupKit.kv("Miting provokasyon riski", "%%%d" % int(round(risk * 100.0)), color))
+		var color := UiTheme.GREEN if risk < 0.12 else (UiTheme.GOLD if risk < 0.25 else UiTheme.RED)
+		_body.add_child(PopupKit.kv("Miting provokasyonu", EffectWords.risk(risk), color))
 		var mult := PublicOpinion.org_action_mult(level)
 		if not is_equal_approx(mult, 1.0):
-			_body.add_child(PopupKit.kv("Miting/karalama etkisi", "×%.1f" % mult, UiTheme.GREEN))
+			_body.add_child(PopupKit.kv("Miting / karalama", EffectWords.multiplier(mult), UiTheme.GREEN))
 	else:
 		_body.add_child(PopupKit.kv("Miting / karalama", "teşkilat gerekli", UiTheme.RED))
 	if level < GameRules.ORG_MAX_LEVEL:
 		_body.add_child(PopupKit.kv("Teşkilat %s" % ("kurmak" if level == 0 else "geliştirmek"),
-			"%d mana" % GameRules.org_cost(level), UiTheme.BLUE.lightened(0.3)))
+			GameRules.cost_text(GameRules.org_cost(level)), UiTheme.BLUE.lightened(0.3)))
 
 ## Son seçim sonucu herkese açık bilgi.
 func _build_last_election(me: int) -> void:

@@ -51,7 +51,7 @@ func _initialize() -> void:
 	gm.main_gov_peer_id = me
 	gm._set_phase(gm.Phase.GOVERNING)
 	cm.current_turn_index = cm.turn_order.find(me)
-	cm.mana[me] = 120.0
+	cm.funds[me] = 120.0
 	cm.agenda = {}
 	cm.crisis = {}
 	# Yüksek vergiyle birkaç dönem, sonra indirim: geçiş sürüyor.
@@ -140,9 +140,9 @@ func _initialize() -> void:
 	await _frames(20)
 	_shot("econ_funding_split")
 	check("sürükleme paylaşımı değiştirdi (%30 devlet)", absf(slider.share - 0.3) < 0.001, str(slider.share))
-	check("iki katkı anında güncellendi", fp._state_pay.text == "30 milyon ₺" and fp._party_pay.text == "35 mana",
+	check("iki katkı anında güncellendi (ikisi de milyon ₺)", fp._state_pay.text == "30 milyon ₺" and fp._party_pay.text == "70 milyon ₺",
 		"%s / %s" % [fp._state_pay.text, fp._party_pay.text])
-	check("kalan bakiyeler güncellendi", fp._party_left.text.contains(cm.mana_text(cm.mana_of(me) - 35.0 - GameRules.INVEST_MANA_COST))
+	check("kalan bakiyeler güncellendi", fp._party_left.text.contains(GameRules.money_text(cm.funds_of(me) - 70.0))
 		and fp._state_left.text.contains(Economy.money_text(cm.state_treasury() - 30.0)), fp._party_left.text)
 	var key := InputEventKey.new()
 	key.pressed = true
@@ -152,28 +152,28 @@ func _initialize() -> void:
 	_shot("econ_funding_party")
 	check("klavyeyle tam 100/0 (tamamı parti)", is_zero_approx(slider.share) and not fp._confirm.disabled)
 	var before: float = cm.state_treasury()
-	var mana_pre: float = cm.mana_of(me)
+	var funds_pre: float = cm.funds_of(me)
 	fp._confirm.pressed.emit()
 	await _frames(4)
-	check("onay: kasa tam bir kez −50 mana −10 bedel, hazine değişmedi", absf(cm.mana_of(me) - (mana_pre - 60.0)) < 0.01 and absf(cm.state_treasury() - before) < 0.01,
-		"%.1f -> %.1f" % [mana_pre, cm.mana_of(me)])
+	check("onay: kasa tam bir kez −100 milyon ₺, hazine değişmedi", absf(cm.funds_of(me) - (funds_pre - 100.0)) < 0.01 and absf(cm.state_treasury() - before) < 0.01,
+		"%.1f -> %.1f" % [funds_pre, cm.funds_of(me)])
 	check("onaydan sonra panel kapandı", not fp.visible)
 	# Hazine azken: devlet tarafı taralı, sınır notu.
 	cm.economy["treasury"] = 40.0
-	cm.mana[me] = 120.0
+	cm.funds[me] = 120.0
 	scene._on_invest_button_pressed()
 	await _frames(3)
 	scene._select_target_province(String(cm._province_ids[9]))
 	await _frames(20)
 	_shot("econ_funding_limited")
 	check("hazine 40: nokta en fazla %40'a gider", absf(slider.max_share - 0.4) < 0.001 and slider.share <= 0.4 + 0.001)
-	cm.mana[me] = 5.0
+	cm.funds[me] = 5.0
 	fp.open(me, "invest", String(cm._province_ids[9]))
 	await _frames(6)
 	_shot("econ_funding_blocked")
 	check("ödenemiyorsa onay kapalı ve nedeni yazar", fp._confirm.disabled and fp._note.text != "", fp._note.text)
 	scene._cancel_targeting()
-	cm.mana[me] = 120.0
+	cm.funds[me] = 120.0
 	cm.economy["treasury"] = 600.0
 	# Hükümet mitingi devlet parasıyla: usulsüzlük uyarısı.
 	var mit_province := ""
@@ -225,7 +225,7 @@ func _initialize() -> void:
 			rival = int(pid)
 			break
 	cm.current_turn_index = cm.turn_order.find(me)
-	cm.mana[me] = 120.0
+	cm.funds[me] = 120.0
 	scene._open_inquiry_panel(rival)
 	await _frames(8)
 	_shot("econ_inquiry_panel")

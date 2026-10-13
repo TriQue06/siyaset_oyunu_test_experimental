@@ -2,11 +2,10 @@ class_name FundingPanel
 extends PanelContainer
 ## FİNANSMAN ONAYI: yatırım ya da (hükümet partisinin) mitingi için il
 ## seçilince haritanın altında açılır. Ortada FundingSlider; üstünde iki uç
-## (PARTİ KASASI · mana / DEVLET HAZİNESİ · milyon ₺), altında paylaşım çubuğu
-## (kim ne kadar öder), iki kaynağın ödediği tutar ve işlem sonrası kalan
-## bakiye, toplam bedel, kısıtlar ve bulgu notu, ONAYLA / Vazgeç. Değerler
-## nokta kaydıkça anında güncellenir. Parti payı MANA ile ödenir (1 mana =
-## Economy.MILLION_PER_MANA milyon ₺); iki kaynak her yerde kendi birimiyle yazılır.
+## (PARTİ KASASI / DEVLET HAZİNESİ), altında paylaşım çubuğu, iki kaynağın
+## ödediği tutar ve işlem sonrası kalan bakiye, toplam, gerekiyorsa TEK kısa
+## not (kısıt ya da partizan harcama uyarısı), ONAYLA / Vazgeç. Değerler
+## nokta kaydıkça anında güncellenir. İki kaynak da milyon ₺.
 
 signal confirmed(share: float)
 signal cancelled
@@ -53,10 +52,10 @@ func _init() -> void:
 	# Uçlar: sol parti kasası, sağ devlet hazinesi (kendi renkleri ve birimleri).
 	var ends := HBoxContainer.new()
 	box.add_child(ends)
-	_party_end = UiTheme.mono_label("PARTİ KASASI · mana", 10, FundingSlider.PARTY_COLOR, true)
+	_party_end = UiTheme.mono_label("PARTİ KASASI", 10, FundingSlider.PARTY_COLOR, true)
 	_party_end.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	ends.add_child(_party_end)
-	_state_end = UiTheme.mono_label("DEVLET HAZİNESİ · milyon ₺", 10, FundingSlider.STATE_COLOR, true)
+	_state_end = UiTheme.mono_label("DEVLET HAZİNESİ", 10, FundingSlider.STATE_COLOR, true)
 	ends.add_child(_state_end)
 	_slider = FundingSlider.new()
 	_slider.share_changed.connect(func(_s: float): _refresh())
@@ -143,52 +142,40 @@ func _refresh() -> void:
 	if _range.is_empty():
 		return
 	var split := _split()
-	var fee := float(_range["fee"])
-	var mana_now := CardManager.mana_of(peer_id)
-	var treasury := CardManager.state_treasury()
-	var party_mana := float(split["mana"])
+	var party_million := float(split["party"])
 	var state_million := float(split["state"])
-	_party_pay.text = "%s mana" % CardManager.mana_text(snappedf(party_mana, 0.5))
-	_party_left.text = "≈ %s milyon ₺ · kasada kalan %s mana" % [Economy.money_text(float(split["party"])),
-		CardManager.mana_text(snappedf(mana_now - party_mana - fee, 0.5))]
+	_party_pay.text = "%s milyon ₺" % Economy.money_text(party_million)
+	_party_left.text = "kasada kalır: %s" % GameRules.money_text(CardManager.funds_of(peer_id) - party_million)
 	_state_pay.text = "%s milyon ₺" % Economy.money_text(state_million)
-	_state_left.text = "hazinede kalan %s milyon ₺" % Economy.money_text(treasury - state_million)
+	_state_left.text = "hazinede kalır: %s" % Economy.money_text(CardManager.state_treasury() - state_million)
 	# Hangi kaynak daha çok ödüyor: o uç parlak, diğeri sönük.
-	var party_more := float(split["party"]) > state_million
-	_party_end.modulate.a = 1.0 if party_more or is_equal_approx(float(split["party"]), state_million) else 0.55
+	var party_more := party_million > state_million
+	_party_end.modulate.a = 1.0 if party_more or is_equal_approx(party_million, state_million) else 0.55
 	_state_end.modulate.a = 1.0 if not party_more else 0.55
-	_total.text = "Toplam %s milyon ₺ · parti %%%d / devlet %%%d%s" % [Economy.money_text(float(_range["total"])),
-		int(round((1.0 - _slider.share) * 100.0)), int(round(_slider.share * 100.0)),
-		(" · ayrıca hamle bedeli %s" % GameRules.cost_text(fee)) if fee > 0.0 else ""]
+	_total.text = "Toplam %s milyon ₺" % Economy.money_text(float(_range["total"]))
 	var reason := CardManager.funding_block_reason(peer_id, kind, _slider.share)
-	var notes := PackedStringArray()
+	var note := ""
 	if float(_range["min"]) > float(_range["max"]) + 0.001:
-		reason = "Bu hamle iki kaynakla da ödenemiyor: parti kasası ve devlet hazinesi birlikte yetmiyor."
-	else:
-		if not bool(_range["state_allowed"]):
-			notes.append("Devlet hazinesini sadece hükümet partileri kullanabilir.")
-		elif float(_range["max"]) < 0.999:
-			notes.append("Devlet payı en fazla %%%d (hazine yetmiyor)." % int(round(float(_range["max"]) * 100.0)))
-		if float(_range["min"]) > 0.001:
-			notes.append("Devlet payı en az %%%d (parti kasası yetmiyor)." % int(round(float(_range["min"]) * 100.0)))
+		reason = "Parti kasası ve devlet hazinesi birlikte yetmiyor."
+	elif not bool(_range["state_allowed"]):
+		note = "Devlet hazinesini sadece hükümet kullanabilir."
+	elif float(_range["max"]) < 0.999:
+		note = "Hazine yetmediği için devlet payı sınırlı."
+	elif float(_range["min"]) > 0.001:
+		note = "Parti kasası yetmediği için devlet payı gerekli."
 	_note.remove_theme_color_override("font_color")
 	if reason != "":
 		_note.text = reason
 		_note.add_theme_color_override("font_color", UiTheme.RED)
 	elif kind == "miting" and state_million > 0.0:
-		notes.append("UYARI: Devlet parasıyla miting PARTİZAN harcamadır; bir finansman soruşturmasında usulsüzlük olarak ortaya çıkar.")
-		_note.text = " ".join(notes)
+		_note.text = "PARTİZAN HARCAMA: devlet parasıyla miting, soruşturmada usulsüzlük olarak çıkar."
 		_note.add_theme_color_override("font_color", UiTheme.RED.lightened(0.2))
 	else:
-		if float(split["party"]) > 0.0:
-			notes.append("Kendi kasandan ödediğin kısım kayda geçer; bir soruşturmada şeffaflık olarak doğrulanabilir.")
-		elif kind == "invest":
-			notes.append("Tamamı devletten: meşru kamu harcaması (soruşturmada usulsüzlük sayılmaz).")
-		_note.text = " ".join(notes)
+		_note.text = note
 		_note.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
+	_note.visible = _note.text != ""
 	if reason == "":
-		_confirm.text = "ONAYLA · %s mana + %s milyon ₺" % [CardManager.mana_text(snappedf(party_mana + fee, 0.5)),
-			Economy.money_text(state_million)]
+		_confirm.text = "ONAYLA · %s milyon ₺" % Economy.money_text(float(_range["total"]))
 		UiSkin.skin_color_button(_confirm, UiTheme.GREEN_DARK)
 		_confirm.disabled = false
 	else:

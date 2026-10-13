@@ -152,7 +152,7 @@ func _refresh() -> void:
 		return
 	_sample = _sim.sample(_t)
 	var counted: float = float(_sample["counted"])
-	_counted.text = "AÇILAN SANDIK  %%%.2f" % counted
+	_counted.text = "AÇILAN SANDIK  %%%.1f" % counted
 	_progress_fill.size = Vector2(_progress_bg.size.x * counted / 100.0, _progress_bg.size.y)
 	var minutes := 21 * 60 + int(_t / DURATION * 300.0)
 	_clock.text = "%02d:%02d" % [(minutes / 60) % 24, minutes % 60]
@@ -321,7 +321,7 @@ func _detect_events() -> void:
 			elif above != bool(_above[peer_id]) and _t - float(_above_changed_at[peer_id]) > 4.0:
 				_above[peer_id] = above
 				_above_changed_at[peer_id] = _t
-				_push_flash("BARAJ", "%s barajın %s  (%%%.2f)" % [_party_name(peer_id),
+				_push_flash("BARAJ", "%s barajın %s  (%%%.1f)" % [_party_name(peer_id),
 					"üzerine çıktı!" if above else "altına düştü!", float(national[peer_id])])
 
 	var provinces: Dictionary = _sample["provinces"]
@@ -643,7 +643,7 @@ class LiveBars extends Control:
 			var fill: float = bar_w * clampf(float(r["percent"]) / scale, 0.0, 1.0)
 			draw_rect(Rect2(bar_x, y + 2, fill, h), Color(color, alpha))
 			draw_rect(Rect2(bar_x, y + 2, fill, maxf(2.0, h * 0.12)), Color(UiTheme.TEXT, 0.25 * alpha))
-			draw_string(font, Vector2(size.x - value_w, y + h * 0.5 + 4), "%%%.2f" % float(r["percent"]),
+			draw_string(font, Vector2(size.x - value_w, y + h * 0.5 + 4), "%%%.1f" % float(r["percent"]),
 				HORIZONTAL_ALIGNMENT_RIGHT, value_w, clampi(int(h * 0.45), 12, 24), Color(UiTheme.TEXT, alpha))
 			var sub := "BARAJ ALTI" if below else "%d vekil" % int(r["seats"])
 			draw_string(font, Vector2(size.x - value_w, y + h * 0.5 + 6 + name_size * 0.8), sub,

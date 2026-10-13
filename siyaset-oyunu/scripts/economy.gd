@@ -20,7 +20,7 @@ extends RefCounted
 ##               kadar yaklaşır; hedef = 50 + vergi etkisi + yatırım ivmesi.
 ##   boost     : yatırım ivmesi (her yatırım +INVEST_ECONOMY, tur sonunda söner)
 ##   treasury  : DEVLET HAZİNESİ (milyon ₺). Tur sonunda vergi geliri girer,
-##               yatırım hazineden ödenir. Parti manasından AYRIDIR.
+##               yatırım hazineden ödenir. Parti kasalarından AYRIDIR.
 ##   enflasyon ve işsizlik ayrı durum değildir: ekonomiden, vergiden ve
 ##   yatırım ivmesinden hesaplanır (tek kaynak, tutarsızlık olmaz).
 ##
@@ -88,7 +88,7 @@ const UNEMPLOYMENT_BASE := 10.0
 const UNEMPLOYMENT_PER_INDEX := 0.15
 
 # --- Yatırım ----------------------------------------------------------------------
-## Yatırım DEVLET HAZİNESİNDEN ödenir (+ partiden GameRules.INVEST_MANA_COST).
+## Yatırım DEVLET HAZİNESİNDEN ödenir (+ partiden GameRules.INVEST_FUNDS_COST).
 const INVEST_COST := 100.0
 ## Yerel etkinin bu payı hemen, kalanı INVEST_DELAY_ROUNDS tur sonunda eşit
 ## dilimlerle gelir (yatırım açılışı: tamamlanmadan başarı sayılmaz).
@@ -227,19 +227,17 @@ static func tax_mood_at(level: int) -> Dictionary:
 	return result
 
 # --- Finansman paylaşımı ----------------------------------------------------------
-## İki AYRI kaynak: PARTİ KASASI (mana) ve DEVLET HAZİNESİ (milyon ₺). Bir
-## hamlenin toplam bedeli milyon ₺ cinsinden yazılır; partinin payı manayla
-## ödenir: 1 mana = MILLION_PER_MANA milyon ₺.
-const MILLION_PER_MANA := 2.0
+## İki AYRI kaynak, aynı birim (milyon ₺): PARTİ KASASI (partinin parası) ve
+## DEVLET HAZİNESİ (kamu parası, sadece hükümet yetkisiyle).
 ## Kaydırıcı %5'lik adımlarla durur (0/100 ve 100/0 dahil).
 const FUND_STEP := 0.05
 
-## state: devletin payı (0..1) → {"state": milyon ₺, "party": milyon ₺, "mana": mana}.
+## state: devletin payı (0..1) → {"share", "state": milyon ₺, "party": milyon ₺}.
 static func split_cost(total: float, state: float) -> Dictionary:
 	var s := snap_share(state)
 	var state_million := total * s
 	var party_million := total - state_million
-	return {"share": s, "state": state_million, "party": party_million, "mana": party_million / MILLION_PER_MANA}
+	return {"share": s, "state": state_million, "party": party_million}
 
 static func snap_share(state: float) -> float:
 	return clampf(snappedf(state, FUND_STEP), 0.0, 1.0)
@@ -247,10 +245,10 @@ static func snap_share(state: float) -> float:
 # --- İşlem kaydı ve Finansman Soruşturması -------------------------------------------
 ## Her yatırım ve miting GERÇEK finansmanıyla kaydedilir (economy["ledger"]):
 ## {"id", "round", "party", "kind", "province", "total", "party_million",
-##  "party_mana", "state_million", "investigated"}. Kayıt sayısı sınırlı.
+##  "state_million", "investigated"}. Kayıt sayısı sınırlı.
 const LEDGER_LIMIT := 80
-## Soruşturma bedeli (soruşturan partinin manası), kapsamı (son kaç tur).
-const INQUIRY_MANA_COST := 15
+## Soruşturma bedeli (soruşturan partinin kasasından), kapsamı (son kaç tur).
+const INQUIRY_FUNDS_COST := 15
 const INQUIRY_SCOPE_ROUNDS := 8
 ## ŞEFFAFLIK ÖDÜLÜ (hedefe, ulusal destek): kendi kasasından ödenmiş toplam
 ## T milyon ₺ için min(MAX, PER_SQRT × √T); T < MIN ise ödül yok (küçük

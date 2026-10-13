@@ -17,7 +17,7 @@ const CARDS := {
 	"gozcu": Color("5A6B7D"),
 	"karalama": Color("A12B3A"),
 	"populizm": Color("C0409A"),
-	"mana_bonusu": Color("2A8FE0"),
+	"bagis_kampanyasi": Color("2A8FE0"),
 	"gundem_isci": Color("B8862B"),
 	"gundem_isveren": Color("D9A93A"),
 	"gundem_dindar": Color("7A4FC4"),

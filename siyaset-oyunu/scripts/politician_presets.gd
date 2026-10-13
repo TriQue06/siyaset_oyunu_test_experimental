@@ -136,10 +136,10 @@ static func is_valid_background(id: String) -> bool:
 	return BACKGROUNDS.has(id)
 
 static func background(id: String) -> Dictionary:
-	return BACKGROUNDS.get(id, {})
+	return L.tr_dict(BACKGROUNDS.get(id, {}))
 
 static func title(id: String) -> String:
-	return String(BACKGROUNDS.get(id, {}).get("title", ""))
+	return L.t(String(BACKGROUNDS.get(id, {}).get("title", "")))
 
 ## Geçmişin bağlı olduğu seçmen grubu ("isci") ya da "".
 static func group_of(id: String) -> String:
@@ -181,7 +181,7 @@ const PART_MAX_LENGTH := 20
 static func normalize_name(text: String) -> String:
 	var cleaned := ""
 	for ch in text:
-		if ch == " " or ch == "'" or ch == "-" or ch.to_upper() != ch.to_lower() or "çğıöşüÇĞİÖŞÜ".contains(ch):
+		if ch == " " or ch == "'" or ch == "-" or ch.to_upper() != ch.to_lower() or L.t("çğıöşüÇĞİÖŞÜ").contains(ch):
 			cleaned += ch
 	while cleaned.contains("  "):
 		cleaned = cleaned.replace("  ", " ")

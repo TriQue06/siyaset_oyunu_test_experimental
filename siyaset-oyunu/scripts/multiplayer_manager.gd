@@ -277,7 +277,7 @@ static func relay_url() -> String:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--relay="):
 			return arg.substr("--relay=".length())
-	var env := OS.get_environment("SIYASET_RELAY_URL")
+	var env := OS.get_environment(L.t("SIYASET_RELAY_URL"))
 	if env != "":
 		return env
 	return str(ProjectSettings.get_setting(RELAY_URL_SETTING, DEFAULT_RELAY_URL))
@@ -313,7 +313,7 @@ func is_standalone_preview() -> bool:
 func start_offline(player_name: String) -> void:
 	_reset_state()
 	offline_mode = true
-	local_player_name = player_name if player_name != "" else "Oyuncu"
+	local_player_name = player_name if player_name != "" else L.t("Oyuncu")
 	# OfflineMultiplayerPeer: ağ yok ama bu instance "sunucu" sayılır, unique_id
 	# 1 olur ve RPC'ler kimseye gitmez. Böylece host tarafındaki tüm yerel
 	# mantık (bot ekleme, oyunu başlatma, CardManager) olduğu gibi çalışır.
@@ -339,7 +339,7 @@ func start_offline(player_name: String) -> void:
 ## connection_error(reason) sinyali yayınlanır.
 func create_room(player_name: String) -> void:
 	offline_mode = false
-	local_player_name = player_name if player_name != "" else "Host"
+	local_player_name = player_name if player_name != "" else L.t("Host")
 	is_host = true
 	room_code = ""
 	_closing = false
@@ -388,7 +388,7 @@ func _on_relay_error(reason: String) -> void:
 ## Röle sunucusu üzerinden, verilen 5 haneli oda koduna katılmayı dener.
 func join_room(code: String, player_name: String) -> void:
 	offline_mode = false
-	local_player_name = player_name if player_name != "" else "Oyuncu"
+	local_player_name = player_name if player_name != "" else L.t("Oyuncu")
 	_pending_code = code.to_upper()
 	room_code = _pending_code
 	_has_synced_once = false
@@ -417,7 +417,7 @@ func leave_room() -> void:
 func leave_game() -> void:
 	if room_code != "" and is_host and multiplayer.multiplayer_peer != null:
 		_closing = true
-		_notify_room_closed.rpc("Oda sahibi oyundan ayrıldı, oda kapatıldı.")
+		_notify_room_closed.rpc(L.t("Oda sahibi oyundan ayrıldı, oda kapatıldı."))
 		# RPC'nin ağa çıkması için birkaç kare bekle.
 		for i in 3:
 			await get_tree().process_frame
@@ -521,7 +521,7 @@ func _renumber_bots() -> void:
 		var entry: Dictionary = players[peer_id]
 		var current := String(entry.get("name", ""))
 		if current == "" or current.begins_with("Bot "):
-			entry["name"] = "Bot %d" % index
+			entry["name"] = L.t("Bot %d") % index
 			players[peer_id] = entry
 
 ## Lobiden oyuncu atma: sadece lobi sahibi, sadece LOBİ aşamasında ve kendisi
@@ -730,8 +730,8 @@ func _on_peer_disconnected(id: int) -> void:
 			if PartyManager.all_ready():
 				finish_party_setup()
 		else:
-			CardManager.log_event("%s oyundan düştü: %s." % [PoliticianPresets.display_name(id),
-				"yerine bot oynuyor" if away_mode == AWAY_BOT else "dönene kadar pasif"], id, "", "party_change")
+			CardManager.log_event(L.t("%s oyundan düştü: %s.") % [PoliticianPresets.display_name(id),
+				L.t("yerine bot oynuyor") if away_mode == AWAY_BOT else L.t("dönene kadar pasif")], id, "", "party_change")
 			CardManager._push_state({"type": "player_away", "peer_id": id})
 		return
 	players.erase(id)
@@ -805,16 +805,16 @@ func _request_join(code: String, player_name: String, signature: String, uid: St
 		return
 	var sender_id := multiplayer.get_remote_sender_id()
 	if signature != network_signature():
-		_join_rejected.rpc_id(sender_id, "Oyun sürümleri farklı (sen %s, oda %s). İki cihazda da aynı güncel sürümü kullanın." % [
+		_join_rejected.rpc_id(sender_id, L.t("Oyun sürümleri farklı (sen %s, oda %s). İki cihazda da aynı güncel sürümü kullanın.") % [
 			signature, game_version()])
 		multiplayer.multiplayer_peer.disconnect_peer(sender_id)
 		return
 	if code != room_code:
-		_join_rejected.rpc_id(sender_id, "Kod hatalı.")
+		_join_rejected.rpc_id(sender_id, L.t("Kod hatalı."))
 		multiplayer.multiplayer_peer.disconnect_peer(sender_id)
 		return
 	if players.size() >= MAX_PLAYERS and (bot_ids().is_empty() or stage != Stage.LOBBY):
-		_join_rejected.rpc_id(sender_id, "Oda dolu.")
+		_join_rejected.rpc_id(sender_id, L.t("Oda dolu."))
 		multiplayer.multiplayer_peer.disconnect_peer(sender_id)
 		return
 	if stage != Stage.LOBBY:
@@ -823,7 +823,7 @@ func _request_join(code: String, player_name: String, signature: String, uid: St
 		if old_id != -1:
 			_rejoin(old_id, sender_id, player_name)
 			return
-		_join_rejected.rpc_id(sender_id, "Bu odada oyun zaten başladı.")
+		_join_rejected.rpc_id(sender_id, L.t("Bu odada oyun zaten başladı."))
 		multiplayer.multiplayer_peer.disconnect_peer(sender_id)
 		return
 	# Oda botlarla doluysa en son eklenen bot insan oyuncuya yer açar.
@@ -850,7 +850,7 @@ func _away_player_with_uid(uid: String) -> int:
 func _rejoin(old_id: int, new_id: int, player_name: String) -> void:
 	var entry: Dictionary = players[old_id].duplicate()
 	entry.erase("away")
-	entry["name"] = player_name if player_name != "" else String(entry.get("name", "Oyuncu"))
+	entry["name"] = player_name if player_name != "" else String(entry.get("name", L.t("Oyuncu")))
 	players.erase(old_id)
 	players[new_id] = entry
 	if owner_id == old_id:
@@ -868,7 +868,7 @@ func _rejoin(old_id: int, new_id: int, player_name: String) -> void:
 	if stage == Stage.IN_GAME:
 		CardManager.send_full_state(new_id)
 		GovernmentManager._push_state()
-		CardManager.log_event("%s oyuna geri döndü." % PoliticianPresets.display_name(new_id), new_id, "", "party_change")
+		CardManager.log_event(L.t("%s oyuna geri döndü.") % PoliticianPresets.display_name(new_id), new_id, "", "party_change")
 		CardManager._push_state({"type": "player_back", "peer_id": new_id})
 	player_list_updated.emit()
 

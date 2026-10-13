@@ -42,7 +42,7 @@ func post_ids() -> Array:
 func post_title(post_id: String) -> String:
 	for post in POSTS:
 		if post["id"] == post_id:
-			return post["title"]
+			return L.t(post["title"])
 	return post_id
 
 func post_points(post_id: String) -> int:

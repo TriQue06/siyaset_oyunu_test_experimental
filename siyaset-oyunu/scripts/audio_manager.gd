@@ -247,12 +247,12 @@ func apply_volumes() -> void:
 	if _music_name == "credits":
 		# Jenerik çalıyor: Master sabit açık, oyuncunun ana sesi diğer bus'lara katılır.
 		var master := GameSettings.master_volume
-		_set_bus_volume("Master", float(VOLUME_CEILING["master"]))
+		_set_bus_volume(L.t("Master"), float(VOLUME_CEILING["master"]))
 		_set_bus_volume(BUS_MUSIC, master * GameSettings.music_volume * float(VOLUME_CEILING["music"]))
 		_set_bus_volume(BUS_SFX, master * GameSettings.sfx_volume * float(VOLUME_CEILING["sfx"]))
 		_set_bus_volume(BUS_CREDITS, CREDITS_VOLUME)
 		return
-	_set_bus_volume("Master", GameSettings.master_volume * float(VOLUME_CEILING["master"]))
+	_set_bus_volume(L.t("Master"), GameSettings.master_volume * float(VOLUME_CEILING["master"]))
 	_set_bus_volume(BUS_MUSIC, GameSettings.music_volume * float(VOLUME_CEILING["music"]))
 	_set_bus_volume(BUS_SFX, GameSettings.sfx_volume * float(VOLUME_CEILING["sfx"]))
 	_set_bus_volume(BUS_CREDITS, CREDITS_VOLUME)
@@ -272,7 +272,7 @@ func _ensure_buses() -> void:
 		var index := AudioServer.bus_count
 		AudioServer.add_bus(index)
 		AudioServer.set_bus_name(index, bus_name)
-		AudioServer.set_bus_send(index, "Master")
+		AudioServer.set_bus_send(index, L.t("Master"))
 
 func _load_streams() -> void:
 	for sound in SOUNDS:

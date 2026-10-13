@@ -153,7 +153,7 @@ func _refresh() -> void:
 		return
 	_sample = _sim.sample(_t)
 	var counted: float = float(_sample["counted"])
-	_counted.text = "AÇILAN SANDIK  %%%.1f" % counted
+	_counted.text = L.t("AÇILAN SANDIK  %%%.1f") % counted
 	_progress_fill.size = Vector2(_progress_bg.size.x * counted / 100.0, _progress_bg.size.y)
 	var minutes := 21 * 60 + int(_t / DURATION * 300.0)
 	_clock.text = "%02d:%02d" % [(minutes / 60) % 24, minutes % 60]
@@ -204,7 +204,7 @@ func _refresh_parliament() -> void:
 	_last_parliament_key = key
 	entries.append({"seats": maxi(0, _sim.total_seats - assigned), "color": UNCOUNTED})
 	_parliament.set_results(entries)
-	_majority_label.text = "Salt çoğunluk %d  ·  Vekil %d/%d" % [
+	_majority_label.text = L.t("Salt çoğunluk %d  ·  Vekil %d/%d") % [
 		_sim.total_seats / 2 + 1, assigned, _sim.total_seats]
 
 func _refresh_map() -> void:
@@ -311,12 +311,12 @@ func _detect_events() -> void:
 	var national: Dictionary = _sample["national"]
 	if not _first_fired:
 		_first_fired = true
-		_push_flash("İLK SONUÇLAR", "Sandıklar açılmaya başladı — sonuçlar kesin değildir")
+		_push_flash(L.t("İLK SONUÇLAR"), L.t("Sandıklar açılmaya başladı — sonuçlar kesin değildir"))
 
 	var leader = _top_peer(national)
 	if counted >= 6.0 and leader != _leader:
 		if _leader != -1 and _t - _leader_since > 3.0:
-			_push_flash("SON DAKİKA", "%s öne geçti!  (%%%.1f)" % [_party_name(leader), float(national[leader])])
+			_push_flash(L.t("SON DAKİKA"), L.t("%s öne geçti!  (%%%.1f)") % [_party_name(leader), float(national[leader])])
 		_leader = leader
 		_leader_since = _t
 
@@ -330,8 +330,8 @@ func _detect_events() -> void:
 			elif above != bool(_above[peer_id]) and _t - float(_above_changed_at[peer_id]) > 4.0:
 				_above[peer_id] = above
 				_above_changed_at[peer_id] = _t
-				_push_flash("BARAJ", "%s barajın %s  (%%%.1f)" % [_party_name(peer_id),
-					"üzerine çıktı!" if above else "altına düştü!", float(national[peer_id])])
+				_push_flash(L.t("BARAJ"), L.t("%s barajın %s  (%%%.1f)") % [_party_name(peer_id),
+					L.t("üzerine çıktı!") if above else L.t("altına düştü!"), float(national[peer_id])])
 
 	var provinces: Dictionary = _sample["provinces"]
 	for province_id in _sim.province_ids:
@@ -343,14 +343,14 @@ func _detect_events() -> void:
 			var shares: Dictionary = p["shares"]
 			var winner = _province_winner(p["seats"], shares)
 			_push_flash(ElectionNightSim.province_name(province_id).to_upper(),
-				"Sandıkların tamamı açıldı — birinci %s  (%%%.1f)" % [_party_name(winner), float(shares[winner])])
+				L.t("Sandıkların tamamı açıldı — birinci %s  (%%%.1f)") % [_party_name(winner), float(shares[winner])])
 
 	if counted >= 40.0:
 		var seats: Dictionary = _sample["seats"]
 		for peer_id in seats.keys():
 			if int(seats[peer_id]) * 2 > _sim.total_seats and not _majority_fired.has(peer_id):
 				_majority_fired[peer_id] = true
-				_push_flash("ÇOĞUNLUK", "%s tek başına çoğunluğu yakaladı!  (%d vekil)" % [_party_name(peer_id), int(seats[peer_id])])
+				_push_flash(L.t("ÇOĞUNLUK"), L.t("%s tek başına çoğunluğu yakaladı!  (%d vekil)") % [_party_name(peer_id), int(seats[peer_id])])
 
 func _top_peer(values: Dictionary):
 	var best = -1
@@ -367,7 +367,7 @@ func _finish() -> void:
 	var national: Dictionary = _sample["national"]
 	var winner = _top_peer(national)
 	if winner != -1:
-		_push_flash("SONUÇ", "Tüm sandıklar açıldı. Kesin olmayan sonuçlara göre birinci parti: %s  (%%%.1f · %d vekil)" % [
+		_push_flash(L.t("SONUÇ"), L.t("Tüm sandıklar açıldı. Kesin olmayan sonuçlara göre birinci parti: %s  (%%%.1f · %d vekil)") % [
 			_party_name(winner), float(national[winner]), int(_sample["seats"].get(winner, 0))])
 	_final_stamp.visible = true
 	_ticker_label.text = _ticker_text()
@@ -377,12 +377,12 @@ func _ticker_text() -> String:
 	var counted := float(_sample.get("counted", 0.0))
 	var national: Dictionary = _sample.get("national", {})
 	if counted > 0.0:
-		parts.append("AÇILAN SANDIK %%%.1f" % counted)
+		parts.append(L.t("AÇILAN SANDIK %%%.1f") % counted)
 		var ids: Array = national.keys()
 		ids.sort_custom(func(a, b): return float(national[a]) > float(national[b]))
 		for peer_id in ids:
 			parts.append("%s %%%.1f" % [_party_name(peer_id), float(national[peer_id])])
-	parts.append(FLAVOR[_ticker_round % FLAVOR.size()])
+	parts.append(L.t(FLAVOR[_ticker_round % FLAVOR.size()]))
 	_ticker_round += 1
 	return "     ●     ".join(PackedStringArray(parts))
 
@@ -440,15 +440,15 @@ func _build_ui() -> void:
 	add_child(_top_bar)
 	_live_badge = _panel(RED)
 	_top_bar.add_child(_live_badge)
-	_live_label = _label("●  CANLI", 20, Color.WHITE)
+	_live_label = _label(L.t("●  CANLI"), 20, Color.WHITE)
 	_live_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_live_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_live_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_live_badge.add_child(_live_label)
-	_title = _label("SEÇİM GECESİ  ·  ÖZEL YAYIN", 26, Color.WHITE)
+	_title = _label(L.t("SEÇİM GECESİ  ·  ÖZEL YAYIN"), 26, Color.WHITE)
 	_top_bar.add_child(_title)
 	_subtitle = _label("%d  ·  %s" % [GameRules.election_year(CardManager.last_election_round),
-		"ERKEN SEÇİM" if CardManager.last_election_was_early else "GENEL SEÇİM"], 14, GOLD)
+		L.t("ERKEN SEÇİM") if CardManager.last_election_was_early else L.t("GENEL SEÇİM")], 14, GOLD)
 	_top_bar.add_child(_subtitle)
 	_clock = _label("21:00", 34, Color.WHITE)
 	_clock.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -466,12 +466,12 @@ func _build_ui() -> void:
 	_progress_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_progress_bg.add_child(_progress_fill)
 
-	_section_votes = _label("OY ORANLARI", 15, TEXT_DIM)
+	_section_votes = _label(L.t("OY ORANLARI"), 15, TEXT_DIM)
 	add_child(_section_votes)
 	_bars = LiveBars.new()
 	_bars.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_bars)
-	_section_parliament = _label("MECLİS DAĞILIMI", 15, TEXT_DIM)
+	_section_parliament = _label(L.t("MECLİS DAĞILIMI"), 15, TEXT_DIM)
 	add_child(_section_parliament)
 	_parliament = ParliamentDiagram.new()
 	_parliament.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -480,7 +480,7 @@ func _build_ui() -> void:
 	_majority_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	add_child(_majority_label)
 
-	_final_stamp = _label("KESİN OLMAYAN SONUÇLAR", 22, GOLD)
+	_final_stamp = _label(L.t("KESİN OLMAYAN SONUÇLAR"), 22, GOLD)
 	_final_stamp.visible = false
 	add_child(_final_stamp)
 
@@ -488,7 +488,7 @@ func _build_ui() -> void:
 	_flash.modulate.a = 0.0
 	add_child(_flash)
 	var flash_tag_bg := _panel(RED)
-	flash_tag_bg.name = "TagBg"
+	flash_tag_bg.name = L.t("TagBg")
 	_flash.add_child(flash_tag_bg)
 	_flash_tag = _label("", 18, Color.WHITE)
 	_flash_tag.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -505,7 +505,7 @@ func _build_ui() -> void:
 	add_child(_ticker_bg)
 	_ticker_tag = _panel(RED)
 	_ticker_bg.add_child(_ticker_tag)
-	var ticker_tag_label := _label("SON DAKİKA", 18, Color.WHITE)
+	var ticker_tag_label := _label(L.t("SON DAKİKA"), 18, Color.WHITE)
 	ticker_tag_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	ticker_tag_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ticker_tag_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -535,6 +535,13 @@ func _layout() -> void:
 	_clock.size = Vector2(110, 50)
 	_counted.position = Vector2(s.x - margin - menu_reserved - 470, 19)
 	_counted.size = Vector2(340, 34)
+	# Başlık sayaca kadar kalan yere sığsın (İngilizce başlık daha uzun).
+	var title_room := _counted.position.x - _title.position.x - 16.0
+	var title_font := _title.get_theme_font("font")
+	var title_size := 26
+	while title_size > 14 and title_font.get_string_size(_title.text, HORIZONTAL_ALIGNMENT_LEFT, -1, title_size).x > title_room:
+		title_size -= 1
+	_title.add_theme_font_size_override("font_size", title_size)
 	_progress_bg.position = Vector2(0, top_h)
 	_progress_bg.size = Vector2(s.x, 6)
 
@@ -652,9 +659,9 @@ class LiveBars extends Control:
 			var fill: float = bar_w * clampf(float(r["percent"]) / scale, 0.0, 1.0)
 			draw_rect(Rect2(bar_x, y + 2, fill, h), Color(color, alpha))
 			draw_rect(Rect2(bar_x, y + 2, fill, maxf(2.0, h * 0.12)), Color(UiTheme.TEXT, 0.25 * alpha))
-			draw_string(font, Vector2(size.x - value_w, y + h * 0.5 + 4), "%%%.1f" % float(r["percent"]),
+			draw_string(font, Vector2(size.x - value_w, y + h * 0.5 + 4), L.t("%%%.1f") % float(r["percent"]),
 				HORIZONTAL_ALIGNMENT_RIGHT, value_w, clampi(int(h * 0.45), 12, 24), Color(UiTheme.TEXT, alpha))
-			var sub := "BARAJ ALTI" if below else "%d vekil" % int(r["seats"])
+			var sub := L.t("BARAJ ALTI") if below else L.t("%d vekil") % int(r["seats"])
 			draw_string(font, Vector2(size.x - value_w, y + h * 0.5 + 6 + name_size * 0.8), sub,
 				HORIZONTAL_ALIGNMENT_RIGHT, value_w, maxi(9, name_size - 6),
 				UiTheme.RED if below else UiTheme.TEXT_MUTED)
@@ -664,5 +671,5 @@ class LiveBars extends Control:
 			while yy < row_h * n:
 				draw_line(Vector2(tx, yy), Vector2(tx, minf(yy + 6.0, row_h * n)), UiTheme.RED, 3.0)
 				yy += 11.0
-			draw_string(font, Vector2(tx + 4, row_h * n + 12), "BARAJ %%%s" % String.num(threshold, 1),
+			draw_string(font, Vector2(tx + 4, row_h * n + 12), L.t("BARAJ %%%s") % String.num(threshold, 1),
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UiTheme.RED)

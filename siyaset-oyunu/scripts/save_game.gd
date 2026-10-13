@@ -26,11 +26,11 @@ static func path_of(slot: String) -> String:
 ## Şu an kaydedilebilir mi? ("" = evet, değilse oyuncuya gösterilecek neden.)
 static func block_reason() -> String:
 	if not MultiplayerManager.offline_mode:
-		return "Kayıt sadece çevrim dışı oyunda yapılır."
+		return L.t("Kayıt sadece çevrim dışı oyunda yapılır.")
 	if MultiplayerManager.stage != MultiplayerManager.Stage.IN_GAME:
-		return "Oyun başlamadan kayıt yapılamaz."
+		return L.t("Oyun başlamadan kayıt yapılamaz.")
 	if CardManager.game_finished:
-		return "Oyun bitti."
+		return L.t("Oyun bitti.")
 	return ""
 
 static func exists(slot: String) -> bool:
@@ -53,7 +53,7 @@ static func save(slot: String = MANUAL_SLOT) -> String:
 	var tmp := path_of(slot) + ".tmp"
 	var file := FileAccess.open(tmp, FileAccess.WRITE)
 	if file == null:
-		return "Kayıt dosyası açılamadı (%s)." % error_string(FileAccess.get_open_error())
+		return L.t("Kayıt dosyası açılamadı (%s).") % error_string(FileAccess.get_open_error())
 	file.store_var(data, false)
 	file.close()
 	var final_path := path_of(slot)
@@ -61,7 +61,7 @@ static func save(slot: String = MANUAL_SLOT) -> String:
 		DirAccess.remove_absolute(final_path)
 	var err := DirAccess.rename_absolute(tmp, final_path)
 	if err != OK:
-		return "Kayıt tamamlanamadı (%s)." % error_string(err)
+		return L.t("Kayıt tamamlanamadı (%s).") % error_string(err)
 	return ""
 
 static func _collect() -> Dictionary:
@@ -105,25 +105,25 @@ static func _collect() -> Dictionary:
 ## Dosyayı okur ve doğrular. Dönüş: veri ya da {"error": metin}.
 static func _read(slot: String) -> Dictionary:
 	if not exists(slot):
-		return {"error": "Kayıt bulunamadı."}
+		return {"error": L.t("Kayıt bulunamadı.")}
 	var file := FileAccess.open(path_of(slot), FileAccess.READ)
 	if file == null:
-		return {"error": "Kayıt açılamadı (%s)." % error_string(FileAccess.get_open_error())}
+		return {"error": L.t("Kayıt açılamadı (%s).") % error_string(FileAccess.get_open_error())}
 	var data: Variant = file.get_var(false)
 	file.close()
 	if typeof(data) != TYPE_DICTIONARY:
-		return {"error": "Kayıt dosyası bozuk."}
+		return {"error": L.t("Kayıt dosyası bozuk.")}
 	var dict: Dictionary = data
 	var format := int(dict.get("format", 0))
 	if format > FORMAT_VERSION:
-		return {"error": "Bu kayıt oyunun daha yeni bir sürümüyle yapılmış."}
+		return {"error": L.t("Bu kayıt oyunun daha yeni bir sürümüyle yapılmış.")}
 	dict = _migrate(dict, format)
 	for key in ["mm", "pm", "cm", "cm_host", "gm"]:
 		if typeof(dict.get(key)) != TYPE_DICTIONARY:
-			return {"error": "Kayıt dosyası eksik ya da bozuk (%s)." % key}
+			return {"error": L.t("Kayıt dosyası eksik ya da bozuk (%s).") % key}
 	for key in ["turn_order", "inventories", "funds", "round", "map"]:
 		if not (dict["cm"] as Dictionary).has(key):
-			return {"error": "Kayıt dosyası eksik ya da bozuk (%s)." % key}
+			return {"error": L.t("Kayıt dosyası eksik ya da bozuk (%s).") % key}
 	return dict
 
 ## Eski biçimleri bugünkü biçime yükseltir (şimdilik tek biçim var).
@@ -145,7 +145,7 @@ static func load_game(tree: SceneTree, slot: String = MANUAL_SLOT) -> String:
 static func apply(data: Dictionary) -> void:
 	var mm := MultiplayerManager
 	var saved_mm: Dictionary = data["mm"]
-	mm.start_offline(String(saved_mm.get("local_player_name", "Oyuncu")))
+	mm.start_offline(String(saved_mm.get("local_player_name", L.t("Oyuncu"))))
 	mm.players = saved_mm["players"]
 	mm.owner_id = int(saved_mm.get("owner_id", mm.owner_id))
 	mm.election_threshold = float(saved_mm.get("election_threshold", mm.election_threshold))

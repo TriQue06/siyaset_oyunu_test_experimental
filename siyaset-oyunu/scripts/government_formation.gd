@@ -64,7 +64,7 @@ func _process(_delta: float) -> void:
 		_update_title()
 
 func _update_title() -> void:
-	title_label.text = "%s   (Süre: %s)" % [_title_base, GameRules.format_seconds(GovernmentManager.phase_seconds_left())]
+	title_label.text = L.t("%s   (Süre: %s)") % [_title_base, GameRules.format_seconds(GovernmentManager.phase_seconds_left())]
 
 func _rebuild() -> void:
 	for child in post_list.get_children():
@@ -73,19 +73,19 @@ func _rebuild() -> void:
 
 	var attempt: int = GovernmentManager.MAX_ATTEMPTS - GovernmentManager.attempts_left() + 1
 	if _step == Step.PARTNERS:
-		_title_base = "1/2 — Hükümet Ortakları"
-		info_label.text = "Hükümete girecek partileri seç. Kendi partin her zaman dahildir.\nGörev verdiğin her ortak oylamada EVET demezse teklif düşer. Süre dolarsa hak yanar.\n%d. teklif hakkın (toplam %d)." % [
+		_title_base = L.t("1/2 — Hükümet Ortakları")
+		info_label.text = L.t("Hükümete girecek partileri seç. Kendi partin her zaman dahildir.\nGörev verdiğin her ortak oylamada EVET demezse teklif düşer. Süre dolarsa hak yanar.\n%d. teklif hakkın (toplam %d).") % [
 			attempt, GovernmentManager.MAX_ATTEMPTS,
 		]
-		propose_button.text = "Dağıtıma Geç"
+		propose_button.text = L.t("Dağıtıma Geç")
 		back_button.visible = false
 		_build_partner_rows()
 	else:
-		_title_base = "2/2 — Görev Dağılımı"
-		info_label.text = "%d görevi ortaklar arasında paylaştır. Başbakanlık kimdeyse ANA İKTİDAR PARTİSİ odur.\nMecliste %d sandalye var; teklifin düşmesi için HAYIR oylarının %d sandalyeyi geçmesi gerekir." % [
+		_title_base = L.t("2/2 — Görev Dağılımı")
+		info_label.text = L.t("%d görevi ortaklar arasında paylaştır. Başbakanlık kimdeyse ANA İKTİDAR PARTİSİ odur.\nMecliste %d sandalye var; teklifin düşmesi için HAYIR oylarının %d sandalyeyi geçmesi gerekir.") % [
 			GovernmentPresets.POSTS.size(), GovernmentManager.total_seats(), GovernmentManager.total_seats() / 2,
 		]
-		propose_button.text = "Teklifte Bulun"
+		propose_button.text = L.t("Teklifte Bulun")
 		back_button.visible = true
 		_build_post_rows()
 
@@ -130,7 +130,7 @@ func _build_partner_bar() -> void:
 	bar.add_theme_constant_override("h_separation", 8)
 	bar.add_theme_constant_override("v_separation", 6)
 	var title := Label.new()
-	title.text = "Ortaklar (tıkla: ekle/çıkar):"
+	title.text = L.t("Ortaklar (tıkla: ekle/çıkar):")
 	title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	bar.add_child(title)
 	var me := PartyManager.party_of(multiplayer.get_unique_id())
@@ -140,7 +140,7 @@ func _build_partner_bar() -> void:
 		UiSkin.skin_button(btn)
 		btn.text = "%s (%d)" % [PartyManager.data_of(peer_id).get("name", "?"), GovernmentManager.seats_of(peer_id)]
 		btn.modulate = Color.WHITE if in_gov else Color(0.78, 0.78, 0.78, 1.0)
-		btn.tooltip_text = "Görevli parti (sabit)" if peer_id == me else ("Hükümetten çıkar" if in_gov else "Hükümete ekle")
+		btn.tooltip_text = L.t("Görevli parti (sabit)") if peer_id == me else (L.t("Hükümetten çıkar") if in_gov else L.t("Hükümete ekle"))
 		btn.disabled = peer_id == me
 		if peer_id != me:
 			btn.pressed.connect(_on_partner_toggled.bind(peer_id))
@@ -173,7 +173,7 @@ func _build_partner_rows() -> void:
 		name_label.add_theme_font_size_override("font_size", 15)
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		name_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		name_label.text = "%s — %s   (%d sandalye)" % [
+		name_label.text = L.t("%s — %s   (%d sandalye)") % [
 			PartyManager.data_of(peer_id).get("name", "?"),
 			PoliticianPresets.display_name(int(peer_id)),
 			GovernmentManager.seats_of(peer_id),
@@ -184,10 +184,10 @@ func _build_partner_rows() -> void:
 		toggle.custom_minimum_size = Vector2(150, 34)
 		UiSkin.skin_button(toggle)
 		if is_me:
-			toggle.text = "GÖREVLİ (sabit)"
+			toggle.text = L.t("GÖREVLİ (sabit)")
 			toggle.disabled = true
 		else:
-			toggle.text = "Çıkar" if _partners.has(peer_id) else "Ekle"
+			toggle.text = L.t("Çıkar") if _partners.has(peer_id) else L.t("Ekle")
 			toggle.pressed.connect(_on_partner_toggled.bind(peer_id))
 		hbox.add_child(toggle)
 
@@ -227,7 +227,7 @@ func _build_post_rows() -> void:
 		margin.add_child(hbox)
 
 		var name_label := Label.new()
-		name_label.text = "%s  (+%d)" % [post["title"], post["points"]]
+		name_label.text = "%s  (+%d)" % [L.t(post["title"]), post["points"]]
 		name_label.custom_minimum_size = Vector2(240, 0)
 		name_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		name_label.add_theme_font_size_override("font_size", 14)
@@ -294,7 +294,7 @@ func _build_party_chip(peer_id: int) -> Control:
 	chip.add_child(badge)
 
 	var halo := TextureRect.new()
-	halo.name = "Halo"
+	halo.name = L.t("Halo")
 	halo.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	halo.texture = load("res://assets/ui/target_highlight.png")
 	halo.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -314,9 +314,9 @@ func _refresh_summary() -> void:
 			seats += GovernmentManager.seats_of(peer_id)
 			names.append(PartyManager.data_of(peer_id).get("name", "?"))
 		var total := GovernmentManager.total_seats()
-		summary_label.text = "Ortaklar: %s\nToplam %d/%d sandalye — %s" % [
+		summary_label.text = L.t("Ortaklar: %s\nToplam %d/%d sandalye — %s") % [
 			" + ".join(names), seats, total,
-			"salt çoğunluk VAR" if seats * 2 > total else "salt çoğunluk YOK (HAYIR, EVET'ten az kalırsa yine de geçer)",
+			L.t("salt çoğunluk VAR") if seats * 2 > total else L.t("salt çoğunluk YOK (HAYIR, EVET'ten az kalırsa yine de geçer)"),
 		]
 		return
 
@@ -335,10 +335,10 @@ func _refresh_summary() -> void:
 
 	var pm_peer: int = int(_assignments.get(GovernmentPresets.POST_PM, -1))
 	var total2 := GovernmentManager.total_seats()
-	summary_label.text = "Ana iktidar partisi: %s  |  Hükümet %d/%d sandalye (%s)\n%s" % [
+	summary_label.text = L.t("Ana iktidar partisi: %s  |  Hükümet %d/%d sandalye (%s)\n%s") % [
 		PartyManager.data_of(pm_peer).get("name", "?"),
 		gov_seats, total2,
-		"salt çoğunluk VAR" if gov_seats * 2 > total2 else "salt çoğunluk YOK",
+		L.t("salt çoğunluk VAR") if gov_seats * 2 > total2 else L.t("salt çoğunluk YOK"),
 		" · ".join(parts),
 	]
 

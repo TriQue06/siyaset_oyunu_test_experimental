@@ -40,7 +40,7 @@ func set_data(entries: Array) -> void:
 
 	if entries.is_empty():
 		var empty_label := Label.new()
-		empty_label.text = "Henüz sonuç yok"
+		empty_label.text = L.t("Henüz sonuç yok")
 		empty_label.modulate.a = 0.6
 		add_child(empty_label)
 		return
@@ -113,7 +113,7 @@ func _build_compact_row(e: Dictionary, max_percent: float) -> Control:
 	name_label.clip_text = true
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(name_label)
-	var percent_label := _mono_label("%%%.1f" % float(e["percent"]), UiTheme.FS_SMALL, UiTheme.TEXT)
+	var percent_label := _mono_label(L.t("%%%.1f") % float(e["percent"]), UiTheme.FS_SMALL, UiTheme.TEXT)
 	percent_label.custom_minimum_size = Vector2(52, 0)
 	percent_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	top.add_child(percent_label)
@@ -126,15 +126,15 @@ func _build_compact_row(e: Dictionary, max_percent: float) -> Control:
 	foot.add_theme_constant_override("separation", 8)
 	foot.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if below:
-		foot.add_child(_mono_label("baraj altı", UiTheme.FS_TINY, UiTheme.RED))
+		foot.add_child(_mono_label(L.t("baraj altı"), UiTheme.FS_TINY, UiTheme.RED))
 	else:
-		foot.add_child(_mono_label("seçim: %d mv" % won, UiTheme.FS_TINY, UiTheme.TEXT_DIM))
+		foot.add_child(_mono_label(L.t("seçim: %d mv") % won, UiTheme.FS_TINY, UiTheme.TEXT_DIM))
 	var now_color := UiTheme.TEXT_MUTED
 	if now > won:
 		now_color = UiTheme.GREEN
 	elif now < won:
 		now_color = UiTheme.RED
-	var now_label := _mono_label("şu an: %d mv" % now, UiTheme.FS_TINY, now_color)
+	var now_label := _mono_label(L.t("şu an: %d mv") % now, UiTheme.FS_TINY, now_color)
 	now_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	now_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	foot.add_child(now_label)
@@ -240,7 +240,7 @@ func _build_row(party_name: String, color: Color, percent: float, seats: int, ma
 
 	# eksen_projeksiyon'daki clip-path ikilisi: dolu kısımda BEYAZ, boş
 	# kısımda RENKLİ yazı — yazı her zaman zeminine göre okunaklı kalır.
-	var percent_text := "%%%.1f" % percent
+	var percent_text := L.t("%%%.1f") % percent
 	var label_white := Label.new()
 	label_white.text = percent_text
 	label_white.set_anchors_preset(Control.PRESET_FULL_RECT)

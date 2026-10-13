@@ -73,7 +73,7 @@ func _ready() -> void:
 	_core = VoterGroups.random_core()
 
 	name_edit.text = _party_name
-	name_edit.placeholder_text = "Parti adını yaz"
+	name_edit.placeholder_text = L.t("Parti adını yaz")
 	name_edit.max_length = PartyManager.NAME_MAX_LENGTH
 	name_edit.text_changed.connect(_on_name_changed)
 
@@ -95,7 +95,7 @@ func _ready() -> void:
 	# Çekirdek seçmen grupları: 8 gruptan 2'si.
 	var core_title := core_container.get_parent().get_node_or_null("CoreGroupLabel")
 	if core_title is Label:
-		core_title.text = "Çekirdek seçmen grupları (2 seç)"
+		core_title.text = L.t("Çekirdek seçmen grupları (2 seç)")
 	_build_core_buttons()
 	_build_bot_profile_button()
 	ready_button.pressed.connect(_on_ready_pressed)
@@ -124,7 +124,7 @@ func _update_countdown_label() -> void:
 		return
 	countdown_label.visible = true
 	var seconds := int(ceil(_time_left))
-	countdown_label.text = "Süre: %02d:%02d" % [seconds / 60, seconds % 60]
+	countdown_label.text = L.t("Süre: %02d:%02d") % [seconds / 60, seconds % 60]
 
 func _refresh_ready_count() -> void:
 	var total := MultiplayerManager.players.size()
@@ -132,7 +132,7 @@ func _refresh_ready_count() -> void:
 	for peer_id in MultiplayerManager.players.keys():
 		if PartyManager.is_ready(peer_id):
 			ready_count += 1
-	ready_count_label.text = "Hazır: %d / %d" % [ready_count, total]
+	ready_count_label.text = L.t("Hazır: %d / %d") % [ready_count, total]
 
 func _on_name_changed(new_text: String) -> void:
 	_party_name = new_text
@@ -143,7 +143,7 @@ func _on_name_changed(new_text: String) -> void:
 
 func _update_name_hint() -> void:
 	var valid := PartyManager.is_valid_name(_party_name)
-	name_hint_label.text = "%d-%d karakter" % [PartyManager.NAME_MIN_LENGTH, PartyManager.NAME_MAX_LENGTH]
+	name_hint_label.text = L.t("%d-%d karakter") % [PartyManager.NAME_MIN_LENGTH, PartyManager.NAME_MAX_LENGTH]
 	name_hint_label.modulate = UiTheme.TEXT_MUTED if valid else UiTheme.RED
 	_refresh_ready_button()
 
@@ -158,8 +158,8 @@ func _refresh_ready_button() -> void:
 ## geçmiş, memleket) rastgele yeniden üretir. Sınırsız basılabilir.
 func _build_bot_profile_button() -> void:
 	_bot_profile_button = Button.new()
-	_bot_profile_button.text = "🎲 Bot Profilini Rastgele Yap"
-	_bot_profile_button.tooltip_text = "Botun adını, soyadını, geçmişini ve memleketini rastgele değiştir"
+	_bot_profile_button.text = L.t("🎲 Bot Profilini Rastgele Yap")
+	_bot_profile_button.tooltip_text = L.t("Botun adını, soyadını, geçmişini ve memleketini rastgele değiştir")
 	_bot_profile_button.focus_mode = Control.FOCUS_NONE
 	_bot_profile_button.custom_minimum_size = Vector2(0, 40)
 	_bot_profile_button.visible = false
@@ -238,7 +238,7 @@ func _build_players_panel() -> void:
 		left_preview.resized.connect(_layout_preview)
 		_layout_preview()
 	var panel := PanelContainer.new()
-	panel.name = "PlayersPanel"
+	panel.name = L.t("PlayersPanel")
 	panel.anchor_bottom = 1.0
 	panel.offset_left = 12
 	panel.offset_top = 86
@@ -252,7 +252,7 @@ func _build_players_panel() -> void:
 	box.add_theme_constant_override("separation", 8)
 	panel.add_child(box)
 	var title := Label.new()
-	title.text = "OYUNCULAR"
+	title.text = L.t("OYUNCULAR")
 	title.add_theme_font_size_override("font_size", 18)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
@@ -310,14 +310,14 @@ func _refresh_players_panel() -> void:
 		texts.size_flags_horizontal = SIZE_EXPAND_FILL
 		texts.add_theme_constant_override("separation", 0)
 		var player_label := Label.new()
-		var player_name := String(MultiplayerManager.players.get(peer_id, {}).get("name", "Sen"))
-		player_label.text = player_name + (" (sen)" if int(peer_id) == my_id else "") + ("  🤖" if MultiplayerManager.is_bot(peer_id) else "")
+		var player_name := String(MultiplayerManager.players.get(peer_id, {}).get("name", L.t("Sen")))
+		player_label.text = player_name + (L.t(" (sen)") if int(peer_id) == my_id else "") + ("  🤖" if MultiplayerManager.is_bot(peer_id) else "")
 		player_label.add_theme_font_size_override("font_size", 13)
 		player_label.modulate = UiTheme.TEXT_MUTED
 		player_label.clip_text = true
 		texts.add_child(player_label)
 		var party_label := Label.new()
-		party_label.text = String(party.get("name", "parti kuruyor…"))
+		party_label.text = String(party.get("name", L.t("parti kuruyor…")))
 		party_label.add_theme_font_size_override("font_size", 17)
 		party_label.clip_text = true
 		texts.add_child(party_label)
@@ -337,8 +337,8 @@ func _refresh_players_panel() -> void:
 				and MultiplayerManager.players.size() > 0:
 			var editing: bool = (int(peer_id) == _edit_target) or (int(peer_id) == my_id and not _editing_bot())
 			var edit_button := Button.new()
-			edit_button.text = "✎" if int(peer_id) != my_id else "Ben"
-			edit_button.tooltip_text = "Bu botun adını, logosunu ve rengini düzenle" if int(peer_id) != my_id else "Kendi partine dön"
+			edit_button.text = "✎" if int(peer_id) != my_id else L.t("Ben")
+			edit_button.tooltip_text = L.t("Bu botun adını, logosunu ve rengini düzenle") if int(peer_id) != my_id else L.t("Kendi partine dön")
 			# Tema butonu 18px iç boşlukla gelir ve dar satırda adı eziyordu;
 			# UiSkin zemini iç boşluksuz olduğu için burada kompakt kalıyor.
 			UiSkin.skin_button(edit_button)
@@ -401,7 +401,7 @@ func _build_color_row() -> void:
 		if taken:
 			btn.text = "✕"
 			btn.add_theme_font_size_override("font_size", 12)
-			btn.tooltip_text = "Bu renk başka bir oyuncuda"
+			btn.tooltip_text = L.t("Bu renk başka bir oyuncuda")
 		btn.disabled = not allowed or (_is_locked and not _editing_bot())
 		btn.modulate = Color.WHITE if allowed else Color(0.55, 0.55, 0.55, 1.0)
 		# Seçili renk altın çerçeveyle ayrılır (pixel tarz: kare, kalın kenar).
@@ -422,8 +422,8 @@ var _profile_button: Button
 
 func _build_back_to_profile_button() -> void:
 	_profile_button = Button.new()
-	_profile_button.text = "← Profilim"
-	_profile_button.tooltip_text = "Siyasetçi profiline dön (ad, geçmiş, memleket)"
+	_profile_button.text = L.t("← Profilim")
+	_profile_button.tooltip_text = L.t("Siyasetçi profiline dön (ad, geçmiş, memleket)")
 	_profile_button.focus_mode = Control.FOCUS_NONE
 	_profile_button.custom_minimum_size = Vector2(150, 40)
 	# Sağ üstte, Menü düğmesinin solunda (başlığı kapatmasın).
@@ -471,7 +471,7 @@ func _build_core_buttons() -> void:
 	_core_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_core_note.add_theme_font_size_override("font_size", 10)
 	_core_note.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
-	_core_note.text = "Çekirdek gruplarda %%%d, karşıtlarında %%%d, diğerlerinde %%%d destekle başlarsın. Oyunda yasa, miting ve toplantıyla değişir." % [
+	_core_note.text = L.t("Çekirdek gruplarda %%%d, karşıtlarında %%%d, diğerlerinde %%%d destekle başlarsın. Oyunda yasa, miting ve toplantıyla değişir.") % [
 		int(VoterGroups.CORE_START), int(VoterGroups.CORE_OPPOSITE_START), int(VoterGroups.AFFINITY_NEUTRAL)]
 	core_container.add_child(_core_note)
 
@@ -483,7 +483,7 @@ func _core_button(group: String) -> Button:
 	button.custom_minimum_size = Vector2(0, 30)
 	button.button_pressed = _core.has(group)
 	button.disabled = _is_locked and not _editing_bot()
-	button.tooltip_text = "%s\n%s\nTalepler: %s" % [VoterGroups.title(group), String(VoterGroups.data(group).get("blurb", "")),
+	button.tooltip_text = L.t("%s\n%s\nTalepler: %s") % [VoterGroups.title(group), String(VoterGroups.data(group).get("blurb", "")),
 		VoterGroups.issues_text(group)]
 	UiSkin.skin_color_button(button, VoterGroups.color(group).darkened(0.2) if _core.has(group) else UiTheme.PANEL)
 	var row := HBoxContainer.new()
@@ -551,7 +551,7 @@ func _start_editing(bot_id: int) -> void:
 		_selected_icon_index = int(_own_backup.get("icon", _selected_icon_index))
 		_selected_bg_color = _own_backup.get("color", _selected_bg_color)
 		_core = (_own_backup.get("core", _core) as Array).duplicate()
-		title_label.text = "PARTİNİ KUR"
+		title_label.text = L.t("PARTİNİ KUR")
 		_set_controls_disabled(_is_locked)
 		_refresh_ready_button()
 	else:
@@ -562,7 +562,7 @@ func _start_editing(bot_id: int) -> void:
 		_selected_bg_color = party.get("bg_color", _selected_bg_color)
 		var bot_core: Array = party.get("core", [])
 		_core = bot_core.duplicate() if VoterGroups.is_valid_core(bot_core) else VoterGroups.random_core()
-		title_label.text = "BOT PARTİSİ: %s" % MultiplayerManager.players.get(bot_id, {}).get("name", "Bot")
+		title_label.text = L.t("BOT PARTİSİ: %s") % MultiplayerManager.players.get(bot_id, {}).get("name", L.t("Bot"))
 		_set_controls_disabled(false)
 		ready_button.disabled = true  # hazır butonu sadece kendi partin için
 	name_edit.text = _party_name
@@ -586,7 +586,7 @@ func _on_ready_pressed() -> void:
 		return
 	_is_locked = not _is_locked
 	_set_controls_disabled(_is_locked)
-	ready_button.text = "✕ İptal Et" if _is_locked else "🔒 Kilitle ve Hazır Ver"
+	ready_button.text = L.t("✕ İptal Et") if _is_locked else L.t("🔒 Kilitle ve Hazır Ver")
 	if _is_locked:
 		if PartyManager.is_valid_name(_party_name):
 			PartyManager.set_party_and_ready(_party_name, _selected_icon_index, ICON_COLOR, _selected_bg_color, _core, true)

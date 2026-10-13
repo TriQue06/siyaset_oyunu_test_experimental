@@ -256,10 +256,10 @@ static var seat_method: String = METHOD_DHONDT
 static func method_title(method: String) -> String:
 	match method:
 		METHOD_HARE:
-			return "Hare kotası"
+			return L.t("Hare kotası")
 		METHOD_WTA:
-			return "Kazanan hepsini alır"
-	return "D'Hondt"
+			return L.t("Kazanan hepsini alır")
+	return L.t("D'Hondt")
 
 ## Geçerli sayım yöntemiyle vekil dağıtımı. national_list=true: ulusal liste.
 static func allocate(votes: Dictionary, eligible: Array, seat_count: int, national_list: bool = false) -> Dictionary:

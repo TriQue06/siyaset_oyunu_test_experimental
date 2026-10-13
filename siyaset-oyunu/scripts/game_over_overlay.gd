@@ -34,7 +34,7 @@ func _ready() -> void:
 	center.add_child(vbox)
 
 	var ranking: Array = CardManager.final_ranking
-	var over := _label("OYUN BİTTİ", 16, DIM)
+	var over := _label(L.t("OYUN BİTTİ"), 16, DIM)
 	vbox.add_child(over)
 	_reveal.append(over)
 
@@ -46,9 +46,9 @@ func _ready() -> void:
 		badge.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		winner_box.add_child(badge)
-		winner_box.add_child(_label("KAZANAN", 13, DIM))
+		winner_box.add_child(_label(L.t("KAZANAN"), 13, DIM))
 		winner_box.add_child(_label(String(winner.get("name", "?")), 30, Color(winner.get("color", Color.WHITE)).lightened(0.35)))
-		winner_box.add_child(_label("%s  ·  %d puan" % [winner.get("leader", "?"), int(winner.get("score", 0))], 15, GOLD))
+		winner_box.add_child(_label(L.t("%s  ·  %d puan") % [winner.get("leader", "?"), int(winner.get("score", 0))], 15, GOLD))
 		vbox.add_child(winner_box)
 		_reveal.append(winner_box)
 
@@ -67,7 +67,7 @@ func _ready() -> void:
 		_reveal.append(row)
 
 	var button := Button.new()
-	button.text = "Ana Menüye Dön"
+	button.text = L.t("Ana Menüye Dön")
 	button.custom_minimum_size = Vector2(220, 44)
 	button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	UiSkin.skin_button(button)
@@ -114,10 +114,10 @@ func _ranking_row(index: int, entry: Dictionary, is_me: bool) -> Control:
 	names.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var party_name := _label(String(entry.get("name", "?")), 17, GOLD if is_me else Color.WHITE)
 	names.add_child(party_name)
-	var leader := _label(String(entry.get("leader", "?")) + ("  (sen)" if is_me else ""), 12, DIM)
+	var leader := _label(String(entry.get("leader", "?")) + (L.t("  (sen)") if is_me else ""), 12, DIM)
 	names.add_child(leader)
 	row.add_child(names)
-	var seats := _label("%d mv" % int(entry.get("seats", 0)), 13, DIM)
+	var seats := _label(L.t("%d mv") % int(entry.get("seats", 0)), 13, DIM)
 	seats.custom_minimum_size = Vector2(56, 0)
 	seats.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	row.add_child(seats)

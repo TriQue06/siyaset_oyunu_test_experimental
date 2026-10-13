@@ -93,10 +93,10 @@ func _refresh() -> void:
 	var count := MultiplayerManager.players.size()
 	if MultiplayerManager.offline_mode:
 		# Çevrim dışında katılan olmaz: boş yuvalar "bot ekle" demektir.
-		info_label.text = "Sen + %d bot  ·  en az %d oyuncu gerekir" % [
+		info_label.text = L.t("Sen + %d bot  ·  en az %d oyuncu gerekir") % [
 			count - 1, MultiplayerManager.MIN_PLAYERS_TO_START]
 	else:
-		info_label.text = "Oyuncular: %d / %d  (başlamak için en az %d gerekir)" % [
+		info_label.text = L.t("Oyuncular: %d / %d  (başlamak için en az %d gerekir)") % [
 			count, MultiplayerManager.MAX_PLAYERS, MultiplayerManager.MIN_PLAYERS_TO_START
 		]
 
@@ -169,11 +169,11 @@ func _build_player_card(peer_id: int, index: int, am_owner: bool, local_id: int)
 	info.add_child(name_label)
 	var tags: Array[String] = []
 	if peer_id == MultiplayerManager.owner_id:
-		tags.append("★ Oda sahibi")
+		tags.append(L.t("★ Oda sahibi"))
 	if peer_id == local_id:
-		tags.append("Sen")
+		tags.append(L.t("Sen"))
 	if is_bot:
-		tags.append("Bot")
+		tags.append(L.t("Bot"))
 	if not tags.is_empty():
 		var tag_label := Label.new()
 		tag_label.text = "  ·  ".join(tags)
@@ -189,17 +189,17 @@ func _build_player_card(peer_id: int, index: int, am_owner: bool, local_id: int)
 		var action := Button.new()
 		UiSkin.skin_button(action)
 		if is_bot:
-			action.text = "Çıkar"
+			action.text = L.t("Çıkar")
 			action.pressed.connect(func(): MultiplayerManager.remove_bot(peer_id))
 		else:
-			action.text = "Sahipliği Devret"
+			action.text = L.t("Sahipliği Devret")
 			action.pressed.connect(func(): MultiplayerManager.transfer_ownership(peer_id))
 		actions.add_child(action)
 		if not is_bot:
 			# Oyuncu atma: sadece lobi sahibinde ve kendisi dışındakiler için.
 			var kick := Button.new()
 			UiSkin.skin_color_button(kick, UiTheme.RED)
-			kick.text = "Lobiden At"
+			kick.text = L.t("Lobiden At")
 			kick.pressed.connect(func(): MultiplayerManager.kick_player(peer_id))
 			actions.add_child(kick)
 		row.add_child(actions)
@@ -240,7 +240,7 @@ func _build_empty_card(index: int) -> Control:
 	UiSkin.skin_panel(card, UiSkin.PANEL)
 	card.modulate = Color(0.75, 0.75, 0.75, 1.0)
 	var label := Label.new()
-	label.text = "%d · %s" % [index + 1, "Bot ekle" if MultiplayerManager.offline_mode else "Boş"]
+	label.text = "%d · %s" % [index + 1, L.t("Bot ekle") if MultiplayerManager.offline_mode else L.t("Boş")]
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.add_theme_font_size_override("font_size", 15)
@@ -284,7 +284,7 @@ func _refresh_settings_display() -> void:
 	var t := MultiplayerManager.election_threshold
 	var interval := MultiplayerManager.election_interval
 	var count := MultiplayerManager.election_count
-	threshold_label.text = "Baraj %%%s  ·  %d seçim, %d yılda bir (%d'den %d yıl)" % [_format_threshold(t), count, interval, GameRules.START_YEAR, interval * count]
+	threshold_label.text = L.t("Baraj %%%s  ·  %d seçim, %d yılda bir (%d'den %d yıl)") % [_format_threshold(t), count, interval, GameRules.START_YEAR, interval * count]
 	interval_value_label.text = str(interval)
 	count_value_label.text = str(count)
 	var years: Array = []
@@ -292,14 +292,14 @@ func _refresh_settings_display() -> void:
 		years.append(str(GameRules.START_YEAR + interval * i))
 	if years.size() > 5:
 		years = years.slice(0, 3) + ["…"] + years.slice(years.size() - 1)
-	game_length_summary.text = "%d'de başlar, %d yıl sürer (bir tur 6 ay). Seçimler: %s." % [GameRules.START_YEAR,
+	game_length_summary.text = L.t("%d'de başlar, %d yıl sürer (bir tur 6 ay). Seçimler: %s.") % [GameRules.START_YEAR,
 		interval * count, ", ".join(PackedStringArray(years))]
 	if MultiplayerManager.is_local_owner():
 		interval_minus.disabled = interval <= GameRules.ELECTION_INTERVAL_MIN
 		interval_plus.disabled = interval >= GameRules.ELECTION_INTERVAL_MAX
 		count_minus.disabled = count <= GameRules.ELECTION_COUNT_MIN
 		count_plus.disabled = count >= GameRules.ELECTION_COUNT_MAX
-	threshold_value_label.text = "%%%s" % _format_threshold(t)
+	threshold_value_label.text = L.t("%%%s") % _format_threshold(t)
 	if not threshold_slider.has_focus():
 		threshold_slider.value = t
 
@@ -335,55 +335,55 @@ func _build_settings_panel() -> void:
 	scroll.add_child(gutter)
 	gutter.add_child(_sections_box)
 	var close_bottom := Button.new()
-	close_bottom.text = "Kapat"
+	close_bottom.text = L.t("Kapat")
 	close_bottom.custom_minimum_size = Vector2(0, 40)
 	close_bottom.focus_mode = Control.FOCUS_NONE
 	close_bottom.pressed.connect(_close_settings_panel)
 	settings_vbox.add_child(close_bottom)
 
-	var length := _section("OYUN SÜRESİ", "")
-	var interval_row := _stepper_row(length, "Seçimler kaç yılda bir")
+	var length := _section(L.t("OYUN SÜRESİ"), "")
+	var interval_row := _stepper_row(length, L.t("Seçimler kaç yılda bir"))
 	interval_minus = interval_row[0]
 	interval_value_label = interval_row[1]
 	interval_plus = interval_row[2]
-	var count_row := _stepper_row(length, "Kaç seçim olacak")
+	var count_row := _stepper_row(length, L.t("Kaç seçim olacak"))
 	count_minus = count_row[0]
 	count_value_label = count_row[1]
 	count_plus = count_row[2]
 	game_length_summary = _note(length, "")
 	game_length_summary.add_theme_color_override("font_color", SECTION_COLOR)
 
-	var election := _section("SEÇİM", "")
-	var threshold_row := _value_row(election, "Seçim barajı")
+	var election := _section(L.t("SEÇİM"), "")
+	var threshold_row := _value_row(election, L.t("Seçim barajı"))
 	threshold_value_label = threshold_row
 	threshold_slider = HSlider.new()
 	election.add_child(threshold_slider)
 
-	var map_box := _section("HARİTA", "Aynı tohum her zaman aynı ülkeyi üretir. Boş bırakırsan her oyunda rastgele.")
+	var map_box := _section(L.t("HARİTA"), L.t("Aynı tohum her zaman aynı ülkeyi üretir. Boş bırakırsan her oyunda rastgele."))
 	map_seed_edit = LineEdit.new()
-	map_seed_edit.placeholder_text = "Rastgele"
+	map_seed_edit.placeholder_text = L.t("Rastgele")
 	map_seed_edit.max_length = MultiplayerManager.MAP_SEED_MAX_DIGITS
 	map_seed_edit.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_NUMBER
 	map_seed_edit.text_submitted.connect(func(text: String): MultiplayerManager.set_map_seed(text))
 	map_seed_edit.focus_exited.connect(func(): MultiplayerManager.set_map_seed(map_seed_edit.text))
 	map_box.add_child(map_seed_edit)
 
-	var parties_box := _section("RASTGELE PARTİLER", "Açıksa seçimlerden sonra arada bir yeni bir parti (bot) kurulur; bir iki seçim sonra kendini fesheder.")
+	var parties_box := _section(L.t("RASTGELE PARTİLER"), L.t("Açıksa seçimlerden sonra arada bir yeni bir parti (bot) kurulur; bir iki seçim sonra kendini fesheder."))
 	random_parties_check = CheckButton.new()
-	random_parties_check.text = "Yeni partiler katılabilir"
+	random_parties_check.text = L.t("Yeni partiler katılabilir")
 	random_parties_check.focus_mode = Control.FOCUS_NONE
 	random_parties_check.toggled.connect(func(on: bool): MultiplayerManager.set_random_parties(on))
 	parties_box.add_child(random_parties_check)
 
-	var away_box := _section("OYUNDAN DÜŞEN OYUNCU", "Bağlantısı kopan oyuncunun yerine bot oynar ya da dönene kadar pasif kalır (sırası geçer, oylarda çekimser). Aynı cihazdan odaya yeniden katılınca kaldığı yerden devam eder.")
+	var away_box := _section(L.t("OYUNDAN DÜŞEN OYUNCU"), L.t("Bağlantısı kopan oyuncunun yerine bot oynar ya da dönene kadar pasif kalır (sırası geçer, oylarda çekimser). Aynı cihazdan odaya yeniden katılınca kaldığı yerden devam eder."))
 	away_bot_check = CheckButton.new()
-	away_bot_check.text = "Yerine bot oynasın"
+	away_bot_check.text = L.t("Yerine bot oynasın")
 	away_bot_check.focus_mode = Control.FOCUS_NONE
 	away_bot_check.toggled.connect(func(on: bool): MultiplayerManager.set_away_mode(
 		MultiplayerManager.AWAY_BOT if on else MultiplayerManager.AWAY_PASSIVE))
 	away_box.add_child(away_bot_check)
 
-	var bot_box := _section("BOT GELİR ZAYIFLATMASI", "Botların dönemlik geliri ve bağış kampanyaları seçilen tutar kadar (milyon ₺) azalır. 0 = zayıflatma yok.")
+	var bot_box := _section(L.t("BOT GELİR ZAYIFLATMASI"), L.t("Botların dönemlik geliri ve bağış kampanyaları seçilen tutar kadar (milyon ₺) azalır. 0 = zayıflatma yok."))
 	var bot_row := HBoxContainer.new()
 	bot_row.add_theme_constant_override("separation", 6)
 	bot_box.add_child(bot_row)
@@ -476,25 +476,25 @@ func _refresh_code_display() -> void:
 	# ÇEVRİM DIŞI modda oda kodu diye bir şey yok: kod ve kopyala butonu gizlenir.
 	var hint := get_node_or_null("CenterBox/HintLabel") as Label
 	if MultiplayerManager.offline_mode:
-		code_label.text = "ÇEVRİM DIŞI OYUN"
+		code_label.text = L.t("ÇEVRİM DIŞI OYUN")
 		copy_code_button.hide()
 		if hint != null:
-			hint.text = "Ağ yok: sadece sen ve eklediğin botlar oynar."
+			hint.text = L.t("Ağ yok: sadece sen ve eklediğin botlar oynar.")
 		return
 	copy_code_button.show()
 	if hint != null:
-		hint.text = "Bu kodu arkadaşına gönder, o da 'Odaya Katıl' ekranına girsin."
+		hint.text = L.t("Bu kodu arkadaşına gönder, o da 'Odaya Katıl' ekranına girsin.")
 	var shown := "•••••" if GameSettings.streamer_mode else MultiplayerManager.room_code
-	code_label.text = "ODA KODU: %s" % shown
+	code_label.text = L.t("ODA KODU: %s") % shown
 
 func _on_streamer_mode_changed(_enabled: bool) -> void:
 	_refresh_code_display()
 
 func _on_copy_code_pressed() -> void:
 	DisplayServer.clipboard_set(MultiplayerManager.room_code)
-	copy_code_button.text = "Kopyalandı!"
+	copy_code_button.text = L.t("Kopyalandı!")
 	await get_tree().create_timer(1.0).timeout
-	copy_code_button.text = "📋 Kopyala"
+	copy_code_button.text = L.t("📋 Kopyala")
 
 ## Lobi ayarları butonu: panel kapalıysa ekranın sağında açar ve ortadaki
 ## içeriği hafifçe sola kaydırır; açıksa tersini yapıp kapatır.

@@ -58,8 +58,8 @@ func _build_ui() -> void:
 	top.add_theme_constant_override("separation", 0)
 	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(top)
-	top.add_child(UiTheme.mono_label("SİYASETÇİNİ OLUŞTUR", 26, UiTheme.GOLD, true))
-	top.add_child(PopupKit.label("Parti kurmadan önce: kim olduğunu ve nereden geldiğini seç.", 13, UiTheme.TEXT_MUTED))
+	top.add_child(UiTheme.mono_label(L.t("SİYASETÇİNİ OLUŞTUR"), 26, UiTheme.GOLD, true))
+	top.add_child(PopupKit.label(L.t("Parti kurmadan önce: kim olduğunu ve nereden geldiğini seç."), 13, UiTheme.TEXT_MUTED))
 
 	var main := HBoxContainer.new()
 	main.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -82,7 +82,7 @@ func _panel(width: float) -> Array:
 func _build_left() -> Control:
 	var built := _panel(LEFT_WIDTH)
 	var body: VBoxContainer = built[1]
-	body.add_child(PopupKit.section("Siyasetçi"))
+	body.add_child(PopupKit.section(L.t("Siyasetçi")))
 	# İSİM RASTGELE: elle yazılmaz, zar sınırsız atılabilir.
 	var name_row := HBoxContainer.new()
 	name_row.add_theme_constant_override("separation", 10)
@@ -99,17 +99,17 @@ func _build_left() -> Control:
 		name_row.add_child(gb)
 		_gender_buttons[g] = gb
 	# Ad ve soyad elle de yazılabilir; baş harfler zorla büyük yapılır.
-	_first_edit = _name_edit("Ad")
+	_first_edit = _name_edit(L.t("Ad"))
 	name_row.add_child(_first_edit)
-	_surname_edit = _name_edit("Soyad")
+	_surname_edit = _name_edit(L.t("Soyad"))
 	name_row.add_child(_surname_edit)
 	# Üç zar: sadece ad, sadece soyad, ikisi birden (sınırsız basılır).
 	var dice_row := HBoxContainer.new()
 	dice_row.add_theme_constant_override("separation", 8)
 	body.add_child(dice_row)
-	for spec in [["🎲 Ad", "Sadece adı değiştir", true, false],
-			["🎲 Soyad", "Sadece soyadı değiştir", false, true],
-			["🎲 İkisi de", "Ad ve soyadı birlikte değiştir", true, true]]:
+	for spec in [[L.t("🎲 Ad"), L.t("Sadece adı değiştir"), true, false],
+			[L.t("🎲 Soyad"), L.t("Sadece soyadı değiştir"), false, true],
+			[L.t("🎲 İkisi de"), L.t("Ad ve soyadı birlikte değiştir"), true, true]]:
 		var dice := Button.new()
 		dice.text = spec[0]
 		dice.tooltip_text = spec[1]
@@ -120,7 +120,7 @@ func _build_left() -> Control:
 		dice_row.add_child(dice)
 	_reroll_name(true, true)
 
-	body.add_child(PopupKit.section("Geçmiş", "partini bir seçmen grubuna biraz yaklaştırır"))
+	body.add_child(PopupKit.section(L.t("Geçmiş"), L.t("partini bir seçmen grubuna biraz yaklaştırır")))
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -146,7 +146,7 @@ func _background_card(id: String) -> Button:
 	button.pressed.connect(_on_background_pressed.bind(id))
 	# Seçili kartın altın çerçevesi.
 	var frame := Panel.new()
-	frame.name = "SelectedFrame"
+	frame.name = L.t("SelectedFrame")
 	frame.set_anchors_preset(Control.PRESET_FULL_RECT)
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var ring := StyleBoxFlat.new()
@@ -193,8 +193,8 @@ func _build_right() -> Control:
 	# Harita tıklamaları _unhandled_input ile gelir: paneller yutmasın.
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var body: VBoxContainer = built[1]
-	body.add_child(PopupKit.section("Memleket", "haritadan bir il seç"))
-	body.add_child(PopupKit.note("Memleketinde güçlü bir teşkilatla başlarsın; hemşehrilerin sana sahip çıkar.",
+	body.add_child(PopupKit.section(L.t("Memleket"), L.t("haritadan bir il seç")))
+	body.add_child(PopupKit.note(L.t("Memleketinde güçlü bir teşkilatla başlarsın; hemşehrilerin sana sahip çıkar."),
 		UiTheme.TEXT_MUTED))
 
 	_map_clip = Control.new()
@@ -229,7 +229,7 @@ func _build_right() -> Control:
 	_summary = PopupKit.note("", UiTheme.GOLD)
 	texts.add_child(_summary)
 	_continue = Button.new()
-	_continue.text = "Partini Kur  →"
+	_continue.text = L.t("Partini Kur  →")
 	_continue.custom_minimum_size = Vector2(200, 48)
 	_continue.size_flags_vertical = Control.SIZE_SHRINK_END
 	_continue.focus_mode = Control.FOCUS_NONE
@@ -350,14 +350,14 @@ func _refresh() -> void:
 	_continue.disabled = not ready
 	var missing: Array = []
 	if _background_id == "":
-		missing.append("geçmiş")
+		missing.append(L.t("geçmiş"))
 	if _hometown == "":
 		missing.append("memleket")
 	if ready:
-		_summary.text = "%s · %s · memleket %s" % [_full_name(),
+		_summary.text = L.t("%s · %s · memleket %s") % [_full_name(),
 			PoliticianPresets.title(_background_id), GameMap.name_of(_hometown)]
 	else:
-		_summary.text = "Seçilmedi: " + ", ".join(missing)
+		_summary.text = L.t("Seçilmedi: ") + ", ".join(missing)
 
 func _paint_map() -> void:
 	_map.clear_overlay()
@@ -369,11 +369,11 @@ func _paint_map() -> void:
 func _refresh_info() -> void:
 	var id := _hovered if _hovered != "" else _hometown
 	if id == "":
-		_info_title.text = "Bir il seç"
-		_info_body.text = "Haritada bir ile tıkla: orası senin memleketin olur."
+		_info_title.text = L.t("Bir il seç")
+		_info_body.text = L.t("Haritada bir ile tıkla: orası senin memleketin olur.")
 		return
-	_info_title.text = GameMap.name_of(id) + ("  ★ memleket" if id == _hometown else "")
-	_info_body.text = "Senin memleketin." if id == _hometown else "Seçmek için tıkla."
+	_info_title.text = GameMap.name_of(id) + (L.t("  ★ memleket") if id == _hometown else "")
+	_info_body.text = L.t("Senin memleketin.") if id == _hometown else L.t("Seçmek için tıkla.")
 
 func _is_complete() -> bool:
 	return _first_name != "" and _surname != "" and not PoliticianPresets.is_banned_surname(_surname) \

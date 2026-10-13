@@ -175,10 +175,10 @@ static func is_group(group: String) -> bool:
 	return GROUPS.has(group)
 
 static func data(group: String) -> Dictionary:
-	return GROUPS.get(group, {})
+	return L.tr_dict(GROUPS.get(group, {}))
 
 static func title(group: String) -> String:
-	return String(GROUPS.get(group, {}).get("title", group))
+	return L.t(String(GROUPS.get(group, {}).get("title", group)))
 
 static func color(group: String) -> Color:
 	return GROUPS.get(group, {}).get("color", Color.GRAY)
@@ -193,7 +193,7 @@ static func pair_of(group: String) -> String:
 	return String(GROUPS.get(group, {}).get("pair", ""))
 
 static func issues_text(group: String) -> String:
-	return ", ".join(PackedStringArray(GROUPS.get(group, {}).get("issues", [])))
+	return ", ".join(PackedStringArray(data(group).get("issues", [])))
 
 # --- İl profili --------------------------------------------------------------------------
 
@@ -419,4 +419,4 @@ static func party_closeness(a: Dictionary, b: Dictionary) -> float:
 
 ## "%62" gibi gösterim.
 static func percent_text(value: float) -> String:
-	return "%%%d" % int(round(value))
+	return L.pct(value, 0)

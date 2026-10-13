@@ -208,12 +208,12 @@ const CRISES := {
 func crisis_data(crisis_type: String) -> Dictionary:
 	if not CRISES.has(crisis_type):
 		return {}
-	return _with_group_info(CRISES[crisis_type])
+	return L.tr_dict(_with_group_info(CRISES[crisis_type]))
 
 func agenda_data(agenda_type: String) -> Dictionary:
 	if not AGENDAS.has(agenda_type):
 		return {}
-	return _with_group_info(AGENDAS[agenda_type])
+	return L.tr_dict(_with_group_info(AGENDAS[agenda_type]))
 
 func _with_group_info(source: Dictionary) -> Dictionary:
 	var data: Dictionary = source.duplicate()
@@ -235,7 +235,7 @@ func agenda_effect_text(agenda_type: String) -> String:
 	var groups := agenda_groups(agenda_type)
 	if groups.size() != 2:
 		return ""
-	return "sadece %s ya da %s için yasa sunulabilir" % [VoterGroups.title(groups[0]), VoterGroups.title(groups[1])]
+	return L.t("sadece %s ya da %s için yasa sunulabilir") % [VoterGroups.title(groups[0]), VoterGroups.title(groups[1])]
 
 func is_censure_card(card_type: String) -> bool:
 	return card_type == CENSURE_CARD_TYPE
@@ -291,69 +291,69 @@ func weighted_pick(weights: Dictionary, rng: RandomNumberGenerator) -> String:
 func card_short_title(card_type: String) -> String:
 	match card_type:
 		"populizm":
-			return "POPÜLİZM\nBONUSU"
+			return L.t("POPÜLİZM\nBONUSU")
 		"bagis_kampanyasi":
-			return "BAĞIŞ\nKAMPANYASI"
+			return L.t("BAĞIŞ\nKAMPANYASI")
 		"bagis_kampanyasi_guclu":
-			return "BÜYÜK BAĞIŞ\nKAMPANYASI"
+			return L.t("BÜYÜK BAĞIŞ\nKAMPANYASI")
 		"bonus_kart":
-			return "BONUS\nKART"
+			return L.t("BONUS\nKART")
 		"kart_calma":
-			return "KART\nÇALMA"
+			return L.t("KART\nÇALMA")
 		"isyan":
-			return "İÇ\nKARIŞIKLIK"
+			return L.t("İÇ\nKARIŞIKLIK")
 		"erken_secim":
-			return "ERKEN\nSEÇİM"
+			return L.t("ERKEN\nSEÇİM")
 		"steal_weak":
-			return "VEKİL ÇALMA\nZAYIF"
+			return L.t("VEKİL ÇALMA\nZAYIF")
 		"steal_medium":
-			return "VEKİL ÇALMA\nORTA"
+			return L.t("VEKİL ÇALMA\nORTA")
 		"steal_strong":
-			return "VEKİL ÇALMA\nGÜÇLÜ"
+			return L.t("VEKİL ÇALMA\nGÜÇLÜ")
 	return card_title(card_type).to_upper()
 
 func card_title(card_type: String) -> String:
 	# Grup yasalarıyla (ör. işverenlerin "Vergi İndirimi ve Yatırım Teşvik
 	# Yasası") karışmasın diye BÜTÇE yasası adını taşır.
 	if is_tax_law(card_type):
-		return "Bütçe Yasası: %s Vergi" % Economy.tax_title(tax_law_level(card_type))
+		return L.t("Bütçe Yasası: %s Vergi") % Economy.tax_title(tax_law_level(card_type))
 	if is_law_card(card_type):
 		return String(law_data(card_type)["title"])
 	match card_type:
 		"steal_weak":
-			return "Vekil Çalma"
+			return L.t("Vekil Çalma")
 		"steal_strong":
-			return "Vekil Çalma (Güçlü)"
+			return L.t("Vekil Çalma (Güçlü)")
 		"kaset":
-			return "Kaset / İtibar Suikastı"
+			return L.t("Kaset / İtibar Suikastı")
 		"isyan":
-			return "İç Karışıklık"
+			return L.t("İç Karışıklık")
 		"kart_calma":
-			return "Kart Çalma"
+			return L.t("Kart Çalma")
 		"bonus_kart":
-			return "Bonus Kart"
+			return L.t("Bonus Kart")
 		"bagis_kampanyasi_guclu":
-			return "Büyük Bağış Kampanyası"
+			return L.t("Büyük Bağış Kampanyası")
 		"gensoru":
-			return "Gensoru"
+			return L.t("Gensoru")
 		"miting":
-			return "Miting"
+			return L.t("Miting")
 		"yatirim":
-			return "Yatırım"
+			return L.t("Yatırım")
 		"karalama":
-			return "Karalama"
+			return L.t("Karalama")
 		"populizm":
-			return "Popülizm Bonusu"
+			return L.t("Popülizm Bonusu")
 		"bagis_kampanyasi":
-			return "Bağış Kampanyası"
+			return L.t("Bağış Kampanyası")
 		"erken_secim":
-			return "Erken Seçim"
+			return L.t("Erken Seçim")
 	return card_type
 
 ## Yasanın hedef grubu: "İşçiler ve Sendikalar".
 func law_direction_text(card_type: String) -> String:
 	if is_tax_law(card_type):
-		return "vergi %s" % Economy.tax_title(tax_law_level(card_type))
+		return L.t("vergi %s") % Economy.tax_title(tax_law_level(card_type))
 	var law := law_data(card_type)
 	if law.is_empty():
 		return ""
@@ -367,7 +367,7 @@ func law_description(card_type: String) -> String:
 		return ""
 	var group := String(law["group"])
 	var backlash := float(VoterGroups.data(group).get("law_backlash", 0.4))
-	return "Sorun: %s.\nKabul edilirse %s arasında %s, %s arasında %s. Reddedilse de vaat olarak küçük bir kazanç kalır." % [
+	return L.t("Sorun: %s.\nKabul edilirse %s arasında %s, %s arasında %s. Reddedilse de vaat olarak küçük bir kazanç kalır.") % [
 		law["problem"], law["group_title"], EffectWords.change(PublicOpinion.LAW_GROUP_GAIN_PASSED, "group"),
 		VoterGroups.title(String(law["opposite"])), EffectWords.change(-PublicOpinion.LAW_GROUP_GAIN_PASSED * backlash, "group")]
 
@@ -376,7 +376,7 @@ func card_description(card_type: String) -> String:
 	var text := _card_effect_text(card_type)
 	var cost := card_cost(card_type)
 	if cost > 0 and not is_law_card(card_type):
-		text += "\nBedel: %s" % GameRules.cost_text(cost)
+		text += L.t("\nBedel: %s") % GameRules.cost_text(cost)
 	return text
 
 ## Kartın ETKİSİ: ne olur, ne kadar güçlü (nitel), kritik kısıt. Kesin
@@ -386,37 +386,37 @@ func _card_effect_text(card_type: String) -> String:
 		return law_description(card_type)
 	if needs_target(card_type):
 		var r: Dictionary = STEAL_RANGES[card_type]
-		var cost_line := "Bedeli: biraz ulusal destek kaybedersin." if card_type == STEAL_STRONG_CARD_TYPE \
-			else "Çalınan parti mağduriyetten biraz destek kazanır."
-		return "Seçtiğin partiden %d–%d vekil çal; aynı seçmen gruplarına hitap ediyorsanız daha çok.\n%s\nSeç, sonra soldaki bir partiye tıkla." % [
+		var cost_line := L.t("Bedeli: biraz ulusal destek kaybedersin.") if card_type == STEAL_STRONG_CARD_TYPE \
+			else L.t("Çalınan parti mağduriyetten biraz destek kazanır.")
+		return L.t("Seçtiğin partiden %d–%d vekil çal; aynı seçmen gruplarına hitap ediyorsanız daha çok.\n%s\nSeç, sonra soldaki bir partiye tıkla.") % [
 			int(r["min"]), int(r["max"]), cost_line]
 	match card_type:
 		REPUTATION_CARD_TYPE:
-			return "Seçtiğin partinin itibarını sarsan bir kaset sızar: %s ve parti içi karışıklık.\nSeç, sonra soldaki bir partiye tıkla." % \
+			return L.t("Seçtiğin partinin itibarını sarsan bir kaset sızar: %s ve parti içi karışıklık.\nSeç, sonra soldaki bir partiye tıkla.") % \
 				EffectWords.change(-PublicOpinion.REPUTATION_NATIONAL_DAMAGE)
 		REBELLION_CARD_TYPE:
-			return "Seçtiğin partide iç karışıklık çıkar: %s. Karışıklık birikirse parti bölünebilir.\nSeç, sonra soldaki bir partiye tıkla." % \
+			return L.t("Seçtiğin partide iç karışıklık çıkar: %s. Karışıklık birikirse parti bölünebilir.\nSeç, sonra soldaki bir partiye tıkla.") % \
 				EffectWords.change(-PublicOpinion.REBELLION_NATIONAL_DAMAGE)
 		CARD_THEFT_CARD_TYPE:
-			return "Seçtiğin partinin elinden rastgele bir kart çalarsın (eli boşsa kart boşa gider).\nSeç, sonra soldaki bir partiye tıkla."
+			return L.t("Seçtiğin partinin elinden rastgele bir kart çalarsın (eli boşsa kart boşa gider).\nSeç, sonra soldaki bir partiye tıkla.")
 		BONUS_CARD_TYPE:
-			return "%d kart daha çekersin (el doluysa sığdığı kadar).\nSeçmek için dokun, tekrar dokun: kullan." % GameRules.BONUS_CARD_DRAW
+			return L.t("%d kart daha çekersin (el doluysa sığdığı kadar).\nSeçmek için dokun, tekrar dokun: kullan.") % GameRules.BONUS_CARD_DRAW
 		FUNDS_BONUS_STRONG_CARD_TYPE:
-			return "Büyük bir bağış kampanyası: kasana %s girer.\nSeçmek için dokun, tekrar dokun: kullan." % GameRules.cost_text(GameRules.FUNDS_BONUS_STRONG)
+			return L.t("Büyük bir bağış kampanyası: kasana %s girer.\nSeçmek için dokun, tekrar dokun: kullan.") % GameRules.cost_text(GameRules.FUNDS_BONUS_STRONG)
 		EARLY_ELECTION_CARD_TYPE:
-			return "Meclise erken seçim önerisi sunarsın; kabul edilirse dönem sonunda sandığa gidilir.\nSeçmek için dokun, tekrar dokun: kullan."
+			return L.t("Meclise erken seçim önerisi sunarsın; kabul edilirse dönem sonunda sandığa gidilir.\nSeçmek için dokun, tekrar dokun: kullan.")
 		CENSURE_CARD_TYPE:
-			return "Hükümeti düşürmek için gensoru ver.\nSeçmek için dokun, tekrar dokun: kullan."
+			return L.t("Hükümeti düşürmek için gensoru ver.\nSeçmek için dokun, tekrar dokun: kullan.")
 		MITING_CARD_TYPE:
-			return "Seçtiğin ilde %s; partin ilin kalabalık seçmen gruplarına yaklaşır. Seçmen sana uzaksa provokasyon riski var." % \
-				EffectWords.change(PublicOpinion.MITING_LOCAL, "local", "yerel güç")
+			return L.t("Seçtiğin ilde %s; partin ilin kalabalık seçmen gruplarına yaklaşır. Seçmen sana uzaksa provokasyon riski var.") % \
+				EffectWords.change(PublicOpinion.MITING_LOCAL, "local", L.t("yerel güç"))
 		INVEST_CARD_TYPE:
-			return "Hükümet: seçtiğin ile devlet hazinesinden %s yatırım. İlde %s; etkinin yarısı hemen, kalanı sonraki dönemlerde." % [
-				Economy.money_full(Economy.INVEST_COST), EffectWords.change(PublicOpinion.INVEST_LOCAL, "local", "yerel güç")]
+			return L.t("Hükümet: seçtiğin ile devlet hazinesinden %s yatırım. İlde %s; etkinin yarısı hemen, kalanı sonraki dönemlerde.") % [
+				Economy.money_full(Economy.INVEST_COST), EffectWords.change(PublicOpinion.INVEST_LOCAL, "local", L.t("yerel güç"))]
 		PROPAGANDA_CARD_TYPE:
-			return "Bir ilde bir partiyi karala: ona eksi, sana artı.\nİlde güçlü olan partiye az işler."
+			return L.t("Bir ilde bir partiyi karala: ona eksi, sana artı.\nİlde güçlü olan partiye az işler.")
 		POPULISM_CARD_TYPE:
-			return "%d dönem boyunca hamlelerin çok daha etkili, kötü sonuçlar hafifler; bu sürede seçim olursa ek ulusal destek.\nSeçmek için dokun, tekrar dokun: kullan." % GameRules.POPULISM_ROUNDS
+			return L.t("%d dönem boyunca hamlelerin çok daha etkili, kötü sonuçlar hafifler; bu sürede seçim olursa ek ulusal destek.\nSeçmek için dokun, tekrar dokun: kullan.") % GameRules.POPULISM_ROUNDS
 		FUNDS_BONUS_CARD_TYPE:
-			return "Bağış kampanyası: kasana %s girer.\nSeçmek için dokun, tekrar dokun: kullan." % GameRules.cost_text(GameRules.FUNDS_BONUS_WEAK)
+			return L.t("Bağış kampanyası: kasana %s girer.\nSeçmek için dokun, tekrar dokun: kullan.") % GameRules.cost_text(GameRules.FUNDS_BONUS_WEAK)
 	return ""

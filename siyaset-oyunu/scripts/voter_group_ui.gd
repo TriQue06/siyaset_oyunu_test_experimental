@@ -60,10 +60,10 @@ static func affinity_row(group: String, value: float, bonus: float = 0.0, delta:
 		text += " " + ("▲" if delta > 0.0 else "▼")
 	box.add_child(name_row(group, text, UiTheme.TEXT))
 	box.add_child(bar(value / 100.0, VoterGroups.color(group), BAR_HEIGHT, bonus / 100.0, VoterGroups.color(group).lightened(0.55)))
-	box.tooltip_text = "%s: partinin bu gruptaki desteği %s%s%s.\nBu, grubun ülkedeki nüfus payı değildir." % [
+	box.tooltip_text = L.t("%s: partinin bu gruptaki desteği %s%s%s.\nBu, grubun ülkedeki nüfus payı değildir.") % [
 		VoterGroups.title(group), VoterGroups.percent_text(value),
-		" (toplantıdan geçici destek dahil)" if bonus > 0.0 else "",
-		("; son dönemde " + EffectWords.change(delta, "group")) if absf(delta) >= 0.5 else ""]
+		L.t(" (toplantıdan geçici destek dahil)") if bonus > 0.0 else "",
+		(L.t("; son dönemde ") + EffectWords.change(delta, "group")) if absf(delta) >= 0.5 else ""]
 	return box
 
 ## İl profilinde bir ÇİFT: üstte ilk grup ve yüzdesi, ortada iki renkli
@@ -76,7 +76,7 @@ static func pair_rows(pair: String, profile: Dictionary) -> Control:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 1)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(name_row(a, "%%%d" % pa, UiTheme.TEXT))
+	box.add_child(name_row(a, L.t("%%%d") % pa, UiTheme.TEXT))
 	var split := Control.new()
 	split.custom_minimum_size = Vector2(0, BAR_HEIGHT + 1.0)
 	split.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -88,13 +88,23 @@ static func pair_rows(pair: String, profile: Dictionary) -> Control:
 		split.draw_rect(Rect2(cut, 0, w - cut, split.size.y), VoterGroups.color(b), true)
 		split.draw_line(Vector2(cut, -1), Vector2(cut, split.size.y + 1), UiTheme.INK, 2.0))
 	box.add_child(split)
-	box.add_child(name_row(b, "%%%d" % (100 - pa), UiTheme.TEXT))
-	box.tooltip_text = "Bu ilde %s %%%d, %s %%%d (iki taraf toplam %%100)." % [
+	box.add_child(name_row(b, L.t("%%%d") % (100 - pa), UiTheme.TEXT))
+	box.tooltip_text = L.t("Bu ilde %s %%%d, %s %%%d (iki taraf toplam %%100).") % [
 		VoterGroups.title(a), pa, VoterGroups.title(b), 100 - pa]
 	return box
 
 ## Etki satırı (önizlemeler için): [simge] Grup adı   hafif artış / orta kayıp
 static func effect_row(group: String, amount: float, font_size: int = FS_NAME) -> Control:
 	var color := UiTheme.GREEN if amount > 0.0 else UiTheme.RED
-	var text := "%s %s" % [EffectWords.adjective(amount, "group"), "artış" if amount > 0.0 else "kayıp"]
-	return name_row(group, text, color, font_size, 14.0, true)
+	var text := "%s %s" % [EffectWords.adjective(amount, "group"), L.t("artış") if amount > 0.0 else L.t("kayıp")]
+	# İki satır: grup adı tam, altında sağa yaslı etki (uzun çeviri paneli genişletmesin).
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", -2)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(name_row(group, "", color, font_size, 14.0))
+	var value := PopupKit.label(text, font_size, color)
+	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	value.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	value.custom_minimum_size = Vector2(80, 0)
+	box.add_child(value)
+	return box

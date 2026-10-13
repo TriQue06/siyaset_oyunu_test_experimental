@@ -1,0 +1,3115 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: en\n"
+
+msgid "\nBedel: %s"
+msgstr "\nCost: %s"
+
+msgid "\nGündemde değil: bu dönem bu grup için yasa sunulamaz."
+msgstr "\nNot on the agenda: no law can be proposed for this group this term."
+
+msgid "\nKRİZ bu grubu istiyor: ulusal destek de kazandırır."
+msgstr "\nThe CRISIS calls for this group: it also brings national support."
+
+msgid "\nORTAK önerildin: EVET kabul, HAYIR ret (çekimser yok)"
+msgstr "\nYou were proposed as a PARTNER: YES accepts, NO rejects (no abstaining)"
+
+msgid "\nOrtaklarının cevabı bekleniyor"
+msgstr "\nWaiting for your partners' answers"
+
+msgid "\nOyun: %s"
+msgstr "\nYour vote: %s"
+
+msgid "\nOyun: %s · diğer partilerin oyu bekleniyor"
+msgstr "\nYour vote: %s · waiting for the other parties"
+
+msgid "\nSayım: "
+msgstr "\nCounting: "
+
+msgid "\nSüre: %s"
+msgstr "\nTime: %s"
+
+msgid "  (oyun: %s)"
+msgstr "  (your vote: %s)"
+
+msgid "  (sen)"
+msgstr "  (you)"
+
+msgid "  ·  Geçersiz yere bırak: iptal"
+msgstr "  ·  Drop in an invalid spot: cancel"
+
+msgid "  · GENEL BAŞKAN"
+msgstr "  · LEADER"
+
+msgid "  · OYUNCU"
+msgstr "  · PLAYER"
+
+msgid "  ●  CANLI  "
+msgstr "  ●  LIVE  "
+
+msgid "  ★ memleket"
+msgstr "  ★ hometown"
+
+msgid " %s +%d puan."
+msgstr " %s +%d points."
+
+msgid " %s devlet yatırımı meşru kamu harcaması sayıldı."
+msgstr " %s of state investment was found to be legitimate public spending."
+
+msgid " %s hükümeti tek başına kaldı."
+msgstr " The %s government is left on its own."
+
+msgid " %s'nin %d teşkilatından %d tanesi (%%%d) yeni partiye geçti."
+msgstr " Of %s's %d organizations, %d (%d%%) moved to the new party."
+
+msgid " (%s'den) · %s"
+msgstr " (from %s) · %s"
+
+msgid " (Panel yine de açılır: yasaları incele.)"
+msgstr " (The panel opens anyway: browse the laws.)"
+
+msgid " (Sen)"
+msgstr " (You)"
+
+msgid " (değişmiyor)"
+msgstr " (unchanged)"
+
+msgid " (genel başkan yardımcısı HAYIR dedi)"
+msgstr " (the deputy leader voted NO)"
+
+msgid " (sen)"
+msgstr " (you)"
+
+msgid " (toplantıdan geçici destek dahil)"
+msgstr " (including temporary support from a meeting)"
+
+msgid " (vaat olarak, az)"
+msgstr " (as a promise, small)"
+
+msgid " (şu an: %s)"
+msgstr " (currently: %s)"
+
+msgid " Başbakanlık %s'ye geçti; hükümet azınlıkta."
+msgstr " The prime ministry passed to %s; the government is in the minority."
+
+msgid " Büyük ortak gitti: koalisyon baskı altında, kalan ortaklar da destek kaybetti."
+msgstr " The big partner left: the coalition is under pressure and the remaining partners lost support too."
+
+msgid " Dönem sonunda sandığa gidiliyor."
+msgstr " Voters go to the polls at the end of the term."
+
+msgid " Görev sıradaki partiye geçti: %s."
+msgstr " The mandate passed to the next party: %s."
+
+msgid " Görevleri %s'ye geçti."
+msgstr " Its posts passed to %s."
+
+msgid " Hitabı %s."
+msgstr " Its appeal %s."
+
+msgid " Hiçbir parti hükümet kuramadı — dönem sonunda sandığa gidiliyor."
+msgstr " No party could form a government — voters go to the polls at the end of the term."
+
+msgid " Hükümet düştü."
+msgstr " The government fell."
+
+msgid " Hükümet salt çoğunluğu kaybetti!"
+msgstr " The government lost its absolute majority!"
+
+msgid " Hükümet salt çoğunluğu kaybetti."
+msgstr " The government lost its absolute majority."
+
+msgid " KRİZ: %s için yasa ulusal destek getirir."
+msgstr " CRISIS: a law for %s brings national support."
+
+msgid " KRİZ: %s — %s için yasa sunan, EVET diyen ya da toplantı yapan partiler ulusal destek kazanır."
+msgstr " CRISIS: %s — parties that propose a law for %s, vote YES on it or meet with them gain national support."
+
+msgid " Kendi kasasından ödediği %s ise doğrulandı."
+msgstr " Its %s of self-funded spending was verified."
+
+msgid " Kongre isteyen %s kaybetti."
+msgstr " %s, who demanded the congress, lost."
+
+msgid " Kriz bu grubu istiyor: ulusal destek de kazandırır."
+msgstr " The crisis calls for this group: it also brings national support."
+
+msgid " Krize yanıt verdi (ulusal destek)."
+msgstr " Responded to the crisis (national support)."
+
+msgid " Krize yanıt verdi (ulusal destek): %s."
+msgstr " Responded to the crisis (national support): %s."
+
+msgid " Miting yaptığı illerde teşkilatla başlıyor: %s."
+msgstr " It starts with organizations in the provinces where it held rallies: %s."
+
+msgid " Seçimde hâlâ %s etkisi olur."
+msgstr " It will still have a %s effect at the election."
+
+msgid " Seçime %d dönem var: seçime kadar söner."
+msgstr " %d terms until the election: it fades before then."
+
+msgid " Yalnız kalan %s −%d puan."
+msgstr " %s, left alone, −%d points."
+
+msgid " Yeni baraj %%%s, seçimler %d yılda bir, sayım: %s."
+msgstr " New threshold %s%%, elections every %d years, counting: %s."
+
+msgid " ve %d ilde birinci"
+msgstr " and first in %d provinces"
+
+msgid " ve birçok ilde birinci"
+msgstr " and first in many provinces"
+
+msgid " · KRİZ"
+msgstr " · CRISIS"
+
+msgid " · grup desteğine etkisi yok"
+msgstr " · no effect on group support"
+
+msgid " · hitap: "
+msgstr " · appeal: "
+
+msgid " · kendi harcamaların (bağımsız denetim)"
+msgstr " · your own spending (independent audit)"
+
+msgid " · memleket: %s"
+msgstr " · hometown: %s"
+
+msgid " · yerleşik"
+msgstr " · settled"
+
+msgid " · üye"
+msgstr " · member"
+
+msgid " · üye "
+msgstr " · member "
+
+msgid "! USULSÜZLÜK"
+msgstr "! IRREGULARITY"
+
+msgid "%%%.0f"
+msgstr "%.0f%%"
+
+msgid "%%%.1f"
+msgstr "%.1f%%"
+
+msgid "%%%d"
+msgstr "%d%%"
+
+msgid "%%%s"
+msgstr "%s%%"
+
+msgid "%90 doğru"
+msgstr "90% accurate"
+
+msgid "%d  ·  %%%d"
+msgstr "%d  ·  %d%%"
+
+msgid "%d bakanlık"
+msgstr "%d ministries"
+
+msgid "%d dilim seçimden sonra"
+msgstr "%d installments after the election"
+
+msgid "%d dönem boyunca hamlelerin çok daha etkili, kötü sonuçlar hafifler; bu sürede seçim olursa ek ulusal destek.\nSeçmek için dokun, tekrar dokun: kullan."
+msgstr "For %d terms your moves are much stronger and bad outcomes milder; extra national support if an election falls in that time.\nTap to select, tap again to use."
+
+msgid "%d dönem tamamlandı. Son hükümeti %s kurdu."
+msgstr "%d terms completed. The last government was formed by %s."
+
+msgid "%d dönem tamamlandı. Son seçimden sonra hükümet kurulamadı."
+msgstr "%d terms completed. No government could be formed after the last election."
+
+msgid "%d genel seçimi yapıldı."
+msgstr "The %d general election was held."
+
+msgid "%d görevi ortaklar arasında paylaştır. Başbakanlık kimdeyse ANA İKTİDAR PARTİSİ odur.\nMecliste %d sandalye var; teklifin düşmesi için HAYIR oylarının %d sandalyeyi geçmesi gerekir."
+msgstr "Share %d posts among the partners. Whoever holds the prime ministry is the MAIN GOVERNING PARTY.\nParliament has %d seats; for the offer to fail, NO votes must exceed %d seats."
+
+msgid "%d il sürüyor · %s"
+msgstr "%d provinces under way · %s"
+
+msgid "%d kart daha çekersin (el doluysa sığdığı kadar).\nSeçmek için dokun, tekrar dokun: kullan."
+msgstr "You draw %d more cards (as many as fit in your hand).\nTap to select, tap again to use."
+
+msgid "%d milletvekili"
+msgstr "%d MPs"
+
+msgid "%d mv"
+msgstr "%d seats"
+
+msgid "%d seçim kaldı"
+msgstr "%d elections left"
+
+msgid "%d vekil"
+msgstr "%d seats"
+
+msgid "%d yıl"
+msgstr "%d years"
+
+msgid "%d'de başlar, %d yıl sürer (bir tur 6 ay). Seçimler: %s."
+msgstr "Starts in %d and lasts %d years (one turn is 6 months). Elections: %s."
+
+msgid "%d-%d karakter"
+msgstr "%d-%d characters"
+
+msgid "%d/%d sandalye — %s"
+msgstr "%d/%d seats — %s"
+
+msgid "%s\n%s\nTalepler: %s"
+msgstr "%s\n%s\nDemands: %s"
+
+msgid "%s\n%s teklifi"
+msgstr "%s\n%s's offer"
+
+msgid "%s\nKonu: %s\nPartinin bu gruptaki desteği %s; toplantı bu dönem %s.%s"
+msgstr "%s\nTopic: %s\nYour party's support in this group is %s; the meeting brings %s this term.%s"
+
+msgid "%s\nTalepler: %s%s"
+msgstr "%s\nDemands: %s%s"
+
+msgid "%s   (Süre: %s)"
+msgstr "%s   (Time: %s)"
+
+msgid "%s  ·  %d delege"
+msgstr "%s  ·  %d delegates"
+
+msgid "%s  ·  %d puan"
+msgstr "%s  ·  %d points"
+
+msgid "%s  ·  Baraj %%%s\n%s"
+msgstr "%s  ·  Threshold %s%%\n%s"
+
+msgid "%s  ·  Onaylamak için tekrar dokun"
+msgstr "%s  ·  Tap again to confirm"
+
+msgid "%s %s (EVET %d – HAYIR %d)."
+msgstr "%s %s (YES %d – NO %d)."
+
+msgid "%s %s — %s, %s seçmeninde güçlendi%s; %s seçmeninde biraz kaybetti.%s"
+msgstr "%s %s — %s gained among %s voters%s; lost a little among %s voters.%s"
+
+msgid "%s (partinden)"
+msgstr "%s (from your party)"
+
+msgid "%s / %s kayıp"
+msgstr "%s / %s loss"
+
+msgid "%s BÖLÜNDÜ! Parti içi karışıklık sonunda %d milletvekili %s önderliğinde ayrılıp %s'yi kurdu."
+msgstr "%s SPLIT! After internal turmoil, %d MPs left under %s and founded %s."
+
+msgid "%s KABUL EDİLDİ — vergiler %s → %s. Dönem geliri %s → %s. Seçmen bunu kademeli hissedecek (yaklaşık %d dönem). %s +%d puan."
+msgstr "%s PASSED — taxes %s → %s. Revenue per term %s → %s. Voters will feel it gradually (about %d terms). %s +%d points."
+
+msgid "%s KONGRESİ  ·  CANLI YAYIN"
+msgstr "%s CONGRESS  ·  LIVE"
+
+msgid "%s KONGRESİ: %s genel başkanlığa geri döndü!"
+msgstr "%s CONGRESS: %s is back as leader!"
+
+msgid "%s KONGRESİ: %s genel başkanlığı kaybetti! Yeni genel başkan %s. %s partide üye olarak kalıyor."
+msgstr "%s CONGRESS: %s lost the leadership! The new leader is %s. %s stays on as a member."
+
+msgid "%s KONGRESİ: %s genel başkanlığını korudu."
+msgstr "%s CONGRESS: %s kept the leadership."
+
+msgid "%s KONGRESİ: %s yeni genel başkan seçildi."
+msgstr "%s CONGRESS: %s was elected the new leader."
+
+msgid "%s ayrıldı, hükümet düştü."
+msgstr "%s left; the government fell."
+
+msgid "%s ayrıldığı için teklif düştü."
+msgstr "The offer fell because %s left."
+
+msgid "%s barajın %s  (%%%.1f)"
+msgstr "%s %s the threshold  (%.1f%%)"
+
+msgid "%s bağış kampanyası yaptı (+%s)."
+msgstr "%s ran a fundraising campaign (+%s)."
+
+msgid "%s başladı."
+msgstr "%s began."
+
+msgid "%s bir kartı bozdurdu (+%s)."
+msgstr "%s cashed in a card (+%s)."
+
+msgid "%s bonus kart kullandı (+%d kart)."
+msgstr "%s played a bonus card (+%d cards)."
+
+msgid "%s büyük bir bağış kampanyası yaptı (+%s)."
+msgstr "%s ran a major fundraising campaign (+%s)."
+
+msgid "%s döneminde parti oy kaybetmedi: kongreyi kazanmanın yolu yok."
+msgstr "The party didn't lose votes under %s: there's no way to win a congress."
+
+msgid "%s erken seçim önergesi verdi."
+msgstr "%s tabled a motion for early elections."
+
+msgid "%s erken seçim önergesi verdi: meclis oylaması başladı."
+msgstr "%s tabled a motion for early elections: parliament is voting."
+
+msgid "%s hakkında kaset sızdı: %s, parti içinde karışıklık."
+msgstr "A tape about %s leaked: %s, turmoil inside the party."
+
+msgid "%s hükümet kurma süresini doldurdu."
+msgstr "%s ran out of time to form a government."
+
+msgid "%s hükümet kuruyor… (%d. teklif hakkı, %s)"
+msgstr "%s is forming a government… (attempt %d, %s)"
+
+msgid "%s hükümete gensoru verdi: meclis oylaması başladı."
+msgstr "%s tabled a motion of no confidence: parliament is voting."
+
+msgid "%s hükümeti güvenoyu aldı."
+msgstr "The %s government won the confidence vote."
+
+msgid "%s hükümetinin ekonomi politikasına seçmen tepkisi:\n%s"
+msgstr "Voter reaction to the %s government's economic policy:\n%s"
+
+msgid "%s ilk seçiminde %%%s oy aldı%s."
+msgstr "%s won %s%% of the vote in its first election%s."
+
+msgid "%s için sağdaki bir partinin logosuna bırak"
+msgstr "%s: drop on a party's logo on the right"
+
+msgid "%s için yasa / toplantı ulusal destek getirir"
+msgstr "a law or meeting for %s brings national support"
+
+msgid "%s kendini feshetti (%d vekil dağıldı)."
+msgstr "%s dissolved itself (%d MPs scattered)."
+
+msgid "%s koalisyondan çekildi: %s.%s%s%s"
+msgstr "%s left the coalition: %s.%s%s%s"
+
+msgid "%s milyon ₺"
+msgstr "%s million ₺"
+
+msgid "%s miting yaptı"
+msgstr "%s held a rally"
+
+msgid "%s mitinginde PROVOKASYON: ilde ve ülkede destek kaybı"
+msgstr "PROVOCATION at the %s rally: support lost locally and nationally"
+
+msgid "%s oy oranını korudu%s."
+msgstr "%s held its vote share%s."
+
+msgid "%s oyuna geri döndü."
+msgstr "%s is back in the game."
+
+msgid "%s oyundan düştü: %s."
+msgstr "%s dropped out of the game: %s."
+
+msgid "%s popülizme başladı: %d dönem boyunca hamleleri daha etkili."
+msgstr "%s turned populist: its moves are stronger for %d terms."
+
+msgid "%s reddedildi — vergiler %s kalıyor."
+msgstr "%s was rejected — taxes stay %s."
+
+msgid "%s tek başına çoğunluğu yakaladı!  (%d vekil)"
+msgstr "%s wins a majority on its own!  (%d seats)"
+
+msgid "%s teşkilat %s (seviye %d)"
+msgstr "%s organization %s (level %d)"
+
+msgid "%s teşkilatı seviye %d: %s"
+msgstr "%s organization level %d: %s"
+
+msgid "%s yatırımı tamamlandı"
+msgstr "%s investment completed"
+
+msgid "%s yatırımı · devlet hazinesi %s → %s milyon ₺\nGüçlü yerel etki: yarısı hemen, kalanı %d dönemde · ekonomi canlanır"
+msgstr "%s investment · state treasury %s → %s million ₺\nStrong local effect: half now, the rest within %d terms · the economy picks up"
+
+msgid "%s · %s · memleket %s"
+msgstr "%s · %s · hometown %s"
+
+msgid "%s · +%s / dönem"
+msgstr "%s · +%s / term"
+
+msgid "%s · dokun: profil"
+msgstr "%s · tap: profile"
+
+msgid "%s · eski meslek: %s"
+msgstr "%s · former profession: %s"
+
+msgid "%s · miting finansmanı"
+msgstr "%s · rally funding"
+
+msgid "%s · yatırım finansmanı"
+msgstr "%s · investment funding"
+
+msgid "%s öne geçti!  (%%%.1f)"
+msgstr "%s takes the lead!  (%.1f%%)"
+
+msgid "%s — %s   (%d sandalye)"
+msgstr "%s — %s   (%d seats)"
+
+msgid "%s → %s milyon ₺ / dönem"
+msgstr "%s → %s million ₺ / term"
+
+msgid "%s%s / dönem"
+msgstr "%s%s / term"
+
+msgid "%s'da %s mitinginde provokasyon çıktı: parti ilde ve ülke genelinde destek kaybetti."
+msgstr "A provocation broke out at a rally in %s by %s: the party lost support locally and nationwide."
+
+msgid "%s'da iç karışıklık çıktı: parti sarsıldı, ulusal desteği düştü."
+msgstr "Infighting broke out in %s: the party was shaken and lost national support."
+
+msgid "%s'da teşkilatın yok — önce teşkilatlan"
+msgstr "You have no organization in %s — organize first"
+
+msgid "%s, %s ile grup toplantısı yaptı (%s): o grupta geçici, %s."
+msgstr "%s met with %s (%s): temporary, %s in that group."
+
+msgid "%s, %s karşıtı kampanya yaptı (%s, %s)"
+msgstr "%s campaigned against %s (%s, %s)"
+
+msgid "%s, %s'a hükümet yatırımı getirdi: devlet hazinesinden %s."
+msgstr "%s brought a government investment to %s: %s from the state treasury."
+
+msgid "%s, %s'da %s karşıtı karalama kampanyası yaptı."
+msgstr "%s ran a smear campaign in %s against %s."
+
+msgid "%s, %s'da miting yaptı."
+msgstr "%s held a rally in %s."
+
+msgid "%s, %s'da teşkilat %s (seviye %d)."
+msgstr "%s: organization in %s %s (level %d)."
+
+msgid "%s, %s'dan %d milletvekili transfer etti."
+msgstr "%s poached MPs from %s: %d."
+
+msgid "%s, %s'den istifa etti ve bağımsız devam ediyor."
+msgstr "%s resigned from %s and continues as an independent."
+
+msgid "%s, %s'yi FESHETTİ ve bağımsız kaldı. %d vekil Bağımsızlar'a, %d vekil yakın partilere geçti.%s"
+msgstr "%s DISSOLVED %s and stayed independent. %d MPs went to the Independents, %d to related parties.%s"
+
+msgid "%s, %s'yi kurdu. Bağımsızken kazandığı destek yeni partisine geçti."
+msgstr "%s founded %s. The support it built as an independent carried over to the new party."
+
+msgid "%s, %s'ın elinden bir kart çaldı."
+msgstr "%s stole a card from %s."
+
+msgid "%s, %s'ın elinden kart çalmaya kalktı ama elinde hiç kart yoktu."
+msgstr "%s tried to steal a card from %s, but they had none."
+
+msgid "%s, ana partisi %s'ya geri döndü: %d milletvekili ve bütün teşkilatlarıyla."
+msgstr "%s returned to its parent party %s, with %d MPs and all its organizations."
+
+msgid "%s: finansmanı aşağıdan ayarla, ONAYLA'ya bas (ya da ile tekrar dokun)  ·  Butona tekrar dokun: iptal"
+msgstr "%s: set the funding below and press CONFIRM (or tap the province again)  ·  Tap the button again: cancel"
+
+msgid "%s: haritada bir ile dokun (ayrıntı görünür), tekrar dokun: oyna  ·  Karta tekrar dokun: iptal"
+msgstr "%s: tap a province on the map (details appear), tap again: play  ·  Tap the card again: cancel"
+
+msgid "%s: kimi karalayacaksın?"
+msgstr "%s: whom will you smear?"
+
+msgid "%s: kullanmak için karta tekrar dokun  ·  Başka yere dokun: vazgeç"
+msgstr "%s: tap the card again to use it  ·  Tap elsewhere: cancel"
+
+msgid "%s: kullanmak için yukarı sürükle"
+msgstr "%s: drag up to use"
+
+msgid "%s: miting (%s) · provokasyon: %s%s"
+msgstr "%s: rally (%s) · provocation: %s%s"
+
+msgid "%s: miting · provokasyon: %s"
+msgstr "%s: rally · provocation: %s"
+
+msgid "%s: parlamento diyagramının üstüne bırak"
+msgstr "%s: drop on the parliament diagram"
+
+msgid "%s: partinin bu gruptaki desteği %s%s%s.\nBu, grubun ülkedeki nüfus payı değildir."
+msgstr "%s: your party's support in this group is %s%s%s.\nThis is not the group's share of the population."
+
+msgid "%s: soldan bir partiye dokun  ·  Karta tekrar dokun: iptal"
+msgstr "%s: tap a party on the left  ·  Tap the card again: cancel"
+
+msgid "%s: teşkilat seviye %d → %d (%s) · %s"
+msgstr "%s: organization level %d → %d (%s) · %s"
+
+msgid "%s: teşkilat zaten en üst seviyede"
+msgstr "%s: organization already at the top level"
+
+msgid "(%s kayıp)"
+msgstr "(%s loss)"
+
+msgid "(F11 ile de değiştirebilirsin)"
+msgstr "(you can also switch with F11)"
+
+msgid "+%s / dönem"
+msgstr "+%s / term"
+
+msgid ", teşkilatlardan %s dahil"
+msgstr ", including %s from organizations"
+
+msgid "0–100 arası ekonomi göstergesi (50 olağan). Vergi ve yatırımlarla her dönem yavaşça değişir; hükümet partilerinin seçmen memnuniyetine yansır."
+msgstr "Economy indicator from 0 to 100 (50 is normal). It changes slowly each term with taxes and investment, and affects voter satisfaction with governing parties."
+
+msgid "1-12 karakter"
+msgstr "1-12 characters"
+
+msgid "1. TUR"
+msgstr "ROUND 1"
+
+msgid "1. yarı"
+msgstr "1st half"
+
+msgid "1/2 KOALİSYON GÖRÜŞMESİ — %s teklifi · ortak onayı %d/%d · %s"
+msgstr "1/2 COALITION TALKS — %s's offer · partner approval %d/%d · %s"
+
+msgid "1/2 — Hükümet Ortakları"
+msgstr "1/2 — Government Partners"
+
+msgid "2. TUR"
+msgstr "ROUND 2"
+
+msgid "2. seviye teşkilat (%s) çok daha isabetli anket verir."
+msgstr "A level-2 organization (%s) gives a much more accurate poll."
+
+msgid "2. yarı"
+msgstr "2nd half"
+
+msgid "2/2 MECLİS OYLAMASI — %s hükümeti · EVET %d / ÇEK. %d / HAYIR %d · %d/%d oy · %s"
+msgstr "2/2 PARLIAMENTARY VOTE — %s government · YES %d / ABSTAIN %d / NO %d · %d/%d votes · %s"
+
+msgid "2/2 — Görev Dağılımı"
+msgstr "2/2 — Allocation of Posts"
+
+msgid "; son dönemde "
+msgstr "; last term "
+
+msgid "> EKRAN MODU"
+msgstr "> DISPLAY MODE"
+
+msgid "> HAMLELER"
+msgstr "> MOVES"
+
+msgid "ANAYASAYI DEĞİŞTİR"
+msgstr "AMEND THE CONSTITUTION"
+
+msgid "ARTIRIM ETKİSİ"
+msgstr "TAX RISE EFFECT"
+
+msgid "AYRIL"
+msgstr "LEAVE"
+
+msgid "AYRIL VE PARTİ KUR"
+msgstr "LEAVE AND FOUND A PARTY"
+
+msgid "AZINLIK"
+msgstr "MINORITY"
+
+msgid "Ad"
+msgstr "First name"
+
+msgid "Ad ve soyadı birlikte değiştir"
+msgstr "Change both first name and surname"
+
+msgid "Adalet Bakanlığı"
+msgstr "Ministry of Justice"
+
+msgid "Akademisyen"
+msgstr "Academic"
+
+msgid "Ana Menüye Dön"
+msgstr "Back to Main Menu"
+
+msgid "Ana iktidar partisi: %s  |  Hükümet %d/%d sandalye (%s)\n%s"
+msgstr "Main governing party: %s  |  Government %d/%d seats (%s)\n%s"
+
+msgid "Ana ses"
+msgstr "Master volume"
+
+msgid "Anayasa değişikliği"
+msgstr "Constitutional amendment"
+
+msgid "Anayasa değişikliği %s (EVET %d / gereken %d)."
+msgstr "Constitutional amendment %s (YES %d / needed %d)."
+
+msgid "Anket · şimdi seçim olsa"
+msgstr "Poll · if the election were today"
+
+msgid "Anladım"
+msgstr "Got it"
+
+msgid "Arka Plan Rengi"
+msgstr "Background Color"
+
+msgid "Asgari Ücret ve Sendika Hakları Yasası"
+msgstr "Minimum Wage and Union Rights Act"
+
+msgid "Ayarlar"
+msgstr "Settings"
+
+msgid "Aynı tohum her zaman aynı ülkeyi üretir. Boş bırakırsan her oyunda rastgele."
+msgstr "The same seed always generates the same country. Leave it empty for a random one each game."
+
+msgid "Ayrımcı saldırılar eşit yurttaşlık talebini büyüttü."
+msgstr "Discriminatory attacks have strengthened the demand for equal citizenship."
+
+msgid "Ayrımcılık Karşıtı Eşit Yurttaşlık Yasası"
+msgstr "Anti-Discrimination and Equal Citizenship Act"
+
+msgid "Ayrımcılık Tartışması"
+msgstr "Discrimination Debate"
+
+msgid "Ayrımcılık ve eşit olmayan yurttaşlık"
+msgstr "Discrimination and unequal citizenship"
+
+msgid "Ayrımcılık, eşit yurttaşlık ve bireysel özgürlükler"
+msgstr "Discrimination, equal citizenship and individual freedoms"
+
+msgid "AÇILAMAZ"
+msgstr "NOT AVAILABLE"
+
+msgid "AÇILAN SANDIK  %%%.1f"
+msgstr "BALLOTS COUNTED  %.1f%%"
+
+msgid "AÇILAN SANDIK %%%.1f"
+msgstr "BALLOTS COUNTED %.1f%%"
+
+msgid "Açıksa seçimlerden sonra arada bir yeni bir parti (bot) kurulur; bir iki seçim sonra kendini fesheder."
+msgstr "If on, a new (bot) party occasionally forms after elections and dissolves itself an election or two later."
+
+msgid "Ağ yok: sadece sen ve eklediğin botlar oynar."
+msgstr "No network: only you and the bots you add play."
+
+msgid "Ağır vergi yükü ve yatırım önündeki engeller"
+msgstr "Heavy taxes and obstacles to investment"
+
+msgid "BARAJ"
+msgstr "THRESHOLD"
+
+msgid "BARAJ %%%s"
+msgstr "THRESHOLD %s%%"
+
+msgid "BARAJ ALTI"
+msgstr "BELOW THRESHOLD"
+
+msgid "BAĞIŞ\nKAMPANYASI"
+msgstr "FUND-\nRAISING"
+
+msgid "BONUS\nKART"
+msgstr "BONUS\nCARD"
+
+msgid "BOT GELİR ZAYIFLATMASI"
+msgstr "BOT INCOME HANDICAP"
+
+msgid "BOT PARTİSİ: %s"
+msgstr "BOT PARTY: %s"
+
+msgid "Bakanlıklar"
+msgstr "Ministries"
+
+msgid "Baraj"
+msgstr "Threshold"
+
+msgid "Baraj %%%s"
+msgstr "Threshold %s%%"
+
+msgid "Baraj %%%s  ·  %d seçim, %d yılda bir (%d'den %d yıl)"
+msgstr "Threshold %s%%  ·  %d elections every %d years (from %d, %d years)"
+
+msgid "Baraj çevresindeki partiler için gerilim sürüyor"
+msgstr "Tension continues for the parties near the threshold"
+
+msgid "Baraj: %0"
+msgstr "Threshold: 0%"
+
+msgid "Bağlantısı kopan oyuncunun yerine bot oynar ya da dönene kadar pasif kalır (sırası geçer, oylarda çekimser). Aynı cihazdan odaya yeniden katılınca kaldığı yerden devam eder."
+msgstr "A bot plays for a disconnected player, or they stay inactive until they return (their turn is skipped, they abstain in votes). Rejoining the room from the same device continues where they left off."
+
+msgid "Bağlanılıyor..."
+msgstr "Connecting..."
+
+msgid "Bağımsız"
+msgstr "Independent"
+
+msgid "Bağımsız siyasetçi"
+msgstr "Independent politician"
+
+msgid "Bağımsızken teşkilatsız miting yapabilirsin; mitingler güvenilirliğini artırır. Parti kurarsan şu an %d ilde teşkilatla başlarsın."
+msgstr "As an independent you can hold rallies without an organization; rallies raise your credibility. If you found a party now, you start with organizations in %d provinces."
+
+msgid "Bağımsızken topladığın destek yeni partine geçer; memleketinden kazandığın sandalye de partinin olur."
+msgstr "The support you built as an independent carries over to your new party; a seat you won in your hometown also becomes the party's."
+
+msgid "Bağımsızlar"
+msgstr "Independents"
+
+msgid "Bağımsızsın: kongre yok. Önce parti kur."
+msgstr "You're an independent: there's no congress. Found a party first."
+
+msgid "Bağış Kampanyası"
+msgstr "Fundraising Campaign"
+
+msgid "Bağış kampanyası: kasana %s girer.\nSeçmek için dokun, tekrar dokun: kullan."
+msgstr "Fundraising campaign: %s goes into your funds.\nTap to select, tap again to use."
+
+msgid "Başbakan"
+msgstr "Prime Minister"
+
+msgid "Başbakan Yardımcılığı"
+msgstr "Deputy Prime Ministry"
+
+msgid "Başbakan Yrd."
+msgstr "Deputy PM"
+
+msgid "Başbakanlık"
+msgstr "Prime Ministry"
+
+msgid "Başka seçim yok"
+msgstr "No more elections"
+
+msgid "Bedel"
+msgstr "Cost"
+
+msgid "Bedel: %s · seçmen gruplarındaki desteğin aynen devam eder"
+msgstr "Cost: %s · your support among voter groups carries over"
+
+msgid "Bedeli: biraz ulusal destek kaybedersin."
+msgstr "Cost: you lose a little national support."
+
+msgid "Belediye Başkanı"
+msgstr "Mayor"
+
+msgid "Belirgin bir siyasi etkisi yok."
+msgstr "No significant political impact."
+
+msgid "Ben"
+msgstr "Me"
+
+msgid "Bir hamle seç, sonra haritada il seç; aynı ile ikinci dokunuş onaylar. Soluk düğme şu an yapılamaz: üstüne gelince nedenini görürsün. Bedeller düğmelerin altında."
+msgstr "Pick a move, then a province on the map; tapping the same province again confirms. A faded button can't be used right now: hover over it to see why. Costs are shown under the buttons."
+
+msgid "Bir il seç"
+msgstr "Pick a province"
+
+msgid "Bir ilde bir partiyi karala: ona eksi, sana artı.\nİlde güçlü olan partiye az işler."
+msgstr "Smear a party in a province: minus for them, plus for you.\nWorks poorly against a party that is strong there."
+
+msgid "Bir kademe seç: geliri, seçmene etkisini ve ne zaman yerleşeceğini gör."
+msgstr "Pick a level: see its revenue, its effect on voters and when it settles."
+
+msgid "Bir kart seç, sonra buraya tıkla: kart bozulur, bedelinin yarısı kasaya döner."
+msgstr "Select a card, then click here: the card is cashed in and half its cost returns to your funds."
+
+msgid "Bir seçmen grubu için yasa sun: o grupta destek kazanırsın, karşıt grup biraz soğur. Geçerse puan. Dönemde bir kez."
+msgstr "Propose a law for a voter group: you gain support in that group and the opposite group cools a little. Points if it passes. Once per term."
+
+msgid "Bonus Kart"
+msgstr "Bonus Card"
+
+msgid "Bot ekle"
+msgstr "Add bot"
+
+msgid "Botlarla Oyna"
+msgstr "Play with Bots"
+
+msgid "Botların dönemlik geliri ve bağış kampanyaları seçilen tutar kadar (milyon ₺) azalır. 0 = zayıflatma yok."
+msgstr "Bots' income per term and fundraising campaigns are reduced by the chosen amount (million ₺). 0 = no handicap."
+
+msgid "Botun adını, soyadını, geçmişini ve memleketini rastgele değiştir"
+msgstr "Randomly change the bot's first name, surname, background and hometown"
+
+msgid "Bozdurmak için KART BOZDUR yuvasına bırak"
+msgstr "Drop on the CASH IN CARD slot to cash it in"
+
+msgid "Boş"
+msgstr "Empty"
+
+msgid "Bu botun adını, logosunu ve rengini düzenle"
+msgstr "Edit this bot's name, logo and color"
+
+msgid "Bu dönem zaten bir yasa sundun (dönemde 1 yasa)."
+msgstr "You already proposed a law this term (1 law per term)."
+
+msgid "Bu grup gündemde değil: bu dönem %s."
+msgstr "This group isn't on the agenda: this term %s."
+
+msgid "Bu ilde %s %%%d, %s %%%d (iki taraf toplam %%100)."
+msgstr "In this province %s %d%%, %s %d%% (both sides total 100%%)."
+
+msgid "Bu ilde henüz bir olay yok."
+msgstr "No events in this province yet."
+
+msgid "Bu ilde teşkilatın yok. Önce teşkilatlanmalısın."
+msgstr "You have no organization in this province. Organize first."
+
+msgid "Bu ildeki teşkilatın zaten en üst seviyede."
+msgstr "Your organization in this province is already at the top level."
+
+msgid "Bu kart şu an oynanamaz."
+msgstr "This card can't be played right now."
+
+msgid "Bu kartı kendi partine oynayamazsın"
+msgstr "You can't play this card on your own party"
+
+msgid "Bu kayıt oyunun daha yeni bir sürümüyle yapılmış."
+msgstr "This save was made with a newer version of the game."
+
+msgid "Bu kodu arkadaşına gönder, o da 'Odaya Katıl' ekranına girsin."
+msgstr "Send this code to your friend; they enter it on the 'Join Room' screen."
+
+msgid "Bu odada oyun zaten başladı."
+msgstr "The game in this room has already started."
+
+msgid "Bu parti soruşturulamaz."
+msgstr "This party can't be investigated."
+
+msgid "Bu partiden vekil çalınamaz"
+msgstr "MPs can't be stolen from this party"
+
+msgid "Bu renk başka bir oyuncuda"
+msgstr "Another player has this color"
+
+msgid "Bu senin partinin parası: sıran geldikçe dolar, hamleler buradan ödenir. Sağdaki EKONOMİ'de görünen DEVLET HAZİNESİ ayrıdır; onu sadece hükümet, yatırım için kullanır."
+msgstr "This is your party's money: it fills up each turn and pays for your moves. The STATE TREASURY shown under ECONOMY on the right is separate; only the government uses it, for investments."
+
+msgid "Burada miting yaparsan:"
+msgstr "If you hold a rally here:"
+
+msgid "Burada teşkilatın yok. Kurmak %s: anketi açar, oy kazandırır. Miting ve karalama teşkilat ister."
+msgstr "You have no organization here. Building one costs %s: it opens polls and wins votes. Rallies and smear campaigns need an organization."
+
+msgid "Burs, Yurt ve Genç İstihdamı Yasası"
+msgstr "Scholarships, Dormitories and Youth Employment Act"
+
+msgid "BÜYÜK BAĞIŞ\nKAMPANYASI"
+msgstr "MAJOR\nFUNDRAISING"
+
+msgid "Bölgeler yerinden yönetim talebiyle sokakta."
+msgstr "Regions are on the streets demanding self-government."
+
+msgid "Bölgesel Ayaklanma"
+msgstr "Regional Uprising"
+
+msgid "Bütçe Yasası: %s Vergi"
+msgstr "Budget Law: %s Tax"
+
+msgid "Büyük Bağış Kampanyası"
+msgstr "Major Fundraising Campaign"
+
+msgid "Büyük bir bağış kampanyası: kasana %s girer.\nSeçmek için dokun, tekrar dokun: kullan."
+msgstr "A major fundraising campaign: %s goes into your funds.\nTap to select, tap again to use."
+
+msgid "Bırak: %s %s (bedelsiz, dönemde 1)"
+msgstr "Drop: %s %s (free, once per term)"
+
+msgid "Bırak: %s hakkında kaset sızdır (%s)"
+msgstr "Drop: leak a tape about %s (%s)"
+
+msgid "Bırak: %s kullan"
+msgstr "Drop: use %s"
+
+msgid "Bırak: %s partisinden %d-%d vekil çal (seçmenleriniz %s)"
+msgstr "Drop: steal from %s, %d-%d MPs (your voters are %s)"
+
+msgid "Bırak: %s'a yatırım"
+msgstr "Drop: invest in %s"
+
+msgid "Bırak: %s'da iç karışıklık çıkar (%s)"
+msgstr "Drop: stir internal turmoil in %s (%s)"
+
+msgid "Bırak: %s'da karalama — sonra hedef partiyi seç"
+msgstr "Drop: smear in %s — then pick the target party"
+
+msgid "Bırak: %s'da miting · provokasyon: %s"
+msgstr "Drop: rally in %s · provocation: %s"
+
+msgid "Bırak: %s'ın elinden rastgele 1 kart çal"
+msgstr "Drop: steal a random card from %s"
+
+msgid "Bırak: erken seçim önergesi sun (meclis oylar)"
+msgstr "Drop: table an early election motion (parliament votes)"
+
+msgid "Bırak: gensoru ver"
+msgstr "Drop: table a motion of no confidence"
+
+msgid "Bırak: kartı bozdur (+%s)"
+msgstr "Drop: cash in the card (+%s)"
+
+msgid "Cemaatin saygın bir siması; sözüne güvenilir."
+msgstr "A respected figure in the community; people trust your word."
+
+msgid "DEVLET HAZİNESİ"
+msgstr "STATE TREASURY"
+
+msgid "DEĞİŞİKLİĞİ GETİREN"
+msgstr "AMENDMENT BY"
+
+msgid "Dağıtıma Geç"
+msgstr "Go to Allocation"
+
+msgid "Delegeler oy kullanıyor…"
+msgstr "Delegates are voting…"
+
+msgid "Devam Et (ESC)"
+msgstr "Continue (ESC)"
+
+msgid "Devlet hazinesi yetmiyor (%s var)."
+msgstr "Not enough in the state treasury (%s available)."
+
+msgid "Devlet hazinesi: %s. Dönem sonunda %s vergi geliri girer. Bir yatırım %s."
+msgstr "State treasury: %s. %s of tax revenue arrives at the end of the term. One investment costs %s."
+
+msgid "Devlet hazinesini sadece hükümet kullanabilir."
+msgstr "Only the government can use the state treasury."
+
+msgid "Devlet hazinesini sadece hükümet partileri kullanabilir."
+msgstr "Only governing parties can use the state treasury."
+
+msgid "Devletten %s yatırım: meşru kamu harcaması, usulsüzlük yok."
+msgstr "%s of state investment: legitimate public spending, no irregularity."
+
+msgid "Devletten ödenmiş miting"
+msgstr "Rally paid by the state"
+
+msgid "Devletten ödenmiş yatırım"
+msgstr "Investment paid by the state"
+
+msgid "Dil"
+msgstr "Language"
+
+msgid "Din eğitimi ve inanç özgürlüğü ülkenin gündeminde."
+msgstr "Religious education and freedom of belief are on the national agenda."
+
+msgid "Dindar Topluluklar"
+msgstr "Religious Communities"
+
+msgid "Disiplin ve birlik senin için her şeyden önce gelir."
+msgstr "Discipline and unity come first for you."
+
+msgid "Düşük"
+msgstr "Low"
+
+msgid "Düşük aylıklar ve yükselen sağlık giderleri"
+msgstr "Low pensions and rising health costs"
+
+msgid "Düşük ücretler ve güvencesiz çalışma"
+msgstr "Low wages and insecure work"
+
+msgid "Dışişleri Bakanlığı"
+msgstr "Ministry of Foreign Affairs"
+
+msgid "EKONOMİ"
+msgstr "ECONOMY"
+
+msgid "ELİM · %d KART"
+msgstr "HAND · %d"
+
+msgid "ENFLASYON"
+msgstr "INFLATION"
+
+msgid "ERKEN\nSEÇİM"
+msgstr "EARLY\nELECTION"
+
+msgid "ERKEN SEÇİM"
+msgstr "EARLY ELECTION"
+
+msgid "ERKEN SEÇİM önergesi oylanıyor — %s getirdi · EVET %d / HAYIR %d · %s kaldı%s"
+msgstr "EARLY ELECTION motion under vote — proposed by %s · YES %d / NO %d · %s left%s"
+
+msgid "EVET"
+msgstr "YES"
+
+msgid "EVET: kabul edilirse yasanın etkisi 2 katına çıkar"
+msgstr "YES: if passed, the law's effect doubles"
+
+msgid "EVET: muhalefete gündem kaptırırsın — her ilde eksi, yasaya yakın illerde nötr/artı"
+msgstr "YES: you hand the opposition a win — minus everywhere, neutral/plus in provinces close to the law"
+
+msgid "EVET: vergi %s olur (gelir %s / dönem)"
+msgstr "YES: tax becomes %s (revenue %s / term)"
+
+msgid "EVET: yasaya yakın illerde artı, zıt illerde eksi"
+msgstr "YES: plus in provinces close to the law, minus in opposed ones"
+
+msgid "Efektler"
+msgstr "Effects"
+
+msgid "Ekle"
+msgstr "Add"
+
+msgid "Ekonomi etkisi"
+msgstr "Economic effect"
+
+msgid "Ekonomi hükümet için yük olmaya başladı."
+msgstr "The economy is starting to weigh on the government."
+
+msgid "Ekonomi hükümete destek kazandırıyor."
+msgstr "The economy is winning support for the government."
+
+msgid "Ekonomi hükümetin en güçlü kozu."
+msgstr "The economy is the government's strongest card."
+
+msgid "Ekonomi politikası hükümete ağır siyasi bedel ödetiyor."
+msgstr "Economic policy is costing the government dearly."
+
+msgid "Ekonomi seçmen üzerinde belirleyici değil."
+msgstr "The economy isn't decisive for voters."
+
+msgid "Ekran Modu"
+msgstr "Display Mode"
+
+msgid "Emekli Aylığı ve Sağlık Güvencesi Yasası"
+msgstr "Pensions and Health Coverage Act"
+
+msgid "Emekli Maaşları"
+msgstr "Pensions"
+
+msgid "Emekli Subay"
+msgstr "Retired Officer"
+
+msgid "Emekli aylıkları, sağlık ve yaşam maliyeti"
+msgstr "Pensions, health and the cost of living"
+
+msgid "Emekliler"
+msgstr "Retirees"
+
+msgid "Emekliler aylıkların geçinmeye yetmediğini söylüyor."
+msgstr "Retirees say their pensions don't cover the cost of living."
+
+msgid "Emin misin? Ayrılmak için tekrar bas"
+msgstr "Are you sure? Press again to leave"
+
+msgid "Emin misin? Tekrar bas"
+msgstr "Are you sure? Press again"
+
+msgid "Emin misin? Tekrar dokun (ortağın yalnız düşerse −%d)"
+msgstr "Are you sure? Tap again (your partner loses %d if it falls alone)"
+
+msgid "En güçlü: %s · en zayıf: %s"
+msgstr "Strongest: %s · weakest: %s"
+
+msgid "Erken Seçim"
+msgstr "Early Election"
+
+msgid "Erken seçim kararı zaten alındı."
+msgstr "Early elections have already been decided."
+
+msgid "Erken seçim önergesi %s (EVET %d – HAYIR %d)."
+msgstr "Early election motion %s (YES %d – NO %d)."
+
+msgid "Erken seçim önergesi: kabul edilirse dönem sonunda sandık kurulur."
+msgstr "Early election motion: if passed, voters go to the polls at the end of the term."
+
+msgid "Erken seçim önergesi: parlamento diyagramının üstüne bırak"
+msgstr "Early election motion: drop on the parliament diagram"
+
+msgid "Erken seçim: meclis oylaması (%s). Kabul edilirse dönem sonunda sandığa gidilir. Onay: butona tekrar dokun"
+msgstr "Early election: parliamentary vote (%s). If passed, voters go to the polls at the end of the term. Confirm: tap the button again"
+
+msgid "Eski partin %s'nin %d teşkilatından %d tanesi yeni partine geçer; beklersen bu sayı azalır."
+msgstr "Of your former party %s's %d organizations, %d move to your new party; the longer you wait, the fewer."
+
+msgid "Esnaf ve sanayici vergi ve kırtasiyeden bunaldı."
+msgstr "Shopkeepers and industrialists are fed up with taxes and paperwork."
+
+msgid "Esnaf, sanayici ve şirket sahipleri."
+msgstr "Shopkeepers, industrialists and business owners."
+
+msgid "Etkisi il il değişir: yasaya yakın illerde EVET, zıt illerde HAYIR kazandırır"
+msgstr "The effect varies by province: YES pays off in provinces close to the law, NO in opposed ones"
+
+msgid "Eğitim, barınma ve genç istihdamı"
+msgstr "Education, housing and youth employment"
+
+msgid "Eşit yurttaşlık ve ayrımcılık yasağı tartışılıyor."
+msgstr "Equal citizenship and a ban on discrimination are being debated."
+
+msgid "FPS Sınırı: %s"
+msgstr "FPS Limit: %s"
+
+msgid "FPS Sınırı: 144"
+msgstr "FPS Limit: 144"
+
+msgid "Fabrika Kapanmaları"
+msgstr "Factory Closures"
+
+msgid "Fabrika kapılarında büyüdün, grevleri sen örgütledin."
+msgstr "You grew up at factory gates and organized the strikes."
+
+msgid "Fabrikalar kapanıyor, işçiler meydanlarda."
+msgstr "Factories are closing; workers are in the squares."
+
+msgid "Finansman Soruşturması Aç…"
+msgstr "Open a Funding Investigation…"
+
+msgid "Finansman doğrulandı: parti %s harcamayı kendi kaynağıyla yaptı."
+msgstr "Funding verified: the party paid %s of spending from its own resources."
+
+msgid "FİNANSMAN SORUŞTURMASI"
+msgstr "FUNDING INVESTIGATION"
+
+msgid "GB"
+msgstr "LEAD"
+
+msgid "GENEL BAŞKAN: %s"
+msgstr "LEADER: %s"
+
+msgid "GENEL SEÇİM"
+msgstr "GENERAL ELECTION"
+
+msgid "GENSORU"
+msgstr "NO CONFIDENCE"
+
+msgid "GENSORU oylanıyor — %d/%d oy, %s kaldı%s"
+msgstr "NO CONFIDENCE vote — %d/%d votes, %s left%s"
+
+msgid "GENSORUYU VEREN"
+msgstr "MOTION BY"
+
+msgid "GRUP TOPLANTISI · bir seçmen grubunun sorunlarını gündeme getir"
+msgstr "GROUP MEETING · bring a voter group's concerns to the fore"
+
+msgid "Genel başkan %s"
+msgstr "Party leader %s"
+
+msgid "Genel başkan: %s  ·  Yardımcı: %s"
+msgstr "Leader: %s  ·  Deputy: %s"
+
+msgid "Genel başkan: partini kongreye götür, liderliğini tazele. Üye: kongre iste, başkanlığı geri almaya çalış."
+msgstr "Leader: take your party to a congress and renew your leadership. Member: demand a congress and try to win back the leadership."
+
+msgid "Genel başkanlığını korudu."
+msgstr "Kept the leadership."
+
+msgid "Gensoru"
+msgstr "Motion of No Confidence"
+
+msgid "Gensoru için parlamento diyagramının üstüne bırak"
+msgstr "Drop on the parliament diagram for a no-confidence motion"
+
+msgid "Gensoru kabul edildi, hükümet düştü."
+msgstr "The motion of no confidence passed; the government fell."
+
+msgid "Gensoru reddedildi, hükümet görevde. %s ulusal destek %s."
+msgstr "The motion of no confidence failed; the government stays. %s national support: %s."
+
+msgid "Gensoru sadece hükümet azınlıktayken verilebilir (salt çoğunluğu yok)."
+msgstr "A motion of no confidence can only be tabled against a minority government (no absolute majority)."
+
+msgid "Gensoru: hükümeti düşürmek için meclis oylaması (%s). Reddedilirse küçük bir itibar kaybı. Onay: butona tekrar dokun"
+msgstr "No confidence: a parliamentary vote to bring down the government (%s). If it fails, a small loss of credibility. Confirm: tap the button again"
+
+msgid "Gensoruyu sadece muhalefet, hükümet görevdeyken verebilir."
+msgstr "Only the opposition can table a motion of no confidence, while a government is in office."
+
+msgid "Genç İşsizliği"
+msgstr "Youth Unemployment"
+
+msgid "Gençler ve Öğrenciler"
+msgstr "Youth and Students"
+
+msgid "Gençlik Protestoları"
+msgstr "Youth Protests"
+
+msgid "Geri"
+msgstr "Back"
+
+msgid "Geçici destek: bu dönem %s, sonra hızla söner."
+msgstr "Temporary support: %s this term, then fading quickly."
+
+msgid "Geçmiş"
+msgstr "Background"
+
+msgid "Gidişat"
+msgstr "Outlook"
+
+msgid "Grup toplantısı: bir seçmen grubunun sorunlarını konuş. O grupta kısa süreli destek (bu dönem güçlü, sonra hızla söner). Dönemde bir kez, isteğe bağlı."
+msgstr "Group meeting: discuss a voter group's concerns. Short-lived support in that group (strong this term, then fading quickly). Once per term, optional."
+
+msgid "GÖREVLİ (sabit)"
+msgstr "MANDATE (fixed)"
+
+msgid "GÜNDEM (%d/%d): %s — bu dönem %s."
+msgstr "AGENDA (%d/%d): %s — this term %s."
+
+msgid "GÜNDEM · %s"
+msgstr "AGENDA · %s"
+
+msgid "GÜNDEM: %s\n%s"
+msgstr "AGENDA: %s\n%s"
+
+msgid "Görevde bir hükümet yok."
+msgstr "There's no government in office."
+
+msgid "Görevlerin ana iktidar partisine geçer. Puan tablon etkilenmez ama kamuoyunda bir miktar destek kaybedersin. Ortağın yalnız kalıp gensoruyla düşerse o %d puan kaybeder."
+msgstr "Your posts pass to the main governing party. Your points aren't affected, but you lose some public support. If your partner is left alone and falls to a no-confidence motion, it loses %d points."
+
+msgid "Görevli parti (sabit)"
+msgstr "Mandate party (fixed)"
+
+msgid "Gündem arası: %d dönem yasa yok, sonra yeni gündemler."
+msgstr "Agenda break: no laws for %d terms, then new agendas."
+
+msgid "Gündem yok: bu dönem grup yasası sunulamaz (vergi yasası gündemden bağımsızdır)."
+msgstr "No agenda: no group law can be proposed this term (the tax law doesn't depend on the agenda)."
+
+msgid "Gündem yok: yasa sadece gündemdeki seçmen grupları için sunulabilir."
+msgstr "No agenda: laws can only be proposed for the voter groups on the agenda."
+
+msgid "Gündem: %s — %s."
+msgstr "Agenda: %s — %s."
+
+msgid "Güvenlik Krizi"
+msgstr "Security Crisis"
+
+msgid "Güvenlik kaygıları ve bölünme korkusu"
+msgstr "Security concerns and fear of division"
+
+msgid "Güvenlik kaygısı güçlü bir merkez talebini büyüttü."
+msgstr "Security fears have grown the demand for a strong center."
+
+msgid "Güvenlik ve Birlik"
+msgstr "Security and Unity"
+
+msgid "Güç"
+msgstr "Strength"
+
+msgid "Güçlü yerel etki: ildeki bütün seçmen memnun olur. Devlet hazinesinden (gerekirse parti kasasından) ödenir; sadece hükümet partileri."
+msgstr "Strong local effect: every voter in the province is pleased. Paid from the state treasury (or party funds if needed); governing parties only."
+
+msgid "HAMLELER"
+msgstr "MOVES"
+
+msgid "HARİTA"
+msgstr "MAP"
+
+msgid "HAYIR"
+msgstr "NO"
+
+msgid "HAYIR oyları (%d) EVET'ten (%d) fazla."
+msgstr "NO votes (%d) outnumbered YES (%d)."
+
+msgid "HAYIR: vergi %s kalır"
+msgstr "NO: tax stays %s"
+
+msgid "HAYIR: yasaya yakın illerde güç kaybı, zıt illerde kazanç"
+msgstr "NO: lose strength in provinces close to the law, gain in opposed ones"
+
+msgid "HAZİNE"
+msgstr "TREASURY"
+
+msgid "Hamleler"
+msgstr "Moves"
+
+msgid "Harcamalarımı Denetlet…"
+msgstr "Audit My Spending…"
+
+msgid "Harcamalarının hangi kasadan ödendiğini meclise inceletir."
+msgstr "Has parliament examine which funds paid for its spending."
+
+msgid "Hare kotası"
+msgstr "Hare quota"
+
+msgid "Harita tohumu: %d"
+msgstr "Map seed: %d"
+
+msgid "Haritada bir ile tıkla: orası senin memleketin olur."
+msgstr "Click a province on the map: it becomes your hometown."
+
+msgid "Haritada bir ilin üstüne bırak"
+msgstr "Drop on a province on the map"
+
+msgid "Haritada göster"
+msgstr "Show on map"
+
+msgid "Hastaneler doldu, emekliler ilaç bulamıyor."
+msgstr "Hospitals are full; retirees can't find medicine."
+
+msgid "Hayat Pahalılığı"
+msgstr "Cost of Living"
+
+msgid "Hazine"
+msgstr "Treasury"
+
+msgid "Hazine geliri"
+msgstr "Treasury revenue"
+
+msgid "Hazine yetmediği için devlet payı sınırlı."
+msgstr "The state share is limited because the treasury is short."
+
+msgid "Hazineye %s vergi geliri girdi (vergi %s). Hazine: %s."
+msgstr "%s of tax revenue entered the treasury (tax %s). Treasury: %s."
+
+msgid "Hazır: %d / %d"
+msgstr "Ready: %d / %d"
+
+msgid "Hazır: 0 / 0"
+msgstr "Ready: 0 / 0"
+
+msgid "Henüz sonuç yok"
+msgstr "No results yet"
+
+msgid "HÜK"
+msgstr "GOV"
+
+msgid "HÜKÜMET"
+msgstr "GOVERNMENT"
+
+msgid "HÜKÜMET KURULUYOR\n\n%s (%s)\ngörev dağılımını hazırlıyor…\n\n%d. teklif hakkı  ·  Süre: %s"
+msgstr "FORMING A GOVERNMENT\n\n%s (%s)\nis preparing the allocation of posts…\n\nOffer %d  ·  Time: %s"
+
+msgid "HÜKÜMETİ KURAN"
+msgstr "FORMED BY"
+
+msgid "Hük %d · çoğ %d · Muh %d"
+msgstr "Gov %d · maj %d · Opp %d"
+
+msgid "Hükümet Kurma Görevi"
+msgstr "Mandate to Form a Government"
+
+msgid "Hükümet kuruldu. Makamlar (başbakanlık, bakanlıklar) puan yazar; küçük ortak olmak da değerlidir. Muhalefet gensoruyla hükümeti düşürmeye, ortaklar koalisyondan çekilmeye karar verebilir."
+msgstr "A government has been formed. Posts (prime minister, ministries) score points; being a junior partner is valuable too. The opposition can try to bring the government down with a motion of no confidence, and partners can leave the coalition."
+
+msgid "Hükümet teklifi reddedildi: "
+msgstr "The government proposal was rejected: "
+
+msgid "Hükümet ve koalisyon"
+msgstr "Government and coalition"
+
+msgid "Hükümet yatırımı — %s getirdi (%s; etkisi %d dönemde tamamlanır)"
+msgstr "Government investment — brought by %s (%s; full effect within %d terms)"
+
+msgid "Hükümet yok"
+msgstr "No government"
+
+msgid "Hükümet yok · çoğunluk %d"
+msgstr "No government · majority %d"
+
+msgid "Hükümet yok: ekonomi kimsenin hanesine yazılmıyor."
+msgstr "No government: the economy counts for no one."
+
+msgid "Hükümet: "
+msgstr "Government: "
+
+msgid "Hükümet: seçtiğin ile devlet hazinesinden %s yatırım. İlde %s; etkinin yarısı hemen, kalanı sonraki dönemlerde."
+msgstr "Government: invest %s from the state treasury in the chosen province. %s in the province; half the effect now, the rest over the next terms."
+
+msgid "Hükümete ekle"
+msgstr "Add to government"
+
+msgid "Hükümete girecek partileri seç. Kendi partin her zaman dahildir.\nGörev verdiğin her ortak oylamada EVET demezse teklif düşer. Süre dolarsa hak yanar.\n%d. teklif hakkın (toplam %d)."
+msgstr "Choose the parties that will join the government. Your own party is always included.\nIf any partner you give a post to doesn't vote YES, the offer fails. If time runs out, you lose the attempt.\nAttempt %d (of %d)."
+
+msgid "Hükümeti düşürmek için gensoru ver.\nSeçmek için dokun, tekrar dokun: kullan."
+msgstr "Table a motion of no confidence to bring down the government.\nTap to select, tap again to use."
+
+msgid "Hükümeti düşürmeye çalış: meclis oylar. Reddedilirse küçük bir itibar kaybı."
+msgstr "Try to bring down the government: parliament votes. If it fails, a small loss of credibility."
+
+msgid "Hükümetteki parti gensoru veremez."
+msgstr "A governing party can't table a motion of no confidence."
+
+msgid "Hükümetten çıkar"
+msgstr "Remove from government"
+
+msgid "Hükümettesin: vergi kademesini meclise sunabilir, devlet hazinesinden il yatırımı yapabilirsin. Vergi indirimi seçmene yavaş yansır, seçimden birkaç dönem önce yap. Devlet parasını partinin mitinginde kullanmak usulsüzlüktür ve soruşturmada ortaya çıkar."
+msgstr "You're in government: you can submit a tax level to parliament and invest state money in provinces. Tax cuts reach voters slowly, so do it a few terms before the election. Using state money for your party's rallies is an irregularity and will come out in an investigation."
+
+msgid "KABUL EDİLDİ"
+msgstr "PASSED"
+
+msgid "KAMU YATIRIMI"
+msgstr "PUBLIC INVESTMENT"
+
+msgid "KANIT YOK — Finansman soruşturması %s hakkında %s."
+msgstr "NO EVIDENCE — The funding investigation into %s %s."
+
+msgid "KART\nÇALMA"
+msgstr "CARD\nTHEFT"
+
+msgid "KART BOZDUR"
+msgstr "CASH IN CARD"
+
+msgid "KASA"
+msgstr "FUNDS"
+
+msgid "KAZANAN"
+msgstr "WINNER"
+
+msgid "KESİN OLMAYAN SONUÇLAR"
+msgstr "UNOFFICIAL RESULTS"
+
+msgid "KOALİSYON GÖRÜŞMESİ"
+msgstr "COALITION TALKS"
+
+msgid "KONGRE"
+msgstr "CONGRESS"
+
+msgid "Kabul: +%d puan · %s"
+msgstr "If passed: +%d points · %s"
+
+msgid "Kalıcı etki (kabul edilirse / edilmezse):"
+msgstr "Lasting effect (if passed / if not):"
+
+msgid "Kapat"
+msgstr "Close"
+
+msgid "Kapat (ESC)"
+msgstr "Close (ESC)"
+
+msgid "Kapsam"
+msgstr "Scope"
+
+msgid "Karalama"
+msgstr "Smear Campaign"
+
+msgid "Karalama ve kasetler sana daha az işler."
+msgstr "Smears and tapes hurt you less."
+
+msgid "Kararların yerelde alınmasını isteyen bölgesel seçmen."
+msgstr "Regional voters who want decisions made locally."
+
+msgid "Kart Çalma"
+msgstr "Card Theft"
+
+msgid "Karta dokun, ne yaptığını oku; hedef isterse bir parti ya da il seç. İstemediğin kartı KART BOZDUR yuvasına sürükle: bedelinin yarısı kasana döner."
+msgstr "Tap a card to read what it does; if it needs a target, pick a party or a province. Drag a card you don't want onto the CASH IN CARD slot: half its cost returns to your funds."
+
+msgid "Kartlar"
+msgstr "Cards"
+
+msgid "Kaset / İtibar Suikastı"
+msgstr "Tape / Character Assassination"
+
+msgid "Katkına göre (biraz da şansla) vekillerin, teşkilatların ve desteğin bir kısmını götürürsün; memleketindeki teşkilat seninle gelir. Seçime yaklaştıkça ayrılık iki partiye de daha çok oy kaybettirir."
+msgstr "Depending on your contribution (and some luck) you take part of the MPs, organizations and support with you; your hometown organization comes with you. The closer the election, the more votes the split costs both parties."
+
+msgid "Katıl"
+msgstr "Join"
+
+msgid "Kayıt açılamadı (%s)."
+msgstr "Couldn't open the save (%s)."
+
+msgid "Kayıt bulunamadı."
+msgstr "Save not found."
+
+msgid "Kayıt dosyası açılamadı (%s)."
+msgstr "Couldn't open the save file (%s)."
+
+msgid "Kayıt dosyası bozuk."
+msgstr "The save file is corrupted."
+
+msgid "Kayıt dosyası eksik ya da bozuk (%s)."
+msgstr "The save file is incomplete or corrupted (%s)."
+
+msgid "Kayıt sadece çevrim dışı oyunda yapılır."
+msgstr "Saving is only available in offline games."
+
+msgid "Kayıt tamamlanamadı (%s)."
+msgstr "Couldn't complete the save (%s)."
+
+msgid "Kayıtlı Oyuna Devam Et"
+msgstr "Continue Saved Game"
+
+msgid "Kazanan hepsini alır"
+msgstr "Winner takes all"
+
+msgid "Kazanan oy oranıyla değil PUANLA belirlenir: hükümette makam, geçen yasa ve başarılı gensoru puan yazar. Sıralamayı PUAN sekmesinden izle."
+msgstr "The winner is decided by POINTS, not vote share: government posts, passed laws and successful no-confidence motions score points. Follow the ranking on the POINTS tab."
+
+msgid "Kaç seçim olacak"
+msgstr "How many elections"
+
+msgid "Kendi kasasından ödediği %s ise doğrulandı."
+msgstr "Its %s of self-funded spending was verified."
+
+msgid "Kendi partine dön"
+msgstr "Back to your party"
+
+msgid "Kendi şirketini kurdun, sermaye çevreleri seni tanır."
+msgstr "You built your own company; business circles know you."
+
+msgid "Kimi etkiler"
+msgstr "Who's affected"
+
+msgid "Kimse delegelerin yarısını geçemedi: İKİNCİ TURA kalanlar belli oldu."
+msgstr "No one passed half of the delegates: the RUNOFF candidates are set."
+
+msgid "Koalisyon görüşmesi başarısız: %s ortak olmayı kabul etmedi%s."
+msgstr "Coalition talks failed: %s didn't agree to be a partner%s."
+
+msgid "Koalisyondan Çekil"
+msgstr "Leave the Coalition"
+
+msgid "Kod hatalı."
+msgstr "Wrong code."
+
+msgid "Kongre iste (%s): genel başkanlığa aday olursun; parti oy kaybettiği için şansın var. Onay: butona tekrar dokun"
+msgstr "Demand a congress (%s): you run for leader; the party lost votes, so you have a chance. Confirm: tap the button again"
+
+msgid "Kongre İste · %s"
+msgstr "Demand a Congress · %s"
+
+msgid "Kongre: "
+msgstr "Congress: "
+
+msgid "Kongreye Git · %s"
+msgstr "Go to Congress · %s"
+
+msgid "Kongreye git (%s): partideki gücün %s; ne kadar güçlüysen o kadar az rakip çıkar. Onay: butona tekrar dokun"
+msgstr "Go to congress (%s): your strength in the party is %s; the stronger you are, the fewer challengers. Confirm: tap the button again"
+
+msgid "Kopyala"
+msgstr "Copy"
+
+msgid "Kopyalandı!"
+msgstr "Copied!"
+
+msgid "Kürsüden siyasete indin; fikirlerin tartışma başlatır."
+msgstr "You came to politics from the lectern; your ideas spark debate."
+
+msgid "Küçük işletmeler peş peşe kepenk kapatıyor."
+msgstr "Small businesses are shutting down one after another."
+
+msgid "LGBT ve Ateist İlericiler"
+msgstr "LGBT and Atheist Progressives"
+
+msgid "Laik, ilerici ve LGBT topluluklar."
+msgstr "Secular, progressive and LGBT communities."
+
+msgid "Liderlerin seçim gecesi açıklaması bekleniyor"
+msgstr "Leaders' election-night statements are expected"
+
+msgid "Lobi Ayarları"
+msgstr "Lobby Settings"
+
+msgid "Lobiden At"
+msgstr "Kick from Lobby"
+
+msgid "MECLİS DAĞILIMI"
+msgstr "SEATS IN PARLIAMENT"
+
+msgid "MECLİS ONAYI GEREKİR"
+msgstr "NEEDS PARLIAMENT'S APPROVAL"
+
+msgid "MECLİS · %d"
+msgstr "PARLIAMENT · %d"
+
+msgid "MECLİS — soluk olanlar hükümet dışı"
+msgstr "PARLIAMENT — faded parties are outside the government"
+
+msgid "MECLİSE SUN · %s"
+msgstr "SUBMIT TO PARLIAMENT · %s"
+
+msgid "Maaşlar eriyor, çalışanlar ücret artışı bekliyor."
+msgstr "Wages are melting away; workers expect a raise."
+
+msgid "Maliye Bakanlığı"
+msgstr "Ministry of Finance"
+
+msgid "Meclis"
+msgstr "Parliament"
+
+msgid "Meclis aritmetiği son sandıklarla netleşecek"
+msgstr "The parliamentary arithmetic will become clear with the last ballot boxes"
+
+msgid "Meclis dışı partide iç karışıklık çıkarılamaz"
+msgstr "Internal turmoil can't be stirred in a party outside parliament"
+
+msgid "Meclis çoğunluğu HAYIR dedi."
+msgstr "The majority of parliament voted NO."
+
+msgid "Meclis çoğunluğu gerekir.%s"
+msgstr "Needs a majority in parliament.%s"
+
+msgid "Meclis şu an meşgul (oylama ya da hükümet kurma sürüyor)."
+msgstr "Parliament is busy right now (a vote or government formation is under way)."
+
+msgid "Meclise erken seçim önerisi sunarsın; kabul edilirse dönem sonunda sandığa gidilir.\nSeçmek için dokun, tekrar dokun: kullan."
+msgstr "You propose early elections to parliament; if passed, voters go to the polls at the end of the term.\nTap to select, tap again to use."
+
+msgid "Meclisin 2/3'ü (%d vekil) EVET derse yürürlüğe girer, yoksa reddedilir. Gündem şartı yok, dönemdeki yasa hakkını kullanır."
+msgstr "Takes effect if 2/3 of parliament (%d MPs) vote YES, otherwise rejected. No agenda needed; it uses the term's law right."
+
+msgid "Mecliste başka bir oylama sürüyor."
+msgstr "Another vote is already under way in parliament."
+
+msgid "Mecliste vekilin yok."
+msgstr "You have no seats in parliament."
+
+msgid "Mecliste vekilin yok: erken seçim önergesi veremezsin."
+msgstr "You have no seats in parliament: you can't table an early election motion."
+
+msgid "Mecliste vekilin yok: gensoru veremezsin."
+msgstr "You have no seats in parliament: you can't table a motion of no confidence."
+
+msgid "Mecliste vekilin yok: yasa teklif edemezsin."
+msgstr "You have no seats in parliament: you can't propose a law."
+
+msgid "Memleket"
+msgstr "Hometown"
+
+msgid "Memleketinde güçlü bir teşkilatla başlarsın; hemşehrilerin sana sahip çıkar."
+msgstr "You start with a strong organization in your hometown; your fellow townspeople back you."
+
+msgid "Menü"
+msgstr "Menu"
+
+msgid "Merkezde toplanan yetkiler ve zayıf yerel temsil"
+msgstr "Power concentrated in the center and weak local representation"
+
+msgid "Mezunlar iş bulamıyor, yurtlar dolu."
+msgstr "Graduates can't find jobs; dormitories are full."
+
+msgid "Meşru kamu harcaması: etkisi yok."
+msgstr "Legitimate public spending: no effect."
+
+msgid "Milli Eğitim Bakanlığı"
+msgstr "Ministry of National Education"
+
+msgid "Milli Savunma Bakanlığı"
+msgstr "Ministry of National Defense"
+
+msgid "Milliyetçiler"
+msgstr "Nationalists"
+
+msgid "Miting"
+msgstr "Rally"
+
+msgid "Miting / karalama"
+msgstr "Rally / smear"
+
+msgid "Miting provokasyonu"
+msgstr "Rally provocation"
+
+msgid "Miting: haritada bir ile dokun, tekrar dokun: miting yap (%s)  ·  Butona tekrar dokun: iptal"
+msgstr "Rally: tap a province on the map, tap again to hold the rally (%s)  ·  Tap the button again: cancel"
+
+msgid "Mitinglerin daha güçlü yankı bulur."
+msgstr "Your rallies resonate more."
+
+msgid "Muhalefet"
+msgstr "Opposition"
+
+msgid "Müzik"
+msgstr "Music"
+
+msgid "MİTİNG"
+msgstr "RALLY"
+
+msgid "Nasıl kazanılır?"
+msgstr "How do you win?"
+
+msgid "Nefret Saldırıları"
+msgstr "Hate Attacks"
+
+msgid "ODA KODU"
+msgstr "ROOM CODE"
+
+msgid "ODA KODU: %s"
+msgstr "ROOM CODE: %s"
+
+msgid "ODA KODU: -----"
+msgstr "ROOM CODE: -----"
+
+msgid "OLAĞAN KONGRE (süre doldu)"
+msgstr "REGULAR CONGRESS (term expired)"
+
+msgid "OLAĞANÜSTÜ KONGRE (genel başkanın çağrısı)"
+msgstr "EXTRAORDINARY CONGRESS (called by the leader)"
+
+msgid "OLAĞANÜSTÜ KONGRE (üyenin talebi)"
+msgstr "EXTRAORDINARY CONGRESS (member's request)"
+
+msgid "ONAYLA · %s milyon ₺"
+msgstr "CONFIRM · %s million ₺"
+
+msgid "OY ORANLARI"
+msgstr "VOTE SHARES"
+
+msgid "OYLANAN HÜKÜMET"
+msgstr "GOVERNMENT UNDER VOTE"
+
+msgid "OYUN BİTTİ"
+msgstr "GAME OVER"
+
+msgid "OYUN SÜRESİ"
+msgstr "GAME LENGTH"
+
+msgid "OYUNCULAR"
+msgstr "PLAYERS"
+
+msgid "OYUNDAN DÜŞEN OYUNCU"
+msgstr "DISCONNECTED PLAYERS"
+
+msgid "OYUNU BAŞLAT"
+msgstr "START GAME"
+
+msgid "Oda Kur"
+msgstr "Create Room"
+
+msgid "Oda dolu."
+msgstr "The room is full."
+
+msgid "Oda kodu 5 harfli olmalı."
+msgstr "The room code must be 5 letters."
+
+msgid "Oda kuruluyor..."
+msgstr "Creating room..."
+
+msgid "Oda sahibi oyundan ayrıldı, oda kapatıldı."
+msgstr "The host left the game; the room was closed."
+
+msgid "Oda sahibisin: ayrılırsan oda herkes için kapanır."
+msgstr "You're the room owner: if you leave, the room closes for everyone."
+
+msgid "Olası bulgular"
+msgstr "Possible findings"
+
+msgid "Olaylar güçlü bir devlet talebini artırdı."
+msgstr "Unrest has increased the demand for a strong state."
+
+msgid "Ortaklar (tıkla: ekle/çıkar):"
+msgstr "Partners (click: add/remove):"
+
+msgid "Ortaklar anlaştı: %s hükümeti meclis oylamasında."
+msgstr "The partners agreed: the %s government faces a parliamentary vote."
+
+msgid "Ortaklar: %s\nToplam %d/%d sandalye — %s"
+msgstr "Partners: %s\nTotal %d/%d seats — %s"
+
+msgid "Oylama tamamlandı — EVET %d / ÇEKİMSER %d / HAYIR %d · sonuç açıklanıyor…"
+msgstr "Voting complete — YES %d / ABSTAIN %d / NO %d · announcing the result…"
+
+msgid "Oylar 8 seçmen grubundan gelir. Seçmen katmanı her grubun hangi illerde yoğun olduğunu gösterir; partin hangi gruplara yakınsa o illerde güçlüdür. Bir ile tıkla: oradaki durumunu görürsün."
+msgstr "Votes come from 8 voter groups. The Voters layer shows where each group is concentrated; your party is strong in provinces whose groups it's close to. Click a province to see your standing there."
+
+msgid "Oyun Ayarları"
+msgstr "Game Settings"
+
+msgid "Oyun Menüsü"
+msgstr "Game Menu"
+
+msgid "Oyun başlamadan kayıt yapılamaz."
+msgstr "You can't save before the game starts."
+
+msgid "Oyun bitti."
+msgstr "The game is over."
+
+msgid "Oyun kapanır, ana menüye dönersin."
+msgstr "The game closes and you return to the main menu."
+
+msgid "Oyun kaydedildi. Ana menüden \"Kayıtlı Oyuna Devam Et\" ile dönebilirsin."
+msgstr "Game saved. You can return to it with \"Continue Saved Game\" on the main menu."
+
+msgid "Oyun sensiz devam eder; kartların ve vekillerin oyundan çıkarılır."
+msgstr "The game continues without you; your cards and MPs are removed from the game."
+
+msgid "Oyun sürümleri farklı (sen %s, oda %s). İki cihazda da aynı güncel sürümü kullanın."
+msgstr "Game versions differ (you %s, room %s). Use the same up-to-date version on both devices."
+
+msgid "Oyuna daha fazla kaynakla başlarsın."
+msgstr "You start the game with more resources."
+
+msgid "Oyuncu"
+msgstr "Player"
+
+msgid "Oyuncu adı"
+msgstr "Player name"
+
+msgid "Oyuncu adın"
+msgstr "Your player name"
+
+msgid "Oyuncu%d"
+msgstr "Player%d"
+
+msgid "Oyuncular: %d / %d  (başlamak için en az %d gerekir)"
+msgstr "Players: %d / %d  (at least %d needed to start)"
+
+msgid "Oyuncular: 0 / 8"
+msgstr "Players: 0 / 8"
+
+msgid "Oyundan Ayrıl"
+msgstr "Leave Game"
+
+msgid "Oyunu Kaydet"
+msgstr "Save Game"
+
+msgid "PARTİ FAALİYETİ"
+msgstr "PARTY ACTIVITY"
+
+msgid "PARTİ KASASI"
+msgstr "PARTY FUNDS"
+
+msgid "PARTİ KASASI: bağış ve aidatlar her sıranda %s (hükümetteysen %s), teşkilatların yerel bağışları ve seçim sonrası hazine yardımı. Kasan yettikçe istediğin kadar hamle yap; para birikir.\nDEVLET HAZİNESİ ayrıdır: onu sadece hükümet, yatırım için kullanır."
+msgstr "PARTY FUNDS: donations and dues of %s each turn (%s if you're in government), local donations from your organizations and state funding after elections. Make as many moves as your funds allow; money carries over.\nThe STATE TREASURY is separate: only the government uses it, for investments."
+
+msgid "PARTİNİ KUR"
+msgstr "FOUND YOUR PARTY"
+
+msgid "PARTİZAN HARCAMA: devlet parasıyla miting, soruşturmada usulsüzlük olarak çıkar."
+msgstr "PARTISAN SPENDING: a rally paid with state money shows up as an irregularity in an investigation."
+
+msgid "PASİF"
+msgstr "AWAY"
+
+msgid "POPÜLİZM\nBONUSU"
+msgstr "POPULISM\nBONUS"
+
+msgid "PUAN"
+msgstr "POINTS"
+
+msgid "Pahalı eğitim, barınma sorunu ve genç işsizliği"
+msgstr "Expensive education, housing problems and youth unemployment"
+
+msgid "Parti"
+msgstr "Party"
+
+msgid "Parti Adı"
+msgstr "Party Name"
+
+msgid "Parti adı"
+msgstr "Party name"
+
+msgid "Parti adını gir"
+msgstr "Enter a party name"
+
+msgid "Parti adını yaz"
+msgstr "Enter a party name"
+
+msgid "Parti genel merkezlerinde heyecanlı bekleyiş sürüyor"
+msgstr "Tense waiting continues at party headquarters"
+
+msgid "Parti itibar kazanıyor."
+msgstr "The party gains credibility."
+
+msgid "Parti kamuoyu nezdinde itibar kazanıyor."
+msgstr "The party gains credibility with the public."
+
+msgid "Parti kasası"
+msgstr "Party funds"
+
+msgid "Parti kasası ve devlet hazinesi"
+msgstr "Party funds and state treasury"
+
+msgid "Parti kasası ve devlet hazinesi birlikte yetmiyor."
+msgstr "Party funds and the state treasury together aren't enough."
+
+msgid "Parti kasası yetmediği için devlet payı gerekli."
+msgstr "A state share is needed because party funds are short."
+
+msgid "Parti kasası yetmiyor (%s gerekir)."
+msgstr "Not enough party funds (%s needed)."
+
+msgid "Parti kasasından ödenmiş"
+msgstr "Paid from party funds"
+
+msgid "Parti kurmadan önce: kim olduğunu ve nereden geldiğini seç."
+msgstr "Before founding a party: choose who you are and where you come from."
+
+msgid "Parti yeni genel başkanını seçti."
+msgstr "The party chose its new leader."
+
+msgid "Partiden İstifa Et"
+msgstr "Resign from the Party"
+
+msgid "Partiler birleştiği için hükümet teklifi düştü."
+msgstr "The government offer fell because the parties merged."
+
+msgid "Partilerin vekil sayısı ve son seçimdeki oy oranı"
+msgstr "Parties' seats and vote share in the last election"
+
+msgid "Partin bu dönem bir soruşturma açtı."
+msgstr "Your party already opened an investigation this term."
+
+msgid "Partin bu dönem grup toplantısını zaten yaptı."
+msgstr "Your party already held its group meeting this term."
+
+msgid "Partin bu dönem yasa hakkını kullandı."
+msgstr "Your party already used its law this term."
+
+msgid "Partin bu ilde"
+msgstr "Your party here"
+
+msgid "Partinde iç karışıklık daha zor büyür."
+msgstr "Turmoil grows more slowly in your party."
+
+msgid "Partini Kur  →"
+msgstr "Found Your Party  →"
+
+msgid "Partinin genel başkanı değilsin: sadece miting yapabilirsin (partine ve güvenilirliğine yazar)."
+msgstr "You're not the party leader: you can only hold rallies (they count for your party and your credibility)."
+
+msgid "Partinin üyesisin: sadece miting yapabilirsin (partine ve güvenilirliğine yazar). Parti hükümetteyse başkanla aynı puanı alırsın."
+msgstr "You're a member of your party: you can only hold rallies (they count for your party and your credibility). If the party is in government, you get the same points as the leader."
+
+msgid "Partiyi Feshet"
+msgstr "Dissolve the Party"
+
+msgid "Partiyi Kur · %s"
+msgstr "Found the Party · %s"
+
+msgid "Partizan harcama tespit edildi: mitingler için devlet hazinesinden %s."
+msgstr "Partisan spending found: %s of state money used for rallies."
+
+msgid "Pas Geç"
+msgstr "Pass"
+
+msgid "Pencere"
+msgstr "Window"
+
+msgid "Pencereli"
+msgstr "Windowed"
+
+msgid "Popülizm Bonusu"
+msgstr "Populism Bonus"
+
+msgid "RASTGELE PARTİLER"
+msgstr "RANDOM PARTIES"
+
+msgid "REDDEDİLDİ"
+msgstr "REJECTED"
+
+msgid "Rastgele"
+msgstr "Random"
+
+msgid "Rehberi Baştan Göster"
+msgstr "Show the Guide Again"
+
+msgid "Rehberi kapat"
+msgstr "Turn off guide"
+
+msgid "Renk"
+msgstr "Color"
+
+msgid "SEN"
+msgstr "YOU"
+
+msgid "SEÇ"
+msgstr "SELECT"
+
+msgid "SEÇİLDİ"
+msgstr "SELECTED"
+
+msgid "SEÇİLİ"
+msgstr "SELECTED"
+
+msgid "SEÇİM"
+msgstr "ELECTION"
+
+msgid "SEÇİM GECESİ  ·  ÖZEL YAYIN"
+msgstr "ELECTION NIGHT  ·  SPECIAL BROADCAST"
+
+msgid "SIRA"
+msgstr "TURN"
+
+msgid "SIRA SENDE"
+msgstr "YOUR TURN"
+
+msgid "SIRA: %s"
+msgstr "TURN: %s"
+
+msgid "SIRA: %s · %s"
+msgstr "TURN: %s · %s"
+
+msgid "SON DAKİKA"
+msgstr "BREAKING NEWS"
+
+msgid "SONUÇ"
+msgstr "RESULT"
+
+msgid "SORUŞTURMA AÇ · %s"
+msgstr "OPEN INVESTIGATION · %s"
+
+msgid "SORUŞTURMA SONUCU"
+msgstr "INVESTIGATION RESULT"
+
+msgid "SUNULAMAZ"
+msgstr "UNAVAILABLE"
+
+msgid "Sadece adı değiştir"
+msgstr "Change only the first name"
+
+msgid "Sadece soyadı değiştir"
+msgstr "Change only the surname"
+
+msgid "Sahipliği Devret"
+msgstr "Transfer Ownership"
+
+msgid "Salt çoğunluk %d  ·  Vekil %d/%d"
+msgstr "Majority %d  ·  Seats %d/%d"
+
+msgid "Sandıklar açılmaya başladı — sonuçlar kesin değildir"
+msgstr "Ballot boxes are being opened — results are not final"
+
+msgid "Sandıkların tamamı açıldı — birinci %s  (%%%.1f)"
+msgstr "All ballot boxes are open — %s comes first  (%.1f%%)"
+
+msgid "Sayım"
+msgstr "Counting"
+
+msgid "Sağlık Bakanlığı"
+msgstr "Ministry of Health"
+
+msgid "Sağlık Sistemi Krizi"
+msgstr "Health System Crisis"
+
+msgid "Sen"
+msgstr "You"
+
+msgid "Sen + %d bot  ·  en az %d oyuncu gerekir"
+msgstr "You + %d bots  ·  at least %d players needed"
+
+msgid "Sen bu ilde"
+msgstr "You in this province"
+
+msgid "Sendikacı"
+msgstr "Union Organizer"
+
+msgid "Senin memleketin."
+msgstr "Your hometown."
+
+msgid "Senin teşkilatın"
+msgstr "Your organization"
+
+msgid "Senin yasan: kabul edilirse il etkileri 2 kat"
+msgstr "Your law: if passed, provincial effects double"
+
+msgid "Ses"
+msgstr "Sound"
+
+msgid "Seviye"
+msgstr "Level"
+
+msgid "Seçilmedi: "
+msgstr "Not selected: "
+
+msgid "Seçim"
+msgstr "Elections"
+
+msgid "Seçim Barajı: %0"
+msgstr "Election Threshold: 0%"
+
+msgid "Seçim barajı"
+msgstr "Election threshold"
+
+msgid "Seçim yapıldı"
+msgstr "Election held"
+
+msgid "Seçimler kaç yılda bir"
+msgstr "Elections every how many years"
+
+msgid "Seçmek için tıkla."
+msgstr "Click to select."
+
+msgid "Seçmen"
+msgstr "Voters"
+
+msgid "Seçmen grupları"
+msgstr "Voter groups"
+
+msgid "Seçmen profili"
+msgstr "Voter profile"
+
+msgid "Seçmen sana"
+msgstr "Voters toward you"
+
+msgid "Seçmene yansıma"
+msgstr "Effect on voters"
+
+msgid "Seçtiğin ilde %s; partin ilin kalabalık seçmen gruplarına yaklaşır. Seçmen sana uzaksa provokasyon riski var."
+msgstr "%s in the chosen province; your party moves closer to the province's largest voter groups. If voters there are far from you, there's a risk of provocation."
+
+msgid "Seçtiğin partide iç karışıklık çıkar: %s. Karışıklık birikirse parti bölünebilir.\nSeç, sonra soldaki bir partiye tıkla."
+msgstr "Internal turmoil breaks out in the chosen party: %s. If turmoil builds up, the party may split.\nSelect it, then click a party on the left."
+
+msgid "Seçtiğin partiden %d–%d vekil çal; aynı seçmen gruplarına hitap ediyorsanız daha çok.\n%s\nSeç, sonra soldaki bir partiye tıkla."
+msgstr "Steal %d–%d MPs from the chosen party; more if you appeal to the same voter groups.\n%s\nSelect it, then click a party on the left."
+
+msgid "Seçtiğin partinin elinden rastgele bir kart çalarsın (eli boşsa kart boşa gider).\nSeç, sonra soldaki bir partiye tıkla."
+msgstr "You steal a random card from the chosen party's hand (wasted if their hand is empty).\nSelect it, then click a party on the left."
+
+msgid "Seçtiğin partinin itibarını sarsan bir kaset sızar: %s ve parti içi karışıklık.\nSeç, sonra soldaki bir partiye tıkla."
+msgstr "A tape damaging the chosen party's reputation leaks: %s and internal turmoil.\nSelect it, then click a party on the left."
+
+msgid "Siyaset stüdyosuna hoş geldin"
+msgstr "Welcome to the politics studio"
+
+msgid "Siyasetçi"
+msgstr "Politician"
+
+msgid "Siyasetçi profiline dön (ad, geçmiş, memleket)"
+msgstr "Back to your politician profile (name, background, hometown)"
+
+msgid "Siyasetçilerin puanı ve partilerinin ulusal durumu"
+msgstr "Politicians' points and their parties' national standing"
+
+msgid "Skandal partiyi %s baskı altına sokuyor."
+msgstr "The scandal puts the party under %s pressure."
+
+msgid "Solda partiler ve vekilleri, ortada ülke haritası, sağda hükümet, haber akışı (LOG) ve seçtiğin il. Altta elindeki kartlar, hamleler ve parti kasan. Sıran gelince hamlelerini yap, sonra Turu Bitir'e bas."
+msgstr "On the left: parties and their MPs. In the middle: the map. On the right: government, news feed (LOG) and the selected province. Below: your cards, moves and party funds. Make your moves on your turn, then press End Turn."
+
+msgid "Son kongreden beri seçim olmadı."
+msgstr "No election since the last congress."
+
+msgid "Son kongreden beri seçim olmadı: bir sonraki seçimden sonra isteyebilirsin."
+msgstr "No election since the last congress: you can request one after the next election."
+
+msgid "Son olaylar"
+msgstr "Recent events"
+
+msgid "Son seçim"
+msgstr "Last election"
+
+msgid "Sonraki seçim %d"
+msgstr "Next election %d"
+
+msgid "Sonraki seçim: %d"
+msgstr "Next election: %d"
+
+msgid "Sonuçlar kesin değildir, sayım devam ediyor"
+msgstr "Results are not final; counting continues"
+
+msgid "Sorun: %s.\nKabul edilirse %s arasında %s, %s arasında %s. Reddedilse de vaat olarak küçük bir kazanç kalır."
+msgstr "Issue: %s.\nIf passed: %s — %s; %s — %s. Even if rejected, a small gain remains as a promise."
+
+msgid "Sorun: %s. Talepler: %s."
+msgstr "Issue: %s. Demands: %s."
+
+msgid "Soruşturma nitelikli bir kanıt bulamadı; siyasi etkisi yok."
+msgstr "The investigation found no qualifying evidence; no political impact."
+
+msgid "Soruşturmayı açan: %s"
+msgstr "Opened by: %s"
+
+msgid "Soruşturmayı partinin genel başkanı açar."
+msgstr "The party leader opens investigations."
+
+msgid "Soyad"
+msgstr "Surname"
+
+msgid "Sunduğun yasalar daha çok ses getirir."
+msgstr "The laws you propose make more noise."
+
+msgid "Süre: %02d:%02d"
+msgstr "Time: %02d:%02d"
+
+msgid "Süre: 01:00"
+msgstr "Time: 01:00"
+
+msgid "SİYASETÇİ"
+msgstr "POLITICIAN"
+
+msgid "SİYASETÇİNİ OLUŞTUR"
+msgstr "CREATE YOUR POLITICIAN"
+
+msgid "Sınırsız"
+msgstr "Unlimited"
+
+msgid "Sıra sende değil."
+msgstr "It's not your turn."
+
+msgid "Sıra sende: kasana +%s girdi%s (kasada %s)."
+msgstr "Your turn: +%s went into your funds%s (%s in funds)."
+
+msgid "Sıra: %s%s%s"
+msgstr "Turn: %s%s%s"
+
+msgid "Sıra: -"
+msgstr "Turn: -"
+
+msgid "Sıran değil."
+msgstr "Not your turn."
+
+msgid "Sıran gelince ve kasan yetince yapabilirsin."
+msgstr "You can do this on your turn when your funds allow."
+
+msgid "TEK ADAY"
+msgstr "SOLE CANDIDATE"
+
+msgid "TEKLİFİ SUN · %s"
+msgstr "SUBMIT THE PROPOSAL · %s"
+
+msgid "TEKLİFİ VEREN"
+msgstr "OFFER BY"
+
+msgid "TEŞKİLAT"
+msgstr "ORGANIZE"
+
+msgid "TOPLANTI"
+msgstr "MEETING"
+
+msgid "Tam Ekran"
+msgstr "Fullscreen"
+
+msgid "Teklifte Bulun"
+msgstr "Make the Offer"
+
+msgid "Teşkilat"
+msgstr "Organization"
+
+msgid "Teşkilat %s"
+msgstr "%s organization"
+
+msgid "Teşkilat desteği"
+msgstr "Organization support"
+
+msgid "Teşkilatlanma: bir ile dokun, tekrar dokun: kur ya da geliştir (%s)  ·  Butona tekrar dokun: iptal"
+msgstr "Organize: tap a province, tap again to build or upgrade (%s)  ·  Tap the button again: cancel"
+
+msgid "Teşkilatların daha çok oy getirir."
+msgstr "Your organizations bring more votes."
+
+msgid "Toplam %s milyon ₺"
+msgstr "Total %s million ₺"
+
+msgid "Toplantıyı kapat (TOPLANTI düğmesiyle yeniden açılır)."
+msgstr "Close the meeting (reopen with the MEETING button)."
+
+msgid "Turu Bitir"
+msgstr "End Turn"
+
+msgid "Tutar küçük: belirgin bir siyasi etkisi yok."
+msgstr "The amount is small: no significant political impact."
+
+msgid "Tutarlar sonuçta açıklanır; incelenmiş işlemler yeniden incelenmez."
+msgstr "Amounts are revealed in the result; transactions already examined aren't re-examined."
+
+msgid "Tüm sandıklar açıldı. Kesin olmayan sonuçlara göre birinci parti: %s  (%%%.1f · %d vekil)"
+msgstr "All ballot boxes are open. According to unofficial results, the leading party is %s  (%.1f%% · %d seats)"
+
+msgid "ULUSAL"
+msgstr "NATIONAL"
+
+msgid "USULSÜZLÜK — Finansman soruşturması: %s partizan faaliyetler için devlet hazinesinden %s kullandı. Skandal partiyi %s baskı altına sokuyor."
+msgstr "IRREGULARITY — Funding investigation: %s used %s of state money for partisan activities. The scandal puts the party under %s pressure."
+
+msgid "Ulusal Güvenlik ve Birlik Yasası"
+msgstr "National Security and Unity Act"
+
+msgid "Ulusal birliği ve güçlü devleti önceleyen seçmen."
+msgstr "Voters who put national unity and a strong state first."
+
+msgid "Ulusal egemenlik ve güvenlik"
+msgstr "National sovereignty and security"
+
+msgid "Ulusal kamuoyu: %s"
+msgstr "National public opinion: %s"
+
+msgid "Usulsüzlük: hedef parti ağır baskı altına girer."
+msgstr "Irregularity: the target party comes under heavy pressure."
+
+msgid "VEKİL"
+msgstr "SEATS"
+
+msgid "VEKİL ÇALMA\nGÜÇLÜ"
+msgstr "STEAL MPs\nSTRONG"
+
+msgid "VEKİL ÇALMA\nORTA"
+msgstr "STEAL MPs\nMEDIUM"
+
+msgid "VEKİL ÇALMA\nZAYIF"
+msgstr "STEAL MPs\nWEAK"
+
+msgid "VERGİ"
+msgstr "TAX"
+
+msgid "VERGİ POLİTİKASI"
+msgstr "TAX POLICY"
+
+msgid "VERGİ POLİTİKASI  ›"
+msgstr "TAX POLICY  ›"
+
+msgid "Vazgeç"
+msgstr "Cancel"
+
+msgid "Vekil sayıları solda. En çok vekili olan parti hükümeti kurmaya çalışır; güvenoyu için meclisin çoğunluğu (251) gerekir. Gerekirse ortak bulunur."
+msgstr "Seat counts are on the left. The party with the most seats tries to form a government; a confidence vote needs a majority of parliament (251). Partners are found if needed."
+
+msgid "Vekil Çalma"
+msgstr "Steal MPs"
+
+msgid "Vekil Çalma (Güçlü)"
+msgstr "Steal MPs (Strong)"
+
+msgid "Vekil çalmak için sağdaki bir partinin logosuna bırak"
+msgstr "Drop on a party's logo on the right to steal MPs"
+
+msgid "Vekiller"
+msgstr "Seats"
+
+msgid "Vergi"
+msgstr "Tax"
+
+msgid "Vergi %s → %s. Seçmen değişimi kademeli hissediyor; tamamen yerleşmesi yaklaşık %d dönem sürer. Seçim olursa sadece yerleşen kısım sayılır."
+msgstr "Tax %s → %s. Voters feel the change gradually; it takes about %d terms to settle fully. If an election comes, only the settled part counts."
+
+msgid "Vergi %s → %s: seçmen tepkisi kademeli gelir, en çok başbakanın partisi hisseder"
+msgstr "Tax %s → %s: voters react gradually; the prime minister's party feels it most"
+
+msgid "Vergi %s. Hükümette kaldıkça seçimde bu gruplara yansır."
+msgstr "Tax %s. While in government, this carries over to these groups at the election."
+
+msgid "Vergi değişikliği meclis oylaması ister: dokun, Vergi Politikası açılsın."
+msgstr "Changing taxes needs a parliamentary vote: tap to open Tax Policy."
+
+msgid "Vergi kademesini değiştiren yasa: gündem şartı yok, sadece hükümet partileri sunar."
+msgstr "A law that changes the tax level: no agenda needed, only governing parties can propose it."
+
+msgid "Vergi ve Bürokrasi Yükü"
+msgstr "Tax and Red Tape"
+
+msgid "Vergi ve yatırım"
+msgstr "Taxes and investment"
+
+msgid "Vergi yasasını sadece hükümet partileri sunabilir."
+msgstr "Only governing parties can propose a tax law."
+
+msgid "Vergi zaten %s."
+msgstr "Taxes are already %s."
+
+msgid "Vergi İndirimi ve Yatırım Teşvik Yasası"
+msgstr "Tax Cut and Investment Incentive Act"
+
+msgid "YASA"
+msgstr "LAW"
+
+msgid "YASA TEKLİFİ"
+msgstr "PROPOSE A LAW"
+
+msgid "YASA: %s (%s) — %s getirdi · EVET %d / ÇEK. %d / HAYIR %d · %s"
+msgstr "LAW: %s (%s) — proposed by %s · YES %d / ABSTAIN %d / NO %d · %s"
+
+msgid "YASAYI GETİREN"
+msgstr "PROPOSED BY"
+
+msgid "YATIRIM"
+msgstr "INVEST"
+
+msgid "YENİ PARTİ KUR"
+msgstr "FOUND A NEW PARTY"
+
+msgid "YENİ PARTİ: %s, %s'yi kurdu."
+msgstr "NEW PARTY: %s founded %s."
+
+msgid "YRD"
+msgstr "DEP"
+
+msgid "Yasa şu an meclise getirilemez (meclis yok ya da hükümet kuruluyor)."
+msgstr "A law can't be brought to parliament right now (no parliament, or a government is being formed)."
+
+msgid "Yasa: %s ya da %s"
+msgstr "Law: %s or %s"
+
+msgid "Yasayı partinin genel başkanı sunar."
+msgstr "The party leader proposes laws."
+
+msgid "Yatırım"
+msgstr "Investment"
+
+msgid "Yatırım (%s, parti kasası ve devlet hazinesi arasında bölünebilir): haritada bir ile dokun  ·  Butona tekrar dokun: iptal"
+msgstr "Investment (%s, can be split between party funds and the state treasury): tap a province on the map  ·  Tap the button again: cancel"
+
+msgid "Yatırım kartını sadece hükümet partileri oynayabilir."
+msgstr "Only governing parties can play the investment card."
+
+msgid "Yatırım ortamı, vergi yükü ve işletmelerin sorunları"
+msgstr "Business climate, tax burden and the problems of businesses"
+
+msgid "Yatırım ödenemiyor: hazinede %s, kasanda %s; ikisi birlikte %s etmeli."
+msgstr "The investment can't be paid: %s in the treasury, %s in your funds; together they must reach %s."
+
+msgid "Yatırımı sadece hükümet partileri yapabilir"
+msgstr "Only governing parties can invest"
+
+msgid "Yatırımı sadece hükümet partileri yapabilir."
+msgstr "Only governing parties can invest."
+
+msgid "Yayıncı Modu"
+msgstr "Streamer Mode"
+
+msgid "Yeni Parti"
+msgstr "New Party"
+
+msgid "Yeni Parti Kur · %s"
+msgstr "Found a New Party · %s"
+
+msgid "Yeni partiler katılabilir"
+msgstr "New parties may join"
+
+msgid "Yerel Yönetimler ve Bölgesel Temsil Yasası"
+msgstr "Local Government and Regional Representation Act"
+
+msgid "Yerel güç"
+msgstr "Local strength"
+
+msgid "Yerel yetkiler ve bölgesel temsil"
+msgstr "Local powers and regional representation"
+
+msgid "Yerelden Yönetim Talebi"
+msgstr "Demand for Local Rule"
+
+msgid "Yerine bot oynasın"
+msgstr "Let a bot play for them"
+
+msgid "Yeterli oyuncu kalmadı."
+msgstr "Not enough players left."
+
+msgid "Yurt genelinde sandıklar tek tek açılıyor"
+msgstr "Ballot boxes are being opened one by one across the country"
+
+msgid "YÜRÜRLÜKTE"
+msgstr "IN FORCE"
+
+msgid "Yüksek"
+msgstr "High"
+
+msgid "Yürürlükte: %s · dönem geliri %s · hazine %s"
+msgstr "Current: %s · revenue per term %s · treasury %s"
+
+msgid "Yürürlükteki vergi: %s.\n"
+msgstr "Current tax: %s.\n"
+
+msgid "Yıllık enflasyon. Düşük vergi ve yoğun yatırım artırır; emeklilerin ve işçilerin hükümete desteğini azaltır."
+msgstr "Annual inflation. Low taxes and heavy investment raise it; it reduces retirees' and workers' support for the government."
+
+msgid "Zorunlu kongreye %s. Partideki gücün %s: güçlüysen rakip az çıkar."
+msgstr "Mandatory congress: %s. Your strength in the party is %s: if you're strong, fewer challengers appear."
+
+msgid "aile değerleri"
+msgstr "family values"
+
+msgid "altına düştü!"
+msgstr "fell below"
+
+msgid "artış"
+msgstr "increase"
+
+msgid "artışı"
+msgstr "increase"
+
+msgid "ayrımcılık"
+msgstr "discrimination"
+
+msgid "az oy bonusu, yaklaşık oy"
+msgstr "small vote bonus, rough poll"
+
+msgid "ağır"
+msgstr "heavy"
+
+msgid "ağır bir kan kaybı yaşadı"
+msgstr "suffered a heavy loss"
+
+msgid "baraj altı"
+msgstr "below threshold"
+
+msgid "barınma"
+msgstr "housing"
+
+msgid "başbakan"
+msgstr "prime minister"
+
+msgid "başka partinin rengi seçilemez"
+msgstr "another party's color can't be chosen"
+
+msgid "bedelsiz"
+msgstr "free"
+
+msgid "belirgin"
+msgstr "significant"
+
+msgid "belirgin bir etki yok"
+msgstr "no clear effect"
+
+msgid "bireysel özgürlükler"
+msgstr "individual freedoms"
+
+msgid "bu seçimden sonra sıran gelince gidilecek"
+msgstr "held on your turn after this election"
+
+msgid "bölgesel temsil"
+msgstr "regional representation"
+
+msgid "bürokrasi"
+msgstr "bureaucracy"
+
+msgid "büyük ölçüde yerleşti"
+msgstr "mostly settled"
+
+msgid "destek %s%s"
+msgstr "support %s%s"
+
+msgid "din eğitimi"
+msgstr "religious education"
+
+msgid "durağan"
+msgstr "stable"
+
+msgid "dönene kadar pasif"
+msgstr "inactive until they return"
+
+msgid "düşük"
+msgstr "low"
+
+msgid "düşük risk"
+msgstr "low risk"
+
+msgid "ekonomi %s · enflasyon %s"
+msgstr "economy %s · inflation %s"
+
+msgid "ekonominin belirgin etkisi yok"
+msgstr "no clear economic effect"
+
+msgid "emekli aylıkları"
+msgstr "pensions"
+
+msgid "en çok başbakanın partisi"
+msgstr "mostly the prime minister's party"
+
+msgid "eski parti"
+msgstr "former party"
+
+msgid "etkisi yerleşiyor"
+msgstr "still settling"
+
+msgid "eğitim"
+msgstr "education"
+
+msgid "eşit yurttaşlık"
+msgstr "equal citizenship"
+
+msgid "geliştirdi"
+msgstr "upgraded"
+
+msgid "geliştirmek"
+msgstr "upgrade"
+
+msgid "geçmiş"
+msgstr "background"
+
+msgid "güvenlik"
+msgstr "security"
+
+msgid "güçleniyor"
+msgstr "strengthening"
+
+msgid "güçlü"
+msgstr "strong"
+
+msgid "güçlü bir yükseliş yakaladı"
+msgstr "surged strongly"
+
+msgid "hafif"
+msgstr "slight"
+
+msgid "halk desteğini artırdı"
+msgstr "gained public support"
+
+msgid "haritadan bir il seç"
+msgstr "pick a province on the map"
+
+msgid "hazinede kalır: %s"
+msgstr "left in treasury: %s"
+
+msgid "hepsi seçimden önce biter"
+msgstr "all finish before the election"
+
+msgid "her çift toplam %100"
+msgstr "each pair totals 100%"
+
+msgid "ilin kalabalık gruplarına kaydı (%s)"
+msgstr "shifted toward the province's largest groups (%s)"
+
+msgid "ilin yarısı"
+msgstr "half the province"
+
+msgid "inanç özgürlüğü"
+msgstr "freedom of belief"
+
+msgid "incelenecek yeni bir işlem bulamadı"
+msgstr "found no new transactions to examine"
+
+msgid "iş güvencesi"
+msgstr "job security"
+
+msgid "kabul edildi"
+msgstr "passed"
+
+msgid "kademeli · ~%d dönemde"
+msgstr "gradual · ~%d terms"
+
+msgid "kamuoyu"
+msgstr "opinion"
+
+msgid "kartı seç, tıkla"
+msgstr "select a card, click"
+
+msgid "karşılığında kazanç"
+msgstr "gained something in return"
+
+msgid "kasada kalır: %s"
+msgstr "left in funds: %s"
+
+msgid "kaybı"
+msgstr "loss"
+
+msgid "kayıp"
+msgstr "loss"
+
+msgid "kazanç yok"
+msgstr "no gain"
+
+msgid "kurdu"
+msgstr "founded"
+
+msgid "kötüleşiyor"
+msgstr "worsening"
+
+msgid "kısmen yakın"
+msgstr "partly close"
+
+msgid "meclise sunulur"
+msgstr "submitted to parliament"
+
+msgid "milyon ₺"
+msgstr "million ₺"
+
+msgid "milyon ₺ / dönem"
+msgstr "million ₺ / term"
+
+msgid "mv"
+msgstr "MPs"
+
+msgid "nitelikli bir kanıt bulamadı"
+msgstr "found no qualifying evidence"
+
+msgid "nötr"
+msgstr "neutral"
+
+msgid "olağan"
+msgstr "normal"
+
+msgid "olumlu"
+msgstr "positive"
+
+msgid "olumsuz"
+msgstr "negative"
+
+msgid "olumsuz (%s)"
+msgstr "negative (%s)"
+
+msgid "orta"
+msgstr "moderate"
+
+msgid "orta risk"
+msgstr "medium risk"
+
+msgid "oy"
+msgstr "votes"
+
+msgid "parti kuruyor…"
+msgstr "founding a party…"
+
+msgid "partini bir seçmen grubuna biraz yaklaştırır"
+msgstr "brings your party a little closer to a voter group"
+
+msgid "puan"
+msgstr "points"
+
+msgid "reddedildi"
+msgstr "rejected"
+
+msgid "risk yok"
+msgstr "no risk"
+
+msgid "sadece %s ya da %s için yasa sunulabilir"
+msgstr "laws can only be proposed for %s or %s"
+
+msgid "sadece sen görürsün"
+msgstr "only you can see this"
+
+msgid "salt çoğunluk VAR"
+msgstr "absolute majority: YES"
+
+msgid "salt çoğunluk YOK"
+msgstr "no absolute majority"
+
+msgid "salt çoğunluk YOK (HAYIR, EVET'ten az kalırsa yine de geçer)"
+msgstr "no absolute majority (it still passes if NO is less than YES)"
+
+msgid "sağlık"
+msgstr "health"
+
+msgid "sendikal haklar"
+msgstr "union rights"
+
+msgid "seçim vaadi olarak açıklanır"
+msgstr "announced as an election promise"
+
+msgid "seçim: %d mv"
+msgstr "election: %d MPs"
+
+msgid "seçmen grupları"
+msgstr "voter groups"
+
+msgid "seçmen: dengeli"
+msgstr "voters: balanced"
+
+msgid "son %d dönem · %d yatırım, %d miting"
+msgstr "last %d terms · %d investments, %d rallies"
+
+msgid "süren yatırım yok"
+msgstr "no investments under way"
+
+msgid "sürüm %s"
+msgstr "version %s"
+
+msgid "teşkilat gerekli"
+msgstr "organization needed"
+
+msgid "teşkilat seviyem"
+msgstr "my organization level"
+
+msgid "toparlanıyor"
+msgstr "recovering"
+
+msgid "ulusal birlik"
+msgstr "national unity"
+
+msgid "ulusal destek"
+msgstr "national support"
+
+msgid "ulusal egemenlik"
+msgstr "national sovereignty"
+
+msgid "uzak"
+msgstr "far"
+
+msgid "vekil"
+msgstr "MPs"
+
+msgid "vekil yok"
+msgstr "no seats"
+
+msgid "vergi %s"
+msgstr "tax %s"
+
+msgid "vergi yükü"
+msgstr "tax burden"
+
+msgid "ya da koda katıl"
+msgstr "or join with a code"
+
+msgid "yaklaşık"
+msgstr "approximate"
+
+msgid "yakın"
+msgstr "close"
+
+msgid "yatırım ortamı"
+msgstr "business climate"
+
+msgid "yaşam maliyeti"
+msgstr "cost of living"
+
+msgid "yerel güç"
+msgstr "local strength"
+
+msgid "yerel yetkiler"
+msgstr "local powers"
+
+msgid "yerinden yönetim"
+msgstr "self-government"
+
+msgid "yerine bot oynuyor"
+msgstr "a bot is playing in their place"
+
+msgid "yüksek"
+msgstr "high"
+
+msgid "yüksek oy bonusu, %90 doğru oy"
+msgstr "high vote bonus, 90% accurate poll"
+
+msgid "yüksek oy bonusu, yüksek isabetli anket"
+msgstr "high vote bonus, highly accurate poll"
+
+msgid "yüksek risk"
+msgstr "high risk"
+
+msgid "zayıf"
+msgstr "weak"
+
+msgid "zayıflıyor"
+msgstr "weakening"
+
+msgid "~%d dönem"
+msgstr "~%d terms"
+
+msgid "·  Yrd."
+msgstr "·  Deputy"
+
+msgid "ÇEKİMSER"
+msgstr "ABSTAIN"
+
+msgid "ÇEVRİM DIŞI OYUN"
+msgstr "OFFLINE GAME"
+
+msgid "ÇOĞUNLUK"
+msgstr "MAJORITY"
+
+msgid "Çalınan parti mağduriyetten biraz destek kazanır."
+msgstr "The targeted party gains a little sympathy support."
+
+msgid "Çalışma hayatını tamamlamış yaşlı seçmenler."
+msgstr "Older voters who have finished their working lives."
+
+msgid "Çekimser"
+msgstr "Abstain"
+
+msgid "Çekirdek gruplarda %%%d, karşıtlarında %%%d, diğerlerinde %%%d destekle başlarsın. Oyunda yasa, miting ve toplantıyla değişir."
+msgstr "You start with %d%% support in your core groups, %d%% in their opposites and %d%% in the others. It changes during the game through laws, rallies and meetings."
+
+msgid "Çekirdek seçmen grupları (2 seç)"
+msgstr "Core voter groups (pick 2)"
+
+msgid "Çevrim Dışı"
+msgstr "Offline"
+
+msgid "Çevrim İçi"
+msgstr "Online"
+
+msgid "Çıkar"
+msgstr "Remove"
+
+msgid "Çıkış"
+msgstr "Quit"
+
+msgid "ÖDENEMİYOR"
+msgstr "CAN'T PAY"
+
+msgid "ÖNERGEYİ VEREN"
+msgstr "MOTION BY"
+
+msgid "Önce bozdurmak istediğin kartı seç."
+msgstr "First select the card you want to cash in."
+
+msgid "Özerkçiler"
+msgstr "Autonomists"
+
+msgid "Öğrenciler barınma ve iş talebiyle sokakta."
+msgstr "Students are on the streets demanding housing and jobs."
+
+msgid "Öğrenciler ve iş hayatına yeni atılanlar."
+msgstr "Students and young people starting their careers."
+
+msgid "Ücretler, iş güvencesi ve sendikal haklar"
+msgstr "Wages, job security and union rights"
+
+msgid "Ücretli çalışanlar, fabrika ve sendika tabanı."
+msgstr "Wage earners, factory floors and the union base."
+
+msgid "çok az"
+msgstr "minimal"
+
+msgid "çok düşük"
+msgstr "very low"
+
+msgid "çok etkili"
+msgstr "very effective"
+
+msgid "çok güçlü"
+msgstr "very strong"
+
+msgid "çok uzak"
+msgstr "very far"
+
+msgid "çok yakın"
+msgstr "very close"
+
+msgid "çok yüksek"
+msgstr "very high"
+
+msgid "çok yüksek risk"
+msgstr "very high risk"
+
+msgid "çok zayıf"
+msgstr "very weak"
+
+msgid "çoğunluk var"
+msgstr "majority"
+
+msgid "ücretler"
+msgstr "wages"
+
+msgid "üzerine çıktı!"
+msgstr "rose above"
+
+msgid "İLK SONUÇLAR"
+msgstr "FIRST RESULTS"
+
+msgid "İNDİRİM ETKİSİ"
+msgstr "TAX CUT EFFECT"
+
+msgid "İbadet yerlerine yönelik kısıtlamalar tepki çekiyor."
+msgstr "Restrictions on places of worship are drawing backlash."
+
+msgid "İflas Dalgası"
+msgstr "Wave of Bankruptcies"
+
+msgid "İkinci tur oylaması…"
+msgstr "Runoff vote…"
+
+msgid "İkon"
+msgstr "Icon"
+
+msgid "İktidardasın: muhalefetin yasasına EVET her ilde eksi (yakın illerde az) · kabul edilirse getiren güçlenir"
+msgstr "You're in government: YES to an opposition law is a minus everywhere (less in close provinces) · if passed, its proposer gains"
+
+msgid "İl inceleme"
+msgstr "Province view"
+
+msgid "İlahiyatçı"
+msgstr "Theologian"
+
+msgid "İlde kalıcı güç ve anket; yerel bağışlarla kasana düzenli para getirir."
+msgstr "Lasting strength and polls in a province; local donations bring regular money to your funds."
+
+msgid "İlde oy kazandırır ve partini ilin kalabalık seçmen gruplarına yaklaştırır. Teşkilat ister; provokasyon riski vardır."
+msgstr "Wins votes in the province and brings your party closer to its largest voter groups. Needs an organization; there's a risk of provocation."
+
+msgid "İlde teşkilat kalıcı oy, anket ve yerel bağış getirir; miting ve karalama ancak teşkilatlı ilde yapılır. Beş ilden sonra her yeni teşkilat biraz daha pahalıdır: nerede kuracağını seç."
+msgstr "An organization brings lasting votes, polls and local donations to a province; rallies and smear campaigns need one. After five provinces each new organization costs a little more: choose where to build."
+
+msgid "İlk oyun rehberi baştan gösterilecek."
+msgstr "The first-game guide will be shown from the start."
+
+msgid "İlk seçimden önce meclis boş"
+msgstr "Parliament is empty before the first election"
+
+msgid "İlk seçime kadar meclis yok: soruşturma açılamaz."
+msgstr "No parliament until the first election: no investigations yet."
+
+msgid "İlk seçime kadar meclis yok: vergi değiştirilemez."
+msgstr "No parliament until the first election: taxes can't be changed."
+
+msgid "İlk seçime kadar meclis yok: yasa yapılamaz."
+msgstr "No parliament until the first election: no laws."
+
+msgid "İnancını gündelik hayatının merkezine koyan topluluklar."
+msgstr "Communities that put faith at the center of daily life."
+
+msgid "İnanç Gerginliği"
+msgstr "Religious Tension"
+
+msgid "İnanç pratiklerine yönelik kısıtlamalar"
+msgstr "Restrictions on religious practice"
+
+msgid "İnanç ve Eğitim Tartışması"
+msgstr "Faith and Education Debate"
+
+msgid "İnanç Özgürlüğü ve Din Eğitimi Yasası"
+msgstr "Freedom of Belief and Religious Education Act"
+
+msgid "İnanç özgürlüğü ve din eğitimi"
+msgstr "Freedom of belief and religious education"
+
+msgid "İptal"
+msgstr "Cancel"
+
+msgid "İÇ\nKARIŞIKLIK"
+msgstr "INTERNAL\nTURMOIL"
+
+msgid "İç Karışıklık"
+msgstr "Internal Turmoil"
+
+msgid "İçişleri Bakanlığı"
+msgstr "Ministry of the Interior"
+
+msgid "İŞSİZLİK"
+msgstr "UNEMPLOYMENT"
+
+msgid "İş İnsanı"
+msgstr "Businessperson"
+
+msgid "İşsizlik oranı. Ekonomi büyüdükçe düşer."
+msgstr "Unemployment rate. Falls as the economy grows."
+
+msgid "İşverenler ve İşletmeler"
+msgstr "Employers and Businesses"
+
+msgid "İşçiler ve Sendikalar"
+msgstr "Workers and Unions"
+
+msgid "ŞEFFAF — Finansman soruşturması: %s %s harcamayı kendi kasasından yaptığı doğrulandı. %s"
+msgstr "CLEAN — Funding investigation: %s verified to have paid %s of spending from its own funds. %s"
+
+msgid "Şeffaflık: hedef parti itibar kazanır."
+msgstr "Transparency: the target party gains credibility."
+
+msgid "Şehirler kendi kararlarını kendileri vermek istiyor."
+msgstr "Cities want to make their own decisions."
+
+msgid "Şehrini yıllarca yönettin, yerel ağları iyi bilirsin."
+msgstr "You ran your city for years and know the local networks well."
+
+msgid "Şu an sunamazsın: "
+msgstr "You can't propose now: "
+
+msgid "Şu an yapılamaz."
+msgstr "Can't be done right now."
+
+msgid "Şu anki kuralları değiştirmiyor. Bir ayarı değiştir."
+msgstr "It doesn't change the current rules. Change a setting."
+
+msgid "şu an: %d mv"
+msgstr "now: %d MPs"
+
+msgid "— KANIT YOK"
+msgstr "— NO EVIDENCE"
+
+msgid "← Profilim"
+msgstr "← My Profile"
+
+msgid "▲▼ son seçimden beri"
+msgstr "▲▼ since the last election"
+
+msgid "●  CANLI"
+msgstr "●  LIVE"
+
+msgid "★ Oda sahibi"
+msgstr "★ Room owner"
+
+msgid "⚙ LOBİ AYARLARI"
+msgstr "⚙ LOBBY SETTINGS"
+
+msgid "⚠ KRİZ · %s"
+msgstr "⚠ CRISIS · %s"
+
+msgid "✓ ŞEFFAF · DOĞRULANDI"
+msgstr "✓ CLEAN · VERIFIED"
+
+msgid "✕ İptal Et"
+msgstr "✕ Cancel"
+
+msgid "🎲 Ad"
+msgstr "🎲 First name"
+
+msgid "🎲 Bot Profilini Rastgele Yap"
+msgstr "🎲 Randomize Bot Profile"
+
+msgid "🎲 Soyad"
+msgstr "🎲 Surname"
+
+msgid "🎲 İkisi de"
+msgstr "🎲 Both"
+
+msgid "📋 KOPYALA"
+msgstr "📋 COPY"
+
+msgid "📋 Kopyala"
+msgstr "📋 Copy"
+
+msgid "🔒 Kilitle ve Hazır Ver"
+msgstr "🔒 Lock and Get Ready"

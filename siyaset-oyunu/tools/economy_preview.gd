@@ -29,6 +29,11 @@ func _inside(control: Control) -> bool:
 
 func _initialize() -> void:
 	# PREVIEW_SIZE=1280x720 gibi: kullanıcının tam ekran ayarına dokunmadan pencere boyutu.
+	await process_frame
+	if OS.get_environment("PREVIEW_LANG") != "":
+		# Ayar dosyasına yazmadan (GameSettings açılışta dili yükledikten sonra).
+		root.get_node("GameSettings").language = OS.get_environment("PREVIEW_LANG")
+		TranslationServer.set_locale(OS.get_environment("PREVIEW_LANG"))
 	var forced := OS.get_environment("PREVIEW_SIZE")
 	if forced != "":
 		var parts := forced.split("x")
@@ -148,7 +153,7 @@ func _initialize() -> void:
 	await _frames(20)
 	_shot("econ_funding_split")
 	check("sürükleme paylaşımı değiştirdi (%30 devlet)", absf(slider.share - 0.3) < 0.001, str(slider.share))
-	check("iki katkı anında güncellendi (ikisi de milyon ₺)", fp._state_pay.text == "30 milyon ₺" and fp._party_pay.text == "70 milyon ₺",
+	check("iki katkı anında güncellendi (ikisi de milyon ₺)", fp._state_pay.text == Economy.money_full(30.0) and fp._party_pay.text == Economy.money_full(70.0),
 		"%s / %s" % [fp._state_pay.text, fp._party_pay.text])
 	check("kalan bakiyeler güncellendi", fp._party_left.text.contains(GameRules.money_text(cm.funds_of(me) - 70.0))
 		and fp._state_left.text.contains(Economy.money_text(cm.state_treasury() - 30.0)), fp._party_left.text)
@@ -199,7 +204,7 @@ func _initialize() -> void:
 	slider.set_share(1.0)
 	await _frames(20)
 	_shot("econ_funding_miting")
-	check("devlet paylı mitingte usulsüzlük uyarısı", fp._note.text.contains("PARTİZAN"), fp._note.text)
+	check("devlet paylı mitingte usulsüzlük uyarısı", (fp._note.text.contains("PARTİZAN") or fp._note.text.contains("PARTISAN")), fp._note.text)
 	scene._cancel_targeting()
 	before = cm.state_treasury()
 	cm._apply_invest_move(me, province)

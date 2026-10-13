@@ -71,10 +71,10 @@ static func normalize_vote(value) -> int:
 static func vote_text(value) -> String:
 	match normalize_vote(value):
 		VOTE_YES:
-			return "EVET"
+			return L.t("EVET")
 		VOTE_NO:
-			return "HAYIR"
-	return "ÇEKİMSER"
+			return L.t("HAYIR")
+	return L.t("ÇEKİMSER")
 
 var phase: int = Phase.IDLE
 ## Koltuk sayısına göre BÜYÜKTEN KÜÇÜĞE sıralı peer_id listesi.
@@ -154,7 +154,7 @@ func tick(delta: float) -> void:
 	if _phase_time_left > 0.0:
 		return
 	if phase == Phase.FORMING:
-		last_resolution_reason = "%s hükümet kurma süresini doldurdu." % _party_name(mandate_peer_id())
+		last_resolution_reason = L.t("%s hükümet kurma süresini doldurdu.") % _party_name(mandate_peer_id())
 		_fail_attempt()
 		_push_state()
 	else:
@@ -423,10 +423,10 @@ func _fail_attempt() -> void:
 	_set_phase(Phase.FORMING if mandate_index < mandate_order.size() else Phase.IDLE)
 	if phase == Phase.IDLE:
 		# Meclisteki HER parti sırayla denedi ve kuramadı: son çare sandık.
-		last_resolution_reason += " Hiçbir parti hükümet kuramadı — dönem sonunda sandığa gidiliyor."
+		last_resolution_reason += L.t(" Hiçbir parti hükümet kuramadı — dönem sonunda sandığa gidiliyor.")
 	elif mandate_peer_id() != -1:
 		# Görev bir SONRAKİ EN BÜYÜK partiye geçer; son partiye kadar sürer.
-		last_resolution_reason += " Görev sıradaki partiye geçti: %s." % _party_name(mandate_peer_id())
+		last_resolution_reason += L.t(" Görev sıradaki partiye geçti: %s.") % _party_name(mandate_peer_id())
 
 ## Oyun bittiğinde CardManager çağırır: açık teklif kapanır, hükümet gösterim
 ## için korunur.
@@ -504,11 +504,11 @@ func _apply_withdraw(peer_id: int) -> void:
 			CardManager.add_national_points(int(ally), ally_penalty)
 	abandoned = true
 	var alone := government_party_ids().size() == 1
-	var text := "%s koalisyondan çekildi: %s.%s%s%s" % [
+	var text := L.t("%s koalisyondan çekildi: %s.%s%s%s") % [
 		_party_name(peer_id), EffectWords.change(penalty),
-		" Büyük ortak gitti: koalisyon baskı altında, kalan ortaklar da destek kaybetti." if ally_penalty < 0.0 else "",
-		(" %s hükümeti tek başına kaldı." % _party_name(main_gov_peer_id)) if alone else "",
-		" Hükümet salt çoğunluğu kaybetti!" if not has_majority() else ""]
+		L.t(" Büyük ortak gitti: koalisyon baskı altında, kalan ortaklar da destek kaybetti.") if ally_penalty < 0.0 else "",
+		(L.t(" %s hükümeti tek başına kaldı.") % _party_name(main_gov_peer_id)) if alone else "",
+		L.t(" Hükümet salt çoğunluğu kaybetti!") if not has_majority() else ""]
 	last_resolution_reason = text
 	_push_state()
 	if not _is_local_only():
@@ -682,13 +682,13 @@ func _resolve_proposal() -> void:
 		var votes_copy := votes.duplicate()
 		_clear_proposal()
 		_set_phase(Phase.GOVERNING if has_government() else Phase.IDLE)
-		last_resolution_reason = "%s %s (EVET %d – HAYIR %d)." % [
-			CardPresets.card_title(law_type), "kabul edildi" if passed else "reddedildi", totals.x, totals.y]
+		last_resolution_reason = L.t("%s %s (EVET %d – HAYIR %d).") % [
+			CardPresets.card_title(law_type), L.t("kabul edildi") if passed else L.t("reddedildi"), totals.x, totals.y]
 		if passed:
 			# Kabul edilen yasa getirene ciddi puan yazar; hükümetinki daha çok.
 			var points: int = CardManager.law_pass_score(gov_ids.has(PartyManager.party_of(proposer)))
 			scores[proposer] = score_of(proposer) + points
-			last_resolution_reason += " %s +%d puan." % [_party_name(proposer), points]
+			last_resolution_reason += L.t(" %s +%d puan.") % [_party_name(proposer), points]
 		# Kamuoyu sonuçları ÖNCE: fazın açılması ertelenmiş bir tur sonunu (ve
 		# seçimi) tetikleyebilir, seçim bu sonuçları görmeli.
 		CardManager.apply_law_result(proposer, law_type, votes_copy, passed, gov_ids)
@@ -704,13 +704,13 @@ func _resolve_proposal() -> void:
 		var payload := proposal_assignments.duplicate()
 		_clear_proposal()
 		_set_phase(Phase.GOVERNING if has_government() else Phase.IDLE)
-		last_resolution_reason = "Anayasa değişikliği %s (EVET %d / gereken %d)." % [
-			"KABUL EDİLDİ" if const_passed else "REDDEDİLDİ", totals.x, needed]
+		last_resolution_reason = L.t("Anayasa değişikliği %s (EVET %d / gereken %d).") % [
+			L.t("KABUL EDİLDİ") if const_passed else L.t("REDDEDİLDİ"), totals.x, needed]
 		if const_passed:
 			MultiplayerManager.apply_constitution(payload)
 			# Takvim son seçimden itibaren yeni aralıkla işlesin.
 			CardManager.rebase_election_calendar()
-			last_resolution_reason += " Yeni baraj %%%s, seçimler %d yılda bir, sayım: %s." % [
+			last_resolution_reason += L.t(" Yeni baraj %%%s, seçimler %d yılda bir, sayım: %s.") % [
 				String.num(MultiplayerManager.election_threshold, 1), MultiplayerManager.election_interval,
 				ElectionModel.method_title(MultiplayerManager.seat_method)]
 		_push_state()
@@ -723,11 +723,11 @@ func _resolve_proposal() -> void:
 		var early_passed: bool = totals.x > totals.y
 		_clear_proposal()
 		_set_phase(Phase.GOVERNING if has_government() else Phase.IDLE)
-		last_resolution_reason = "Erken seçim önergesi %s (EVET %d – HAYIR %d)." % [
-			"KABUL EDİLDİ" if early_passed else "reddedildi", totals.x, totals.y]
+		last_resolution_reason = L.t("Erken seçim önergesi %s (EVET %d – HAYIR %d).") % [
+			L.t("KABUL EDİLDİ") if early_passed else L.t("reddedildi"), totals.x, totals.y]
 		if early_passed:
 			CardManager.schedule_early_election()
-			last_resolution_reason += " Dönem sonunda sandığa gidiliyor."
+			last_resolution_reason += L.t(" Dönem sonunda sandığa gidiliyor.")
 		_push_state()
 		if not _is_local_only():
 			_notify_resolved.rpc(early_passed, kind, proposer)
@@ -743,8 +743,8 @@ func _resolve_proposal() -> void:
 	# HAYIR, EVET'ten fazlaysa da teklif düşer (çekimserler sayılmaz):
 	# azınlık hükümeti ancak çekimserlerin desteğiyle kurulabilir.
 	var rejected: bool = totals.y * 2 > total_seats() or totals.y > totals.x
-	var reason := "Meclis çoğunluğu HAYIR dedi." if totals.y * 2 > total_seats() \
-		else ("HAYIR oyları (%d) EVET'ten (%d) fazla." % [totals.y, totals.x] if rejected else "")
+	var reason := L.t("Meclis çoğunluğu HAYIR dedi.") if totals.y * 2 > total_seats() \
+		else (L.t("HAYIR oyları (%d) EVET'ten (%d) fazla.") % [totals.y, totals.x] if rejected else "")
 	if kind == KIND_CENSURE:
 		# Gensoru, EVET veren vekiller HAYIR verenlerden fazlaysa geçer (yasalardaki
 		# gibi). Çekimser ve oy vermeyenler sayılmaz; eşitlikte hükümet görevde kalır.
@@ -759,22 +759,22 @@ func _resolve_proposal() -> void:
 			_clear_proposal()
 			_set_phase(Phase.GOVERNING)
 			formed_round = CardManager.round_number
-			last_resolution_reason = "%s hükümeti güvenoyu aldı." % _party_name(main_gov_peer_id)
+			last_resolution_reason = L.t("%s hükümeti güvenoyu aldı.") % _party_name(main_gov_peer_id)
 			CardManager.grant_government_funds(government_party_ids())
 			# Makam puanları TEK SEFER, hükümetin kurulduğu anda yazılır.
 			award_formation_scores()
 		else:
-			last_resolution_reason = "Hükümet teklifi reddedildi: " + reason
+			last_resolution_reason = L.t("Hükümet teklifi reddedildi: ") + reason
 			_fail_attempt()
 	else: # KIND_CENSURE
 		if accepted:
 			# Hükümet düştü: kurma aşaması baştan başlar. Ortağı çekildiği için
 			# tek başına kalıp düşen ana parti ağır puan kaybeder.
-			var fall_note := " %s +%d puan." % [_party_name(proposer), GameRules.CENSURE_PASS_SCORE]
+			var fall_note := L.t(" %s +%d puan.") % [_party_name(proposer), GameRules.CENSURE_PASS_SCORE]
 			scores[proposer] = score_of(proposer) + GameRules.CENSURE_PASS_SCORE
 			if abandoned and government_party_ids().size() == 1 and main_gov_peer_id != -1:
 				add_party_score(main_gov_peer_id, -GovernmentPresets.ABANDONED_FALL_PENALTY)
-				fall_note = " Yalnız kalan %s −%d puan." % [_party_name(main_gov_peer_id), GovernmentPresets.ABANDONED_FALL_PENALTY]
+				fall_note = L.t(" Yalnız kalan %s −%d puan.") % [_party_name(main_gov_peer_id), GovernmentPresets.ABANDONED_FALL_PENALTY]
 			abandoned = false
 			government.clear()
 			main_gov_peer_id = -1
@@ -783,13 +783,13 @@ func _resolve_proposal() -> void:
 			attempts_used = 0
 			_clear_proposal()
 			_set_phase(Phase.FORMING if not mandate_order.is_empty() else Phase.IDLE)
-			last_resolution_reason = "Gensoru kabul edildi, hükümet düştü." + fall_note
+			last_resolution_reason = L.t("Gensoru kabul edildi, hükümet düştü.") + fall_note
 		else:
 			_clear_proposal()
 			_set_phase(Phase.GOVERNING)
 			# Başarısız gensoru getiren partinin ulusal desteğine eksi yazar (puan tablosuna değil).
 			CardManager.apply_censure_rejected(proposer)
-			last_resolution_reason = "Gensoru reddedildi, hükümet görevde. %s ulusal destek %s." % [
+			last_resolution_reason = L.t("Gensoru reddedildi, hükümet görevde. %s ulusal destek %s.") % [
 				_party_name(proposer), String.num(PublicOpinion.CENSURE_REJECTED_NATIONAL, 2).replace(".", ",")]
 
 	_push_state()
@@ -804,8 +804,8 @@ func _resolve_coalition_stage() -> void:
 	for member in eligible_voter_ids():
 		if int(votes.get(member, VOTE_ABSTAIN)) != VOTE_YES:
 			var partner := PartyManager.party_of(int(member))
-			last_resolution_reason = "Koalisyon görüşmesi başarısız: %s ortak olmayı kabul etmedi%s." % [_party_name(partner),
-				"" if int(member) == partner else " (genel başkan yardımcısı HAYIR dedi)"]
+			last_resolution_reason = L.t("Koalisyon görüşmesi başarısız: %s ortak olmayı kabul etmedi%s.") % [_party_name(partner),
+				"" if int(member) == partner else L.t(" (genel başkan yardımcısı HAYIR dedi)")]
 			_fail_attempt()
 			_push_state()
 			if not _is_local_only():
@@ -814,7 +814,7 @@ func _resolve_coalition_stage() -> void:
 			return
 	proposal_stage = STAGE_PARLIAMENT
 	_set_phase(Phase.VOTING)  # meclis oylamasına tam süre
-	last_resolution_reason = "Ortaklar anlaştı: %s hükümeti meclis oylamasında." % _party_name(proposer)
+	last_resolution_reason = L.t("Ortaklar anlaştı: %s hükümeti meclis oylamasında.") % _party_name(proposer)
 	var text := last_resolution_reason
 	if _all_voted():
 		_begin_resolution()
@@ -886,7 +886,7 @@ func absorb_party(old_id: int, new_id: int) -> void:
 	if phase == Phase.VOTING and proposal_kind == KIND_GOVERNMENT and proposal_assignments.values().has(old_id):
 		_clear_proposal()
 		_set_phase(Phase.FORMING if mandate_index < mandate_order.size() else Phase.IDLE)
-		last_resolution_reason = "Partiler birleştiği için hükümet teklifi düştü."
+		last_resolution_reason = L.t("Partiler birleştiği için hükümet teklifi düştü.")
 	_push_state()
 
 ## PARTİ FESHEDİLDİ (vekilleri zaten dağıtıldı). Hükümetteyse hükümet azınlığa
@@ -906,16 +906,16 @@ func party_dissolved(pid: int) -> String:
 				if int(government[post_id]) == pid:
 					government[post_id] = new_main
 			main_gov_peer_id = new_main
-			note = " Başbakanlık %s'ye geçti; hükümet azınlıkta." % _party_name(new_main)
+			note = L.t(" Başbakanlık %s'ye geçti; hükümet azınlıkta.") % _party_name(new_main)
 		elif main_gov_peer_id != pid:
 			for post_id in government.keys():
 				if int(government[post_id]) == pid:
 					government[post_id] = main_gov_peer_id
-			note = " Görevleri %s'ye geçti." % _party_name(main_gov_peer_id)
+			note = L.t(" Görevleri %s'ye geçti.") % _party_name(main_gov_peer_id)
 			if not has_majority():
-				note += " Hükümet salt çoğunluğu kaybetti."
+				note += L.t(" Hükümet salt çoğunluğu kaybetti.")
 		else:
-			note = " Hükümet düştü."
+			note = L.t(" Hükümet düştü.")
 	remove_player(pid)
 	return note
 
@@ -935,7 +935,7 @@ func remove_player(peer_id: int) -> void:
 			_build_mandate_order()
 			mandate_index = 0
 			attempts_used = 0
-			last_resolution_reason = "%s ayrıldı, hükümet düştü." % _party_name(peer_id)
+			last_resolution_reason = L.t("%s ayrıldı, hükümet düştü.") % _party_name(peer_id)
 			_set_phase(Phase.FORMING if not mandate_order.is_empty() else Phase.IDLE)
 			_push_state()
 			return
@@ -965,7 +965,7 @@ func remove_player(peer_id: int) -> void:
 				_set_phase(Phase.FORMING if mandate_index < mandate_order.size() else Phase.IDLE)
 			else:
 				_set_phase(Phase.GOVERNING if has_government() else Phase.IDLE)
-			last_resolution_reason = "%s ayrıldığı için teklif düştü." % _party_name(peer_id)
+			last_resolution_reason = L.t("%s ayrıldığı için teklif düştü.") % _party_name(peer_id)
 		elif _all_voted():
 			_resolve_proposal()
 			return

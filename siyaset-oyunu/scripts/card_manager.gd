@@ -411,23 +411,23 @@ func can_propose_tax_law(peer_id: int, level: int = -1) -> bool:
 ## Vergi yasası neden sunulamıyor ("" = sunulabilir). Arayüz bunu gösterir.
 func tax_law_block_reason(peer_id: int, level: int = -1) -> String:
 	if last_seats.is_empty():
-		return "İlk seçime kadar meclis yok: vergi değiştirilemez."
+		return L.t("İlk seçime kadar meclis yok: vergi değiştirilemez.")
 	if not is_government_party(peer_id):
-		return "Vergi yasasını sadece hükümet partileri sunabilir."
+		return L.t("Vergi yasasını sadece hükümet partileri sunabilir.")
 	if is_party_member(peer_id):
-		return "Yasayı partinin genel başkanı sunar."
+		return L.t("Yasayı partinin genel başkanı sunar.")
 	if not has_seats(peer_id):
-		return "Mecliste vekilin yok."
+		return L.t("Mecliste vekilin yok.")
 	if has_proposed_law_this_round(peer_id):
-		return "Partin bu dönem yasa hakkını kullandı."
+		return L.t("Partin bu dönem yasa hakkını kullandı.")
 	if not GovernmentManager.can_submit_law():
-		return "Mecliste başka bir oylama sürüyor."
+		return L.t("Mecliste başka bir oylama sürüyor.")
 	if not can_choose_main_action(peer_id):
-		return "Sıra sende değil."
+		return L.t("Sıra sende değil.")
 	if funds_of(peer_id) < GameRules.LAW_FUNDS_COST:
-		return "Parti kasası yetmiyor (%s gerekir)." % GameRules.cost_text(GameRules.LAW_FUNDS_COST)
+		return L.t("Parti kasası yetmiyor (%s gerekir).") % GameRules.cost_text(GameRules.LAW_FUNDS_COST)
 	if level >= 0 and (level == tax_level() or not Economy.TAX_LEVELS.has(level)):
-		return "Vergi zaten %s." % Economy.tax_title(tax_level())
+		return L.t("Vergi zaten %s.") % Economy.tax_title(tax_level())
 	return ""
 
 ## Yasanın bu partiye bedeli (her grup için aynı).
@@ -516,11 +516,11 @@ func funding_block_reason(peer_id: int, kind: String, state: float) -> String:
 	var r := funding_range(peer_id, kind)
 	var split := Economy.split_cost(float(r["total"]), state)
 	if float(split["state"]) > state_treasury() + 0.001:
-		return "Devlet hazinesi yetmiyor (%s var)." % Economy.money_full(state_treasury())
+		return L.t("Devlet hazinesi yetmiyor (%s var).") % Economy.money_full(state_treasury())
 	if float(split["state"]) > 0.0 and not bool(r["state_allowed"]):
-		return "Devlet hazinesini sadece hükümet partileri kullanabilir."
+		return L.t("Devlet hazinesini sadece hükümet partileri kullanabilir.")
 	if float(split["party"]) > funds_of(peer_id) + 0.001:
-		return "Parti kasası yetmiyor (%s gerekir)." % GameRules.cost_text(float(split["party"]))
+		return L.t("Parti kasası yetmiyor (%s gerekir).") % GameRules.cost_text(float(split["party"]))
 	return ""
 
 ## Gerçek finansmanı kaydeder (soruşturmanın tek kaynağı).
@@ -549,19 +549,19 @@ func inquiry_records(target: int) -> Array:
 ## Hükümet de muhalefet de açabilir; hedef herhangi bir parti (kendi dahil).
 func inquiry_block_reason(peer_id: int, target: int = -1) -> String:
 	if last_seats.is_empty():
-		return "İlk seçime kadar meclis yok: soruşturma açılamaz."
+		return L.t("İlk seçime kadar meclis yok: soruşturma açılamaz.")
 	if is_party_member(peer_id):
-		return "Soruşturmayı partinin genel başkanı açar."
+		return L.t("Soruşturmayı partinin genel başkanı açar.")
 	if not has_seats(peer_id):
-		return "Mecliste vekilin yok."
+		return L.t("Mecliste vekilin yok.")
 	if int(economy.get("inquiries", {}).get(party_of(peer_id), -1)) == round_number:
-		return "Partin bu dönem bir soruşturma açtı."
+		return L.t("Partin bu dönem bir soruşturma açtı.")
 	if not can_choose_main_action(peer_id):
-		return "Sıra sende değil."
+		return L.t("Sıra sende değil.")
 	if funds_of(peer_id) < Economy.INQUIRY_FUNDS_COST:
-		return "Parti kasası yetmiyor (%s gerekir)." % GameRules.cost_text(Economy.INQUIRY_FUNDS_COST)
+		return L.t("Parti kasası yetmiyor (%s gerekir).") % GameRules.cost_text(Economy.INQUIRY_FUNDS_COST)
 	if target != -1 and (not party_ids().has(party_of(target)) or PartyManager.is_independent(target)):
-		return "Bu parti soruşturulamaz."
+		return L.t("Bu parti soruşturulamaz.")
 	return ""
 
 func can_open_inquiry(peer_id: int, target: int = -1) -> bool:
@@ -623,18 +623,18 @@ func _apply_inquiry(peer_id: int, target: int) -> void:
 	var text := ""
 	match result:
 		"scandal":
-			text = "USULSÜZLÜK — Finansman soruşturması: %s partizan faaliyetler için devlet hazinesinden %s kullandı. Skandal partiyi %s baskı altına sokuyor." % [
-				who, Economy.money_full(improper_million), "ağır" if EffectWords.level(damage) >= 3 else "ciddi"]
+			text = L.t("USULSÜZLÜK — Finansman soruşturması: %s partizan faaliyetler için devlet hazinesinden %s kullandı. Skandal partiyi %s baskı altına sokuyor.") % [
+				who, Economy.money_full(improper_million), L.t("ağır") if EffectWords.level(damage) >= 3 else "ciddi"]
 			if party_million > 0.0:
-				text += " Kendi kasasından ödediği %s ise doğrulandı." % Economy.money_full(party_million)
+				text += L.t(" Kendi kasasından ödediği %s ise doğrulandı.") % Economy.money_full(party_million)
 		"clean":
-			text = "ŞEFFAF — Finansman soruşturması: %s %s harcamayı kendi kasasından yaptığı doğrulandı. %s" % [
-				who, Economy.money_full(party_million), "Parti itibar kazanıyor." if gain > 0.0 else "Belirgin bir siyasi etkisi yok."]
+			text = L.t("ŞEFFAF — Finansman soruşturması: %s %s harcamayı kendi kasasından yaptığı doğrulandı. %s") % [
+				who, Economy.money_full(party_million), L.t("Parti itibar kazanıyor.") if gain > 0.0 else L.t("Belirgin bir siyasi etkisi yok.")]
 		_:
-			text = "KANIT YOK — Finansman soruşturması %s hakkında %s." % [who,
-				"incelenecek yeni bir işlem bulamadı" if records.is_empty() else "nitelikli bir kanıt bulamadı"]
+			text = L.t("KANIT YOK — Finansman soruşturması %s hakkında %s.") % [who,
+				L.t("incelenecek yeni bir işlem bulamadı") if records.is_empty() else L.t("nitelikli bir kanıt bulamadı")]
 	if public_million > 0.0:
-		text += " %s devlet yatırımı meşru kamu harcaması sayıldı." % Economy.money_full(public_million)
+		text += L.t(" %s devlet yatırımı meşru kamu harcaması sayıldı.") % Economy.money_full(public_million)
 	var data := {"peer_id": peer_id, "target": tpid, "result": result, "examined": records.size(),
 		"party_million": party_million, "public_million": public_million, "improper_million": improper_million,
 		"gain": gain, "damage": damage}
@@ -670,7 +670,7 @@ func _apply_early_election_move(peer_id: int) -> void:
 		return
 	funds[peer_id] = funds_of(peer_id) - GameRules.EARLY_ELECTION_FUNDS_COST
 	_push_state({"type": "early_election", "peer_id": peer_id,
-		"message": "%s erken seçim önergesi verdi: meclis oylaması başladı." % _party_name(peer_id)})
+		"message": L.t("%s erken seçim önergesi verdi: meclis oylaması başladı.") % _party_name(peer_id)})
 	GovernmentManager.submit_early_election(peer_id)
 
 @rpc("any_peer", "reliable")
@@ -1087,17 +1087,17 @@ func election_trend(pid: int) -> String:
 			wins += 1
 	var where := ""
 	if wins >= 10:
-		where = " ve birçok ilde birinci"
+		where = L.t(" ve birçok ilde birinci")
 	elif wins > 0:
-		where = " ve %d ilde birinci" % wins
+		where = L.t(" ve %d ilde birinci") % wins
 	if not previous_vote_shares.has(pid):
-		return "%s ilk seçiminde %%%s oy aldı%s." % [name, String.num(now, 1).replace(".", ","), where]
+		return L.t("%s ilk seçiminde %%%s oy aldı%s.") % [name, String.num(now, 1).replace(".", ","), where]
 	var diff := now - float(previous_vote_shares[pid])
 	if absf(diff) < 1.0:
-		return "%s oy oranını korudu%s." % [name, where]
+		return L.t("%s oy oranını korudu%s.") % [name, where]
 	if diff > 0.0:
-		return "%s %s%s." % [name, "güçlü bir yükseliş yakaladı" if diff >= 5.0 else "halk desteğini artırdı", where]
-	return "%s %s%s." % [name, "ağır bir kan kaybı yaşadı" if diff <= -5.0 else "geriledi", where]
+		return "%s %s%s." % [name, L.t("güçlü bir yükseliş yakaladı") if diff >= 5.0 else L.t("halk desteğini artırdı"), where]
+	return "%s %s%s." % [name, L.t("ağır bir kan kaybı yaşadı") if diff <= -5.0 else "geriledi", where]
 
 ## Eski sürüm kayıtlarındaki kart adları ve yeni karşılıkları.
 const OLD_CARD_TYPES := {"mana_bonusu": "bagis_kampanyasi", "mana_bonusu_guclu": "bagis_kampanyasi_guclu"}
@@ -1379,7 +1379,7 @@ func _apply_discard(peer_id: int, hand_index: int) -> void:
 	hand.remove_at(hand_index)
 	var refund := discard_refund(card_type)
 	funds[peer_id] = funds_of(peer_id) + refund
-	_event_message = "%s bir kartı bozdurdu (+%s)." % [_party_name(peer_id), GameRules.cost_text(refund)]
+	_event_message = L.t("%s bir kartı bozdurdu (+%s).") % [_party_name(peer_id), GameRules.cost_text(refund)]
 	inventories_updated.emit()
 	if _is_local_only() and turn_order.is_empty():
 		return
@@ -1522,12 +1522,12 @@ func _apply_organization(peer_id: int, province_id: String) -> void:
 	var level := int(entry.get(party_of(peer_id), 0)) + 1
 	entry[party_of(peer_id)] = level
 	organizations[province_id] = entry
-	var verb := "kurdu" if level == 1 else "geliştirdi"
-	_log_province(province_id, "%s teşkilat %s (seviye %d)" % [_party_name(peer_id), verb, level])
+	var verb := L.t("kurdu") if level == 1 else L.t("geliştirdi")
+	_log_province(province_id, L.t("%s teşkilat %s (seviye %d)") % [_party_name(peer_id), verb, level])
 	# Teşkilat parti içini toparlar (oy bonusu activity_of'ta, kalıcı).
 	_ease_turmoil(peer_id, PublicOpinion.TURMOIL_EASE_ORG)
 	_push_state({"type": "organization", "peer_id": peer_id, "province": province_id,
-		"message": "%s, %s'da teşkilat %s (seviye %d)." % [_actor_name(peer_id), _province_name(province_id), verb, level]})
+		"message": L.t("%s, %s'da teşkilat %s (seviye %d).") % [_actor_name(peer_id), _province_name(province_id), verb, level]})
 
 ## state: devletin payı (varsayılan tamamı devletten, eski kural). Bedel
 ## TEK SEFER düşer: devlet payı hazineden, parti payı (+ sabit hamle bedeli)
@@ -1551,7 +1551,7 @@ func _apply_censure_move(peer_id: int) -> void:
 		return
 	funds[peer_id] = funds_of(peer_id) - GameRules.CENSURE_FUNDS_COST
 	_push_state({"type": "censure", "peer_id": peer_id,
-		"message": "%s hükümete gensoru verdi: meclis oylaması başladı." % _party_name(peer_id)})
+		"message": L.t("%s hükümete gensoru verdi: meclis oylaması başladı.") % _party_name(peer_id)})
 	GovernmentManager.submit_censure(peer_id)
 
 func _apply_miting_move(peer_id: int, province_id: String, state: float = 0.0) -> void:
@@ -1590,7 +1590,7 @@ func _apply_card_effect(peer_id: int, card_type: String, target_peer_id: int = -
 			_add_national(target_peer_id, -PublicOpinion.REBELLION_NATIONAL_DAMAGE)
 			_add_turmoil(target_peer_id, PublicOpinion.TURMOIL_REBELLION)
 			# ANONİM: iç karışıklığı kimin kışkırttığı hiçbir yerde gösterilmez.
-			_event_message = "%s'da iç karışıklık çıktı: parti sarsıldı, ulusal desteği düştü." % _party_name(target_peer_id)
+			_event_message = L.t("%s'da iç karışıklık çıktı: parti sarsıldı, ulusal desteği düştü.") % _party_name(target_peer_id)
 		CardPresets.CARD_THEFT_CARD_TYPE:
 			_apply_card_theft(peer_id, target_peer_id)
 		CardPresets.BONUS_CARD_TYPE:
@@ -1598,21 +1598,21 @@ func _apply_card_effect(peer_id: int, card_type: String, target_peer_id: int = -
 			for i in GameRules.BONUS_CARD_DRAW:
 				if _deal_turn_card(peer_id, [CardPresets.BONUS_CARD_TYPE]) != "":
 					drawn += 1
-			_event_message = "%s bonus kart kullandı (+%d kart)." % [_party_name(peer_id), drawn]
+			_event_message = L.t("%s bonus kart kullandı (+%d kart).") % [_party_name(peer_id), drawn]
 		CardPresets.FUNDS_BONUS_STRONG_CARD_TYPE:
 			var strong_gain := funds_bonus_amount(peer_id, true)
 			funds[peer_id] = funds_of(peer_id) + strong_gain
-			_event_message = "%s büyük bir bağış kampanyası yaptı (+%s)." % [_party_name(peer_id), GameRules.cost_text(strong_gain)]
+			_event_message = L.t("%s büyük bir bağış kampanyası yaptı (+%s).") % [_party_name(peer_id), GameRules.cost_text(strong_gain)]
 		CardPresets.EARLY_ELECTION_CARD_TYPE:
 			GovernmentManager.submit_early_election(peer_id)
-			_event_message = "%s erken seçim önergesi verdi." % _party_name(peer_id)
+			_event_message = L.t("%s erken seçim önergesi verdi.") % _party_name(peer_id)
 		CardPresets.POPULISM_CARD_TYPE:
 			populism[party_of(peer_id)] = round_number + GameRules.POPULISM_ROUNDS
-			_event_message = "%s popülizme başladı: %d dönem boyunca hamleleri daha etkili." % [_party_name(peer_id), GameRules.POPULISM_ROUNDS]
+			_event_message = L.t("%s popülizme başladı: %d dönem boyunca hamleleri daha etkili.") % [_party_name(peer_id), GameRules.POPULISM_ROUNDS]
 		CardPresets.FUNDS_BONUS_CARD_TYPE:
 			var weak_gain := funds_bonus_amount(peer_id, false)
 			funds[peer_id] = funds_of(peer_id) + weak_gain
-			_event_message = "%s bağış kampanyası yaptı (+%s)." % [_party_name(peer_id), GameRules.cost_text(weak_gain)]
+			_event_message = L.t("%s bağış kampanyası yaptı (+%s).") % [_party_name(peer_id), GameRules.cost_text(weak_gain)]
 		CardPresets.PROPAGANDA_CARD_TYPE:
 			_apply_propaganda(peer_id, target_peer_id, target_province)
 	return false
@@ -1625,7 +1625,7 @@ func _party_name(peer_id: int) -> String:
 func _apply_card_theft(peer_id: int, target_peer_id: int) -> void:
 	var hand: Array = inventories.get(target_peer_id, [])
 	if hand.is_empty():
-		_event_message = "%s, %s'ın elinden kart çalmaya kalktı ama elinde hiç kart yoktu." % [
+		_event_message = L.t("%s, %s'ın elinden kart çalmaya kalktı ama elinde hiç kart yoktu.") % [
 			_party_name(peer_id), _party_name(target_peer_id)]
 		return
 	var card: String = hand[_rng.randi_range(0, hand.size() - 1)]
@@ -1634,7 +1634,7 @@ func _apply_card_theft(peer_id: int, target_peer_id: int) -> void:
 	if mine.size() < MAX_HAND_SIZE:
 		mine.append(card)
 		inventories[peer_id] = mine
-	_event_message = "%s, %s'ın elinden bir kart çaldı." % [_party_name(peer_id), _party_name(target_peer_id)]
+	_event_message = L.t("%s, %s'ın elinden bir kart çaldı.") % [_party_name(peer_id), _party_name(target_peer_id)]
 
 ## Olay metinlerinde hamleyi yapan: "Soyad (Parti)"; siyasetçi yoksa parti adı.
 func _actor_name(peer_id: int) -> String:
@@ -1652,8 +1652,8 @@ func _apply_miting(peer_id: int, province_id: String) -> void:
 	if _rng.randf() < risk:
 		_add_local(province_id, peer_id, PublicOpinion.PROVOCATION_LOCAL, true)
 		_add_national(peer_id, PublicOpinion.PROVOCATION_NATIONAL, true)
-		_log_province(province_id, "%s mitinginde PROVOKASYON: ilde ve ülkede destek kaybı" % _party_name(peer_id))
-		_event_message = "%s'da %s mitinginde provokasyon çıktı: parti ilde ve ülke genelinde destek kaybetti." % [
+		_log_province(province_id, L.t("%s mitinginde PROVOKASYON: ilde ve ülkede destek kaybı") % _party_name(peer_id))
+		_event_message = L.t("%s'da %s mitinginde provokasyon çıktı: parti ilde ve ülke genelinde destek kaybetti.") % [
 			_province_name(province_id), _party_name(peer_id)]
 	else:
 		var org_mult := PublicOpinion.org_action_mult(organization_level(province_id, peer_id))
@@ -1663,11 +1663,11 @@ func _apply_miting(peer_id: int, province_id: String) -> void:
 		_add_local(province_id, peer_id, PublicOpinion.MITING_LOCAL * org_mult, true)
 		# ULUSAL YANSIMA: hitap ilin baskın gruplarına kayar (kalıcı, azalan getiri).
 		var moved := _apply_miting_positioning(peer_id, province_id, org_mult)
-		_log_province(province_id, "%s miting yaptı" % _party_name(peer_id))
+		_log_province(province_id, L.t("%s miting yaptı") % _party_name(peer_id))
 		_ease_turmoil(peer_id, PublicOpinion.TURMOIL_EASE_MITING)
-		_event_message = "%s, %s'da miting yaptı." % [_actor_name(peer_id), _province_name(province_id)]
+		_event_message = L.t("%s, %s'da miting yaptı.") % [_actor_name(peer_id), _province_name(province_id)]
 		if moved != "":
-			_event_message += " Hitabı %s." % moved
+			_event_message += L.t(" Hitabı %s.") % moved
 
 ## MİTİNGİN SİYASİ HİTABI: ilin her çiftindeki baskın gruba ulusal yakınlık,
 ## karşıt gruba daha küçük kayıp. Yorgunluk (aynı gruba art arda miting) ve
@@ -1696,7 +1696,7 @@ func _apply_miting_positioning(peer_id: int, province_id: String, mult: float) -
 		miting_fatigue[pid] = fatigue
 	if parts.is_empty():
 		return ""
-	return "ilin kalabalık gruplarına kaydı (%s)" % ", ".join(parts)
+	return L.t("ilin kalabalık gruplarına kaydı (%s)") % ", ".join(parts)
 
 ## "1,8" gibi kısa sayı.
 static func _num(value: float) -> String:
@@ -1724,9 +1724,9 @@ func _apply_investment(peer_id: int, province_id: String) -> void:
 	economy["investments"] = pending
 	economy["boost"] = minf(Economy.BOOST_MAX, float(economy.get("boost", 0.0)) + Economy.INVEST_ECONOMY)
 	_ease_turmoil(peer_id, PublicOpinion.TURMOIL_EASE_INVEST)
-	_log_province(province_id, "Hükümet yatırımı — %s getirdi (%s; etkisi %d dönemde tamamlanır)" % [
+	_log_province(province_id, L.t("Hükümet yatırımı — %s getirdi (%s; etkisi %d dönemde tamamlanır)") % [
 		_party_name(peer_id), Economy.money_full(Economy.INVEST_COST), Economy.INVEST_DELAY_ROUNDS])
-	_event_message = "%s, %s'a hükümet yatırımı getirdi: devlet hazinesinden %s." % [_party_name(peer_id),
+	_event_message = L.t("%s, %s'a hükümet yatırımı getirdi: devlet hazinesinden %s.") % [_party_name(peer_id),
 		_province_name(province_id), Economy.money_full(Economy.INVEST_COST)]
 
 ## TUR SONU EKONOMİSİ (host, tur başına TEK SEFER, seçimden önce): vergi
@@ -1745,9 +1745,9 @@ func _advance_economy() -> String:
 		if int(entry["rounds_left"]) > 0:
 			still.append(entry)
 		else:
-			_log_province(province_id, "%s yatırımı tamamlandı" % _party_name(int(entry.get("party", -1))))
+			_log_province(province_id, L.t("%s yatırımı tamamlandı") % _party_name(int(entry.get("party", -1))))
 	economy["investments"] = still
-	return "Hazineye %s vergi geliri girdi (vergi %s). Hazine: %s." % [Economy.money_full(float(economy["revenue"])),
+	return L.t("Hazineye %s vergi geliri girdi (vergi %s). Hazine: %s.") % [Economy.money_full(float(economy["revenue"])),
 		Economy.tax_title(tax_level()), Economy.money_full(state_treasury())]
 
 ## Karalama: hedefe eksi, karalayana artı; ikisi de o ildeki güçleriyle ölçeklenir.
@@ -1765,9 +1765,9 @@ func _apply_propaganda(peer_id: int, target_peer_id: int, province_id: String) -
 	damage = clampf(damage, 0.0, maxf(0.0, current - PublicOpinion.PROPAGANDA_FLOOR))
 	_add_local(province_id, target_peer_id, -damage)
 	_add_local(province_id, peer_id, gain, true)
-	_log_province(province_id, "%s, %s karşıtı kampanya yaptı (%s, %s)" % [
-		_party_name(peer_id), _party_name(target_peer_id), EffectWords.change(-damage, "local", "yerel güç"), "karşılığında kazanç" if gain > 0.0 else "kazanç yok"])
-	_event_message = "%s, %s'da %s karşıtı karalama kampanyası yaptı." % [
+	_log_province(province_id, L.t("%s, %s karşıtı kampanya yaptı (%s, %s)") % [
+		_party_name(peer_id), _party_name(target_peer_id), EffectWords.change(-damage, "local", L.t("yerel güç")), L.t("karşılığında kazanç") if gain > 0.0 else L.t("kazanç yok")])
+	_event_message = L.t("%s, %s'da %s karşıtı karalama kampanyası yaptı.") % [
 		_actor_name(peer_id), _province_name(province_id), _party_name(target_peer_id)]
 
 ## GovernmentManager, bir yasa oylaması sonuçlanınca (host) çağırır. Etkiler
@@ -1842,13 +1842,13 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 		for pid in crisis_parties:
 			_add_national(int(pid), PublicOpinion.CRISIS_RESPONSE_NATIONAL)
 			names.append(_party_name(int(pid)))
-		notes += " Krize yanıt verdi (ulusal destek): %s." % ", ".join(names)
+		notes += L.t(" Krize yanıt verdi (ulusal destek): %s.") % ", ".join(names)
 	if passed:
-		notes += " %s +%d puan." % [_actor_name(proposer), law_pass_score(proposer_in_gov)]
+		notes += L.t(" %s +%d puan.") % [_actor_name(proposer), law_pass_score(proposer_in_gov)]
 		_ease_turmoil(proposer_party, PublicOpinion.TURMOIL_EASE_LAW)
-	_push_state({"type": "opinion", "peer_id": proposer, "message": "%s %s — %s, %s seçmeninde güçlendi%s; %s seçmeninde biraz kaybetti.%s" % [
-		law["title"], "KABUL EDİLDİ" if passed else "reddedildi", _party_name(proposer), law["group_title"],
-		"" if passed else " (vaat olarak, az)", VoterGroups.title(opposite), notes]})
+	_push_state({"type": "opinion", "peer_id": proposer, "message": L.t("%s %s — %s, %s seçmeninde güçlendi%s; %s seçmeninde biraz kaybetti.%s") % [
+		law["title"], L.t("KABUL EDİLDİ") if passed else L.t("reddedildi"), _party_name(proposer), law["group_title"],
+		"" if passed else L.t(" (vaat olarak, az)"), VoterGroups.title(opposite), notes]})
 
 ## VERGİ YASASI sonucu. Kabul: kademe değişir, gelir bir sonraki tur sonundan
 ## itibaren yeni kademeyle; seçmenin hissettiği baskı TAX_IMMEDIATE kadar
@@ -1858,7 +1858,7 @@ func _apply_tax_result(proposer: int, level: int, passed: bool) -> void:
 	var old := tax_level()
 	var title := CardPresets.card_title(CardPresets.tax_law_type(level))
 	if not passed or level == old:
-		_push_state({"type": "opinion", "peer_id": proposer, "message": "%s reddedildi — vergiler %s kalıyor." % [
+		_push_state({"type": "opinion", "peer_id": proposer, "message": L.t("%s reddedildi — vergiler %s kalıyor.") % [
 			title, Economy.tax_title(old)]})
 		return
 	economy["tax_from"] = old
@@ -1869,7 +1869,7 @@ func _apply_tax_result(proposer: int, level: int, passed: bool) -> void:
 	_ease_turmoil(party_of(proposer), PublicOpinion.TURMOIL_EASE_LAW)
 	var rounds := Economy.rounds_to_settle(economy)
 	_push_state({"type": "opinion", "peer_id": proposer, "econ": {"kind": "tax", "from": old, "to": level},
-		"message": "%s KABUL EDİLDİ — vergiler %s → %s. Dönem geliri %s → %s. Seçmen bunu kademeli hissedecek (yaklaşık %d dönem). %s +%d puan." % [
+		"message": L.t("%s KABUL EDİLDİ — vergiler %s → %s. Dönem geliri %s → %s. Seçmen bunu kademeli hissedecek (yaklaşık %d dönem). %s +%d puan.") % [
 		title, Economy.tax_title(old), Economy.tax_title(level), Economy.money_full(expected_revenue(old)),
 		Economy.money_full(expected_revenue(level)), rounds, _actor_name(proposer), law_pass_score(true)]})
 
@@ -1933,7 +1933,7 @@ func _schedule_agenda() -> void:
 		var was_active := not agenda.is_empty()
 		agenda = {}
 		if was_active and pos == GameRules.AGENDA_ROUNDS:
-			_push_state({"type": "agenda", "message": "Gündem arası: %d dönem yasa yok, sonra yeni gündemler." % GameRules.AGENDA_GAP})
+			_push_state({"type": "agenda", "message": L.t("Gündem arası: %d dönem yasa yok, sonra yeni gündemler.") % GameRules.AGENDA_GAP})
 		return
 	# Çiftler karıştırılmış bir sıradan tüketilir: arka arkaya gelen iki gündem
 	# hep farklı çiftten olur.
@@ -1953,13 +1953,13 @@ func _schedule_agenda() -> void:
 	agenda = {"type": type, "until": round_number + 1, "index": pos + 1}
 	var data := CardPresets.agenda_data(type)
 	crisis = {}
-	var message := "GÜNDEM (%d/%d): %s — bu dönem %s." % [pos + 1, GameRules.AGENDA_ROUNDS,
+	var message := L.t("GÜNDEM (%d/%d): %s — bu dönem %s.") % [pos + 1, GameRules.AGENDA_ROUNDS,
 		data["title"], CardPresets.agenda_effect_text(type)]
 	if _crisis_rng.randf() < GameRules.CRISIS_CHANCE:
 		var crisis_kind := "kriz_%s" % groups[_crisis_rng.randi() % 2]
 		crisis = {"type": crisis_kind, "until": round_number + 1}
 		var info := CardPresets.crisis_data(crisis_kind)
-		message += " KRİZ: %s — %s için yasa sunan, EVET diyen ya da toplantı yapan partiler ulusal destek kazanır." % [
+		message += L.t(" KRİZ: %s — %s için yasa sunan, EVET diyen ya da toplantı yapan partiler ulusal destek kazanır.") % [
 			info["title"], info["group_title"]]
 	_push_state({"type": "agenda", "message": message})
 
@@ -2034,12 +2034,12 @@ func _apply_speech(peer_id: int, group: String) -> void:
 	var entry: Dictionary = group_meetings.get(pid, {})
 	entry[group] = round_number
 	group_meetings[pid] = entry
-	var text := "%s, %s ile grup toplantısı yaptı (%s): o grupta geçici, %s." % [
+	var text := L.t("%s, %s ile grup toplantısı yaptı (%s): o grupta geçici, %s.") % [
 		_party_name(peer_id), VoterGroups.title(group), String(VoterGroups.data(group).get("meeting", "")),
 		EffectWords.change(PublicOpinion.MEETING_BONUS[0], "group")]
 	if crisis_group() == group:
 		_add_national(pid, PublicOpinion.CRISIS_RESPONSE_NATIONAL)
-		text += " Krize yanıt verdi (ulusal destek)."
+		text += L.t(" Krize yanıt verdi (ulusal destek).")
 	_push_state({"type": "speech", "peer_id": peer_id, "message": text})
 
 @rpc("any_peer", "reliable")
@@ -2120,7 +2120,7 @@ func _splinter_name(parent_name: String) -> String:
 	var used: Array = []
 	for party in PartyManager.parties.values():
 		used.append(String(party.get("name", "")))
-	for prefix in ["Yeni ", "Öz ", "Gerçek ", "Hür "]:
+	for prefix in ["Yeni ", L.t("Öz "), L.t("Gerçek "), L.t("Hür ")]:
 		var candidate := (String(prefix) + parent_name).left(PartyManager.NAME_MAX_LENGTH).strip_edges()
 		if not used.has(candidate):
 			return candidate
@@ -2161,7 +2161,7 @@ func _split_party(parent: int) -> void:
 	turmoil[parent] = PublicOpinion.SPLIT_AFTER_TURMOIL
 	splinters[splinter] = {"parent": parent, "elections": 0, "since": round_number}
 	_push_state({"type": "party_split", "peer_id": parent, "message":
-		"%s BÖLÜNDÜ! Parti içi karışıklık sonunda %d milletvekili %s önderliğinde ayrılıp %s'yi kurdu." % [
+		L.t("%s BÖLÜNDÜ! Parti içi karışıklık sonunda %d milletvekili %s önderliğinde ayrılıp %s'yi kurdu.") % [
 		parent_name, moved, PoliticianPresets.display_name(splinter), _party_name(splinter)]}, true)
 
 ## Tur sonu: ayrılan parti en erken 1, en geç 4 seçim atlattıktan sonra ana
@@ -2218,7 +2218,7 @@ func _merge_splinter(splinter: int) -> void:
 	turmoil.erase(parent)
 	GovernmentManager.merge_party(splinter, parent)
 	_push_state({"type": "party_merge", "peer_id": parent, "message":
-		"%s, ana partisi %s'ya geri döndü: %d milletvekili ve bütün teşkilatlarıyla." % [
+		L.t("%s, ana partisi %s'ya geri döndü: %d milletvekili ve bütün teşkilatlarıyla.") % [
 		splinter_name, _party_name(parent), moved]}, true)
 	PartyManager.remove_party(splinter)
 	MultiplayerManager.remove_splinter_bot(splinter)
@@ -2312,7 +2312,7 @@ func _apply_steal(peer_id: int, target_peer_id: int, card_type: String) -> bool:
 	if card_type == CardPresets.STEAL_STRONG_CARD_TYPE:
 		_add_national(peer_id, PublicOpinion.steal_thief_national(moved))
 	_add_national(target_peer_id, PublicOpinion.steal_victim_national(moved))
-	_event_message = "%s, %s'dan %d milletvekili transfer etti." % [_party_name(peer_id), _party_name(target_peer_id), moved]
+	_event_message = L.t("%s, %s'dan %d milletvekili transfer etti.") % [_party_name(peer_id), _party_name(target_peer_id), moved]
 	return true
 
 ## Kaset / itibar suikastı: hedefin ULUSAL desteği doğrudan düşer. Popülizm
@@ -2326,7 +2326,7 @@ func _apply_reputation(peer_id: int, target_peer_id: int) -> void:
 	_add_turmoil(target_peer_id, PublicOpinion.TURMOIL_REPUTATION)
 	_add_national(target_peer_id, -damage)
 	# ANONİM: kaseti kimin sızdırdığı hiçbir yerde gösterilmez.
-	_event_message = "%s hakkında kaset sızdı: %s, parti içinde karışıklık." % [
+	_event_message = L.t("%s hakkında kaset sızdı: %s, parti içinde karışıklık.") % [
 		_party_name(target_peer_id), EffectWords.change(-damage)]
 
 ## GovernmentManager, hükümet güvenoyu alınca çağırır: hükümet partilerine para.
@@ -2628,10 +2628,10 @@ func _add_independent_seats(result: Dictionary, groups: Dictionary, mods: Dictio
 func _finish_final_election() -> void:
 	final_election_pending = false
 	if GovernmentManager.has_government():
-		_end_game("%d dönem tamamlandı. Son hükümeti %s kurdu." % [
+		_end_game(L.t("%d dönem tamamlandı. Son hükümeti %s kurdu.") % [
 			GameRules.MAX_ROUNDS, _party_name(GovernmentManager.main_gov_peer_id)])
 	else:
-		_end_game("%d dönem tamamlandı. Son seçimden sonra hükümet kurulamadı." % GameRules.MAX_ROUNDS)
+		_end_game(L.t("%d dönem tamamlandı. Son seçimden sonra hükümet kurulamadı.") % GameRules.MAX_ROUNDS)
 
 func _end_game(reason: String) -> void:
 	game_finished = true
@@ -2722,7 +2722,7 @@ func remove_player(peer_id: int) -> void:
 		GovernmentManager.votes.erase(peer_id)
 		_push_state({"type": "player_left", "peer_id": peer_id}, true)
 		if turn_order.size() < GameRules.MIN_PLAYERS_TO_CONTINUE:
-			_end_game("Yeterli oyuncu kalmadı.")
+			_end_game(L.t("Yeterli oyuncu kalmadı."))
 		return
 	var was_current := idx == current_turn_index
 	turn_order.remove_at(idx)
@@ -2758,7 +2758,7 @@ func remove_player(peer_id: int) -> void:
 	GovernmentManager.remove_player(peer_id)
 	_push_state({"type": "player_left", "peer_id": peer_id}, true)
 	if turn_order.size() < GameRules.MIN_PLAYERS_TO_CONTINUE:
-		_end_game("Yeterli oyuncu kalmadı.")
+		_end_game(L.t("Yeterli oyuncu kalmadı."))
 		return
 	_finish_round_if_needed(wrapped)
 
@@ -2996,7 +2996,7 @@ func _apply_dissolve(peer_id: int) -> void:
 	PartyManager.broadcast()
 	var gov_note := GovernmentManager.party_dissolved(pid)
 	_push_state({"type": "party_change", "peer_id": peer_id, "message":
-		"%s, %s'yi FESHETTİ ve bağımsız kaldı. %d vekil Bağımsızlar'a, %d vekil yakın partilere geçti.%s" % [
+		L.t("%s, %s'yi FESHETTİ ve bağımsız kaldı. %d vekil Bağımsızlar'a, %d vekil yakın partilere geçti.%s") % [
 		PoliticianPresets.display_name(peer_id), party_name, to_bloc, rest, gov_note]}, true)
 
 ## Üye partisinden istifa eder: bağımsız olur (parti bot başkanla sürer).
@@ -3012,7 +3012,7 @@ func _apply_resign(peer_id: int) -> void:
 	national_support[peer_id] = 0.0
 	PartyManager.broadcast()
 	_push_state({"type": "party_change", "peer_id": peer_id, "message":
-		"%s, %s'den istifa etti ve bağımsız devam ediyor." % [PoliticianPresets.display_name(peer_id), party_name]}, true)
+		L.t("%s, %s'den istifa etti ve bağımsız devam ediyor.") % [PoliticianPresets.display_name(peer_id), party_name]}, true)
 
 ## Feshedilen partinin vekilleri: yarısı Bağımsızlar bloğuna, yarısı seçmen
 ## grupları en yakın partilere (grup yakınlığı ağırlıklı D'Hondt).
@@ -3076,7 +3076,7 @@ func _maybe_add_temporary_party() -> void:
 		return
 	if _rng.randf() >= TEMP_PARTY_CHANCE:
 		return
-	var bot := MultiplayerManager.add_splinter_bot("Yeni Parti")
+	var bot := MultiplayerManager.add_splinter_bot(L.t("Yeni Parti"))
 	PartyManager.add_bot_party(bot)
 	PartyManager.parties[bot]["temporary"] = true
 	PartyManager.parties[bot]["temp_elections"] = 0
@@ -3091,7 +3091,7 @@ func _maybe_add_temporary_party() -> void:
 	funds[bot] = float(GameRules.FUNDS_PER_ROUND)
 	credibility[bot] = CREDIBILITY_START
 	national_support[bot] = TEMP_PARTY_NATIONAL
-	_pending_log.append({"text": "YENİ PARTİ: %s, %s'yi kurdu." % [PoliticianPresets.display_name(bot), _party_name(bot)],
+	_pending_log.append({"text": L.t("YENİ PARTİ: %s, %s'yi kurdu.") % [PoliticianPresets.display_name(bot), _party_name(bot)],
 		"peer_id": bot, "province": "", "kind": "party_change"})
 
 ## Seçimden sonra: geçici partiler seçim sayar; süresi dolan ya da barajı
@@ -3146,7 +3146,7 @@ func _dissolve_temporary_party(pid: int) -> void:
 	PartyManager.politicians.erase(pid)
 	MultiplayerManager.remove_splinter_bot(pid)
 	PartyManager.broadcast()
-	_pending_log.append({"text": "%s kendini feshetti (%d vekil dağıldı)." % [party_name, int(scattered[0]) + int(scattered[1])],
+	_pending_log.append({"text": L.t("%s kendini feshetti (%d vekil dağıldı).") % [party_name, int(scattered[0]) + int(scattered[1])],
 		"peer_id": -1, "province": "", "kind": "party_change"})
 
 ## Siyasetçiyi bağımsız kayda çevirir (gri, kullanıcı simgeli, adıyla).
@@ -3166,7 +3166,7 @@ func _ensure_bloc() -> void:
 	if PartyManager.parties.has(PartyManager.BLOC_ID):
 		return
 	PartyManager.parties[PartyManager.BLOC_ID] = {
-		"name": "Bağımsızlar",
+		"name": L.t("Bağımsızlar"),
 		"icon_index": PartyPresets.USER_ICON_INDEX,
 		"icon_color": Color.WHITE,
 		"bg_color": PartyPresets.INDEPENDENT_COLOR.darkened(0.25),
@@ -3229,13 +3229,13 @@ func _apply_found(peer_id: int, data: Dictionary) -> void:
 	var moved := _transfer_former_orgs(peer_id) if not former.is_empty() else [0, 0, 0.0]
 	former_parties.erase(peer_id)
 	PartyManager.broadcast()
-	var text := "%s, %s'yi kurdu. Bağımsızken kazandığı destek yeni partisine geçti." % [
+	var text := L.t("%s, %s'yi kurdu. Bağımsızken kazandığı destek yeni partisine geçti.") % [
 		PoliticianPresets.display_name(peer_id), info["name"]]
 	if int(moved[0]) > 0:
-		text += " %s'nin %d teşkilatından %d tanesi (%%%d) yeni partiye geçti." % [String(former.get("name", "eski parti")),
+		text += L.t(" %s'nin %d teşkilatından %d tanesi (%%%d) yeni partiye geçti.") % [String(former.get("name", L.t("eski parti"))),
 			int(moved[1]), int(moved[0]), int(round(float(moved[2]) * 100.0))]
 	if not opened.is_empty():
-		text += " Miting yaptığı illerde teşkilatla başlıyor: %s." % ", ".join(PackedStringArray(opened))
+		text += L.t(" Miting yaptığı illerde teşkilatla başlıyor: %s.") % ", ".join(PackedStringArray(opened))
 	_push_state({"type": "party_change", "peer_id": peer_id, "message": text}, true)
 
 func _shuffle(list: Array) -> void:
@@ -3304,17 +3304,17 @@ func congress_block_reason(peer_id: int) -> String:
 	var pid := party_of(peer_id)
 	if is_party_member(peer_id):
 		if elections_since_congress(pid) < 1:
-			return "Son kongreden beri seçim olmadı: bir sonraki seçimden sonra isteyebilirsin."
+			return L.t("Son kongreden beri seçim olmadı: bir sonraki seçimden sonra isteyebilirsin.")
 		if member_vote_drop(pid) <= 0.0:
-			return "%s döneminde parti oy kaybetmedi: kongreyi kazanmanın yolu yok." % PoliticianPresets.display_name(pid)
+			return L.t("%s döneminde parti oy kaybetmedi: kongreyi kazanmanın yolu yok.") % PoliticianPresets.display_name(pid)
 		if funds_of(peer_id) < CONGRESS_REQUEST_COST:
-			return "Parti kasası yetmiyor (%s gerekir)." % GameRules.cost_text(CONGRESS_REQUEST_COST)
+			return L.t("Parti kasası yetmiyor (%s gerekir).") % GameRules.cost_text(CONGRESS_REQUEST_COST)
 	elif elections_since_congress(pid) < 1:
-		return "Son kongreden beri seçim olmadı."
+		return L.t("Son kongreden beri seçim olmadı.")
 	elif funds_of(peer_id) < CONGRESS_COST:
-		return "Parti kasası yetmiyor (%s gerekir)." % GameRules.cost_text(CONGRESS_COST)
+		return L.t("Parti kasası yetmiyor (%s gerekir).") % GameRules.cost_text(CONGRESS_COST)
 	if not can_choose_main_action(peer_id):
-		return "Sıran değil."
+		return L.t("Sıran değil.")
 	return ""
 
 ## GENEL BAŞKANIN GÜCÜ (0..100): kongrede alacağı delege payının merkezi.
@@ -3448,12 +3448,12 @@ func _run_congress(pid: int, kind: String, requester: int = -1) -> void:
 	var has_human := not MultiplayerManager.is_bot(pid) or member != -1
 	var text := ""
 	if bool(winner.get("incumbent", false)):
-		text = "%s KONGRESİ: %s genel başkanlığını korudu." % [party_name, PoliticianPresets.display_name(pid)]
+		text = L.t("%s KONGRESİ: %s genel başkanlığını korudu.") % [party_name, PoliticianPresets.display_name(pid)]
 		_congress_info(pid)["elections"] = 0
 		_congress_info(pid).erase("bot_due")
 		_congress_info(pid)["share"] = float(last_vote_shares.get(pid, 0.0))
 		if requester != -1:
-			text += " Kongre isteyen %s kaybetti." % PoliticianPresets.display_name(requester)
+			text += L.t(" Kongre isteyen %s kaybetti.") % PoliticianPresets.display_name(requester)
 	elif int(winner.get("peer", -1)) == requester and requester != -1:
 		# Eski başkan (oyuncu) geri döndü: bot başkan siyasetten çekilir.
 		_rekey_party(old_leader, requester, -1)
@@ -3461,7 +3461,7 @@ func _run_congress(pid: int, kind: String, requester: int = -1) -> void:
 		_congress_info(requester)["elections"] = 0
 		_congress_info(requester)["share"] = float(last_vote_shares.get(requester, 0.0))
 		_congress_info(requester).erase("member_share")
-		text = "%s KONGRESİ: %s genel başkanlığa geri döndü!" % [party_name, PoliticianPresets.display_name(requester)]
+		text = L.t("%s KONGRESİ: %s genel başkanlığa geri döndü!") % [party_name, PoliticianPresets.display_name(requester)]
 	else:
 		var person: Dictionary = winner["_person"]
 		var new_politician := PoliticianPresets.make(person["first_name"], person["surname"], String(winner["_background"]),
@@ -3473,7 +3473,7 @@ func _run_congress(pid: int, kind: String, requester: int = -1) -> void:
 			credibility[old_leader] = CREDIBILITY_START
 			_congress_info(old_leader)["elections"] = 0
 			_congress_info(old_leader)["share"] = float(last_vote_shares.get(old_leader, 0.0))
-			text = "%s KONGRESİ: %s yeni genel başkan seçildi." % [party_name, PoliticianPresets.display_name(old_leader)]
+			text = L.t("%s KONGRESİ: %s yeni genel başkan seçildi.") % [party_name, PoliticianPresets.display_name(old_leader)]
 		else:
 			# Oyuncu başkanlığı kaybetti: yeni bot başkan gelir, oyuncu ÜYE olur.
 			var bot := MultiplayerManager.add_splinter_bot(String(winner["name"]))
@@ -3488,7 +3488,7 @@ func _run_congress(pid: int, kind: String, requester: int = -1) -> void:
 			_congress_info(bot)["elections"] = 0
 			_congress_info(bot)["share"] = share
 			_congress_info(bot)["member_share"] = share
-			text = "%s KONGRESİ: %s genel başkanlığı kaybetti! Yeni genel başkan %s. %s partide üye olarak kalıyor." % [
+			text = L.t("%s KONGRESİ: %s genel başkanlığı kaybetti! Yeni genel başkan %s. %s partide üye olarak kalıyor.") % [
 				party_name, PoliticianPresets.display_name(old_leader), PoliticianPresets.display_name(bot),
 				PoliticianPresets.display_name(old_leader)]
 	for key in party_congress.keys():
@@ -3818,9 +3818,9 @@ func _emit_post_event(event: Dictionary) -> void:
 		log_event(String(extra["text"]), int(extra["peer_id"]), String(extra["province"]), String(extra["kind"]))
 	match type:
 		"round":
-			log_event("%s başladı." % GameRules.period_label(round_number), -1, "", "round")
+			log_event(L.t("%s başladı.") % GameRules.period_label(round_number), -1, "", "round")
 		"election":
-			log_event("%d genel seçimi yapıldı." % GameRules.election_year(last_election_round), -1, "", "election")
+			log_event(L.t("%d genel seçimi yapıldı.") % GameRules.election_year(last_election_round), -1, "", "election")
 			var mine := party_of(multiplayer.get_unique_id())
 			var trend := election_trend(mine)
 			if trend != "":

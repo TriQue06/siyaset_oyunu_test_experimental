@@ -182,7 +182,7 @@ static func _build_framed(party: Dictionary, icon_pixel_size: int, is_self: bool
 
 	# Hedef seçerken (vekil çalma) yanan vurgu.
 	var halo := TextureRect.new()
-	halo.name = "TargetHalo"
+	halo.name = L.t("TargetHalo")
 	halo.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	halo.texture = load("res://assets/ui/target_highlight.png")
 	halo.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST

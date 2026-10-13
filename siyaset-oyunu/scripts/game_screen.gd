@@ -405,7 +405,7 @@ func _ready() -> void:
 	vote_yes_button.pressed.connect(_on_vote_pressed.bind(GovernmentManager.VOTE_YES))
 	vote_no_button.pressed.connect(_on_vote_pressed.bind(GovernmentManager.VOTE_NO))
 	_abstain_button = Button.new()
-	_abstain_button.text = "Çekimser"
+	_abstain_button.text = L.t("Çekimser")
 	# DAR SÜTUNDA DA SIĞSIN: oy sırası eskiden satır genişliğinden taşıp sol
 	# panelin altına kayıyordu (EVET butonu panelin arkasında kalıyordu).
 	# Satır artık sütunu FILL ediyor, çekimser butonu da kalan yeri alıp
@@ -450,38 +450,38 @@ func _build_tutorial() -> void:
 	add_child(_tutorial)
 	var mine := func() -> bool: return CardManager.can_act() and not CardManager.game_finished
 	var me := multiplayer.get_unique_id()
-	_tutorial.add_step("ekran", "Siyaset stüdyosuna hoş geldin",
-		"Solda partiler ve vekilleri, ortada ülke haritası, sağda hükümet, haber akışı (LOG) ve seçtiğin il. Altta elindeki kartlar, hamleler ve parti kasan. Sıran gelince hamlelerini yap, sonra Turu Bitir'e bas.",
+	_tutorial.add_step("ekran", L.t("Siyaset stüdyosuna hoş geldin"),
+		L.t("Solda partiler ve vekilleri, ortada ülke haritası, sağda hükümet, haber akışı (LOG) ve seçtiğin il. Altta elindeki kartlar, hamleler ve parti kasan. Sıran gelince hamlelerini yap, sonra Turu Bitir'e bas."),
 		func() -> Rect2: return _r(R_MAP), func() -> bool: return true)
-	_tutorial.add_step("kasa", "Parti kasası ve devlet hazinesi",
-		"Bu senin partinin parası: sıran geldikçe dolar, hamleler buradan ödenir. Sağdaki EKONOMİ'de görünen DEVLET HAZİNESİ ayrıdır; onu sadece hükümet, yatırım için kullanır.",
+	_tutorial.add_step("kasa", L.t("Parti kasası ve devlet hazinesi"),
+		L.t("Bu senin partinin parası: sıran geldikçe dolar, hamleler buradan ödenir. Sağdaki EKONOMİ'de görünen DEVLET HAZİNESİ ayrıdır; onu sadece hükümet, yatırım için kullanır."),
 		func() -> Rect2: return _r(R_FUNDS), mine)
-	_tutorial.add_step("hamleler", "Hamleler",
-		"Bir hamle seç, sonra haritada il seç; aynı ile ikinci dokunuş onaylar. Soluk düğme şu an yapılamaz: üstüne gelince nedenini görürsün. Bedeller düğmelerin altında.",
+	_tutorial.add_step("hamleler", L.t("Hamleler"),
+		L.t("Bir hamle seç, sonra haritada il seç; aynı ile ikinci dokunuş onaylar. Soluk düğme şu an yapılamaz: üstüne gelince nedenini görürsün. Bedeller düğmelerin altında."),
 		func() -> Rect2: return _r(R_ACTIONS), mine)
-	_tutorial.add_step("secmen", "Seçmen grupları",
-		"Oylar 8 seçmen grubundan gelir. Seçmen katmanı her grubun hangi illerde yoğun olduğunu gösterir; partin hangi gruplara yakınsa o illerde güçlüdür. Bir ile tıkla: oradaki durumunu görürsün.",
+	_tutorial.add_step("secmen", L.t("Seçmen grupları"),
+		L.t("Oylar 8 seçmen grubundan gelir. Seçmen katmanı her grubun hangi illerde yoğun olduğunu gösterir; partin hangi gruplara yakınsa o illerde güçlüdür. Bir ile tıkla: oradaki durumunu görürsün."),
 		func() -> Rect2: return (_layer_buttons[MapLayer.GROUPS] as Control).get_global_rect() if _layer_buttons.size() > MapLayer.GROUPS else _r(R_MAP),
 		func() -> bool: return mine.call() and _tutorial.seen_count() >= 3)
-	_tutorial.add_step("teskilat", "Teşkilat",
-		"İlde teşkilat kalıcı oy, anket ve yerel bağış getirir; miting ve karalama ancak teşkilatlı ilde yapılır. Beş ilden sonra her yeni teşkilat biraz daha pahalıdır: nerede kuracağını seç.",
+	_tutorial.add_step("teskilat", L.t("Teşkilat"),
+		L.t("İlde teşkilat kalıcı oy, anket ve yerel bağış getirir; miting ve karalama ancak teşkilatlı ilde yapılır. Beş ilden sonra her yeni teşkilat biraz daha pahalıdır: nerede kuracağını seç."),
 		func() -> Rect2: return _org_button.get_global_rect(), func() -> bool: return mine.call() and _tutorial.seen_count() >= 4)
-	_tutorial.add_step("kartlar", "Kartlar",
-		"Karta dokun, ne yaptığını oku; hedef isterse bir parti ya da il seç. İstemediğin kartı KART BOZDUR yuvasına sürükle: bedelinin yarısı kasana döner.",
+	_tutorial.add_step("kartlar", L.t("Kartlar"),
+		L.t("Karta dokun, ne yaptığını oku; hedef isterse bir parti ya da il seç. İstemediğin kartı KART BOZDUR yuvasına sürükle: bedelinin yarısı kasana döner."),
 		func() -> Rect2: return _r(R_HAND),
 		func() -> bool: return mine.call() and not CardManager.my_inventory().is_empty() and _tutorial.seen_count() >= 5)
-	_tutorial.add_step("secim", "Seçim yapıldı",
-		"Vekil sayıları solda. En çok vekili olan parti hükümeti kurmaya çalışır; güvenoyu için meclisin çoğunluğu (251) gerekir. Gerekirse ortak bulunur.",
+	_tutorial.add_step("secim", L.t("Seçim yapıldı"),
+		L.t("Vekil sayıları solda. En çok vekili olan parti hükümeti kurmaya çalışır; güvenoyu için meclisin çoğunluğu (251) gerekir. Gerekirse ortak bulunur."),
 		func() -> Rect2: return _r(R_BOARD), func() -> bool: return CardManager.last_election_round > 0 and not CardManager.is_turn_blocked())
-	_tutorial.add_step("hukumet", "Hükümet ve koalisyon",
-		"Hükümet kuruldu. Makamlar (başbakanlık, bakanlıklar) puan yazar; küçük ortak olmak da değerlidir. Muhalefet gensoruyla hükümeti düşürmeye, ortaklar koalisyondan çekilmeye karar verebilir.",
+	_tutorial.add_step("hukumet", L.t("Hükümet ve koalisyon"),
+		L.t("Hükümet kuruldu. Makamlar (başbakanlık, bakanlıklar) puan yazar; küçük ortak olmak da değerlidir. Muhalefet gensoruyla hükümeti düşürmeye, ortaklar koalisyondan çekilmeye karar verebilir."),
 		func() -> Rect2: return _r(R_SIDE), func() -> bool: return GovernmentManager.has_government() and not CardManager.is_turn_blocked())
-	_tutorial.add_step("ekonomi", "Vergi ve yatırım",
-		"Hükümettesin: vergi kademesini meclise sunabilir, devlet hazinesinden il yatırımı yapabilirsin. Vergi indirimi seçmene yavaş yansır, seçimden birkaç dönem önce yap. Devlet parasını partinin mitinginde kullanmak usulsüzlüktür ve soruşturmada ortaya çıkar.",
+	_tutorial.add_step("ekonomi", L.t("Vergi ve yatırım"),
+		L.t("Hükümettesin: vergi kademesini meclise sunabilir, devlet hazinesinden il yatırımı yapabilirsin. Vergi indirimi seçmene yavaş yansır, seçimden birkaç dönem önce yap. Devlet parasını partinin mitinginde kullanmak usulsüzlüktür ve soruşturmada ortaya çıkar."),
 		func() -> Rect2: return _economy_panel.get_global_rect() if _economy_panel != null and _economy_panel.is_visible_in_tree() else _r(R_SIDE),
 		func() -> bool: return mine.call() and CardManager.is_government_party(me))
-	_tutorial.add_step("puan", "Nasıl kazanılır?",
-		"Kazanan oy oranıyla değil PUANLA belirlenir: hükümette makam, geçen yasa ve başarılı gensoru puan yazar. Sıralamayı PUAN sekmesinden izle.",
+	_tutorial.add_step("puan", L.t("Nasıl kazanılır?"),
+		L.t("Kazanan oy oranıyla değil PUANLA belirlenir: hükümette makam, geçen yasa ve başarılı gensoru puan yazar. Sıralamayı PUAN sekmesinden izle."),
 		func() -> Rect2: return (_player_tab_buttons[1] as Control).get_global_rect() if _player_tab_buttons.size() > 1 else _r(R_BOARD),
 		func() -> bool: return GovernmentManager.has_government() and not CardManager.is_turn_blocked() and _tutorial.seen_count() >= 7)
 
@@ -570,19 +570,19 @@ func _place_desk_labels() -> void:
 	(_desk_labels["hand"] as Label).position = Vector2(16, 538) * k
 	(_desk_labels["actions"] as Label).position = Vector2(536, 538) * k
 	(_desk_labels["turn"] as Label).position = Vector2(952, 538) * k
-	(_desk_labels["actions"] as Label).text = "HAMLELER"
+	(_desk_labels["actions"] as Label).text = L.t("HAMLELER")
 	_refresh_desk_labels()
 
 func _refresh_desk_labels() -> void:
 	if _desk_labels.is_empty():
 		return
-	(_desk_labels["hand"] as Label).text = "ELİM · %d KART" % CardManager.my_inventory().size()
+	(_desk_labels["hand"] as Label).text = L.t("ELİM · %d KART") % CardManager.my_inventory().size()
 	var peer_id := CardManager.current_turn_peer_id()
 	var turn_text := ""
 	if peer_id == multiplayer.get_unique_id():
-		turn_text = "SIRA SENDE"
+		turn_text = L.t("SIRA SENDE")
 	elif peer_id != -1:
-		turn_text = "SIRA: %s" % ("Bağımsız" if PartyManager.is_independent(peer_id) else String(PartyManager.data_of(peer_id).get("name", "?")))
+		turn_text = L.t("SIRA: %s") % (L.t("Bağımsız") if PartyManager.is_independent(peer_id) else String(PartyManager.data_of(peer_id).get("name", "?")))
 	if peer_id != -1 and not CardManager.is_turn_blocked():
 		turn_text += "  ·  %s" % GameRules.format_seconds(CardManager.turn_seconds_left())
 	(_desk_labels["turn"] as Label).text = turn_text
@@ -782,8 +782,8 @@ func _refresh_band_date() -> void:
 		return
 	var next_election := GameRules.next_election_round(CardManager.round_number)
 	_band_period.text = GameRules.period_label(mini(CardManager.round_number, GameRules.MAX_ROUNDS))
-	var parts := ["Baraj %%%s" % _format_threshold(MultiplayerManager.election_threshold),
-		("Sonraki seçim %d" % GameRules.election_year(next_election)) if next_election != -1 else "Başka seçim yok"]
+	var parts := [L.t("Baraj %%%s") % _format_threshold(MultiplayerManager.election_threshold),
+		(L.t("Sonraki seçim %d") % GameRules.election_year(next_election)) if next_election != -1 else L.t("Başka seçim yok")]
 	if MultiplayerManager.seat_method != MultiplayerManager.DEFAULT_SEAT_METHOD:
 		parts.append(ElectionModel.method_title(MultiplayerManager.seat_method))
 	_date_label.text = "  ·  ".join(PackedStringArray(parts))
@@ -807,17 +807,17 @@ func _refresh_band_crisis() -> void:
 		var data := CardPresets.crisis_data(crisis)
 		style.bg_color = Color("4a1020")
 		style.border_color = Color("ff3b4e")
-		_band_crisis_title.text = "⚠ KRİZ · %s" % data["title"]
+		_band_crisis_title.text = L.t("⚠ KRİZ · %s") % data["title"]
 		_band_crisis_title.add_theme_color_override("font_color", Color("ff8a94"))
-		_band_crisis_text.text = "%s için yasa / toplantı ulusal destek getirir" % data["group_title"]
+		_band_crisis_text.text = L.t("%s için yasa / toplantı ulusal destek getirir") % data["group_title"]
 	else:
 		var data := CardPresets.agenda_data(agenda)
 		style.bg_color = Color("2a2350")
 		style.border_color = UiTheme.GOLD
-		_band_crisis_title.text = "GÜNDEM · %s" % data["title"]
+		_band_crisis_title.text = L.t("GÜNDEM · %s") % data["title"]
 		_band_crisis_title.add_theme_color_override("font_color", UiTheme.GOLD)
 		var pair: Array = CardPresets.agenda_groups(agenda)
-		_band_crisis_text.text = "Yasa: %s ya da %s" % [VoterGroups.title(pair[0]), VoterGroups.title(pair[1])] if pair.size() == 2 else ""
+		_band_crisis_text.text = L.t("Yasa: %s ya da %s") % [VoterGroups.title(pair[0]), VoterGroups.title(pair[1])] if pair.size() == 2 else ""
 	_band_crisis.add_theme_stylebox_override("panel", style)
 
 func _refresh_timer_bar() -> void:
@@ -852,8 +852,8 @@ func _refresh_band_turn() -> void:
 	var badge := PartyBadge.build(PartyManager.data_of(peer_id), Vector2(22, 22), BADGE_ICON_PIXEL_SIZE)
 	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_band_turn_row.add_child(badge)
-	var party_text := "Bağımsız" if PartyManager.is_independent(peer_id) else String(PartyManager.data_of(peer_id).get("name", "?"))
-	var text := "SIRA SENDE" if peer_id == multiplayer.get_unique_id() else "SIRA: %s · %s" % [party_text, PoliticianPresets.display_name(peer_id)]
+	var party_text := L.t("Bağımsız") if PartyManager.is_independent(peer_id) else String(PartyManager.data_of(peer_id).get("name", "?"))
+	var text := L.t("SIRA SENDE") if peer_id == multiplayer.get_unique_id() else L.t("SIRA: %s · %s") % [party_text, PoliticianPresets.display_name(peer_id)]
 	var label := _avatar_label(text, _fit_font_size(text, _r(Rect2(0, 0, 300, 0)).size.x, 14, 8), UiTheme.TEXT)
 	label.add_theme_font_override("font", UiTheme.mono(true))
 	label.clip_text = false
@@ -887,7 +887,7 @@ func _place_parliament_badge() -> void:
 		move_child(_parl_bg, bottom_area.get_index())
 		var vbox := bottom_area.get_node_or_null("ChamberSplit/ParliamentChamber/ParliamentVBox") as VBoxContainer
 		if vbox != null:
-			_parl_title = _section_label("MECLİS · %d" % CardManager.TOTAL_SEATS)
+			_parl_title = _section_label(L.t("MECLİS · %d") % CardManager.TOTAL_SEATS)
 			vbox.add_child(_parl_title)
 			vbox.move_child(_parl_title, 0)
 			_parl_summary = Label.new()
@@ -957,14 +957,14 @@ func _refresh_parliament_summary() -> void:
 	var total := 0
 	for k in CardManager.last_seats.keys():
 		total += int(CardManager.last_seats[k])
-	_parl_title.text = "MECLİS · %d" % maxi(total, CardManager.TOTAL_SEATS)
+	_parl_title.text = L.t("MECLİS · %d") % maxi(total, CardManager.TOTAL_SEATS)
 	if total <= 0:
-		_parl_summary.text = "İlk seçimden önce meclis boş"
+		_parl_summary.text = L.t("İlk seçimden önce meclis boş")
 		_parl_summary.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
 		return
 	var majority := total / 2 + 1
-	_parl_summary.text = ("Hük %d · çoğ %d · Muh %d" % [gov, majority, total - gov]) if GovernmentManager.has_government() \
-		else "Hükümet yok · çoğunluk %d" % majority
+	_parl_summary.text = (L.t("Hük %d · çoğ %d · Muh %d") % [gov, majority, total - gov]) if GovernmentManager.has_government() \
+		else L.t("Hükümet yok · çoğunluk %d") % majority
 	_parl_summary.add_theme_color_override("font_color", UiTheme.TEXT)
 
 ## SAĞ SÜTUN: üstte sekmeler; Hükümet (hükümet + son olaylar), Log (sadece
@@ -978,7 +978,7 @@ func _setup_side_column() -> void:
 	if margin != null:
 		for side in ["left", "right", "top", "bottom"]:
 			margin.add_theme_constant_override("margin_" + side, 8)
-	for node_name in ["InfoPlate", "Separator1", "TurnIndicator", "TurnSpacer"]:
+	for node_name in ["InfoPlate", L.t("Separator1"), L.t("TurnIndicator"), L.t("TurnSpacer")]:
 		var node := vbox.get_node_or_null(node_name) as Control
 		if node != null:
 			node.hide()
@@ -1056,10 +1056,10 @@ func _refresh_score_table() -> void:
 		child.queue_free()
 	var header := HBoxContainer.new()
 	header.add_theme_constant_override("separation", 6)
-	var title := _section_label("SİYASETÇİ")
+	var title := _section_label(L.t("SİYASETÇİ"))
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title)
-	for column in ["PUAN", "ULUSAL"]:
+	for column in ["PUAN", L.t("ULUSAL")]:
 		var label := _section_label(column)
 		label.custom_minimum_size = Vector2(46, 0)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -1096,14 +1096,14 @@ func _refresh_score_table() -> void:
 		name_label.clip_text = false
 		name_label.add_theme_font_override("font", UiTheme.mono(true))
 		names.add_child(name_label)
-		var party_text := "Bağımsız" if PartyManager.is_independent(pid) else String(party.get("name", "?"))
+		var party_text := L.t("Bağımsız") if PartyManager.is_independent(pid) else String(party.get("name", "?"))
 		if CardManager.is_party_member(peer_id):
-			party_text += " · üye"
+			party_text += L.t(" · üye")
 		names.add_child(_avatar_label(party_text, 10, UiTheme.TEXT_MUTED))
 		line.add_child(_table_value(str(GovernmentManager.score_of(peer_id)), 40.0, UiTheme.GOLD, 13))
 		var national := CardManager.national_of(pid)
 		var trend_value := _table_value(EffectWords.arrows(national), 46.0, ProvincePanel._opinion_color(national), 12)
-		trend_value.tooltip_text = "Ulusal kamuoyu: %s" % EffectWords.standing(national)
+		trend_value.tooltip_text = L.t("Ulusal kamuoyu: %s") % EffectWords.standing(national)
 		trend_value.mouse_filter = Control.MOUSE_FILTER_PASS
 		line.add_child(trend_value)
 		_score_box.add_child(row)
@@ -1192,7 +1192,7 @@ func _on_proposal_resolved(_accepted: bool, _kind: String, _proposer_id: int) ->
 ## (Eski üst bant yazısı kaldırıldı; her olay ve uyarı buraya düşer.)
 func _build_event_log() -> void:
 	_event_log = EventLogPanel.new()
-	_event_log.name = "EventLog"
+	_event_log.name = L.t("EventLog")
 	_event_log.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var spacer := left_panel.get_node_or_null("LeftMargin/LeftVBox/TurnSpacer")
 	if spacer != null:
@@ -1373,13 +1373,13 @@ func _refresh_map_seat_markers() -> void:
 
 func _refresh_game_settings_label() -> void:
 	var next_election := GameRules.next_election_round(CardManager.round_number)
-	game_settings_label.text = "%s  ·  Baraj %%%s\n%s" % [
+	game_settings_label.text = L.t("%s  ·  Baraj %%%s\n%s") % [
 		GameRules.period_label(mini(CardManager.round_number, GameRules.MAX_ROUNDS)),
 		_format_threshold(MultiplayerManager.election_threshold),
-		("Sonraki seçim: %d" % GameRules.election_year(next_election)) if next_election != -1 else "Başka seçim yok",
+		(L.t("Sonraki seçim: %d") % GameRules.election_year(next_election)) if next_election != -1 else L.t("Başka seçim yok"),
 	]
 	if MultiplayerManager.seat_method != MultiplayerManager.DEFAULT_SEAT_METHOD:
-		game_settings_label.text += "\nSayım: " + ElectionModel.method_title(MultiplayerManager.seat_method)
+		game_settings_label.text += L.t("\nSayım: ") + ElectionModel.method_title(MultiplayerManager.seat_method)
 	_refresh_band_date()
 
 func _format_threshold(value: float) -> String:
@@ -1502,7 +1502,7 @@ func _player_row_values(peer_id: int, is_self: bool) -> Array:
 			var won: int = int(CardManager.election_seats.get(pid, CardManager.last_seats.get(pid, 0)))
 			var below: bool = not CardManager.last_vote_shares.is_empty() 				and not CardManager.passed_threshold.has(pid)
 			return [
-				_table_value("%%%.1f" % percent, 56.0, UiTheme.RED if below else UiTheme.TEXT),
+				_table_value(L.t("%%%.1f") % percent, 56.0, UiTheme.RED if below else UiTheme.TEXT),
 				_table_value(str(won), 50.0, UiTheme.TEXT_MUTED),
 			]
 		2:
@@ -1609,15 +1609,15 @@ func _build_plaque(pid: int, width: float) -> Control:
 	stack.add_child(head)
 	var tags: Array = []
 	if GovernmentManager.has_government() and CardManager.is_government_party(pid):
-		tags.append(["PM" if GovernmentManager.main_gov_peer_id == pid else "HÜK", UiTheme.GREEN, UiTheme.TEXT])
+		tags.append([L.t("PM") if GovernmentManager.main_gov_peer_id == pid else L.t("HÜK"), UiTheme.GREEN, UiTheme.TEXT])
 	if mine:
-		tags.append(["SEN", UiTheme.GOLD, UiTheme.INK])
+		tags.append([L.t("SEN"), UiTheme.GOLD, UiTheme.INK])
 	var populism_left := CardManager.populism_rounds_left(pid)
 	if populism_left > 0:
-		tags.append(["POP %d" % populism_left, UiTheme.PURPLE, UiTheme.TEXT])
+		tags.append([L.t("POP %d") % populism_left, UiTheme.PURPLE, UiTheme.TEXT])
 	for member in members:
 		if MultiplayerManager.is_away(int(member)):
-			tags.append(["BOT" if MultiplayerManager.away_mode == MultiplayerManager.AWAY_BOT else "PASİF", UiTheme.RED, UiTheme.TEXT])
+			tags.append([L.t("BOT") if MultiplayerManager.away_mode == MultiplayerManager.AWAY_BOT else L.t("PASİF"), UiTheme.RED, UiTheme.TEXT])
 	var vote_member := -1
 	for member in members:
 		if GovernmentManager.is_voting() and GovernmentManager.eligible_voter_ids().has(int(member)):
@@ -1631,7 +1631,7 @@ func _build_plaque(pid: int, width: float) -> Control:
 		tags_width += String(tag[0]).length() * 6.0 + 10.0
 	var has_seats: bool = CardManager.last_seats.has(pid)
 	var seats_text := str(int(CardManager.last_seats.get(pid, 0))) if has_seats else "—"
-	var name_text := "Bağımsız" if independent else String(party.get("name", "?"))
+	var name_text := L.t("Bağımsız") if independent else String(party.get("name", "?"))
 	var inner: float = width - 12.0 - PLAQUE_BADGE - 7.0
 	var name_label := _avatar_label(name_text, _fit_font_size(name_text, inner - tags_width - 34.0, 14, 8),
 		UiTheme.GOLD if mine else UiTheme.TEXT)
@@ -1654,9 +1654,9 @@ func _build_plaque(pid: int, width: float) -> Control:
 	stack.add_child(foot)
 	var leader_text := PoliticianPresets.display_name(pid)
 	if members.size() > 1:
-		leader_text += " · üye " + PoliticianPresets.display_name(int(members[1]))
+		leader_text += L.t(" · üye ") + PoliticianPresets.display_name(int(members[1]))
 	var share: float = float(CardManager.last_vote_shares.get(pid, 0.0))
-	var share_text := ("%%%.1f" % share) if has_seats else ""
+	var share_text := (L.t("%%%.1f") % share) if has_seats else ""
 	var leader := _avatar_label(leader_text, _fit_font_size(leader_text, inner - 44.0, 11, 7), UiTheme.TEXT_MUTED)
 	leader.clip_text = false
 	leader.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1687,9 +1687,9 @@ func _build_plaque(pid: int, width: float) -> Control:
 	stack.add_child(bar)
 
 	card.set_meta("peer_id", pid)
-	card.tooltip_text = "%s · dokun: profil" % name_text
+	card.tooltip_text = L.t("%s · dokun: profil") % name_text
 	var halo := Panel.new()
-	halo.name = "TargetHalo"
+	halo.name = L.t("TargetHalo")
 	halo.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	halo.add_theme_stylebox_override("panel", UiSkin.color_box(UiTheme.GOLD, UiSkin.TARGET))
 	halo.visible = false
@@ -1712,8 +1712,8 @@ func _on_turn_changed(_peer_id: int) -> void:
 		_last_turn_peer = current
 		if current == multiplayer.get_unique_id() and not CardManager.game_finished:
 			var org_part := CardManager.org_income(current)
-			_show_toast("Sıra sende: kasana +%s girdi%s (kasada %s)." % [GameRules.cost_text(CardManager.turn_income(current)),
-				(", teşkilatlardan %s dahil" % GameRules.cost_text(org_part)) if org_part > 0 else "", GameRules.cost_text(CardManager.funds_of(current))])
+			_show_toast(L.t("Sıra sende: kasana +%s girdi%s (kasada %s).") % [GameRules.cost_text(CardManager.turn_income(current)),
+				(L.t(", teşkilatlardan %s dahil") % GameRules.cost_text(org_part)) if org_part > 0 else "", GameRules.cost_text(CardManager.funds_of(current))])
 			AudioManager.play("turn_start")
 	_update_turn_indicator()
 	_refresh_band_crisis()
@@ -1743,11 +1743,11 @@ func _update_turn_indicator_text() -> void:
 	if peer_id == -1:
 		return
 	var party: Dictionary = PartyManager.data_of(peer_id)
-	var party_text := "Bağımsız" if PartyManager.is_independent(peer_id) else String(party.get("name", "?"))
+	var party_text := L.t("Bağımsız") if PartyManager.is_independent(peer_id) else String(party.get("name", "?"))
 	var pname := "%s · %s" % [PoliticianPresets.display_name(peer_id), party_text]
-	var suffix := " (Sen)" if peer_id == multiplayer.get_unique_id() else ""
-	var timer := "" if CardManager.is_turn_blocked() else "\nSüre: %s" % GameRules.format_seconds(CardManager.turn_seconds_left())
-	turn_indicator_label.text = "Sıra: %s%s%s" % [pname, suffix, timer]
+	var suffix := L.t(" (Sen)") if peer_id == multiplayer.get_unique_id() else ""
+	var timer := "" if CardManager.is_turn_blocked() else L.t("\nSüre: %s") % GameRules.format_seconds(CardManager.turn_seconds_left())
+	turn_indicator_label.text = L.t("Sıra: %s%s%s") % [pname, suffix, timer]
 	_refresh_desk_labels()
 
 ## Kart bozdurma yuvası sadece sıra sendeyken ve elinde kart varken belirgin.
@@ -1759,7 +1759,7 @@ func _refresh_trash_button() -> void:
 
 func _refresh_pass_button() -> void:
 	pass_button.disabled = not CardManager.can_act()
-	pass_button.text = "Turu Bitir"
+	pass_button.text = L.t("Turu Bitir")
 	# Para bittiyse tur kendiliğinden geçmez; buton nabız gibi atarak hatırlatır.
 	var should_pulse: bool = not pass_button.disabled and CardManager.funds_of(multiplayer.get_unique_id()) <= 0
 	if should_pulse and _pass_pulse == null:
@@ -1974,12 +1974,12 @@ func _on_hand_card_clicked(hand_index: int) -> void:
 		return
 	if CardPresets.needs_province_target(card_type):
 		if card_type == CardPresets.INVEST_CARD_TYPE and not CardManager.is_government_party(me):
-			_show_toast("Yatırım kartını sadece hükümet partileri oynayabilir.")
+			_show_toast(L.t("Yatırım kartını sadece hükümet partileri oynayabilir."))
 			return
 		_begin_province_targeting(hand_index)
 		return
 	if CardPresets.is_self_card(card_type):
-		_set_target_hint("%s: kullanmak için karta tekrar dokun  ·  Başka yere dokun: vazgeç" % CardPresets.card_title(card_type))
+		_set_target_hint(L.t("%s: kullanmak için karta tekrar dokun  ·  Başka yere dokun: vazgeç") % CardPresets.card_title(card_type))
 
 func _select_hand_card(hand_index: int) -> void:
 	_selected_hand_index = hand_index
@@ -2068,12 +2068,12 @@ func _maybe_autosave() -> void:
 ## Oynanamayan bir karta tıklanınca neden oynanamadığı.
 func _unplayable_reason(card_type: String) -> String:
 	if CardManager.funds_of(multiplayer.get_unique_id()) < CardPresets.card_cost(card_type):
-		return "Parti kasası yetmiyor (%s gerekir)." % GameRules.cost_text(CardPresets.card_cost(card_type))
+		return L.t("Parti kasası yetmiyor (%s gerekir).") % GameRules.cost_text(CardPresets.card_cost(card_type))
 	if CardPresets.is_law_card(card_type):
-		return "Yasa şu an meclise getirilemez (meclis yok ya da hükümet kuruluyor)."
+		return L.t("Yasa şu an meclise getirilemez (meclis yok ya da hükümet kuruluyor).")
 	if CardPresets.is_censure_card(card_type):
-		return "Gensoruyu sadece muhalefet, hükümet görevdeyken verebilir."
-	return "Bu kart şu an oynanamaz."
+		return L.t("Gensoruyu sadece muhalefet, hükümet görevdeyken verebilir.")
+	return L.t("Bu kart şu an oynanamaz.")
 
 # --- Sürükle-bırak -----------------------------------------------------------
 
@@ -2108,7 +2108,7 @@ func _update_drag() -> void:
 	var mouse := get_viewport().get_mouse_position()
 	_drag_ghost.position = mouse - _drag_ghost.size * 0.5
 	var target := _drop_target(_drag_card_type)
-	_set_target_hint(String(target["label"]) + "  ·  Geçersiz yere bırak: iptal")
+	_set_target_hint(String(target["label"]) + L.t("  ·  Geçersiz yere bırak: iptal"))
 	var valid: bool = target["valid"]
 	_drag_ghost.modulate = Color(1, 1, 1, 0.95) if valid else Color(1, 0.6, 0.6, 0.85)
 	parliament_diagram.modulate = Color(1.3, 1.3, 1.05) if bool(target["parliament"]) else Color.WHITE
@@ -2164,11 +2164,11 @@ func _drop_target(card_type: String) -> Dictionary:
 	if _trash_panel != null and card_type != "" and not CardPresets.is_law_card(card_type) 			and _trash_panel.get_global_rect().has_point(get_viewport().get_mouse_position()):
 		result["valid"] = true
 		result["discard"] = true
-		result["label"] = "Bırak: kartı bozdur (+%s)" % GameRules.cost_text(CardManager.discard_refund(card_type))
+		result["label"] = L.t("Bırak: kartı bozdur (+%s)") % GameRules.cost_text(CardManager.discard_refund(card_type))
 		return result
 	if _drag_hand_index >= 0:
 		# Eldeki kart sürükleniyor: tek geçerli hedef KART BOZDUR yuvası.
-		result["label"] = "Bozdurmak için KART BOZDUR yuvasına bırak"
+		result["label"] = L.t("Bozdurmak için KART BOZDUR yuvasına bırak")
 		return result
 	if CardPresets.needs_party_target(card_type) and not CardPresets.needs_target(card_type):
 		# Kaset / parti içi isyan: hedef, kendisi dışında herhangi bir parti.
@@ -2176,68 +2176,68 @@ func _drop_target(card_type: String) -> Dictionary:
 		result["peer"] = other
 		var title := CardPresets.card_title(card_type)
 		if other == -1:
-			result["label"] = "%s için sağdaki bir partinin logosuna bırak" % title
+			result["label"] = L.t("%s için sağdaki bir partinin logosuna bırak") % title
 		elif other == me:
-			result["label"] = "Bu kartı kendi partine oynayamazsın"
+			result["label"] = L.t("Bu kartı kendi partine oynayamazsın")
 			result["error"] = result["label"]
 		elif card_type == CardPresets.REBELLION_CARD_TYPE and not CardManager.has_seats(other):
-			result["label"] = "Meclis dışı partide iç karışıklık çıkarılamaz"
+			result["label"] = L.t("Meclis dışı partide iç karışıklık çıkarılamaz")
 			result["error"] = result["label"]
 		else:
 			result["valid"] = true
 			if card_type == CardPresets.REPUTATION_CARD_TYPE:
-				result["label"] = "Bırak: %s hakkında kaset sızdır (%s)" % [_party_name_of(other),
+				result["label"] = L.t("Bırak: %s hakkında kaset sızdır (%s)") % [_party_name_of(other),
 					EffectWords.change(-PublicOpinion.REPUTATION_NATIONAL_DAMAGE)]
 			elif card_type == CardPresets.CARD_THEFT_CARD_TYPE:
-				result["label"] = "Bırak: %s'ın elinden rastgele 1 kart çal" % _party_name_of(other)
+				result["label"] = L.t("Bırak: %s'ın elinden rastgele 1 kart çal") % _party_name_of(other)
 			else:
-				result["label"] = "Bırak: %s'da iç karışıklık çıkar (%s)" % [_party_name_of(other),
+				result["label"] = L.t("Bırak: %s'da iç karışıklık çıkar (%s)") % [_party_name_of(other),
 					EffectWords.change(-PublicOpinion.REBELLION_NATIONAL_DAMAGE)]
 	elif CardPresets.needs_target(card_type):
 		var peer := _party_under_mouse()
 		result["peer"] = peer
 		if peer == -1:
-			result["label"] = "Vekil çalmak için sağdaki bir partinin logosuna bırak"
+			result["label"] = L.t("Vekil çalmak için sağdaki bir partinin logosuna bırak")
 		elif CardManager.is_valid_steal_target(me, peer):
 			result["valid"] = true
 			var r := CardManager.steal_range(me, peer, card_type)
 			var closeness := CardManager.group_closeness(me, peer)
-			result["label"] = "Bırak: %s partisinden %d-%d vekil çal (seçmenleriniz %s)" % [_party_name_of(peer),
-				int(r["min"]), int(r["max"]), "yakın" if closeness >= 0.6 else ("kısmen yakın" if closeness >= 0.3 else "uzak")]
+			result["label"] = L.t("Bırak: %s partisinden %d-%d vekil çal (seçmenleriniz %s)") % [_party_name_of(peer),
+				int(r["min"]), int(r["max"]), L.t("yakın") if closeness >= 0.6 else (L.t("kısmen yakın") if closeness >= 0.3 else L.t("uzak"))]
 		else:
-			result["label"] = "Bu partiden vekil çalınamaz"
+			result["label"] = L.t("Bu partiden vekil çalınamaz")
 			result["error"] = result["label"]
 	elif CardPresets.needs_province_target(card_type):
 		var province_id := _province_under_mouse()
 		result["province"] = province_id
 		var pname := ElectionNightSim.province_name(province_id)
 		if province_id == "":
-			result["label"] = "Haritada bir ilin üstüne bırak"
+			result["label"] = L.t("Haritada bir ilin üstüne bırak")
 		elif card_type == CardPresets.INVEST_CARD_TYPE and not CardManager.is_government_party(me):
-			result["label"] = "Yatırımı sadece hükümet partileri yapabilir"
+			result["label"] = L.t("Yatırımı sadece hükümet partileri yapabilir")
 			result["error"] = result["label"]
 		elif card_type != CardPresets.INVEST_CARD_TYPE and CardManager.organization_level(province_id, me) < 1 \
 				and not PartyManager.is_independent(me):
-			result["label"] = "%s'da teşkilatın yok — önce teşkilatlan" % pname
+			result["label"] = L.t("%s'da teşkilatın yok — önce teşkilatlan") % pname
 			result["error"] = result["label"]
 		else:
 			result["valid"] = true
 			if card_type == CardPresets.MITING_CARD_TYPE:
-				result["label"] = "Bırak: %s'da miting · provokasyon: %s" % [pname, EffectWords.risk(CardManager.miting_risk(me, province_id))]
+				result["label"] = L.t("Bırak: %s'da miting · provokasyon: %s") % [pname, EffectWords.risk(CardManager.miting_risk(me, province_id))]
 			elif card_type == CardPresets.INVEST_CARD_TYPE:
-				result["label"] = "Bırak: %s'a yatırım" % pname
+				result["label"] = L.t("Bırak: %s'a yatırım") % pname
 			else:
-				result["label"] = "Bırak: %s'da karalama — sonra hedef partiyi seç" % pname
+				result["label"] = L.t("Bırak: %s'da karalama — sonra hedef partiyi seç") % pname
 	elif CardPresets.is_law_card(card_type):
 		var over_law := parliament_diagram.get_global_rect().has_point(get_viewport().get_mouse_position())
 		result["parliament"] = over_law
 		var law := CardPresets.law_data(card_type)
 		if not over_law:
-			result["label"] = "%s: parlamento diyagramının üstüne bırak" % law["title"]
+			result["label"] = L.t("%s: parlamento diyagramının üstüne bırak") % law["title"]
 		elif CardManager.can_propose_law(me, card_type):
 			result["valid"] = true
-			result["label"] = "Bırak: %s %s (bedelsiz, dönemde 1)" % [law["title"],
-				"seçim vaadi olarak açıklanır" if CardManager.last_seats.is_empty() else "meclise sunulur"]
+			result["label"] = L.t("Bırak: %s %s (bedelsiz, dönemde 1)") % [law["title"],
+				L.t("seçim vaadi olarak açıklanır") if CardManager.last_seats.is_empty() else L.t("meclise sunulur")]
 		else:
 			result["label"] = _action_block_reason(GameRules.LAW_FUNDS_COST, true)
 			result["error"] = result["label"]
@@ -2245,20 +2245,20 @@ func _drop_target(card_type: String) -> Dictionary:
 		var over_parliament := parliament_diagram.get_global_rect().has_point(get_viewport().get_mouse_position())
 		result["parliament"] = over_parliament
 		if not over_parliament:
-			result["label"] = "Erken seçim önergesi: parlamento diyagramının üstüne bırak"
+			result["label"] = L.t("Erken seçim önergesi: parlamento diyagramının üstüne bırak")
 		elif CardManager.can_play_card(me, card_type):
 			result["valid"] = true
-			result["label"] = "Bırak: erken seçim önergesi sun (meclis oylar)"
+			result["label"] = L.t("Bırak: erken seçim önergesi sun (meclis oylar)")
 		else:
 			result["label"] = _unplayable_reason(card_type)
 			result["error"] = result["label"]
 	elif CardPresets.is_self_card(card_type):
 		var above_hand := get_viewport().get_mouse_position().y < hand_area.get_global_rect().position.y
 		if not above_hand:
-			result["label"] = "%s: kullanmak için yukarı sürükle" % CardPresets.card_title(card_type)
+			result["label"] = L.t("%s: kullanmak için yukarı sürükle") % CardPresets.card_title(card_type)
 		elif CardManager.can_play_card(me, card_type):
 			result["valid"] = true
-			result["label"] = "Bırak: %s kullan" % CardPresets.card_title(card_type)
+			result["label"] = L.t("Bırak: %s kullan") % CardPresets.card_title(card_type)
 		else:
 			result["label"] = _unplayable_reason(card_type)
 			result["error"] = result["label"]
@@ -2266,10 +2266,10 @@ func _drop_target(card_type: String) -> Dictionary:
 		var over := parliament_diagram.get_global_rect().has_point(get_viewport().get_mouse_position())
 		result["parliament"] = over
 		if not over:
-			result["label"] = "Gensoru için parlamento diyagramının üstüne bırak"
+			result["label"] = L.t("Gensoru için parlamento diyagramının üstüne bırak")
 		elif CardManager.can_play_card(me, card_type):
 			result["valid"] = true
-			result["label"] = "Bırak: gensoru ver"
+			result["label"] = L.t("Bırak: gensoru ver")
 		else:
 			result["label"] = _unplayable_reason(card_type)
 			result["error"] = result["label"]
@@ -2305,7 +2305,7 @@ func _begin_targeting(hand_index: int) -> void:
 		_on_player_tab_pressed(0)  # hedef plaketler VEKİL sekmesinde
 	_refresh_target_highlights()
 	_hide_profile()
-	_set_target_hint("%s: soldan bir partiye dokun  ·  Karta tekrar dokun: iptal" % CardPresets.card_title(
+	_set_target_hint(L.t("%s: soldan bir partiye dokun  ·  Karta tekrar dokun: iptal") % CardPresets.card_title(
 		String(CardManager.my_inventory()[hand_index])))
 
 ## Hedef seçilen kart bu partiye oynanabilir mi?
@@ -2322,7 +2322,7 @@ func _begin_province_targeting(hand_index: int) -> void:
 	if _province_panel != null:
 		_province_panel.hide()
 	var card_type: String = CardManager.my_inventory()[hand_index]
-	_set_target_hint("%s: haritada bir ile dokun (ayrıntı görünür), tekrar dokun: oyna  ·  Karta tekrar dokun: iptal" % CardPresets.card_title(card_type))
+	_set_target_hint(L.t("%s: haritada bir ile dokun (ayrıntı görünür), tekrar dokun: oyna  ·  Karta tekrar dokun: iptal") % CardPresets.card_title(card_type))
 
 func _cancel_targeting() -> void:
 	_pending_province_hand_index = -1
@@ -2366,7 +2366,7 @@ func _on_province_clicked(province_id: String) -> void:
 		if CardManager.can_miting(me, province_id):
 			CardManager.miting(province_id)
 		elif CardManager.organization_level(province_id, me) < 1 and not PartyManager.is_independent(me):
-			_show_toast("Bu ilde teşkilatın yok. Önce teşkilatlanmalısın.")
+			_show_toast(L.t("Bu ilde teşkilatın yok. Önce teşkilatlanmalısın."))
 		else:
 			_show_toast(_action_block_reason(GameRules.MITING_FUNDS_COST))
 		return
@@ -2374,7 +2374,7 @@ func _on_province_clicked(province_id: String) -> void:
 		if not CardManager.can_build_organization(me, province_id):
 			_cancel_targeting()
 			if CardManager.organization_level(province_id, me) >= GameRules.ORG_MAX_LEVEL:
-				_show_toast("Bu ildeki teşkilatın zaten en üst seviyede.")
+				_show_toast(L.t("Bu ildeki teşkilatın zaten en üst seviyede."))
 			else:
 				_show_toast(_action_block_reason(CardManager.org_cost_for(multiplayer.get_unique_id())))
 			return
@@ -2386,7 +2386,7 @@ func _on_province_clicked(province_id: String) -> void:
 		_set_target_hint("")
 		var level := CardManager.organization_level(province_id, me) + 1
 		CardManager.build_organization(province_id)
-		_show_toast("%s teşkilatı seviye %d: %s" % [ElectionNightSim.province_name(province_id), level, _org_level_text(level)])
+		_show_toast(L.t("%s teşkilatı seviye %d: %s") % [ElectionNightSim.province_name(province_id), level, _org_level_text(level)])
 		_refresh_action_buttons()
 		return
 	if _pending_province_hand_index != -1:
@@ -2501,10 +2501,10 @@ func _miting_group_preview(me: int, province_id: String) -> String:
 		if absf(delta) < EffectWords.NEGLIGIBLE:
 			continue
 		parts.append("%s %s" % [VoterGroups.title(String(effect["group"])),
-			"(%s)" % EffectWords.adjective(delta, "group") if delta > 0.0 else "(%s kayıp)" % EffectWords.adjective(delta, "group")])
+			"(%s)" % EffectWords.adjective(delta, "group") if delta > 0.0 else L.t("(%s kayıp)") % EffectWords.adjective(delta, "group")])
 	if parts.is_empty():
-		return " · grup desteğine etkisi yok"
-	return " · hitap: " + ", ".join(parts)
+		return L.t(" · grup desteğine etkisi yok")
+	return L.t(" · hitap: ") + ", ".join(parts)
 
 ## Hedef seçme modunda dokunulan il: vurgulanır, üstte ne olacağı yazar.
 func _select_target_province(province_id: String) -> void:
@@ -2515,24 +2515,24 @@ func _select_target_province(province_id: String) -> void:
 	var detail := ""
 	if _pending_invest or (_pending_miting and _miting_has_choice()):
 		_open_funding(province_id)
-		_set_target_hint("%s: finansmanı aşağıdan ayarla, ONAYLA'ya bas (ya da ile tekrar dokun)  ·  Butona tekrar dokun: iptal" % pname)
+		_set_target_hint(L.t("%s: finansmanı aşağıdan ayarla, ONAYLA'ya bas (ya da ile tekrar dokun)  ·  Butona tekrar dokun: iptal") % pname)
 		return
 	if _pending_invest:
 		detail = _invest_preview(pname)
 	elif _pending_miting:
-		detail = "%s: miting (%s) · provokasyon: %s%s" % [pname, GameRules.cost_text(GameRules.MITING_FUNDS_COST),
+		detail = L.t("%s: miting (%s) · provokasyon: %s%s") % [pname, GameRules.cost_text(GameRules.MITING_FUNDS_COST),
 			EffectWords.risk(CardManager.miting_risk(me, province_id)), _miting_group_preview(me, province_id)]
 	elif _pending_org:
 		var level := CardManager.organization_level(province_id, me)
-		detail = "%s: teşkilat zaten en üst seviyede" % pname if level >= GameRules.ORG_MAX_LEVEL \
-			else "%s: teşkilat seviye %d → %d (%s) · %s" % [pname, level, level + 1, GameRules.cost_text(CardManager.org_cost_for(me, province_id)), _org_level_text(level + 1)]
+		detail = L.t("%s: teşkilat zaten en üst seviyede") % pname if level >= GameRules.ORG_MAX_LEVEL \
+			else L.t("%s: teşkilat seviye %d → %d (%s) · %s") % [pname, level, level + 1, GameRules.cost_text(CardManager.org_cost_for(me, province_id)), _org_level_text(level + 1)]
 	else:
 		var card_type: String = CardManager.my_inventory()[_pending_province_hand_index]
 		if card_type == CardPresets.MITING_CARD_TYPE:
-			detail = "%s: miting · provokasyon: %s" % [pname, EffectWords.risk(CardManager.miting_risk(me, province_id))]
+			detail = L.t("%s: miting · provokasyon: %s") % [pname, EffectWords.risk(CardManager.miting_risk(me, province_id))]
 		else:
 			detail = "%s: %s" % [pname, CardPresets.card_title(card_type)]
-	_set_target_hint("%s  ·  Onaylamak için tekrar dokun" % detail)
+	_set_target_hint(L.t("%s  ·  Onaylamak için tekrar dokun") % detail)
 
 # --- Davet / başvuru şeridi ------------------------------------------------------
 
@@ -2848,7 +2848,7 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(info)
 	var independent := PartyManager.is_independent(peer_id)
-	var party_text := "Bağımsız" if independent else String(party.get("name", "?"))
+	var party_text := L.t("Bağımsız") if independent else String(party.get("name", "?"))
 	var party_color: Color = UiTheme.TEXT_MUTED if independent else color.lightened(0.45)
 	var populism_left := CardManager.populism_rounds_left(peer_id)
 
@@ -2859,15 +2859,15 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 	info.add_child(first)
 	var tags: Array = []
 	if is_turn:
-		tags.append(["SIRA", UiTheme.TEXT, UiTheme.INK])
+		tags.append([L.t("SIRA"), UiTheme.TEXT, UiTheme.INK])
 	if is_self:
-		tags.append(["SEN", UiTheme.GOLD, UiTheme.INK])
+		tags.append([L.t("SEN"), UiTheme.GOLD, UiTheme.INK])
 	if populism_left > 0:
-		tags.append(["POP %d" % populism_left, UiTheme.PURPLE, UiTheme.TEXT])
+		tags.append([L.t("POP %d") % populism_left, UiTheme.PURPLE, UiTheme.TEXT])
 	if PartyManager.is_deputy(peer_id):
-		tags.append(["YRD", color, UiTheme.TEXT])
+		tags.append([L.t("YRD"), color, UiTheme.TEXT])
 	elif PartyManager.deputy_of(peer_id) != -1:
-		tags.append(["GB", color, UiTheme.TEXT])
+		tags.append([L.t("GB"), color, UiTheme.TEXT])
 	var tags_width := 0.0
 	for tag in tags:
 		tags_width += String(tag[0]).length() * 6.0 + 10.0
@@ -2909,14 +2909,14 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 		first.add_child(tag)
 	# Vekil çalma hedefi vurgusu (bkz. _refresh_target_highlights).
 	var halo := Panel.new()
-	halo.name = "TargetHalo"
+	halo.name = L.t("TargetHalo")
 	halo.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	halo.add_theme_stylebox_override("panel", UiSkin.color_box(UiTheme.GOLD, UiSkin.TARGET))
 	halo.visible = false
 	card.add_child(halo)
 	if is_turn:
 		var frame := Panel.new()
-		frame.name = "TurnFrame"
+		frame.name = L.t("TurnFrame")
 		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		frame.add_theme_stylebox_override("panel", UiSkin.color_box(UiTheme.TEXT, UiSkin.TARGET))
 		card.add_child(frame)
@@ -3163,7 +3163,7 @@ func _refresh_waiting_overlay() -> void:
 		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_waiting_badge_slot.add_child(badge)
 		_waiting_badge_slot.position = Vector2(get_viewport_rect().size.x * 0.5 - 48.0, get_viewport_rect().size.y * 0.5 - 190.0)
-	_waiting_label.text = "HÜKÜMET KURULUYOR\n\n%s (%s)\ngörev dağılımını hazırlıyor…\n\n%d. teklif hakkı  ·  Süre: %s" % [
+	_waiting_label.text = L.t("HÜKÜMET KURULUYOR\n\n%s (%s)\ngörev dağılımını hazırlıyor…\n\n%d. teklif hakkı  ·  Süre: %s") % [
 		_party_name_of(holder),
 		_leader_name_of(holder),
 		GovernmentManager.current_attempt_number(),
@@ -3272,12 +3272,12 @@ func _refresh_proposer_chip() -> void:
 ## Oylanan teklifin kısa türü (rozetin üst satırı).
 func _proposal_kind_title() -> String:
 	match GovernmentManager.proposal_kind:
-		GovernmentManager.KIND_LAW: return "YASAYI GETİREN"
-		GovernmentManager.KIND_GOVERNMENT: return "HÜKÜMETİ KURAN"
-		GovernmentManager.KIND_CENSURE: return "GENSORUYU VEREN"
-		GovernmentManager.KIND_EARLY: return "ÖNERGEYİ VEREN"
-		GovernmentManager.KIND_CONSTITUTION: return "DEĞİŞİKLİĞİ GETİREN"
-	return "TEKLİFİ VEREN"
+		GovernmentManager.KIND_LAW: return L.t("YASAYI GETİREN")
+		GovernmentManager.KIND_GOVERNMENT: return L.t("HÜKÜMETİ KURAN")
+		GovernmentManager.KIND_CENSURE: return L.t("GENSORUYU VEREN")
+		GovernmentManager.KIND_EARLY: return L.t("ÖNERGEYİ VEREN")
+		GovernmentManager.KIND_CONSTITUTION: return L.t("DEĞİŞİKLİĞİ GETİREN")
+	return L.t("TEKLİFİ VEREN")
 
 func _party_name_of(peer_id: int) -> String:
 	return GovernmentHud.party_name_of(peer_id)
@@ -3318,10 +3318,10 @@ func _on_trash_input(event: InputEvent) -> void:
 		return
 	var hand := CardManager.my_inventory()
 	if _selected_hand_index < 0 or _selected_hand_index >= hand.size():
-		_show_toast("Önce bozdurmak istediğin kartı seç.")
+		_show_toast(L.t("Önce bozdurmak istediğin kartı seç."))
 		return
 	if not CardManager.can_act():
-		_show_toast("Sıra sende değil.")
+		_show_toast(L.t("Sıra sende değil."))
 		return
 	var index := _selected_hand_index
 	_deselect_hand_card()
@@ -3338,7 +3338,7 @@ func _build_trash_button() -> void:
 	_trash_panel.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	_trash_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	_trash_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	_trash_panel.tooltip_text = "Bir kart seç, sonra buraya tıkla: kart bozulur, bedelinin yarısı kasaya döner."
+	_trash_panel.tooltip_text = L.t("Bir kart seç, sonra buraya tıkla: kart bozulur, bedelinin yarısı kasaya döner.")
 	var style := UiSkin.stylebox(UiSkin.SLOT)
 	style.set_content_margin_all(UiTheme.PAD_S)
 	_trash_panel.add_theme_stylebox_override("panel", style)
@@ -3355,8 +3355,8 @@ func _build_trash_button() -> void:
 	box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(box)
-	box.add_child(_trash_label("KART BOZDUR", 11, UiTheme.TEXT_MUTED))
-	box.add_child(_trash_label("kartı seç, tıkla", 10, UiTheme.TEXT_DIM))
+	box.add_child(_trash_label(L.t("KART BOZDUR"), 11, UiTheme.TEXT_MUTED))
+	box.add_child(_trash_label(L.t("kartı seç, tıkla"), 10, UiTheme.TEXT_DIM))
 	add_child(_trash_panel)
 
 func _trash_label(text: String, size: int, color: Color) -> Label:
@@ -3382,7 +3382,7 @@ func _build_action_buttons() -> void:
 	_funds_plate.offset_top = FUNDS_PLATE_TOP
 	_funds_plate.offset_bottom = FUNDS_PLATE_TOP + FUNDS_PLATE_HEIGHT
 	_funds_plate.mouse_filter = Control.MOUSE_FILTER_STOP
-	_funds_plate.tooltip_text = "Parti kasası"
+	_funds_plate.tooltip_text = L.t("Parti kasası")
 	var funds_style := UiSkin.color_box(FUNDS_COLOR.darkened(0.62), UiSkin.SLOT)
 	funds_style.content_margin_left = UiTheme.PAD_S
 	funds_style.content_margin_right = UiTheme.PAD_S
@@ -3415,7 +3415,7 @@ func _build_action_buttons() -> void:
 	_funds_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	amount_box.add_child(_funds_label)
 	var unit := Label.new()
-	unit.text = "milyon ₺"
+	unit.text = L.t("milyon ₺")
 	unit.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	unit.add_theme_font_override("font", UiTheme.mono(true))
 	unit.add_theme_font_size_override("font_size", 10)
@@ -3425,7 +3425,7 @@ func _build_action_buttons() -> void:
 	_funds_plate.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_show_toast(_funds_rules))
-	_funds_rules = "PARTİ KASASI: bağış ve aidatlar her sıranda %s (hükümetteysen %s), teşkilatların yerel bağışları ve seçim sonrası hazine yardımı. Kasan yettikçe istediğin kadar hamle yap; para birikir.\nDEVLET HAZİNESİ ayrıdır: onu sadece hükümet, yatırım için kullanır." % [
+	_funds_rules = L.t("PARTİ KASASI: bağış ve aidatlar her sıranda %s (hükümetteysen %s), teşkilatların yerel bağışları ve seçim sonrası hazine yardımı. Kasan yettikçe istediğin kadar hamle yap; para birikir.\nDEVLET HAZİNESİ ayrıdır: onu sadece hükümet, yatırım için kullanır.") % [
 		GameRules.cost_text(GameRules.FUNDS_PER_ROUND), GameRules.cost_text(GameRules.FUNDS_PER_ROUND_GOVERNMENT)]
 	# HAMLELER: 3 sütun x 2 satır IZGARA. Eskiden her buton tek tek mutlak
 	# konuma oturtuluyordu; uzun bir yazı (TEŞKİLATLANMA) butonun asgari
@@ -3442,33 +3442,33 @@ func _build_action_buttons() -> void:
 	filler.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	filler.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	actions_vbox.add_child(filler)
-	_law_button = _action_button("YASA", GameRules.cost_text(GameRules.LAW_FUNDS_COST), UiTheme.PURPLE)
+	_law_button = _action_button(L.t("YASA"), GameRules.cost_text(GameRules.LAW_FUNDS_COST), UiTheme.PURPLE)
 	_law_button.pressed.connect(_on_law_button_pressed)
-	_law_button.tooltip_text = "Bir seçmen grubu için yasa sun: o grupta destek kazanırsın, karşıt grup biraz soğur. Geçerse puan. Dönemde bir kez."
-	_miting_button = _action_button("MİTİNG", GameRules.cost_text(GameRules.MITING_FUNDS_COST), UiTheme.RED)
+	_law_button.tooltip_text = L.t("Bir seçmen grubu için yasa sun: o grupta destek kazanırsın, karşıt grup biraz soğur. Geçerse puan. Dönemde bir kez.")
+	_miting_button = _action_button(L.t("MİTİNG"), GameRules.cost_text(GameRules.MITING_FUNDS_COST), UiTheme.RED)
 	_miting_button.pressed.connect(_on_miting_button_pressed)
-	_miting_button.tooltip_text = "İlde oy kazandırır ve partini ilin kalabalık seçmen gruplarına yaklaştırır. Teşkilat ister; provokasyon riski vardır."
-	_org_button = _action_button("TEŞKİLAT", GameRules.cost_text(GameRules.ORG_FUNDS_COST), UiTheme.BLUE)
+	_miting_button.tooltip_text = L.t("İlde oy kazandırır ve partini ilin kalabalık seçmen gruplarına yaklaştırır. Teşkilat ister; provokasyon riski vardır.")
+	_org_button = _action_button(L.t("TEŞKİLAT"), GameRules.cost_text(GameRules.ORG_FUNDS_COST), UiTheme.BLUE)
 	_org_button.pressed.connect(_on_org_button_pressed)
-	_org_button.tooltip_text = "İlde kalıcı güç ve anket; yerel bağışlarla kasana düzenli para getirir."
-	_invest_button = _action_button("YATIRIM", GameRules.cost_text(Economy.INVEST_COST), UiTheme.GREEN_DARK)
+	_org_button.tooltip_text = L.t("İlde kalıcı güç ve anket; yerel bağışlarla kasana düzenli para getirir.")
+	_invest_button = _action_button(L.t("YATIRIM"), GameRules.cost_text(Economy.INVEST_COST), UiTheme.GREEN_DARK)
 	_invest_button.pressed.connect(_on_invest_button_pressed)
-	_invest_button.tooltip_text = "Güçlü yerel etki: ildeki bütün seçmen memnun olur. Devlet hazinesinden (gerekirse parti kasasından) ödenir; sadece hükümet partileri."
-	_censure_button = _action_button("GENSORU", GameRules.cost_text(GameRules.CENSURE_FUNDS_COST), UiTheme.RED_DARK)
+	_invest_button.tooltip_text = L.t("Güçlü yerel etki: ildeki bütün seçmen memnun olur. Devlet hazinesinden (gerekirse parti kasasından) ödenir; sadece hükümet partileri.")
+	_censure_button = _action_button(L.t("GENSORU"), GameRules.cost_text(GameRules.CENSURE_FUNDS_COST), UiTheme.RED_DARK)
 	_censure_button.pressed.connect(_on_censure_button_pressed)
-	_censure_button.tooltip_text = "Hükümeti düşürmeye çalış: meclis oylar. Reddedilirse küçük bir itibar kaybı."
-	_early_button = _action_button("ERKEN SEÇİM", GameRules.cost_text(GameRules.EARLY_ELECTION_FUNDS_COST), UiTheme.GOLD)
+	_censure_button.tooltip_text = L.t("Hükümeti düşürmeye çalış: meclis oylar. Reddedilirse küçük bir itibar kaybı.")
+	_early_button = _action_button(L.t("ERKEN SEÇİM"), GameRules.cost_text(GameRules.EARLY_ELECTION_FUNDS_COST), UiTheme.GOLD)
 	_early_button.pressed.connect(_on_early_button_pressed)
-	_early_button.tooltip_text = "Erken seçim önergesi: kabul edilirse dönem sonunda sandık kurulur."
+	_early_button.tooltip_text = L.t("Erken seçim önergesi: kabul edilirse dönem sonunda sandık kurulur.")
 	# GRUP TOPLANTISI: sıra sendeyken açık, sırada bir kez.
-	_speech_button = _action_button("TOPLANTI", GameRules.cost_text(GameRules.SPEECH_FUNDS_COST), UiTheme.GOLD_DIM)
-	_speech_button.tooltip_text = "Grup toplantısı: bir seçmen grubunun sorunlarını konuş. O grupta kısa süreli destek (bu dönem +10, sonra +3, +1). Dönemde bir kez, isteğe bağlı."
+	_speech_button = _action_button(L.t("TOPLANTI"), GameRules.cost_text(GameRules.SPEECH_FUNDS_COST), UiTheme.GOLD_DIM)
+	_speech_button.tooltip_text = L.t("Grup toplantısı: bir seçmen grubunun sorunlarını konuş. O grupta kısa süreli destek (bu dönem güçlü, sonra hızla söner). Dönemde bir kez, isteğe bağlı.")
 	_speech_button.pressed.connect(_on_speech_button_pressed)
 	# KONGRE: genel başkan kendi sırasında (en az bir seçim geçtiyse) kongreye
 	# gider; partide üye kalan eski başkan kongre ister.
-	_congress_button = _action_button("KONGRE", _congress_cost_text(), UiTheme.PURPLE.darkened(0.3))
+	_congress_button = _action_button(L.t("KONGRE"), _congress_cost_text(), UiTheme.PURPLE.darkened(0.3))
 	_congress_button.pressed.connect(_on_congress_button_pressed)
-	_congress_button.tooltip_text = "Genel başkan: partini kongreye götür, liderliğini tazele. Üye: kongre iste, başkanlığı geri almaya çalış."
+	_congress_button.tooltip_text = L.t("Genel başkan: partini kongreye götür, liderliğini tazele. Üye: kongre iste, başkanlığı geri almaya çalış.")
 
 ## Kongre bedeli oyuncunun yerine göre: genel başkan 10, üye 20.
 func _congress_cost_text() -> String:
@@ -3480,36 +3480,42 @@ func _congress_cost_text() -> String:
 ## kırpılır — böylece hiçbir buton komşusunu itemez.
 func _action_button(title: String, cost_text: String, color: Color) -> Button:
 	var button := Button.new()
-	button.text = "%s
-%s" % [title, cost_text]
 	button.custom_minimum_size = Vector2(ACTION_BUTTON_WIDTH, ACTION_BUTTON_HEIGHT)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.clip_text = true
-	# DAR KUTUYA SIĞSIN: "TEŞKİLAT"/"bedelsiz" 12 puntoda kırpılıyordu.
-	button.add_theme_font_size_override("font_size", UiTheme.FS_TINY - 2)
 	button.add_theme_constant_override("line_spacing", -1)
+	_set_action_text(button, title, cost_text)
 	UiSkin.skin_color_button(button, color)
 	_action_grid.add_child(button)
 	return button
+
+## Hamle düğmesinin iki satırı (ad + bedel). DAR KUTUYA SIĞSIN: en uzun satır
+## düğmeye sığana kadar yazı küçülür (İngilizce "EARLY ELECTION" gibi; ad
+## kısaltılmaz).
+func _set_action_text(button: Button, title: String, cost_text: String) -> void:
+	button.text = "%s\n%s" % [title, cost_text]
+	var width := ACTION_BUTTON_WIDTH - 10.0
+	var longest := title if title.length() >= cost_text.length() else cost_text
+	button.add_theme_font_size_override("font_size", _fit_font_size(longest, width, UiTheme.FS_TINY - 2, 8))
 
 ## Neden şu an bu hamle yapılamıyor? (Buton ipucu ve uyarı yazısı.)
 func _action_block_reason(cost: float, is_law: bool = false) -> String:
 	var me := multiplayer.get_unique_id()
 	if CardManager.is_party_member(me):
-		return "Partinin genel başkanı değilsin: sadece miting yapabilirsin (partine ve güvenilirliğine yazar)."
+		return L.t("Partinin genel başkanı değilsin: sadece miting yapabilirsin (partine ve güvenilirliğine yazar).")
 	if is_law and CardManager.last_seats.is_empty():
-		return "İlk seçime kadar meclis yok: yasa yapılamaz."
+		return L.t("İlk seçime kadar meclis yok: yasa yapılamaz.")
 	if is_law and not CardManager.has_seats(me):
-		return "Mecliste vekilin yok: yasa teklif edemezsin."
+		return L.t("Mecliste vekilin yok: yasa teklif edemezsin.")
 	if is_law and CardManager.agenda_type() == "":
-		return "Gündem yok: yasa sadece gündemdeki seçmen grupları için sunulabilir."
+		return L.t("Gündem yok: yasa sadece gündemdeki seçmen grupları için sunulabilir.")
 	if not CardManager.can_act():
-		return "Sıran değil."
+		return L.t("Sıran değil.")
 	if is_law and CardManager.has_proposed_law_this_round(me):
-		return "Bu dönem zaten bir yasa sundun (dönemde 1 yasa)."
+		return L.t("Bu dönem zaten bir yasa sundun (dönemde 1 yasa).")
 	if CardManager.funds_of(me) < cost:
-		return "Parti kasası yetmiyor (%s gerekir)." % GameRules.cost_text(cost)
-	return "Şu an yapılamaz."
+		return L.t("Parti kasası yetmiyor (%s gerekir).") % GameRules.cost_text(cost)
+	return L.t("Şu an yapılamaz.")
 
 func _refresh_action_buttons() -> void:
 	if _law_button == null:
@@ -3519,8 +3525,7 @@ func _refresh_action_buttons() -> void:
 	_funds_label.text = CardManager.funds_text(funds_now)
 	var law_ok := CardManager.can_propose_law(me) or CardManager.can_propose_constitution(me)
 	var org_ok := CardManager.can_choose_main_action(me) and funds_now >= CardManager.org_cost_for(me)
-	_org_button.text = "TEŞKİLAT
-%s" % GameRules.cost_text(CardManager.org_cost_for(me))
+	_set_action_text(_org_button, L.t("TEŞKİLAT"), GameRules.cost_text(CardManager.org_cost_for(me)))
 	var miting_ok := CardManager.can_miting(me)
 	_miting_button.modulate.a = 1.0 if miting_ok or _pending_miting else 0.45
 	_invest_button.modulate.a = 1.0 if CardManager.can_invest(me) or _pending_invest else 0.45
@@ -3530,8 +3535,7 @@ func _refresh_action_buttons() -> void:
 	# disabled kullanılmıyor: pasif butona dokununca neden olmadığı uyarı olarak çıksın.
 	_law_button.modulate.a = 1.0 if law_ok else 0.45
 	_org_button.modulate.a = 1.0 if org_ok or _pending_org else 0.45
-	_congress_button.text = "KONGRE
-%s" % _congress_cost_text()
+	_set_action_text(_congress_button, L.t("KONGRE"), _congress_cost_text())
 	# TOPLANTI: sıra sendeyken açık; sırada bir kez (konuşunca söner).
 	if _speech_button != null:
 		_speech_button.modulate.a = 1.0 if CardManager.can_act() and CardManager.needs_speech(me) else 0.45
@@ -3568,7 +3572,7 @@ func _refresh_agenda_banner() -> void:
 		return
 	var data := CardPresets.agenda_data(current)
 	# Kısa tut: sol panelde olay loguna yer kalsın.
-	_agenda_label.text = "GÜNDEM: %s\n%s" % [data["title"], CardPresets.agenda_effect_text(current)]
+	_agenda_label.text = L.t("GÜNDEM: %s\n%s") % [data["title"], CardPresets.agenda_effect_text(current)]
 
 func _build_law_designer() -> void:
 	_law_designer = PanelContainer.new()
@@ -3583,12 +3587,12 @@ func _build_law_designer() -> void:
 	var header := HBoxContainer.new()
 	box.add_child(header)
 	var title := Label.new()
-	title.text = "YASA TEKLİFİ"
+	title.text = L.t("YASA TEKLİFİ")
 	title.add_theme_font_size_override("font_size", 14)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title)
 	var close := Button.new()
-	close.text = "Kapat"
+	close.text = L.t("Kapat")
 	UiSkin.skin_button(close)
 	close.add_theme_font_size_override("font_size", 11)
 	close.pressed.connect(func(): _law_designer.hide())
@@ -3610,12 +3614,12 @@ func _build_law_designer() -> void:
 	# VERGİ YASASI ayrı panelde (gündemden bağımsız; sadece hükümet sunar).
 	var tax_link := Button.new()
 	tax_link.focus_mode = Control.FOCUS_NONE
-	tax_link.text = "VERGİ POLİTİKASI  ›"
+	tax_link.text = L.t("VERGİ POLİTİKASI  ›")
 	tax_link.add_theme_font_override("font", UiTheme.mono(true))
 	tax_link.add_theme_font_size_override("font_size", 11)
 	tax_link.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	UiSkin.skin_color_button(tax_link, UiTheme.PANEL_LIGHT)
-	tax_link.tooltip_text = "Vergi kademesini değiştiren yasa: gündem şartı yok, sadece hükümet partileri sunar."
+	tax_link.tooltip_text = L.t("Vergi kademesini değiştiren yasa: gündem şartı yok, sadece hükümet partileri sunar.")
 	tax_link.pressed.connect(_open_tax_panel)
 	box.add_child(tax_link)
 	# SEKİZ SEÇMEN GRUBU (iki sütun): gündemdeki çiftin grupları seçilebilir.
@@ -3637,7 +3641,7 @@ func _build_law_designer() -> void:
 ## ama meclisin 2/3'ü gerekir. Oyuncu barajı ve seçim aralığını seçip paket
 ## halinde sunar.
 func _build_constitution_section(box: VBoxContainer) -> void:
-	box.add_child(UiTheme.section_label("Anayasa değişikliği"))
+	box.add_child(UiTheme.section_label(L.t("Anayasa değişikliği")))
 	_constitution_threshold = MultiplayerManager.election_threshold
 	_constitution_interval = MultiplayerManager.election_interval
 	# Altı ayar iki sütunlu ızgarada: panel ekrandan taşmasın.
@@ -3649,7 +3653,7 @@ func _build_constitution_section(box: VBoxContainer) -> void:
 
 	var threshold_row := HBoxContainer.new()
 	threshold_row.add_theme_constant_override("separation", 6)
-	var threshold_row_title := UiTheme.body_label("Baraj", UiTheme.FS_TINY, UiTheme.TEXT_MUTED)
+	var threshold_row_title := UiTheme.body_label(L.t("Baraj"), UiTheme.FS_TINY, UiTheme.TEXT_MUTED)
 	threshold_row_title.custom_minimum_size.x = 58
 	threshold_row.add_child(threshold_row_title)
 	_constitution_threshold_label = UiTheme.mono_label("", UiTheme.FS_SMALL)
@@ -3662,7 +3666,7 @@ func _build_constitution_section(box: VBoxContainer) -> void:
 
 	var interval_row := HBoxContainer.new()
 	interval_row.add_theme_constant_override("separation", 6)
-	var interval_row_title := UiTheme.body_label("Seçim", UiTheme.FS_TINY, UiTheme.TEXT_MUTED)
+	var interval_row_title := UiTheme.body_label(L.t("Seçim"), UiTheme.FS_TINY, UiTheme.TEXT_MUTED)
 	interval_row_title.custom_minimum_size.x = 58
 	interval_row.add_child(interval_row_title)
 	_constitution_interval_label = UiTheme.mono_label("", UiTheme.FS_SMALL)
@@ -3677,7 +3681,7 @@ func _build_constitution_section(box: VBoxContainer) -> void:
 	_constitution_method = MultiplayerManager.seat_method
 	var method_row := HBoxContainer.new()
 	method_row.add_theme_constant_override("separation", 6)
-	var method_title := UiTheme.body_label("Sayım", UiTheme.FS_TINY, UiTheme.TEXT_MUTED)
+	var method_title := UiTheme.body_label(L.t("Sayım"), UiTheme.FS_TINY, UiTheme.TEXT_MUTED)
 	method_title.custom_minimum_size.x = 58
 	method_row.add_child(method_title)
 	_constitution_method_label = UiTheme.mono_label("", UiTheme.FS_TINY)
@@ -3689,7 +3693,7 @@ func _build_constitution_section(box: VBoxContainer) -> void:
 	box.add_child(method_row)
 
 	_constitution_button = Button.new()
-	_constitution_button.text = "ANAYASAYI DEĞİŞTİR"
+	_constitution_button.text = L.t("ANAYASAYI DEĞİŞTİR")
 	_constitution_button.add_theme_font_size_override("font_size", UiTheme.FS_TINY)
 	UiSkin.skin_color_button(_constitution_button, UiTheme.GOLD.darkened(0.25))
 	_constitution_button.pressed.connect(_on_constitution_pressed)
@@ -3726,8 +3730,8 @@ func _change_constitution(threshold_delta: float, interval_delta: int) -> void:
 func _refresh_constitution_section() -> void:
 	if _constitution_threshold_label == null:
 		return
-	_constitution_threshold_label.text = "%%%s" % String.num(_constitution_threshold, 1)
-	_constitution_interval_label.text = "%d yıl" % _constitution_interval
+	_constitution_threshold_label.text = L.t("%%%s") % String.num(_constitution_threshold, 1)
+	_constitution_interval_label.text = L.t("%d yıl") % _constitution_interval
 	_constitution_method_label.text = ElectionModel.method_title(_constitution_method)
 	var me := multiplayer.get_unique_id()
 	var can := CardManager.can_propose_constitution(me)
@@ -3736,10 +3740,10 @@ func _refresh_constitution_section() -> void:
 	var changed: bool = not is_equal_approx(_constitution_threshold, MultiplayerManager.election_threshold) 		or _constitution_interval != MultiplayerManager.election_interval \
 		or _constitution_method != MultiplayerManager.seat_method
 	if not changed:
-		_constitution_info.text = "Şu anki kuralları değiştirmiyor. Bir ayarı değiştir."
+		_constitution_info.text = L.t("Şu anki kuralları değiştirmiyor. Bir ayarı değiştir.")
 		_constitution_button.disabled = true
 	elif can:
-		_constitution_info.text = "Meclisin 2/3'ü (%d vekil) EVET derse yürürlüğe girer, yoksa reddedilir. Gündem şartı yok, dönemdeki yasa hakkını kullanır." % needed
+		_constitution_info.text = L.t("Meclisin 2/3'ü (%d vekil) EVET derse yürürlüğe girer, yoksa reddedilir. Gündem şartı yok, dönemdeki yasa hakkını kullanır.") % needed
 	else:
 		_constitution_info.text = _action_block_reason(0, true)
 
@@ -3749,16 +3753,16 @@ func _refresh_law_designer() -> void:
 	_refresh_constitution_section()
 	var me := multiplayer.get_unique_id()
 	var in_gov := CardManager.is_government_party(me)
-	_law_points_label.text = "Kabul: +%d puan · %s" % [CardManager.law_pass_score(in_gov), GameRules.cost_text(GameRules.LAW_FUNDS_COST)]
+	_law_points_label.text = L.t("Kabul: +%d puan · %s") % [CardManager.law_pass_score(in_gov), GameRules.cost_text(GameRules.LAW_FUNDS_COST)]
 	var current := CardManager.agenda_type()
 	if current == "":
-		_law_agenda_label.text = "Gündem yok: bu dönem grup yasası sunulamaz (vergi yasası gündemden bağımsızdır)."
+		_law_agenda_label.text = L.t("Gündem yok: bu dönem grup yasası sunulamaz (vergi yasası gündemden bağımsızdır).")
 	else:
 		var data := CardPresets.agenda_data(current)
-		_law_agenda_label.text = "Gündem: %s — %s." % [data["title"], CardPresets.agenda_effect_text(current)]
+		_law_agenda_label.text = L.t("Gündem: %s — %s.") % [data["title"], CardPresets.agenda_effect_text(current)]
 		var crisis_group := CardManager.crisis_group()
 		if crisis_group != "":
-			_law_agenda_label.text += " KRİZ: %s için yasa ulusal destek getirir." % VoterGroups.title(crisis_group)
+			_law_agenda_label.text += L.t(" KRİZ: %s için yasa ulusal destek getirir.") % VoterGroups.title(crisis_group)
 	for child in _law_rows.get_children():
 		child.queue_free()
 	var groups_on_agenda := CardManager.agenda_groups()
@@ -3780,8 +3784,8 @@ func _law_group_button(group: String, on_agenda: bool) -> Control:
 	var tint := VoterGroups.color(group)
 	UiSkin.skin_color_button(button, tint.darkened(0.45) if group != _law_group else tint.darkened(0.15))
 	button.disabled = not on_agenda
-	button.tooltip_text = "%s\nTalepler: %s%s" % [VoterGroups.title(group), VoterGroups.issues_text(group),
-		"" if on_agenda else "\nGündemde değil: bu dönem bu grup için yasa sunulamaz."]
+	button.tooltip_text = L.t("%s\nTalepler: %s%s") % [VoterGroups.title(group), VoterGroups.issues_text(group),
+		"" if on_agenda else L.t("\nGündemde değil: bu dönem bu grup için yasa sunulamaz.")]
 	var row := HBoxContainer.new()
 	row.set_anchors_preset(Control.PRESET_FULL_RECT)
 	row.offset_left = 4
@@ -3831,21 +3835,21 @@ func _refresh_law_detail() -> void:
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title.custom_minimum_size = Vector2(300, 0)
 	_law_detail.add_child(title)
-	_law_detail.add_child(PopupKit.note("Sorun: %s. Talepler: %s." % [law["problem"], VoterGroups.issues_text(_law_group)], UiTheme.TEXT_MUTED, 300))
+	_law_detail.add_child(PopupKit.note(L.t("Sorun: %s. Talepler: %s.") % [law["problem"], VoterGroups.issues_text(_law_group)], UiTheme.TEXT_MUTED, 300))
 	# Etki tablosu: her grup tek satır, "kabul / ret" (kalıcı, ulusal; gerçek kuralla).
 	var passed := PublicOpinion.LAW_GROUP_GAIN_PASSED * mult
 	var rejected := PublicOpinion.LAW_GROUP_GAIN_REJECTED * mult
-	_law_detail.add_child(PopupKit.note("Kalıcı etki (kabul edilirse / edilmezse):", UiTheme.TEXT, 300))
+	_law_detail.add_child(PopupKit.note(L.t("Kalıcı etki (kabul edilirse / edilmezse):"), UiTheme.TEXT, 300))
 	_law_detail.add_child(VoterGroupUI.name_row(_law_group, "%s / %s" % [EffectWords.adjective(VoterGroups.effective_delta(groups, _law_group, passed), "group"),
 		EffectWords.adjective(VoterGroups.effective_delta(groups, _law_group, rejected), "group")], UiTheme.GREEN, VoterGroupUI.FS_NAME, 16.0, true))
-	_law_detail.add_child(VoterGroupUI.name_row(opposite, "%s / %s kayıp" % [EffectWords.adjective(VoterGroups.effective_delta(groups, opposite, -passed * backlash), "group"),
+	_law_detail.add_child(VoterGroupUI.name_row(opposite, L.t("%s / %s kayıp") % [EffectWords.adjective(VoterGroups.effective_delta(groups, opposite, -passed * backlash), "group"),
 		EffectWords.adjective(VoterGroups.effective_delta(groups, opposite, -rejected * backlash), "group")], UiTheme.RED, VoterGroupUI.FS_NAME, 16.0, true))
-	var crisis_note := " Kriz bu grubu istiyor: ulusal destek de kazandırır." if CardManager.crisis_group() == _law_group else ""
-	_law_detail.add_child(PopupKit.note("Meclis çoğunluğu gerekir.%s" % crisis_note, UiTheme.TEXT_DIM, 300))
+	var crisis_note := L.t(" Kriz bu grubu istiyor: ulusal destek de kazandırır.") if CardManager.crisis_group() == _law_group else ""
+	_law_detail.add_child(PopupKit.note(L.t("Meclis çoğunluğu gerekir.%s") % crisis_note, UiTheme.TEXT_DIM, 300))
 	var submit := Button.new()
 	submit.focus_mode = Control.FOCUS_NONE
 	submit.custom_minimum_size = Vector2(0, 32)
-	submit.text = "TEKLİFİ SUN · %s" % GameRules.cost_text(CardManager.law_funds_cost(me, law_type))
+	submit.text = L.t("TEKLİFİ SUN · %s") % GameRules.cost_text(CardManager.law_funds_cost(me, law_type))
 	UiSkin.skin_color_button(submit, UiTheme.GREEN_DARK)
 	submit.disabled = not CardManager.can_propose_law(me, law_type)
 	submit.pressed.connect(func(): _propose_law_clicked(law_type))
@@ -3855,7 +3859,7 @@ func _refresh_law_detail() -> void:
 func _propose_law_clicked(law_type: String) -> void:
 	var current := CardManager.agenda_type()
 	if current != "" and not CardManager.law_on_agenda(law_type):
-		_show_toast("Bu grup gündemde değil: bu dönem %s." % CardPresets.agenda_effect_text(current))
+		_show_toast(L.t("Bu grup gündemde değil: bu dönem %s.") % CardPresets.agenda_effect_text(current))
 		return
 	if not CardManager.can_propose_law(multiplayer.get_unique_id(), law_type):
 		_show_toast(_action_block_reason(CardManager.law_funds_cost(multiplayer.get_unique_id(), law_type), true))
@@ -3886,7 +3890,7 @@ func _invest_preview(pname: String) -> String:
 	var before := CardManager.state_treasury()
 	var immediate := PublicOpinion.INVEST_LOCAL * Economy.INVEST_IMMEDIATE
 	var later := PublicOpinion.INVEST_LOCAL - immediate
-	return "%s yatırımı · devlet hazinesi %s → %s milyon ₺\nGüçlü yerel etki: yarısı hemen, kalanı %d dönemde · ekonomi canlanır" % [
+	return L.t("%s yatırımı · devlet hazinesi %s → %s milyon ₺\nGüçlü yerel etki: yarısı hemen, kalanı %d dönemde · ekonomi canlanır") % [
 		pname, Economy.money_text(before), Economy.money_text(before - Economy.INVEST_COST), Economy.INVEST_DELAY_ROUNDS]
 
 static func _one_decimal(value: float) -> String:
@@ -4078,7 +4082,7 @@ func _on_law_button_pressed() -> void:
 	_deselect_hand_card()
 	var law_me := multiplayer.get_unique_id()
 	if not _law_designer.visible and not CardManager.can_propose_law(law_me) and not CardManager.can_propose_constitution(law_me):
-		_show_toast(_action_block_reason(GameRules.LAW_FUNDS_COST, true) + " (Panel yine de açılır: yasaları incele.)")
+		_show_toast(_action_block_reason(GameRules.LAW_FUNDS_COST, true) + L.t(" (Panel yine de açılır: yasaları incele.)"))
 	if _law_designer.visible:
 		_law_designer.hide()
 		return
@@ -4095,9 +4099,9 @@ func _on_law_button_pressed() -> void:
 
 func _invest_block_reason() -> String:
 	if CardManager.can_act() and not CardManager.is_government_party(multiplayer.get_unique_id()):
-		return "Yatırımı sadece hükümet partileri yapabilir."
+		return L.t("Yatırımı sadece hükümet partileri yapabilir.")
 	if CardManager.can_act() and not CardManager.can_invest(multiplayer.get_unique_id()):
-		return "Yatırım ödenemiyor: hazinede %s, kasanda %s; ikisi birlikte %s etmeli." % [
+		return L.t("Yatırım ödenemiyor: hazinede %s, kasanda %s; ikisi birlikte %s etmeli.") % [
 			Economy.money_full(CardManager.state_treasury()), GameRules.cost_text(CardManager.funds_of(multiplayer.get_unique_id())),
 			Economy.money_full(Economy.INVEST_COST)]
 	return _action_block_reason(0)
@@ -4118,7 +4122,7 @@ func _on_invest_button_pressed() -> void:
 	if _province_panel != null:
 		_province_panel.hide()
 	_refresh_action_buttons()
-	_set_target_hint("Yatırım (%s, parti kasası ve devlet hazinesi arasında bölünebilir): haritada bir ile dokun  ·  Butona tekrar dokun: iptal" %
+	_set_target_hint(L.t("Yatırım (%s, parti kasası ve devlet hazinesi arasında bölünebilir): haritada bir ile dokun  ·  Butona tekrar dokun: iptal") %
 		Economy.money_full(Economy.INVEST_COST))
 
 ## Gensoru hamlesi: sadece hükümet azınlıktayken muhalefete açık. İlk dokunuş
@@ -4135,21 +4139,21 @@ func _on_censure_button_pressed() -> void:
 	_cancel_targeting()
 	if not CardManager.can_censure(me):
 		if not CardManager.can_act():
-			_show_toast("Sıran değil.")
+			_show_toast(L.t("Sıran değil."))
 		elif not GovernmentManager.has_government():
-			_show_toast("Görevde bir hükümet yok.")
+			_show_toast(L.t("Görevde bir hükümet yok."))
 		elif not CardManager.has_seats(me):
-			_show_toast("Mecliste vekilin yok: gensoru veremezsin.")
+			_show_toast(L.t("Mecliste vekilin yok: gensoru veremezsin."))
 		elif CardManager.is_government_party(me):
-			_show_toast("Hükümetteki parti gensoru veremez.")
+			_show_toast(L.t("Hükümetteki parti gensoru veremez."))
 		elif GovernmentManager.has_majority():
-			_show_toast("Gensoru sadece hükümet azınlıktayken verilebilir (salt çoğunluğu yok).")
+			_show_toast(L.t("Gensoru sadece hükümet azınlıktayken verilebilir (salt çoğunluğu yok)."))
 		else:
 			_show_toast(_action_block_reason(GameRules.CENSURE_FUNDS_COST))
 		return
 	_pending_censure = true
 	_refresh_action_buttons()
-	_set_target_hint("Gensoru: hükümeti düşürmek için meclis oylaması (%s). Reddedilirse küçük bir itibar kaybı. Onay: butona tekrar dokun" % GameRules.cost_text(GameRules.CENSURE_FUNDS_COST))
+	_set_target_hint(L.t("Gensoru: hükümeti düşürmek için meclis oylaması (%s). Reddedilirse küçük bir itibar kaybı. Onay: butona tekrar dokun") % GameRules.cost_text(GameRules.CENSURE_FUNDS_COST))
 
 ## Erken seçim hamlesi: ilk dokunuş onay ister, ikincisi önergeyi meclise getirir.
 ## Kongre hamlesi: ilk dokunuş açıklama ve onay, ikincisi kongreyi başlatır.
@@ -4166,7 +4170,7 @@ func _on_congress_button_pressed() -> void:
 	_law_designer.hide()
 	_cancel_targeting()
 	if PartyManager.is_independent(me):
-		_show_toast("Bağımsızsın: kongre yok. Önce parti kur.")
+		_show_toast(L.t("Bağımsızsın: kongre yok. Önce parti kur."))
 		return
 	if not CardManager.can_call_congress(me):
 		_show_toast(CardManager.congress_block_reason(me))
@@ -4175,9 +4179,9 @@ func _on_congress_button_pressed() -> void:
 	_refresh_action_buttons()
 	var pid := CardManager.party_of(me)
 	if CardManager.is_party_member(me):
-		_set_target_hint("Kongre iste (%s): genel başkanlığa aday olursun; parti oy kaybettiği için şansın var. Onay: butona tekrar dokun" % GameRules.cost_text(CardManager.CONGRESS_REQUEST_COST))
+		_set_target_hint(L.t("Kongre iste (%s): genel başkanlığa aday olursun; parti oy kaybettiği için şansın var. Onay: butona tekrar dokun") % GameRules.cost_text(CardManager.CONGRESS_REQUEST_COST))
 	else:
-		_set_target_hint("Kongreye git (%s): partideki gücün %s; ne kadar güçlüysen o kadar az rakip çıkar. Onay: butona tekrar dokun" % [
+		_set_target_hint(L.t("Kongreye git (%s): partideki gücün %s; ne kadar güçlüysen o kadar az rakip çıkar. Onay: butona tekrar dokun") % [
 			GameRules.cost_text(CardManager.CONGRESS_COST), EffectWords.strength(CardManager.congress_strength(pid))])
 
 func _on_early_button_pressed() -> void:
@@ -4194,19 +4198,19 @@ func _on_early_button_pressed() -> void:
 	_cancel_targeting()
 	if not CardManager.can_early_election(me):
 		if not CardManager.can_act():
-			_show_toast("Sıran değil.")
+			_show_toast(L.t("Sıran değil."))
 		elif not CardManager.has_seats(me):
-			_show_toast("Mecliste vekilin yok: erken seçim önergesi veremezsin.")
+			_show_toast(L.t("Mecliste vekilin yok: erken seçim önergesi veremezsin."))
 		elif CardManager.early_election_pending:
-			_show_toast("Erken seçim kararı zaten alındı.")
+			_show_toast(L.t("Erken seçim kararı zaten alındı."))
 		elif not GovernmentManager.can_submit_law():
-			_show_toast("Meclis şu an meşgul (oylama ya da hükümet kurma sürüyor).")
+			_show_toast(L.t("Meclis şu an meşgul (oylama ya da hükümet kurma sürüyor)."))
 		else:
 			_show_toast(_action_block_reason(GameRules.EARLY_ELECTION_FUNDS_COST))
 		return
 	_pending_early = true
 	_refresh_action_buttons()
-	_set_target_hint("Erken seçim: meclis oylaması (%s). Kabul edilirse dönem sonunda sandığa gidilir. Onay: butona tekrar dokun" % GameRules.cost_text(GameRules.EARLY_ELECTION_FUNDS_COST))
+	_set_target_hint(L.t("Erken seçim: meclis oylaması (%s). Kabul edilirse dönem sonunda sandığa gidilir. Onay: butona tekrar dokun") % GameRules.cost_text(GameRules.EARLY_ELECTION_FUNDS_COST))
 
 ## Miting hamlesi: haritadan il seçilir (ilk dokunuş riski gösterir, ikincisi yapar).
 func _on_miting_button_pressed() -> void:
@@ -4225,7 +4229,7 @@ func _on_miting_button_pressed() -> void:
 	if _province_panel != null:
 		_province_panel.hide()
 	_refresh_action_buttons()
-	_set_target_hint("Miting: haritada bir ile dokun, tekrar dokun: miting yap (%s)  ·  Butona tekrar dokun: iptal" % GameRules.cost_text(GameRules.MITING_FUNDS_COST))
+	_set_target_hint(L.t("Miting: haritada bir ile dokun, tekrar dokun: miting yap (%s)  ·  Butona tekrar dokun: iptal") % GameRules.cost_text(GameRules.MITING_FUNDS_COST))
 
 # --- Harita katmanları ---------------------------------------------------------
 
@@ -4233,7 +4237,7 @@ func _ensure_map_clip() -> void:
 	if _map_clip != null:
 		return
 	_map_clip = Control.new()
-	_map_clip.name = "MapClip"
+	_map_clip.name = L.t("MapClip")
 	_map_clip.clip_contents = true
 	_map_clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_map_clip)
@@ -4282,7 +4286,7 @@ func _build_layer_bar() -> void:
 		icon.size = Vector2(28, 28)
 		pick.add_child(icon)
 		var name_label := Label.new()
-		name_label.name = "Title"
+		name_label.name = L.t("Title")
 		name_label.text = VoterGroups.title(group)
 		name_label.add_theme_font_size_override("font_size", 12)
 		name_label.add_theme_color_override("font_color", Color.WHITE)
@@ -4381,18 +4385,18 @@ func _rebuild_layer_legend() -> void:
 		MapLayer.ORGANIZATION:
 			for level in GameRules.ORG_MAX_LEVEL + 1:
 				swatches.append([MAP_BLANK_COLOR.lerp(mine, float(level) / GameRules.ORG_MAX_LEVEL), str(level)])
-			swatches.append([null, "teşkilat seviyem"])
+			swatches.append([null, L.t("teşkilat seviyem")])
 		MapLayer.STRENGTH:
-			swatches.append([null, "vekil yok"])
+			swatches.append([null, L.t("vekil yok")])
 			for i in STRENGTH_STOPS.size():
 				swatches.append([STRENGTH_STOPS[i], ""])
-			swatches.append([null, "ilin yarısı"])
+			swatches.append([null, L.t("ilin yarısı")])
 		MapLayer.GROUPS:
 			var span := _group_layer_span()
-			swatches.append([null, "%%%d" % int(span.x)])
+			swatches.append([null, L.t("%%%d") % int(span.x)])
 			for i in 4:
 				swatches.append([MAP_BLANK_COLOR.lerp(_group_layer_color(), float(i) / 3.0), ""])
-			swatches.append([null, "%%%d" % int(span.y)])
+			swatches.append([null, L.t("%%%d") % int(span.y)])
 	_layer_legend.visible = not swatches.is_empty()
 	for entry in swatches:
 		if entry[0] == null:
@@ -4593,17 +4597,17 @@ func _on_org_button_pressed() -> void:
 		_province_panel.hide()
 	_begin_org_view()
 	_refresh_action_buttons()
-	_set_target_hint("Teşkilatlanma: bir ile dokun, tekrar dokun: kur ya da geliştir (%s)  ·  Butona tekrar dokun: iptal" % GameRules.cost_text(CardManager.org_cost_for(me)))
+	_set_target_hint(L.t("Teşkilatlanma: bir ile dokun, tekrar dokun: kur ya da geliştir (%s)  ·  Butona tekrar dokun: iptal") % GameRules.cost_text(CardManager.org_cost_for(me)))
 
 ## Teşkilat seviyesinin getirdikleri (kısa).
 static func _org_level_text(level: int) -> String:
 	match level:
 		1:
-			return "az oy bonusu, yaklaşık oy"
+			return L.t("az oy bonusu, yaklaşık oy")
 		2:
-			return "yüksek oy bonusu, %90 doğru oy"
+			return L.t("yüksek oy bonusu, %90 doğru oy")
 		3:
-			return "yüksek oy bonusu, yüksek isabetli anket"
+			return L.t("yüksek oy bonusu, yüksek isabetli anket")
 	return ""
 
 # --- Grup toplantısı -----------------------------------------------------------------
@@ -4624,7 +4628,7 @@ func _build_speech_panel() -> void:
 	var header := HBoxContainer.new()
 	header.add_theme_constant_override("separation", 6)
 	box.add_child(header)
-	title.text = "GRUP TOPLANTISI · bir seçmen grubunun sorunlarını gündeme getir"
+	title.text = L.t("GRUP TOPLANTISI · bir seçmen grubunun sorunlarını gündeme getir")
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 11)
@@ -4632,8 +4636,8 @@ func _build_speech_panel() -> void:
 	header.add_child(title)
 	# Kapat: şerit gizlenir; hamle düğmesiyle yeniden açılır.
 	var skip := Button.new()
-	skip.text = "Kapat"
-	skip.tooltip_text = "Toplantıyı kapat (TOPLANTI düğmesiyle yeniden açılır)."
+	skip.text = L.t("Kapat")
+	skip.tooltip_text = L.t("Toplantıyı kapat (TOPLANTI düğmesiyle yeniden açılır).")
 	skip.add_theme_font_size_override("font_size", 11)
 	UiSkin.skin_button(skip)
 	skip.pressed.connect(func():
@@ -4655,10 +4659,10 @@ func _build_speech_panel() -> void:
 func _on_speech_button_pressed() -> void:
 	var me := multiplayer.get_unique_id()
 	if not CardManager.can_act():
-		_show_toast("Sıran değil.")
+		_show_toast(L.t("Sıran değil."))
 		return
 	if not CardManager.needs_speech(me):
-		_show_toast("Partin bu dönem grup toplantısını zaten yaptı.")
+		_show_toast(L.t("Partin bu dönem grup toplantısını zaten yaptı."))
 		return
 	var key := "%d:%d" % [CardManager.round_number, CardManager.current_turn_index]
 	_speech_open_key = "" if _speech_open_key == key else key
@@ -4706,14 +4710,14 @@ func _place_speech_panel() -> void:
 ## Toplantının seçime göre zamanlaması: bonus seçimde ne kadar olur?
 func _meeting_timing_text() -> String:
 	var next := GameRules.next_election_round(CardManager.round_number)
-	var bonus_text := "Geçici destek: bu dönem %s, sonra hızla söner." % EffectWords.adjective(PublicOpinion.MEETING_BONUS[0], "group")
+	var bonus_text := L.t("Geçici destek: bu dönem %s, sonra hızla söner.") % EffectWords.adjective(PublicOpinion.MEETING_BONUS[0], "group")
 	if next == -1:
 		return bonus_text
 	var age := next - CardManager.round_number
 	var at_election := PublicOpinion.meeting_bonus(age)
 	if at_election > 0.0:
-		return bonus_text + " Seçimde hâlâ %s etkisi olur." % EffectWords.adjective(at_election, "group")
-	return bonus_text + " Seçime %d dönem var: seçime kadar söner." % age
+		return bonus_text + L.t(" Seçimde hâlâ %s etkisi olur.") % EffectWords.adjective(at_election, "group")
+	return bonus_text + L.t(" Seçime %d dönem var: seçime kadar söner.") % age
 
 ## Bir seçmen grubu düğmesi: simge + tam ad + partinin şu anki desteği.
 ## Kriz bu grubu istiyorsa kırmızı çerçeveli not.
@@ -4724,10 +4728,10 @@ func _speech_row(group: String, value: float) -> Control:
 	button.clip_text = false
 	UiSkin.skin_color_button(button, VoterGroups.color(group).darkened(0.4))
 	var crisis := CardManager.crisis_group() == group
-	button.tooltip_text = "%s\nKonu: %s\nPartinin bu gruptaki desteği %s; toplantı bu dönem %s.%s" % [
+	button.tooltip_text = L.t("%s\nKonu: %s\nPartinin bu gruptaki desteği %s; toplantı bu dönem %s.%s") % [
 		VoterGroups.title(group), String(VoterGroups.data(group).get("meeting", "")), VoterGroups.percent_text(value),
 		EffectWords.change(PublicOpinion.MEETING_BONUS[0], "group"),
-		"\nKRİZ bu grubu istiyor: ulusal destek de kazandırır." if crisis else ""]
+		L.t("\nKRİZ bu grubu istiyor: ulusal destek de kazandırır.") if crisis else ""]
 	var row := HBoxContainer.new()
 	row.set_anchors_preset(Control.PRESET_FULL_RECT)
 	row.offset_left = 4
@@ -4751,7 +4755,7 @@ func _speech_row(group: String, value: float) -> Control:
 	name.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	texts.add_child(name)
 	var sub := Label.new()
-	sub.text = "destek %s%s" % [VoterGroups.percent_text(value), " · KRİZ" if crisis else ""]
+	sub.text = L.t("destek %s%s") % [VoterGroups.percent_text(value), L.t(" · KRİZ") if crisis else ""]
 	sub.add_theme_font_size_override("font_size", 9)
 	sub.add_theme_color_override("font_color", Color("ff8a94") if crisis else UiTheme.TEXT_MUTED)
 	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -4781,7 +4785,7 @@ func _ask_propaganda_target(hand_index: int, province_id: String) -> void:
 	box.add_theme_constant_override("separation", 6)
 	margin.add_child(box)
 	var title := Label.new()
-	title.text = "%s: kimi karalayacaksın?" % ElectionNightSim.province_name(province_id)
+	title.text = L.t("%s: kimi karalayacaksın?") % ElectionNightSim.province_name(province_id)
 	title.add_theme_font_size_override("font_size", 14)
 	box.add_child(title)
 	var me := multiplayer.get_unique_id()
@@ -4806,7 +4810,7 @@ func _ask_propaganda_target(hand_index: int, province_id: String) -> void:
 		box.add_child(row)
 	var cancel := Button.new()
 	UiSkin.skin_button(cancel)
-	cancel.text = "İptal"
+	cancel.text = L.t("İptal")
 	cancel.pressed.connect(func(): _propaganda_menu.hide())
 	box.add_child(cancel)
 	var mouse := get_viewport().get_mouse_position()

@@ -49,7 +49,7 @@ var _dark_borders := false
 
 func _ready() -> void:
 	for child in get_children():
-		if child.name in ["Background", "Overlay"]:
+		if child.name in ["Background", L.t("Overlay")]:
 			child.queue_free()
 	GameMap.map_changed.connect(_rebuild)
 	_rebuild()

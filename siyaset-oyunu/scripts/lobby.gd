@@ -133,11 +133,11 @@ func _build_card() -> void:
 	var profile_row := HBoxContainer.new()
 	profile_row.add_theme_constant_override("separation", 10)
 	profile.add_child(profile_row)
-	var who := _small_label("Oyuncu adın")
+	var who := _small_label(L.t("Oyuncu adın"))
 	who.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	who.add_theme_color_override("font_color", ACCENT)
 	profile_row.add_child(who)
-	name_edit = _field("Oyuncu adı", 20)
+	name_edit = _field(L.t("Oyuncu adı"), 20)
 	name_edit.custom_minimum_size = Vector2(190, 34)
 	name_edit.add_theme_font_size_override("font_size", 15)
 	name_edit.text = PlayerProfile.player_name
@@ -159,12 +159,12 @@ func _build_card() -> void:
 	var tabs := HBoxContainer.new()
 	tabs.add_theme_constant_override("separation", 6)
 	box.add_child(tabs)
-	_online_tab = _button("Çevrim İçi", ACCENT, 38.0)
+	_online_tab = _button(L.t("Çevrim İçi"), ACCENT, 38.0)
 	_online_tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_online_tab.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
 	_online_tab.pressed.connect(_set_mode.bind(true))
 	tabs.add_child(_online_tab)
-	_offline_tab = _button("Çevrim Dışı", UiTheme.PANEL_LIGHT, 38.0)
+	_offline_tab = _button(L.t("Çevrim Dışı"), UiTheme.PANEL_LIGHT, 38.0)
 	_offline_tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_offline_tab.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
 	_offline_tab.pressed.connect(_set_mode.bind(false))
@@ -179,14 +179,14 @@ Sadece sen ve eklediğin botlar.")
 	offline_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	offline_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_offline_box.add_child(offline_hint)
-	_offline_button = _button("Botlarla Oyna", UiTheme.GREEN_DARK, 42.0)
+	_offline_button = _button(L.t("Botlarla Oyna"), UiTheme.GREEN_DARK, 42.0)
 	_offline_button.pressed.connect(_on_offline_pressed)
 	_offline_box.add_child(_offline_button)
 	# KAYITLI OYUN: elle kayıt ya da otomatik kayıt varsa en yenisinden devam.
 	var slot := _latest_save()
 	if slot != "":
 		var info := SaveGame.summary(slot)
-		var resume := _button("Kayıtlı Oyuna Devam Et", UiTheme.BLUE.darkened(0.2), 42.0)
+		var resume := _button(L.t("Kayıtlı Oyuna Devam Et"), UiTheme.BLUE.darkened(0.2), 42.0)
 		resume.tooltip_text = "%s · %s · %s" % [String(info.get("party", "")), String(info.get("period", "")), String(info.get("saved_at", ""))]
 		resume.pressed.connect(func():
 			resume.disabled = true
@@ -203,7 +203,7 @@ Sadece sen ve eklediğin botlar.")
 	_online_box.add_theme_constant_override("separation", 10)
 	box.add_child(_online_box)
 
-	create_button = _button("Oda Kur", ACCENT, 42.0)
+	create_button = _button(L.t("Oda Kur"), ACCENT, 42.0)
 	create_button.pressed.connect(_on_create_pressed)
 	_online_box.add_child(create_button)
 
@@ -213,7 +213,7 @@ Sadece sen ve eklediğin botlar.")
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	left.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	divider.add_child(left)
-	divider.add_child(_small_label("ya da koda katıl"))
+	divider.add_child(_small_label(L.t("ya da koda katıl")))
 	var right := HSeparator.new()
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	right.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -222,7 +222,7 @@ Sadece sen ve eklediğin botlar.")
 
 	var join_row := HBoxContainer.new()
 	join_row.add_theme_constant_override("separation", 8)
-	code_edit = _field("ODA KODU", 5)
+	code_edit = _field(L.t("ODA KODU"), 5)
 	code_edit.custom_minimum_size = Vector2(0, 40)
 	code_edit.add_theme_font_size_override("font_size", 16)
 	code_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -231,7 +231,7 @@ Sadece sen ve eklediğin botlar.")
 	code_edit.text_changed.connect(_on_code_text_changed)
 	code_edit.text_submitted.connect(func(_t): _on_join_pressed())
 	join_row.add_child(code_edit)
-	join_button = _button("Katıl", UiTheme.BLUE, 44.0)
+	join_button = _button(L.t("Katıl"), UiTheme.BLUE, 44.0)
 	join_button.custom_minimum_size.x = 96
 	join_button.pressed.connect(_on_join_pressed)
 	join_row.add_child(join_button)
@@ -256,14 +256,14 @@ func _set_mode(online: bool) -> void:
 
 func _build_footer() -> void:
 	var version := Label.new()
-	version.text = "sürüm %s" % MultiplayerManager.game_version()
+	version.text = L.t("sürüm %s") % MultiplayerManager.game_version()
 	version.add_theme_font_size_override("font_size", 13)
 	version.modulate = UiTheme.TEXT_MUTED
 	version.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	version.position += Vector2(12, -28)
 	version.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(version)
-	var quit := _button("Çıkış", UiTheme.PANEL_LIGHT, 36.0)
+	var quit := _button(L.t("Çıkış"), UiTheme.PANEL_LIGHT, 36.0)
 	quit.add_theme_font_size_override("font_size", 13)
 	quit.custom_minimum_size.x = 84
 	quit.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
@@ -327,15 +327,15 @@ func _on_offline_pressed() -> void:
 func _on_create_pressed() -> void:
 	create_button.disabled = true
 	join_button.disabled = true
-	_set_status("Oda kuruluyor...")
+	_set_status(L.t("Oda kuruluyor..."))
 	MultiplayerManager.create_room(_player_name())
 
 func _on_join_pressed() -> void:
 	var code := code_edit.text.strip_edges()
 	if code.length() != 5:
-		_set_status("Oda kodu 5 harfli olmalı.", true)
+		_set_status(L.t("Oda kodu 5 harfli olmalı."), true)
 		return
-	_set_status("Bağlanılıyor...")
+	_set_status(L.t("Bağlanılıyor..."))
 	create_button.disabled = true
 	join_button.disabled = true
 	MultiplayerManager.join_room(code, _player_name())

@@ -120,7 +120,7 @@ static func normalized(state) -> Dictionary:
 	return result
 
 static func tax_title(level: int) -> String:
-	return String(TAX_TITLES[clampi(level, TAX_LOW, TAX_HIGH)])
+	return L.t(String(TAX_TITLES[clampi(level, TAX_LOW, TAX_HIGH)]))
 
 static func tax_id(level: int) -> String:
 	return String(TAX_IDS[clampi(level, TAX_LOW, TAX_HIGH)])
@@ -311,18 +311,12 @@ static func scandal_damage(improper_million: float) -> float:
 
 ## "1.240" gibi binlik ayraçlı tam sayı.
 static func money_text(value: float) -> String:
-	var negative := value < 0.0
-	var digits := str(int(round(absf(value))))
-	var out := ""
-	while digits.length() > 3:
-		out = "." + digits.substr(digits.length() - 3) + out
-		digits = digits.substr(0, digits.length() - 3)
-	return ("−" if negative else "") + digits + out
+	return L.thousands(value)
 
 ## "1.240 milyon ₺"
 static func money_full(value: float) -> String:
-	return "%s milyon ₺" % money_text(value)
+	return L.t("%s milyon ₺") % money_text(value)
 
 ## "%8,4"
 static func percent_text(value: float) -> String:
-	return "%" + String.num(value, 1).replace(".", ",")
+	return L.pct(value, 1)

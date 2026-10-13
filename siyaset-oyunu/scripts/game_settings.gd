@@ -37,10 +37,17 @@ var master_volume: float = DEFAULT_MASTER_VOLUME
 var music_volume: float = DEFAULT_MUSIC_VOLUME
 var sfx_volume: float = DEFAULT_SFX_VOLUME
 var province_view: int = DEFAULT_PROVINCE_VIEW
+## Arayüz dili ("tr" / "en"). İlk açılışta sistem dili İngilizce değilse Türkçe.
+var language: String = "tr" if not OS.get_locale_language().begins_with("en") else "en"
 
 func _ready() -> void:
 	_load()
 	_apply()
+
+func set_language(code: String) -> void:
+	language = code if L.LOCALES.has(code) else "tr"
+	TranslationServer.set_locale(language)
+	_save()
 
 func set_fps_limit(value: int) -> void:
 	fps_limit = max(0, value)  # 0 = sınırsız
@@ -86,6 +93,7 @@ func set_streamer_mode(value: bool) -> void:
 	_save()
 
 func _apply() -> void:
+	TranslationServer.set_locale(language)
 	Engine.max_fps = fps_limit
 	DisplayServer.window_set_vsync_mode(
 		DisplayServer.VSYNC_ENABLED if vsync_enabled else DisplayServer.VSYNC_DISABLED
@@ -111,8 +119,12 @@ func _load() -> void:
 		music_volume = float(config.get_value("settings", "music_volume", DEFAULT_MUSIC_VOLUME))
 		sfx_volume = float(config.get_value("settings", "sfx_volume", DEFAULT_SFX_VOLUME))
 		province_view = int(config.get_value("settings", "province_view", DEFAULT_PROVINCE_VIEW))
+		language = String(config.get_value("settings", "language", language))
 
 func _save() -> void:
+	# Test/önizleme betikleri (-s) oyuncunun ayar dosyasına yazmaz.
+	if get_tree() != null and get_tree().get_script() != null:
+		return
 	var config := ConfigFile.new()
 	config.set_value("settings", "fps_limit", fps_limit)
 	config.set_value("settings", "vsync_enabled", vsync_enabled)
@@ -122,4 +134,5 @@ func _save() -> void:
 	config.set_value("settings", "music_volume", music_volume)
 	config.set_value("settings", "sfx_volume", sfx_volume)
 	config.set_value("settings", "province_view", province_view)
+	config.set_value("settings", "language", language)
 	config.save(CONFIG_PATH)

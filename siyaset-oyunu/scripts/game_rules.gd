@@ -85,14 +85,12 @@ const FUNDS_PER_ROUND_GOVERNMENT := 40
 ## gerekirse basılır.
 static func cost_text(cost: float) -> String:
 	if cost <= 0.0:
-		return "bedelsiz"
-	return "%s milyon ₺" % money_text(cost)
+		return L.t("bedelsiz")
+	return L.t("%s milyon ₺") % money_text(cost)
 
 ## Tutar yazısı (milyon ₺, birimsiz): tam sayıysa "15", değilse "2,5".
 static func money_text(value: float) -> String:
-	if is_equal_approx(value, roundf(value)):
-		return str(int(roundf(value)))
-	return String.num(value, 1).replace(".", ",")
+	return L.dec(value, 1)
 
 ## Yasa sunmak ucuz (turda 1): meclis oyunun merkezi, para engel olmasın.
 const LAW_FUNDS_COST := 5
@@ -200,7 +198,7 @@ static func half_of_round(round_number: int) -> int:
 ## "1950 · 1. yarı" gibi okunur dönem etiketi.
 static func period_label(round_number: int) -> String:
 	return "%d %s" % [year_of_round(round_number),
-		"1. yarı" if half_of_round(round_number) == 0 else "2. yarı"]
+		L.t("1. yarı") if half_of_round(round_number) == 0 else L.t("2. yarı")]
 
 ## round_number'uncu turun sonunda yapılan seçimin adı olan yıl.
 static func election_year(round_number: int) -> int:

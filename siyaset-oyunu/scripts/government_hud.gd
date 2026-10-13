@@ -51,11 +51,25 @@ static func _badge(peer_id: int) -> Control:
 static func _leadership_row(pm: int, deputy: int) -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
-	row.add_child(_label("Başbakan", 12, DIM_COLOR))
-	row.add_child(_party_chip(pm, true))
+	var pm_label := _label(L.t("Başbakan"), 12, DIM_COLOR)
+	row.add_child(pm_label)
+	var chip := _party_chip(pm, true)
+	row.add_child(chip)
+	var used := pm_label.get_combined_minimum_size().x + 28.0 + 16.0
 	if deputy != -1:
-		row.add_child(_label("·  Yrd.", 12, DIM_COLOR))
+		var dep_label := _label(L.t("·  Yrd."), 12, DIM_COLOR)
+		row.add_child(dep_label)
 		row.add_child(_party_chip(deputy, false))
+		used += dep_label.get_combined_minimum_size().x + 28.0 + 12.0
+	# Parti adı KISALTILMAZ: sığmazsa yazısı küçülür (sütun ~256 px).
+	var name_label := chip.get_node_or_null("Name") as Label
+	if name_label != null:
+		var room := 250.0 - used
+		var font := name_label.get_theme_font("font")
+		var size := 13
+		while size > 8 and font.get_string_size(name_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > room:
+			size -= 1
+		name_label.add_theme_font_size_override("font_size", size)
 	return row
 
 ## Küçük "logo (+ parti adı)" öbeği. Ad gösterilmese de ipucunda durur.
@@ -73,6 +87,7 @@ static func _party_chip(peer_id: int, show_name: bool) -> Control:
 	chip.add_child(_badge(peer_id))
 	if show_name:
 		var name_label := _label(party_name_of(peer_id), 13)
+		name_label.name = "Name"
 		name_label.clip_text = true
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		chip.add_child(name_label)
@@ -103,17 +118,17 @@ static func fill_government_panel(box: VBoxContainer) -> void:
 	_clear(box)
 	if GovernmentManager.is_voting() and GovernmentManager.proposal_kind == GovernmentManager.KIND_GOVERNMENT:
 		# İki satır: tek satırda sol paneli genişletip yandaki alanı itiyordu.
-		var title := section_title("%s\n%s teklifi" % [
-			"KOALİSYON GÖRÜŞMESİ" if GovernmentManager.is_coalition_stage() else "OYLANAN HÜKÜMET",
+		var title := section_title(L.t("%s\n%s teklifi") % [
+			L.t("KOALİSYON GÖRÜŞMESİ") if GovernmentManager.is_coalition_stage() else L.t("OYLANAN HÜKÜMET"),
 			party_name_of(GovernmentManager.proposal_peer_id)])
 		title.modulate = UiTheme.GOLD
 		box.add_child(title)
 		_fill_cabinet(box, GovernmentManager.proposal_assignments)
 		return
 
-	box.add_child(section_title("HÜKÜMET"))
+	box.add_child(section_title(L.t("HÜKÜMET")))
 	if not GovernmentManager.has_government():
-		box.add_child(_label("Hükümet yok", 13, DIM_COLOR))
+		box.add_child(_label(L.t("Hükümet yok"), 13, DIM_COLOR))
 		return
 	_fill_cabinet(box, GovernmentManager.government)
 
@@ -121,15 +136,15 @@ static func fill_government_panel(box: VBoxContainer) -> void:
 	if GovernmentManager.can_withdraw(me):
 		var withdraw := Button.new()
 		UiSkin.skin_button(withdraw)
-		withdraw.text = "Koalisyondan Çekil"
+		withdraw.text = L.t("Koalisyondan Çekil")
 		withdraw.add_theme_font_size_override("font_size", 12)
-		withdraw.tooltip_text = "Görevlerin ana iktidar partisine geçer. Puan tablon etkilenmez ama kamuoyunda bir miktar destek kaybedersin. Ortağın yalnız kalıp gensoruyla düşerse o %d puan kaybeder." % GovernmentPresets.ABANDONED_FALL_PENALTY
+		withdraw.tooltip_text = L.t("Görevlerin ana iktidar partisine geçer. Puan tablon etkilenmez ama kamuoyunda bir miktar destek kaybedersin. Ortağın yalnız kalıp gensoruyla düşerse o %d puan kaybeder.") % GovernmentPresets.ABANDONED_FALL_PENALTY
 		withdraw.pressed.connect(func():
 			if bool(withdraw.get_meta("armed", false)):
 				GovernmentManager.withdraw_from_coalition()
 			else:
 				withdraw.set_meta("armed", true)
-				withdraw.text = "Emin misin? Tekrar dokun (ortağın yalnız düşerse −%d)" % GovernmentPresets.ABANDONED_FALL_PENALTY
+				withdraw.text = L.t("Emin misin? Tekrar dokun (ortağın yalnız düşerse −%d)") % GovernmentPresets.ABANDONED_FALL_PENALTY
 		)
 		box.add_child(withdraw)
 
@@ -157,7 +172,7 @@ static func _fill_cabinet(box: VBoxContainer, government: Dictionary) -> void:
 
 	var ministry_row := HBoxContainer.new()
 	ministry_row.add_theme_constant_override("separation", 6)
-	var ministry_title := _label("Bakanlıklar", 12, DIM_COLOR)
+	var ministry_title := _label(L.t("Bakanlıklar"), 12, DIM_COLOR)
 	ministry_title.custom_minimum_size = Vector2(92, 0)
 	ministry_row.add_child(ministry_title)
 	var chips := HFlowContainer.new()
@@ -180,7 +195,7 @@ static func _fill_cabinet(box: VBoxContainer, government: Dictionary) -> void:
 		seats += GovernmentManager.seats_of(peer_id)
 	var total := GovernmentManager.total_seats()
 	var majority: bool = seats * 2 > total
-	box.add_child(_label("%d/%d sandalye — %s" % [seats, total, "çoğunluk var" if majority else "AZINLIK"],
+	box.add_child(_label(L.t("%d/%d sandalye — %s") % [seats, total, L.t("çoğunluk var") if majority else L.t("AZINLIK")],
 		UiTheme.FS_TINY, UiTheme.TEXT_MUTED if majority else UiTheme.RED))
 
 ## Yasa oylaması: 1. satır yasa ve oy durumu, 2. satır bu oyuncu için oyların
@@ -188,12 +203,12 @@ static func _fill_cabinet(box: VBoxContainer, government: Dictionary) -> void:
 static func _law_status_text(my_id: int, time_text: String) -> String:
 	var law_type := GovernmentManager.proposal_law
 	var totals := GovernmentManager.vote_seat_totals()
-	var first := "YASA: %s (%s) — %s getirdi · EVET %d / ÇEK. %d / HAYIR %d · %s" % [
+	var first := L.t("YASA: %s (%s) — %s getirdi · EVET %d / ÇEK. %d / HAYIR %d · %s") % [
 		CardPresets.card_title(law_type), CardPresets.law_direction_text(law_type),
 		party_name_of(GovernmentManager.proposal_peer_id), totals.x, GovernmentManager.abstain_seats(), totals.y, time_text,
 	]
 	if GovernmentManager.has_voted(my_id):
-		return first + "\nOyun: %s · diğer partilerin oyu bekleniyor" % GovernmentManager.vote_text(GovernmentManager.my_vote())
+		return first + L.t("\nOyun: %s · diğer partilerin oyu bekleniyor") % GovernmentManager.vote_text(GovernmentManager.my_vote())
 	# IPUCU SATIRI KALDIRILDI: teklifi veren parti artik parlamento
 	# diyagraminin yaninda logosuyla gosteriliyor (bkz. game_screen.gd).
 	return first
@@ -204,21 +219,21 @@ static func law_vote_hint(my_id: int) -> Dictionary:
 	if CardPresets.is_tax_law(GovernmentManager.proposal_law):
 		var level := CardPresets.tax_law_level(GovernmentManager.proposal_law)
 		var now := Economy.tax_title(CardManager.tax_level())
-		return {"yes": "EVET: vergi %s olur (gelir %s / dönem)" % [Economy.tax_title(level), Economy.money_full(CardManager.expected_revenue(level))],
-			"no": "HAYIR: vergi %s kalır" % now,
-			"short": "Vergi %s → %s: seçmen tepkisi kademeli gelir, en çok başbakanın partisi hisseder" % [now, Economy.tax_title(level)]}
-	var no_text := "HAYIR: yasaya yakın illerde güç kaybı, zıt illerde kazanç"
+		return {"yes": L.t("EVET: vergi %s olur (gelir %s / dönem)") % [Economy.tax_title(level), Economy.money_full(CardManager.expected_revenue(level))],
+			"no": L.t("HAYIR: vergi %s kalır") % now,
+			"short": L.t("Vergi %s → %s: seçmen tepkisi kademeli gelir, en çok başbakanın partisi hisseder") % [now, Economy.tax_title(level)]}
+	var no_text := L.t("HAYIR: yasaya yakın illerde güç kaybı, zıt illerde kazanç")
 	if my_id == proposer:
-		return {"yes": "EVET: kabul edilirse yasanın etkisi 2 katına çıkar", "no": no_text,
-			"short": "Senin yasan: kabul edilirse il etkileri 2 kat"}
+		return {"yes": L.t("EVET: kabul edilirse yasanın etkisi 2 katına çıkar"), "no": no_text,
+			"short": L.t("Senin yasan: kabul edilirse il etkileri 2 kat")}
 	var me_gov := GovernmentManager.proposal_gov_ids.has(my_id)
 	var proposer_gov := GovernmentManager.proposal_gov_ids.has(proposer)
 	if me_gov and not proposer_gov:
-		return {"yes": "EVET: muhalefete gündem kaptırırsın — her ilde eksi, yasaya yakın illerde nötr/artı",
+		return {"yes": L.t("EVET: muhalefete gündem kaptırırsın — her ilde eksi, yasaya yakın illerde nötr/artı"),
 			"no": no_text,
-			"short": "İktidardasın: muhalefetin yasasına EVET her ilde eksi (yakın illerde az) · kabul edilirse getiren güçlenir"}
-	return {"yes": "EVET: yasaya yakın illerde artı, zıt illerde eksi", "no": no_text,
-		"short": "Etkisi il il değişir: yasaya yakın illerde EVET, zıt illerde HAYIR kazandırır"}
+			"short": L.t("İktidardasın: muhalefetin yasasına EVET her ilde eksi (yakın illerde az) · kabul edilirse getiren güçlenir")}
+	return {"yes": L.t("EVET: yasaya yakın illerde artı, zıt illerde eksi"), "no": no_text,
+		"short": L.t("Etkisi il il değişir: yasaya yakın illerde EVET, zıt illerde HAYIR kazandırır")}
 
 ## Hükümet teklifi: 1/2 koalisyon görüşmesi ya da 2/2 meclis oylaması.
 static func _government_status_text(my_id: int, time_text: String) -> String:
@@ -229,18 +244,18 @@ static func _government_status_text(my_id: int, time_text: String) -> String:
 			voted += 1
 	var proposer := party_name_of(GovernmentManager.proposal_peer_id)
 	if GovernmentManager.is_coalition_stage():
-		var text := "1/2 KOALİSYON GÖRÜŞMESİ — %s teklifi · ortak onayı %d/%d · %s" % [
+		var text := L.t("1/2 KOALİSYON GÖRÜŞMESİ — %s teklifi · ortak onayı %d/%d · %s") % [
 			proposer, voted, eligible.size(), time_text]
 		if eligible.has(my_id) and not GovernmentManager.has_voted(my_id):
-			text += "\nORTAK önerildin: EVET kabul, HAYIR ret (çekimser yok)"
+			text += L.t("\nORTAK önerildin: EVET kabul, HAYIR ret (çekimser yok)")
 		elif my_id == GovernmentManager.proposal_peer_id:
-			text += "\nOrtaklarının cevabı bekleniyor"
+			text += L.t("\nOrtaklarının cevabı bekleniyor")
 		return text
 	var totals := GovernmentManager.vote_seat_totals()
-	var text2 := "2/2 MECLİS OYLAMASI — %s hükümeti · EVET %d / ÇEK. %d / HAYIR %d · %d/%d oy · %s" % [
+	var text2 := L.t("2/2 MECLİS OYLAMASI — %s hükümeti · EVET %d / ÇEK. %d / HAYIR %d · %d/%d oy · %s") % [
 		proposer, totals.x, GovernmentManager.abstain_seats(), totals.y, voted, eligible.size(), time_text]
 	if GovernmentManager.has_voted(my_id):
-		text2 += "\nOyun: %s" % GovernmentManager.vote_text(GovernmentManager.my_vote())
+		text2 += L.t("\nOyun: %s") % GovernmentManager.vote_text(GovernmentManager.my_vote())
 	return text2
 
 ## Meclis butonlarının altındaki durum metni (kalan süre dahil).
@@ -251,13 +266,13 @@ static func proposal_status_text(my_id: int) -> String:
 			var holder: int = GovernmentManager.mandate_peer_id()
 			if holder == -1:
 				return ""
-			return "%s hükümet kuruyor… (%d. teklif hakkı, %s)" % [
+			return L.t("%s hükümet kuruyor… (%d. teklif hakkı, %s)") % [
 				party_name_of(holder), GovernmentManager.current_attempt_number(), time_text,
 			]
 		GovernmentManager.Phase.VOTING:
 			if GovernmentManager.is_resolving():
 				var totals := GovernmentManager.vote_seat_totals()
-				return "Oylama tamamlandı — EVET %d / ÇEKİMSER %d / HAYIR %d · sonuç açıklanıyor…" % [
+				return L.t("Oylama tamamlandı — EVET %d / ÇEKİMSER %d / HAYIR %d · sonuç açıklanıyor…") % [
 					totals.x, GovernmentManager.abstain_seats(), totals.y]
 			if GovernmentManager.proposal_kind == GovernmentManager.KIND_LAW:
 				return _law_status_text(my_id, time_text)
@@ -265,10 +280,10 @@ static func proposal_status_text(my_id: int) -> String:
 				return _government_status_text(my_id, time_text)
 			var mine := ""
 			if GovernmentManager.has_voted(my_id):
-				mine = "  (oyun: %s)" % GovernmentManager.vote_text(GovernmentManager.my_vote())
+				mine = L.t("  (oyun: %s)") % GovernmentManager.vote_text(GovernmentManager.my_vote())
 			var totals_now := GovernmentManager.vote_seat_totals()
 			if GovernmentManager.proposal_kind == GovernmentManager.KIND_EARLY:
-				return "ERKEN SEÇİM önergesi oylanıyor — %s getirdi · EVET %d / HAYIR %d · %s kaldı%s" % [
+				return L.t("ERKEN SEÇİM önergesi oylanıyor — %s getirdi · EVET %d / HAYIR %d · %s kaldı%s") % [
 					party_name_of(GovernmentManager.proposal_peer_id), totals_now.x, totals_now.y, time_text, mine,
 				]
 			if GovernmentManager.proposal_kind == GovernmentManager.KIND_CONSTITUTION:
@@ -279,10 +294,10 @@ EVET %d / gereken %d (2/3) · %s kaldı%s" % [
 					party_name_of(GovernmentManager.proposal_peer_id),
 					String.num(float(payload.get("threshold", 0.0)), 1), int(payload.get("interval", 0)),
 					ElectionModel.method_title(method),
-					" (değişmiyor)" if method == MultiplayerManager.seat_method else " (şu an: %s)" % ElectionModel.method_title(MultiplayerManager.seat_method),
+					L.t(" (değişmiyor)") if method == MultiplayerManager.seat_method else L.t(" (şu an: %s)") % ElectionModel.method_title(MultiplayerManager.seat_method),
 					totals_now.x, GovernmentManager.constitution_threshold_seats(), time_text, mine,
 				]
-			return "GENSORU oylanıyor — %d/%d oy, %s kaldı%s" % [
+			return L.t("GENSORU oylanıyor — %d/%d oy, %s kaldı%s") % [
 				GovernmentManager.votes.size(), GovernmentManager.voter_ids().size(), time_text, mine,
 			]
 		_:

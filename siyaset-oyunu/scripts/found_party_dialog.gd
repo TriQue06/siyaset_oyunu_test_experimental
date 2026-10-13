@@ -36,12 +36,12 @@ func _ready() -> void:
 	center.add_child(built[0])
 	var body: VBoxContainer = built[1]
 	var cost := CardManager.FOUND_PARTY_COST
-	body.add_child(PopupKit.header("YENİ PARTİ KUR" if not leaving else "AYRIL VE PARTİ KUR",
-		"Bedel: %s · seçmen gruplarındaki desteğin aynen devam eder" % GameRules.cost_text(cost), null, queue_free))
+	body.add_child(PopupKit.header(L.t("YENİ PARTİ KUR") if not leaving else L.t("AYRIL VE PARTİ KUR"),
+		L.t("Bedel: %s · seçmen gruplarındaki desteğin aynen devam eder") % GameRules.cost_text(cost), null, queue_free))
 	if leaving:
-		body.add_child(PopupKit.note("Katkına göre (biraz da şansla) vekillerin, teşkilatların ve desteğin bir kısmını götürürsün; memleketindeki teşkilat seninle gelir. Seçime yaklaştıkça ayrılık iki partiye de daha çok oy kaybettirir.", UiTheme.TEXT_MUTED))
+		body.add_child(PopupKit.note(L.t("Katkına göre (biraz da şansla) vekillerin, teşkilatların ve desteğin bir kısmını götürürsün; memleketindeki teşkilat seninle gelir. Seçime yaklaştıkça ayrılık iki partiye de daha çok oy kaybettirir."), UiTheme.TEXT_MUTED))
 	else:
-		body.add_child(PopupKit.note("Bağımsızken topladığın destek yeni partine geçer; memleketinden kazandığın sandalye de partinin olur.", UiTheme.TEXT_MUTED))
+		body.add_child(PopupKit.note(L.t("Bağımsızken topladığın destek yeni partine geçer; memleketinden kazandığın sandalye de partinin olur."), UiTheme.TEXT_MUTED))
 
 	var top := HBoxContainer.new()
 	top.add_theme_constant_override("separation", 12)
@@ -52,14 +52,14 @@ func _ready() -> void:
 	var name_box := VBoxContainer.new()
 	name_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(name_box)
-	name_box.add_child(PopupKit.label("Parti adı", PopupKit.FS_SMALL, UiTheme.TEXT_MUTED))
+	name_box.add_child(PopupKit.label(L.t("Parti adı"), PopupKit.FS_SMALL, UiTheme.TEXT_MUTED))
 	_name_edit = LineEdit.new()
 	_name_edit.max_length = PartyManager.NAME_MAX_LENGTH
-	_name_edit.placeholder_text = "Parti adını yaz"
+	_name_edit.placeholder_text = L.t("Parti adını yaz")
 	_name_edit.text_changed.connect(func(_t): _refresh())
 	name_box.add_child(_name_edit)
 
-	body.add_child(PopupKit.section("Logo"))
+	body.add_child(PopupKit.section(L.t("Logo")))
 	_icon_grid = GridContainer.new()
 	_icon_grid.columns = 13
 	_icon_grid.add_theme_constant_override("h_separation", 6)
@@ -76,7 +76,7 @@ func _ready() -> void:
 			_refresh())
 		_icon_grid.add_child(button)
 
-	body.add_child(PopupKit.section("Renk", "başka partinin rengi seçilemez"))
+	body.add_child(PopupKit.section(L.t("Renk"), L.t("başka partinin rengi seçilemez")))
 	_color_row = HFlowContainer.new()
 	_color_row.add_theme_constant_override("h_separation", 4)
 	_color_row.add_theme_constant_override("v_separation", 4)
@@ -104,13 +104,13 @@ func _ready() -> void:
 	buttons.alignment = BoxContainer.ALIGNMENT_END
 	body.add_child(buttons)
 	var cancel := Button.new()
-	cancel.text = "Vazgeç"
+	cancel.text = L.t("Vazgeç")
 	cancel.custom_minimum_size = Vector2(120, 40)
 	UiSkin.skin_button(cancel)
 	cancel.pressed.connect(queue_free)
 	buttons.add_child(cancel)
 	_found_button = Button.new()
-	_found_button.text = "Partiyi Kur · %s" % GameRules.cost_text(cost)
+	_found_button.text = L.t("Partiyi Kur · %s") % GameRules.cost_text(cost)
 	_found_button.custom_minimum_size = Vector2(200, 40)
 	UiSkin.skin_color_button(_found_button, UiTheme.GREEN_DARK)
 	_found_button.pressed.connect(_on_found)

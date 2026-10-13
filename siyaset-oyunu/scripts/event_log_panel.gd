@@ -100,7 +100,7 @@ func _add_row(entry: Dictionary) -> void:
 		focus.custom_minimum_size = Vector2(FOCUS_SIZE, FOCUS_SIZE)
 		focus.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		focus.ring_color = party.get("bg_color", UiTheme.GOLD)
-		focus.tooltip_text = "Haritada göster"
+		focus.tooltip_text = L.t("Haritada göster")
 		focus.pressed.connect(func(): focus_requested.emit(entry))
 		row.add_child(focus)
 		_focus_buttons.append(focus)

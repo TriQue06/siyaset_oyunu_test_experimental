@@ -110,7 +110,7 @@ func _build_panel() -> void:
 	buttons.add_theme_constant_override("separation", 8)
 	box.add_child(buttons)
 	var ok := Button.new()
-	ok.text = "Anladım"
+	ok.text = L.t("Anladım")
 	ok.focus_mode = Control.FOCUS_NONE
 	ok.custom_minimum_size = Vector2(110, 30)
 	ok.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -118,7 +118,7 @@ func _build_panel() -> void:
 	ok.pressed.connect(_on_ok)
 	buttons.add_child(ok)
 	var off := Button.new()
-	off.text = "Rehberi kapat"
+	off.text = L.t("Rehberi kapat")
 	off.focus_mode = Control.FOCUS_NONE
 	off.custom_minimum_size = Vector2(120, 30)
 	UiSkin.skin_button(off)

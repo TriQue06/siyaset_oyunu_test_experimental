@@ -51,31 +51,31 @@ func _process(delta: float) -> void:
 	_progress_fill.size.x = (_progress_fill.get_parent() as Control).size.x * clampf(_t / _duration, 0.0, 1.0)
 	if _t <= ends[0]:
 		_fill_rows(data.get("round1", []), clampf(_t / ends[0], 0.0, 1.0))
-		_status.text = "Delegeler oy kullanıyor…"
+		_status.text = L.t("Delegeler oy kullanıyor…")
 	elif _t <= ends[1]:
 		_fill_rows(data.get("round1", []), 1.0)
-		_status.text = "Kimse delegelerin yarısını geçemedi: İKİNCİ TURA kalanlar belli oldu."
+		_status.text = L.t("Kimse delegelerin yarısını geçemedi: İKİNCİ TURA kalanlar belli oldu.")
 	elif not round2.is_empty() and _t <= ends[2]:
 		if not _second_built:
 			_second_built = true
-			_round_label.text = "2. TUR"
+			_round_label.text = L.t("2. TUR")
 			_build_rows([int(round2[0]), int(round2[1])], [])
 		var k := clampf((_t - ends[1]) / maxf(0.01, ends[2] - ends[1]), 0.0, 1.0)
 		_fill_pair(int(round2[2]), int(round2[3]), k)
-		_status.text = "İkinci tur oylaması…"
+		_status.text = L.t("İkinci tur oylaması…")
 	else:
 		if not round2.is_empty():
 			if not _second_built:
 				_second_built = true
-				_round_label.text = "2. TUR"
+				_round_label.text = L.t("2. TUR")
 				_build_rows([int(round2[0]), int(round2[1])], [])
 			_fill_pair(int(round2[2]), int(round2[3]), 1.0)
 		else:
 			_fill_rows(data.get("round1", []), 1.0)
 		var winner: Dictionary = candidates[int(data.get("winner", 0))]
-		_stamp.text = "GENEL BAŞKAN: %s" % String(winner.get("name", "?"))
+		_stamp.text = L.t("GENEL BAŞKAN: %s") % String(winner.get("name", "?"))
 		_stamp.visible = true
-		_status.text = "Genel başkanlığını korudu." if bool(winner.get("incumbent", false)) else "Parti yeni genel başkanını seçti."
+		_status.text = L.t("Genel başkanlığını korudu.") if bool(winner.get("incumbent", false)) else L.t("Parti yeni genel başkanını seçti.")
 		for row in _rows:
 			if int(row["index"]) == int(data.get("winner", 0)):
 				(row["panel"] as Panel).modulate = Color(1.15, 1.1, 0.8)
@@ -105,7 +105,7 @@ func _set_row(row: Dictionary, value: float) -> void:
 	var half: ColorRect = row["half"]
 	half.position = Vector2(track.size.x * 0.5 - 1.0, -4.0)
 	half.size = Vector2(2.0, track.size.y + 8.0)
-	(row["value"] as Label).text = "%d  ·  %%%d" % [int(round(value)), int(round(value / total * 100.0))]
+	(row["value"] as Label).text = L.t("%d  ·  %%%d") % [int(round(value)), int(round(value / total * 100.0))]
 
 func _build() -> void:
 	var bg := ColorRect.new()
@@ -137,7 +137,7 @@ func _build() -> void:
 	var live := PanelContainer.new()
 	live.add_theme_stylebox_override("panel", UiSkin.color_box(RED))
 	live.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	live.add_child(_label("  ●  CANLI  ", 18, Color.WHITE))
+	live.add_child(_label(L.t("  ●  CANLI  "), 18, Color.WHITE))
 	top_row.add_child(live)
 	var swatch := ColorRect.new()
 	swatch.color = color
@@ -150,10 +150,10 @@ func _build() -> void:
 	titles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	titles.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	top_row.add_child(titles)
-	titles.add_child(_label("%s KONGRESİ  ·  CANLI YAYIN" % String(data.get("party", "")).to_upper(), 24, Color.WHITE))
-	var kinds := {"mandatory": "OLAĞAN KONGRE (süre doldu)", "voluntary": "OLAĞANÜSTÜ KONGRE (genel başkanın çağrısı)",
-		"request": "OLAĞANÜSTÜ KONGRE (üyenin talebi)"}
-	titles.add_child(_label("%s  ·  %d delege" % [kinds.get(String(data.get("kind", "")), "KONGRE"), CardManager.CONGRESS_DELEGATES], 13, GOLD))
+	titles.add_child(_label(L.t("%s KONGRESİ  ·  CANLI YAYIN") % String(data.get("party", "")).to_upper(), 24, Color.WHITE))
+	var kinds := {"mandatory": L.t("OLAĞAN KONGRE (süre doldu)"), "voluntary": L.t("OLAĞANÜSTÜ KONGRE (genel başkanın çağrısı)"),
+		"request": L.t("OLAĞANÜSTÜ KONGRE (üyenin talebi)")}
+	titles.add_child(_label(L.t("%s  ·  %d delege") % [kinds.get(String(data.get("kind", "")), L.t("KONGRE")), CardManager.CONGRESS_DELEGATES], 13, GOLD))
 
 	var progress := ColorRect.new()
 	progress.color = UiTheme.SLOT
@@ -166,7 +166,7 @@ func _build() -> void:
 	_progress_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	progress.add_child(_progress_fill)
 
-	_round_label = _label("1. TUR" if (data.get("candidates", []) as Array).size() > 1 else "TEK ADAY", 18, UiTheme.TEXT_MUTED)
+	_round_label = _label(L.t("1. TUR") if (data.get("candidates", []) as Array).size() > 1 else L.t("TEK ADAY"), 18, UiTheme.TEXT_MUTED)
 	root.add_child(_round_label)
 	_bars_box = VBoxContainer.new()
 	_bars_box.add_theme_constant_override("separation", 10)
@@ -207,9 +207,9 @@ func _build_rows(indices: Array, _delegates: Array) -> void:
 		row.add_child(names)
 		var tag := ""
 		if bool(c.get("incumbent", false)):
-			tag = "  · GENEL BAŞKAN"
+			tag = L.t("  · GENEL BAŞKAN")
 		elif bool(c.get("human", false)):
-			tag = "  · OYUNCU"
+			tag = L.t("  · OYUNCU")
 		names.add_child(_label(String(c.get("name", "?")) + tag, 18, GOLD if bool(c.get("human", false)) else Color.WHITE))
 		names.add_child(_label(String(c.get("background", "")), 12, UiTheme.TEXT_MUTED))
 		var track := ColorRect.new()

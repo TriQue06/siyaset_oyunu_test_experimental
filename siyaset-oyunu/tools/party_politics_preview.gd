@@ -14,6 +14,11 @@ func _shot(name: String) -> void:
 
 func _initialize() -> void:
 	# PREVIEW_SIZE=1280x720 gibi: kullanıcının tam ekran ayarına dokunmadan pencere boyutu.
+	await process_frame
+	if OS.get_environment("PREVIEW_LANG") != "":
+		# Ayar dosyasına yazmadan (GameSettings açılışta dili yükledikten sonra).
+		root.get_node("GameSettings").language = OS.get_environment("PREVIEW_LANG")
+		TranslationServer.set_locale(OS.get_environment("PREVIEW_LANG"))
 	var forced := OS.get_environment("PREVIEW_SIZE")
 	if forced != "":
 		var parts := forced.split("x")

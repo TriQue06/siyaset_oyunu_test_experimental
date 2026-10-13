@@ -93,7 +93,7 @@ func _rebuild() -> void:
 	var root: VBoxContainer = parts[1]
 
 	var head := PopupKit.header(ElectionNightSim.province_name(province_id),
-		"%d milletvekili" % CardManager.province_seat_count(province_id), null, func():
+		L.t("%d milletvekili") % CardManager.province_seat_count(province_id), null, func():
 			hide()
 			closed.emit())
 	root.add_child(head)
@@ -134,10 +134,10 @@ func _restore_scroll(value: int) -> void:
 
 func _build_intel(me: int) -> void:
 	var level := CardManager.organization_level(province_id, me)
-	_body.add_child(PopupKit.section("Senin teşkilatın", "sadece sen görürsün"))
+	_body.add_child(PopupKit.section(L.t("Senin teşkilatın"), L.t("sadece sen görürsün")))
 	_body.add_child(_level_row(level))
 	if level == 0:
-		_body.add_child(PopupKit.note("Burada teşkilatın yok. Kurmak %s: anketi açar, oy kazandırır. Miting ve karalama teşkilat ister." % GameRules.cost_text(CardManager.org_cost_for(multiplayer.get_unique_id(), province_id))))
+		_body.add_child(PopupKit.note(L.t("Burada teşkilatın yok. Kurmak %s: anketi açar, oy kazandırır. Miting ve karalama teşkilat ister.") % GameRules.cost_text(CardManager.org_cost_for(multiplayer.get_unique_id(), province_id))))
 		return
 	_build_poll(me, level)
 
@@ -146,7 +146,7 @@ func _build_profile() -> void:
 	var profile := CardManager.province_profile(province_id)
 	if profile.is_empty():
 		return
-	_body.add_child(PopupKit.section("Seçmen profili", "her çift toplam %100"))
+	_body.add_child(PopupKit.section(L.t("Seçmen profili"), L.t("her çift toplam %100")))
 	for pair in VoterGroups.PAIR_IDS:
 		_body.add_child(VoterGroupUI.pair_rows(pair, profile))
 
@@ -158,16 +158,16 @@ func _build_appeal(me: int) -> void:
 		return
 	var appeal := CardManager.appeal_of(province_id, me)
 	var closeness := PublicOpinion.appeal_closeness(appeal)
-	var closeness_text := "çok yakın" if closeness >= 0.75 else ("yakın" if closeness >= PublicOpinion.CLOSENESS_NEAR \
-		else ("uzak" if closeness >= 0.3 else "çok uzak"))
+	var closeness_text := L.t("çok yakın") if closeness >= 0.75 else (L.t("yakın") if closeness >= PublicOpinion.CLOSENESS_NEAR \
+		else (L.t("uzak") if closeness >= 0.3 else L.t("çok uzak")))
 	var closeness_color := UiTheme.GREEN if closeness >= PublicOpinion.CLOSENESS_NEAR else (UiTheme.GOLD if closeness >= 0.3 else UiTheme.RED)
-	_body.add_child(PopupKit.section("Partin bu ilde", "seçmen grupları"))
-	_body.add_child(PopupKit.kv("Seçmen sana", closeness_text, closeness_color))
+	_body.add_child(PopupKit.section(L.t("Partin bu ilde"), L.t("seçmen grupları")))
+	_body.add_child(PopupKit.kv(L.t("Seçmen sana"), closeness_text, closeness_color))
 	var groups := CardManager.effective_groups(me)
 	var effects := PublicOpinion.miting_positioning(profile, PublicOpinion.org_action_mult(CardManager.organization_level(province_id, me)))
 	if effects.is_empty():
 		return
-	_body.add_child(PopupKit.note("Burada miting yaparsan:", DIM))
+	_body.add_child(PopupKit.note(L.t("Burada miting yaparsan:"), DIM))
 	var fatigue: Dictionary = CardManager.miting_fatigue.get(CardManager.party_of(me), {})
 	for effect in effects:
 		var damp := PublicOpinion.miting_fatigue_mult(float(fatigue.get(String(effect["group"]), 0.0)))
@@ -180,7 +180,7 @@ func _build_appeal(me: int) -> void:
 func _level_row(level: int) -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 4)
-	var key := PopupKit.label("Seviye", PopupKit.FS_TEXT, PopupKit.KEY)
+	var key := PopupKit.label(L.t("Seviye"), PopupKit.FS_TEXT, PopupKit.KEY)
 	key.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(key)
 	var mine: Color = PartyManager.data_of(multiplayer.get_unique_id()).get("bg_color", UiTheme.BLUE)
@@ -198,8 +198,8 @@ func _build_poll(me: int, level: int) -> void:
 	var poll := CardManager.province_poll(me, province_id)
 	if poll.is_empty():
 		return
-	var accuracy := "%90 doğru" if level >= 2 else "yaklaşık"
-	_body.add_child(PopupKit.section("Anket · şimdi seçim olsa", "%s ±%%%d" % [accuracy,
+	var accuracy := L.t("%90 doğru") if level >= 2 else L.t("yaklaşık")
+	_body.add_child(PopupKit.section(L.t("Anket · şimdi seçim olsa"), "%s ±%%%d" % [accuracy,
 		int(round(CardManager.poll_error(me, province_id) * 100.0))]))
 	var ids: Array = poll.keys()
 	ids.sort_custom(func(x, y):
@@ -220,9 +220,9 @@ func _build_poll(me: int, level: int) -> void:
 	for peer_id in ids:
 		var entry: Dictionary = poll[peer_id]
 		_body.add_child(PopupKit.party_row(PartyManager.data_of(peer_id), int(peer_id) == CardManager.party_of(me),
-			["%%%.0f" % float(entry["percent"]), str(int(entry["seats"]))], [44, 30]))
+			[L.t("%%%.0f") % float(entry["percent"]), str(int(entry["seats"]))], [44, 30]))
 	if level < 2:
-		_body.add_child(PopupKit.note("2. seviye teşkilat (%s) çok daha isabetli anket verir." % GameRules.cost_text(CardManager.org_cost_for(me, province_id)), UiTheme.TEXT_DIM))
+		_body.add_child(PopupKit.note(L.t("2. seviye teşkilat (%s) çok daha isabetli anket verir.") % GameRules.cost_text(CardManager.org_cost_for(me, province_id)), UiTheme.TEXT_DIM))
 
 func _columns_header() -> Control:
 	var row := HBoxContainer.new()
@@ -239,21 +239,21 @@ func _columns_header() -> Control:
 
 func _build_own(me: int) -> void:
 	var level := CardManager.organization_level(province_id, me)
-	_body.add_child(PopupKit.section("Sen bu ilde"))
+	_body.add_child(PopupKit.section(L.t("Sen bu ilde")))
 	var power := CardManager.activity_of(province_id, me)
-	_body.add_child(PopupKit.kv("Yerel güç", EffectWords.amount(power, "local"), _opinion_color(power)))
+	_body.add_child(PopupKit.kv(L.t("Yerel güç"), EffectWords.amount(power, "local"), _opinion_color(power)))
 	if level > 0:
-		_body.add_child(PopupKit.kv("Teşkilat desteği", EffectWords.amount(CardManager.org_bonus(province_id, me), "local"), UiTheme.GREEN))
+		_body.add_child(PopupKit.kv(L.t("Teşkilat desteği"), EffectWords.amount(CardManager.org_bonus(province_id, me), "local"), UiTheme.GREEN))
 		var risk := CardManager.miting_risk(me, province_id)
 		var color := UiTheme.GREEN if risk < 0.12 else (UiTheme.GOLD if risk < 0.25 else UiTheme.RED)
-		_body.add_child(PopupKit.kv("Miting provokasyonu", EffectWords.risk(risk), color))
+		_body.add_child(PopupKit.kv(L.t("Miting provokasyonu"), EffectWords.risk(risk), color))
 		var mult := PublicOpinion.org_action_mult(level)
 		if not is_equal_approx(mult, 1.0):
-			_body.add_child(PopupKit.kv("Miting / karalama", EffectWords.multiplier(mult), UiTheme.GREEN))
+			_body.add_child(PopupKit.kv(L.t("Miting / karalama"), EffectWords.multiplier(mult), UiTheme.GREEN))
 	else:
-		_body.add_child(PopupKit.kv("Miting / karalama", "teşkilat gerekli", UiTheme.RED))
+		_body.add_child(PopupKit.kv(L.t("Miting / karalama"), L.t("teşkilat gerekli"), UiTheme.RED))
 	if level < GameRules.ORG_MAX_LEVEL:
-		_body.add_child(PopupKit.kv("Teşkilat %s" % ("kurmak" if level == 0 else "geliştirmek"),
+		_body.add_child(PopupKit.kv(L.t("Teşkilat %s") % ("kurmak" if level == 0 else L.t("geliştirmek")),
 			GameRules.cost_text(CardManager.org_cost_for(me, province_id)), UiTheme.BLUE.lightened(0.3)))
 
 ## Son seçim sonucu herkese açık bilgi.
@@ -261,7 +261,7 @@ func _build_last_election(me: int) -> void:
 	var results: Dictionary = CardManager.last_province_results.get(province_id, {})
 	if results.is_empty():
 		return
-	_body.add_child(PopupKit.section("Son seçim"))
+	_body.add_child(PopupKit.section(L.t("Son seçim")))
 	_body.add_child(_columns_header())
 	var ids: Array = results.keys()
 	ids.sort_custom(func(a, b): return float(results[a].get("percent", 0.0)) > float(results[b].get("percent", 0.0)))
@@ -269,13 +269,13 @@ func _build_last_election(me: int) -> void:
 		var entry: Dictionary = results[peer_id]
 		var seats := int(entry.get("seats", 0))
 		_body.add_child(PopupKit.party_row(PartyManager.data_of(peer_id), int(peer_id) == CardManager.party_of(me),
-			["%%%.0f" % float(entry.get("percent", 0.0)), [str(seats), UiTheme.TEXT if seats > 0 else UiTheme.TEXT_DIM]], [44, 30]))
+			[L.t("%%%.0f") % float(entry.get("percent", 0.0)), [str(seats), UiTheme.TEXT if seats > 0 else UiTheme.TEXT_DIM]], [44, 30]))
 
 func _build_events() -> void:
-	_body.add_child(PopupKit.section("Son olaylar"))
+	_body.add_child(PopupKit.section(L.t("Son olaylar")))
 	var events: Array = CardManager.province_events.get(province_id, [])
 	if events.is_empty():
-		_body.add_child(PopupKit.note("Bu ilde henüz bir olay yok.", UiTheme.TEXT_DIM))
+		_body.add_child(PopupKit.note(L.t("Bu ilde henüz bir olay yok."), UiTheme.TEXT_DIM))
 		return
 	var shown := 0
 	for i in range(events.size() - 1, -1, -1):

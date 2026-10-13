@@ -816,9 +816,6 @@ msgstr "Play with Bots"
 msgid "Botların dönemlik geliri ve bağış kampanyaları seçilen tutar kadar (milyon ₺) azalır. 0 = zayıflatma yok."
 msgstr "Bots' income per term and fundraising campaigns are reduced by the chosen amount (million ₺). 0 = no handicap."
 
-msgid "Botun adını, soyadını, geçmişini ve memleketini rastgele değiştir"
-msgstr "Randomly change the bot's first name, surname, background and hometown"
-
 msgid "Bozdurmak için KART BOZDUR yuvasına bırak"
 msgstr "Drop on the CASH IN CARD slot to cash it in"
 
@@ -3113,3 +3110,6 @@ msgstr "📋 Copy"
 
 msgid "🔒 Kilitle ve Hazır Ver"
 msgstr "🔒 Lock and Get Ready"
+
+msgid "Botun adını, soyadını, geçmişini, memleketini ve çekirdek seçmen gruplarını rastgele değiştir"
+msgstr "Randomize the bot's first name, surname, background, hometown and core voter groups"

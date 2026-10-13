@@ -88,6 +88,18 @@ func _initialize() -> void:
 	var taken_by_me: Color = pm.parties[me]["bg_color"]
 	pm.set_bot_party(edited_bot, "Robotlar", 0, taken_by_me)
 	check("bot baskasinin rengini alamaz", not Color(pm.parties[edited_bot]["bg_color"]).is_equal_approx(taken_by_me))
+	# Bot profilini rastgele yap: siyasetçiyle birlikte çekirdek gruplar da yenilenir.
+	var changed := 0
+	for n in 5:
+		var core_before: Array = (pm.parties[edited_bot]["core"] as Array).duplicate()
+		scene._bot_profile_button.pressed.emit()
+		await _frames(2)
+		var core_after: Array = pm.parties[edited_bot]["core"]
+		check("rastgele cekirdek gecerli", core_after.size() == 2 and core_after[0] != core_after[1], str(core_after))
+		check("ekrandaki cekirdek = partinin cekirdegi", scene._core == core_after, "%s / %s" % [scene._core, core_after])
+		if not (core_after.has(core_before[0]) and core_after.has(core_before[1])):
+			changed += 1
+	check("bot profili rastgele: cekirdek gruplar yenilendi", changed >= 4, "%d/5 degisti" % changed)
 	if DisplayServer.get_name() != "headless":
 		root.get_texture().get_image().save_png("%s/party_setup_bot_edit.png" % OS.get_user_data_dir())
 	scene._start_editing(-1)

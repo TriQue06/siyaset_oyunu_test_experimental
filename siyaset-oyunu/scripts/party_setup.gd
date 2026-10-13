@@ -159,15 +159,28 @@ func _refresh_ready_button() -> void:
 func _build_bot_profile_button() -> void:
 	_bot_profile_button = Button.new()
 	_bot_profile_button.text = L.t("🎲 Bot Profilini Rastgele Yap")
-	_bot_profile_button.tooltip_text = L.t("Botun adını, soyadını, geçmişini ve memleketini rastgele değiştir")
+	_bot_profile_button.tooltip_text = L.t("Botun adını, soyadını, geçmişini, memleketini ve çekirdek seçmen gruplarını rastgele değiştir")
 	_bot_profile_button.focus_mode = Control.FOCUS_NONE
 	_bot_profile_button.custom_minimum_size = Vector2(0, 40)
 	_bot_profile_button.visible = false
 	_bot_profile_button.pressed.connect(func():
 		if _editing_bot():
-			PartyManager.randomize_bot_politician(_edit_target))
+			PartyManager.randomize_bot_politician(_edit_target)
+			_randomize_bot_core())
 	ready_button.get_parent().add_child(_bot_profile_button)
 	ready_button.get_parent().move_child(_bot_profile_button, ready_button.get_index())
+
+## Düzenlenen botun çekirdek seçmen gruplarını rastgele yenile (öncekinden
+## farklı bir çift gelsin diye birkaç kez dener).
+func _randomize_bot_core() -> void:
+	var fresh := VoterGroups.random_core()
+	for i in 10:
+		if _core.size() != 2 or not (fresh.has(_core[0]) and fresh.has(_core[1])):
+			break
+		fresh = VoterGroups.random_core()
+	_core = fresh
+	_build_core_buttons()
+	_push_party()
 
 func _build_icon_grid() -> void:
 	for i in PartyPresets.icon_count():

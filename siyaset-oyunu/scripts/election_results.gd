@@ -51,6 +51,7 @@ var _last_parliament_key := ""
 ## Meclis diyagramında partilerin sabit sırası: işçi desteği yüksek olanlar
 ## solda, işveren desteği yüksek olanlar sağda (sadece görsel sıralama).
 var _party_order: Array = []
+const RANK_HYSTERESIS := 0.1
 ## peer_id -> {"percent", "rank"} ekranda gösterilen (yumuşatılmış) değerler.
 var _display: Dictionary = {}
 var _targets: Dictionary = {}
@@ -160,9 +161,17 @@ func _refresh() -> void:
 	var national: Dictionary = _sample["national"]
 	var ranked: Array = _sim.peer_ids.duplicate()
 	if counted > 0.0:
+		# HİSTEREZİS: oyları neredeyse eşit iki parti her karede yer değiştirip
+		# satırları yarı yolda bırakıyordu; fark RANK_HYSTERESIS'i geçmedikçe
+		# önceki sıra korunur.
 		ranked.sort_custom(func(a, b):
-			if float(national[a]) != float(national[b]):
-				return float(national[a]) > float(national[b])
+			var diff := float(national[a]) - float(national[b])
+			if absf(diff) > (0.0 if _finished else RANK_HYSTERESIS):
+				return diff > 0.0
+			var ra := float(_targets.get(a, {}).get("rank", 0.0))
+			var rb := float(_targets.get(b, {}).get("rank", 0.0))
+			if ra != rb:
+				return ra < rb
 			return int(a) < int(b))
 	else:
 		ranked = _party_order.duplicate()

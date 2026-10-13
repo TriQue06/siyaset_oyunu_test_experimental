@@ -13,6 +13,14 @@ func _shot(name: String) -> void:
 	print("screenshot: " + name)
 
 func _initialize() -> void:
+	# PREVIEW_SIZE=1280x720 gibi: kullanıcının tam ekran ayarına dokunmadan pencere boyutu.
+	var forced := OS.get_environment("PREVIEW_SIZE")
+	if forced != "":
+		var parts := forced.split("x")
+		for i in 3:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+			DisplayServer.window_set_size(Vector2i(int(parts[0]), int(parts[1])))
+			await process_frame
 	await process_frame
 	var mm = root.get_node("MultiplayerManager")
 	var pm = root.get_node("PartyManager")

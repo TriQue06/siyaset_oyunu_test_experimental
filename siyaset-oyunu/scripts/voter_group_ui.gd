@@ -11,7 +11,7 @@ const BAR_HEIGHT := 7.0
 
 ## [simge] Grup adı ............ değer   (adın rengi grubun rengi, açık tonda)
 static func name_row(group: String, value_text: String = "", value_color: Color = UiTheme.TEXT,
-		font_size: int = FS_NAME, icon_size: float = 16.0) -> HBoxContainer:
+		font_size: int = FS_NAME, icon_size: float = 16.0, words: bool = false) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 5)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -24,7 +24,8 @@ static func name_row(group: String, value_text: String = "", value_color: Color 
 	name.autowrap_mode = TextServer.AUTOWRAP_OFF
 	row.add_child(name)
 	if value_text != "":
-		var value := UiTheme.mono_label(value_text, font_size + 1, value_color, true)
+		# Sayılar mono (hizalı), nitel sözcükler normal yazı tipiyle.
+		var value: Label = PopupKit.label(value_text, font_size + 1, value_color) if words 			else UiTheme.mono_label(value_text, font_size + 1, value_color, true)
 		value.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(value)
 	return row
@@ -96,4 +97,4 @@ static func pair_rows(pair: String, profile: Dictionary) -> Control:
 static func effect_row(group: String, amount: float, font_size: int = FS_NAME) -> Control:
 	var color := UiTheme.GREEN if amount > 0.0 else UiTheme.RED
 	var text := "%s %s" % [EffectWords.adjective(amount, "group"), "artış" if amount > 0.0 else "kayıp"]
-	return name_row(group, text, color, font_size, 14.0)
+	return name_row(group, text, color, font_size, 14.0, true)

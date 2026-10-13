@@ -1137,7 +1137,9 @@ func _refresh_side_tabs() -> void:
 	if _parl_slot != null:
 		_parl_slot.visible = not selected_open and _side_tab == 0
 	if _economy_panel != null:
-		_economy_panel.visible = not selected_open and _side_tab == 0
+		# Oylamada meclis yuvası büyür: ekonomi kutusu yer açar (hükümet bilgisi
+		# 720p'de de görünür kalsın), oylama bitince geri gelir.
+		_economy_panel.visible = not selected_open and _side_tab == 0 			and GovernmentManager.phase != GovernmentManager.Phase.VOTING
 	_sync_parliament_to_slot()
 
 ## İl inceleme ayarı: PENCERE ise il ve profil haritanın üstünde pencerede açılır.
@@ -1884,8 +1886,17 @@ func _build_hand_card(card_type: String, hand_index: int) -> Control:
 	card.set_meta("is_click_target", true)
 	holder.add_child(card)
 
+	# KART YÜZÜ: türün renginde zemin + büyük simge (gövdenin sol yarısında:
+	# kartlar üst üste binince de görünür).
+	var face := CardFace.new()
+	face.card_type = card_type
+	face.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	face.position = Vector2(4.0, 56.0 * CARD_ART_RATIO)
+	face.size = Vector2(CARD_DISPLAY_SIZE.x - 8.0, CARD_DISPLAY_SIZE.y - 56.0 * CARD_ART_RATIO - 4.0)
+	holder.add_child(face)
 	# Kartın ne olduğu her kartta görselin üstündeki bantta yazar.
-	holder.add_child(_card_title_banner(card_type))
+	# Kartlar üst üste biniyorsa başlık sola yaslanır (görünen şeritte okunur).
+	holder.add_child(_card_title_banner(card_type, CardManager.my_inventory().size() * CARD_DISPLAY_SIZE.x > _r(R_HAND).size.x))
 	holder.add_child(_card_cost_badge(CardPresets.card_cost(card_type)))
 
 	# TIK ve SÜRÜKLEME: basılı tutup TAP_MAX_MOVE_PX'ten fazla kaydırınca
@@ -1992,7 +2003,7 @@ func _deselect_hand_card() -> void:
 			holder.z_index = 0
 
 ## Kart görselinin üstündeki isim bandı.
-func _card_title_banner(card_type: String) -> Control:
+func _card_title_banner(card_type: String, crowded: bool = false) -> Control:
 	var banner := PanelContainer.new()
 	banner.position = Vector2(6.0 * CARD_ART_RATIO, 8.0 * CARD_ART_RATIO)
 	banner.size = Vector2(CARD_DISPLAY_SIZE.x - 12.0 * CARD_ART_RATIO, 44.0 * CARD_ART_RATIO)
@@ -2002,7 +2013,7 @@ func _card_title_banner(card_type: String) -> Control:
 	banner.add_theme_stylebox_override("panel", style)
 	var title := Label.new()
 	title.text = CardPresets.card_short_title(card_type)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if crowded else HORIZONTAL_ALIGNMENT_CENTER
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title.add_theme_font_size_override("font_size", int(roundf(14.0 * CARD_ART_RATIO)))
@@ -2037,9 +2048,8 @@ func _card_cost_badge(cost: int) -> Control:
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(label)
 	badge.reset_size()
-	# Başlık bandının hemen altında, sağda: el kartlarının yarısı ekran dışında kaldığı için üstte.
-	badge.position = Vector2(CARD_DISPLAY_SIZE.x - badge.get_combined_minimum_size().x - 6.0 * CARD_ART_RATIO,
-		56.0 * CARD_ART_RATIO)
+	# Sol altta: kartlar üst üste binince de görünen şeritte kalır.
+	badge.position = Vector2(6.0, CARD_DISPLAY_SIZE.y - badge.get_combined_minimum_size().y - 6.0)
 	return badge
 
 ## OTOMATİK KAYIT: çevrim dışı oyunda her yeni dönemin başında (tur akışı
@@ -3121,6 +3131,7 @@ func _on_seats_changed() -> void:
 ## Hükümet kurma görevi BENDEYSE görev dağıtım ekranına geçiyoruz; diğer
 ## oyuncular "Hükümet kuruluyor…" bekleme perdesini görüyor.
 func _on_government_phase_changed() -> void:
+	_refresh_side_tabs()
 	_refresh_economy()
 	_refresh_vote_ui()
 	_refresh_action_buttons()
@@ -3826,9 +3837,9 @@ func _refresh_law_detail() -> void:
 	var rejected := PublicOpinion.LAW_GROUP_GAIN_REJECTED * mult
 	_law_detail.add_child(PopupKit.note("Kalıcı etki (kabul edilirse / edilmezse):", UiTheme.TEXT, 300))
 	_law_detail.add_child(VoterGroupUI.name_row(_law_group, "%s / %s" % [EffectWords.adjective(VoterGroups.effective_delta(groups, _law_group, passed), "group"),
-		EffectWords.adjective(VoterGroups.effective_delta(groups, _law_group, rejected), "group")], UiTheme.GREEN))
+		EffectWords.adjective(VoterGroups.effective_delta(groups, _law_group, rejected), "group")], UiTheme.GREEN, VoterGroupUI.FS_NAME, 16.0, true))
 	_law_detail.add_child(VoterGroupUI.name_row(opposite, "%s / %s kayıp" % [EffectWords.adjective(VoterGroups.effective_delta(groups, opposite, -passed * backlash), "group"),
-		EffectWords.adjective(VoterGroups.effective_delta(groups, opposite, -rejected * backlash), "group")], UiTheme.RED))
+		EffectWords.adjective(VoterGroups.effective_delta(groups, opposite, -rejected * backlash), "group")], UiTheme.RED, VoterGroupUI.FS_NAME, 16.0, true))
 	var crisis_note := " Kriz bu grubu istiyor: ulusal destek de kazandırır." if CardManager.crisis_group() == _law_group else ""
 	_law_detail.add_child(PopupKit.note("Meclis çoğunluğu gerekir.%s" % crisis_note, UiTheme.TEXT_DIM, 300))
 	var submit := Button.new()

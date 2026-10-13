@@ -340,7 +340,10 @@ static func _fill_summary(box: VBoxContainer, headline: Array) -> void:
 			"%d dilim seçimden sonra" % after if after > 0 else "hepsi seçimden önce biter"]))
 	var pm := GovernmentManager.main_gov_peer_id
 	if pm == -1 or not GovernmentManager.has_government():
-		box.add_child(PopupKit.label("Hükümet yok: ekonomi kimsenin hanesine yazılmıyor.", 10, UiTheme.TEXT_MUTED))
+		var none := PopupKit.label("Hükümet yok: ekonomi kimsenin hanesine yazılmıyor.", 10, UiTheme.TEXT_MUTED)
+		none.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		none.custom_minimum_size = Vector2(120, 0)
+		box.add_child(none)
 		return
 	var mood := CardManager.economy_mood(pm)
 	box.add_child(_summary_row("Gidişat", economy_verdict(mood)))

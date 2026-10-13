@@ -1855,7 +1855,11 @@ func _build_hand_card(card_type: String, hand_index: int) -> Control:
 					_finish_drag()
 				elif _drag_hand_index == -1:
 					_on_hand_card_clicked(hand_index)
-		# SÜRÜKLEME YOK: karta tıkla, sonra hedefini (il / parti / bozdurma) seç.
+		# SÜRÜKLEYEREK BOZDURMA: kart oynamak tıkla-seç ile; sürükleme sadece
+		# KART BOZDUR yuvasına bırakmak içindir (başka yere bırakmak iptal).
+		elif event is InputEventMouseMotion and card.get_meta("pressed", false) and _drag_hand_index == -1:
+			if event.position.distance_to(card.get_meta("press_pos", Vector2.ZERO)) > TAP_MAX_MOVE_PX:
+				_start_drag(hand_index, card_type, holder)
 	)
 
 	# FARE ÜSTÜNE GELİNCE kart tamamen görünür (dokunmatikte aynısını tek
@@ -2022,10 +2026,6 @@ func _start_drag(hand_index: int, card_type: String, holder: Control) -> void:
 	_drag_ghost.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_drag_ghost.z_index = 150
 	add_child(_drag_ghost)
-	# Hedef parti seçilen kartlarda geçerli partiler vurgulanır.
-	if CardPresets.needs_party_target(card_type):
-		_pending_target_hand_index = hand_index
-		_refresh_target_highlights()
 	_update_drag()
 
 ## Her kare: kopya imleci izler, imlecin altındaki hedef vurgulanır ve üstte
@@ -2091,6 +2091,10 @@ func _drop_target(card_type: String) -> Dictionary:
 		result["valid"] = true
 		result["discard"] = true
 		result["label"] = "Bırak: kartı bozdur (+%s)" % GameRules.cost_text(CardManager.discard_refund(card_type))
+		return result
+	if _drag_hand_index >= 0:
+		# Eldeki kart sürükleniyor: tek geçerli hedef KART BOZDUR yuvası.
+		result["label"] = "Bozdurmak için KART BOZDUR yuvasına bırak"
 		return result
 	if CardPresets.needs_party_target(card_type) and not CardPresets.needs_target(card_type):
 		# Kaset / parti içi isyan: hedef, kendisi dışında herhangi bir parti.

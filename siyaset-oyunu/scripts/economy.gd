@@ -239,14 +239,33 @@ static func split_cost(total: float, state: float) -> Dictionary:
 	var party_million := total - state_million
 	return {"share": s, "state": state_million, "party": party_million}
 
+## Süresi dolan ve incelenmiş kayıtları atar; kapsamdaki kanıtı korur.
+static func prune_ledger(ledger: Array, round_number: int) -> Array:
+	var kept: Array = []
+	for entry in ledger:
+		if round_number - int(entry.get("round", 0)) > INQUIRY_SCOPE_ROUNDS:
+			continue
+		kept.append(entry)
+	# Hâlâ çok fazlaysa önce incelenmiş (artık kanıt olmayan) kayıtlar gider.
+	var i := 0
+	while kept.size() > LEDGER_LIMIT and i < kept.size():
+		if bool(kept[i].get("investigated", false)):
+			kept.remove_at(i)
+		else:
+			i += 1
+	return kept
+
 static func snap_share(state: float) -> float:
 	return clampf(snappedf(state, FUND_STEP), 0.0, 1.0)
 
 # --- İşlem kaydı ve Finansman Soruşturması -------------------------------------------
 ## Her yatırım ve miting GERÇEK finansmanıyla kaydedilir (economy["ledger"]):
 ## {"id", "round", "party", "kind", "province", "total", "party_million",
-##  "state_million", "investigated"}. Kayıt sayısı sınırlı.
-const LEDGER_LIMIT := 80
+##  "state_million", "investigated"}. KAYIT SAKLAMA zaman penceresiyledir:
+## soruşturma kapsamından (INQUIRY_SCOPE_ROUNDS) çıkan ya da incelenmiş kayıt
+## silinir; kapsamdaki incelenmemiş kayıt (geçerli kanıt) SAYI SINIRIYLA
+## SİLİNMEZ. LEDGER_LIMIT sadece bunlardan sonra uygulanan güvenlik sınırıdır.
+const LEDGER_LIMIT := 400
 ## Soruşturma bedeli (soruşturan partinin kasasından), kapsamı (son kaç tur).
 const INQUIRY_FUNDS_COST := 15
 const INQUIRY_SCOPE_ROUNDS := 8

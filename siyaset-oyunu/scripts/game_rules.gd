@@ -104,8 +104,8 @@ const POLL_ERROR_HIGH := 0.10
 const MITING_FUNDS_COST := 15
 ## Yatırım (sadece hükümet partileri) ve gensoru (sadece muhalefet, hükümet
 ## azınlıktayken) hamleleri. Yatırımın asıl bedeli DEVLET HAZİNESİNDEN
-## ödenir (Economy.INVEST_COST); ayrı bir hamle bedeli YOK (hazine ve dönemde
-## tek yatırım hakkı yeterli sınır).
+## ödenir (Economy.INVEST_COST); ayrı bir hamle bedeli YOK: sınır devlet
+## hazinesidir (dönemlik vergi geliri ≈ bir yatırım).
 const INVEST_FUNDS_COST := 0
 ## Gensoru BEDELSİZ: muhalefetin elindeki tek gerçek silah engellenmemeli.
 const CENSURE_FUNDS_COST := 0
@@ -151,9 +151,20 @@ const ORG_INCOME_CAP := 25
 const SPEECH_FUNDS_COST := 5
 const ORG_UPGRADE_FUNDS_COST := ORG_FUNDS_COST
 
-## Bu ildeki teşkilatı bir seviye ilerletmenin bedeli (current_level: şu anki seviye).
-static func org_cost(current_level: int) -> int:
-	return ORG_FUNDS_COST if current_level <= 0 else ORG_UPGRADE_FUNDS_COST
+## KADEMELİ TEŞKİLAT BEDELİ (0.0.168): partinin ilk ORG_COST_FREE teşkilatı
+## sabit bedelle; ötesinde sahip olunan her teşkilat yeni hamleyi
+## ORG_COST_STEP pahalandırır (30 ilde teşkilatlı parti: 35). Denge
+## simülasyonunda bütün partiler 40–50 ile yayılıyor, kasa yine de birikiyordu:
+## teşkilat geniş ağın tek ve sınırsız harcaması olmasın.
+const ORG_COST_FREE := 5
+const ORG_COST_STEP := 1.0
+
+## Bu ildeki teşkilatı bir seviye ilerletmenin bedeli (current_level: şu anki
+## seviye, owned: partinin teşkilatlı il sayısı). Tek doğru kaynak budur;
+## oyuncu için CardManager.org_cost_for kullanılır.
+static func org_cost(current_level: int, owned: int = 0) -> float:
+	var base := float(ORG_FUNDS_COST if current_level <= 0 else ORG_UPGRADE_FUNDS_COST)
+	return base + ORG_COST_STEP * float(maxi(0, owned - ORG_COST_FREE))
 ## En fazla 2 seviye: 1 = kaba anket + az bonus, 2 = isabetli anket + yüksek bonus.
 const ORG_MAX_LEVEL := 2
 

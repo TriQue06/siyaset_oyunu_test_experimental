@@ -489,6 +489,82 @@ func _initialize() -> void:
 	check("bot da kasası yetmeden soruşturma açamaz", bb._eval_inquiry(3).is_empty())
 
 	print("")
+	print("=== 14) KANIT SAKLAMA VE BOT FİNANSMANI ===")
+	new_game()
+	# 120 kapsam içi kayıt: eski 80 sınırı kanıt silerdi; artık hepsi kalır.
+	var big: Array = []
+	for i in 120:
+		big.append({"id": i, "round": cm.round_number, "party": 1, "kind": "miting", "province": "", "total": 15.0,
+			"party_million": 0.0, "state_million": 15.0, "investigated": false})
+	check("kapsamdaki incelenmemiş kanıt sayı sınırıyla silinmez", Economy.prune_ledger(big, cm.round_number).size() == 120)
+	big.append({"id": 999, "round": cm.round_number - Economy.INQUIRY_SCOPE_ROUNDS - 1, "party": 1, "kind": "miting",
+		"province": "", "total": 15.0, "party_million": 15.0, "state_million": 0.0, "investigated": false})
+	check("kapsamı geçen kayıt temizlenir", Economy.prune_ledger(big, cm.round_number).size() == 120)
+	var many: Array = []
+	for i in Economy.LEDGER_LIMIT + 50:
+		many.append({"id": i, "round": cm.round_number, "party": 1, "kind": "invest", "province": "", "total": 100.0,
+			"party_million": 0.0, "state_million": 100.0, "investigated": i < 100})
+	var pruned: Array = Economy.prune_ledger(many, cm.round_number)
+	var open_left := 0
+	for e in pruned:
+		if not bool(e["investigated"]):
+			open_left += 1
+	check("güvenlik sınırında önce incelenmiş kayıtlar gider", open_left == Economy.LEDGER_LIMIT + 50 - 100, "%d" % open_left)
+	# Bot: hükümette ve kasası darken mitingi bazen devletten öder; muhalefette asla.
+	cm.economy["treasury"] = 2000.0
+	cm.economy["ledger"] = []
+	seed(4242)
+	var partisan := 0
+	for i in 200:
+		cm.funds[1] = 20.0
+		if bb.miting_state_share(1) > 0.0:
+			partisan += 1
+	check("hükümet botu bazen partizan finansman seçer (zorunlu değil)", partisan > 0 and partisan < 200, "%d/200" % partisan)
+	var opp := 0
+	for i in 100:
+		cm.funds[3] = 20.0
+		if bb.miting_state_share(3) > 0.0:
+			opp += 1
+	check("muhalefet botu devlet parası kullanamaz", opp == 0)
+	# Kendi açık usulsüzlükleri birikince durur (kanıt bilgisi değil, kendi kaydı).
+	var p_org := String(cm._province_ids[7])
+	cm.organizations[p_org] = {1: 1}
+	for k in bb.PARTISAN_MAX_OPEN:
+		give_turn(1)
+		cm.funds[1] = 100.0
+		cm._apply_miting_move(1, p_org, 1.0)
+	var after_open := 0
+	for i in 100:
+		cm.funds[1] = 20.0
+		if bb.miting_state_share(1) > 0.0:
+			after_open += 1
+	check("kendi açık usulsüzlükleri birikince bot durur", after_open == 0)
+	# Botun usulsüzlüğü insanla aynı soruşturmayla bulunur.
+	var nat_b: float = cm.national_of(1)
+	give_turn(3)
+	cm.funds[3] = 100.0
+	cm.economy["inquiries"] = {}
+	cm._apply_inquiry(3, 1)
+	check("botun partizan harcaması da usulsüzlük olarak bulunur", cm.national_of(1) < nat_b)
+	# Yatırımda hazine yetmezse bot kalanı kasadan tamamlar.
+	cm.economy["treasury"] = 60.0
+	cm.funds[1] = 100.0
+	check("bot yatırımı: hazine yetmezse devlet payı hazine kadar", near(bb.invest_state_share(1), 0.6))
+	# Kademeli teşkilat bedeli: ilk 5 sabit, sonra her teşkilat +1.
+	cm.organizations = {}
+	check("ilk teşkilat sabit bedel", near(cm.org_cost_for(1), float(GameRules.ORG_FUNDS_COST)))
+	for i in 12:
+		cm.organizations[String(cm._province_ids[i])] = {cm.party_of(1): 1}
+	check("12 teşkilatlı partiye yeni teşkilat 17", near(cm.org_cost_for(1), float(GameRules.ORG_FUNDS_COST) + 7.0 * GameRules.ORG_COST_STEP),
+		str(cm.org_cost_for(1)))
+	give_turn(1)
+	cm.funds[1] = 16.0
+	check("bedel yetmezse teşkilat kurulamaz", not cm.can_build_organization(1, String(cm._province_ids[20])))
+	cm.funds[1] = 50.0
+	cm._apply_organization(1, String(cm._province_ids[20]))
+	check("kurulunca tam kademeli bedel düşer", near(cm.funds_of(1), 50.0 - 17.0), str(cm.funds_of(1)))
+
+	print("")
 	if fails == 0:
 		print("EKONOMİ TESTLERİ: HEPSİ GEÇTİ")
 	else:

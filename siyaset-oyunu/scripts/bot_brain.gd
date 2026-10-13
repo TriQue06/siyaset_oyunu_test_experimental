@@ -266,7 +266,7 @@ static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 		best_score = float(constitution["score"])
 
 	var org := _best_organization(bot)
-	var org_cost := GameRules.org_cost(CardManager.organization_level(String(org.get("province", "")), bot)) if not org.is_empty() else 0
+	var org_cost := CardManager.org_cost_for(bot, String(org.get("province", ""))) if not org.is_empty() else 0.0
 	var org_noise := _jitter(bot)
 	if not org.is_empty():
 		candidates.append({"type": "organization", "province": org["province"]})
@@ -461,6 +461,44 @@ static func _eval_inquiry(bot: int) -> Dictionary:
 		if rival != -1 and (best.is_empty() or INQUIRY_RIVAL_SCORE > float(best["score"])):
 			best = {"target": rival, "score": INQUIRY_RIVAL_SCORE}
 	return best
+
+# --- FİNANSMAN TERCİHİ (insanla aynı kurallar) ------------------------------
+## Hükümetteki bot mitingini devlet parasıyla ödeyebilir (PARTİZAN HARCAMA,
+## soruşturmada usulsüzlük çıkar). Karar: kasası daraldıysa cazip
+## (PARTISAN_TEMPT_LOW), bol parası varken nadiren (PARTISAN_TEMPT); botun
+## sabit RİSK İŞTAHI (kişilik, 0..1) çarpan olur. Bot sadece KENDİ kaydını bilir:
+## henüz incelenmemiş usulsüz mitingi PARTISAN_MAX_OPEN'e ulaştıysa bir daha
+## denemez (yakalanma riski birikir). Kanıtın bulunup bulunmayacağını bilmez.
+const PARTISAN_TEMPT_LOW := 0.3
+const PARTISAN_TEMPT := 0.06
+const PARTISAN_MAX_OPEN := 2
+
+## Botun değişmeyen risk iştahı (0..1; aynı bot hep aynı).
+static func risk_appetite(bot: int) -> float:
+	return fposmod(float(absi(bot)) * 0.618034 + 0.17, 1.0)
+
+## Miting için devlet payı (0 = tamamı kendi kasasından).
+static func miting_state_share(bot: int) -> float:
+	var r := CardManager.funding_range(bot, "miting")
+	var lo := float(r["min"])
+	var hi := float(r["max"])
+	if not bool(r["state_allowed"]) or hi <= 0.0 or lo > hi:
+		return lo
+	var open := 0
+	for entry in CardManager.inquiry_records(bot):
+		if Economy.is_partisan(String(entry["kind"])) and float(entry.get("state_million", 0.0)) > 0.0:
+			open += 1
+	if open >= PARTISAN_MAX_OPEN:
+		return lo
+	var low_funds := CardManager.funds_of(bot) < GameRules.MITING_FUNDS_COST * 3.0
+	var chance := (PARTISAN_TEMPT_LOW if low_funds else PARTISAN_TEMPT) * (0.4 + risk_appetite(bot))
+	return hi if randf() < chance else lo
+
+## Yatırım için devlet payı: mümkün olduğunca devletten (meşru), hazine
+## yetmezse kalanı kasadan.
+static func invest_state_share(bot: int) -> float:
+	var r := CardManager.funding_range(bot, "invest")
+	return clampf(float(r["max"]), float(r["min"]), 1.0)
 
 ## Vergi yasasına oy: hükümet (genelde) destekler; ortak seçime yakın vergi
 ## artırımına destek vermez (sonucunu o da taşır). Muhalefet artırıma HAYIR,

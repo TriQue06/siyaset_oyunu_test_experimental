@@ -531,9 +531,7 @@ func _record_funding(peer_id: int, kind: String, province_id: String, split: Dic
 	ledger.append({"id": id, "round": round_number, "party": party_of(peer_id), "kind": kind, "province": province_id,
 		"total": total, "party_million": float(split["party"]),
 		"state_million": float(split["state"]), "investigated": false})
-	while ledger.size() > Economy.LEDGER_LIMIT:
-		ledger.pop_front()
-	economy["ledger"] = ledger
+	economy["ledger"] = Economy.prune_ledger(ledger, round_number)
 
 ## Partinin henüz incelenmemiş, kapsam içindeki işlemleri (sadece SAYI ve tür
 ## herkese açıktır; tutarlar soruşturmada açıklanır).
@@ -709,8 +707,7 @@ func has_organization_anywhere(peer_id: int) -> bool:
 func can_build_organization(peer_id: int, province_id: String) -> bool:
 	if PartyManager.is_independent(peer_id) or is_party_member(peer_id):
 		return false  # bağımsızın teşkilatı olmaz; üye teşkilat kuramaz
-	return can_choose_main_action(peer_id) and (province_id == "" and funds_of(peer_id) >= GameRules.ORG_FUNDS_COST \
-		or funds_of(peer_id) >= GameRules.org_cost(organization_level(province_id, peer_id))) \
+	return can_choose_main_action(peer_id) and funds_of(peer_id) >= org_cost_for(peer_id, province_id) \
 		and has_province(province_id) and organization_level(province_id, peer_id) < GameRules.ORG_MAX_LEVEL
 
 ## Bir partiden vekil çalınabilir mi? Kendinden çalınamaz, meclis dışı partiden
@@ -1520,7 +1517,7 @@ func _apply_law(peer_id: int, law_type: String) -> void:
 func _apply_organization(peer_id: int, province_id: String) -> void:
 	if not can_build_organization(peer_id, province_id):
 		return
-	funds[peer_id] = funds_of(peer_id) - GameRules.org_cost(organization_level(province_id, peer_id))
+	funds[peer_id] = funds_of(peer_id) - org_cost_for(peer_id, province_id)
 	var entry: Dictionary = organizations.get(province_id, {})
 	var level := int(entry.get(party_of(peer_id), 0)) + 1
 	entry[party_of(peer_id)] = level
@@ -2401,6 +2398,20 @@ func _peek_turn_card(peer_id: int) -> String:
 func turn_income(peer_id: int) -> float:
 	var base := float(GameRules.FUNDS_PER_ROUND_GOVERNMENT if is_government_party(peer_id) else GameRules.FUNDS_PER_ROUND)
 	return maxf(0.0, base - bot_funds_penalty(peer_id)) + float(org_income(peer_id))
+
+## Partinin teşkilatlı il sayısı.
+func org_count(peer_id: int) -> int:
+	var pid := party_of(peer_id)
+	var n := 0
+	for province_id in organizations.keys():
+		if int((organizations[province_id] as Dictionary).get(pid, 0)) > 0:
+			n += 1
+	return n
+
+## Bu oyuncunun bu ilde (il yoksa yeni bir ilde) teşkilat hamlesinin bedeli.
+func org_cost_for(peer_id: int, province_id: String = "") -> float:
+	var level := organization_level(province_id, peer_id) if province_id != "" else 0
+	return GameRules.org_cost(level, org_count(peer_id))
 
 ## Partinin teşkilatlarının tur başı geliri (1. seviye +5, 2. seviye +10 / il,
 ## toplamı en fazla GameRules.ORG_INCOME_CAP).

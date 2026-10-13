@@ -85,6 +85,10 @@ func _handle_turn(now: float) -> void:
 static func do_action(bot: int) -> Dictionary:
 	var action := BotBrain.choose_action(bot)
 	var funds_before := CardManager.funds_of(bot)
+	# Devletten ödenen hamle (yatırım, partizan miting) kasayı değiştirmez:
+	# hazine ve işlem defteri de izlenir.
+	var treasury_before := CardManager.state_treasury()
+	var ledger_before := int(CardManager.economy.get("next_id", 1))
 	var hand_before: int = CardManager.inventories.get(bot, []).size()
 	var laws_before := CardManager.has_proposed_law_this_round(bot)
 	var blocked_before := CardManager.is_turn_blocked()
@@ -103,9 +107,9 @@ static func do_action(bot: int) -> Dictionary:
 		"organization":
 			CardManager._apply_organization(bot, String(action["province"]))
 		"miting":
-			CardManager._apply_miting_move(bot, String(action["province"]))
+			CardManager._apply_miting_move(bot, String(action["province"]), BotBrain.miting_state_share(bot))
 		"invest":
-			CardManager._apply_invest_move(bot, String(action["province"]))
+			CardManager._apply_invest_move(bot, String(action["province"]), BotBrain.invest_state_share(bot))
 		"censure":
 			CardManager._apply_censure_move(bot)
 		"inquiry":
@@ -126,6 +130,7 @@ static func do_action(bot: int) -> Dictionary:
 			return {}
 	# Hamle gerçekten uygulandı mı? (Reddedilen hamlede döngüye girmesin.)
 	var applied: bool = CardManager.funds_of(bot) != funds_before or CardManager.current_turn_peer_id() != bot \
+		or CardManager.state_treasury() != treasury_before or int(CardManager.economy.get("next_id", 1)) != ledger_before \
 		or CardManager.inventories.get(bot, []).size() != hand_before \
 		or CardManager.has_proposed_law_this_round(bot) != laws_before \
 		or CardManager.is_turn_blocked() != blocked_before or CardManager.speech_done != speech_before

@@ -137,7 +137,7 @@ func _build_intel(me: int) -> void:
 	_body.add_child(PopupKit.section("Senin teşkilatın", "sadece sen görürsün"))
 	_body.add_child(_level_row(level))
 	if level == 0:
-		_body.add_child(PopupKit.note("Burada teşkilatın yok. Kurmak %s: anketi açar, oy kazandırır. Miting ve karalama teşkilat ister." % GameRules.cost_text(GameRules.ORG_FUNDS_COST)))
+		_body.add_child(PopupKit.note("Burada teşkilatın yok. Kurmak %s: anketi açar, oy kazandırır. Miting ve karalama teşkilat ister." % GameRules.cost_text(CardManager.org_cost_for(multiplayer.get_unique_id(), province_id))))
 		return
 	_build_poll(me, level)
 
@@ -222,7 +222,7 @@ func _build_poll(me: int, level: int) -> void:
 		_body.add_child(PopupKit.party_row(PartyManager.data_of(peer_id), int(peer_id) == CardManager.party_of(me),
 			["%%%.0f" % float(entry["percent"]), str(int(entry["seats"]))], [44, 30]))
 	if level < 2:
-		_body.add_child(PopupKit.note("2. seviye teşkilat (%s) çok daha isabetli anket verir." % GameRules.cost_text(GameRules.ORG_UPGRADE_FUNDS_COST), UiTheme.TEXT_DIM))
+		_body.add_child(PopupKit.note("2. seviye teşkilat (%s) çok daha isabetli anket verir." % GameRules.cost_text(CardManager.org_cost_for(me, province_id)), UiTheme.TEXT_DIM))
 
 func _columns_header() -> Control:
 	var row := HBoxContainer.new()
@@ -254,7 +254,7 @@ func _build_own(me: int) -> void:
 		_body.add_child(PopupKit.kv("Miting / karalama", "teşkilat gerekli", UiTheme.RED))
 	if level < GameRules.ORG_MAX_LEVEL:
 		_body.add_child(PopupKit.kv("Teşkilat %s" % ("kurmak" if level == 0 else "geliştirmek"),
-			GameRules.cost_text(GameRules.org_cost(level)), UiTheme.BLUE.lightened(0.3)))
+			GameRules.cost_text(CardManager.org_cost_for(me, province_id)), UiTheme.BLUE.lightened(0.3)))
 
 ## Son seçim sonucu herkese açık bilgi.
 func _build_last_election(me: int) -> void:

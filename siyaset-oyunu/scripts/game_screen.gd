@@ -2302,7 +2302,7 @@ func _on_province_clicked(province_id: String) -> void:
 			if CardManager.organization_level(province_id, me) >= GameRules.ORG_MAX_LEVEL:
 				_show_toast("Bu ildeki teşkilatın zaten en üst seviyede.")
 			else:
-				_show_toast(_action_block_reason(GameRules.ORG_FUNDS_COST))
+				_show_toast(_action_block_reason(CardManager.org_cost_for(multiplayer.get_unique_id())))
 			return
 		# Kuruldu: harita teşkilat katmanında kalır (geri dönmez).
 		_layer_before_org = -1
@@ -2451,7 +2451,7 @@ func _select_target_province(province_id: String) -> void:
 	elif _pending_org:
 		var level := CardManager.organization_level(province_id, me)
 		detail = "%s: teşkilat zaten en üst seviyede" % pname if level >= GameRules.ORG_MAX_LEVEL \
-			else "%s: teşkilat seviye %d → %d (%s) · %s" % [pname, level, level + 1, GameRules.cost_text(GameRules.org_cost(level)), _org_level_text(level + 1)]
+			else "%s: teşkilat seviye %d → %d (%s) · %s" % [pname, level, level + 1, GameRules.cost_text(CardManager.org_cost_for(me, province_id)), _org_level_text(level + 1)]
 	else:
 		var card_type: String = CardManager.my_inventory()[_pending_province_hand_index]
 		if card_type == CardPresets.MITING_CARD_TYPE:
@@ -3418,7 +3418,7 @@ func _action_button(title: String, cost_text: String, color: Color) -> Button:
 	return button
 
 ## Neden şu an bu hamle yapılamıyor? (Buton ipucu ve uyarı yazısı.)
-func _action_block_reason(cost: int, is_law: bool = false) -> String:
+func _action_block_reason(cost: float, is_law: bool = false) -> String:
 	var me := multiplayer.get_unique_id()
 	if CardManager.is_party_member(me):
 		return "Partinin genel başkanı değilsin: sadece miting yapabilirsin (partine ve güvenilirliğine yazar)."
@@ -3443,7 +3443,9 @@ func _refresh_action_buttons() -> void:
 	var funds_now := CardManager.funds_of(me)
 	_funds_label.text = CardManager.funds_text(funds_now)
 	var law_ok := CardManager.can_propose_law(me) or CardManager.can_propose_constitution(me)
-	var org_ok := CardManager.can_choose_main_action(me) and funds_now >= GameRules.ORG_FUNDS_COST
+	var org_ok := CardManager.can_choose_main_action(me) and funds_now >= CardManager.org_cost_for(me)
+	_org_button.text = "TEŞKİLAT
+%s" % GameRules.cost_text(CardManager.org_cost_for(me))
 	var miting_ok := CardManager.can_miting(me)
 	_miting_button.modulate.a = 1.0 if miting_ok or _pending_miting else 0.45
 	_invest_button.modulate.a = 1.0 if CardManager.can_invest(me) or _pending_invest else 0.45
@@ -4508,15 +4510,15 @@ func _on_org_button_pressed() -> void:
 	_law_designer.hide()
 	if _pending_miting or _pending_invest or _pending_censure or _pending_province_hand_index != -1:
 		_cancel_targeting()
-	if not CardManager.can_choose_main_action(me) or CardManager.funds_of(me) < GameRules.ORG_FUNDS_COST:
-		_show_toast(_action_block_reason(GameRules.ORG_FUNDS_COST))
+	if not CardManager.can_choose_main_action(me) or CardManager.funds_of(me) < CardManager.org_cost_for(me):
+		_show_toast(_action_block_reason(CardManager.org_cost_for(me)))
 		return
 	_pending_org = true
 	if _province_panel != null:
 		_province_panel.hide()
 	_begin_org_view()
 	_refresh_action_buttons()
-	_set_target_hint("Teşkilatlanma: bir ile dokun, tekrar dokun: kur ya da geliştir (%s)  ·  Butona tekrar dokun: iptal" % GameRules.cost_text(GameRules.ORG_FUNDS_COST))
+	_set_target_hint("Teşkilatlanma: bir ile dokun, tekrar dokun: kur ya da geliştir (%s)  ·  Butona tekrar dokun: iptal" % GameRules.cost_text(CardManager.org_cost_for(me)))
 
 ## Teşkilat seviyesinin getirdikleri (kısa).
 static func _org_level_text(level: int) -> String:

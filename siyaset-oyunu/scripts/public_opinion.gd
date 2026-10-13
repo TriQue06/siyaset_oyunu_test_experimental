@@ -59,11 +59,12 @@ const PROVOCATION_FULL_APPEAL := 40.0
 # --- Yatırım (sadece hükümet partileri) ---------------------------------------
 ## YEREL MEMNUNİYET: yatırım partinin siyasi kimliğine (grup yakınlığına)
 ## dokunmaz; ildeki herkesin partiye yaklaşmasını sağlar (il aktivitesi).
-## INVEST_NATIONAL mevcut ekonomik yansımadır (genel ulusal puan, grup değil).
+## Toplam etki; Economy.INVEST_IMMEDIATE'i hemen, kalanı sonraki turlarda.
+## Ekonomik yansıması ayrı bir ulusal puan DEĞİLDİR: yatırım ekonomi ivmesini
+## büyütür, o da hükümetin seçmen memnuniyetine yansır (bkz. Economy).
 ## Azalan getiri: il puanı LIMIT ile sınırlı; aynı ile art arda yatırım tavana
 ## dayanınca daha az getirir.
 const INVEST_LOCAL := 10.0
-const INVEST_NATIONAL := 2.0
 const INVEST_PARTNER_LOCAL := 4.0
 
 # --- Popülizm bonusu -----------------------------------------------------------

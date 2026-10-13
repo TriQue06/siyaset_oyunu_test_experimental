@@ -95,8 +95,9 @@ const POLL_ERROR_LOW := 0.35
 const POLL_ERROR_HIGH := 0.10
 const MITING_MANA_COST := 15
 ## Yatırım (sadece hükümet partileri) ve gensoru (sadece muhalefet, hükümet
-## azınlıktayken) hamleleri.
-const INVEST_MANA_COST := 30
+## azınlıktayken) hamleleri. Yatırımın asıl bedeli DEVLET HAZİNESİNDEN
+## ödenir (Economy.INVEST_COST); partiden sadece bu küçük mana bedeli.
+const INVEST_MANA_COST := 10
 ## Gensoru BEDELSİZ: muhalefetin elindeki tek gerçek silah engellenmemeli.
 const CENSURE_MANA_COST := 0
 ## ERKEN SEÇİM hamlesi (eskiden kart): meclise önerge getirir.

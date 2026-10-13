@@ -308,6 +308,11 @@ var _speech_key: String = ""
 ## GRUP TOPLANTISI hamle düğmesiyle bu sırada (tur:sıra) açıldı mı?
 var _speech_open_key: String = ""
 var _speech_button: Button
+## EKONOMİ: sağ sütundaki özet (Hükümet sekmesi) ve Vergi Politikası paneli.
+var _economy_panel: EconomyPanel
+var _tax_panel: PanelContainer
+var _tax_box: VBoxContainer
+var _tax_selected: int = -1
 
 func _ready() -> void:
 	AudioManager.play_game_music()
@@ -345,6 +350,7 @@ func _ready() -> void:
 	CardManager.seats_changed.connect(_on_seats_changed)
 	GovernmentManager.proposal_resolved.connect(_on_proposal_resolved)
 	CardManager.opinion_changed.connect(_on_opinion_changed)
+	CardManager.economy_event.connect(_on_economy_event)
 	GameSettings.province_view_changed.connect(_on_province_view_changed)
 
 	UiSkin.skin_panel(left_panel, UiSkin.PANEL_DARK)
@@ -383,6 +389,7 @@ func _ready() -> void:
 	# Çöp kutusu destenin yanına otursun (yerleşim butonlar kurulduktan sonra).
 	_place_right_column_controls()
 	_build_law_designer()
+	_build_tax_panel()
 	_build_agenda_banner()
 	_build_propaganda_menu()
 	_build_speech_panel()
@@ -936,6 +943,12 @@ func _setup_side_column() -> void:
 		_parl_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		vbox.add_child(_parl_slot)
 		vbox.move_child(_parl_slot, 1)
+		# EKONOMİ ÖZETİ: meclisin hemen altında (sadece Hükümet sekmesinde).
+		_economy_panel = EconomyPanel.new()
+		_economy_panel.tax_policy_requested.connect(_open_tax_panel)
+		vbox.add_child(_economy_panel)
+		vbox.move_child(_economy_panel, 2)
+		_economy_panel.refresh()
 	_refresh_side_tabs()
 
 var _score_scroll: ScrollContainer
@@ -1061,6 +1074,8 @@ func _refresh_side_tabs() -> void:
 			_event_log.visible = _side_tab == 1
 	if _parl_slot != null:
 		_parl_slot.visible = not selected_open and _side_tab == 0
+	if _economy_panel != null:
+		_economy_panel.visible = not selected_open and _side_tab == 0
 	_sync_parliament_to_slot()
 
 ## İl inceleme ayarı: PENCERE ise il ve profil haritanın üstünde pencerede açılır.
@@ -2407,8 +2422,7 @@ func _select_target_province(province_id: String) -> void:
 	var pname := ElectionNightSim.province_name(province_id)
 	var detail := ""
 	if _pending_invest:
-		detail = "%s: hükümet yatırımı (%d mana) · sen +%.0f, ortakların +%.1f güç · seçmen grubu desteğin değişmez" % [pname, GameRules.INVEST_MANA_COST,
-			PublicOpinion.INVEST_LOCAL, PublicOpinion.INVEST_PARTNER_LOCAL]
+		detail = _invest_preview(pname)
 	elif _pending_miting:
 		detail = "%s: miting (%d mana) · provokasyon riski %%%d · gücün %+.1f%s" % [pname, GameRules.MITING_MANA_COST,
 			int(round(CardManager.miting_risk(me, province_id) * 100.0)), CardManager.activity_of(province_id, me),
@@ -2429,6 +2443,7 @@ func _select_target_province(province_id: String) -> void:
 # --- Davet / başvuru şeridi ------------------------------------------------------
 
 func _on_opinion_changed() -> void:
+	_refresh_economy()
 	_refresh_score_panel()
 	_refresh_agenda_banner()
 	if _map_layer != MapLayer.SEATS:
@@ -2455,7 +2470,7 @@ func _set_target_hint(text: String) -> void:
 	_target_hint.visible = text != ""
 	var viewport_size := get_viewport_rect().size
 	_target_hint.position = Vector2(LEFT_PANEL_WIDTH, TOP_STRIP_HEIGHT + 4.0)
-	_target_hint.size = Vector2(viewport_size.x - LEFT_PANEL_WIDTH - RIGHT_COLUMN_WIDTH, 24)
+	_target_hint.size = Vector2(viewport_size.x - LEFT_PANEL_WIDTH - RIGHT_COLUMN_WIDTH, 24.0 * (text.count("\n") + 1))
 
 func _build_card_info() -> void:
 	_card_info = PanelContainer.new()
@@ -3020,6 +3035,7 @@ func _on_seats_changed() -> void:
 ## Hükümet kurma görevi BENDEYSE görev dağıtım ekranına geçiyoruz; diğer
 ## oyuncular "Hükümet kuruluyor…" bekleme perdesini görüyor.
 func _on_government_phase_changed() -> void:
+	_refresh_economy()
 	_refresh_vote_ui()
 	_refresh_action_buttons()
 	_refresh_government_panel()
@@ -3486,6 +3502,17 @@ func _build_law_designer() -> void:
 	_law_agenda_label.add_theme_font_size_override("font_size", 11)
 	_law_agenda_label.add_theme_color_override("font_color", UiTheme.GOLD)
 	box.add_child(_law_agenda_label)
+	# VERGİ YASASI ayrı panelde (gündemden bağımsız; sadece hükümet sunar).
+	var tax_link := Button.new()
+	tax_link.focus_mode = Control.FOCUS_NONE
+	tax_link.text = "VERGİ POLİTİKASI  ›"
+	tax_link.add_theme_font_override("font", UiTheme.mono(true))
+	tax_link.add_theme_font_size_override("font_size", 11)
+	tax_link.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	UiSkin.skin_color_button(tax_link, UiTheme.PANEL_LIGHT)
+	tax_link.tooltip_text = "Vergi kademesini değiştiren yasa: gündem şartı yok, sadece hükümet partileri sunar."
+	tax_link.pressed.connect(_open_tax_panel)
+	box.add_child(tax_link)
 	# SEKİZ SEÇMEN GRUBU (iki sütun): gündemdeki çiftin grupları seçilebilir.
 	_law_rows = GridContainer.new()
 	_law_rows.columns = 2
@@ -3622,7 +3649,7 @@ func _refresh_law_designer() -> void:
 		GameRules.LAW_MANA_COST]
 	var current := CardManager.agenda_type()
 	if current == "":
-		_law_agenda_label.text = "Gündem yok: bu dönem yasa sunulamaz."
+		_law_agenda_label.text = "Gündem yok: bu dönem grup yasası sunulamaz (vergi yasası gündemden bağımsızdır)."
 	else:
 		var data := CardPresets.agenda_data(current)
 		_law_agenda_label.text = "Gündem: %s — %s." % [data["title"], CardPresets.agenda_effect_text(current)]
@@ -3735,6 +3762,92 @@ func _propose_law_clicked(law_type: String) -> void:
 	_law_designer.hide()
 	CardManager.propose_law(law_type)
 
+# --- Ekonomi ve vergi ---------------------------------------------------------
+
+func _refresh_economy() -> void:
+	if _economy_panel != null:
+		_economy_panel.refresh()
+	if _tax_panel != null and _tax_panel.visible:
+		_fill_tax_panel()
+
+## Para hareketi / vergi değişikliği: ekonomi kutusu animasyonu oynatır; vergi
+## değişince açık vergi paneli yeni duruma göre yenilenir.
+func _on_economy_event(data: Dictionary) -> void:
+	if _economy_panel != null:
+		_economy_panel.play_event(data)
+	if String(data.get("kind", "")) == "tax":
+		_tax_selected = -1
+		_refresh_economy()
+
+## Yatırım önizlemesi (onaydan önce): bedel ve kaynağı, hazinenin önce/sonra
+## bakiyesi, etkinin zamanlaması.
+func _invest_preview(pname: String) -> String:
+	var before := CardManager.state_treasury()
+	var immediate := PublicOpinion.INVEST_LOCAL * Economy.INVEST_IMMEDIATE
+	var later := PublicOpinion.INVEST_LOCAL - immediate
+	return "%s yatırımı · devlet hazinesi %s → %s milyon ₺ · partinden %s\nil +%s hemen, +%s sonraki %d dönemde · ortaklar +%s · ekonomi ▲" % [
+		pname, Economy.money_text(before), Economy.money_text(before - Economy.INVEST_COST),
+		GameRules.cost_text(GameRules.INVEST_MANA_COST), _one_decimal(immediate), _one_decimal(later),
+		Economy.INVEST_DELAY_ROUNDS, _one_decimal(PublicOpinion.INVEST_PARTNER_LOCAL)]
+
+static func _one_decimal(value: float) -> String:
+	if is_equal_approx(value, roundf(value)):
+		return str(int(roundf(value)))
+	return String.num(value, 1).replace(".", ",")
+
+func _build_tax_panel() -> void:
+	_tax_panel = PanelContainer.new()
+	var style := UiSkin.stylebox(UiSkin.PANEL)
+	style.set_content_margin_all(UiTheme.PAD_M)
+	_tax_panel.add_theme_stylebox_override("panel", style)
+	_tax_panel.z_index = 108
+	_tax_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	_tax_box = VBoxContainer.new()
+	_tax_box.add_theme_constant_override("separation", 6)
+	_tax_box.custom_minimum_size = Vector2(404, 0)
+	_tax_panel.add_child(_tax_box)
+	_tax_panel.hide()
+	add_child(_tax_panel)
+
+## VERGİ POLİTİKASI: ekonomi şeridine ya da yasa panelindeki bağlantıya
+## dokununca açılır (tekrar dokununca kapanır).
+func _open_tax_panel() -> void:
+	if _tax_panel.visible:
+		_tax_panel.hide()
+		return
+	_deselect_hand_card()
+	_law_designer.hide()
+	_cancel_targeting()
+	_tax_selected = -1
+	_fill_tax_panel()
+	_tax_panel.show()
+	_place_tax_panel.call_deferred()
+
+func _fill_tax_panel() -> void:
+	EconomyPanel.fill_policy(_tax_box, multiplayer.get_unique_id(), _tax_selected, _on_tax_selected, _propose_tax, _tax_panel.hide)
+
+func _on_tax_selected(level: int) -> void:
+	_tax_selected = level
+	_fill_tax_panel()
+	_place_tax_panel.call_deferred()
+
+func _place_tax_panel() -> void:
+	if _tax_panel == null or not _tax_panel.visible:
+		return
+	_tax_panel.reset_size()
+	var viewport_size := get_viewport_rect().size
+	_tax_panel.position = Vector2(
+		viewport_size.x - RIGHT_COLUMN_WIDTH - _tax_panel.size.x - 12.0,
+		clampf(_top_area_height() - _tax_panel.size.y, 12.0, maxf(12.0, viewport_size.y - _tax_panel.size.y - 12.0)))
+
+func _propose_tax(law_type: String) -> void:
+	var me := multiplayer.get_unique_id()
+	if not CardManager.can_propose_law(me, law_type):
+		_show_toast(CardManager.tax_law_block_reason(me, CardPresets.tax_law_level(law_type)))
+		return
+	_tax_panel.hide()
+	CardManager.propose_law(law_type)
+
 func _circle_texture(color: Color) -> Texture2D:
 	var key := color.to_html()
 	if _circle_textures.has(key):
@@ -3760,6 +3873,8 @@ func _on_law_button_pressed() -> void:
 	if _law_designer.visible:
 		_law_designer.hide()
 		return
+	if _tax_panel != null:
+		_tax_panel.hide()
 	_refresh_law_designer()
 	_law_designer.show()
 	_law_designer.reset_size()
@@ -3772,6 +3887,9 @@ func _on_law_button_pressed() -> void:
 func _invest_block_reason() -> String:
 	if CardManager.can_act() and not CardManager.is_government_party(multiplayer.get_unique_id()):
 		return "Yatırımı sadece hükümet partileri yapabilir."
+	if CardManager.can_act() and CardManager.state_treasury() < Economy.INVEST_COST:
+		return "Devlet hazinesi yetmiyor: yatırım %s, hazinede %s. Vergi geliri dönem sonunda girer." % [
+			Economy.money_full(Economy.INVEST_COST), Economy.money_full(CardManager.state_treasury())]
 	return _action_block_reason(GameRules.INVEST_MANA_COST)
 
 ## Yatırım hamlesi: haritadan il seçilir (ilk dokunuş ayrıntı, ikincisi yapar).
@@ -3790,7 +3908,8 @@ func _on_invest_button_pressed() -> void:
 	if _province_panel != null:
 		_province_panel.hide()
 	_refresh_action_buttons()
-	_set_target_hint("Yatırım: haritada bir ile dokun, tekrar dokun: yatırım yap (%d mana)  ·  Butona tekrar dokun: iptal" % GameRules.INVEST_MANA_COST)
+	_set_target_hint("Yatırım: devlet hazinesinden %s (hazine %s) + %s  ·  Haritada bir ile dokun  ·  Butona tekrar dokun: iptal" % [
+		Economy.money_full(Economy.INVEST_COST), Economy.money_full(CardManager.state_treasury()), GameRules.cost_text(GameRules.INVEST_MANA_COST)])
 
 ## Gensoru hamlesi: sadece hükümet azınlıktayken muhalefete açık. İlk dokunuş
 ## onay ister, ikinci dokunuş meclis oylamasını başlatır.

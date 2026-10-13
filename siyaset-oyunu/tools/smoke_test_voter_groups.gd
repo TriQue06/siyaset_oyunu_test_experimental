@@ -233,7 +233,7 @@ func _initialize() -> void:
 	var gi: Dictionary = pm.parties[1]["groups"].duplicate()
 	var prof_inv := str(cm.province_profiles[inv])
 	cm._apply_invest_move(1, inv)
-	check("yatirim il aktivitesini artirir", near(cm.local_of(inv, 1), PublicOpinion.INVEST_LOCAL))
+	check("yatirim il aktivitesini artirir (hemen gelen pay)", near(cm.local_of(inv, 1), PublicOpinion.INVEST_LOCAL * Economy.INVEST_IMMEDIATE))
 	check("yatirim grup yakinligini degistirmez", str(pm.parties[1]["groups"]) == str(gi))
 	check("yatirim il profilini degistirmez", str(cm.province_profiles[inv]) == prof_inv)
 	cm._apply_invest_move(1, inv)

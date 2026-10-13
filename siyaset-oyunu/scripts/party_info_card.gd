@@ -186,6 +186,19 @@ static func _add_group_section(box: VBoxContainer, peer_id: int) -> void:
 		var delta := value - float(before[group]) if before.has(group) else 0.0
 		list.add_child(VoterGroupUI.affinity_row(group, value, float(bonuses.get(group, 0.0)), delta))
 	box.add_child(PopupKit.note("Destek, grubun ülkedeki nüfus payı değildir. ▲▼: son seçimden beri.", DIM, _text_width()))
+	# HÜKÜMETTE: ekonomi (vergi, büyüme, enflasyon) seçimde bu desteklere
+	# geçici olarak eklenir (kalıcı desteğe yazılmaz).
+	var mood := CardManager.economy_mood(pid)
+	if not mood.is_empty():
+		var share := CardManager.economy_share(pid)
+		box.add_child(PopupKit.section("Ekonomi etkisi", "başbakan" if share >= 1.0 else "ortak %%%d" % int(round(share * 100.0))))
+		var by_size: Array = mood.keys()
+		by_size.sort_custom(func(a, b): return absf(float(mood[a])) > absf(float(mood[b])))
+		for i in mini(4, by_size.size()):
+			box.add_child(VoterGroupUI.effect_row(String(by_size[i]), float(mood[by_size[i]])))
+		box.add_child(PopupKit.note("Vergi %s · ekonomi %d · enflasyon %s. Hükümetteyken seçimde grup desteğine eklenir; hükümetten çıkınca kalkar." % [
+			Economy.tax_title(CardManager.tax_level()), int(round(CardManager.economy_index())), Economy.percent_text(CardManager.inflation())],
+			DIM, _text_width()))
 
 ## Sarmalı notların genişliği (çerçeveli kartta iç boşluk düşülür).
 static func _text_width() -> float:

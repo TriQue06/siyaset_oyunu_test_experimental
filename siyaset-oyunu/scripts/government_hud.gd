@@ -201,6 +201,13 @@ static func _law_status_text(my_id: int, time_text: String) -> String:
 ## Bu oyuncunun oylamadaki yeri için EVET / HAYIR ipuçları.
 static func law_vote_hint(my_id: int) -> Dictionary:
 	var proposer := GovernmentManager.proposal_peer_id
+	if CardPresets.is_tax_law(GovernmentManager.proposal_law):
+		var level := CardPresets.tax_law_level(GovernmentManager.proposal_law)
+		var now := Economy.tax_title(CardManager.tax_level())
+		return {"yes": "EVET: vergi %s olur (gelir %s / dönem)" % [Economy.tax_title(level), Economy.money_full(CardManager.expected_revenue(level))],
+			"no": "HAYIR: vergi %s kalır" % now,
+			"short": "Vergi %s → %s: seçmen etkisini hükümet partileri taşır (ortaklar %%%d), %%%d'i hemen gelir" % [
+				now, Economy.tax_title(level), int(round(Economy.PARTNER_SHARE * 100.0)), int(round(Economy.TAX_IMMEDIATE * 100.0))]}
 	var no_text := "HAYIR: yasaya yakın illerde güç kaybı, zıt illerde kazanç"
 	if my_id == proposer:
 		return {"yes": "EVET: kabul edilirse yasanın etkisi 2 katına çıkar", "no": no_text,

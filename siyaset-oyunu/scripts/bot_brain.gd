@@ -250,6 +250,15 @@ static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 			best = {"type": "law", "law": law["law"]}
 			best_score = float(law["score"]) - law_cost * mana_value + law_noise
 
+	# VERGİ YASASI (sadece başbakanın partisi): aynı yasa hakkını kullanır.
+	var tax := _best_tax_law(bot)
+	if not tax.is_empty():
+		var tax_score := float(tax["score"]) - GameRules.LAW_MANA_COST * mana_value + _jitter(bot)
+		candidates.append({"type": "law", "law": tax["law"]})
+		if tax_score > best_score:
+			best = {"type": "law", "law": tax["law"]}
+			best_score = tax_score
+
 	# Anayasa teklifi yasa hakkını kullanır; o yüzden yasayla yarışır.
 	var constitution := _best_constitution(bot)
 	if not constitution.is_empty() and float(constitution["score"]) > best_score:
@@ -360,6 +369,70 @@ static func _best_law(bot: int) -> Dictionary:
 			best = {"law": law_type, "score": score}
 	return best
 
+## VERGİ SEZGİLERİ (oyuncuyla aynı kurallar ve aynı görünür bilgi: hazine,
+## vergi kademesi, seçim takvimi). Az ve anlaşılır kural:
+##   - Seçime TAX_CUT_LEAD turdan az kaldıysa vergi yüksek kalmaz (indirimin
+##     etkisi yavaş gelir: erken indirmek gerekir); hazine bolsa düşüğe iner.
+##   - Seçim uzaksa ve hazine yatırıma yetmiyorsa vergi artırılır (para biriktir).
+##   - Hazine çok dolduysa yüksek vergi normale iner; düşük vergi hazineyi
+##     eritiyorsa normale döner.
+const TAX_CUT_LEAD := 2
+const TAX_LAW_SCORE := 2.2
+const TAX_LOW_TREASURY := 2.0   # × yatırım bedeli
+const TAX_RICH_TREASURY := 6.0
+const TAX_CUT_TREASURY := 3.0
+
+## Bu turun sonunda seçim varsa 0; seçim yoksa 99.
+static func _rounds_to_election() -> int:
+	if CardManager.early_election_pending:
+		return 0
+	var next := GameRules.next_election_round(CardManager.round_number)
+	return 99 if next == -1 else next - CardManager.round_number
+
+static func _desired_tax() -> int:
+	var current := CardManager.tax_level()
+	var treasury := CardManager.state_treasury()
+	var cost := Economy.INVEST_COST
+	if _rounds_to_election() <= TAX_CUT_LEAD:
+		if current == Economy.TAX_HIGH:
+			return Economy.TAX_NORMAL
+		if current == Economy.TAX_NORMAL and treasury >= cost * TAX_CUT_TREASURY and _rounds_to_election() >= 1:
+			return Economy.TAX_LOW
+		return current
+	if treasury < cost * TAX_LOW_TREASURY:
+		return mini(Economy.TAX_HIGH, current + 1)
+	if current == Economy.TAX_HIGH and treasury > cost * TAX_RICH_TREASURY:
+		return Economy.TAX_NORMAL
+	if current == Economy.TAX_LOW and treasury < cost * TAX_CUT_TREASURY:
+		return Economy.TAX_NORMAL
+	return current
+
+## Başbakanın partisi bot ise vergi kademesini sezgiye göre değiştirmeyi önerir.
+static func _best_tax_law(bot: int) -> Dictionary:
+	if CardManager.party_of(bot) != GovernmentManager.main_gov_peer_id or not CardManager.can_propose_tax_law(bot):
+		return {}
+	var level := _desired_tax()
+	if level == CardManager.tax_level():
+		return {}
+	var law_type := CardPresets.tax_law_type(level)
+	if _law_pass_chance(bot, law_type) < 0.5:
+		return {}
+	return {"law": law_type, "score": TAX_LAW_SCORE}
+
+## Vergi yasasına oy: hükümet (genelde) destekler; ortak seçime yakın vergi
+## artırımına destek vermez (sonucunu o da taşır). Muhalefet artırıma HAYIR,
+## seçime yakın indirime HAYIR (iktidara kazanç bırakmaz), yoksa çekimser.
+static func _tax_law_vote(voter: int, law_type: String, proposer: int, gov_ids: Array) -> int:
+	var raising := CardPresets.tax_law_level(law_type) > CardManager.tax_level()
+	var soon := _rounds_to_election() <= TAX_CUT_LEAD
+	if gov_ids.has(voter):
+		if raising and soon and voter != proposer:
+			return GovernmentManager.VOTE_ABSTAIN
+		return GovernmentManager.VOTE_YES if gov_ids.has(proposer) else GovernmentManager.VOTE_NO
+	if raising:
+		return GovernmentManager.VOTE_NO
+	return GovernmentManager.VOTE_NO if _rounds_to_election() <= TAX_CUT_LEAD + 1 else GovernmentManager.VOTE_ABSTAIN
+
 ## Botun son sunduğu yasalar: aynı yasayı (ve karşıt grubun yasasını) üst üste sunmasın.
 static var _recent_laws: Dictionary = {}
 const RECENT_LAW_MEMORY := 4
@@ -421,6 +494,8 @@ static func _law_vote_value(voter: int, law_type: String, choice: int, proposer:
 	return value
 
 static func _best_law_vote(voter: int, law_type: String, proposer: int, gov_ids: Array) -> int:
+	if CardPresets.is_tax_law(law_type):
+		return _tax_law_vote(voter, law_type, proposer, gov_ids)
 	var best := GovernmentManager.VOTE_ABSTAIN
 	var best_value := 0.0
 	for choice in [GovernmentManager.VOTE_YES, GovernmentManager.VOTE_NO]:
@@ -588,9 +663,17 @@ static func _eval_miting(bot: int) -> Dictionary:
 
 ## Yatırım: yerel memnuniyet. Büyük, partiye uyumlu ve aktivitesi henüz
 ## tavana dayanmamış il (azalan getiri: il puanı LIMIT'te durur).
+## HAZİNE: seçim uzaksa bir yatırımlık yedek bırakır (hepsini harcamaz);
+## yatırımın kalan dilimleri seçimden sonraya kalacaksa değeri düşer.
 static func _eval_investment(bot: int) -> Dictionary:
-	if not CardManager.is_government_party(bot):
+	if not CardManager.is_government_party(bot) or CardManager.state_treasury() < Economy.INVEST_COST:
 		return {}
+	var left := _rounds_to_election()
+	var reserve := Economy.INVEST_COST if left > TAX_CUT_LEAD else 0.0
+	if CardManager.state_treasury() - Economy.INVEST_COST < reserve:
+		return {}
+	var timing := Economy.INVEST_IMMEDIATE + (1.0 - Economy.INVEST_IMMEDIATE) \
+		* minf(float(left), float(Economy.INVEST_DELAY_ROUNDS)) / float(Economy.INVEST_DELAY_ROUNDS)
 	var best_province := ""
 	var best_value := -INF
 	for province_id in _seats().keys():
@@ -601,7 +684,7 @@ static func _eval_investment(bot: int) -> Dictionary:
 			best_value = value
 			best_province = province_id
 	# İl başkanlığı ve mitingle aynı ölçek (vekil/30).
-	return {"score": 0.8 + best_value / 30.0 * 1.2 * (1.3 if _election_soon() else 1.0), "peer": -1, "province": best_province}
+	return {"score": (0.8 + best_value / 30.0 * 1.2 * (1.3 if _election_soon() else 1.0)) * timing, "peer": -1, "province": best_province}
 
 ## En büyük rakibi, en çok vekilli ve onun zayıf, botun güçlü olduğu ilde karala.
 static func _eval_propaganda(bot: int) -> Dictionary:

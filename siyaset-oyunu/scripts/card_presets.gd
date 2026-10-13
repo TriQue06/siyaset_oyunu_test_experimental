@@ -88,6 +88,9 @@ const CARD_TYPES: Array[String] = [
 ]
 
 const LAW_PREFIX := "law:"
+## VERGİ YASASI: "tax:dusuk" / "tax:normal" / "tax:yuksek" (bkz. Economy).
+## Grup yasası değildir (law_data boş); meclis akışı aynı.
+const TAX_PREFIX := "tax:"
 
 const CARD_NATIVE_SIZE := Vector2(72, 96)
 
@@ -242,7 +245,19 @@ func law_type(group: String) -> String:
 	return LAW_PREFIX + group
 
 func is_law_card(card_type: String) -> bool:
-	return not law_data(card_type).is_empty()
+	return not law_data(card_type).is_empty() or is_tax_law(card_type)
+
+func tax_law_type(level: int) -> String:
+	return TAX_PREFIX + Economy.tax_id(level)
+
+func is_tax_law(card_type: String) -> bool:
+	return tax_law_level(card_type) != -1
+
+## Vergi yasasının getireceği kademe (-1: vergi yasası değil).
+func tax_law_level(card_type: String) -> int:
+	if not card_type.begins_with(TAX_PREFIX):
+		return -1
+	return Economy.tax_level_of_id(card_type.substr(TAX_PREFIX.length()))
 
 ## {"group", "title", "group_title", "opposite", "problem"} ya da (yasa değilse) boş sözlük.
 func law_data(card_type: String) -> Dictionary:
@@ -298,6 +313,10 @@ func card_short_title(card_type: String) -> String:
 	return card_title(card_type).to_upper()
 
 func card_title(card_type: String) -> String:
+	# Grup yasalarıyla (ör. işverenlerin "Vergi İndirimi ve Yatırım Teşvik
+	# Yasası") karışmasın diye BÜTÇE yasası adını taşır.
+	if is_tax_law(card_type):
+		return "Bütçe Yasası: %s Vergi" % Economy.tax_title(tax_law_level(card_type))
 	if is_law_card(card_type):
 		return String(law_data(card_type)["title"])
 	match card_type:
@@ -333,6 +352,8 @@ func card_title(card_type: String) -> String:
 
 ## Yasanın hedef grubu: "İşçiler ve Sendikalar".
 func law_direction_text(card_type: String) -> String:
+	if is_tax_law(card_type):
+		return "vergi %s" % Economy.tax_title(tax_law_level(card_type))
 	var law := law_data(card_type)
 	if law.is_empty():
 		return ""
@@ -399,7 +420,8 @@ func _card_effect_text(card_type: String) -> String:
 		MITING_CARD_TYPE:
 			return "Seçtiğin ilde güç kazan (+%.0f); partin ilin kalabalık seçmen gruplarına yaklaşır (ulusal), karşıt gruplarda biraz kaybeder.\nİlin seçmeni sana uzaksa provokasyon riski var." % PublicOpinion.MITING_LOCAL
 		INVEST_CARD_TYPE:
-			return "Hükümet: seçtiğin ile yatırım (yerel memnuniyet, grup yakınlığını değiştirmez).\nSen +%.0f, ortakların +%.1f güç kazanır." % [PublicOpinion.INVEST_LOCAL, PublicOpinion.INVEST_PARTNER_LOCAL]
+			return "Hükümet: seçtiğin ile devlet hazinesinden yatırım (%s; yerel memnuniyet, grup yakınlığını değiştirmez).\nSen +%.0f, ortakların +%.1f güç kazanır: yarısı hemen, kalanı sonraki %d dönemde." % [
+				Economy.money_full(Economy.INVEST_COST), PublicOpinion.INVEST_LOCAL, PublicOpinion.INVEST_PARTNER_LOCAL, Economy.INVEST_DELAY_ROUNDS]
 		PROPAGANDA_CARD_TYPE:
 			return "Bir ilde bir partiyi karala: ona eksi, sana artı.\nİlde güçlü olan partiye az işler."
 		POPULISM_CARD_TYPE:

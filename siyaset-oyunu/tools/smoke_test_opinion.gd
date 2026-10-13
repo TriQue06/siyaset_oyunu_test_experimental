@@ -168,11 +168,11 @@ func _initialize() -> void:
 	cm.local_support = {}
 	cm.national_support = {}
 	cm._apply_invest_move(1, TestProvinces.id("izmir"))
-	check("yatirim hamlesi 3 mana", cm.mana_of(1) == 100 - GameRules.INVEST_MANA_COST)
-	check("getiren parti il +3", near(cm.local_of(TestProvinces.id("izmir"), 1), PublicOpinion.INVEST_LOCAL))
-	check("ortak il +1.5", near(cm.local_of(TestProvinces.id("izmir"), 2), PublicOpinion.INVEST_PARTNER_LOCAL))
+	check("yatirim hamlesi mana bedeli", cm.mana_of(1) == 100 - GameRules.INVEST_MANA_COST)
+	check("getiren parti il: etkinin hemen gelen payi", near(cm.local_of(TestProvinces.id("izmir"), 1), PublicOpinion.INVEST_LOCAL * Economy.INVEST_IMMEDIATE))
+	check("ortak il: hemen gelen pay", near(cm.local_of(TestProvinces.id("izmir"), 2), PublicOpinion.INVEST_PARTNER_LOCAL * Economy.INVEST_IMMEDIATE))
 	check("muhalefet etkilenmez", near(cm.local_of(TestProvinces.id("izmir"), 3), 0.0))
-	check("getiren parti ulusal +INVEST_NATIONAL (ekonomik yansima)", near(cm.national_of(1), PublicOpinion.INVEST_NATIONAL))
+	check("yatirim ayrica ulusal puan yazmaz (ekonomi ivmesi uzerinden)", near(cm.national_of(1), 0.0))
 	check("yatirim grup yakinligina dokunmaz", str(pm.parties[1]["groups"]) == str(groups(["isci", "dindar"])))
 	check("yatirim destede degil (hamle)", not cm._draw_weights(1).has("yatirim"))
 

@@ -230,6 +230,8 @@ func _initialize() -> void:
 		if int(cm.organizations[province_id].get(me, 0)) > 0:
 			any_org = true
 	check("fesih: teşkilatlar silindi", not any_org)
+	var snapshot: Dictionary = cm.former_parties.get(me, {}).get("orgs", {})
+	check("fesih: dağılan teşkilatlar eski parti kaydında", cm.former_parties.has(me) and not snapshot.is_empty(), str(cm.former_parties.get(me, {})))
 	check("bağımsız her ilde miting yapabilir", cm.can_miting(me, String(root.get_node("GameMap").province_ids()[5])) or cm.mana_of(me) < GameRules.MITING_MANA_COST)
 	check("bağımsız teşkilat kuramaz", not cm.can_build_organization(me, String(root.get_node("GameMap").province_ids()[5])))
 	check("blok oy vermez", not gm.voter_ids().has(pm.BLOC_ID))
@@ -254,14 +256,81 @@ func _initialize() -> void:
 	check("bağımsız mitingi güvenilirlik kazandırır", cm.credibility_of(me) > 60.0)
 	give_turn(me)
 	cm.mana[me] = 90.0
+	var expect_moved: int = cm.former_org_count(me)
+	var expect_share: float = cm.former_org_share(me)
+	check("geçiş payı %10-%90 arasında", expect_share >= 0.1 and expect_share <= 0.9 and expect_moved >= 1, "%.2f / %d" % [expect_share, expect_moved])
 	cm.found_party({"name": "Doğru Yol", "icon_index": 4, "bg_color": free_color(me)})
 	check("bağımsız parti kurdu (80 mana)", not pm.is_independent(me) and pm.parties[me]["name"] == "Doğru Yol"
 		and is_equal_approx(cm.mana_of(me), 10.0), str(cm.mana_of(me)))
 	var opened := 0
 	for province_id in cm.organizations.keys():
 		opened += int(cm.organizations[province_id].get(me, 0))
-	check("güvenilirliğe göre miting yaptığı illerde teşkilatla başladı", int(cm.organizations.get(p1, {}).get(me, 0)) == 1
-		and opened <= mini(cm.FOUND_ORG_MAX, int(cm.credibility_of(me) / cm.FOUND_ORG_PER_CREDIBILITY)), str(opened))
+	check("güvenilirliğe göre miting yaptığı illerde teşkilatla başladı", int(cm.organizations.get(p1, {}).get(me, 0)) >= 1)
+	var inherited := 0
+	for province_id in snapshot.keys():
+		if int(cm.organizations.get(province_id, {}).get(me, 0)) >= int(snapshot[province_id]):
+			inherited += 1
+	check("feshedilen partinin teşkilatlarından payı kadarı geri geldi", inherited >= expect_moved and not cm.former_parties.has(me),
+		"%d / %d" % [inherited, expect_moved])
+
+	print("=== ESKİ PARTİDEN TEŞKİLAT GEÇİŞİ ===")
+	var donor := -1
+	for bot in mm.bot_ids():
+		var n := 0
+		for province_id in cm.organizations.keys():
+			if int(cm.organizations[province_id].get(int(bot), 0)) > 0:
+				n += 1
+		if pm.is_leader(int(bot)) and not pm.is_independent(int(bot)):
+			donor = int(bot)
+	if donor != -1:
+		# Eski partinin 6 ilde teşkilatı olsun (geçiş oranı ölçülebilsin).
+		var ids: Array = root.get_node("GameMap").province_ids()
+		for k in 6:
+			var pid_k := String(ids[10 + k])
+			if not cm.organizations.has(pid_k):
+				cm.organizations[pid_k] = {}
+			cm.organizations[pid_k][donor] = 1 + k % 2
+	check("teşkilatlı bir bot partisi var", donor != -1)
+	if donor != -1:
+		var round_now: int = cm.round_number
+		cm.former_parties[me] = {"party": donor, "name": "Eski", "round": round_now}
+		var fresh: float = cm.former_org_share(me)
+		cm.former_parties[me]["round"] = round_now - 8
+		var late: float = cm.former_org_share(me)
+		check("ayrılıştan beri zaman geçtikçe pay azalır", late < fresh, "%.2f -> %.2f" % [fresh, late])
+		cm.former_parties[me]["round"] = round_now
+		var nat_before: float = cm.national_of(me)
+		cm.national_support[me] = 5.0
+		var popular: float = cm.former_org_share(me)
+		cm.national_support[me] = -5.0
+		var unpopular: float = cm.former_org_share(me)
+		cm.national_support[me] = nat_before
+		check("ulusal destek payı artırır", popular > unpopular, "%.2f / %.2f" % [popular, unpopular])
+		gm.scores[me] = 0
+		var low_score: float = cm.former_org_share(me)
+		gm.scores[me] = 30
+		check("geçmiş başarı (puan) payı artırır", cm.former_org_share(me) > low_score)
+		cm.national_support[me] = -50.0
+		cm.credibility[me] = 0.0
+		cm.former_parties[me]["round"] = round_now - 40
+		gm.scores[me] = 0
+		check("pay en az %10", is_equal_approx(cm.former_org_share(me), cm.FORMER_ORG_MIN))
+		cm.national_support[me] = 50.0
+		cm.credibility[me] = 100.0
+		cm.former_parties[me]["round"] = round_now
+		gm.scores[me] = 100
+		check("pay en fazla %90", is_equal_approx(cm.former_org_share(me), cm.FORMER_ORG_MAX))
+		cm.national_support[me] = nat_before
+		var source: Dictionary = cm.former_org_source(me)
+		var count: int = cm.former_org_count(me)
+		var moved: Array = cm._transfer_former_orgs(me)
+		var left := 0
+		for province_id in source.keys():
+			if int(cm.organizations[province_id].get(donor, 0)) > 0:
+				left += 1
+		check("süren partiden teşkilatlar kopar (taşınır)", int(moved[0]) == count and left == source.size() - count,
+			"%d taşındı, %d kaldı / %d" % [int(moved[0]), left, source.size()])
+		cm.former_parties.erase(me)
 	check("bağımsız sandalyesi partiye geçti", int(cm.last_seats.get(me, 0)) == 1)
 
 	print("=== GEÇİCİ PARTİLER ===")

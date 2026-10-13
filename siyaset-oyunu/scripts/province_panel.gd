@@ -48,17 +48,46 @@ func _fit() -> void:
 	size = Vector2(panel_width, minf(wanted, maxf(140.0, _max_height)))
 
 func show_province(id: String) -> void:
+	var same := id == province_id and _body != null and is_instance_valid(_body)
 	province_id = id
-	refresh()
+	if same:
+		refresh()
+	else:
+		_rebuild()
 	show()
 
+## Durum değişince (başkaları hamle yaptıkça) çağrılır. Aynı il açıkken panel
+## baştan kurulmaz: sadece kaydırılan içerik yenilenir, kaydırma kutusu yerinde
+## kaldığı için oyuncunun kaydırdığı yer korunur (en üste zıplamaz).
 func refresh() -> void:
+	if province_id == "" or not is_inside_tree():
+		return
+	if _body == null or not is_instance_valid(_body) or _built_for != province_id:
+		_rebuild()
+		return
+	var keep := _scroll.scroll_vertical
+	for child in _body.get_children():
+		_body.remove_child(child)
+		child.queue_free()
+	PopupKit.embedded = embedded_mode
+	_build_sections()
+	PopupKit.embedded = false
+	_scroll.scroll_vertical = keep
+	if is_visible_in_tree():
+		_fit.call_deferred()
+		_restore_scroll.call_deferred(keep)
+
+## Bu panelin içeriğinin kurulduğu il (başka ile geçince baştan kurulur).
+var _built_for: String = ""
+
+## Paneli baştan kurar (yeni il): başlık, kaydırma kutusu ve bölümler.
+func _rebuild() -> void:
 	if province_id == "" or not is_inside_tree():
 		return
 	for child in get_children():
 		remove_child(child)
 		child.queue_free()
-	var me := multiplayer.get_unique_id()
+	_built_for = province_id
 	PopupKit.embedded = embedded_mode
 	var parts := PopupKit.frame(panel_width, UiTheme.PANEL_LIGHT, self)
 	var root: VBoxContainer = parts[1]
@@ -82,7 +111,13 @@ func refresh() -> void:
 	_body.add_theme_constant_override("separation", PopupKit.GAP)
 	_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	gutter.add_child(_body)
+	_build_sections()
+	PopupKit.embedded = false
+	if is_visible_in_tree():
+		_fit.call_deferred()
 
+func _build_sections() -> void:
+	var me := multiplayer.get_unique_id()
 	_build_profile()
 	if PartyManager.parties.has(CardManager.party_of(me)):
 		_build_appeal(me)
@@ -90,9 +125,12 @@ func refresh() -> void:
 		_build_own(me)
 	_build_last_election(me)
 	_build_events()
-	PopupKit.embedded = false
-	if is_visible_in_tree():
-		_fit.call_deferred()
+
+## İçerik yeniden ölçülünce kaydırma sınırı geçici olarak küçülebilir:
+## konum bir kez daha yazılır.
+func _restore_scroll(value: int) -> void:
+	if value > 0 and _scroll != null and is_instance_valid(_scroll):
+		_scroll.scroll_vertical = value
 
 func _build_intel(me: int) -> void:
 	var level := CardManager.organization_level(province_id, me)

@@ -222,6 +222,8 @@ var _province_panel: ProvincePanel
 ## yerine sol panelde açılır; ✕ ile kapanınca hükümet ve log geri gelir.
 var _left_dock: Panel
 var _profile_scroll: ScrollContainer
+## Profil panelinde gösterilen parti (aynı parti tazelenirken kaydırma korunur).
+var _profile_scroll_peer: int = -1
 ## Hedef seçme modundayken üstte görünen yönerge ("... sağ tık: iptal").
 var _target_hint: Label
 ## Eldeki bir kartın üstüne gelince çıkan açıklama kutusu.
@@ -2952,8 +2954,12 @@ func _show_tooltip_for(peer_id: int) -> void:
 		_province_panel.hide()
 	var keep_scroll := 0
 	if _profile_scroll != null:
-		keep_scroll = _profile_scroll.scroll_vertical
+		# Aynı partinin profili tazeleniyorsa kaydırılan yer korunur; başka
+		# partiye geçince en üstten başlar.
+		if _profile_scroll_peer == peer_id:
+			keep_scroll = _profile_scroll.scroll_vertical
 		_profile_scroll.queue_free()
+	_profile_scroll_peer = peer_id
 	_profile_scroll = ScrollContainer.new()
 	_profile_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_left_dock.add_child(_profile_scroll)

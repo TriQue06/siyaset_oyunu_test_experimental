@@ -876,6 +876,7 @@ func init_game() -> void:
 	group_meetings = {}
 	miting_fatigue = {}
 	election_groups = {}
+	former_parties = {}
 	national_list = {}
 	round_number = 1
 	last_election_round = 0
@@ -997,6 +998,7 @@ func abandon_game() -> void:
 	group_meetings = {}
 	miting_fatigue = {}
 	election_groups = {}
+	former_parties = {}
 	organizations = {}
 	turmoil = {}
 	splinters = {}
@@ -2400,6 +2402,29 @@ const MITING_CREDIBILITY := 3.0
 ## yapılan en güçlü illerden birinde 1. seviye teşkilat (en fazla FOUND_ORG_MAX).
 const FOUND_ORG_PER_CREDIBILITY := 25.0
 const FOUND_ORG_MAX := 4
+## ESKİ PARTİDEN TEŞKİLAT GEÇİŞİ: partisinden istifa eden ya da partisini
+## feshedip bağımsız kalan siyasetçi yeni parti kurunca eski partisinin
+## teşkilatlarının bir kısmı (seviyeleriyle) yeni partiye geçer:
+##   pay = 0,5 + süre + başarı + ulusal destek + güvenilirlik (%10..%90)
+##   süre       : +0,2 − 0,05 × ayrılıştan beri geçen tur (en az −0,25)
+##   başarı     : siyasetçinin puanı / 100 (en fazla +0,25)
+##   ulusal     : ulusal destek × 0,04 (−0,2..+0,2)
+##   güvenilirlik: (güvenilirlik − 50) / 500 (−0,1..+0,1)
+## Eski parti sürüyorsa teşkilatlar ondan KOPAR (taşınır); feshedildiyse
+## dağılan teşkilatlar yeniden toplanır.
+const FORMER_ORG_BASE := 0.5
+const FORMER_ORG_FRESH := 0.2
+const FORMER_ORG_PER_ROUND := 0.05
+const FORMER_ORG_TIME_MIN := -0.25
+const FORMER_ORG_SCORE_DIV := 100.0
+const FORMER_ORG_SCORE_MAX := 0.25
+const FORMER_ORG_NATIONAL := 0.04
+const FORMER_ORG_NATIONAL_MAX := 0.2
+const FORMER_ORG_MIN := 0.1
+const FORMER_ORG_MAX := 0.9
+## Bağımsız siyasetçi -> {"party": eski parti, "name": adı, "round": ayrıldığı
+## tur, "orgs": {il: seviye} (sadece parti feshedildiyse: dağılan teşkilatlar)}.
+var former_parties: Dictionary = {}
 
 # Sorgular (arayüz ve host doğrulaması) -------------------------------------------
 
@@ -2415,6 +2440,72 @@ func can_resign(peer_id: int) -> bool:
 
 func can_found_party(peer_id: int) -> bool:
 	return can_choose_main_action(peer_id) and PartyManager.is_independent(peer_id) and mana_of(peer_id) >= FOUND_PARTY_COST
+
+## Yeni parti kurulursa eski partiden geçecek teşkilat payı (0 = eski parti yok).
+func former_org_share(peer_id: int) -> float:
+	var info: Dictionary = former_parties.get(peer_id, {})
+	if info.is_empty() or former_org_source(peer_id).is_empty():
+		return 0.0
+	var rounds := maxi(0, round_number - int(info.get("round", round_number)))
+	var share := FORMER_ORG_BASE
+	share += maxf(FORMER_ORG_TIME_MIN, FORMER_ORG_FRESH - FORMER_ORG_PER_ROUND * rounds)
+	share += clampf(float(GovernmentManager.score_of(peer_id)) / FORMER_ORG_SCORE_DIV, 0.0, FORMER_ORG_SCORE_MAX)
+	share += clampf(national_of(peer_id) * FORMER_ORG_NATIONAL, -FORMER_ORG_NATIONAL_MAX, FORMER_ORG_NATIONAL_MAX)
+	share += clampf((credibility_of(peer_id) - 50.0) / 500.0, -0.1, 0.1)
+	return clampf(share, FORMER_ORG_MIN, FORMER_ORG_MAX)
+
+## Eski partinin şu an devralınabilecek teşkilatları: il -> seviye.
+func former_org_source(peer_id: int) -> Dictionary:
+	var info: Dictionary = former_parties.get(peer_id, {})
+	if info.is_empty():
+		return {}
+	if info.has("orgs"):
+		return info["orgs"]
+	var pid := int(info.get("party", -1))
+	if not PartyManager.parties.has(pid) or PartyManager.is_independent(pid):
+		return {}
+	var result := {}
+	for province_id in organizations.keys():
+		var level := int(organizations[province_id].get(pid, 0))
+		if level > 0:
+			result[province_id] = level
+	return result
+
+## Yeni parti kurulunca geçecek teşkilat sayısı (arayüz önizlemesi için).
+func former_org_count(peer_id: int) -> int:
+	var total := former_org_source(peer_id).size()
+	if total == 0:
+		return 0
+	return clampi(int(round(former_org_share(peer_id) * total)), 1, total)
+
+## Ayrılan siyasetçinin eski partisini kaydeder. dissolved_orgs: fesihte
+## dağılan teşkilatlar (parti sürüyorsa boş).
+func _remember_former_party(peer_id: int, pid: int, dissolved_orgs: Dictionary = {}) -> void:
+	var info := {"party": pid, "name": _party_name(pid), "round": round_number}
+	if not dissolved_orgs.is_empty() or pid == peer_id:
+		info["orgs"] = dissolved_orgs
+	former_parties[peer_id] = info
+
+## Eski partinin teşkilatlarından payı kadarını yeni partiye taşır.
+## Dönüş: [geçen sayı, toplam, pay].
+func _transfer_former_orgs(peer_id: int) -> Array:
+	var source := former_org_source(peer_id)
+	var share := former_org_share(peer_id)
+	var count := former_org_count(peer_id)
+	var info: Dictionary = former_parties.get(peer_id, {})
+	var old_pid := int(info.get("party", -1))
+	var dissolved := info.has("orgs")
+	var ids: Array = source.keys()
+	ids.sort()
+	_shuffle(ids)
+	for i in count:
+		var province_id := String(ids[i])
+		if not organizations.has(province_id):
+			organizations[province_id] = {}
+		organizations[province_id][peer_id] = maxi(int(organizations[province_id].get(peer_id, 0)), int(source[province_id]))
+		if not dissolved:
+			organizations[province_id].erase(old_pid)
+	return [count, source.size(), share]
 
 func credibility_add(peer_id: int, amount: float) -> void:
 	credibility[peer_id] = clampf(credibility_of(peer_id) + amount, 0.0, CREDIBILITY_MAX)
@@ -2495,8 +2586,12 @@ func _apply_dissolve(peer_id: int) -> void:
 	last_vote_shares.erase(pid)
 	previous_vote_shares.erase(pid)
 	passed_threshold.erase(pid)
+	var dissolved_orgs := {}
 	for province_id in organizations.keys():
+		if int(organizations[province_id].get(pid, 0)) > 0:
+			dissolved_orgs[province_id] = int(organizations[province_id][pid])
 		organizations[province_id].erase(pid)
+	_remember_former_party(peer_id, pid, dissolved_orgs)
 	for province_id in local_support.keys():
 		local_support[province_id].erase(pid)
 	national_support[pid] = national_of(pid) * DISSOLVE_NATIONAL_KEEP
@@ -2520,6 +2615,7 @@ func _apply_resign(peer_id: int) -> void:
 	var pid := party_of(peer_id)
 	var party_name := _party_name(pid)
 	var groups := PartyManager.groups_of(pid).duplicate()
+	_remember_former_party(peer_id, pid)
 	PartyManager.parties[pid].erase("deputy")
 	_make_independent(peer_id, groups)
 	national_support[peer_id] = 0.0
@@ -2638,6 +2734,11 @@ func _dissolve_temporary_party(pid: int) -> void:
 	var deputy := PartyManager.deputy_of(pid)
 	if deputy != -1:
 		# Yardımcısı (bir oyuncu) varsa parti feshedilince o bağımsız kalır.
+		var temp_orgs := {}
+		for province_id in organizations.keys():
+			if int(organizations[province_id].get(pid, 0)) > 0:
+				temp_orgs[province_id] = int(organizations[province_id][pid])
+		_remember_former_party(deputy, pid, temp_orgs)
 		_make_independent(deputy, PartyManager.groups_of(pid).duplicate())
 	for table in [national_support, populism, turmoil, law_rounds, speech_rounds, congress_rounds,
 			group_meetings, miting_fatigue, election_groups,
@@ -2732,9 +2833,16 @@ func _apply_found(peer_id: int, data: Dictionary) -> void:
 		if int(organizations[province_id].get(peer_id, 0)) < 1:
 			organizations[province_id][peer_id] = 1
 			opened.append(_province_name(province_id))
+	# Eski partinin teşkilatlarından bir kısmı yeni partiye geçer.
+	var former: Dictionary = former_parties.get(peer_id, {})
+	var moved := _transfer_former_orgs(peer_id) if not former.is_empty() else [0, 0, 0.0]
+	former_parties.erase(peer_id)
 	PartyManager.broadcast()
 	var text := "%s, %s'yi kurdu. Bağımsızken kazandığı destek yeni partisine geçti." % [
 		PoliticianPresets.display_name(peer_id), info["name"]]
+	if int(moved[0]) > 0:
+		text += " %s'nin %d teşkilatından %d tanesi (%%%d) yeni partiye geçti." % [String(former.get("name", "eski parti")),
+			int(moved[1]), int(moved[0]), int(round(float(moved[2]) * 100.0))]
 	if not opened.is_empty():
 		text += " Miting yaptığı illerde teşkilatla başlıyor: %s." % ", ".join(PackedStringArray(opened))
 	_push_state({"type": "party_change", "peer_id": peer_id, "message": text}, true)
@@ -3113,6 +3221,9 @@ func _rekey_party(old_id: int, new_id: int, new_member: int) -> void:
 	if splinters.has(old_id):
 		splinters[new_id] = splinters[old_id]
 		splinters.erase(old_id)
+	for politician in former_parties.keys():
+		if int(former_parties[politician].get("party", -1)) == old_id:
+			former_parties[politician]["party"] = new_id
 	for splinter in splinters.keys():
 		if int(splinters[splinter].get("parent", -1)) == old_id:
 			splinters[splinter]["parent"] = new_id
@@ -3158,6 +3269,7 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"group_meetings": group_meetings,
 		"miting_fatigue": miting_fatigue,
 		"election_groups": election_groups,
+		"former_parties": former_parties,
 		"mana": mana,
 		"game_finished": game_finished,
 		"final_ranking": final_ranking,
@@ -3206,6 +3318,7 @@ func _apply_state(state: Dictionary) -> void:
 	group_meetings = state.get("group_meetings", {})
 	miting_fatigue = state.get("miting_fatigue", {})
 	election_groups = state.get("election_groups", {})
+	former_parties = state.get("former_parties", {})
 	mana = state.get("mana", {})
 	game_finished = bool(state["game_finished"])
 	final_ranking = state["final_ranking"]

@@ -54,6 +54,13 @@ func _initialize() -> void:
 		panel._scroll.scroll_vertical = 420
 		await _frames(5)
 		_shot("vg_province_mid")
+		# Başkası hamle yapınca panel tazelenir: kaydırılan yer korunmalı.
+		var before: int = panel._scroll.scroll_vertical
+		cm._add_local(province, me, 1.0)
+		cm.opinion_changed.emit()
+		scene._on_opinion_changed()
+		await _frames(5)
+		print("KAYDIRMA KORUNDU: %s (%d -> %d)" % [str(before > 0 and panel._scroll.scroll_vertical == before), before, panel._scroll.scroll_vertical])
 		panel._scroll.scroll_vertical = 900
 		await _frames(5)
 		_shot("vg_province_bottom")

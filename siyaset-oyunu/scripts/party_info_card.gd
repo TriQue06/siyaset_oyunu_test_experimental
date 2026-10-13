@@ -90,6 +90,12 @@ static func _actions(peer_id: int, my_id: int, on_action: Callable) -> Control:
 		list.append(["Yeni Parti Kur · %d mana" % CardManager.FOUND_PARTY_COST, "found", CardManager.can_found_party(my_id), false])
 		notes.append("Bağımsızken her yerde teşkilatsız miting yapabilirsin; mitingler güvenilirliğini artırır. Parti kurduğunda güvenilirliğin kadar ilde teşkilatla başlarsın (şu an %d il)." %
 			mini(CardManager.FOUND_ORG_MAX, int(CardManager.credibility_of(my_id) / CardManager.FOUND_ORG_PER_CREDIBILITY)))
+		var former: Dictionary = CardManager.former_parties.get(my_id, {})
+		var moving := CardManager.former_org_count(my_id)
+		if moving > 0:
+			notes.append("Eski partin %s'nin %d teşkilatından şu an %d tanesi (%%%d) yeni partine geçer. Pay ayrılıştan beri geçen süre (her tur azalır), puanın, ulusal desteğin ve güvenilirliğinle belirlenir (%%10-90)." % [
+				String(former.get("name", "")), CardManager.former_org_source(my_id).size(), moving,
+				int(round(CardManager.former_org_share(my_id) * 100.0))])
 	elif CardManager.is_party_member(my_id):
 		list.append(["Kongre İste · %d mana" % CardManager.CONGRESS_REQUEST_COST, "congress", CardManager.can_request_congress(my_id), false])
 		list.append(["Partiden İstifa Et", "resign", CardManager.can_resign(my_id), true])

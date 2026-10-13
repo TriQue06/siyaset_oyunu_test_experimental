@@ -148,20 +148,16 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 8
 
-[node name="VoteYesButton" type="TextureButton" parent="BottomArea/ChamberSplit/ParliamentChamber/ParliamentVBox/VoteButtonRow" unique_id=3821004462]
+[node name="VoteYesButton" type="Button" parent="BottomArea/ChamberSplit/ParliamentChamber/ParliamentVBox/VoteButtonRow" unique_id=3821004462]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
-ignore_texture_size = true
-stretch_mode = 0
 texture_filter = 1
 
-[node name="VoteNoButton" type="TextureButton" parent="BottomArea/ChamberSplit/ParliamentChamber/ParliamentVBox/VoteButtonRow" unique_id=3821004463]
+[node name="VoteNoButton" type="Button" parent="BottomArea/ChamberSplit/ParliamentChamber/ParliamentVBox/VoteButtonRow" unique_id=3821004463]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
-ignore_texture_size = true
-stretch_mode = 0
 texture_filter = 1
 
 [node name="ProposalLabel" type="Label" parent="BottomArea/ChamberSplit/ParliamentChamber/ParliamentVBox" unique_id=3821004464]

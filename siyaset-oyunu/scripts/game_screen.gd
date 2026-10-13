@@ -92,6 +92,8 @@ const BADGE_ICON_PIXEL_SIZE := 64
 const CARD_DISPLAY_SCALE := 4.0 / 3.0
 ## Kart üstündeki bant/rozet ölçüleri 2 kat büyük karta göre yazılmıştı;
 ## hepsi bu oranla küçülüyor ki kartla orantılı kalsınlar.
+const CARD_TITLE_SIZE := 12
+const CARD_TITLE_MIN_SIZE := 8
 const CARD_ART_RATIO := CARD_DISPLAY_SCALE / 2.0
 const CARD_DISPLAY_SIZE := Vector2(72, 96) * CARD_DISPLAY_SCALE
 const CARD_LIFT := -14.0
@@ -158,8 +160,8 @@ var _constitution_info: Label
 @onready var parliament_diagram: ParliamentDiagram = %ParliamentDiagram
 @onready var game_settings_label: Label = %GameSettingsLabel
 @onready var bottom_area: Control = %BottomArea
-@onready var vote_yes_button: TextureButton = %VoteYesButton
-@onready var vote_no_button: TextureButton = %VoteNoButton
+@onready var vote_yes_button: Button = %VoteYesButton
+@onready var vote_no_button: Button = %VoteNoButton
 @onready var proposal_label: Label = %ProposalLabel
 ## DÜZ Panel (PanelContainer değil): içeriği ne kadar büyürse büyüsün
 ## genişliği 260'ta SABİT kalsın, parlamento diyagramının üstüne binmesin.
@@ -405,16 +407,11 @@ func _ready() -> void:
 	vote_yes_button.pressed.connect(_on_vote_pressed.bind(GovernmentManager.VOTE_YES))
 	vote_no_button.pressed.connect(_on_vote_pressed.bind(GovernmentManager.VOTE_NO))
 	_abstain_button = Button.new()
-	_abstain_button.text = L.t("Çekimser")
-	# DAR SÜTUNDA DA SIĞSIN: oy sırası eskiden satır genişliğinden taşıp sol
-	# panelin altına kayıyordu (EVET butonu panelin arkasında kalıyordu).
-	# Satır artık sütunu FILL ediyor, çekimser butonu da kalan yeri alıp
-	# gerekirse yazısını kırpıyor.
-	_abstain_button.custom_minimum_size = Vector2(44, 42)
-	_abstain_button.add_theme_font_size_override("font_size", 10)
-	_abstain_button.clip_text = true
-	_abstain_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	UiSkin.skin_button(_abstain_button)
+	# OY DÜĞMELERİ: simge üstte, ad altta; EVET yeşil, ÇEKİMSER sarı, HAYIR
+	# kırmızı. DAR SÜTUNDA DA SIĞSIN: üçü satırı eşit paylaşır.
+	_style_vote_button(vote_yes_button, L.t("EVET"), "evet", UiTheme.GREEN_DARK)
+	_style_vote_button(_abstain_button, L.t("ÇEKİMSER"), "cekimser", UiTheme.GOLD_DIM)
+	_style_vote_button(vote_no_button, L.t("HAYIR"), "hayir", UiTheme.RED_DARK)
 	_abstain_button.pressed.connect(_on_vote_pressed.bind(GovernmentManager.VOTE_ABSTAIN))
 	vote_yes_button.get_parent().add_child(_abstain_button)
 	vote_yes_button.get_parent().move_child(_abstain_button, vote_yes_button.get_index() + 1)
@@ -1758,6 +1755,8 @@ func _refresh_trash_button() -> void:
 	_trash_panel.modulate.a = 1.0 if usable else 0.35
 
 func _refresh_pass_button() -> void:
+	if pass_button.icon == null:
+		UiSkin.set_side_icon(pass_button, "turu_gec", 16)
 	pass_button.disabled = not CardManager.can_act()
 	pass_button.text = L.t("Turu Bitir")
 	# Para bittiyse tur kendiliğinden geçmez; buton nabız gibi atarak hatırlatır.
@@ -1870,6 +1869,7 @@ func _build_hand_card(card_type: String, hand_index: int) -> Control:
 	holder.set_meta("hand_index", hand_index)
 
 	var shadow := TextureRect.new()
+	shadow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	shadow.texture = CardPresets.get_card_texture(card_type)
 	shadow.size = CARD_DISPLAY_SIZE
 	shadow.position = SHADOW_OFFSET
@@ -1879,12 +1879,27 @@ func _build_hand_card(card_type: String, hand_index: int) -> Control:
 	holder.add_child(shadow)
 
 	var card := TextureRect.new()
+	card.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	card.texture = CardPresets.get_card_texture(card_type)
 	card.size = CARD_DISPLAY_SIZE
 	card.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	card.set_meta("is_click_target", true)
 	holder.add_child(card)
+
+	# TAM GÖRSELLİ KART: görsel kartı kaplar (2:3 görsel 3:4 karta kırpılır),
+	# ad alttaki karartmada, bedel sol üstte, kenar görselin ortalama renginde.
+	if CardPresets.has_full_art(card_type):
+		for art: TextureRect in [card, shadow]:
+			art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+			art.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		holder.add_child(_card_art_title(card_type, CardManager.my_inventory().size() * CARD_DISPLAY_SIZE.x > _r(R_HAND).size.x))
+		holder.add_child(_card_art_edge(CardPresets.art_edge_color(card_type)))
+		var art_badge := _card_cost_badge(CardPresets.card_cost(card_type))
+		art_badge.position = Vector2(4.0, 4.0)
+		holder.add_child(art_badge)
+		_wire_hand_card(wrapper, holder, card, card_type, hand_index)
+		return wrapper
 
 	# KART YÜZÜ: türün renginde zemin + büyük simge (gövdenin sol yarısında:
 	# kartlar üst üste binince de görünür).
@@ -1898,7 +1913,11 @@ func _build_hand_card(card_type: String, hand_index: int) -> Control:
 	# Kartlar üst üste biniyorsa başlık sola yaslanır (görünen şeritte okunur).
 	holder.add_child(_card_title_banner(card_type, CardManager.my_inventory().size() * CARD_DISPLAY_SIZE.x > _r(R_HAND).size.x))
 	holder.add_child(_card_cost_badge(CardPresets.card_cost(card_type)))
+	_wire_hand_card(wrapper, holder, card, card_type, hand_index)
+	return wrapper
 
+## El kartının tık / sürükleme / üstüne gelme davranışı (iki kart yüzü için ortak).
+func _wire_hand_card(wrapper: Control, holder: Control, card: Control, card_type: String, hand_index: int) -> void:
 	# TIK ve SÜRÜKLEME: basılı tutup TAP_MAX_MOVE_PX'ten fazla kaydırınca
 	# sürükleme başlar (kartın kopyası imleci izler, bırakınca hedefe göre
 	# oynanır — bkz. _drop_target). Kaydırmadan bırakmak TIK sayılır.
@@ -1939,7 +1958,91 @@ func _build_hand_card(card_type: String, hand_index: int) -> Control:
 
 	wrapper.add_child(holder)
 	_hand_holders.append(holder)
-	return wrapper
+
+## Tam görselli kartın adı: alttaki koyu geçişin üstünde, iki satıra kadar.
+## Kartlar üst üste binince sola yaslanır (görünen şeritte okunur).
+func _card_art_title(card_type: String, crowded: bool) -> Control:
+	var box := Control.new()
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var height := CARD_DISPLAY_SIZE.y * 0.42
+	box.position = Vector2(0.0, CARD_DISPLAY_SIZE.y - height)
+	box.size = Vector2(CARD_DISPLAY_SIZE.x, height)
+	var shade := TextureRect.new()
+	var grad := Gradient.new()
+	grad.set_color(0, Color(0.03, 0.02, 0.08, 0.0))
+	grad.set_color(1, Color(0.03, 0.02, 0.08, 0.92))
+	grad.add_point(0.5, Color(0.03, 0.02, 0.08, 0.75))
+	var tex := GradientTexture2D.new()
+	tex.gradient = grad
+	tex.fill_from = Vector2(0, 0)
+	tex.fill_to = Vector2(0, 1)
+	tex.width = 4
+	tex.height = 64
+	shade.texture = tex
+	shade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	shade.stretch_mode = TextureRect.STRETCH_SCALE
+	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(shade)
+	var title := Label.new()
+	title.text = CardPresets.card_short_title(card_type)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if crowded else HORIZONTAL_ALIGNMENT_CENTER
+	title.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD
+	# AYNI BOYUT: eldeki bütün kartların adları tek bir yazı boyutunda; boyut,
+	# eldeki en uzun sözcük görünen şeride sığana kadar küçülür (kısaltılmaz).
+	var room := CARD_DISPLAY_SIZE.x - 10.0
+	if crowded:
+		# Kalabalık elde komşu kart sağ yanı örter: görünen şerit kadar yer var.
+		var count := maxi(2, CardManager.my_inventory().size())
+		var step := (_r(R_HAND).size.x - CARD_DISPLAY_SIZE.x) / float(count - 1)
+		room = clampf(step, 30.0, CARD_DISPLAY_SIZE.x) - 8.0
+	var font_size := _hand_title_font_size(room)
+	title.add_theme_font_override("font", _card_title_font())
+	title.add_theme_font_size_override("font_size", font_size)
+	title.add_theme_constant_override("line_spacing", -2)
+	title.add_theme_color_override("font_color", Color.WHITE)
+	title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	title.add_theme_constant_override("outline_size", 3)
+	title.set_anchors_preset(Control.PRESET_FULL_RECT)
+	title.offset_left = 5.0
+	# Satır kaydırma görünen alana göre yapılsın (kalabalık elde dar şerit).
+	title.offset_right = -maxf(5.0, CARD_DISPLAY_SIZE.x - 5.0 - room)
+	title.offset_bottom = -4.0
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(title)
+	return box
+
+## Eldeki tam görselli kartların ortak ad boyutu (en uzun sözcük sığar).
+func _hand_title_font_size(room: float) -> int:
+	var font := _card_title_font()
+	var longest := 0.0
+	for card_type in CardManager.my_inventory():
+		if not CardPresets.has_full_art(card_type):
+			continue
+		for word in CardPresets.card_short_title(card_type).split(" "):
+			longest = maxf(longest, font.get_string_size(word, HORIZONTAL_ALIGNMENT_LEFT, -1, CARD_TITLE_SIZE).x)
+	if longest <= room or longest <= 0.0:
+		return CARD_TITLE_SIZE
+	return maxi(CARD_TITLE_MIN_SIZE, int(floor(CARD_TITLE_SIZE * room / longest)))
+
+## Kart adı yazı tipi: oyunun başlık fontu (IBM Plex Mono Bold).
+func _card_title_font() -> Font:
+	return UiTheme.mono(true)
+
+## Tam görselli kartın kenar çizgisi.
+func _card_art_edge(color: Color) -> Control:
+	var edge := Panel.new()
+	edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	edge.position = Vector2.ZERO
+	edge.size = CARD_DISPLAY_SIZE
+	var style := StyleBoxFlat.new()
+	style.draw_center = false
+	style.set_border_width_all(2)
+	style.border_color = color
+	style.set_corner_radius_all(4)
+	edge.add_theme_stylebox_override("panel", style)
+	return edge
 
 ## TEK DOKUNUŞ (hover yok, tablette de çalışır):
 ##   - karta dokunmak onu SEÇER: kalkar (üst üste binen kartların önüne çıkar),
@@ -2095,7 +2198,8 @@ func _start_drag(hand_index: int, card_type: String, holder: Control) -> void:
 		else CardPresets.get_card_texture(card_type)
 	_drag_ghost.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_drag_ghost.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_drag_ghost.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_drag_ghost.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS if CardPresets.has_full_art(card_type) \
+		else CanvasItem.TEXTURE_FILTER_NEAREST
 	_drag_ghost.size = Vector2(52, 52) if not law.is_empty() else CARD_DISPLAY_SIZE * 0.6
 	_drag_ghost.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_drag_ghost.z_index = 150
@@ -2655,6 +2759,10 @@ func _play_draw_animation(card_type: String, old_hand_size: int) -> void:
 	var flying := TextureRect.new()
 	flying.texture = CardPresets.get_card_texture(card_type)
 	flying.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	if CardPresets.has_full_art(card_type):
+		flying.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		flying.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		flying.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	flying.z_index = 100
 	flying.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	flying.modulate.a = 0.0
@@ -2711,6 +2819,10 @@ func _play_card_animation(card_type: String, origin_pos: Vector2, origin_size: V
 	var flying := TextureRect.new()
 	flying.texture = CardPresets.get_card_texture(card_type)
 	flying.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	if CardPresets.has_full_art(card_type):
+		flying.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		flying.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		flying.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	flying.z_index = 100
 	flying.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	flying.size = origin_size
@@ -3201,8 +3313,18 @@ func _build_waiting_overlay() -> void:
 func _on_vote_pressed(choice: int) -> void:
 	GovernmentManager.cast_vote(choice)
 
-## Oylama butonları: teklif yokken (ya da oyumu kullandıysam) GRİ ve
-## tıklanamaz, oylama açıkken yeşil/kırmızı ve hover'lı. Hepsi PNG.
+## Oy düğmesi: simge üstte, ad altta, kendi renginde (kapalıyken koyulaşır).
+func _style_vote_button(button: Button, title: String, icon_name: String, color: Color) -> void:
+	button.text = title
+	button.custom_minimum_size = Vector2(44, 46)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.clip_text = true
+	button.add_theme_font_size_override("font_size", 10)
+	UiSkin.skin_color_button(button, color)
+	UiSkin.set_top_icon(button, icon_name, 20)
+
+## Oylama butonları: teklif yokken (ya da oyumu kullandıysam) koyu ve
+## tıklanamaz, oylama açıkken renkli.
 func _refresh_vote_ui() -> void:
 	var can_vote: bool = GovernmentManager.is_voting() \
 		and GovernmentManager.eligible_voter_ids().has(multiplayer.get_unique_id()) \
@@ -3212,21 +3334,6 @@ func _refresh_vote_ui() -> void:
 	vote_no_button.disabled = not can_vote
 	# Koalisyon teklifinde ortak çekimser kalamaz: ya EVET ya HAYIR.
 	_abstain_button.disabled = not can_vote or GovernmentManager.is_coalition_stage()
-
-	if can_vote:
-		vote_yes_button.texture_normal = load("res://assets/ui/vote_yes_normal.png")
-		vote_yes_button.texture_hover = load("res://assets/ui/vote_yes_hover.png")
-		vote_yes_button.texture_pressed = load("res://assets/ui/vote_yes_pressed.png")
-		vote_no_button.texture_normal = load("res://assets/ui/vote_no_normal.png")
-		vote_no_button.texture_hover = load("res://assets/ui/vote_no_hover.png")
-		vote_no_button.texture_pressed = load("res://assets/ui/vote_no_pressed.png")
-	else:
-		vote_yes_button.texture_normal = load("res://assets/ui/vote_yes_disabled.png")
-		vote_yes_button.texture_hover = null
-		vote_yes_button.texture_pressed = null
-		vote_no_button.texture_normal = load("res://assets/ui/vote_no_disabled.png")
-		vote_no_button.texture_hover = null
-		vote_no_button.texture_pressed = null
 
 	proposal_label.text = GovernmentHud.proposal_status_text(multiplayer.get_unique_id())
 	_refresh_proposer_chip()
@@ -3445,28 +3552,28 @@ func _build_action_buttons() -> void:
 	_law_button = _action_button(L.t("YASA"), GameRules.cost_text(GameRules.LAW_FUNDS_COST), UiTheme.PURPLE)
 	_law_button.pressed.connect(_on_law_button_pressed)
 	_law_button.tooltip_text = L.t("Bir seçmen grubu için yasa sun: o grupta destek kazanırsın, karşıt grup biraz soğur. Geçerse puan. Dönemde bir kez.")
-	_miting_button = _action_button(L.t("MİTİNG"), GameRules.cost_text(GameRules.MITING_FUNDS_COST), UiTheme.RED)
+	_miting_button = _action_button(L.t("MİTİNG"), GameRules.cost_text(GameRules.MITING_FUNDS_COST), UiTheme.RED, "miting")
 	_miting_button.pressed.connect(_on_miting_button_pressed)
 	_miting_button.tooltip_text = L.t("İlde oy kazandırır ve partini ilin kalabalık seçmen gruplarına yaklaştırır. Teşkilat ister; provokasyon riski vardır.")
-	_org_button = _action_button(L.t("TEŞKİLAT"), GameRules.cost_text(GameRules.ORG_FUNDS_COST), UiTheme.BLUE)
+	_org_button = _action_button(L.t("TEŞKİLAT"), GameRules.cost_text(GameRules.ORG_FUNDS_COST), UiTheme.BLUE, "teskilat")
 	_org_button.pressed.connect(_on_org_button_pressed)
 	_org_button.tooltip_text = L.t("İlde kalıcı güç ve anket; yerel bağışlarla kasana düzenli para getirir.")
-	_invest_button = _action_button(L.t("YATIRIM"), GameRules.cost_text(Economy.INVEST_COST), UiTheme.GREEN_DARK)
+	_invest_button = _action_button(L.t("YATIRIM"), GameRules.cost_text(Economy.INVEST_COST), UiTheme.GREEN_DARK, "yatirim")
 	_invest_button.pressed.connect(_on_invest_button_pressed)
 	_invest_button.tooltip_text = L.t("Güçlü yerel etki: ildeki bütün seçmen memnun olur. Devlet hazinesinden (gerekirse parti kasasından) ödenir; sadece hükümet partileri.")
-	_censure_button = _action_button(L.t("GENSORU"), GameRules.cost_text(GameRules.CENSURE_FUNDS_COST), UiTheme.RED_DARK)
+	_censure_button = _action_button(L.t("GENSORU"), GameRules.cost_text(GameRules.CENSURE_FUNDS_COST), UiTheme.RED_DARK, "gensoru")
 	_censure_button.pressed.connect(_on_censure_button_pressed)
 	_censure_button.tooltip_text = L.t("Hükümeti düşürmeye çalış: meclis oylar. Reddedilirse küçük bir itibar kaybı.")
-	_early_button = _action_button(L.t("ERKEN SEÇİM"), GameRules.cost_text(GameRules.EARLY_ELECTION_FUNDS_COST), UiTheme.GOLD)
+	_early_button = _action_button(L.t("ERKEN SEÇİM"), GameRules.cost_text(GameRules.EARLY_ELECTION_FUNDS_COST), UiTheme.GOLD, "erken_secim")
 	_early_button.pressed.connect(_on_early_button_pressed)
 	_early_button.tooltip_text = L.t("Erken seçim önergesi: kabul edilirse dönem sonunda sandık kurulur.")
 	# GRUP TOPLANTISI: sıra sendeyken açık, sırada bir kez.
-	_speech_button = _action_button(L.t("TOPLANTI"), GameRules.cost_text(GameRules.SPEECH_FUNDS_COST), UiTheme.GOLD_DIM)
+	_speech_button = _action_button(L.t("TOPLANTI"), GameRules.cost_text(GameRules.SPEECH_FUNDS_COST), UiTheme.GOLD_DIM, "grup_toplantisi")
 	_speech_button.tooltip_text = L.t("Grup toplantısı: bir seçmen grubunun sorunlarını konuş. O grupta kısa süreli destek (bu dönem güçlü, sonra hızla söner). Dönemde bir kez, isteğe bağlı.")
 	_speech_button.pressed.connect(_on_speech_button_pressed)
 	# KONGRE: genel başkan kendi sırasında (en az bir seçim geçtiyse) kongreye
 	# gider; partide üye kalan eski başkan kongre ister.
-	_congress_button = _action_button(L.t("KONGRE"), _congress_cost_text(), UiTheme.PURPLE.darkened(0.3))
+	_congress_button = _action_button(L.t("KONGRE"), _congress_cost_text(), UiTheme.PURPLE.darkened(0.3), "kongre")
 	_congress_button.pressed.connect(_on_congress_button_pressed)
 	_congress_button.tooltip_text = L.t("Genel başkan: partini kongreye götür, liderliğini tazele. Üye: kongre iste, başkanlığı geri almaya çalış.")
 
@@ -3478,7 +3585,7 @@ func _congress_cost_text() -> String:
 
 ## Hamle butonu: ızgaraya eklenir, sabit kutu boyutunda kalır ve yazı taşarsa
 ## kırpılır — böylece hiçbir buton komşusunu itemez.
-func _action_button(title: String, cost_text: String, color: Color) -> Button:
+func _action_button(title: String, cost_text: String, color: Color, icon_name: String = "") -> Button:
 	var button := Button.new()
 	button.custom_minimum_size = Vector2(ACTION_BUTTON_WIDTH, ACTION_BUTTON_HEIGHT)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -3486,6 +3593,7 @@ func _action_button(title: String, cost_text: String, color: Color) -> Button:
 	button.add_theme_constant_override("line_spacing", -1)
 	_set_action_text(button, title, cost_text)
 	UiSkin.skin_color_button(button, color)
+	UiSkin.set_top_icon(button, icon_name, 18)
 	_action_grid.add_child(button)
 	return button
 

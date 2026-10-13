@@ -138,6 +138,7 @@ static func fill_government_panel(box: VBoxContainer) -> void:
 		UiSkin.skin_button(withdraw)
 		withdraw.text = L.t("Koalisyondan Çekil")
 		withdraw.add_theme_font_size_override("font_size", 12)
+		UiSkin.set_side_icon(withdraw, "koalisyondan_cekil", 16)
 		withdraw.tooltip_text = L.t("Görevlerin ana iktidar partisine geçer. Puan tablon etkilenmez ama kamuoyunda bir miktar destek kaybedersin. Ortağın yalnız kalıp gensoruyla düşerse o %d puan kaybeder.") % GovernmentPresets.ABANDONED_FALL_PENALTY
 		withdraw.pressed.connect(func():
 			if bool(withdraw.get_meta("armed", false)):

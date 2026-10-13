@@ -67,6 +67,48 @@ static func skin_button(button: Button) -> void:
 
 ## İSTENEN RENKTE buton (katıl, oy ver, hamle butonları). Doku gri tonlarında
 ## olduğu için modulate rengi doğrudan verir; koyu dış çizgi koyu kalır.
+## HAMLE SİMGELERİ (assets/icons/actions/<ad>.svg, beyaz; yazı rengine boyanır).
+const ACTION_ICON_PATH := "res://assets/icons/actions/%s.svg"
+
+static func action_icon(icon_name: String) -> Texture2D:
+	var path := ACTION_ICON_PATH % icon_name
+	return load(path) if icon_name != "" and ResourceLoader.exists(path) else null
+
+## Simge yazının üstünde, ortada (hamle ve oy düğmeleri).
+static func set_top_icon(button: Button, icon_name: String, size: int) -> void:
+	var tex := action_icon(icon_name)
+	if tex == null:
+		return
+	button.icon = tex
+	button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	button.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
+	button.expand_icon = false
+	button.add_theme_constant_override("icon_max_width", size)
+	button.add_theme_constant_override("h_separation", 1)
+	button.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	_tint_icon(button)
+
+## Simge yazının solunda (geniş düğmeler).
+static func set_side_icon(button: Button, icon_name: String, size: int) -> void:
+	var tex := action_icon(icon_name)
+	if tex == null:
+		return
+	button.icon = tex
+	button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
+	button.add_theme_constant_override("icon_max_width", size)
+	button.add_theme_constant_override("h_separation", 6)
+	button.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	_tint_icon(button)
+
+## Simge yazıyla aynı renkte görünsün (açık zeminde koyu, koyu zeminde açık).
+static func _tint_icon(button: Button) -> void:
+	for state in ["normal", "hover", "pressed", "focus", "hover_pressed"]:
+		var font_key := "font_color" if state == "normal" else "font_%s_color" % state
+		var c := button.get_theme_color(font_key) if button.has_theme_color_override(font_key) else button.get_theme_color("font_color")
+		button.add_theme_color_override("icon_%s_color" % state, c)
+	button.add_theme_color_override("icon_disabled_color", button.get_theme_color("font_disabled_color"))
+
 static func skin_color_button(button: Button, color: Color) -> void:
 	button.add_theme_stylebox_override("normal", color_box(color, BUTTON_TINT_NORMAL))
 	button.add_theme_stylebox_override("hover", color_box(color, BUTTON_TINT_HOVER))

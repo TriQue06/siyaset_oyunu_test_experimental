@@ -149,14 +149,52 @@ const CARD_ART_ALIAS := {
 }
 
 var _card_textures: Dictionary = {}
+## TAM KART GÖRSELİ (0.0.173): el kartlarının resimli yüzü
+## (assets/cards/art/card_<tür>.png, 2:3). Olan kartta eski piksel çizim ve
+## CardFace yerine bu görsel kartı kaplar; kenar çizgisi görselin ortalama rengi.
+const FULL_ART_PATH := "res://assets/cards/art/card_%s.png"
+var _full_art: Dictionary = {}
+var _art_edge: Dictionary = {}
 
 func _ready() -> void:
 	for card_type in CARD_TYPES:
+		var full := FULL_ART_PATH % card_type
+		if ResourceLoader.exists(full):
+			var tex: Texture2D = load(full)
+			_full_art[card_type] = tex
+			_card_textures[card_type] = tex
+			_art_edge[card_type] = _average_color(tex)
+			continue
 		var path := "res://assets/cards/politic_card_%s.png" % String(CARD_ART_ALIAS.get(card_type, card_type))
 		if ResourceLoader.exists(path):
 			_card_textures[card_type] = load(path)
 		else:
 			push_warning("Kart görseli bulunamadı: %s" % path)
+
+## Kartın tam görseli var mı? (Varsa kart yüzü görselin kendisidir.)
+func has_full_art(card_type: String) -> bool:
+	return _full_art.has(card_type)
+
+## Kart kenar çizgisinin rengi: görselin ortalama rengi (biraz açılmış).
+func art_edge_color(card_type: String) -> Color:
+	return _art_edge.get(card_type, Color("#8a8aa8"))
+
+static func _average_color(tex: Texture2D) -> Color:
+	var img := tex.get_image()
+	if img == null or img.is_empty():
+		return Color("#8a8aa8")
+	img = img.duplicate()
+	if img.is_compressed():
+		img.decompress()
+	img.resize(12, 18, Image.INTERPOLATE_BILINEAR)
+	var sum := Color(0, 0, 0, 0)
+	for y in img.get_height():
+		for x in img.get_width():
+			sum += img.get_pixel(x, y)
+	var n := float(img.get_width() * img.get_height())
+	var avg := Color(sum.r / n, sum.g / n, sum.b / n)
+	# Koyu görsellerde çizgi zemine karışmasın: rengi koru, parlaklığı yükselt.
+	return Color.from_hsv(avg.h, minf(1.0, avg.s * 1.2), maxf(avg.v, 0.75))
 
 func get_card_texture(card_type: String) -> Texture2D:
 	return _card_textures.get(card_type, _card_textures.get(MITING_CARD_TYPE))

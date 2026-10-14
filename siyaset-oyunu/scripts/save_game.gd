@@ -80,7 +80,7 @@ static func _collect() -> Dictionary:
 		"mm": {
 			"players": mm.players, "owner_id": me, "local_player_name": mm.local_player_name,
 			"election_threshold": mm.election_threshold, "election_interval": mm.election_interval,
-			"vote_timeout": mm.vote_timeout, "election_count": mm.election_count, "map_seed": mm.map_seed, "game_map_seed": mm.game_map_seed,
+			"world_settings": mm.world_settings, "vote_timeout": mm.vote_timeout, "election_count": mm.election_count, "map_seed": mm.map_seed, "game_map_seed": mm.game_map_seed,
 			"random_parties": mm.random_parties, "away_mode": mm.away_mode,
 			"bot_funds_penalty": mm.bot_funds_penalty, "seat_method": mm.seat_method,
 		},
@@ -150,6 +150,7 @@ static func apply(data: Dictionary) -> void:
 	mm.owner_id = int(saved_mm.get("owner_id", mm.owner_id))
 	mm.election_threshold = float(saved_mm.get("election_threshold", mm.election_threshold))
 	mm.election_interval = int(saved_mm.get("election_interval", mm.election_interval))
+	mm._apply_world_settings(saved_mm.get("world_settings", mm.WORLD_DEFAULTS))
 	mm.vote_timeout = int(saved_mm.get("vote_timeout", 30))
 	mm.election_count = int(saved_mm.get("election_count", mm.election_count))
 	mm.map_seed = String(saved_mm.get("map_seed", ""))

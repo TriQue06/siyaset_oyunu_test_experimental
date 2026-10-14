@@ -73,7 +73,10 @@ static func group_vote_shares(parties: Dictionary, profile: Dictionary, weights:
 		var groups: Array = VoterGroups.PAIRS[pair]
 		var first := VoterGroups.share(profile, groups[0])
 		for k in 2:
-			var size := (first if k == 0 else 1.0 - first) / float(VoterGroups.PAIR_IDS.size())
+			var counts: Dictionary = profile.get("_counts", {})
+			var population := float(profile.get("_electorate", 0))
+			var fraction := float(counts.get(groups[k], 0)) / population if population > 0 else (first if k == 0 else 1.0 - first)
+			var size := fraction / float(VoterGroups.PAIR_IDS.size())
 			if size <= 0.0:
 				continue
 			var in_group := shares_in_group(parties, String(groups[k]), weights)
@@ -100,7 +103,7 @@ static func expected_national(parties: Dictionary, profiles: Dictionary, provinc
 	var national := {}
 	var total := 0.0
 	for province_id in province_seats.keys():
-		var n := float(province_seats[province_id])
+		var n := float(profiles.get(province_id, {}).get("_electorate", province_seats[province_id]))
 		if n <= 0.0:
 			continue
 		var shares := expected_shares(parties, profiles.get(province_id, {}), national_mod, local_mod.get(province_id, {}))
@@ -145,12 +148,12 @@ static func expected_shares(parties: Dictionary, profile: Dictionary,
 ## ULUSAL LİSTE: il seçim çevrelerinin dışında, ülke geneli oy oranına göre
 ## D'Hondt ile dağıtılan vekiller. Vekil çalma bunlara da erişir
 ## (bkz. CardManager._apply_steal — torbada "" ulusal listeyi temsil eder).
-const NATIONAL_LIST_SEATS := 200
+static var NATIONAL_LIST_SEATS := 200
 ## Bir partinin bir ildeki oy payı en fazla bu kadar olabilir. Fazlası diğer
 ## partilere oranla dağılır.
 const PROVINCE_MAX_SHARE := 0.92
 ## İl payının ne kadarı ülke genelindeki paydan gelir (bkz. model 4b).
-const NATIONAL_BLEND := 0.25
+const NATIONAL_BLEND := 0.08
 
 ## national: peer_id -> ulusal pay (toplam 1). İl payını onunla karıştırır.
 static func blend_national(shares: Dictionary, national: Dictionary) -> Dictionary:
@@ -198,11 +201,13 @@ static func compute(parties: Dictionary, province_seats: Dictionary, voters: Dic
 	peer_ids.sort()
 	var province_ids: Array = []
 	var total_seats := 0
+	var electorate_total := 0.0
 	for province_id in province_seats.keys():
 		var n: int = int(province_seats[province_id])
 		if n > 0:
 			province_ids.append(province_id)
 			total_seats += n
+			electorate_total += float(voters.get(province_id, {}).get("_electorate", n))
 	province_ids.sort()
 	if peer_ids.is_empty() or total_seats <= 0:
 		return result
@@ -217,7 +222,7 @@ static func compute(parties: Dictionary, province_seats: Dictionary, voters: Dic
 	var province_shares: Dictionary = {}
 
 	for province_id in province_ids:
-		var seats_here: int = int(province_seats[province_id])
+		var seats_here: float = float(voters.get(province_id, {}).get("_electorate", province_seats[province_id]))
 		var profile: Dictionary = voters.get(province_id, {})
 		var local_here: Dictionary = local_mod.get(province_id, {})
 		var weights: Dictionary = {}
@@ -232,18 +237,18 @@ static func compute(parties: Dictionary, province_seats: Dictionary, voters: Dic
 	# Ülke geneli karışımı (model 4b), sonra il tavanı; ulusal oy yeniden toplanır.
 	var national_share := {}
 	for peer_id in peer_ids:
-		national_share[peer_id] = float(national[peer_id]) / float(total_seats)
+		national_share[peer_id] = float(national[peer_id]) / electorate_total
 		national[peer_id] = 0.0
 	for province_id in province_ids:
 		var shares: Dictionary = cap_shares(blend_national(province_shares[province_id], national_share))
 		province_shares[province_id] = shares
 		for peer_id in peer_ids:
-			national[peer_id] = float(national[peer_id]) + float(shares[peer_id]) * int(province_seats[province_id])
+			national[peer_id] = float(national[peer_id]) + float(shares[peer_id]) * float(voters.get(province_id, {}).get("_electorate", province_seats[province_id]))
 
 	var eligible: Array = []
 	var alliance_totals := {}
 	for peer_id in peer_ids:
-		var percent: float = float(national[peer_id]) / float(total_seats) * 100.0
+		var percent: float = float(national[peer_id]) / electorate_total * 100.0
 		vote_shares[peer_id] = percent
 		seats[peer_id] = 0
 		var alliance_id := int(alliance_membership.get(peer_id, 0))

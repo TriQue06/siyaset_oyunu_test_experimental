@@ -154,7 +154,7 @@ const DISTANCE_SCALE := 11.3
 const MAX_DISTANCE := 10.4
 
 # --- İl profili üretimi ----------------------------------------------------------------
-const SMOOTHING_PASSES := 3
+const SMOOTHING_PASSES := 1
 const SELF_WEIGHT := 0.4
 ## Her çiftin ülke ortalaması 50 ± bu kadar (her oyunda farklı).
 const PAIR_CENTER_JITTER := 8.0
@@ -170,7 +170,7 @@ const HOTSPOT_STRENGTH := 2.6
 ## Büyük seçim çevreleri daha karma (ülke ortalamasına yakın) olur.
 const HOMOGENEOUS_SEATS_FROM := 6
 const HOMOGENEOUS_SEATS_TO := 20
-const HOMOGENEOUS_MIN_FACTOR := 0.6
+const HOMOGENEOUS_MIN_FACTOR := 0.32
 
 static func is_group(group: String) -> bool:
 	return GROUPS.has(group)
@@ -250,7 +250,7 @@ static func neighbors() -> Dictionary:
 ##   3. Çiftin bu oyunluk ülke ortalaması etrafına yayılır; büyük seçim
 ##      çevreleri biraz daha karma kalır.
 ## seats: province_id -> vekil sayısı (verilmezse karmalık uygulanmaz).
-static func generate_profiles(rng: RandomNumberGenerator, province_ids: Array, seats: Dictionary = {}) -> Dictionary:
+static func generate_profiles(rng: RandomNumberGenerator, province_ids: Array, seats: Dictionary = {}, populations: Dictionary = {}) -> Dictionary:
 	var ids: Array = province_ids.duplicate()
 	ids.sort()  # aynı tohum her makinede aynı ülkeyi versin
 	var result: Dictionary = {}
@@ -292,11 +292,24 @@ static func generate_profiles(rng: RandomNumberGenerator, province_ids: Array, s
 			max_abs = maxf(max_abs, absf(float(values[province_id]) - mean))
 		for province_id in ids:
 			var v := (float(values[province_id]) - mean) / max_abs
+			v = signf(v) * pow(absf(v), 0.55)
 			var n := int(seats.get(province_id, 0))
+			if populations.has(province_id):
+				n = int(float(populations[province_id]) / 100000.0)
 			if n > 0:
 				var t := clampf(float(n - HOMOGENEOUS_SEATS_FROM) / float(HOMOGENEOUS_SEATS_TO - HOMOGENEOUS_SEATS_FROM), 0.0, 1.0)
 				v *= lerpf(1.0, HOMOGENEOUS_MIN_FACTOR, t)
 			result[province_id][pair] = clampi(int(round(center + PROFILE_SPREAD * v)), PROFILE_MIN, PROFILE_MAX)
+	for province_id in ids:
+		var electorate := int(populations.get(province_id, maxi(1, int(seats.get(province_id, 1))) * 100000))
+		var counts := {}
+		for pair in PAIR_IDS:
+			var groups: Array = PAIRS[pair]
+			var first := int(round(float(electorate) * float(result[province_id][pair]) / 100.0))
+			counts[groups[0]] = first
+			counts[groups[1]] = electorate - first
+		result[province_id]["_electorate"] = electorate
+		result[province_id]["_counts"] = counts
 	return result
 
 ## Ülke geneli (vekil ağırlıklı) grup payı 0..1.
@@ -304,7 +317,7 @@ static func national_share(profiles: Dictionary, seats: Dictionary, group: Strin
 	var total := 0.0
 	var sum := 0.0
 	for province_id in profiles.keys():
-		var n := float(seats.get(province_id, 1))
+		var n := float(profiles[province_id].get("_electorate", seats.get(province_id, 1)))
 		if n <= 0.0:
 			continue
 		sum += share(profiles[province_id], group) * n

@@ -3557,3 +3557,27 @@ msgstr "INVITE TO ALLIANCE"
 
 msgid "Seçilebilecek parti yok."
 msgstr "There are no eligible parties."
+
+msgid "HARİTA VE MECLİS"
+msgstr "MAP AND PARLIAMENT"
+
+msgid "İl sayısı"
+msgstr "Province count"
+
+msgid "İl milletvekilleri"
+msgstr "District seats"
+
+msgid "Ulusal milletvekilleri"
+msgstr "National seats"
+
+msgid "Tur süresi"
+msgstr "Turn duration"
+
+msgid "Az"
+msgstr "Few"
+
+msgid "Ortalama"
+msgstr "Average"
+
+msgid "Fazla"
+msgstr "Many"

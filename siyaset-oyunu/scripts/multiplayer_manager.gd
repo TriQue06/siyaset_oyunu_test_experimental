@@ -81,6 +81,9 @@ var players: Dictionary = {}
 var election_threshold: float = THRESHOLD_DEFAULT
 ## Oyun süresi: seçimler kaç turda bir ve kaç seçim olacak (bkz. GameRules.configure).
 var election_interval: int = GameRules.DEFAULT_ELECTION_INTERVAL
+const WORLD_DEFAULTS := {"province_scale": 1.0, "province_seats": 300, "national_seats": 200, "turn_seconds": 60}
+const WORLD_OPTIONS := {"province_scale": [0.75, 1.0, 1.25], "province_seats": [150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750], "national_seats": [0, 50, 100, 150, 200, 250, 300], "turn_seconds": [30, 45, 60, 75, 90, 105, 120]}
+var world_settings: Dictionary = WORLD_DEFAULTS.duplicate()
 var vote_timeout: int = 30
 const VOTE_TIME_OPTIONS := [15, 30, 45, 60]
 
@@ -331,6 +334,7 @@ func start_offline(player_name: String) -> void:
 	election_interval = GameRules.DEFAULT_ELECTION_INTERVAL
 	election_count = GameRules.DEFAULT_ELECTION_COUNT
 	vote_timeout = 30
+	_apply_world_settings(WORLD_DEFAULTS)
 	GameRules.configure(election_interval, election_count)
 	players.clear()
 	owner_id = multiplayer.get_unique_id()
@@ -355,6 +359,7 @@ func create_room(player_name: String) -> void:
 	election_interval = GameRules.DEFAULT_ELECTION_INTERVAL
 	election_count = GameRules.DEFAULT_ELECTION_COUNT
 	vote_timeout = 30
+	_apply_world_settings(WORLD_DEFAULTS)
 	GameRules.configure(election_interval, election_count)
 	players.clear()
 	var peer := RelayMultiplayerPeerScript.new()
@@ -573,6 +578,7 @@ func _notify_kicked() -> void:
 func _broadcast_player_list() -> void:
 	if room_code != "" and multiplayer.multiplayer_peer != null:
 		_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
+		_sync_world_settings.rpc(world_settings)
 		_sync_map_seed.rpc(map_seed)
 		_sync_random_parties.rpc(random_parties)
 		_sync_bot_funds_penalty.rpc(bot_funds_penalty)
@@ -602,6 +608,7 @@ func transfer_ownership(new_owner_id: int) -> void:
 	if is_host:
 		owner_id = new_owner_id
 		_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
+		_sync_world_settings.rpc(world_settings)
 		_sync_map_seed.rpc(map_seed)
 		_sync_random_parties.rpc(random_parties)
 		_sync_bot_funds_penalty.rpc(bot_funds_penalty)
@@ -682,6 +689,7 @@ func _reset_state() -> void:
 	election_interval = GameRules.DEFAULT_ELECTION_INTERVAL
 	election_count = GameRules.DEFAULT_ELECTION_COUNT
 	vote_timeout = 30
+	_apply_world_settings(WORLD_DEFAULTS)
 	GameRules.configure(election_interval, election_count)
 	_has_synced_once = false
 	_closing = false
@@ -733,6 +741,7 @@ func _on_peer_disconnected(id: int) -> void:
 		if id == owner_id:
 			owner_id = multiplayer.get_unique_id()
 		_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
+		_sync_world_settings.rpc(world_settings)
 		player_list_updated.emit()
 		if stage == Stage.PARTY_SETUP:
 			PartyManager.auto_ready_away(id)
@@ -748,6 +757,7 @@ func _on_peer_disconnected(id: int) -> void:
 		# Host olmayan lobi sahibi ayrıldı: oda kapanmaz, sahiplik host'a geçer.
 		owner_id = multiplayer.get_unique_id()
 	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
+	_sync_world_settings.rpc(world_settings)
 	_sync_map_seed.rpc(map_seed)
 	_sync_random_parties.rpc(random_parties)
 	_sync_bot_funds_penalty.rpc(bot_funds_penalty)
@@ -840,6 +850,7 @@ func _request_join(code: String, player_name: String, signature: String, uid: St
 		players.erase(bot_ids().back())
 	players[sender_id] = {"name": player_name, "uid": uid}
 	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
+	_sync_world_settings.rpc(world_settings)
 	_sync_map_seed.rpc(map_seed)
 	_sync_random_parties.rpc(random_parties)
 	_sync_bot_funds_penalty.rpc(bot_funds_penalty)
@@ -868,6 +879,7 @@ func _rejoin(old_id: int, new_id: int, player_name: String) -> void:
 	# Önce istemciye "geri döndün" denir (lobi ekranına gitmesin), sonra her şey.
 	_notify_rejoined.rpc_id(new_id, stage, game_map_seed)
 	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
+	_sync_world_settings.rpc(world_settings)
 	_sync_map_seed.rpc_id(new_id, map_seed)
 	_sync_random_parties.rpc_id(new_id, random_parties)
 	_sync_away_mode.rpc_id(new_id, away_mode)
@@ -921,6 +933,7 @@ func _request_transfer_ownership(new_owner_id: int) -> void:
 		return
 	owner_id = new_owner_id
 	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
+	_sync_world_settings.rpc(world_settings)
 	_sync_map_seed.rpc(map_seed)
 	_sync_random_parties.rpc(random_parties)
 	_sync_bot_funds_penalty.rpc(bot_funds_penalty)
@@ -1048,3 +1061,38 @@ func _apply_vote_timeout(seconds: int) -> void:
 func _request_vote_timeout(seconds: int) -> void:
 	if is_host and multiplayer.get_remote_sender_id() == owner_id:
 		_apply_vote_timeout(seconds)
+
+func set_world_setting(key: String, value: Variant) -> void:
+	if not is_local_owner() or not WORLD_OPTIONS.has(key) or not (WORLD_OPTIONS[key] as Array).has(value):
+		return
+	if is_host or room_code == "":
+		var updated := world_settings.duplicate()
+		updated[key] = value
+		_apply_world_settings(updated)
+		if room_code != "":
+			_sync_world_settings.rpc(world_settings)
+	else:
+		_request_world_setting.rpc_id(1, key, value)
+
+func _apply_world_settings(values: Dictionary) -> void:
+	for key in WORLD_DEFAULTS:
+		var value = values.get(key, WORLD_DEFAULTS[key])
+		world_settings[key] = value if (WORLD_OPTIONS[key] as Array).has(value) else WORLD_DEFAULTS[key]
+	GameRules.TURN_TIMEOUT = float(world_settings["turn_seconds"])
+	ElectionModel.NATIONAL_LIST_SEATS = int(world_settings["national_seats"])
+	var cards := get_node_or_null("/root/CardManager")
+	if cards != null:
+		cards._load_province_seat_counts()
+	settings_updated.emit()
+
+@rpc("authority", "reliable")
+func _sync_world_settings(values: Dictionary) -> void:
+	_apply_world_settings(values)
+
+@rpc("any_peer", "reliable")
+func _request_world_setting(key: String, value: Variant) -> void:
+	if is_host and multiplayer.get_remote_sender_id() == owner_id and WORLD_OPTIONS.has(key) and (WORLD_OPTIONS[key] as Array).has(value):
+		var updated := world_settings.duplicate()
+		updated[key] = value
+		_apply_world_settings(updated)
+		_sync_world_settings.rpc(world_settings)

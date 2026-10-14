@@ -1587,7 +1587,7 @@ func init_game() -> void:
 		map_seed = _rng.randi_range(1, 999999999)
 	GameMap.generate_new(map_seed)
 	_load_province_seat_counts()
-	province_profiles = VoterGroups.generate_profiles(_rng, _province_ids, _province_seat_counts)
+	province_profiles = VoterGroups.generate_profiles(_rng, _province_ids, _province_seat_counts, GameMap.electorate_counts())
 	organizations = {}
 	_apply_politician_starts()
 	credibility = {}
@@ -4159,6 +4159,7 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"inventories": inventories,
 		"turn_order": turn_order,
 		"turn_index": current_turn_index,
+		"world_settings": MultiplayerManager.world_settings,
 		"alliances_enabled": alliances_enabled,
 		"alliances": alliances,
 		"law_rounds": law_rounds,
@@ -4239,6 +4240,7 @@ func _apply_state(state: Dictionary) -> void:
 			hand[i] = OLD_CARD_TYPES.get(String(hand[i]), hand[i])
 	turn_order = state["turn_order"]
 	current_turn_index = int(state["turn_index"])
+	MultiplayerManager._apply_world_settings(state.get("world_settings", MultiplayerManager.world_settings))
 	alliances_enabled = bool(state.get("alliances_enabled", true))
 	alliances = state.get("alliances", {})
 	law_rounds = state.get("law_rounds", {})

@@ -83,21 +83,21 @@ const ODD_ROW_NEIGHBORS := [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(1, -1), Ve
 ## Dönüş (ağ üzerinden gönderilebilir, sadece temel tipler):
 ##   {"seed", "cols", "rows", "cells": Array[int] (bölge indeksi, -1 deniz),
 ##    "regions": Array[{"id", "name", "seats", "coastal"}]}
-static func generate(seed_value: int) -> Dictionary:
+static func generate(seed_value: int, province_scale: float = 1.0, seat_total: int = 300) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value
 	var land := _make_land(rng)
-	var cells := _grow_regions(land, rng)
+	var cells := _grow_regions(land, rng, province_scale)
 	var region_count := 0
 	for v in cells:
 		region_count = maxi(region_count, int(v) + 1)
 	var coastal := _coastal_regions(cells, region_count)
 	var population := _population(cells, region_count, coastal, rng)
-	var seats := _allocate_seats(population)
+	var seats := _allocate_seats(population, seat_total)
 	var names := _names(cells, region_count, coastal, population, rng)
 	var regions: Array = []
 	for i in region_count:
-		regions.append({"id": "b%02d" % (i + 1), "name": names[i], "seats": int(seats[i]), "coastal": bool(coastal[i])})
+		regions.append({"id": "b%02d" % (i + 1), "name": names[i], "seats": int(seats[i]), "coastal": bool(coastal[i]), "electorate": maxi(10000, int(round(float(population[i]) * 25000.0)))})
 	return {"seed": seed_value, "cols": COLS, "rows": ROWS, "cells": cells, "regions": regions}
 
 # --- Yardımcılar -------------------------------------------------------------
@@ -200,12 +200,12 @@ static func _flood(start: int, accept: Callable, seen: Dictionary) -> Array:
 
 # --- 2. Bölgeler ---------------------------------------------------------------
 
-static func _grow_regions(land: Array, rng: RandomNumberGenerator) -> Array:
+static func _grow_regions(land: Array, rng: RandomNumberGenerator, province_scale: float = 1.0) -> Array:
 	var land_cells: Array = []
 	for i in land.size():
 		if land[i]:
 			land_cells.append(i)
-	var target := maxi(8, int(round(land_cells.size() / HEXES_PER_REGION)))
+	var target := maxi(8, int(round((land_cells.size() / HEXES_PER_REGION - 4.0) * province_scale)))
 	# Birbirinden uzak tohumlar: önce geniş aralık, yetmezse daralt.
 	var seeds: Array = []
 	var shuffled := land_cells.duplicate()
@@ -425,12 +425,12 @@ static func _population(cells: Array, count: int, coastal: Array, rng: RandomNum
 
 # --- 4. Vekiller -----------------------------------------------------------------
 
-static func _allocate_seats(population: Array) -> Array:
+static func _allocate_seats(population: Array, seat_total: int = 300) -> Array:
 	var count := population.size()
 	var seats: Array = []
 	seats.resize(count)
 	seats.fill(MIN_SEATS)
-	var left := PROVINCE_SEATS - MIN_SEATS * count
+	var left := seat_total - MIN_SEATS * count
 	var total := 0.0
 	for p in population:
 		total += float(p)

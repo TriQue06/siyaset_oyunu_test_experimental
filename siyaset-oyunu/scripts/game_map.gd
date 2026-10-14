@@ -32,7 +32,7 @@ func _ready() -> void:
 
 ## Host: yeni oyun için yeni harita.
 func generate_new(seed_value: int) -> void:
-	set_data(HexGridGenerator.generate(seed_value))
+	set_data(HexGridGenerator.generate(seed_value, float(MultiplayerManager.world_settings["province_scale"]), int(MultiplayerManager.world_settings["province_seats"])))
 
 func set_data(new_data: Dictionary) -> void:
 	if new_data.is_empty():
@@ -231,3 +231,9 @@ func cell_at(point: Vector2) -> int:
 
 func province_at(point: Vector2) -> String:
 	return region_at_cell(cell_at(point))
+
+func electorate_counts() -> Dictionary:
+	var result := {}
+	for region in data.get("regions", []):
+		result[String(region["id"])] = int(region.get("electorate", int(region["seats"]) * 100000))
+	return result

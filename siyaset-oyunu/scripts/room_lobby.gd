@@ -35,6 +35,7 @@ var map_seed_edit: LineEdit
 var random_parties_check: CheckButton
 var away_bot_check: CheckButton
 var bot_funds_buttons: Array = []
+var world_controls: Dictionary = {}
 var vote_time_buttons: Array[Button] = []
 var threshold_value_label: Label
 
@@ -91,6 +92,15 @@ func _refresh() -> void:
 		else:
 			player_list_box.add_child(_build_slot(_build_empty_card(i), am_owner, i == order.size()))
 
+	var shared_size := SLOT_SIZE
+	for slot in player_list_box.get_children():
+		if slot.has_meta("card_minimum") and not slot.is_queued_for_deletion():
+			var minimum: Vector2 = slot.get_meta("card_minimum")
+			shared_size.x = maxf(shared_size.x, minimum.x + BOT_BUTTON_SIZE * 0.45)
+			shared_size.y = maxf(shared_size.y, minimum.y + BOT_BUTTON_SIZE * 0.45)
+	for slot in player_list_box.get_children():
+		if not slot.is_queued_for_deletion():
+			slot.custom_minimum_size = shared_size
 	var count := MultiplayerManager.players.size()
 	if MultiplayerManager.offline_mode:
 		# Çevrim dışında katılan olmaz: boş yuvalar "bot ekle" demektir.
@@ -212,10 +222,15 @@ func _build_slot(card: Control, show_bot_button: bool, enabled: bool) -> Control
 	var slot := Control.new()
 	slot.custom_minimum_size = SLOT_SIZE
 	card.custom_minimum_size = Vector2.ZERO
+	slot.set_meta("card_minimum", card.get_combined_minimum_size())
 	card.set_anchors_preset(Control.PRESET_FULL_RECT)
 	card.offset_top = BOT_BUTTON_SIZE * 0.45
 	card.offset_right = -BOT_BUTTON_SIZE * 0.45
-	slot.add_child(card)
+	var frame := Control.new()
+	frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	frame.clip_contents = true
+	slot.add_child(frame)
+	frame.add_child(card)
 	if not show_bot_button:
 		return slot
 	var button := Button.new()
@@ -271,6 +286,11 @@ class RobotIcon extends Control:
 		draw_rect(Rect2(c + Vector2(0.29, -0.06) * s, Vector2(0.07, 0.14) * s), color)
 
 func _refresh_settings_display() -> void:
+	for key in world_controls:
+		var control: OptionButton = world_controls[key]
+		control.select((MultiplayerManager.WORLD_OPTIONS[key] as Array).find(MultiplayerManager.world_settings[key]))
+		control.disabled = not MultiplayerManager.is_local_owner()
+
 	for button in vote_time_buttons:
 		button.set_pressed_no_signal(int(button.get_meta("seconds")) == MultiplayerManager.vote_timeout)
 		button.disabled = not MultiplayerManager.is_local_owner()
@@ -376,6 +396,18 @@ func _build_settings_panel() -> void:
 		button.pressed.connect(func(): MultiplayerManager.set_vote_timeout(int(button.get_meta("seconds"))))
 		votes_row.add_child(button)
 		vote_time_buttons.append(button)
+	var world_box := _section(L.t("HARİTA VE MECLİS"), "")
+	var labels := {"province_scale": L.t("İl sayısı"), "province_seats": L.t("İl milletvekilleri"), "national_seats": L.t("Ulusal milletvekilleri"), "turn_seconds": L.t("Tur süresi")}
+	for key in MultiplayerManager.WORLD_OPTIONS:
+		world_box.add_child(UiTheme.mono_label(labels[key], 12, UiTheme.TEXT))
+		var control := OptionButton.new()
+		var values: Array = MultiplayerManager.WORLD_OPTIONS[key]
+		for i in values.size():
+			control.add_item([L.t("Az"), L.t("Ortalama"), L.t("Fazla")][i] if key == "province_scale" else str(values[i]) + (" s" if key == "turn_seconds" else ""))
+		control.item_selected.connect(func(index: int): MultiplayerManager.set_world_setting(String(control.get_meta("key")), (MultiplayerManager.WORLD_OPTIONS[control.get_meta("key")] as Array)[index]))
+		control.set_meta("key", key)
+		world_box.add_child(control)
+		world_controls[key] = control
 	var map_box := _section(L.t("HARİTA"), L.t("Aynı tohum her zaman aynı ülkeyi üretir. Boş bırakırsan her oyunda rastgele."))
 	map_seed_edit = LineEdit.new()
 	map_seed_edit.placeholder_text = L.t("Rastgele")

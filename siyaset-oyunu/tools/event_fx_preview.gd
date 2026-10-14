@@ -145,20 +145,6 @@ func _initialize() -> void:
 	else:
 		print("  (gensoru şartı yok, atlandı)")
 
-	# 6) KONGRE ve SEÇİM manşetleri (oyunun gerçek verisiyle).
-	await _frames(5)
-	scene._headline_for_congress({"pid": me, "party": "Yeni Yol", "color": Color("F20C1F"),
-		"candidates": [{"name": "Barış", "incumbent": true}, {"name": "Deniz Kaya", "incumbent": false}],
-		"round1": [700, 500], "round2": [], "winner": 0})
-	await _seconds(0.9)
-	_shot("kongre")
-	fx.skip_all()
-	await _frames(3)
-	scene._headline_for_election()
-	await _seconds(0.9)
-	_shot("secim")
-	check("seçim manşeti oynuyor", fx.is_playing())
-
 	# 6b) Koalisyondan çekilme metni tanınır (TR ve EN kalıp), "ortaklar anlaştı" tanınmaz.
 	var tr_text := "%s koalisyondan çekildi: %s.%s%s%s" % ["ABC", "hafif destek kaybı", "", "", ""]
 	var en_text := TranslationServer.get_translation_object("en").get_message("%s koalisyondan çekildi: %s.%s%s%s") % ["ABC", "x", "", "", ""]

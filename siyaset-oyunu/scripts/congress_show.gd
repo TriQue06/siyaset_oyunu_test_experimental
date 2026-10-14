@@ -3,27 +3,42 @@ extends Control
 ## KONGRE GECESİ: bir partinin kongre seçimi herkesin ekranında, seçim gecesiyle
 ## aynı yayın tarzında oynar. Sonuç host'ta önceden hesaplanmıştır
 ## (CardManager._compute_congress); burada sadece gösterilir.
-##   1. TUR: delegeler sayılır, çubuklar büyür. Biri yarıyı geçerse kazanır.
-##   2. TUR (gerekirse): ilk iki aday; elenenlerin delegeleri dağılır.
-##   SONUÇ: kazanan altın damgayla.
-## Süre: oyuncunun partisi seçim gecesinin yarısı, bot partisi dörtte biri.
+## DELEGE SALONU (0.0.180): üstte delegeleri temsil eden koltuklar oy verdikçe
+## adayın rengine döner; altta her adayın renkli kartı (sayaç + yarı çizgisi).
+##   1. TUR: koltuklar sıra sıra dolar. Biri yarıyı geçerse kazanır.
+##   2. TUR (gerekirse): ilk iki aday; elenenlerin koltukları griye döner ve
+##      iki finaliste akar.
+##   SONUÇ: konfeti + "GENEL BAŞKAN" damgası, ardından sonuç gazetesi (EventFx)
+##   bu ekranda oynar ve ekran kapanır.
+## Adaylar parti renginin tonları yerine ayrı canlı renkler alır (CANDIDATE_COLORS).
+## Süre: CardManager.congress_duration (gazete hariç).
 
 const BG_TOP := UiTheme.BG
 const BG_BOTTOM := UiTheme.INK
 const GOLD := UiTheme.GOLD
 const RED := UiTheme.RED
+const CANDIDATE_COLORS := [Color("FF3B5C"), Color("3BD1FF"), Color("FFC93C"), Color("9DFF5C"),
+	Color("C77DFF"), Color("FF8A3B")]
+## Salondaki koltuk sayısı (her koltuk 1200 / SEATS delegeyi temsil eder).
+const SEATS := 300
+const HALL_ROWS := 10
 
 var data: Dictionary = {}
 var _t := 0.0
 var _duration := 6.0
-var _rows: Array = []        # [{"panel","fill","name","value","index"}]
+var _cards: Array = []        # [{"panel","fill","value","index"}]
 var _round_label: Label
 var _status: Label
-var _stamp: Label
+var _stamp: PanelContainer
+var _stamp_label: Label
 var _progress_fill: ColorRect
-var _bars_box: VBoxContainer
+var _cards_box: HBoxContainer
+var _hall: Hall
 var _second_built := false
-var _hold_end := 0.0
+var _ended := false
+var _end_t := 0.0
+var _paper_started := false
+var _event_fx: EventFx
 
 func _ready() -> void:
 	# Ekranın TAMAMINI kaplar (ebeveynin düzeninden bağımsız).
@@ -35,8 +50,11 @@ func _ready() -> void:
 	z_index = 200
 	_duration = maxf(2.0, float(data.get("duration", 6.0)))
 	_build()
-	_build_rows(range((data.get("candidates", []) as Array).size()), data.get("round1", []))
+	_build_cards(range((data.get("candidates", []) as Array).size()))
+	_hall.setup(data)
 	_build_skip_controls()
+	_event_fx = EventFx.new()
+	add_child(_event_fx)
 
 func _phase_ends() -> Array:
 	# [1. tur sayımı biter, 2. tur başlar, 2. tur biter]
@@ -46,25 +64,28 @@ func _phase_ends() -> Array:
 
 ## ATLA / 2× (0.0.179): yalnız bu ekran; kongre sonucu host'ta önceden
 ## hesaplandığı için atlamak sonucu değiştirmez. ATLA (Boşluk / Esc) önce
-## sonucu gösterir, ikinci basış ekranı kapatır.
+## sonucu gösterir, ikinci basış gazeteye geçer.
 var _speed := 1.0
+var _skip_row: HBoxContainer
 
 func skip_or_close() -> void:
 	var ends := _phase_ends()
 	if _t < float(ends[2]) + 0.01:
 		_t = float(ends[2]) + 0.01
-	else:
-		queue_free()
+	elif not _paper_started:
+		_start_paper()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _paper_started:
+		return  # gazeteyi EventFx kendisi geçirir
 	if event is InputEventKey and event.pressed and not event.echo \
 			and (event.keycode == KEY_SPACE or event.keycode == KEY_ESCAPE):
 		skip_or_close()
 		get_viewport().set_input_as_handled()
 
 func _build_skip_controls() -> void:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 6)
+	_skip_row = HBoxContainer.new()
+	_skip_row.add_theme_constant_override("separation", 6)
 	var speed := Button.new()
 	speed.text = L.t("2× HIZ")
 	speed.toggle_mode = true
@@ -78,79 +99,147 @@ func _build_skip_controls() -> void:
 		b.add_theme_font_override("font", UiTheme.mono())
 		b.add_theme_font_size_override("font_size", 13)
 		b.custom_minimum_size = Vector2(0, 32)
-		row.add_child(b)
-	add_child(row)
-	row.reset_size()
+		_skip_row.add_child(b)
+	add_child(_skip_row)
+	_skip_row.reset_size()
 	var view := get_viewport_rect().size
-	row.position = Vector2(view.x - row.size.x - 16.0, view.y - row.size.y - 16.0)
+	_skip_row.position = Vector2(view.x - _skip_row.size.x - 16.0, view.y - _skip_row.size.y - 16.0)
 
 func _process(delta: float) -> void:
+	if _paper_started:
+		if not _event_fx.is_playing():
+			queue_free()
+		return
 	_t += delta * _speed
 	var ends := _phase_ends()
 	var candidates: Array = data.get("candidates", [])
+	var round1: Array = data.get("round1", [])
 	var round2: Array = data.get("round2", [])
 	_progress_fill.size.x = (_progress_fill.get_parent() as Control).size.x * clampf(_t / _duration, 0.0, 1.0)
 	if _t <= ends[0]:
-		_fill_rows(data.get("round1", []), clampf(_t / ends[0], 0.0, 1.0))
+		var k := _ease(clampf(_t / ends[0], 0.0, 1.0))
+		_fill_cards(round1, k)
+		_hall.show_round1(k)
 		_status.text = L.t("Delegeler oy kullanıyor…")
 	elif _t <= ends[1]:
-		_fill_rows(data.get("round1", []), 1.0)
+		_fill_cards(round1, 1.0)
+		_hall.show_between(clampf((_t - ends[0]) / maxf(0.01, ends[1] - ends[0]), 0.0, 1.0))
 		_status.text = L.t("Kimse delegelerin yarısını geçemedi: İKİNCİ TURA kalanlar belli oldu.")
 	elif not round2.is_empty() and _t <= ends[2]:
-		if not _second_built:
-			_second_built = true
-			_round_label.text = L.t("2. TUR")
-			_build_rows([int(round2[0]), int(round2[1])], [])
-		var k := clampf((_t - ends[1]) / maxf(0.01, ends[2] - ends[1]), 0.0, 1.0)
-		_fill_pair(int(round2[2]), int(round2[3]), k)
+		_enter_round2(round2)
+		var k := _ease(clampf((_t - ends[1]) / maxf(0.01, ends[2] - ends[1]), 0.0, 1.0))
+		_fill_pair(round1, round2, k)
+		_hall.show_round2(k)
 		_status.text = L.t("İkinci tur oylaması…")
 	else:
 		if not round2.is_empty():
-			if not _second_built:
-				_second_built = true
-				_round_label.text = L.t("2. TUR")
-				_build_rows([int(round2[0]), int(round2[1])], [])
-			_fill_pair(int(round2[2]), int(round2[3]), 1.0)
+			_enter_round2(round2)
+			_fill_pair(round1, round2, 1.0)
+			_hall.show_round2(1.0)
 		else:
-			_fill_rows(data.get("round1", []), 1.0)
-		var winner: Dictionary = candidates[int(data.get("winner", 0))]
-		_stamp.text = L.t("GENEL BAŞKAN: %s") % String(winner.get("name", "?"))
-		_stamp.visible = true
-		_status.text = L.t("Genel başkanlığını korudu.") if bool(winner.get("incumbent", false)) else L.t("Parti yeni genel başkanını seçti.")
-		for row in _rows:
-			if int(row["index"]) == int(data.get("winner", 0)):
-				(row["panel"] as Panel).modulate = Color(1.15, 1.1, 0.8)
-	if _t >= _duration:
+			_fill_cards(round1, 1.0)
+			_hall.show_round1(1.0)
+		if not _ended:
+			_ended = true
+			_end_t = _t
+			_show_winner(candidates)
+		var since := _t - _end_t
+		_hall.confetti_t = since
+		_stamp.scale = Vector2.ONE * (1.0 + maxf(0.0, 0.3 - since) * 2.2)
+	if _t >= _duration and not _paper_started:
+		_start_paper()
+
+func _show_winner(candidates: Array) -> void:
+	var w := int(data.get("winner", 0))
+	var winner: Dictionary = candidates[w]
+	_stamp_label.text = L.t("GENEL BAŞKAN: %s") % String(winner.get("name", "?"))
+	_stamp.visible = true
+	_stamp.reset_size()
+	_stamp.pivot_offset = _stamp.size * 0.5
+	_stamp.position = Vector2(_hall.global_position.x + (_hall.size.x - _stamp.size.x) * 0.5,
+		_hall.global_position.y + (_hall.size.y - _stamp.size.y) * 0.5)
+	_status.text = L.t("Genel başkanlığını korudu.") if bool(winner.get("incumbent", false)) else L.t("Parti yeni genel başkanını seçti.")
+	for card in _cards:
+		var on := int(card["index"]) == w
+		(card["panel"] as Control).modulate = Color(1.15, 1.12, 1.0) if on else Color(0.55, 0.55, 0.65)
+
+## Sonuç gazetesi kongre ekranında oynar; bitince (ya da animasyonlar
+## kapalıysa hemen) ekran kapanır.
+func _start_paper() -> void:
+	_paper_started = true
+	_skip_row.visible = false
+	var candidates: Array = data.get("candidates", [])
+	var w := int(data.get("winner", 0))
+	if w < 0 or w >= candidates.size():
+		queue_free()
+		return
+	var winner: Dictionary = candidates[w]
+	var round2: Array = data.get("round2", [])
+	var round1: Array = data.get("round1", [])
+	var delegates := 0
+	if round2.size() >= 4:
+		delegates = int(round2[2]) if int(round2[0]) == w else int(round2[3])
+	elif w < round1.size():
+		delegates = int(round1[w])
+	var kept := bool(winner.get("incumbent", false))
+	var shown := _event_fx.present("cg|%d|%d|%s" % [int(data.get("pid", -1)), CardManager.round_number, String(winner.get("name", ""))], {
+		"headline": L.t("GENEL BAŞKAN KOLTUĞUNU KORUDU!") if kept else L.t("YENİ GENEL BAŞKAN BELLİ OLDU!"),
+		"subtitle": L.t("%s kongresi: %s, %d delegenin oyuyla genel başkan.") % [
+			String(data.get("party", "")), String(winner.get("name", "?")), delegates],
+		"party": int(data.get("pid", -1)), "accent": data.get("color", GOLD),
+		"stamp": L.t("GENEL BAŞKAN"), "sound": "law_passed"})
+	if not shown:
 		queue_free()
 
-func _fill_rows(delegates: Array, k: float) -> void:
-	for row in _rows:
-		var i := int(row["index"])
-		var value := float(delegates[i]) if i < delegates.size() else 0.0
-		_set_row(row, value * _ease(k))
+static func candidate_color(index: int) -> Color:
+	return CANDIDATE_COLORS[index % CANDIDATE_COLORS.size()]
 
-func _fill_pair(a_value: int, b_value: int, k: float) -> void:
-	if _rows.size() < 2:
+func _enter_round2(round2: Array) -> void:
+	if _second_built:
 		return
-	_set_row(_rows[0], a_value * _ease(k))
-	_set_row(_rows[1], b_value * _ease(k))
+	_second_built = true
+	_round_label.text = L.t("2. TUR")
+	_build_cards([int(round2[0]), int(round2[1])])
+
+func _fill_cards(delegates: Array, k: float) -> void:
+	for card in _cards:
+		var i := int(card["index"])
+		_set_card(card, (float(delegates[i]) if i < delegates.size() else 0.0) * k)
+
+## 2. tur: finalistler 1. turdaki delegeleriyle başlar, elenenlerinkini toplar.
+func _fill_pair(round1: Array, round2: Array, k: float) -> void:
+	if _cards.size() < 2:
+		return
+	for j in 2:
+		var start := float(round1[int(round2[j])])
+		_set_card(_cards[j], lerpf(start, float(round2[2 + j]), k))
 
 func _ease(k: float) -> float:
 	return 1.0 - pow(1.0 - k, 2.0)
 
-func _set_row(row: Dictionary, value: float) -> void:
+func _set_card(card: Dictionary, value: float) -> void:
 	var total := float(CardManager.CONGRESS_DELEGATES)
-	var fill: ColorRect = row["fill"]
+	var fill: ColorRect = card["fill"]
 	var track: Control = fill.get_parent()
 	fill.size = Vector2(track.size.x * clampf(value / total, 0.0, 1.0), track.size.y)
-	var half: ColorRect = row["half"]
-	half.position = Vector2(track.size.x * 0.5 - 1.0, -4.0)
-	half.size = Vector2(2.0, track.size.y + 8.0)
-	(row["value"] as Label).text = L.t("%d  ·  %%%d") % [int(round(value)), int(round(value / total * 100.0))]
+	var half: ColorRect = card["half"]
+	half.position = Vector2(track.size.x * 0.5 - 1.0, -5.0)
+	half.size = Vector2(3.0, track.size.y + 10.0)
+	(card["value"] as Label).text = str(int(round(value)))
+	(card["percent"] as Label).text = L.t("%%%d") % int(round(value / total * 100.0))
 
 func _build() -> void:
-	var bg := ColorRect.new()
-	bg.color = BG_TOP
+	var bg := TextureRect.new()
+	var gradient := Gradient.new()
+	gradient.set_color(0, BG_TOP)
+	gradient.set_color(1, BG_BOTTOM)
+	var texture := GradientTexture2D.new()
+	texture.gradient = gradient
+	texture.fill_from = Vector2(0.5, 0.0)
+	texture.fill_to = Vector2(0.5, 1.0)
+	bg.texture = texture
+	bg.stretch_mode = TextureRect.STRETCH_SCALE
+	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
@@ -158,11 +247,11 @@ func _build() -> void:
 	var color: Color = data.get("color", GOLD)
 	var root := VBoxContainer.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.offset_left = 48
-	root.offset_right = -48
+	root.offset_left = 40
+	root.offset_right = -40
 	root.offset_top = 0
-	root.offset_bottom = -24
-	root.add_theme_constant_override("separation", 12)
+	root.offset_bottom = -60
+	root.add_theme_constant_override("separation", 10)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
 
@@ -207,62 +296,113 @@ func _build() -> void:
 	_progress_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	progress.add_child(_progress_fill)
 
-	_round_label = _label(L.t("1. TUR") if (data.get("candidates", []) as Array).size() > 1 else L.t("TEK ADAY"), 18, UiTheme.TEXT_MUTED)
+	# Delege salonu
+	_hall = Hall.new()
+	_hall.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_hall.size_flags_stretch_ratio = 1.25
+	_hall.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_hall)
+
+	_round_label = _label(L.t("1. TUR") if (data.get("candidates", []) as Array).size() > 1 else L.t("TEK ADAY"), 20, GOLD)
+	_round_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root.add_child(_round_label)
-	_bars_box = VBoxContainer.new()
-	_bars_box.add_theme_constant_override("separation", 10)
-	_bars_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_bars_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(_bars_box)
+	_cards_box = HBoxContainer.new()
+	_cards_box.add_theme_constant_override("separation", 14)
+	_cards_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_cards_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_cards_box)
 	_status = _label("", 15, UiTheme.TEXT_MUTED)
 	root.add_child(_status)
-	_stamp = _label("", 30, GOLD)
-	_stamp.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_stamp.visible = false
-	root.add_child(_stamp)
 
-func _build_rows(indices: Array, _delegates: Array) -> void:
-	for child in _bars_box.get_children():
+	# Sonuç damgası (salonun ortasına, hafif eğik)
+	_stamp = PanelContainer.new()
+	_stamp.add_theme_stylebox_override("panel", UiSkin.color_box(GOLD))
+	_stamp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_stamp.rotation = deg_to_rad(-4.0)
+	_stamp.visible = false
+	_stamp.z_index = 5
+	_stamp_label = Label.new()
+	_stamp_label.add_theme_font_override("font", UiTheme.mono(true))
+	_stamp_label.add_theme_font_size_override("font_size", 34)
+	_stamp_label.add_theme_color_override("font_color", UiTheme.INK)
+	_stamp_label.text = " "
+	var pad := MarginContainer.new()
+	for side in ["left", "right"]:
+		pad.add_theme_constant_override("margin_" + side, 28)
+	for side in ["top", "bottom"]:
+		pad.add_theme_constant_override("margin_" + side, 10)
+	pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pad.add_child(_stamp_label)
+	_stamp.add_child(pad)
+	add_child(_stamp)
+
+func _build_cards(indices: Array) -> void:
+	for child in _cards_box.get_children():
 		child.queue_free()
-	_rows.clear()
+	_cards.clear()
 	var candidates: Array = data.get("candidates", [])
-	var party_color: Color = data.get("color", GOLD)
 	for i in indices:
 		var c: Dictionary = candidates[int(i)]
-		var panel := Panel.new()
-		panel.custom_minimum_size = Vector2(0, 58)
-		panel.add_theme_stylebox_override("panel", UiSkin.color_box(UiTheme.PANEL_DARK))
+		var color := candidate_color(int(i))
+		var panel := PanelContainer.new()
+		panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		panel.add_theme_stylebox_override("panel", UiSkin.color_box(UiTheme.PANEL))
 		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_bars_box.add_child(panel)
-		var row := HBoxContainer.new()
-		row.set_anchors_preset(Control.PRESET_FULL_RECT)
-		row.offset_left = 10
-		row.offset_right = -10
-		row.add_theme_constant_override("separation", 12)
-		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		panel.add_child(row)
-		var names := VBoxContainer.new()
-		names.custom_minimum_size = Vector2(300, 0)
-		names.alignment = BoxContainer.ALIGNMENT_CENTER
-		names.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_child(names)
+		_cards_box.add_child(panel)
+		var col := VBoxContainer.new()
+		col.add_theme_constant_override("separation", 6)
+		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		panel.add_child(col)
+		# Adayın renkli ad şeridi
+		var strip := PanelContainer.new()
+		strip.add_theme_stylebox_override("panel", UiSkin.color_box(color))
+		strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		col.add_child(strip)
+		var name_label := Label.new()
+		name_label.text = "  " + String(c.get("name", "?"))
+		name_label.add_theme_font_override("font", UiTheme.mono(true))
+		name_label.add_theme_font_size_override("font_size", 19)
+		name_label.add_theme_color_override("font_color", UiTheme.INK)
+		name_label.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
+		name_label.clip_text = false
+		name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		strip.add_child(name_label)
 		var tag := ""
 		if bool(c.get("incumbent", false)):
-			tag = L.t("  · GENEL BAŞKAN")
+			tag = L.t("GENEL BAŞKAN")
 		elif bool(c.get("human", false)):
-			tag = L.t("  · OYUNCU")
-		names.add_child(_label(String(c.get("name", "?")) + tag, 18, GOLD if bool(c.get("human", false)) else Color.WHITE))
-		names.add_child(_label(String(c.get("background", "")), 12, UiTheme.TEXT_MUTED))
+			tag = L.t("OYUNCU")
+		var sub := String(c.get("background", ""))
+		if tag != "":
+			sub = tag if sub == "" else "%s  ·  %s" % [tag, sub]
+		var sub_label := _label("  " + sub, 13, GOLD if tag != "" else UiTheme.TEXT_MUTED)
+		col.add_child(sub_label)
+		var nums := HBoxContainer.new()
+		nums.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		col.add_child(nums)
+		var percent := _label("%0", 18, UiTheme.TEXT_MUTED)
+		percent.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		percent.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+		nums.add_child(_spacer(10))
+		nums.add_child(percent)
+		var value := _label("0", 40, Color.WHITE)
+		value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		nums.add_child(value)
+		nums.add_child(_spacer(10))
+		var track_row := MarginContainer.new()
+		track_row.add_theme_constant_override("margin_left", 10)
+		track_row.add_theme_constant_override("margin_right", 10)
+		track_row.add_theme_constant_override("margin_bottom", 12)
+		track_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		col.add_child(track_row)
 		var track := ColorRect.new()
 		track.color = UiTheme.SLOT
-		track.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		track.custom_minimum_size = Vector2(0, 26)
-		track.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		track.custom_minimum_size = Vector2(0, 18)
 		track.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_child(track)
+		track_row.add_child(track)
 		var fill := ColorRect.new()
-		fill.color = party_color if bool(c.get("incumbent", false)) else party_color.lerp(Color.WHITE, 0.35 + 0.15 * float(int(i) % 3))
-		fill.size = Vector2(0, 26)
+		fill.color = color
+		fill.size = Vector2(0, 18)
 		fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		track.add_child(fill)
 		# Yarı çizgisi (delegelerin yarısı): geçen 1. turda kazanır.
@@ -270,12 +410,13 @@ func _build_rows(indices: Array, _delegates: Array) -> void:
 		half.color = Color.WHITE
 		half.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		track.add_child(half)
-		var value := _label("0  ·  %0", 16, Color.WHITE)
-		value.custom_minimum_size = Vector2(150, 0)
-		value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		value.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		row.add_child(value)
-		_rows.append({"panel": panel, "fill": fill, "half": half, "value": value, "index": int(i)})
+		_cards.append({"panel": panel, "fill": fill, "half": half, "value": value, "percent": percent, "index": int(i)})
+
+func _spacer(w: float) -> Control:
+	var c := Control.new()
+	c.custom_minimum_size = Vector2(w, 0)
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return c
 
 func _label(text: String, font_size: int, color: Color) -> Label:
 	var label := Label.new()
@@ -287,3 +428,167 @@ func _label(text: String, font_size: int, color: Color) -> Label:
 	label.add_theme_constant_override("outline_size", 4)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return label
+
+## Delege salonu: amfi biçiminde SEATS koltuk. Her koltuk bir adaya aittir;
+## oy sırası salonun ortasından kenarlara dalga gibi ilerler.
+class Hall extends Control:
+	var owner_r1: PackedInt32Array = []   # koltuk -> 1. tur adayı
+	var owner_r2: PackedInt32Array = []   # koltuk -> 2. tur adayı
+	var order: PackedInt32Array = []      # oy sırası (koltuk indeksleri)
+	var transfer_rank: PackedInt32Array = []  # 2. turda el değiştiren koltukların sırası (-1: değişmez)
+	var transfers := 0
+	var mode := 0        # 0: 1. tur, 1: turlar arası, 2: 2. tur
+	var k := 0.0
+	var confetti_t := -1.0
+
+	func setup(d: Dictionary) -> void:
+		var total := float(CardManager.CONGRESS_DELEGATES)
+		var round1: Array = d.get("round1", [])
+		var round2: Array = d.get("round2", [])
+		# Koltukları delegelere orantılı dağıt (en büyük kalan yöntemi).
+		var counts := _apportion(round1, total)
+		var rng := RandomNumberGenerator.new()
+		rng.seed = hash(str(round1) + str(round2))
+		var pool: Array = []
+		for i in counts.size():
+			for j in int(counts[i]):
+				pool.append(i)
+		while pool.size() < SEATS:
+			pool.append(0)
+		# Karışık oturma düzeni (aynı kongre her ekranda aynı görünür).
+		for i in range(pool.size() - 1, 0, -1):
+			var j := rng.randi_range(0, i)
+			var tmp = pool[i]
+			pool[i] = pool[j]
+			pool[j] = tmp
+		owner_r1 = PackedInt32Array(pool)
+		owner_r2 = owner_r1.duplicate()
+		transfer_rank.resize(SEATS)
+		transfer_rank.fill(-1)
+		if round2.size() >= 4:
+			var a := int(round2[0])
+			var b := int(round2[1])
+			var target_a := int(round(float(round2[2]) / total * SEATS))
+			var have_a := 0
+			for i in SEATS:
+				if owner_r1[i] == a:
+					have_a += 1
+			transfers = 0
+			for i in SEATS:
+				if owner_r1[i] != a and owner_r1[i] != b:
+					owner_r2[i] = a if have_a < target_a else b
+					if owner_r2[i] == a:
+						have_a += 1
+					transfer_rank[i] = transfers
+					transfers += 1
+		# Oy sırası: ortadan kenarlara, ön sıradan arkaya.
+		var idx: Array = range(SEATS)
+		idx.sort_custom(func(p, q): return _wave_key(p) < _wave_key(q))
+		order = PackedInt32Array(idx)
+		queue_redraw()
+
+	func _apportion(delegates: Array, total: float) -> Array:
+		var counts: Array = []
+		var rems: Array = []
+		var used := 0
+		for i in delegates.size():
+			var exact := float(delegates[i]) / total * SEATS
+			counts.append(int(floor(exact)))
+			rems.append([exact - floor(exact), i])
+			used += int(floor(exact))
+		rems.sort_custom(func(p, q): return p[0] > q[0])
+		var r := 0
+		while used < SEATS and r < rems.size():
+			counts[int(rems[r][1])] += 1
+			used += 1
+			r += 1
+		return counts
+
+	func _seat_pos(i: int) -> Vector2:
+		var per_row := SEATS / HALL_ROWS
+		var row := i / per_row
+		var col := i % per_row
+		var w := size.x
+		var h := size.y
+		var t := (float(col) + 0.5) / float(per_row)
+		var row_k := float(row) / float(HALL_ROWS - 1)
+		# Hafif amfi: arka sıralar geniş ve yukarıda, kenarlar öne kıvrılır.
+		var spread := 0.62 + 0.36 * row_k
+		var x := w * 0.5 + (t - 0.5) * w * spread
+		var y := h * (0.92 - 0.82 * row_k) - pow(absf(t - 0.5) * 2.0, 2.0) * h * 0.08 * (1.0 - row_k * 0.5)
+		return Vector2(x, y)
+
+	func _wave_key(i: int) -> float:
+		var per_row := SEATS / HALL_ROWS
+		return absf(float(i % per_row) / per_row - 0.5) * 2.0 + float(i / per_row) * 0.09
+
+	func show_round1(value: float) -> void:
+		mode = 0
+		k = value
+		queue_redraw()
+
+	func show_between(value: float) -> void:
+		mode = 1
+		k = value
+		queue_redraw()
+
+	func show_round2(value: float) -> void:
+		mode = 2
+		k = value
+		queue_redraw()
+
+	func _process(_delta: float) -> void:
+		if confetti_t >= 0.0:
+			queue_redraw()
+
+	func _draw() -> void:
+		if owner_r1.is_empty():
+			return
+		var per_row := SEATS / HALL_ROWS
+		var r: float = clampf(minf(size.x * 0.62 / per_row * 0.42, size.y / HALL_ROWS * 0.4), 3.0, 14.0)
+		var lit_count := int(k * SEATS) if mode == 0 else SEATS
+		var rank := PackedInt32Array()
+		rank.resize(SEATS)
+		for n in order.size():
+			rank[order[n]] = n
+		var transfer_lit := int(k * transfers)
+		for i in SEATS:
+			var p := _seat_pos(i)
+			var color := UiTheme.PANEL
+			var radius := r
+			if mode == 0:
+				if rank[i] < lit_count:
+					color = CongressShow.candidate_color(owner_r1[i])
+					if lit_count - rank[i] < 8:
+						radius = r * 1.35  # yeni oy veren delege "parlar"
+			elif transfer_rank[i] < 0:
+				color = CongressShow.candidate_color(owner_r1[i])
+			elif mode == 1:
+				# Elenen adayların koltukları griye döner.
+				color = CongressShow.candidate_color(owner_r1[i]).lerp(UiTheme.PANEL_LIGHT, k)
+			elif transfer_rank[i] < transfer_lit:
+				color = CongressShow.candidate_color(owner_r2[i])
+				if transfer_lit - transfer_rank[i] < 6:
+					radius = r * 1.35
+			else:
+				color = UiTheme.PANEL_LIGHT
+			draw_circle(p, radius, color)
+		if confetti_t >= 0.0:
+			_draw_confetti()
+
+	func _draw_confetti() -> void:
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 1789
+		for n in 120:
+			var x0 := rng.randf() * size.x
+			var speed := rng.randf_range(0.35, 0.8) * size.y
+			var y := -20.0 + confetti_t * speed - rng.randf() * size.y * 0.4
+			if y < -20.0 or y > size.y + 20.0:
+				continue
+			var x := x0 + sin(confetti_t * 3.0 + n) * 14.0
+			var c := CongressShow.candidate_color(n)
+			if n % 3 == 0:
+				c = GOLD
+			draw_set_transform(Vector2(x, y), confetti_t * 4.0 + n, Vector2.ONE)
+			draw_rect(Rect2(-4, -6, 8, 12), c)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

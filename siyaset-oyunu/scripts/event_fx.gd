@@ -34,8 +34,6 @@ const QUEUE_MAX := 3
 const CATCH_UP_SPEED := 1.7
 
 static var _seen: Array = []
-## Seçim gecesinden oyun ekranına dönülürken ElectionResults işaretler.
-static var pending_election := false
 
 var speed := 1.0
 var _queue: Array = []

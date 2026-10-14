@@ -173,10 +173,12 @@ const TURN_TIMEOUT := 90.0
 const FORMATION_TIMEOUT := 120.0
 const VOTE_TIMEOUT := 45.0
 ## Seçim gecesi canlı sayım yayınının süresi ve bittikten sonra kesin sonucun
-## ekranda kaldığı süre (bkz. election_results.gd). Host, hükümet kurma
+## ekranda kaldığı süre (bkz. election_results.gd); ardından seçim ekranında
+## sonuç gazetesi (~2,8 sn, ELECTION_NIGHT_PAPER) oynar. Host, hükümet kurma
 ## süresine bunları ekler.
-const ELECTION_NIGHT_SECONDS := 22.5
-const ELECTION_NIGHT_HOLD := 5.0
+const ELECTION_NIGHT_SECONDS := 19.5
+const ELECTION_NIGHT_HOLD := 2.5
+const ELECTION_NIGHT_PAPER := 3.0
 
 ## Oyun ortasında oyuncular ayrılıp bu sayının altına düşülürse oyun biter.
 const MIN_PLAYERS_TO_CONTINUE := 2

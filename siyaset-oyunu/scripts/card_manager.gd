@@ -2636,7 +2636,7 @@ func _hold_election(finished_round: int, early: bool) -> void:
 	_push_state({"type": "election"}, true)
 	# Yeni meclis: hükümet kurma görevi en çok vekili olan partiye verilir.
 	# Seçim gecesi yayını herkesin ekranında oynarken kurma süresi yanmasın.
-	GovernmentManager.start_formation(GameRules.ELECTION_NIGHT_SECONDS + GameRules.ELECTION_NIGHT_HOLD + 2.0)
+	GovernmentManager.start_formation(GameRules.ELECTION_NIGHT_SECONDS + GameRules.ELECTION_NIGHT_HOLD + GameRules.ELECTION_NIGHT_PAPER + 2.0)
 
 ## BAĞIMSIZ ADAY: sadece memleketinde yarışır, en fazla 1 sandalye kazanır.
 ## O ildeki payı (diğer partilerle birlikte hesaplanır) ilin bir vekillik
@@ -3314,9 +3314,10 @@ const CONGRESS_MAX_ELECTIONS := 3
 const CONGRESS_COST := 10
 const CONGRESS_REQUEST_COST := 20
 const CONGRESS_DELEGATES := 1200
-## Gösteri süreleri: oyuncunun partisi seçim gecesinin yarısı, bot partisi dörtte biri.
+## Gösteri süreleri (sonuç gazetesi hariç): oyuncunun partisi seçim gecesinin
+## 0,4'ü (~8,8 sn), bot partisi dörtte biri (~5,5 sn).
 static func congress_duration(has_human: bool) -> float:
-	return (GameRules.ELECTION_NIGHT_SECONDS + GameRules.ELECTION_NIGHT_HOLD) * (0.5 if has_human else 0.25)
+	return (GameRules.ELECTION_NIGHT_SECONDS + GameRules.ELECTION_NIGHT_HOLD) * (0.4 if has_human else 0.25)
 
 func _congress_info(pid: int) -> Dictionary:
 	if not party_congress.has(pid):
@@ -3549,9 +3550,10 @@ func _run_congress(pid: int, kind: String, requester: int = -1) -> void:
 	for key in party_congress.keys():
 		if int(key) == pid or int(key) == party_of(pid):
 			party_congress[key].erase("bot_due")
-	# Gösteri herkesin ekranında oynar; o süre boyunca tur akışı durur.
+	# Gösteri herkesin ekranında oynar; o süre boyunca (sonuç gazetesi dahil)
+	# tur akışı durur.
 	var duration := congress_duration(has_human)
-	_congress_time_left = duration
+	_congress_time_left = duration + GameRules.ELECTION_NIGHT_PAPER
 	congress_active = true
 	var show := result.duplicate(true)
 	for c in show["candidates"]:

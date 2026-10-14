@@ -1199,9 +1199,6 @@ func _build_event_fx() -> void:
 	CardManager.event_presented.connect(_headline_for_event)
 	GovernmentManager.coalition_changed.connect(_headline_for_coalition)
 	tree_exiting.connect(_event_fx.skip_all)
-	if EventFx.pending_election:
-		EventFx.pending_election = false
-		get_tree().create_timer(0.7).timeout.connect(_headline_for_election)
 
 func _fx_party_name(peer_id: int) -> String:
 	return String(PartyManager.data_of(peer_id).get("name", "?"))
@@ -1298,47 +1295,6 @@ static func _is_withdrawal_text(text: String) -> bool:
 	return false
 
 ## Seçim gecesinden dönünce: kesin sonuç manşeti (birinci parti, vekil, oy).
-func _headline_for_election() -> void:
-	if not is_inside_tree() or CardManager.last_election_round <= 0 or CardManager.last_seats.is_empty():
-		return
-	var winner := -1
-	for peer_id in CardManager.last_seats.keys():
-		if winner == -1 or int(CardManager.last_seats[peer_id]) > int(CardManager.last_seats[winner]):
-			winner = int(peer_id)
-	var seats := int(CardManager.last_seats.get(winner, 0))
-	var majority := seats * 2 > GovernmentManager.total_seats()
-	_event_fx.present("el|%d" % CardManager.last_election_round, {
-		"headline": L.t("SANDIKTAN TEK PARTİ ÇOĞUNLUĞU!") if majority else L.t("SANDIKTAN KOALİSYON MECLİSİ ÇIKTI!"),
-		"subtitle": L.t("%d seçimi: %s %d vekille birinci (oy oranı %s).") % [
-			GameRules.election_year(CardManager.last_election_round), _fx_party_name(winner), seats,
-			L.pct(float(CardManager.last_vote_shares.get(winner, 0.0)))],
-		"party": winner, "accent": UiTheme.GOLD, "stamp": L.t("BİRİNCİ PARTİ"), "sound": "law_passed",
-		"status": L.t("%d VEKİL") % seats})
-
-## Kongre gecesi kapanınca (bittiğinde ya da atlanınca): sonuç manşeti.
-func _headline_for_congress(data: Dictionary) -> void:
-	if not is_inside_tree() or is_queued_for_deletion() or _event_fx == null:
-		return
-	var candidates: Array = data.get("candidates", [])
-	var w := int(data.get("winner", 0))
-	if w < 0 or w >= candidates.size():
-		return
-	var winner: Dictionary = candidates[w]
-	var round2: Array = data.get("round2", [])
-	var round1: Array = data.get("round1", [])
-	var delegates := 0
-	if round2.size() >= 4:
-		delegates = int(round2[2]) if int(round2[0]) == w else int(round2[3])
-	elif w < round1.size():
-		delegates = int(round1[w])
-	var kept := bool(winner.get("incumbent", false))
-	_event_fx.present("cg|%d|%d|%s" % [int(data.get("pid", -1)), CardManager.round_number, String(winner.get("name", ""))], {
-		"headline": L.t("GENEL BAŞKAN KOLTUĞUNU KORUDU!") if kept else L.t("YENİ GENEL BAŞKAN BELLİ OLDU!"),
-		"subtitle": L.t("%s kongresi: %s, %d delegenin oyuyla genel başkan.") % [
-			String(data.get("party", "")), String(winner.get("name", "?")), delegates],
-		"party": int(data.get("pid", -1)), "accent": data.get("color", UiTheme.GOLD),
-		"stamp": L.t("GENEL BAŞKAN"), "sound": "law_passed"})
-
 ## OLAY LOGU: sol panelde hükümet bilgisi ile sıra göstergesi arasındaki boşluk.
 ## (Eski üst bant yazısı kaldırıldı; her olay ve uyarı buraya düşer.)
 func _build_event_log() -> void:
@@ -1387,8 +1343,7 @@ func _focus_log_entry(entry: Dictionary) -> void:
 func _on_congress_started(data: Dictionary) -> void:
 	var congress_view: Control = preload("res://scripts/congress_show.gd").new()
 	congress_view.data = data
-	add_child(congress_view)
-	congress_view.tree_exited.connect(_headline_for_congress.bind(data))
+	add_child(congress_view)  # sonuç gazetesini kendisi oynatır
 
 ## Haritada bir hamle olunca (ili olan her log kaydı) ilin üstünde, log
 ## kaydına dokununca oynayan animasyonun YAKINLAŞTIRMASIZ hâli oynar.

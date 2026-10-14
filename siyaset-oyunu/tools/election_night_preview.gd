@@ -50,7 +50,7 @@ func _initialize() -> void:
 	for i in 5:
 		await process_frame
 	var out := OS.get_user_data_dir()
-	for moment in [3.0, 9.0, 16.0, GameRules.ELECTION_NIGHT_SECONDS]:
+	for moment in [3.0, 7.0, 12.0, 17.0, GameRules.ELECTION_NIGHT_SECONDS]:
 		scene._t = moment
 		scene._refresh_left = 0.0
 		scene._map_refresh_left = 0.0
@@ -60,5 +60,12 @@ func _initialize() -> void:
 			var path := "%s/election_night_%02d.png" % [out, int(moment)]
 			root.get_texture().get_image().save_png(path)
 			print("screenshot: ", path)
+	# Sonuç gazetesi seçim ekranında oynar, bitince oyun ekranına dönülür.
+	scene._hold_left = 0.0
+	for i in 75:
+		await process_frame
+	print("gazete başladı: %s, oynuyor: %s" % [str(scene._paper_started), str(scene._event_fx.is_playing())])
+	if DisplayServer.get_name() != "headless":
+		root.get_texture().get_image().save_png("%s/election_night_paper.png" % out)
 	print("=== PREVIEW DONE ===")
 	quit()

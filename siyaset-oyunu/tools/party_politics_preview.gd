@@ -154,12 +154,19 @@ func _initialize() -> void:
 		show_node._t = 0.8
 		await _frames(3)
 		_shot("party_politics_congress_round1")
+		show_node._t = 1.25
+		await _frames(3)
+		_shot("party_politics_congress_between")
 		show_node._t = 1.9
 		await _frames(3)
 		_shot("party_politics_congress_round2")
 		show_node._t = 2.6
 		await _frames(3)
 		_shot("party_politics_congress_result")
+		show_node._t = 3.0
+		await _frames(40)
+		print("KONGRE GAZETESİ: başladı %s, oynuyor %s" % [str(show_node._paper_started), str(show_node._event_fx.is_playing())])
+		_shot("party_politics_congress_paper")
 	# Parti kurma penceresi.
 	var dialog: Control = load("res://scripts/found_party_dialog.gd").new()
 	scene.add_child(dialog)

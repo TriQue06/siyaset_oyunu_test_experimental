@@ -31,6 +31,10 @@ func run() -> void:
 		if not slot.is_queued_for_deletion() and not slot.size.is_equal_approx(common):
 			equal = false
 	check(equal, "all lobby player slots equal")
+	var card_size: Vector2 = (slots[0].get_meta("card") as Control).size
+	for slot in slots:
+		if not slot.is_queued_for_deletion():
+			check((slot.get_meta("card") as Control).size.is_equal_approx(card_size), "visible player frames equal")
 	check(lobby._lobby_columns.size.x <= lobby.size.x, "lobby fits viewport horizontally")
 	lobby.world_controls["turn_seconds"].value = 90
 	check(int(mm.world_settings["turn_seconds"]) == 90, "slider changes server setting")

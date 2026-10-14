@@ -238,10 +238,20 @@ func _build_slot(card: Control, show_bot_button: bool, enabled: bool) -> Control
 	card.offset_top = BOT_BUTTON_SIZE * 0.45
 	card.offset_right = -BOT_BUTTON_SIZE * 0.45
 	var frame := Control.new()
-	frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	frame.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	frame.clip_contents = true
 	slot.add_child(frame)
 	frame.add_child(card)
+	# Container minimums must not independently size occupied/empty cards.
+	card.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	var fit_card := func():
+		var reserve := BOT_BUTTON_SIZE * 0.45
+		frame.position = Vector2.ZERO
+		frame.size = slot.size
+		card.position = Vector2(0, reserve)
+		card.size = Vector2(slot.size.x - reserve, slot.size.y - reserve)
+	slot.resized.connect(fit_card)
+	fit_card.call_deferred()
 	if not show_bot_button:
 		return slot
 	var button := Button.new()

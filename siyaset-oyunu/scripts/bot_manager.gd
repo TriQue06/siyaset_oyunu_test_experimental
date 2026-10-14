@@ -72,6 +72,15 @@ func _handle_turn(now: float) -> void:
 		return
 	if now < _turn_due:
 		return
+	var alliance_decision := BotBrain.choose_alliance_decision(bot)
+	if not alliance_decision.is_empty():
+		var alliance_id := int(alliance_decision["alliance_id"])
+		if String(alliance_decision["type"]) == "join":
+			CardManager._apply_join_alliance(bot, alliance_id)
+		else:
+			CardManager._apply_decline_alliance_invitation(bot, alliance_id)
+		_turn_due = now + _delay(PLAY_SECONDS)
+		return
 	# Hamle sınırı yok: bot her hamleden sonra biraz düşünüp devam eder,
 	# yapacak değerli bir şey kalmayınca turu bitirir.
 	_turn_due = now + _delay(PLAY_SECONDS)

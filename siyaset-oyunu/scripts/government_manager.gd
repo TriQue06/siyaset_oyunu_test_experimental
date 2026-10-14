@@ -715,6 +715,8 @@ func _resolve_proposal() -> void:
 			last_resolution_reason += L.t(" Yeni baraj %%%s, seçimler %d yılda bir, sayım: %s.") % [
 				String.num(MultiplayerManager.election_threshold, 1), MultiplayerManager.election_interval,
 				ElectionModel.method_title(MultiplayerManager.seat_method)]
+			var alliance_status := L.t("açık") if CardManager.alliances_enabled else L.t("kapalı")
+			last_resolution_reason += L.t(" Seçim ittifakları: %s.") % alliance_status
 		_push_state()
 		if not _is_local_only():
 			_notify_resolved.rpc(const_passed, kind, proposer)

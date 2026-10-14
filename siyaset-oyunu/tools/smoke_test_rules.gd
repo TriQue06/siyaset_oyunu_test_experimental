@@ -236,6 +236,9 @@ func _initialize() -> void:
 	print("=== 7) GENSORU OYLAMASI SIRAYI DEVRETMEZ ===")
 	form_government({1: 200, 2: 100, 3: 90}, all_posts_to(1))
 	check("hukumet kuruldu", gm.has_government())
+	# Gensoruyu muhalefet oyuncusu 3'ün verebilmesi için bu senaryodaki
+	# oyuncu sırasını açıkça sabitle; Dictionary.keys() sırasına güvenme.
+	cm.turn_order = [1, 2, 3]
 	cm.current_turn_index = cm.turn_order.size() - 1
 	var last_peer: int = cm.current_turn_peer_id()
 	var round_before: int = cm.round_number

@@ -142,6 +142,7 @@ var _constitution_interval: int = 4
 var _constitution_threshold_label: Label
 var _constitution_interval_label: Label
 var _constitution_button: Button
+var _constitution_alliances: CheckButton
 var _constitution_method: String = "dhondt"
 var _constitution_method_label: Label
 
@@ -346,6 +347,12 @@ var _inquiry_panel: PanelContainer
 var _inquiry_box: VBoxContainer
 var _inquiry_target: int = -1
 var _inquiry_card: Control
+var _alliance_button: Button
+var _alliance_panel: PanelContainer
+var _alliance_list: VBoxContainer
+var _alliance_name: LineEdit
+var _alliance_color: ColorPickerButton
+var _alliance_create_button: Button
 
 func _ready() -> void:
 	AudioManager.play_game_music()
@@ -424,6 +431,7 @@ func _ready() -> void:
 	# Çöp kutusu destenin yanına otursun (yerleşim butonlar kurulduktan sonra).
 	_place_right_column_controls()
 	_build_law_designer()
+	_build_alliance_panel()
 	_build_tax_panel()
 	_build_funding_ui()
 	_build_agenda_banner()
@@ -1218,6 +1226,9 @@ func _on_proposal_resolved(accepted: bool, kind: String, proposer_id: int) -> vo
 	# Sonuç metni olay loguna CardManager üzerinden düşer; büyük sonuçlar ayrıca
 	# gazete manşeti olur.
 	_headline_for_proposal(accepted, kind, proposer_id)
+	if accepted and kind == GovernmentManager.KIND_CONSTITUTION and _constitution_alliances != null:
+		_constitution_alliances.set_pressed_no_signal(CardManager.alliances_enabled)
+		_refresh_constitution_section()
 
 # --- OLAY GAZETESİ (EventFx, 0.0.179) -------------------------------------------
 ## Büyük olaylar gazete manşeti olarak sunulur. Sadece GÖSTERİM: veriler oyun
@@ -1228,6 +1239,9 @@ func _build_event_fx() -> void:
 	_event_fx = EventFx.new()
 	add_child(_event_fx)
 	CardManager.event_presented.connect(_headline_for_event)
+	CardManager.event_presented.connect(func(_event: Dictionary, _version: int):
+		if _alliance_panel != null and _alliance_panel.visible:
+			_refresh_alliance_panel())
 	GovernmentManager.coalition_changed.connect(_headline_for_coalition)
 	tree_exiting.connect(_event_fx.skip_all)
 	# Afet seçim gecesinde başladıysa gazetesi oyun ekranına dönünce oynar.
@@ -1276,6 +1290,16 @@ func _headline_for_event(event: Dictionary, version: int) -> void:
 				"art": CardPresets.get_card_texture(CardPresets.REBELLION_CARD_TYPE), "party": parent,
 				"accent": PartyManager.data_of(parent).get("bg_color", UiTheme.RED), "style": "conflict",
 				"stamp": L.t("BÖLÜNDÜ")})
+		"alliance_created":
+			var alliance: Dictionary = CardManager.alliances.get(int(event.get("alliance_id", -1)), {})
+			_event_fx.present(key, {"headline": L.t("SANDIKTA GÜÇLER BİRLEŞİYOR!"), "subtitle": message,
+				"party": int(event.get("peer_id", -1)), "accent": alliance.get("color", UiTheme.GOLD),
+				"style": "conflict", "status": L.t("İTTİFAK KURULDU"), "stamp": String(alliance.get("name", ""))})
+		"alliance_joined":
+			var alliance: Dictionary = CardManager.alliances.get(int(event.get("alliance_id", -1)), {})
+			_event_fx.present(key, {"headline": L.t("İTTİFAK GENİŞLİYOR!"), "subtitle": message,
+				"party": int(event.get("peer_id", -1)), "accent": alliance.get("color", UiTheme.GOLD),
+				"style": "conflict", "status": L.t("İTTİFAKA KATILDI"), "stamp": String(alliance.get("name", ""))})
 
 ## Meclis oylamalarının büyük sonuçları (gensoru, erken seçim, güvenoyu, anayasa).
 func _headline_for_proposal(accepted: bool, kind: String, proposer_id: int) -> void:
@@ -1542,7 +1566,8 @@ func _format_threshold(value: float) -> String:
 ## Anayasa paketi meclise sunulur (2/3 gerekir).
 func _on_constitution_pressed() -> void:
 	CardManager.propose_constitution({"threshold": _constitution_threshold, "interval": _constitution_interval,
-		"seat_method": _constitution_method})
+		"seat_method": _constitution_method,
+		"alliances_enabled": _constitution_alliances.button_pressed if _constitution_alliances != null else CardManager.alliances_enabled})
 	_law_designer.hide()
 
 func _on_pass_pressed() -> void:
@@ -1768,6 +1793,10 @@ func _build_plaque(pid: int, width: float) -> Control:
 	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	stack.add_child(head)
 	var tags: Array = []
+	var alliance_id := CardManager.alliance_of(pid)
+	if alliance_id >= 0 and CardManager.alliances.has(alliance_id):
+		var alliance: Dictionary = CardManager.alliances[alliance_id]
+		tags.append([String(alliance.get("name", "")), alliance.get("color", UiTheme.GOLD), UiTheme.INK])
 	if GovernmentManager.has_government() and CardManager.is_government_party(pid):
 		tags.append([L.t("PM") if GovernmentManager.main_gov_peer_id == pid else L.t("HÜK"), UiTheme.GREEN, UiTheme.TEXT])
 	if mine:
@@ -3766,6 +3795,9 @@ func _build_action_buttons() -> void:
 	_inquiry_button = _action_button(L.t("SORUŞTURMA"), GameRules.cost_text(Economy.INQUIRY_FUNDS_COST), UiTheme.PURPLE.darkened(0.1), "sorusturma", ActionTab.SIYASET)
 	_inquiry_button.pressed.connect(_on_inquiry_button_pressed)
 	_inquiry_button.tooltip_text = L.t("Bir partinin harcamalarına finansman soruşturması aç: devlet parasıyla miting usulsüzlüktür, kendi kasasından ödeyen itibar kazanır.")
+	_alliance_button = _action_button(L.t("İTTİFAK"), L.t("görüntüle"), UiTheme.GOLD, "", ActionTab.SIYASET)
+	_alliance_button.pressed.connect(_on_alliance_button_pressed)
+	_alliance_button.tooltip_text = L.t("İttifakları görüntüle, kur veya partileri davet et ve katıl.")
 
 ## Kongre bedeli oyuncunun yerine göre: genel başkan 10, üye 20.
 func _congress_cost_text() -> String:
@@ -3886,6 +3918,8 @@ func _refresh_action_buttons() -> void:
 		_aid_button.modulate.a = 1.0 if CardManager.can_aid(me) else 0.45
 	if _inquiry_button != null:
 		_inquiry_button.modulate.a = 1.0 if CardManager.can_open_inquiry(me) else 0.45
+	if _alliance_button != null:
+		_alliance_button.modulate.a = 1.0 if CardManager.alliances_enabled else 0.45
 	# disabled kullanılmıyor: pasif butona dokununca neden olmadığı uyarı olarak çıksın.
 	_law_button.modulate.a = 1.0 if law_ok else 0.45
 	_org_button.modulate.a = 1.0 if org_ok or _pending_org else 0.45
@@ -3893,6 +3927,8 @@ func _refresh_action_buttons() -> void:
 	# TOPLANTI: sıra sendeyken açık; sırada bir kez (konuşunca söner).
 	if _speech_button != null:
 		_speech_button.modulate.a = 1.0 if CardManager.can_act() and CardManager.needs_speech(me) else 0.45
+	if _alliance_panel != null and _alliance_panel.visible:
+		_refresh_alliance_panel()
 	_refresh_action_tabs()
 
 func _build_agenda_banner() -> void:
@@ -3928,6 +3964,192 @@ func _refresh_agenda_banner() -> void:
 	var data := CardPresets.agenda_data(current)
 	# Kısa tut: sol panelde olay loguna yer kalsın.
 	_agenda_label.text = L.t("GÜNDEM: %s\n%s") % [data["title"], CardPresets.agenda_effect_text(current)]
+
+func _build_alliance_panel() -> void:
+	_alliance_panel = PanelContainer.new()
+	var style := UiSkin.stylebox(UiSkin.PANEL)
+	style.set_content_margin_all(UiTheme.PAD_M)
+	_alliance_panel.add_theme_stylebox_override("panel", style)
+	_alliance_panel.z_index = 108
+	_alliance_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	_alliance_panel.add_child(box)
+	var header := HBoxContainer.new()
+	box.add_child(header)
+	var title := UiTheme.mono_label(L.t("SEÇİM İTTİFAKLARI"), 14, UiTheme.TEXT, true)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(title)
+	var close := Button.new()
+	close.text = L.t("Kapat")
+	close.focus_mode = Control.FOCUS_NONE
+	close.pressed.connect(func(): _alliance_panel.hide())
+	UiSkin.skin_button(close)
+	header.add_child(close)
+	box.add_child(PopupKit.note(L.t("Barajda ortak oy sayılır. Her ilde ittifakın vekilleri, üyelerin oy oranına göre paylaşılır."), UiTheme.TEXT_DIM, 360))
+	_alliance_list = VBoxContainer.new()
+	_alliance_list.add_theme_constant_override("separation", 5)
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(380, 220)
+	scroll.add_child(_alliance_list)
+	box.add_child(scroll)
+	var divider := HSeparator.new()
+	box.add_child(divider)
+	box.add_child(UiTheme.section_label(L.t("YENİ İTTİFAK KUR")))
+	var create_row := HBoxContainer.new()
+	create_row.add_theme_constant_override("separation", 5)
+	box.add_child(create_row)
+	_alliance_name = LineEdit.new()
+	_alliance_name.placeholder_text = L.t("İttifak adı")
+	_alliance_name.max_length = 28
+	_alliance_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	create_row.add_child(_alliance_name)
+	_alliance_color = ColorPickerButton.new()
+	_alliance_color.color = UiTheme.GOLD
+	_alliance_color.custom_minimum_size = Vector2(42, 34)
+	_alliance_color.tooltip_text = L.t("İttifak rengini seç")
+	create_row.add_child(_alliance_color)
+	_alliance_create_button = Button.new()
+	_alliance_create_button.text = L.t("KUR")
+	_alliance_create_button.focus_mode = Control.FOCUS_NONE
+	UiSkin.skin_color_button(_alliance_create_button, UiTheme.GOLD.darkened(0.25))
+	_alliance_create_button.pressed.connect(_on_alliance_create_pressed)
+	box.add_child(_alliance_create_button)
+	_alliance_panel.hide()
+	add_child(_alliance_panel)
+
+func _on_alliance_button_pressed() -> void:
+	_deselect_hand_card()
+	if _alliance_panel.visible:
+		_alliance_panel.hide()
+		return
+	if _law_designer != null:
+		_law_designer.hide()
+	if _inquiry_panel != null:
+		_inquiry_panel.hide()
+	_refresh_alliance_panel()
+	_alliance_panel.show()
+	_place_alliance_panel.call_deferred()
+
+func _on_alliance_create_pressed() -> void:
+	var me := multiplayer.get_unique_id()
+	var reason := _alliance_action_reason(me)
+	if reason != "":
+		_show_toast(reason)
+		return
+	if _alliance_name.text.strip_edges() == "":
+		_show_toast(L.t("İttifaka bir ad ver."))
+		return
+	CardManager.create_alliance(me, _alliance_name.text, _alliance_color.color)
+	_alliance_name.clear()
+
+func _alliance_action_reason(peer_id: int) -> String:
+	if not CardManager.alliances_enabled:
+		return L.t("Anayasa seçim ittifaklarını devre dışı bıraktı.")
+	if PartyManager.is_independent(peer_id):
+		return L.t("Bağımsız siyasetçiler ittifaka katılamaz.")
+	if CardManager.is_party_member(peer_id):
+		return L.t("İttifak kararını partinin genel başkanı verir.")
+	if not CardManager.can_choose_main_action(peer_id):
+		return L.t("İttifaka katılmak veya davet göndermek için sıranı bekle.")
+	return ""
+
+func _refresh_alliance_panel() -> void:
+	if _alliance_list == null or not is_instance_valid(_alliance_list):
+		return
+	for child in _alliance_list.get_children():
+		child.free()
+	var me := multiplayer.get_unique_id()
+	var my_party := CardManager.party_of(me)
+	var my_alliance := CardManager.alliance_of(me)
+	var action_reason := _alliance_action_reason(me)
+	_alliance_create_button.modulate.a = 1.0 if action_reason == "" and my_alliance < 0 else 0.45
+	if not CardManager.alliances_enabled:
+		_alliance_list.add_child(PopupKit.note(L.t("Anayasa ittifakları devre dışı bıraktı. Yeni seçim ittifakı kurulamaz ve ittifak hesabı yapılmaz."), UiTheme.RED, 340))
+	elif CardManager.alliances.is_empty():
+		_alliance_list.add_child(PopupKit.note(L.t("Henüz kurulmuş bir seçim ittifakı yok."), UiTheme.TEXT_DIM, 340))
+	for alliance_id in CardManager.alliances:
+		var alliance: Dictionary = CardManager.alliances[alliance_id]
+		var members: Array = alliance.get("members", [])
+		var row := VBoxContainer.new()
+		row.add_theme_constant_override("separation", 3)
+		var heading := HBoxContainer.new()
+		var swatch := ColorRect.new()
+		swatch.custom_minimum_size = Vector2(12, 12)
+		swatch.color = alliance.get("color", UiTheme.GOLD)
+		heading.add_child(swatch)
+		var name_label := UiTheme.mono_label(String(alliance.get("name", L.t("İttifak"))), UiTheme.FS_SMALL, UiTheme.TEXT, true)
+		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		heading.add_child(name_label)
+		row.add_child(heading)
+		var names: Array[String] = []
+		for pid in members:
+			names.append(String(PartyManager.data_of(int(pid)).get("name", "?")))
+		row.add_child(PopupKit.note(L.t("Üyeler: %s") % (", ".join(PackedStringArray(names)) if not names.is_empty() else L.t("yok")), UiTheme.TEXT_DIM, 350))
+		var invitations: Array = alliance.get("invitations", [])
+		for target in invitations:
+			var target_name := String(PartyManager.data_of(int(target)).get("name", "?"))
+			row.add_child(PopupKit.note(L.t("Davet bekliyor: %s") % target_name, UiTheme.GOLD, 350))
+		var action := Button.new()
+		action.focus_mode = Control.FOCUS_NONE
+		if my_alliance == int(alliance_id):
+			action.text = L.t("DAVET ET")
+			UiSkin.skin_color_button(action, Color(alliance.get("color", UiTheme.GOLD)).darkened(0.25))
+			action.pressed.connect(_on_alliance_invite_pressed.bind(int(alliance_id)))
+			var can_invite := action_reason == "" and not PartyManager.is_independent(me)
+			var has_targets := false
+			for pid in CardManager.party_ids():
+				if not PartyManager.is_independent(int(pid)) and CardManager.alliance_of(int(pid)) < 0 and int(pid) != my_party:
+					has_targets = true
+			action.modulate.a = 1.0 if can_invite and has_targets else 0.45
+			row.add_child(action)
+		elif my_alliance < 0:
+			action.text = L.t("KATIL") if invitations.has(my_party) else L.t("KATIL")
+			UiSkin.skin_color_button(action, Color(alliance.get("color", UiTheme.GOLD)).darkened(0.25))
+			action.pressed.connect(_on_alliance_join_pressed.bind(int(alliance_id)))
+			action.modulate.a = 1.0 if action_reason == "" else 0.45
+			row.add_child(action)
+		_alliance_list.add_child(row)
+		var divider := HSeparator.new()
+		_alliance_list.add_child(divider)
+
+func _on_alliance_join_pressed(alliance_id: int) -> void:
+	var reason := _alliance_action_reason(multiplayer.get_unique_id())
+	if reason != "":
+		_show_toast(reason)
+		return
+	CardManager.join_alliance(multiplayer.get_unique_id(), alliance_id)
+	_refresh_alliance_panel()
+
+func _on_alliance_invite_pressed(alliance_id: int) -> void:
+	var reason := _alliance_action_reason(multiplayer.get_unique_id())
+	if reason != "":
+		_show_toast(reason)
+		return
+	var picker := PopupMenu.new()
+	for pid in CardManager.party_ids():
+		if PartyManager.is_independent(int(pid)) or CardManager.alliance_of(int(pid)) >= 0 or int(pid) == CardManager.party_of(multiplayer.get_unique_id()):
+			continue
+		picker.add_item(String(PartyManager.data_of(int(pid)).get("name", "?")), int(pid))
+	if picker.item_count == 0:
+		_show_toast(L.t("Davet edilebilecek başka parti yok."))
+		return
+	add_child(picker)
+	picker.id_pressed.connect(func(pid: int):
+		CardManager.invite_alliance_party(multiplayer.get_unique_id(), alliance_id, pid)
+		_refresh_alliance_panel()
+		picker.queue_free())
+	picker.popup()
+
+func _place_alliance_panel() -> void:
+	if not _alliance_panel.visible:
+		return
+	_alliance_panel.reset_size()
+	await get_tree().process_frame
+	_alliance_panel.reset_size()
+	var viewport_size := get_viewport_rect().size
+	_alliance_panel.position = Vector2(viewport_size.x - RIGHT_COLUMN_WIDTH - _alliance_panel.size.x - 12.0,
+		clampf(_top_area_height() - _alliance_panel.size.y, 12.0, maxf(12.0, viewport_size.y - _alliance_panel.size.y - 12.0)))
 
 func _build_law_designer() -> void:
 	_law_designer = PanelContainer.new()
@@ -4062,6 +4284,12 @@ func _build_constitution_section(box: VBoxContainer) -> void:
 	UiSkin.skin_color_button(_constitution_button, UiTheme.GOLD.darkened(0.25))
 	_constitution_button.pressed.connect(_on_constitution_pressed)
 	box.add_child(_constitution_button)
+	_constitution_alliances = CheckButton.new()
+	_constitution_alliances.text = L.t("Seçim ittifakları açık")
+	_constitution_alliances.button_pressed = CardManager.alliances_enabled
+	_constitution_alliances.add_theme_font_size_override("font_size", UiTheme.FS_TINY)
+	_constitution_alliances.toggled.connect(func(_pressed: bool): _refresh_constitution_section())
+	box.add_child(_constitution_alliances)
 
 	_constitution_info = Label.new()
 	_constitution_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -4102,12 +4330,13 @@ func _refresh_constitution_section() -> void:
 	_constitution_button.disabled = not can
 	var needed := GovernmentManager.constitution_threshold_seats()
 	var changed: bool = not is_equal_approx(_constitution_threshold, MultiplayerManager.election_threshold) 		or _constitution_interval != MultiplayerManager.election_interval \
-		or _constitution_method != MultiplayerManager.seat_method
+		or _constitution_method != MultiplayerManager.seat_method \
+		or _constitution_alliances.button_pressed != CardManager.alliances_enabled
 	if not changed:
 		_constitution_info.text = L.t("Şu anki kuralları değiştirmiyor. Bir ayarı değiştir.")
 		_constitution_button.disabled = true
 	elif can:
-		_constitution_info.text = L.t("Meclisin 2/3'ü (%d vekil) EVET derse yürürlüğe girer, yoksa reddedilir. Gündem şartı yok, dönemdeki yasa hakkını kullanır.") % needed
+		_constitution_info.text = L.t("Meclisin 2/3'ü (%d vekil) EVET derse yürürlüğe girer, yoksa reddedilir. İttifaklar baraj için ortak sayılır; seçim çevresinde vekiller önce ittifaka, sonra üyelere dağıtılır.") % needed
 	else:
 		_constitution_info.text = _action_block_reason(0, true)
 

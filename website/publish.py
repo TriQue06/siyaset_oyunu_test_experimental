@@ -20,6 +20,8 @@ import zipfile
 from pathlib import Path
 
 BUILD_DIR = Path(r"C:\Users\baris\Desktop\Siyaset Oyunu Build")
+if "--build-dir" in sys.argv:
+    BUILD_DIR = Path(sys.argv[sys.argv.index("--build-dir") + 1]).resolve()
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 BUILDS = REPO / "builds"

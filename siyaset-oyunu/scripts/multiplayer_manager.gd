@@ -615,6 +615,9 @@ func apply_constitution(payload: Dictionary) -> void:
 	election_interval = clampi(int(payload.get("interval", election_interval)), GameRules.ELECTION_INTERVAL_MIN, GameRules.ELECTION_INTERVAL_MAX)
 	GameRules.configure(election_interval, election_count)
 	_set_seat_method(String(payload.get("seat_method", seat_method)))
+	CardManager.alliances_enabled = bool(payload.get("alliances_enabled", CardManager.alliances_enabled))
+	if not CardManager.alliances_enabled:
+		CardManager.alliances.clear()
 	if not local_only:
 		_sync_settings.rpc(election_threshold, election_interval, election_count)
 		_sync_seat_method.rpc(seat_method)

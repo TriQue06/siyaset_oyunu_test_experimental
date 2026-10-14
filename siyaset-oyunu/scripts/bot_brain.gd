@@ -220,6 +220,49 @@ static func choose_action(bot: int) -> Dictionary:
 			return {"type": "pass"}
 	return best
 
+## Botlar ittifak kurmaz; davetleri kendi turlarında değerlendirir ve
+## baraj/ortak oy hesabı lehlerineyse açık ittifaklara katılabilir.
+static func choose_alliance_decision(bot: int) -> Dictionary:
+	if not CardManager.alliances_enabled or not CardManager.can_manage_alliance(bot):
+		return {}
+	var pid := CardManager.party_of(bot)
+	var threshold := MultiplayerManager.election_threshold
+	var own_share := float(CardManager.last_vote_shares.get(pid, CardManager.national_of(pid)))
+	var struggling := threshold > 0.0 and own_share < threshold + 2.0
+	# Davet varsa mutlaka yanıt ver; barajda kalan parti bunu neredeyse her
+	# zaman kabul eder. İttifakın havuz oyu barajı kurtarmasa bile davet değerlidir.
+	for alliance_id in CardManager.alliances:
+		var alliance: Dictionary = CardManager.alliances[alliance_id]
+		if (alliance.get("invitations", []) as Array).has(pid):
+			var pooled := _alliance_share(int(alliance_id))
+			var helps_threshold := threshold > 0.0 and own_share + pooled >= threshold
+			if struggling or helps_threshold:
+				return {"type": "join", "alliance_id": int(alliance_id)}
+			return {"type": "decline", "alliance_id": int(alliance_id)}
+	# Davetsiz katılım kararı: ancak ortak liste baraj avantajı sağlıyorsa katıl.
+	if struggling:
+		var best_id := -1
+		var best_share := own_share
+		for alliance_id in CardManager.alliances:
+			var alliance: Dictionary = CardManager.alliances[alliance_id]
+			var members: Array = alliance.get("members", [])
+			if members.has(pid):
+				continue
+			var combined := own_share + _alliance_share(int(alliance_id))
+			if combined >= threshold and combined > best_share:
+				best_id = int(alliance_id)
+				best_share = combined
+		if best_id >= 0:
+			return {"type": "join", "alliance_id": best_id}
+	return {}
+
+static func _alliance_share(alliance_id: int) -> float:
+	var alliance: Dictionary = CardManager.alliances.get(alliance_id, {})
+	var total := 0.0
+	for member in alliance.get("members", []):
+		total += float(CardManager.last_vote_shares.get(int(member), CardManager.national_of(int(member))))
+	return total
+
 ## En iyi hamle (gürültülü puanlarla). Geçerli seçenekler candidates'e eklenir.
 static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 	var best := {"type": "pass"}

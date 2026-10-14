@@ -64,8 +64,11 @@ const PROVOCATION_FULL_APPEAL := 40.0
 ## büyütür, o da hükümetin seçmen memnuniyetine yansır (bkz. Economy).
 ## Azalan getiri: il puanı LIMIT ile sınırlı; aynı ile art arda yatırım tavana
 ## dayanınca daha az getirir.
-const INVEST_LOCAL := 10.0
-const INVEST_PARTNER_LOCAL := 4.0
+## PAYLAŞIM (0.0.190): toplam etkinin INVEST_OWN_SHARE'i getiren partiye; kalanı
+## hükümet partilerine makam puanlarıyla (başbakanlık, bakanlıklar…) doğru
+## orantılı dağıtılır (getiren parti de makamı oranında pay alır).
+const INVEST_LOCAL := 16.0
+const INVEST_OWN_SHARE := 0.5
 
 # --- Popülizm bonusu -----------------------------------------------------------
 ## Popülizm süren partinin KENDİ hamlelerinin (miting, yatırım, yasa, oy,

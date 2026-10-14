@@ -3428,3 +3428,9 @@ msgstr "PARTY"
 
 msgid "SİYASET"
 msgstr "POLITICS"
+
+msgid "GRUP YASASI"
+msgstr "GROUP LAW"
+
+msgid "ANAYASA"
+msgstr "CONSTITUTION"

@@ -1991,12 +1991,29 @@ static func _num(value: float) -> String:
 ## sonraki INVEST_DELAY_ROUNDS tur sonunda dilim dilim gelir (bekleyen
 ## dilimler economy["investments"]'ta; seçimde sadece gelmiş olan sayılır).
 ## Ekonomik yansıması ayrı bir ulusal puan değil: ekonomi ivmesi (bkz. Economy).
+## Yatırımın parti başına toplam il etkisi: INVEST_OWN_SHARE getirene, kalanı
+## hükümet partilerine makam puanlarıyla orantılı. Makam puanı yoksa hepsi getirene.
+func investment_shares(investor: int) -> Dictionary:
+	var total := PublicOpinion.INVEST_LOCAL
+	var shares := {investor: total * PublicOpinion.INVEST_OWN_SHARE}
+	var rest := total - float(shares[investor])
+	var points := {}
+	var sum := 0
+	for pid in GovernmentManager.government_party_ids():
+		var p := GovernmentManager.round_points_of(int(pid))
+		if p > 0:
+			points[int(pid)] = p
+			sum += p
+	if sum <= 0:
+		shares[investor] = total
+		return shares
+	for pid in points:
+		shares[pid] = float(shares.get(pid, 0.0)) + rest * float(points[pid]) / float(sum)
+	return shares
+
 func _apply_investment(peer_id: int, province_id: String) -> void:
 	var investor := party_of(peer_id)
-	var shares := {investor: PublicOpinion.INVEST_LOCAL}
-	for partner in GovernmentManager.government_party_ids():
-		if partner != investor:
-			shares[partner] = PublicOpinion.INVEST_PARTNER_LOCAL
+	var shares := investment_shares(investor)
 	var later := {}
 	for pid in shares.keys():
 		_add_local(province_id, int(pid), float(shares[pid]) * Economy.INVEST_IMMEDIATE)

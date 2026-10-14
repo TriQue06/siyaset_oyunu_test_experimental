@@ -174,8 +174,8 @@ func _initialize() -> void:
 	check("hazineden tam bir kez yatırım bedeli düştü", near(cm.state_treasury(), t_before - Economy.INVEST_COST))
 	check("tamamı devletten: parti kasası değişmedi", near(cm.funds_of(1), funds_before))
 	var immediate: float = cm.local_of(province, 1)
-	check("etkinin yarısı hemen geldi", near(immediate, PublicOpinion.INVEST_LOCAL * Economy.INVEST_IMMEDIATE), "%.2f" % immediate)
-	check("ortağa da hemen gelen pay", near(cm.local_of(province, 2), PublicOpinion.INVEST_PARTNER_LOCAL * Economy.INVEST_IMMEDIATE))
+	check("etkinin yarısı hemen geldi", near(immediate, float(cm.investment_shares(1)[1]) * Economy.INVEST_IMMEDIATE), "%.2f" % immediate)
+	check("ortağa da hemen gelen pay", near(cm.local_of(province, 2), float(cm.investment_shares(1).get(2, 0.0)) * Economy.INVEST_IMMEDIATE))
 	check("kalan dilimler bekliyor", cm.pending_investments(1).size() == 1 and int(cm.pending_investments(1)[0]["rounds_left"]) == Economy.INVEST_DELAY_ROUNDS)
 	check("muhalefet yatırımdan pay almaz", cm.pending_investments(3).is_empty() and near(cm.local_of(province, 3), 0.0))
 	cm.economy["treasury"] = Economy.INVEST_COST - 1.0
@@ -185,7 +185,7 @@ func _initialize() -> void:
 	check("hazine ve kasa birlikte yetmezse yatırım yapılamaz", not cm.can_invest(1, province))
 	cm.funds[1] = keep_funds
 	cm.economy["treasury"] = 1000.0
-	var tranche: float = PublicOpinion.INVEST_LOCAL * (1.0 - Economy.INVEST_IMMEDIATE) / Economy.INVEST_DELAY_ROUNDS
+	var tranche: float = float(cm.investment_shares(1)[1]) * (1.0 - Economy.INVEST_IMMEDIATE) / Economy.INVEST_DELAY_ROUNDS
 	var local_before: float = cm.local_of(province, 1)
 	var treasury_before_round: float = cm.state_treasury()
 	end_round()

@@ -87,6 +87,12 @@ func _initialize() -> void:
 		await create_timer(0.3).timeout
 		root.get_texture().get_image().save_png("%s/midgame_law.png" % OS.get_user_data_dir())
 		print("screenshot: midgame_law")
+		for law_tab in [1, 2]:
+			scene._select_law_tab(law_tab)
+			await create_timer(0.3).timeout
+			root.get_texture().get_image().save_png("%s/midgame_law_tab%d.png" % [OS.get_user_data_dir(), law_tab])
+			print("screenshot: midgame_law_tab%d" % law_tab)
+		scene._select_law_tab(0)
 		scene._on_law_button_pressed()
 		scene._set_map_layer(1, false)
 		await create_timer(0.3).timeout

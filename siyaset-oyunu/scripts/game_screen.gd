@@ -293,6 +293,14 @@ var _pending_censure: bool = false
 var _last_turn_peer: int = -2
 ## Yasa tasarlama paneli (6 daire) ve karalama hedef menüsü.
 var _law_designer: PanelContainer
+## YASA SEKMELERİ (0.0.190): GRUP YASASI · VERGİ · ANAYASA; her sekme ayrı sayfa.
+enum LawTab { GROUP, TAX, CONSTITUTION }
+const LAW_TAB_TITLES := ["GRUP YASASI", "VERGİ", "ANAYASA"]
+var _law_tab := LawTab.GROUP
+var _law_tab_buttons: Array = []
+var _law_pages: Array = []
+var _law_tax_box: VBoxContainer
+var _law_tax_selected := -1
 var _propaganda_menu: PanelContainer
 ## Teşkilatlanma için il seçme modu (harita teşkilat katmanına geçer).
 var _pending_org: bool = false
@@ -3815,13 +3823,18 @@ func _refresh_action_tabs() -> void:
 		var active := i == _action_tab
 		var count := int(ready.get(i, 0))
 		button.text = "%s %d" % [L.t(ACTION_TAB_TITLES[i]), count] if count > 0 else L.t(ACTION_TAB_TITLES[i])
-		var color := UiTheme.GOLD if active else UiTheme.PANEL
-		for state in ["normal", "hover", "pressed", "focus"]:
-			var c := color.lightened(0.08) if state == "hover" and not active else color
-			button.add_theme_stylebox_override(state, _layer_button_style(c, false, false))
-		var font := UiTheme.INK if active else (UiTheme.TEXT if count > 0 else UiTheme.TEXT.darkened(0.4))
-		for key in ["font_color", "font_hover_color", "font_pressed_color"]:
-			button.add_theme_color_override(key, font)
+		_style_tab_button(button, active, count > 0)
+
+## Sekme düğmesi (hamle ve yasa sekmeleri): harita katman düğmeleri gibi kare,
+## seçili olan altın; lit false ise yazı sönük.
+func _style_tab_button(button: Button, active: bool, lit: bool) -> void:
+	var color := UiTheme.GOLD if active else UiTheme.PANEL
+	for state in ["normal", "hover", "pressed", "focus"]:
+		var c := color.lightened(0.08) if state == "hover" and not active else color
+		button.add_theme_stylebox_override(state, _layer_button_style(c, false, false))
+	var font := UiTheme.INK if active else (UiTheme.TEXT if lit else UiTheme.TEXT.darkened(0.4))
+	for key in ["font_color", "font_hover_color", "font_pressed_color"]:
+		button.add_theme_color_override(key, font)
 
 ## Hamle düğmesinin iki satırı (ad + bedel). DAR KUTUYA SIĞSIN: en uzun satır
 ## düğmeye sığana kadar yazı küçülür (İngilizce "EARLY ELECTION" gibi; ad
@@ -3946,36 +3959,45 @@ func _build_law_designer() -> void:
 	_law_points_label.custom_minimum_size = Vector2(240, 0)
 	_law_points_label.add_theme_color_override("font_color", UiTheme.GREEN)
 	box.add_child(_law_points_label)
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 0)
+	box.add_child(tabs)
+	for i in LAW_TAB_TITLES.size():
+		var tab_button := Button.new()
+		tab_button.focus_mode = Control.FOCUS_NONE
+		tab_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tab_button.custom_minimum_size = Vector2(0, 30)
+		tab_button.add_theme_font_size_override("font_size", 12)
+		tab_button.text = L.t(LAW_TAB_TITLES[i])
+		tab_button.pressed.connect(_select_law_tab.bind(i))
+		tabs.add_child(tab_button)
+		_law_tab_buttons.append(tab_button)
+		var page := VBoxContainer.new()
+		page.add_theme_constant_override("separation", 4)
+		box.add_child(page)
+		_law_pages.append(page)
+	var group_page: VBoxContainer = _law_pages[LawTab.GROUP]
+	_law_tax_box = _law_pages[LawTab.TAX]
+	_law_tax_box.add_theme_constant_override("separation", 6)
+	_law_tax_box.custom_minimum_size = Vector2(404, 0)
 	# Gündem şeridi.
 	_law_agenda_label = Label.new()
 	_law_agenda_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_law_agenda_label.custom_minimum_size = Vector2(240, 0)
 	_law_agenda_label.add_theme_font_size_override("font_size", 11)
 	_law_agenda_label.add_theme_color_override("font_color", UiTheme.GOLD)
-	box.add_child(_law_agenda_label)
-	# VERGİ YASASI ayrı panelde (gündemden bağımsız; sadece hükümet sunar).
-	var tax_link := Button.new()
-	tax_link.focus_mode = Control.FOCUS_NONE
-	tax_link.text = L.t("VERGİ POLİTİKASI  ›")
-	tax_link.add_theme_font_override("font", UiTheme.mono(true))
-	tax_link.add_theme_font_size_override("font_size", 11)
-	tax_link.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	UiSkin.skin_color_button(tax_link, UiTheme.PANEL_LIGHT)
-	tax_link.tooltip_text = L.t("Vergi kademesini değiştiren yasa: gündem şartı yok, sadece hükümet partileri sunar.")
-	tax_link.pressed.connect(_open_tax_panel)
-	box.add_child(tax_link)
+	group_page.add_child(_law_agenda_label)
 	# SEKİZ SEÇMEN GRUBU (iki sütun): gündemdeki çiftin grupları seçilebilir.
 	_law_rows = GridContainer.new()
 	_law_rows.columns = 2
 	_law_rows.add_theme_constant_override("h_separation", 4)
 	_law_rows.add_theme_constant_override("v_separation", 4)
-	box.add_child(_law_rows)
+	group_page.add_child(_law_rows)
 	_law_detail = VBoxContainer.new()
 	_law_detail.add_theme_constant_override("separation", 3)
 	_law_detail.custom_minimum_size = Vector2(300, 0)
-	box.add_child(_law_detail)
-	box.add_child(UiTheme.rule())
-	_build_constitution_section(box)
+	group_page.add_child(_law_detail)
+	_build_constitution_section(_law_pages[LawTab.CONSTITUTION])
 	_law_designer.hide()
 	add_child(_law_designer)
 
@@ -4092,7 +4114,11 @@ func _refresh_constitution_section() -> void:
 ## Yasa panelinin değişen kısımları: puan, gündem, seçmen grupları, seçili grubun etkisi
 ## ve gündem çarpanı rozetleri. Panel her açılışta tazelenir.
 func _refresh_law_designer() -> void:
+	_refresh_law_tabs()
 	_refresh_constitution_section()
+	if _law_tab == LawTab.TAX:
+		EconomyPanel.fill_policy(_law_tax_box, multiplayer.get_unique_id(), _law_tax_selected,
+			_on_law_tax_selected, _propose_tax, _law_designer.hide, false)
 	var me := multiplayer.get_unique_id()
 	var in_gov := CardManager.is_government_party(me)
 	_law_points_label.text = L.t("Kabul: +%d puan · %s") % [CardManager.law_pass_score(in_gov), GameRules.cost_text(GameRules.LAW_FUNDS_COST)]
@@ -4110,6 +4136,23 @@ func _refresh_law_designer() -> void:
 	for group in VoterGroups.GROUP_IDS:
 		_law_rows.add_child(_law_group_button(group, groups_on_agenda.has(group)))
 	_refresh_law_detail()
+
+func _select_law_tab(tab: int) -> void:
+	_law_tab = tab
+	_law_tax_selected = -1
+	_refresh_law_designer()
+	_place_law_designer()
+
+func _on_law_tax_selected(level: int) -> void:
+	_law_tax_selected = level
+	_refresh_law_designer()
+	_place_law_designer()
+
+## Sekme düğmeleri hamle sekmeleriyle aynı stilde; yalnız seçili sayfa görünür.
+func _refresh_law_tabs() -> void:
+	for i in _law_tab_buttons.size():
+		(_law_pages[i] as Control).visible = i == _law_tab
+		_style_tab_button(_law_tab_buttons[i], i == _law_tab, true)
 
 ## Yasa panelinde bir seçmen grubu düğmesi: simge + tam ad. Gündemde değilse
 ## sönük ve seçilemez; seçiliyse altın çerçeve.
@@ -4220,8 +4263,6 @@ func _on_economy_event(data: Dictionary) -> void:
 ## bakiyesi, etkinin zamanlaması.
 func _invest_preview(pname: String) -> String:
 	var before := CardManager.state_treasury()
-	var immediate := PublicOpinion.INVEST_LOCAL * Economy.INVEST_IMMEDIATE
-	var later := PublicOpinion.INVEST_LOCAL - immediate
 	return L.t("%s yatırımı · devlet hazinesi %s → %s milyon ₺\nGüçlü yerel etki: yarısı hemen, kalanı %d dönemde · ekonomi canlanır") % [
 		pname, Economy.money_text(before), Economy.money_text(before - Economy.INVEST_COST), Economy.INVEST_DELAY_ROUNDS]
 
@@ -4281,6 +4322,7 @@ func _propose_tax(law_type: String) -> void:
 		_show_toast(CardManager.tax_law_block_reason(me, CardPresets.tax_law_level(law_type)))
 		return
 	_tax_panel.hide()
+	_law_designer.hide()
 	CardManager.propose_law(law_type)
 
 # --- Finansman paylaşımı ve soruşturma ----------------------------------------
@@ -4486,10 +4528,15 @@ func _on_law_button_pressed() -> void:
 		return
 	if _tax_panel != null:
 		_tax_panel.hide()
+	_law_tax_selected = -1
 	_refresh_law_designer()
 	_law_designer.show()
+	_place_law_designer()
+
+func _place_law_designer() -> void:
 	_law_designer.reset_size()
 	await get_tree().process_frame
+	_law_designer.reset_size()
 	var viewport_size := get_viewport_rect().size
 	_law_designer.position = Vector2(
 		viewport_size.x - RIGHT_COLUMN_WIDTH - _law_designer.size.x - 12.0,

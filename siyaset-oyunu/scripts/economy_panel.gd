@@ -488,7 +488,8 @@ func _pop(control: Control) -> void:
 
 ## Panel içeriği: başlık, üç kademe kartı, seçilen kademenin ayrıntısı ve
 ## meclise sunma düğmesi. selected: seçili kademe (-1: henüz seçilmedi).
-static func fill_policy(box: VBoxContainer, me: int, selected: int, on_select: Callable, on_propose: Callable, on_close: Callable) -> void:
+## show_header false: başlık ve Kapat yok (yasa panelinin VERGİ sekmesi).
+static func fill_policy(box: VBoxContainer, me: int, selected: int, on_select: Callable, on_propose: Callable, on_close: Callable, show_header: bool = true) -> void:
 	for child in box.get_children():
 		box.remove_child(child)
 		child.queue_free()
@@ -496,16 +497,18 @@ static func fill_policy(box: VBoxContainer, me: int, selected: int, on_select: C
 	var header := HBoxContainer.new()
 	header.add_theme_constant_override("separation", 8)
 	box.add_child(header)
-	var title := UiTheme.mono_label(L.t("VERGİ POLİTİKASI"), 14, UiTheme.TEXT, true)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header.add_child(title)
+	if show_header:
+		var title := UiTheme.mono_label(L.t("VERGİ POLİTİKASI"), 14, UiTheme.TEXT, true)
+		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		header.add_child(title)
 	header.add_child(PopupKit.chip(L.t("MECLİS ONAYI GEREKİR"), UiTheme.GOLD))
-	var close := Button.new()
-	close.text = L.t("Kapat")
-	UiSkin.skin_button(close)
-	close.add_theme_font_size_override("font_size", 11)
-	close.pressed.connect(on_close)
-	header.add_child(close)
+	if show_header:
+		var close := Button.new()
+		close.text = L.t("Kapat")
+		UiSkin.skin_button(close)
+		close.add_theme_font_size_override("font_size", 11)
+		close.pressed.connect(on_close)
+		header.add_child(close)
 	box.add_child(PopupKit.label(L.t("Yürürlükte: %s · dönem geliri %s · hazine %s") % [Economy.tax_title(current),
 		Economy.money_full(CardManager.expected_revenue()), Economy.money_full(CardManager.state_treasury())], 11, UiTheme.TEXT_MUTED))
 	var cards := HBoxContainer.new()

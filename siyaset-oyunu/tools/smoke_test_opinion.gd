@@ -169,9 +169,20 @@ func _initialize() -> void:
 	cm.national_support = {}
 	cm._apply_invest_move(1, TestProvinces.id("izmir"))
 	check("yatirim hazineden: parti kasasi degismedi", cm.funds_of(1) == 100)
-	check("getiren parti il: etkinin hemen gelen payi", near(cm.local_of(TestProvinces.id("izmir"), 1), PublicOpinion.INVEST_LOCAL * Economy.INVEST_IMMEDIATE))
-	check("ortak il: hemen gelen pay", near(cm.local_of(TestProvinces.id("izmir"), 2), PublicOpinion.INVEST_PARTNER_LOCAL * Economy.INVEST_IMMEDIATE))
+	check("getiren parti il: etkinin hemen gelen payi", near(cm.local_of(TestProvinces.id("izmir"), 1), float(cm.investment_shares(1)[1]) * Economy.INVEST_IMMEDIATE))
+	check("ortak il: hemen gelen pay", near(cm.local_of(TestProvinces.id("izmir"), 2), float(cm.investment_shares(1).get(2, 0.0)) * Economy.INVEST_IMMEDIATE))
 	check("muhalefet etkilenmez", near(cm.local_of(TestProvinces.id("izmir"), 3), 0.0))
+	var inv_shares: Dictionary = cm.investment_shares(1)
+	var inv_sum := 0.0
+	for k in inv_shares:
+		inv_sum += float(inv_shares[k])
+	check("yatirim paylari toplami INVEST_LOCAL", near(inv_sum, PublicOpinion.INVEST_LOCAL))
+	var pts1: int = gm.round_points_of(1)
+	var pts2: int = gm.round_points_of(2)
+	var rest: float = PublicOpinion.INVEST_LOCAL * (1.0 - PublicOpinion.INVEST_OWN_SHARE)
+	check("getirene %50 + makam payi", near(float(inv_shares[1]), PublicOpinion.INVEST_LOCAL * PublicOpinion.INVEST_OWN_SHARE + rest * pts1 / float(pts1 + pts2)), "%.2f" % float(inv_shares[1]))
+	check("ortaga makam puaniyla orantili pay", near(float(inv_shares.get(2, 0.0)), rest * pts2 / float(pts1 + pts2)), "%.2f" % float(inv_shares.get(2, 0.0)))
+	check("ortagin makami var", pts1 > 0 and pts2 > 0, "%d / %d" % [pts1, pts2])
 	check("yatirim ayrica ulusal puan yazmaz (ekonomi ivmesi uzerinden)", near(cm.national_of(1), 0.0))
 	check("yatirim grup yakinligina dokunmaz", str(pm.parties[1]["groups"]) == str(groups(["isci", "dindar"])))
 	check("yatirim destede degil (hamle)", not cm._draw_weights(1).has("yatirim"))

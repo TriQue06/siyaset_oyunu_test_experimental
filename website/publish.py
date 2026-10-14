@@ -28,7 +28,7 @@ BUILDS = REPO / "builds"
 SITE_FALLBACK = HERE / "public" / "version.json"
 ## Butonların indirdiği adres (depo herkese açık olmalı). Dal değişirse burası ve
 ## public/app.js'teki RAW sabiti birlikte güncellenir.
-RAW = "https://raw.githubusercontent.com/TriQue06/siyaset_oyunu_test_experimental/oyun-duzeltmeleri/builds/"
+RAW = "https://raw.githubusercontent.com/TriQue06/siyaset_oyunu_test_experimental/main/builds/"
 PATTERN = re.compile(r"SiyasetOyunu-(\d+)\.(\d+)\.(\d+)\.(apk|exe)$")
 GITHUB_LIMIT = 100 * 1024 * 1024
 

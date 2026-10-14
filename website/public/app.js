@@ -5,7 +5,7 @@
 
   // --- En güncel sürüm: GitHub'daki builds/version.json (website/publish.py yazar).
   // Dosyalar da oradan iner; GitHub'a ulaşılamazsa sitedeki yedek bilgi kullanılır.
-  const RAW = "https://raw.githubusercontent.com/TriQue06/siyaset_oyunu_test_experimental/oyun-duzeltmeleri/builds/";
+  const RAW = "https://raw.githubusercontent.com/TriQue06/siyaset_oyunu_test_experimental/main/builds/";
   const mb = (bytes) => (bytes / 1048576).toFixed(0) + " MB";
   const getJson = (url) => fetch(url, { cache: "no-cache" }).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
   getJson(RAW + "version.json")

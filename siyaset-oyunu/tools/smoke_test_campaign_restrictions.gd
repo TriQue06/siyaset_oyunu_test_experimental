@@ -35,7 +35,7 @@ func run() -> void:
 	var count := 0
 	for id in cm._province_ids:
 		var marker_count: int = markers._seats.get(id, []).size()
-		check(marker_count == cm._province_seat_counts[id], "pre-election hollow seats " + id)
+		check(marker_count == cm._province_seat_counts[id], "pre-election seat markers " + id)
 		count += marker_count
 	check(count > 0, "campaign seat markers visible")
 	screen.queue_free()

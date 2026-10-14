@@ -420,7 +420,7 @@ func _initialize() -> void:
 		cm.organizations[String(cm._province_ids[i])] = {cm.party_of(me): 2}
 	check("teşkilat geliri üst sınırı (sınırsız para yok)", cm.org_income(me) == GameRules.ORG_INCOME_CAP, str(cm.org_income(me)))
 	cm.organizations = saved_orgs
-	check("yasa bedelsiz, toplantı 5, kongre 10 / üye 20", GameRules.LAW_FUNDS_COST == 0 and GameRules.EARLY_ELECTION_FUNDS_COST == 0 and GameRules.CENSURE_FUNDS_COST == 0 and GameRules.SPEECH_FUNDS_COST == 5
+	check("yasa ve toplantı bedelsiz, kongre 10 / üye 20", GameRules.LAW_FUNDS_COST == 0 and GameRules.EARLY_ELECTION_FUNDS_COST == 0 and GameRules.CENSURE_FUNDS_COST == 0 and GameRules.SPEECH_FUNDS_COST == 0
 		and cm.CONGRESS_COST == 10 and cm.CONGRESS_REQUEST_COST == 20)
 
 	print("=== GÜNDEM (kriz birleşti) ===")

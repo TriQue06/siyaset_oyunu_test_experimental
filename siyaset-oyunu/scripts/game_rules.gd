@@ -144,7 +144,7 @@ const ORG_FUNDS_COST := 10
 const ORG_INCOME := [0, 5, 10]
 const ORG_INCOME_CAP := 25
 ## GRUP TOPLANTISI bedeli (sırada bir kez; bir seçmen grubuyla, geçici destek).
-const SPEECH_FUNDS_COST := 5
+const SPEECH_FUNDS_COST := 0
 const ORG_UPGRADE_FUNDS_COST := ORG_FUNDS_COST
 
 ## KADEMELİ TEŞKİLAT BEDELİ (0.0.168): partinin ilk ORG_COST_FREE teşkilatı

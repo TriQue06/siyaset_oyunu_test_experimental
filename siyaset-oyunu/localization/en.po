@@ -3413,3 +3413,6 @@ msgstr "Your party already proposed a tax law this term."
 
 msgid "Bu dönem zaten bir seçmen grubu yasası sundun (vergi yasası ve anayasa ayrı haklardır)."
 msgstr "You already proposed a voter group law this term (tax laws and constitutional amendments are separate rights)."
+
+msgid "Seçim zaten bu turun sonunda: erken seçim önergesine gerek yok."
+msgstr "The election is already at the end of this round: no need for an early election motion."

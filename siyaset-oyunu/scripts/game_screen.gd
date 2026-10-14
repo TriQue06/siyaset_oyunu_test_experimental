@@ -4605,6 +4605,8 @@ func _on_early_button_pressed() -> void:
 			_show_toast(L.t("Mecliste vekilin yok: erken seçim önergesi veremezsin."))
 		elif CardManager.early_election_pending:
 			_show_toast(L.t("Erken seçim kararı zaten alındı."))
+		elif CardManager.election_this_round():
+			_show_toast(L.t("Seçim zaten bu turun sonunda: erken seçim önergesine gerek yok."))
 		elif CardManager.early_request_used(me):
 			_show_toast(L.t("Partin bu seçim döneminde zaten erken seçim önergesi verdi."))
 		elif not GovernmentManager.can_submit_law():

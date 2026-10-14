@@ -429,6 +429,9 @@ func _initialize() -> void:
 	cm.agenda = {"type": "gundem_isci", "until": cm.round_number + 1}
 	check("gündem işçileri istiyor, ayrı kriz yok", cm.crisis_type() == "" and cm.crisis_group() == "isci" and cm.agenda_groups() == ["isci"])
 	# Gündem dışı gruba da yasa sunulabilir (eskiden sadece gündem çifti).
+	# İki yasa da aynı başlangıçtan (50) ölçülsün: azalan getiri karışmasın.
+	for g in ["dindar", "ilerici", "isci", "isveren"]:
+		pm.parties[crisis_bot]["groups"][g] = 50.0
 	var gb: Dictionary = (pm.parties[crisis_bot]["groups"] as Dictionary).duplicate()
 	cm.apply_law_result(crisis_bot, "law:dindar", {}, true, [])
 	var off_gain: float = float(pm.parties[crisis_bot]["groups"]["dindar"]) - float(gb["dindar"])

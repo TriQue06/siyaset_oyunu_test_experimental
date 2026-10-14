@@ -1167,5 +1167,6 @@
 " · GÜNDEM": " · AGENDA",
 "Partin bu seçim döneminde zaten erken seçim önergesi verdi.": "Your party already filed an early election motion this term.",
 "Partin bu dönem zaten bir vergi yasası sundu.": "Your party already proposed a tax law this term.",
-"Bu dönem zaten bir seçmen grubu yasası sundun (vergi yasası ve anayasa ayrı haklardır).": "You already proposed a voter group law this term (tax laws and constitutional amendments are separate rights)."
+"Bu dönem zaten bir seçmen grubu yasası sundun (vergi yasası ve anayasa ayrı haklardır).": "You already proposed a voter group law this term (tax laws and constitutional amendments are separate rights).",
+"Seçim zaten bu turun sonunda: erken seçim önergesine gerek yok.": "The election is already at the end of this round: no need for an early election motion."
 }

@@ -33,8 +33,10 @@ const AID_LOCAL_K := 1.5
 const AID_NATIONAL_K := 0.2
 
 ## Seçim aralığı uzunsa (anayasa) tur başına olasılık düşer: dönemde ~1.
+## Seçimden hemen sonraki tur afetsiz (0.0.188): zar dönemin kalan turlarına
+## (aralık − 1) yayılır, ortalama yine ~1.
 static func round_chance() -> float:
-	return clampf(1.0 / float(maxi(1, GameRules.ELECTION_INTERVAL)), 0.06, 0.5)
+	return clampf(1.0 / float(maxi(1, GameRules.ELECTION_INTERVAL - 1)), 0.06, 0.6)
 
 static func title(kind: String) -> String:
 	match kind:

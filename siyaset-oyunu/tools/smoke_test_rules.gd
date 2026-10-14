@@ -171,13 +171,19 @@ func _initialize() -> void:
 	pass_round()
 	check("10. tur sonunda ilk secim yapildi", cm.last_election_round == 10 and int(sum_values(cm.last_seats)) == cm.TOTAL_SEATS, str(cm.last_seats))
 	check("tur 11'e gecildi", cm.round_number == 11)
-	var election_bonus_ok := true
+	# 0.0.188: seçimden sonra sıra oy oranına göre yeniden dizilir; yeni turun
+	# geliri yeni sıranın ilk oyuncusuna gider. Toplamda: turda herkes bir sıra
+	# geliri (+FUNDS_PER_ROUND) ve seçim bonusu aldı; toplam aynı.
+	var gained := 0.0
+	var bonus_ok := true
 	for id in cm.turn_order:
-		# Turdaki herkes sira gelirini (+3) aldi, ustune secim bonusu (+1).
-		var expected_funds: int = int(funds_before_election[id]) + GameRules.FUNDS_PER_ROUND + GameRules.ELECTION_FUNDS_BONUS
-		if cm.funds_of(id) != expected_funds:
-			election_bonus_ok = false
-	check("secim sonrasi herkese +1 milyon", election_bonus_ok, "%s -> %s" % [funds_before_election, cm.funds])
+		var diff: float = cm.funds_of(id) - float(funds_before_election[id])
+		gained += diff
+		if diff < float(GameRules.ELECTION_FUNDS_BONUS) - 0.01:
+			bonus_ok = false
+	var expected_total := float(cm.turn_order.size()) * float(GameRules.FUNDS_PER_ROUND + GameRules.ELECTION_FUNDS_BONUS)
+	check("secim sonrasi herkese secim parasi, toplam gelir dogru", bonus_ok and is_equal_approx(gained, expected_total),
+		"%s -> %s" % [funds_before_election, cm.funds])
 	check("secimde kazanilan vekiller momentum icin kaydedildi", cm.election_seats == cm.last_seats)
 	check("hukumet kurma asamasi", gm.phase == gm.Phase.FORMING)
 	var idx_before: int = cm.current_turn_index
@@ -721,6 +727,55 @@ func _initialize() -> void:
 	GameRules.configure(2, 5)
 	cm._apply_state(packed_cal)
 	check("kayit / istemci: uzayan oyun durumla tasinir", GameRules.MAX_ROUNDS == 18)
+
+	print("")
+	print("=== 17) SECIM SONRASI SIRA, AFET, SON TURDA ERKEN SECIM ===")
+	GameRules.configure(2, 5)  # 4, 8, 12, 16, 20
+	new_game({1: groups(), 2: groups(), 3: groups()})
+	cm.turn_order = [1, 2, 3]
+	cm.last_seats = {1: 150, 2: 200, 3: 150}
+	gm.government = {"pm": 2, "deputy_pm": 1}
+	gm.main_gov_peer_id = 2
+	gm._set_phase(gm.Phase.GOVERNING)
+	# Son turda (seçim bu turun sonunda) erken seçim önergesi verilemez.
+	cm.round_number = 8
+	cm.current_turn_index = cm.turn_order.find(3)
+	check("secim bu turun sonundaysa erken secim yok", cm.election_this_round() and not cm.can_early_election(3))
+	cm.round_number = 6
+	check("secime daha varken erken secim onergesi verilebilir", not cm.election_this_round() and cm.can_early_election(3))
+	# Turun son oyuncusu pas geçer: tur kapanır, seçim yapılır.
+	cm.round_number = 8
+	cm.current_turn_index = cm.turn_order.size() - 1
+	var income_before := {}
+	for p in cm.turn_order:
+		income_before[p] = cm.funds_of(int(p))
+	cm._apply_pass(int(cm.turn_order[cm.current_turn_index]))
+	var sorted_ok := true
+	for i in range(cm.turn_order.size() - 1):
+		var a: float = float(cm.last_vote_shares.get(cm.party_of(int(cm.turn_order[i])), 0.0))
+		var b: float = float(cm.last_vote_shares.get(cm.party_of(int(cm.turn_order[i + 1])), 0.0))
+		if a < b:
+			sorted_ok = false
+	check("secimden sonra sira oy oranina gore (buyukten kucuge)", cm.last_election_round == 8 and sorted_ok and cm.current_turn_index == 0,
+		"%s / %s" % [str(cm.turn_order), str(cm.last_vote_shares)])
+	check("secimden hemen sonraki tur afet yok", not cm.has_disaster())
+	# İlk sıradaki oyuncu yeni turun gelirini aldı (seçim parası + tur geliri).
+	var first := int(cm.turn_order[0])
+	var others_ok := true
+	for p in cm.turn_order:
+		if int(p) != first and cm.funds_of(int(p)) - float(income_before[p]) > float(GameRules.ELECTION_FUNDS_BONUS) + 0.01:
+			others_ok = false
+	check("tur geliri yeni siradaki ilk oyuncuya, digerlerine yalniz secim parasi",
+		cm.funds_of(first) - float(income_before[first]) > float(GameRules.ELECTION_FUNDS_BONUS) + 0.01 and others_ok)
+	# Seçimden sonraki ikinci turdan itibaren afet çıkabilir (zorla: borç ve son tur değil).
+	var disasters := 0
+	for trial in 40:
+		cm.disaster = {"term_count": 0}
+		cm.round_number = 9
+		cm._roll_disaster()
+		if cm.has_disaster():
+			disasters += 1
+	check("sonraki turlarda afet cikabilir", disasters > 0, str(disasters))
 
 	print("")
 	if fails == 0:

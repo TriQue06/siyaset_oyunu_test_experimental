@@ -864,7 +864,11 @@ func can_censure(peer_id: int) -> bool:
 ## seçim kararı yoksa.
 func can_early_election(peer_id: int) -> bool:
 	return can_choose_main_action(peer_id) and not is_party_member(peer_id) and funds_of(peer_id) >= GameRules.EARLY_ELECTION_FUNDS_COST \
-		and has_seats(peer_id) and not early_election_pending and GovernmentManager.can_submit_law() 		and not early_request_used(peer_id)
+		and has_seats(peer_id) and not early_election_pending and GovernmentManager.can_submit_law() 		and not early_request_used(peer_id) and not election_this_round()
+
+## Seçim zaten BU turun sonunda mı? (Son turda erken seçim önergesi anlamsız.)
+func election_this_round() -> bool:
+	return GameRules.is_election_round(round_number) or round_number >= GameRules.MAX_ROUNDS
 
 ## Partisi bu seçim aralığında erken seçim önergesi verdi mi?
 func early_request_used(peer_id: int) -> bool:
@@ -2640,9 +2644,50 @@ func _advance_turn() -> bool:
 	_turn_time_left = GameRules.TURN_TIMEOUT
 	if not wrapped:
 		_retire_due_temporary_parties()
+	else:
+		# Tur kapandı: yeni turun ilk oyuncusu seçimden sonra (sıralama
+		# değişebilir) belli olur; geliri ve kartı _begin_round_turn verir.
+		_income_deferred = true
+		return wrapped
 	_grant_turn_income()
 	_maybe_mandatory_congress()
 	return wrapped
+
+## Tur kapanırken ertelenen ilk oyuncu geliri / kartı / zorunlu kongre.
+var _income_deferred := false
+
+func _begin_round_turn() -> void:
+	if not _income_deferred:
+		return
+	_income_deferred = false
+	_grant_turn_income()
+	_maybe_mandatory_congress()
+
+## SIRALAMA (0.0.188): her seçimden sonra oynama sırası partilerin SON OY
+## ORANINA göre (büyükten küçüğe) dizilir; iki kişilik partide genel başkan ve
+## üye yan yana, eski sıralarıyla kalır. Yeni tur sıranın başından başlar.
+func _order_turns_by_votes() -> void:
+	var old: Array = turn_order.duplicate()
+	var keyed: Array = []
+	for i in old.size():
+		var peer := int(old[i])
+		keyed.append({"peer": peer, "share": float(last_vote_shares.get(party_of(peer), 0.0)), "party": party_of(peer), "i": i})
+	# Partinin ilk görüldüğü sıra (üyeler başkanla birlikte kalsın diye).
+	var first_seen := {}
+	for k in keyed:
+		if not first_seen.has(k["party"]):
+			first_seen[k["party"]] = k["i"]
+	keyed.sort_custom(func(a, b):
+		if not is_equal_approx(float(a["share"]), float(b["share"])):
+			return float(a["share"]) > float(b["share"])
+		if int(first_seen[a["party"]]) != int(first_seen[b["party"]]):
+			return int(first_seen[a["party"]]) < int(first_seen[b["party"]])
+		return int(a["i"]) < int(b["i"]))
+	turn_order = []
+	for k in keyed:
+		turn_order.append(k["peer"])
+	current_turn_index = 0
+	_turn_time_left = GameRules.TURN_TIMEOUT
 
 ## Sırası gelen oyuncu para gelirini VE bir kart alır.
 ## KART ÇEKME HAMLESİ KALDIRILDI: deste butonu yerine her elin başında
@@ -2786,7 +2831,10 @@ func _finish_round() -> void:
 			and GovernmentManager.phase == GovernmentManager.Phase.IDLE)
 	if will_elect:
 		_disaster_new_term()
-	if finished_round < GameRules.MAX_ROUNDS:
+	# Seçimden hemen sonraki ilk tur AFETSİZ (0.0.188): seçim gecesi, hükümet
+	# kurma ve sonuç gazetesi arasında afet haberi kayboluyordu; o turda yalnız
+	# gündem olur. Afet ancak seçimden sonraki ikinci turdan itibaren çıkar.
+	if finished_round < GameRules.MAX_ROUNDS and not will_elect:
 		_roll_disaster()
 
 	if finished_round >= GameRules.MAX_ROUNDS:
@@ -2821,6 +2869,7 @@ func _finish_round() -> void:
 		_hold_election(finished_round, no_government and not scheduled)
 	else:
 		_decay_opinion()
+		_begin_round_turn()
 		_push_state({"type": "round"})
 	_schedule_agenda()
 
@@ -2877,6 +2926,8 @@ func _hold_election(finished_round: int, early: bool) -> void:
 	for splinter in splinters.keys():
 		splinters[splinter]["elections"] = int(splinters[splinter].get("elections", 0)) + 1
 	last_election_was_early = early
+	_order_turns_by_votes()
+	_begin_round_turn()
 	# Seçim sonrası herkese para ve 1 kart hediye.
 	for peer_id in turn_order:
 		funds[peer_id] = funds_of(peer_id) + float(GameRules.ELECTION_FUNDS_BONUS)

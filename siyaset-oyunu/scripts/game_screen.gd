@@ -524,8 +524,8 @@ func _place_card_bar() -> void:
 	_fit_hand_width(CardManager.my_inventory().size())
 	_place_desk_labels()
 
-const DESK_COLOR := Color("2A1A10")
-const STRIP_BG := Color("2A1A10")
+const DESK_COLOR := Color("130f27")
+const STRIP_BG := Color("130f27")
 var _desk_labels: Dictionary = {}
 var _date_chip: PanelContainer
 var _date_label: Label
@@ -613,7 +613,7 @@ func _apply_layout() -> void:
 	if _strip_bg == null:
 		_strip_bg = Panel.new()
 		var strip_style := StyleBoxFlat.new()
-		strip_style.bg_color = Color("3B2617")
+		strip_style.bg_color = Color("1d1838")
 		strip_style.border_color = UiTheme.INK
 		strip_style.border_width_bottom = 2
 		_strip_bg.add_theme_stylebox_override("panel", strip_style)
@@ -674,40 +674,17 @@ func _detach_actions_panel() -> void:
 	_set_rect(panel, _r(R_ACTIONS))
 
 ## Harita alanının zemini (harita bunun ortasına oturur).
-## OYUN MASASI: ekranın zemini bordo keçe (assets/ui/board_felt.png), harita
-## masaya serilmiş krem bir KÂĞIT PAFTANIN üstünde (gölgeli).
-const BOARD_FELT := "res://assets/ui/board_felt.png"
-const BOARD_PAPER := "res://assets/ui/board_paper.png"
-var _felt_bg: TextureRect
-var _map_shadow: Panel
-
-func _ensure_felt() -> void:
-	if _felt_bg != null:
-		return
-	_felt_bg = TextureRect.new()
-	_felt_bg.texture = load(BOARD_FELT)
-	_felt_bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_felt_bg.stretch_mode = TextureRect.STRETCH_SCALE
-	_felt_bg.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	_felt_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_felt_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(_felt_bg)
-	move_child(_felt_bg, 1)
-
 func _ensure_map_bg(rect: Rect2) -> void:
-	_ensure_felt()
 	if _map_bg == null:
-		_map_shadow = Panel.new()
-		_map_shadow.add_theme_stylebox_override("panel", UiSkin.color_box(Color(0, 0, 0, 0.35), UiSkin.PANEL))
-		_map_shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		add_child(_map_shadow)
-		move_child(_map_shadow, 2)
 		_map_bg = Panel.new()
-		_map_bg.add_theme_stylebox_override("panel", UiSkin.stylebox(BOARD_PAPER, 8))
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color("141a36")
+		style.border_color = UiTheme.INK
+		style.set_border_width_all(2)
+		_map_bg.add_theme_stylebox_override("panel", style)
 		_map_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(_map_bg)
-		move_child(_map_bg, 3)
-	_set_rect(_map_shadow, Rect2(rect.position + Vector2(5, 7), rect.size))
+		move_child(_map_bg, 1)
 	_set_rect(_map_bg, rect)
 
 ## YAYIN BANDI: kırmızı CANLI rozeti, "SİYASET GÜNDEMİ" ve altında tarih /
@@ -760,7 +737,7 @@ func _place_date_chip(_map_rect: Rect2) -> void:
 		add_child(_band_crisis)
 		_band_turn = PanelContainer.new()
 		var turn_style := StyleBoxFlat.new()
-		turn_style.bg_color = Color("5A3C24")
+		turn_style.bg_color = Color("2a2350")
 		turn_style.border_color = UiTheme.GOLD
 		turn_style.set_border_width_all(2)
 		turn_style.content_margin_left = 8
@@ -776,7 +753,7 @@ func _place_date_chip(_map_rect: Rect2) -> void:
 		# SÜRE ŞERİDİ: ekranın en üstünde, sırası gelenin renginde, süre
 		# azaldıkça soldan sağa uzar (dolunca süre biter).
 		_timer_bar_bg = ColorRect.new()
-		_timer_bar_bg.color = Color("1A0F09")
+		_timer_bar_bg.color = Color("0a0816")
 		_timer_bar_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_timer_bar_bg.z_index = 7
 		add_child(_timer_bar_bg)
@@ -825,14 +802,14 @@ func _refresh_band_crisis() -> void:
 	style.content_margin_bottom = 0
 	if crisis != "":
 		var data := CardPresets.crisis_data(crisis)
-		style.bg_color = Color("5A1A14")
+		style.bg_color = Color("4a1020")
 		style.border_color = Color("ff3b4e")
 		_band_crisis_title.text = L.t("⚠ KRİZ · %s") % data["title"]
 		_band_crisis_title.add_theme_color_override("font_color", Color("ff8a94"))
 		_band_crisis_text.text = L.t("%s için yasa / toplantı ulusal destek getirir") % data["group_title"]
 	else:
 		var data := CardPresets.agenda_data(agenda)
-		style.bg_color = Color("5A3C24")
+		style.bg_color = Color("2a2350")
 		style.border_color = UiTheme.GOLD
 		_band_crisis_title.text = L.t("GÜNDEM · %s") % data["title"]
 		_band_crisis_title.add_theme_color_override("font_color", UiTheme.GOLD)
@@ -898,8 +875,8 @@ func _place_parliament_badge() -> void:
 	if _parl_bg == null:
 		_parl_bg = Panel.new()
 		var style := StyleBoxFlat.new()
-		style.bg_color = Color("2E1D12")
-		style.border_color = Color("6B4A2E")
+		style.bg_color = Color("15112b")
+		style.border_color = Color("3f3775")
 		style.set_border_width_all(1)
 		_parl_bg.add_theme_stylebox_override("panel", style)
 		_parl_bg.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -1094,7 +1071,7 @@ func _refresh_score_table() -> void:
 		var party: Dictionary = PartyManager.data_of(pid)
 		var row := PanelContainer.new()
 		var style := StyleBoxFlat.new()
-		style.bg_color = Color("5A3C24") if peer_id == me else Color("2E1D12")
+		style.bg_color = Color("2a2350") if peer_id == me else Color("15112b")
 		style.border_color = party.get("bg_color", Color.GRAY)
 		style.border_width_left = 4
 		style.content_margin_left = 6
@@ -1596,7 +1573,7 @@ func _build_plaque(pid: int, width: float) -> Control:
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	card.clip_contents = true
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color("5A3C24") if is_turn else Color("3B2617")
+	style.bg_color = Color("2a2350") if is_turn else Color("1d1838")
 	style.border_color = color
 	style.border_width_left = 5
 	if is_turn:
@@ -1694,7 +1671,7 @@ func _build_plaque(pid: int, width: float) -> Control:
 	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var bar_bg := ColorRect.new()
-	bar_bg.color = Color("1A0F09")
+	bar_bg.color = Color("0a0816")
 	bar_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	bar_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar.add_child(bar_bg)
@@ -1833,29 +1810,10 @@ func _rebuild_hand() -> void:
 	for i in hand.size():
 		hand_container.add_child(_build_hand_card(hand[i], i))
 	_fit_hand_width(hand.size())
-	_fan_hand()
 	_refresh_hand_interactivity()
 
 ## Kartlar ayrılan alana (sağ yarı) sığmıyorsa aralarındaki boşluk negatife
 ## çekilip üst üste bindirilir; sıra göstergesine ve meclis butonlarına taşmaz.
-## ELDEKİ KARTLAR YELPAZE: kart oyununda elde tutulur gibi uçlara doğru hafif
-## döner ve aşağı iner. Fareyle kalkan / seçilen kart düzleşir (okunur).
-const FAN_MAX_DEGREES := 3.5
-const FAN_MAX_DROP := 6.0
-
-func _fan_hand() -> void:
-	var n := _hand_holders.size()
-	for holder in _hand_holders:
-		if not is_instance_valid(holder):
-			continue
-		var i := int(holder.get_meta("hand_index", 0))
-		var t := 0.0 if n <= 1 else (float(i) - float(n - 1) * 0.5) / (float(n - 1) * 0.5)
-		holder.pivot_offset = Vector2(CARD_DISPLAY_SIZE.x * 0.5, CARD_DISPLAY_SIZE.y)
-		holder.set_meta("fan_rotation", deg_to_rad(t * FAN_MAX_DEGREES))
-		holder.set_meta("fan_drop", t * t * FAN_MAX_DROP)
-		holder.rotation = deg_to_rad(t * FAN_MAX_DEGREES)
-		holder.position.y = t * t * FAN_MAX_DROP
-
 func _fit_hand_width(count: int) -> void:
 	var separation := HAND_CARD_SEPARATION
 	# Masadaki el alanının genişliği (düğüm boyu bir kare sonra kesinleşir;
@@ -1890,10 +1848,7 @@ func _process(delta: float) -> void:
 			if absf(current - target) < 0.5:
 				current = target
 			holder.set_meta("lift_current", current)
-			# Yelpaze: kart kalktıkça düzleşir, yelpaze inişi kalkışa eklenir.
-			var lifted := clampf(current / CARD_LIFT, 0.0, 1.0) if not is_zero_approx(CARD_LIFT) else 0.0
-			holder.position.y = current + float(holder.get_meta("fan_drop", 0.0)) * (1.0 - lifted)
-			holder.rotation = float(holder.get_meta("fan_rotation", 0.0)) * (1.0 - lifted)
+			holder.position.y = current
 		i -= 1
 
 ## wrapper (HBox'un yonettigi sabit yer tutucu)
@@ -3462,23 +3417,7 @@ func _place_right_column_controls() -> void:
 	if _trash_panel != null:
 		_set_rect(_trash_panel, _r(R_TRASH))
 	pass_button.add_theme_font_size_override("font_size", 20)
-	_skin_pass_plaque()
 	_set_rect(pass_button, _r(R_PASS))
-
-## TURU BİTİR: masanın sağ altında pirinç plaka (kapsül), koyu yazı.
-func _skin_pass_plaque() -> void:
-	if pass_button.has_meta("plaque"):
-		return
-	pass_button.set_meta("plaque", true)
-	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
-		var suffix: String = {"normal": "", "hover": "_hover", "focus": "_hover", "pressed": "_pressed", "disabled": "_disabled"}[state]
-		var box := UiSkin.stylebox("res://assets/ui/board_plaque%s.png" % suffix, 24)
-		box.texture_margin_left = 26
-		box.texture_margin_right = 26
-		pass_button.add_theme_stylebox_override(state, box)
-	for key in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
-		pass_button.add_theme_color_override(key, UiTheme.TEXT_ON_GOLD)
-	pass_button.add_theme_color_override("font_disabled_color", Color(UiTheme.TEXT_ON_GOLD, 0.6))
 
 ## Seçili kart bozdurulur (sıra sendeyse).
 func _on_trash_input(event: InputEvent) -> void:
@@ -4538,7 +4477,7 @@ func _refresh_layer_bar() -> void:
 					pill.bg_color = color.darkened(0.1)
 					pill.border_color = color.lightened(0.25)
 				else:
-					pill.bg_color = Color("#3B2617") if state != "hover" else Color("#5A3C24")
+					pill.bg_color = Color("#222a38") if state != "hover" else Color("#2c3648")
 					pill.border_color = Color(color, 0.0 if state != "hover" else 0.6)
 				pill.set_border_width_all(1)
 				(pick as Button).add_theme_stylebox_override(state, pill)

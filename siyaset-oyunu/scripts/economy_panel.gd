@@ -18,8 +18,8 @@ extends VBoxContainer
 
 signal tax_policy_requested
 
-const TILE_BG := Color("2E1D12")
-const TILE_BORDER := Color("6B4A2E")
+const TILE_BG := Color("15112b")
+const TILE_BORDER := Color("3f3775")
 const TAX_COLORS := [UiTheme.GREEN, UiTheme.GOLD, UiTheme.RED]
 const CAPTION_SIZE := 9
 const VALUE_SIZE := 14
@@ -538,7 +538,7 @@ static func _policy_card(me: int, level: int, current: int, selected: int, on_se
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	for state in ["normal", "hover", "pressed", "disabled"]:
 		var style := StyleBoxFlat.new()
-		style.bg_color = Color(color, 0.16) if is_current else (Color("5A3C24") if state == "hover" and not is_current else TILE_BG)
+		style.bg_color = Color(color, 0.16) if is_current else (Color("2a2350") if state == "hover" and not is_current else TILE_BG)
 		style.border_color = color if is_current else (UiTheme.TEXT if is_selected else TILE_BORDER)
 		style.set_border_width_all(2 if is_current or is_selected else 1)
 		style.border_width_top = 4 if is_current or is_selected else 1
@@ -753,7 +753,7 @@ static func inquiry_result_card(data: Dictionary) -> PanelContainer:
 	var card := PanelContainer.new()
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color("2E1D12")
+	style.bg_color = Color("15112b")
 	style.border_color = color
 	style.set_border_width_all(2)
 	style.border_width_left = 6

@@ -24,9 +24,9 @@ const BUTTON_TINT_PRESSED := "res://assets/ui/ui_button_tint_pressed.png"
 ## Sadece çerçeve (içi saydam): seçili/hedef vurgusu.
 const TARGET := "res://assets/ui/target_highlight.png"
 
-## 9-slice kenar payı: masa dokuları 32x32, yuvarlak köşeli (yarıçap 7-12);
-## 10px pay köşeleri bozmadan her boyuta esnetir.
-const SLICE_MARGIN := 10
+## 9-slice kenar payı: placeholder'lar 16x16 ve 1px çerçeveli üretiliyor,
+## 5px pay köşeleri bozmadan her boyuta esnetir.
+const SLICE_MARGIN := 5
 
 static func _texture(path: String) -> Texture2D:
 	return load(path) as Texture2D

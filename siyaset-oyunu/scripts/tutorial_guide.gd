@@ -76,7 +76,7 @@ func _build_panel() -> void:
 	_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	_panel.custom_minimum_size = Vector2(PANEL_WIDTH, 0)
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color("3B2617")
+	style.bg_color = Color("1d1838")
 	style.border_color = UiTheme.GOLD
 	style.set_border_width_all(2)
 	style.border_width_top = 4

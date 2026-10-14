@@ -1,45 +1,44 @@
 class_name UiTheme
 extends RefCounted
-## ARAYÜZÜN TEK KAYNAĞI (0.0.176: OYUN MASASI teması; eski "haber stüdyosu"
-## paleti git dalı tema-haber-studyosu'nda).
+## ARAYÜZÜN TEK KAYNAĞI (Konsept C — Piksel).
 ##
 ## Renk, yazı boyutu, boşluk, kenar kalınlığı: hepsi burada. Hiçbir ekran kendi
 ## rengini ya da punto değerini uydurmaz; hepsi buradan okur. Tarzı değiştirmek
 ## için TEK dosya düzenlenir.
 ##
 ## Dokular (panel/buton zeminleri) assets/ui/ altındaki PNG'lerdir ve
-## tools/make_board_art.py ile üretilir — oradaki palet buradakiyle aynıdır.
+## tools/make_ui_art.py ile üretilir — oradaki palet buradakiyle aynıdır.
 ##
-## TARZ: bordo keçe masa, ceviz ahşap paneller, krem kâğıt, pirinç vurgu,
-## yuvarlak köşeler, monospace başlık ve rakamlar.
+## TARZ: koyu mor-lacivert zemin, kalın koyu dış çizgi, pah (bevel) kenarlar,
+## sert gölge, altın vurgu, monospace başlık ve rakamlar.
 
 # --- RENKLER ---------------------------------------------------------------
 ## Ekran zemini (haritanın ve panellerin arkası).
-const BG := Color("3A1A1F")
+const BG := Color("181430")
 ## Sert gölge / dış çizgi.
-const INK := Color("1E120A")
+const INK := Color("100D22")
 ## Panel dolgusu ve pah renkleri.
-const PANEL := Color("3B2617")
-const PANEL_LIGHT := Color("5A3C24")
-const PANEL_DARK := Color("2A1A10")
+const PANEL := Color("2B2352")
+const PANEL_LIGHT := Color("4A3F7A")
+const PANEL_DARK := Color("1C1738")
 ## Oyuk (kart yuvası, ilerleme çubuğu zemini).
-const SLOT := Color("1A0F09")
+const SLOT := Color("100D22")
 
 ## Yazı.
-const TEXT := Color("F5EAD2")
-const TEXT_MUTED := Color("C9B48F")
-const TEXT_DIM := Color("8A7358")
-const TEXT_ON_GOLD := Color("2A1A10")
+const TEXT := Color("F2EFFF")
+const TEXT_MUTED := Color("A79BD6")
+const TEXT_DIM := Color("6B62A0")
+const TEXT_ON_GOLD := Color("100D22")
 
 ## Vurgular.
-const GOLD := Color("E4B43C")
-const GOLD_DIM := Color("9A7420")
-const GREEN := Color("7BC86A")
-const GREEN_DARK := Color("2F7A45")
-const RED := Color("D9473A")
-const RED_DARK := Color("7E231A")
-const BLUE := Color("3F7FC8")
-const PURPLE := Color("8E5BBF")
+const GOLD := Color("FFC93C")
+const GOLD_DIM := Color("B08A22")
+const GREEN := Color("4BE08A")
+const GREEN_DARK := Color("258F53")
+const RED := Color("E8402A")
+const RED_DARK := Color("8E2215")
+const BLUE := Color("3A8DE0")
+const PURPLE := Color("A56BE8")
 
 ## Anlam renkleri (puan, oy, uyarı).
 const POSITIVE := GREEN
@@ -50,7 +49,7 @@ const NEUTRAL := TEXT_MUTED
 ## Dokulardaki dış çizgi kalınlığı (make_ui_art.py ile aynı).
 const BORDER := 3
 ## 9-slice kenar payı: 16x16 dokuda kenarların esnemeden kalacağı pay.
-const SLICE := 10
+const SLICE := 5
 ## Sert gölge kayması (panellerin altına/sağına).
 const SHADOW := 6
 

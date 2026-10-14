@@ -199,6 +199,9 @@ var election_seats: Dictionary = {}
 var early_election_pending: bool = false
 ## Seçim takviminin çıpası (erken seçimden sonra kayar; 0 = varsayılan).
 var election_anchor: int = 0
+## Erken seçimden sonra takvim TAMAMEN kayar: kalan seçim sayısı korunur, son
+## seçim de aralık kadar ileri gider (oyun uzar). 0 = lobi ayarındaki uzunluk.
+var max_rounds_override: int = 0
 ## Son seçimin girdileri (sadece host/yerel; denge analizi için, senkronlanmaz).
 var last_election_inputs: Dictionary = {}
 
@@ -1427,6 +1430,10 @@ func init_game() -> void:
 	early_election_pending = false
 	election_anchor = 0
 	GameRules.set_election_anchor(0)
+	if max_rounds_override > 0:
+		# Erken seçimle uzamış oyun: lobideki uzunluğa dön.
+		GameRules.configure(MultiplayerManager.election_interval, MultiplayerManager.election_count)
+	max_rounds_override = 0
 	national_support = {}
 	local_support = {}
 	province_events = {}
@@ -1529,6 +1536,9 @@ func abandon_game() -> void:
 	early_election_pending = false
 	election_anchor = 0
 	GameRules.set_election_anchor(0)
+	if max_rounds_override > 0:
+		GameRules.configure(MultiplayerManager.election_interval, MultiplayerManager.election_count)
+	max_rounds_override = 0
 	national_support = {}
 	local_support = {}
 	province_events = {}
@@ -2711,6 +2721,13 @@ func rebase_election_calendar() -> void:
 ## Meclis erken seçimi kabul etti (GovernmentManager çağırır).
 func schedule_early_election() -> void:
 	early_election_pending = true
+	_push_state({"type": "opinion"})
+
+## Sıradaki seçimin turu: erken seçim kararı varsa BU turun sonu.
+func next_election_round() -> int:
+	if early_election_pending:
+		return round_number
+	return GameRules.next_election_round(round_number)
 
 func _finish_round() -> void:
 	_round_end_pending = false
@@ -2754,8 +2771,16 @@ func _finish_round() -> void:
 	# takvim bu tura sabitlenir — sonraki seçimler buradan itibaren sayılır.
 	if early_election_pending:
 		early_election_pending = false
+		# Erken seçim sıradaki olağan seçimin YERİNE geçer: ondan sonraki
+		# olağan seçimler kadar seçim kalır, hepsi buradan itibaren aralıkla.
+		var remaining := 0
+		for r in range(finished_round + 1, GameRules.MAX_ROUNDS + 1):
+			if GameRules.is_election_round(r):
+				remaining += 1
 		election_anchor = finished_round
 		GameRules.set_election_anchor(election_anchor)
+		max_rounds_override = finished_round + maxi(1, remaining - 1) * GameRules.ELECTION_INTERVAL
+		GameRules.MAX_ROUNDS = max_rounds_override
 		_hold_election(finished_round, false)
 		_schedule_agenda()
 		return
@@ -3928,6 +3953,7 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"election_seats": election_seats,
 		"early_election_pending": early_election_pending,
 		"election_anchor": election_anchor,
+		"max_rounds_override": max_rounds_override,
 		"passed": passed_threshold,
 		"national": national_support,
 		"local": local_support,
@@ -3987,6 +4013,9 @@ func _apply_state(state: Dictionary) -> void:
 	election_seats = state.get("election_seats", {})
 	early_election_pending = bool(state.get("early_election_pending", false))
 	election_anchor = int(state.get("election_anchor", 0))
+	max_rounds_override = int(state.get("max_rounds_override", 0))
+	if max_rounds_override > 0:
+		GameRules.MAX_ROUNDS = max_rounds_override
 	# Takvim çıpası her istemcide aynı olmalı (erken seçim sonrası).
 	GameRules.set_election_anchor(election_anchor)
 	passed_threshold = state["passed"]

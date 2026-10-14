@@ -785,7 +785,7 @@ const TIMER_BAR_HEIGHT := 7.0
 func _refresh_band_date() -> void:
 	if _band_period == null:
 		return
-	var next_election := GameRules.next_election_round(CardManager.round_number)
+	var next_election := CardManager.next_election_round()
 	_band_period.text = GameRules.period_label(mini(CardManager.round_number, GameRules.MAX_ROUNDS))
 	var parts := [L.t("Baraj %%%s") % _format_threshold(MultiplayerManager.election_threshold),
 		(L.t("Sonraki seçim %d") % GameRules.election_year(next_election)) if next_election != -1 else L.t("Başka seçim yok")]
@@ -1507,7 +1507,7 @@ func _refresh_map_seat_markers() -> void:
 			seat_markers.set_seats(province_id, colors)
 
 func _refresh_game_settings_label() -> void:
-	var next_election := GameRules.next_election_round(CardManager.round_number)
+	var next_election := CardManager.next_election_round()
 	game_settings_label.text = L.t("%s  ·  Baraj %%%s\n%s") % [
 		GameRules.period_label(mini(CardManager.round_number, GameRules.MAX_ROUNDS)),
 		_format_threshold(MultiplayerManager.election_threshold),
@@ -2804,6 +2804,8 @@ func _select_target_province(province_id: String) -> void:
 
 func _on_opinion_changed() -> void:
 	_refresh_disaster()
+	# Erken seçim kararı / takvim kayması üst şeritte hemen görünsün.
+	_refresh_band_date()
 	_refresh_economy()
 	_refresh_score_panel()
 	_refresh_agenda_banner()
@@ -4681,21 +4683,21 @@ func _build_layer_bar() -> void:
 		# Hap düğme: madalyon + (seçiliyse) grubun tam adı.
 		var pick := Button.new()
 		pick.focus_mode = Control.FOCUS_NONE
-		pick.custom_minimum_size = Vector2(34, 34)
+		pick.custom_minimum_size = Vector2(44, 44)
 		pick.tooltip_text = VoterGroups.title(group)
-		var icon := VoterGroupIcon.make(group, 28.0)
+		var icon := VoterGroupIcon.make(group, 38.0)
 		icon.position = Vector2(3, 3)
-		icon.size = Vector2(28, 28)
+		icon.size = Vector2(38, 38)
 		pick.add_child(icon)
 		var name_label := Label.new()
 		name_label.name = L.t("Title")
 		name_label.text = VoterGroups.title(group)
-		name_label.add_theme_font_size_override("font_size", 12)
+		name_label.add_theme_font_size_override("font_size", 14)
 		name_label.add_theme_color_override("font_color", Color.WHITE)
 		name_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.45))
 		name_label.add_theme_constant_override("outline_size", 3)
-		name_label.position = Vector2(36, 0)
-		name_label.size = Vector2(0, 34)
+		name_label.position = Vector2(46, 0)
+		name_label.size = Vector2(0, 44)
 		name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		pick.add_child(name_label)
@@ -4758,14 +4760,14 @@ func _refresh_layer_bar() -> void:
 			var color := VoterGroups.color(group)
 			var title: Label = pick.get_node("Title")
 			title.visible = selected
-			var width := 34.0
+			var width := 44.0
 			if selected:
-				width = 36.0 + title.get_theme_font("font").get_string_size(title.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x + 14.0
-			(pick as Button).custom_minimum_size = Vector2(width, 34)
-			(pick as Button).size = Vector2(width, 34)
+				width = 46.0 + title.get_theme_font("font").get_string_size(title.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x + 14.0
+			(pick as Button).custom_minimum_size = Vector2(width, 44)
+			(pick as Button).size = Vector2(width, 44)
 			for state in ["normal", "hover", "pressed", "focus"]:
 				var pill := StyleBoxFlat.new()
-				pill.set_corner_radius_all(17)
+				pill.set_corner_radius_all(0)
 				pill.anti_aliasing = true
 				if selected:
 					pill.bg_color = color.darkened(0.1)

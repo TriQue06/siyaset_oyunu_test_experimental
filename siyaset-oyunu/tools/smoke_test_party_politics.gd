@@ -335,6 +335,7 @@ func _initialize() -> void:
 
 	print("=== GEÇİCİ PARTİLER ===")
 	cm.allow_temporary_parties = true
+	mm.random_parties = true  # 0.0.186: lobide varsayılan kapalı
 	var temp := -1
 	for attempt in 30:
 		cm._hold_election(cm.round_number, false)

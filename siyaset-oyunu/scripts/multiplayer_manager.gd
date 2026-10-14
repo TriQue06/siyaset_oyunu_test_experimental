@@ -88,9 +88,9 @@ const MAP_SEED_MAX_DIGITS := 9
 var map_seed: String = ""
 ## Bu oyunun kesinleşmiş harita tohumu (oyun başlarken belirlenir; 0 = henüz yok).
 var game_map_seed: int = 0
-## RASTGELE PARTİLER (lobi ayarı, varsayılan açık): seçimlerden sonra arada
+## RASTGELE PARTİLER (lobi ayarı, varsayılan KAPALI (0.0.186)): seçimlerden sonra arada
 ## bir yeni bir bot partisi katılır (bkz. CardManager._maybe_add_temporary_party).
-var random_parties: bool = true
+var random_parties: bool = false
 
 func set_random_parties(value: bool) -> void:
 	if not is_local_owner():
@@ -321,7 +321,7 @@ func start_offline(player_name: String) -> void:
 	is_host = true
 	room_code = ""
 	map_seed = ""
-	random_parties = true
+	random_parties = false
 	game_map_seed = 0
 	reset_seat_method()
 	election_threshold = THRESHOLD_DEFAULT

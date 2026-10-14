@@ -113,8 +113,16 @@ func _initialize() -> void:
 			best_appeal = id
 		if national_appeal(parties[id], voters, seat_file) < national_appeal(parties[worst_appeal], voters, seat_file):
 			worst_appeal = id
-	check("ulke genelinde secmen gruplarina en uyumlu parti en uyumsuzdan cok oy aldi",
-		float(r["vote_shares"][best_appeal]) > float(r["vote_shares"][worst_appeal]), str(r["vote_shares"]))
+	# 0.0.186 GRUP BAZLI OY: bir grubu tek başına sahiplenen parti (3: işçi ve
+	# özerkçi çekirdeği kimsede yok) o grubun oylarının çoğunu alır.
+	var in_isci: Dictionary = ElectionModel.shares_in_group(parties, "isci")
+	check("grubu tek basina sahiplenen parti o grubun cogunu alir", float(in_isci[3]) > 0.6, str(in_isci))
+	var focused := {1: groups(["emekli", "dindar"]), 2: groups(["genc", "ilerici"]), 3: groups(["isci", "milliyetci"]),
+		4: groups(["isveren", "ozerkci"]), 5: groups(["isci", "dindar"]), 6: groups(["isveren", "milliyetci"])}
+	(focused[1] as Dictionary)["emekli"] = 88.0
+	var in_emekli: Dictionary = ElectionModel.shares_in_group(focused, "emekli")
+	print("  (6 parti; emeklilere 88 yakinliktaki parti emekli oylarinin %%%.0f'ini alir)" % (float(in_emekli[1]) * 100.0))
+	check("emeklilere uzun sure odaklanan parti emeklilerin %70-90'ini alir", float(in_emekli[1]) >= 0.7 and float(in_emekli[1]) <= 0.9, str(in_emekli[1]))
 	var per_province_ok := true
 	for province_id in r["province_results"].keys():
 		var n := 0
@@ -125,9 +133,13 @@ func _initialize() -> void:
 	check("her ilin koltuklari tam dagitildi", per_province_ok)
 
 	rng.seed = 42
-	var share3: float = float(r["vote_shares"][3])
+	var smallest := 1
+	for id in parties.keys():
+		if float(r["vote_shares"][id]) < float(r["vote_shares"][smallest]):
+			smallest = id
+	var share3: float = float(r["vote_shares"][smallest])
 	var rt := ElectionModel.compute(parties, seat_file, voters, share3 + 0.5, rng)
-	check("baraj alti parti 0 vekil", int(rt["seats"][3]) == 0 and not rt["passed_threshold"].has(3), str(rt["seats"]))
+	check("baraj alti parti 0 vekil", int(rt["seats"][smallest]) == 0 and not rt["passed_threshold"].has(smallest), str(rt["seats"]))
 	check("baraj sonrasi vekil sayisi ayni", int(sum_values(rt["seats"])) == cm.TOTAL_SEATS)
 	var r100 := ElectionModel.compute(parties, seat_file, voters, 100.0, rng)
 	check("kimse gecemezse baraj uygulanmaz", int(sum_values(r100["seats"])) == cm.TOTAL_SEATS and r100["passed_threshold"].size() == 3)
@@ -136,8 +148,8 @@ func _initialize() -> void:
 
 	print("")
 	print("=== 3) SECIM TAKVIMI ===")
-	check("varsayilan: 2 yilda bir (4 tur), 8 secim = 32 tur", GameRules.ELECTION_INTERVAL == 4 and GameRules.MAX_ROUNDS == 32 \
-		and GameRules.is_election_round(4) and GameRules.is_election_round(32) and not GameRules.is_election_round(34))
+	check("varsayilan: 2 yilda bir (4 tur), 5 secim = 20 tur", GameRules.ELECTION_INTERVAL == 4 and GameRules.MAX_ROUNDS == 20 \
+		and GameRules.is_election_round(4) and GameRules.is_election_round(20) and not GameRules.is_election_round(22))
 	# Bu testin geri kalanı 5 YILDA bir (10 tur), 6 seçimlik (60 tur) takvimle yazıldı.
 	GameRules.configure(5, 6)
 	check("secim turlari 10,20,30 (5,15,25 degil)", GameRules.is_election_round(10) and GameRules.is_election_round(20) \
@@ -687,6 +699,28 @@ func _initialize() -> void:
 		"%.3f" % (cm.national_of(thief) - strong_nat))
 	check("bedeller kucuk (en fazla 1 puan)", absf(cm.national_of(thief) - thief_nat) <= 1.0 \
 		and absf(cm.national_of(victim) - victim_nat) <= 0.8)
+
+	print("")
+	print("=== 16) ERKEN SECIM TAKVIMI TAMAMEN KAYAR ===")
+	GameRules.configure(2, 5)  # 4 turda bir: 4, 8, 12, 16, 20
+	new_game({1: groups(), 2: groups(), 3: groups()})
+	cm.last_seats = {1: 150, 2: 200, 3: 150}
+	cm.last_election_round = 4
+	cm.round_number = 6
+	cm.schedule_early_election()
+	check("erken secim karari: sonraki secim bu tur", cm.next_election_round() == 6)
+	cm._finish_round()
+	var cal: Array = []
+	for rr in range(7, GameRules.MAX_ROUNDS + 1):
+		if GameRules.is_election_round(rr):
+			cal.append(rr)
+	check("takvim 6'dan itibaren 4 turda bir: 10, 14, 18; oyun 18'de biter (secim sayisi korunur)",
+		cal == [10, 14, 18] and GameRules.MAX_ROUNDS == 18, "%s, son tur %d" % [str(cal), GameRules.MAX_ROUNDS])
+	check("ust seritteki sonraki secim yeni takvimden", cm.next_election_round() == 10, str(cm.next_election_round()))
+	var packed_cal: Dictionary = cm._pack_state(false)
+	GameRules.configure(2, 5)
+	cm._apply_state(packed_cal)
+	check("kayit / istemci: uzayan oyun durumla tasinir", GameRules.MAX_ROUNDS == 18)
 
 	print("")
 	if fails == 0:

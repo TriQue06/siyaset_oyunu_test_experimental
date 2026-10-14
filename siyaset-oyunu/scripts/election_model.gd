@@ -54,6 +54,45 @@ static func load_province_voters() -> Dictionary:
 static func support(affinities: Dictionary, profile: Dictionary) -> float:
 	return VoterGroups.vote_weight(VoterGroups.appeal(affinities, profile))
 
+## GRUP BAZLI OY (0.0.186): ildeki her seçmen grubu (4 çiftin iki tarafı, ilin
+## profiline göre büyüklük) oyunu partiler arasında KENDİ içinde paylaştırır:
+## partinin o gruptaki ağırlığı exp(GROUP_SHARPNESS × (yakınlık − 50)) ×
+## kamuoyu. Bir gruba çok yakın parti (ör. emeklilerde 85, rakipler 50-60) o
+## grubun oylarının büyük kısmını alır; il payı grupların toplamıdır.
+## weights: peer_id -> kamuoyu / dalgalanma çarpanı (> 0).
+const GROUP_SHARPNESS := 0.09
+
+static func group_vote_shares(parties: Dictionary, profile: Dictionary, weights: Dictionary) -> Dictionary:
+	var peer_ids: Array = parties.keys()
+	var result := {}
+	for peer_id in peer_ids:
+		result[peer_id] = 0.0
+	if peer_ids.is_empty():
+		return result
+	for pair in VoterGroups.PAIR_IDS:
+		var groups: Array = VoterGroups.PAIRS[pair]
+		var first := VoterGroups.share(profile, groups[0])
+		for k in 2:
+			var size := (first if k == 0 else 1.0 - first) / float(VoterGroups.PAIR_IDS.size())
+			if size <= 0.0:
+				continue
+			var in_group := shares_in_group(parties, String(groups[k]), weights)
+			for peer_id in peer_ids:
+				result[peer_id] = float(result[peer_id]) + size * float(in_group[peer_id])
+	return result
+
+## Bir grubun oylarının partiler arasındaki dağılımı (0..1).
+static func shares_in_group(parties: Dictionary, group: String, weights: Dictionary = {}) -> Dictionary:
+	var raw := {}
+	var total := 0.0
+	for peer_id in parties.keys():
+		var aff := float((parties[peer_id] as Dictionary).get(group, VoterGroups.AFFINITY_NEUTRAL))
+		raw[peer_id] = exp(GROUP_SHARPNESS * (aff - VoterGroups.AFFINITY_NEUTRAL)) * float(weights.get(peer_id, 1.0))
+		total += float(raw[peer_id])
+	for peer_id in raw.keys():
+		raw[peer_id] = float(raw[peer_id]) / maxf(total, 0.0001)
+	return raw
+
 ## Rastgelelik OLMADAN beklenen ulusal paylar (karışımdan önce; toplam 1).
 ## profiles: province_id -> il profili, local_mod: province_id -> {peer -> puan}.
 static func expected_national(parties: Dictionary, profiles: Dictionary, province_seats: Dictionary,
@@ -80,18 +119,12 @@ static func expected_shares(parties: Dictionary, profile: Dictionary,
 		national_mod: Dictionary = {}, local_here: Dictionary = {}, national: Dictionary = {}) -> Dictionary:
 	var peer_ids: Array = parties.keys()
 	peer_ids.sort()
-	var raw := {}
-	var raw_total := 0.0
+	var weights := {}
 	for peer_id in peer_ids:
-		var opinion: float = PublicOpinion.multiplier(float(national_mod.get(peer_id, 0.0)), float(local_here.get(peer_id, 0.0)))
-		var w: float = support(parties[peer_id], profile) * opinion
-		raw[peer_id] = w
-		raw_total += w
-	var result := {}
-	if raw_total <= 0.0:
+		weights[peer_id] = PublicOpinion.multiplier(float(national_mod.get(peer_id, 0.0)), float(local_here.get(peer_id, 0.0)))
+	var result := group_vote_shares(parties, profile, weights)
+	if result.is_empty():
 		return result
-	for peer_id in peer_ids:
-		result[peer_id] = float(raw[peer_id]) / raw_total
 	result = cap_shares(blend_national(result, national))
 	for peer_id in peer_ids:
 		result[peer_id] = float(result[peer_id]) * 100.0
@@ -187,17 +220,11 @@ static func compute(parties: Dictionary, province_seats: Dictionary, voters: Dic
 		var seats_here: int = int(province_seats[province_id])
 		var profile: Dictionary = voters.get(province_id, {})
 		var local_here: Dictionary = local_mod.get(province_id, {})
-		var raw: Dictionary = {}
-		var raw_total := 0.0
+		var weights: Dictionary = {}
 		for peer_id in peer_ids:
 			var opinion: float = PublicOpinion.multiplier(float(national_mod.get(peer_id, 0.0)), float(local_here.get(peer_id, 0.0)))
-			var w: float = support(parties[peer_id], profile) * float(swing[peer_id]) * opinion \
-				* rng.randf_range(1.0 - PROVINCE_NOISE, 1.0 + PROVINCE_NOISE)
-			raw[peer_id] = w
-			raw_total += w
-		var shares: Dictionary = {}
-		for peer_id in peer_ids:
-			shares[peer_id] = float(raw[peer_id]) / raw_total
+			weights[peer_id] = float(swing[peer_id]) * opinion * rng.randf_range(1.0 - PROVINCE_NOISE, 1.0 + PROVINCE_NOISE)
+		var shares: Dictionary = group_vote_shares(parties, profile, weights)
 		for peer_id in peer_ids:
 			national[peer_id] = float(national[peer_id]) + float(shares[peer_id]) * seats_here
 		province_shares[province_id] = shares

@@ -5,13 +5,15 @@ extends RefCounted
 ## yazılır (kısaltma yok, gerekirse yazı küçülür); renk her zaman simge ve
 ## metinle birlikte kullanılır.
 
-const FS_NAME := 11
-const FS_VALUE := 12
-const BAR_HEIGHT := 7.0
+const FS_NAME := 13
+const FS_VALUE := 15
+## 0.0.186: karo simgeler ve yüzdeler büyüdü (eskiden 16 px simge, 11 px yazı).
+const ICON_SIZE := 24.0
+const BAR_HEIGHT := 9.0
 
 ## [simge] Grup adı ............ değer   (adın rengi grubun rengi, açık tonda)
 static func name_row(group: String, value_text: String = "", value_color: Color = UiTheme.TEXT,
-		font_size: int = FS_NAME, icon_size: float = 16.0, words: bool = false) -> HBoxContainer:
+		font_size: int = FS_NAME, icon_size: float = ICON_SIZE, words: bool = false) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 5)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -25,7 +27,7 @@ static func name_row(group: String, value_text: String = "", value_color: Color 
 	row.add_child(name)
 	if value_text != "":
 		# Sayılar mono (hizalı), nitel sözcükler normal yazı tipiyle.
-		var value: Label = PopupKit.label(value_text, font_size + 1, value_color) if words 			else UiTheme.mono_label(value_text, font_size + 1, value_color, true)
+		var value: Label = PopupKit.label(value_text, font_size + 1, value_color) if words 			else UiTheme.mono_label(value_text, font_size + 2, value_color, true)
 		value.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(value)
 	return row
@@ -101,7 +103,7 @@ static func effect_row(group: String, amount: float, font_size: int = FS_NAME) -
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", -2)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(name_row(group, "", color, font_size, 14.0))
+	box.add_child(name_row(group, "", color, font_size, 20.0))
 	var value := PopupKit.label(text, font_size, color)
 	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	value.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

@@ -41,7 +41,7 @@ extends RefCounted
 const ROUNDS_PER_YEAR := 2
 ## VARSAYILAN: seçimler 2 YILDA BİR, yani 4 dönemde bir (tur = 6 ay).
 const DEFAULT_ELECTION_INTERVAL := 2
-const DEFAULT_ELECTION_COUNT := 8
+const DEFAULT_ELECTION_COUNT := 5
 const ELECTION_INTERVAL_MIN := 2
 const ELECTION_INTERVAL_MAX := 8
 const ELECTION_COUNT_MIN := 2

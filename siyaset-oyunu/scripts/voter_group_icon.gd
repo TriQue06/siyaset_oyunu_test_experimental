@@ -31,11 +31,24 @@ func _draw() -> void:
 	var ink := Color.WHITE
 	if bare:
 		ink = VoterGroups.color(group)
-	else:
-		r = draw_medallion(self, c, r, VoterGroups.color(group))
-	draw_symbol(self, VoterGroups.icon(group), c, r * (0.6 if not bare else 0.9), ink)
+		draw_symbol(self, VoterGroups.icon(group), c, r * 0.9, ink)
+		return
+	# KESKİN KARO (0.0.186): köşeli, grubun renginde; sembol karonun çoğunu kaplar.
+	var inner := draw_tile(self, Rect2(c - Vector2(r, r), Vector2(r, r) * 2.0), VoterGroups.color(group))
+	draw_symbol(self, VoterGroups.icon(group), c - Vector2(0, inner * 0.06), inner * 0.78, ink)
 
-## MADALYON: grubun renginde dolu daire, koyu kontur, dışta grubun renginde
+## KARO: koyu çerçeve, grubun renginde dolgu, altta hafif gölge şeridi (keskin
+## köşe; kartlar ve düğmelerle aynı dil). Sembolün ölçeği için iç yarı genişliği döner.
+static func draw_tile(canvas: CanvasItem, rect: Rect2, color: Color) -> float:
+	canvas.draw_rect(rect, Color("#0b0f16"), true)
+	var edge := maxf(1.0, rect.size.x * 0.06)
+	var inner := rect.grow(-edge)
+	canvas.draw_rect(inner, color, true)
+	var shade := inner.size.y * 0.16
+	canvas.draw_rect(Rect2(inner.position.x, inner.end.y - shade, inner.size.x, shade), Color(0, 0, 0, 0.22), true)
+	return inner.size.x * 0.5
+
+## MADALYON (eski, harita lejantı gibi yerler için): grubun renginde dolu daire, koyu kontur, dışta grubun renginde
 ## yarı saydam hale (16 px ve üstünde) ve üstte hafif parlama. İç dairenin
 ## yarıçapını döndürür (sembol buna göre ölçeklenir).
 static func draw_medallion(canvas: CanvasItem, c: Vector2, r: float, color: Color) -> float:

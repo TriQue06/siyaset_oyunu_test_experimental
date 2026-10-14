@@ -184,8 +184,8 @@ const MIN_PLAYERS_TO_CONTINUE := 2
 ## TAKVİM: bir tur ALTI AYDIR. Oyun START_YEAR'ın ilk yarısında başlar.
 ## Tur sonunda sandıktan çıkan meclis bir sonraki dönemin meclisidir; bu yüzden
 ## seçim, biten turun DEĞİL onu izleyen yılın adıyla anılır (varsayılan 4 yıllık
-## aralıkla 1954, 1958, 1962 ...).
-const START_YEAR := 1950
+## aralıkla 2004, 2008, 2012 ...).
+const START_YEAR := 2000
 
 ## Bu turun takvim yılı.
 static func year_of_round(round_number: int) -> int:
@@ -195,7 +195,7 @@ static func year_of_round(round_number: int) -> int:
 static func half_of_round(round_number: int) -> int:
 	return (maxi(1, round_number) - 1) % ROUNDS_PER_YEAR
 
-## "1950 · 1. yarı" gibi okunur dönem etiketi.
+## "2000 · 1. yarı" gibi okunur dönem etiketi.
 static func period_label(round_number: int) -> String:
 	return "%d %s" % [year_of_round(round_number),
 		L.t("1. yarı") if half_of_round(round_number) == 0 else L.t("2. yarı")]

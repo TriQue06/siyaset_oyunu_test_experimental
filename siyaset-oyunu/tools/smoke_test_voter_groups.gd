@@ -353,13 +353,13 @@ func _initialize() -> void:
 	cm._decay_group_effects(r0 + 3)
 	check("suresi dolan toplanti kaydi silinir", not cm.group_meetings.has(1))
 	cm.round_number = r0
-	cm.crisis = {"type": "kriz_emekli", "until": r0 + 1}
+	cm.agenda = {"type": "gundem_emekli", "until": r0 + 1}
 	cm.speech_rounds = {}
 	cm.current_turn_index = cm.turn_order.find(3)
 	var nat3: float = cm.national_of(3)
 	cm.funds[3] = 50.0
 	cm._apply_speech(3, "emekli")
-	check("krizin grubuyla toplanti ulusal destek getirir", near(cm.national_of(3) - nat3, PublicOpinion.CRISIS_RESPONSE_NATIONAL))
+	check("gundemin grubuyla toplanti ulusal destek getirir", near(cm.national_of(3) - nat3, PublicOpinion.CRISIS_RESPONSE_NATIONAL))
 	cm.speech_required = false
 	cm.crisis = {}
 
@@ -497,6 +497,9 @@ func _initialize() -> void:
 	plan = brain._best_constitution(1)
 	check("barajda zorlanan bot (ve zorlanan ortagi) barajin dusmesini onerir", not plan.is_empty()
 		and float(plan["payload"]["threshold"]) < 7.0, str(plan))
+	# Yasa da bedelsiz ve her gruba açık: bot geçen dönem yasa sundu sayılır ki
+	# anayasa yasa hakkıyla yarışsın (yasa sıklığı sınırı).
+	cm.law_rounds[1] = cm.round_number - 1
 	var action: Dictionary = brain.choose_action(1)
 	check("bot hamlesi anayasa teklifi", String(action.get("type", "")) == "constitution", str(action))
 	root.get_node("BotManager").do_action(1)

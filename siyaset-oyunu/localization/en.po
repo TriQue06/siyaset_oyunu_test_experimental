@@ -3362,3 +3362,48 @@ msgstr "Event Animations"
 
 msgid "destek"
 msgstr "support"
+
+msgid " Gündeme yanıt verdi (ulusal destek): %s."
+msgstr " Responded to the agenda (national support): %s."
+
+msgid "GÜNDEM: %s — %s."
+msgstr "AGENDA: %s — %s."
+
+msgid " Gündeme yanıt verdi (ulusal destek)."
+msgstr " Responded to the agenda (national support)."
+
+msgid "%s için yasa daha güçlü; yasa, EVET oyu ve toplantı ulusal destek getirir"
+msgstr "laws for %s are stronger; a law, a YES vote or a meeting brings national support"
+
+msgid "SORUŞTURMA"
+msgstr "INQUIRY"
+
+msgid "Bir partinin harcamalarına finansman soruşturması aç: devlet parasıyla miting usulsüzlüktür, kendi kasasından ödeyen itibar kazanır."
+msgstr "Open a funding inquiry into a party's spending: rallies paid with state money are misconduct, paying from the party's own funds earns credibility."
+
+msgid "Gündem yok: her grup için yasa sunulabilir."
+msgstr "No agenda: a law can be proposed for any group."
+
+msgid "\nGÜNDEMDE: yasa daha güçlü ve ulusal destek getirir."
+msgstr "\nON THE AGENDA: the law is stronger and brings national support."
+
+msgid " Gündemde: etki daha güçlü, ulusal destek de kazandırır."
+msgstr " On the agenda: stronger effect, also brings national support."
+
+msgid "SORUŞTURMA: HEDEF PARTİ"
+msgstr "INQUIRY: TARGET PARTY"
+
+msgid "Harcamaları incelenecek partiyi seç (kendi partin de olabilir: bağımsız denetim)."
+msgstr "Choose the party whose spending will be examined (your own party too: independent audit)."
+
+msgid "İncelenebilecek işlem sayısı: %d"
+msgstr "Transactions that can be examined: %d"
+
+msgid "\nGÜNDEMDE: toplantı ulusal destek de kazandırır."
+msgstr "\nON THE AGENDA: a meeting also brings national support."
+
+msgid " · GÜNDEM"
+msgstr " · AGENDA"
+
+msgid "Partin bu seçim döneminde zaten erken seçim önergesi verdi."
+msgstr "Your party already filed an early election motion this term."

@@ -160,7 +160,7 @@ func _initialize() -> void:
 	cm._push_state({"type": "timer"})
 	await _frames(3)
 	check("gundem bandi gorunur", scene._agenda_banner.visible)
-	check("gundem sadece cifti belirler", cm.law_on_agenda("law:isci") and cm.law_on_agenda("law:isveren") 		and not cm.law_on_agenda("law:dindar"))
+	check("gundem tek grubu odullendirir, yasa her gruba acik", cm.law_on_agenda("law:isci") and not cm.law_on_agenda("law:isveren") and not cm.law_on_agenda("law:dindar"))
 	scene._on_law_button_pressed()
 	await create_timer(0.3).timeout
 	_shot("law_designer")

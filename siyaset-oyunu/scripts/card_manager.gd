@@ -134,6 +134,9 @@ var splinters: Dictionary = {}
 var speech_done: bool = false
 ## Parti -> grup toplantısı yaptığı son dönem.
 var speech_rounds: Dictionary = {}
+## ERKEN SEÇİM önergesi bedelsiz (0.0.182): parti başına bir seçim aralığında
+## (GameRules.ELECTION_INTERVAL tur) bir önerge. parti -> önerge turu.
+var early_requests: Dictionary = {}
 ## Parti -> kongre yapıldığı son dönem (dönemde bir kongre).
 var congress_rounds: Dictionary = {}
 ## Bir önceki seçimin oy oranları (kongrede "oy kaybı" ölçüsü).
@@ -400,11 +403,7 @@ func can_propose_law(peer_id: int, law_type: String = "") -> bool:
 		return false
 	if not has_seats(peer_id):
 		return false  # meclis dışı parti yasa teklif edemez
-	# Yasa sadece gündemdeki çiftin gruplarından biri için sunulabilir.
-	if agenda_type() == "":
-		return false
-	if law_type != "" and not law_on_agenda(law_type):
-		return false
+	# Gündem şartı yok (0.0.182): her grup için yasa sunulabilir; gündem ödüllendirir.
 	if has_proposed_law_this_round(peer_id):
 		return false
 	if law_type != "" and not CardPresets.is_law_card(law_type):
@@ -821,7 +820,12 @@ func can_censure(peer_id: int) -> bool:
 ## seçim kararı yoksa.
 func can_early_election(peer_id: int) -> bool:
 	return can_choose_main_action(peer_id) and not is_party_member(peer_id) and funds_of(peer_id) >= GameRules.EARLY_ELECTION_FUNDS_COST \
-		and has_seats(peer_id) and not early_election_pending and GovernmentManager.can_submit_law()
+		and has_seats(peer_id) and not early_election_pending and GovernmentManager.can_submit_law() 		and not early_request_used(peer_id)
+
+## Partisi bu seçim aralığında erken seçim önergesi verdi mi?
+func early_request_used(peer_id: int) -> bool:
+	var last := int(early_requests.get(party_of(peer_id), -999))
+	return round_number - last < GameRules.ELECTION_INTERVAL
 
 func early_election() -> void:
 	if not can_early_election(multiplayer.get_unique_id()):
@@ -835,6 +839,7 @@ func _apply_early_election_move(peer_id: int) -> void:
 	if not can_early_election(peer_id):
 		return
 	funds[peer_id] = funds_of(peer_id) - GameRules.EARLY_ELECTION_FUNDS_COST
+	early_requests[party_of(peer_id)] = round_number
 	_push_state({"type": "early_election", "peer_id": peer_id,
 		"message": L.t("%s erken seçim önergesi verdi: meclis oylaması başladı.") % _party_name(peer_id)})
 	GovernmentManager.submit_early_election(peer_id)
@@ -1369,6 +1374,7 @@ func init_game() -> void:
 	_grant_turn_income()
 	law_rounds = {}
 	speech_rounds = {}
+	early_requests = {}
 	congress_rounds = {}
 	previous_vote_shares = {}
 	party_congress = {}
@@ -2011,6 +2017,9 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 	var party_votes := _party_vote_shares(votes)
 	var law_mult := PoliticianPresets.ACADEMIC_LAW_MULT if PoliticianPresets.has_background(proposer, "akademisyen") else 1.0
 	var gain := (PublicOpinion.LAW_GROUP_GAIN_PASSED if passed else PublicOpinion.LAW_GROUP_GAIN_REJECTED) * law_mult
+	# GÜNDEM: gündemdeki gruba yasa sunana daha güçlü yazar (karşıt kayıp da büyür).
+	if crisis_group() == group:
+		gain *= PublicOpinion.AGENDA_LAW_MULT
 	var changes: Array = [
 		{"peer": proposer_party, "group": group, "amount": _own_effect(proposer_party, gain)},
 		{"peer": proposer_party, "group": opposite, "amount": _own_effect(proposer_party, -gain * backlash)},
@@ -2059,7 +2068,7 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 		for pid in crisis_parties:
 			_add_national(int(pid), PublicOpinion.CRISIS_RESPONSE_NATIONAL)
 			names.append(_party_name(int(pid)))
-		notes += L.t(" Krize yanıt verdi (ulusal destek): %s.") % ", ".join(names)
+		notes += L.t(" Gündeme yanıt verdi (ulusal destek): %s.") % ", ".join(names)
 	if passed:
 		notes += L.t(" %s +%d puan.") % [_actor_name(proposer), law_pass_score(proposer_in_gov)]
 		_ease_turmoil(proposer_party, PublicOpinion.TURMOIL_EASE_LAW)
@@ -2109,16 +2118,13 @@ static func law_pass_score(proposer_in_gov: bool) -> int:
 
 # --- Gündem ------------------------------------------------------------------------
 
-## Şu anki kriz türü ("kriz_<grup>") ya da "".
+## Eski ayrı KRİZ kaldırıldı (0.0.182: gündemle birleşti); hep "".
 func crisis_type() -> String:
-	if crisis.is_empty() or round_number >= int(crisis.get("until", 0)):
-		return ""
-	return String(crisis.get("type", ""))
+	return ""
 
-## Krizin istediği seçmen grubu ya da "".
+## Gündemin ödüllendirdiği seçmen grubu ya da "" (eskiden krizin grubu).
 func crisis_group() -> String:
-	var data := CardPresets.crisis_data(crisis_type())
-	return String(data.get("group", ""))
+	return String(CardPresets.agenda_data(agenda_type()).get("group", ""))
 
 ## Şu an gündemdeki konu ("gundem_<grup>") ya da "".
 func agenda_type() -> String:
@@ -2129,11 +2135,12 @@ func agenda_type() -> String:
 func agenda_rounds_left() -> int:
 	return maxi(0, int(agenda.get("until", 0)) - round_number) if agenda_type() != "" else 0
 
-## Gündemde yasa sunulabilen iki grup (gündem yoksa boş).
+## Gündemin ödüllendirdiği grup (tek elemanlı; gündem yoksa boş).
 func agenda_groups() -> Array:
-	return CardPresets.agenda_groups(agenda_type())
+	var group := crisis_group()
+	return [] if group == "" else [group]
 
-## Bu yasa gündemdeki çiftin bir grubu için mi?
+## Bu yasa gündemdeki grup için mi?
 func law_on_agenda(law_type: String) -> bool:
 	var law := CardPresets.law_data(law_type)
 	return not law.is_empty() and agenda_groups().has(String(law["group"]))
@@ -2170,14 +2177,7 @@ func _schedule_agenda() -> void:
 	agenda = {"type": type, "until": round_number + 1, "index": pos + 1}
 	var data := CardPresets.agenda_data(type)
 	crisis = {}
-	var message := L.t("GÜNDEM (%d/%d): %s — bu dönem %s.") % [pos + 1, GameRules.AGENDA_ROUNDS,
-		data["title"], CardPresets.agenda_effect_text(type)]
-	if _crisis_rng.randf() < GameRules.CRISIS_CHANCE:
-		var crisis_kind := "kriz_%s" % groups[_crisis_rng.randi() % 2]
-		crisis = {"type": crisis_kind, "until": round_number + 1}
-		var info := CardPresets.crisis_data(crisis_kind)
-		message += L.t(" KRİZ: %s — %s için yasa sunan, EVET diyen ya da toplantı yapan partiler ulusal destek kazanır.") % [
-			info["title"], info["group_title"]]
+	var message := L.t("GÜNDEM: %s — %s.") % [data["title"], CardPresets.agenda_effect_text(type)]
 	_push_state({"type": "agenda", "message": message})
 
 ## GovernmentManager, reddedilen gensorudan sonra (host) çağırır: getiren parti
@@ -2256,7 +2256,7 @@ func _apply_speech(peer_id: int, group: String) -> void:
 		EffectWords.change(PublicOpinion.MEETING_BONUS[0], "group")]
 	if crisis_group() == group:
 		_add_national(pid, PublicOpinion.CRISIS_RESPONSE_NATIONAL)
-		text += L.t(" Krize yanıt verdi (ulusal destek).")
+		text += L.t(" Gündeme yanıt verdi (ulusal destek).")
 	_push_state({"type": "speech", "peer_id": peer_id, "message": text})
 
 @rpc("any_peer", "reliable")
@@ -3877,6 +3877,7 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"splinters": splinters,
 		"speech_done": speech_done,
 		"speech_rounds": speech_rounds,
+		"early_requests": early_requests,
 		"congress_rounds": congress_rounds,
 		"previous_vote_shares": previous_vote_shares,
 		"party_congress": party_congress,
@@ -3932,6 +3933,7 @@ func _apply_state(state: Dictionary) -> void:
 	splinters = state.get("splinters", {})
 	speech_done = bool(state.get("speech_done", false))
 	speech_rounds = state.get("speech_rounds", {})
+	early_requests = state.get("early_requests", {})
 	congress_rounds = state.get("congress_rounds", {})
 	previous_vote_shares = state.get("previous_vote_shares", {})
 	party_congress = state.get("party_congress", {})

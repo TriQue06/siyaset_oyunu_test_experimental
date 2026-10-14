@@ -90,10 +90,11 @@ const GOVERNMENT_FATIGUE := 1.1
 # --- Gensoru ------------------------------------------------------------------
 ## Reddedilen gensoruyu getiren parti bu kadar ulusal destek kaybeder.
 const CENSURE_REJECTED_NATIONAL := -0.25
-## KRİZE YANIT: krizin istediği gruba yasa sunan, o yasaya EVET diyen ya da o
-## grupla toplantı yapan parti bu kadar ulusal puan kazanır. Kısmi: oyunu tek
-## başına çevirmez.
-const CRISIS_RESPONSE_NATIONAL := 0.4
+## GÜNDEME YANIT: gündemdeki gruba yasa sunan, o yasaya EVET diyen ya da o
+## grupla toplantı yapan parti bu kadar ulusal puan kazanır (eski kriz 0,4).
+const CRISIS_RESPONSE_NATIONAL := 0.6
+## Gündemdeki gruba sunulan yasanın grup etkisi (sunana) bu kadar büyür.
+const AGENDA_LAW_MULT := 1.3
 
 # --- Teşkilat ------------------------------------------------------------------
 ## Seviyeye göre KALICI aktivite (sönmez): 1 az, 2 orta, 3 yüksek oy bonusu.

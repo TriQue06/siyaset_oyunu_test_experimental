@@ -1150,5 +1150,20 @@
 "%s kongresi: %s, %d delegenin oyuyla genel başkan.": "%s congress: %s elected leader with %d delegate votes.",
 "GENEL BAŞKAN": "LEADER",
 "Olay Animasyonları": "Event Animations",
-"destek": "support"
+"destek": "support",
+" Gündeme yanıt verdi (ulusal destek): %s.": " Responded to the agenda (national support): %s.",
+"GÜNDEM: %s — %s.": "AGENDA: %s — %s.",
+" Gündeme yanıt verdi (ulusal destek).": " Responded to the agenda (national support).",
+"%s için yasa daha güçlü; yasa, EVET oyu ve toplantı ulusal destek getirir": "laws for %s are stronger; a law, a YES vote or a meeting brings national support",
+"SORUŞTURMA": "INQUIRY",
+"Bir partinin harcamalarına finansman soruşturması aç: devlet parasıyla miting usulsüzlüktür, kendi kasasından ödeyen itibar kazanır.": "Open a funding inquiry into a party's spending: rallies paid with state money are misconduct, paying from the party's own funds earns credibility.",
+"Gündem yok: her grup için yasa sunulabilir.": "No agenda: a law can be proposed for any group.",
+"\nGÜNDEMDE: yasa daha güçlü ve ulusal destek getirir.": "\nON THE AGENDA: the law is stronger and brings national support.",
+" Gündemde: etki daha güçlü, ulusal destek de kazandırır.": " On the agenda: stronger effect, also brings national support.",
+"SORUŞTURMA: HEDEF PARTİ": "INQUIRY: TARGET PARTY",
+"Harcamaları incelenecek partiyi seç (kendi partin de olabilir: bağımsız denetim).": "Choose the party whose spending will be examined (your own party too: independent audit).",
+"İncelenebilecek işlem sayısı: %d": "Transactions that can be examined: %d",
+"\nGÜNDEMDE: toplantı ulusal destek de kazandırır.": "\nON THE AGENDA: a meeting also brings national support.",
+" · GÜNDEM": " · AGENDA",
+"Partin bu seçim döneminde zaten erken seçim önergesi verdi.": "Your party already filed an early election motion this term."
 }

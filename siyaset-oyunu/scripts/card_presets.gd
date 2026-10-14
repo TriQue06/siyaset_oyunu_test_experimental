@@ -268,12 +268,12 @@ func agenda_groups(agenda_type: String) -> Array:
 		return []
 	return (VoterGroups.PAIRS[data["pair"]] as Array).duplicate()
 
-## Gündemin yasalar üzerindeki etkisini anlatan kısa metin.
+## Gündemin ödülünü anlatan kısa metin (0.0.182: yasa her grup için serbest).
 func agenda_effect_text(agenda_type: String) -> String:
-	var groups := agenda_groups(agenda_type)
-	if groups.size() != 2:
+	var data := agenda_data(agenda_type)
+	if data.is_empty():
 		return ""
-	return L.t("sadece %s ya da %s için yasa sunulabilir") % [VoterGroups.title(groups[0]), VoterGroups.title(groups[1])]
+	return L.t("%s için yasa daha güçlü; yasa, EVET oyu ve toplantı ulusal destek getirir") % data["group_title"]
 
 func is_censure_card(card_type: String) -> bool:
 	return card_type == CENSURE_CARD_TYPE

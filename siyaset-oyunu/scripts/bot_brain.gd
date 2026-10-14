@@ -28,7 +28,7 @@ const APPEAL_TO_POINTS := 1.4
 const PERMANENT_GAIN_VALUE := 3.0
 ## Grup toplantısı puanı: uyum kazancı × bu + kriz grubuysa CRISIS_MEETING_BONUS.
 const MEETING_VALUE := 1.5
-const CRISIS_MEETING_BONUS := 0.9
+const CRISIS_MEETING_BONUS := 1.2
 ## Yasanın taban puanı: yasa her tur meclisi durdurur, bot onu sadece gerçekten
 ## işe yarayacaksa sunsun (miting / il başkanlığı / kartlar öne geçebilsin).
 const LAW_BASE_SCORE := 1.0
@@ -357,8 +357,8 @@ static func choose_speech(bot: int) -> Dictionary:
 ## Seçim desteğini en çok artıracak yasa: gündemdeki iki grup için, geçme
 ## ihtimaliyle beklenen grup kazancının ülke geneli uyuma etkisi + krize yanıt +
 ## kabul edilirse puan tablosu.
-const CRISIS_LAW_BONUS := 0.4
-const CRISIS_VOTE_BONUS := 0.2
+const CRISIS_LAW_BONUS := 0.6
+const CRISIS_VOTE_BONUS := 0.3
 
 static func _law_changes(law_type: String, gain: float) -> Array:
 	var law := CardPresets.law_data(law_type)
@@ -370,11 +370,14 @@ static func _law_changes(law_type: String, gain: float) -> Array:
 static func _best_law(bot: int) -> Dictionary:
 	var in_parliament := not CardManager.last_seats.is_empty()
 	var best := {}
-	for group in CardManager.agenda_groups():
+	# 0.0.182: her grup için yasa sunulabilir; gündemdeki grup daha güçlü.
+	for group in VoterGroups.GROUP_IDS:
 		var law_type := CardPresets.law_type(String(group))
 		var pass_chance := _law_pass_chance(bot, law_type) if in_parliament else 0.0
 		var expected_gain := pass_chance * PublicOpinion.LAW_GROUP_GAIN_PASSED \
 			+ (1.0 - pass_chance) * PublicOpinion.LAW_GROUP_GAIN_REJECTED
+		if CardManager.crisis_group() == group:
+			expected_gain *= PublicOpinion.AGENDA_LAW_MULT
 		var value := _appeal_gain(bot, _law_changes(law_type, expected_gain)) * APPEAL_TO_POINTS * PERMANENT_GAIN_VALUE
 		if CardManager.crisis_group() == group:
 			value += CRISIS_LAW_BONUS

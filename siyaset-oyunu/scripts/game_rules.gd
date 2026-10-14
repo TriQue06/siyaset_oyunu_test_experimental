@@ -92,8 +92,9 @@ static func cost_text(cost: float) -> String:
 static func money_text(value: float) -> String:
 	return L.dec(value, 1)
 
-## Yasa sunmak ucuz (turda 1): meclis oyunun merkezi, para engel olmasın.
-const LAW_FUNDS_COST := 5
+## MECLİS HAMLELERİ BEDELSİZ (0.0.182): yasa, gensoru, erken seçim önergesi,
+## anayasa. Meclis oyunun merkezi, para engel olmasın; sınır dönemde 1 yasa.
+const LAW_FUNDS_COST := 0
 const LAWS_PER_ROUND := 1
 ## Teşkilat anketinin sapması (her partinin oyu en fazla bu oranda sapar):
 ## 1. seviye YAKLAŞIK oy (±%35), 2. seviye %90 doğruluk (±%10).
@@ -108,7 +109,7 @@ const INVEST_FUNDS_COST := 0
 ## Gensoru BEDELSİZ: muhalefetin elindeki tek gerçek silah engellenmemeli.
 const CENSURE_FUNDS_COST := 0
 ## ERKEN SEÇİM hamlesi (eskiden kart): meclise önerge getirir.
-const EARLY_ELECTION_FUNDS_COST := 20
+const EARLY_ELECTION_FUNDS_COST := 0
 ## Popülizm bonusu kartı bu kadar tur sürer. BAĞIŞ KAMPANYASI kartının iki
 ## çeşidi var: zayıf +FUNDS_BONUS_WEAK, güçlü +FUNDS_BONUS_STRONG milyon ₺. Bonus kart BONUS_CARD_DRAW kart çeker.
 const POPULISM_ROUNDS := 3
@@ -117,18 +118,15 @@ const FUNDS_BONUS_STRONG := 60
 const FUNDS_BONUS_AMOUNT := FUNDS_BONUS_WEAK
 const BONUS_CARD_DRAW := 2
 const ELECTION_FUNDS_BONUS := 10
-## GÜNDEM TAKVİMİ: ilk seçimden hemen sonraki turdan itibaren AGENDA_ROUNDS tur
-## (6 ay) gündem, AGENDA_GAP tur (12 ay) ara, yine gündem... Gündemli her tur
-## bir SEÇMEN GRUBU ÇİFTİNİN (işçi/işveren, genç/emekli, dindar/ilerici,
-## özerkçi/milliyetçi) bir tarafının sıcak konusudur; art arda gelen gündemler
-## farklı çiftlerden olur. YASA sadece gündemdeki çiftin iki grubundan biri
-## için sunulabilir.
+## GÜNDEM (0.0.182'de kriz ile birleşti): ilk seçimden sonraki her tur bir
+## SEÇMEN GRUBUNUN sıcak konusudur; art arda gelen gündemler farklı çiftlerden
+## (işçi/işveren, genç/emekli, dindar/ilerici, özerkçi/milliyetçi) olur.
+## YASA her zaman HER grup için sunulabilir; gündem sadece o gruba eğilimi
+## ÖDÜLLENDİRİR: o gruba yasa daha güçlü (PublicOpinion.AGENDA_LAW_MULT), o
+## gruba yasa sunan, EVET diyen ya da onunla toplanan parti ulusal destek
+## kazanır (PublicOpinion.CRISIS_RESPONSE_NATIONAL).
 const AGENDA_ROUNDS := 1
-const AGENDA_GAP := 2
-## KRİZ: yeni bir gündem açıldığında bu olasılıkla ülke krize de girer. Kriz
-## gündemdeki çiftin bir grubunu seçer; o dönem bu gruba yasa sunan, o yasaya
-## EVET diyen ya da bu grupla toplantı yapan parti kısmi ulusal destek kazanır.
-const CRISIS_CHANCE := 0.5
+const AGENDA_GAP := 0
 ## Kabul edilen yasa, getiren partiye puan tablosunda bu kadar puan yazar
 ## (hükümet partisinin yasası daha çok).
 ## Kabul edilen gensoru, getiren partiye puan tablosunda bu kadar puan yazar.

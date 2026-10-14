@@ -39,6 +39,7 @@ const PAIR_IDS := ["emek", "kusak", "inanc", "yonetim"]
 
 ## icon: VoterGroupIcon'un çizdiği simge adı.
 ## law_backlash: grup yasası kabul edilince karşıt gruptaki kaybın kazanca oranı.
+## (0.0.182: ideolojik keskinlik için ikisi de ×1,2.)
 ## miting_backlash: mitingle bu gruba yaklaşınca karşıt gruptaki kayıp oranı.
 const GROUPS := {
 	"isci": {
@@ -49,7 +50,7 @@ const GROUPS := {
 		"law_title": "Asgari Ücret ve Sendika Hakları Yasası",
 		"law_problem": "Düşük ücretler ve güvencesiz çalışma",
 		"meeting": "Ücretler, iş güvencesi ve sendikal haklar",
-		"law_backlash": 0.45, "miting_backlash": 0.35,
+		"law_backlash": 0.54, "miting_backlash": 0.42,
 	},
 	"isveren": {
 		"title": "İşverenler ve İşletmeler", "color": Color("#3D8BDB"), "icon": "briefcase",
@@ -59,7 +60,7 @@ const GROUPS := {
 		"law_title": "Vergi İndirimi ve Yatırım Teşvik Yasası",
 		"law_problem": "Ağır vergi yükü ve yatırım önündeki engeller",
 		"meeting": "Yatırım ortamı, vergi yükü ve işletmelerin sorunları",
-		"law_backlash": 0.45, "miting_backlash": 0.35,
+		"law_backlash": 0.54, "miting_backlash": 0.42,
 	},
 	"genc": {
 		"title": "Gençler ve Öğrenciler", "color": Color("#F2B632"), "icon": "gradcap",
@@ -69,7 +70,7 @@ const GROUPS := {
 		"law_title": "Burs, Yurt ve Genç İstihdamı Yasası",
 		"law_problem": "Pahalı eğitim, barınma sorunu ve genç işsizliği",
 		"meeting": "Eğitim, barınma ve genç istihdamı",
-		"law_backlash": 0.3, "miting_backlash": 0.25,
+		"law_backlash": 0.36, "miting_backlash": 0.3,
 	},
 	"emekli": {
 		"title": "Emekliler", "color": Color("#8B70D6"), "icon": "heart",
@@ -79,7 +80,7 @@ const GROUPS := {
 		"law_title": "Emekli Aylığı ve Sağlık Güvencesi Yasası",
 		"law_problem": "Düşük aylıklar ve yükselen sağlık giderleri",
 		"meeting": "Emekli aylıkları, sağlık ve yaşam maliyeti",
-		"law_backlash": 0.3, "miting_backlash": 0.25,
+		"law_backlash": 0.36, "miting_backlash": 0.3,
 	},
 	"dindar": {
 		"title": "Dindar Topluluklar", "color": Color("#2EAA79"), "icon": "dome",
@@ -89,7 +90,7 @@ const GROUPS := {
 		"law_title": "İnanç Özgürlüğü ve Din Eğitimi Yasası",
 		"law_problem": "İnanç pratiklerine yönelik kısıtlamalar",
 		"meeting": "İnanç özgürlüğü ve din eğitimi",
-		"law_backlash": 0.5, "miting_backlash": 0.4,
+		"law_backlash": 0.6, "miting_backlash": 0.48,
 	},
 	"ilerici": {
 		"title": "LGBT ve Ateist İlericiler", "color": Color("#E65AB7"), "icon": "rainbow",
@@ -99,7 +100,7 @@ const GROUPS := {
 		"law_title": "Ayrımcılık Karşıtı Eşit Yurttaşlık Yasası",
 		"law_problem": "Ayrımcılık ve eşit olmayan yurttaşlık",
 		"meeting": "Ayrımcılık, eşit yurttaşlık ve bireysel özgürlükler",
-		"law_backlash": 0.5, "miting_backlash": 0.4,
+		"law_backlash": 0.6, "miting_backlash": 0.48,
 	},
 	"ozerkci": {
 		"title": "Özerkçiler", "color": Color("#16A6A1"), "icon": "pin",
@@ -109,7 +110,7 @@ const GROUPS := {
 		"law_title": "Yerel Yönetimler ve Bölgesel Temsil Yasası",
 		"law_problem": "Merkezde toplanan yetkiler ve zayıf yerel temsil",
 		"meeting": "Yerel yetkiler ve bölgesel temsil",
-		"law_backlash": 0.4, "miting_backlash": 0.3,
+		"law_backlash": 0.48, "miting_backlash": 0.36,
 	},
 	"milliyetci": {
 		"title": "Milliyetçiler", "color": Color("#E87532"), "icon": "flag",
@@ -119,7 +120,7 @@ const GROUPS := {
 		"law_title": "Ulusal Güvenlik ve Birlik Yasası",
 		"law_problem": "Güvenlik kaygıları ve bölünme korkusu",
 		"meeting": "Ulusal egemenlik ve güvenlik",
-		"law_backlash": 0.4, "miting_backlash": 0.3,
+		"law_backlash": 0.48, "miting_backlash": 0.36,
 	},
 }
 

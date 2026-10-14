@@ -96,6 +96,25 @@ func _initialize() -> void:
 	check("yardım uygulandı", cm.disaster_aid_of(me) == 60.0 and cm.local_of(String(region[0]), me) > before,
 		"%.1f milyon, il %.2f -> %.2f" % [cm.disaster_aid_of(me), before, cm.local_of(String(region[0]), me)])
 	_shot("disaster_after")
+	# SORUŞTURMA hamlesi: hedef parti seçici açılır, seçim soruşturma panelini açar.
+	cm.current_turn_index = cm.turn_order.find(me)
+	cm.economy["inquiries"] = {}
+	scene._refresh_action_buttons()
+	check("SORUŞTURMA butonu açık", scene._inquiry_button.modulate.a > 0.9)
+	scene._on_inquiry_button_pressed()
+	await _frames(10)
+	_shot("inquiry_picker")
+	var picker: Control = scene._inquiry_picker
+	check("soruşturma seçicisi açıldı", picker != null and picker.visible)
+	if picker != null:
+		check("seçici ekrana sığıyor", view.encloses(picker.get_global_rect()), str(picker.get_global_rect()))
+	scene._open_inquiry_panel(partner)
+	if picker != null and is_instance_valid(picker):
+		picker.queue_free()
+	await _frames(10)
+	check("soruşturma paneli açıldı", scene._inquiry_panel.visible)
+	_shot("inquiry_panel")
+	scene._inquiry_panel.hide()
 	# Sağ sütun: sekmeler panelin üstünde kalır, içerik kaydırılabilir.
 	var tabs: Control = scene._side_tabs
 	var left: Control = scene.left_panel

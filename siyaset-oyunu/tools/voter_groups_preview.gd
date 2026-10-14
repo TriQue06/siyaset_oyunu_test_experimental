@@ -35,7 +35,6 @@ func _initialize() -> void:
 	cm.funds[me] = 120.0
 	cm.speech_rounds = {}
 	cm.agenda = {"type": "gundem_isci", "until": cm.round_number + 1}
-	cm.crisis = {"type": "kriz_isveren", "until": cm.round_number + 1}
 	cm.group_meetings[me] = {"emekli": cm.round_number}
 	pm.apply_group_deltas([{"peer": me, "group": "isci", "amount": 6.0}])
 	cm._push_state({"type": "timer"})

@@ -419,21 +419,31 @@ func _initialize() -> void:
 		cm.organizations[String(cm._province_ids[i])] = {cm.party_of(me): 2}
 	check("teşkilat geliri üst sınırı (sınırsız para yok)", cm.org_income(me) == GameRules.ORG_INCOME_CAP, str(cm.org_income(me)))
 	cm.organizations = saved_orgs
-	check("yasa 5, toplantı 5, kongre 10 / üye 20", GameRules.LAW_FUNDS_COST == 5 and GameRules.SPEECH_FUNDS_COST == 5
+	check("yasa bedelsiz, toplantı 5, kongre 10 / üye 20", GameRules.LAW_FUNDS_COST == 0 and GameRules.EARLY_ELECTION_FUNDS_COST == 0 and GameRules.CENSURE_FUNDS_COST == 0 and GameRules.SPEECH_FUNDS_COST == 5
 		and cm.CONGRESS_COST == 10 and cm.CONGRESS_REQUEST_COST == 20)
 
-	print("=== KRİZ ===")
+	print("=== GÜNDEM (kriz birleşti) ===")
 	var crisis_bot: int = cm.party_of(int(mm.bot_ids()[1]))
-	cm.crisis = {"type": "kriz_isci", "until": cm.round_number + 1}
-	check("kriz açık, işçileri istiyor", cm.crisis_type() == "kriz_isci" and cm.crisis_group() == "isci")
+	var saved_agenda: Dictionary = cm.agenda
+	cm.agenda = {"type": "gundem_isci", "until": cm.round_number + 1}
+	check("gündem işçileri istiyor, ayrı kriz yok", cm.crisis_type() == "" and cm.crisis_group() == "isci" and cm.agenda_groups() == ["isci"])
+	# Gündem dışı gruba da yasa sunulabilir (eskiden sadece gündem çifti).
+	var gb: Dictionary = (pm.parties[crisis_bot]["groups"] as Dictionary).duplicate()
+	cm.apply_law_result(crisis_bot, "law:dindar", {}, true, [])
+	var off_gain: float = float(pm.parties[crisis_bot]["groups"]["dindar"]) - float(gb["dindar"])
+	gb = (pm.parties[crisis_bot]["groups"] as Dictionary).duplicate()
+	cm.apply_law_result(crisis_bot, "law:isci", {}, true, [])
+	var on_gain: float = float(pm.parties[crisis_bot]["groups"]["isci"]) - float(gb["isci"])
+	print("  (grup etkisi: gündem dışı %.2f, gündemde %.2f)" % [off_gain, on_gain])
+	check("gündemdeki gruba yasa daha güçlü", on_gain > off_gain * 1.1, "%.2f > %.2f" % [on_gain, off_gain])
 	var before_national: float = cm.national_of(crisis_bot)
 	cm.apply_law_result(crisis_bot, "law:isci", {}, false, [])
 	var gained: float = cm.national_of(crisis_bot) - before_national
-	check("krizin grubuna yasa sunan kısmi ulusal destek kazanır", is_equal_approx(gained, PublicOpinion.CRISIS_RESPONSE_NATIONAL), str(gained))
+	check("gündemin grubuna yasa sunan ulusal destek kazanır", is_equal_approx(gained, PublicOpinion.CRISIS_RESPONSE_NATIONAL), str(gained))
 	before_national = cm.national_of(crisis_bot)
 	cm.apply_law_result(crisis_bot, "law:isveren", {}, false, [])
-	check("karşıt gruba yasa sunan kriz desteği almaz", cm.national_of(crisis_bot) <= before_national + 0.0001)
-	cm.crisis = {}
+	check("karşıt gruba yasa sunan gündem desteği almaz", cm.national_of(crisis_bot) <= before_national + 0.0001)
+	cm.agenda = saved_agenda
 
 	print("")
 	print("=== %s ===" % ("TUM TESTLER GECTI" if _failed == 0 else "%d TEST BASARISIZ" % _failed))

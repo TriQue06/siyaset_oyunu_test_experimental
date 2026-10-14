@@ -289,9 +289,9 @@ func _initialize() -> void:
 	check("secim oncesi yasa reddedildi: para ve grup destegi degismedi", cm.funds_of(1) == 10 and near(float(pm.parties[1]["groups"]["isveren"]), 50.0))
 	cm.last_seats = {1: 150, 2: 140, 3: 100}
 	cm.agenda = {}
-	check("gundem yokken yasa sunulamaz", not cm.can_propose_law(1))
+	check("gundem yokken de yasa sunulabilir (0.0.182)", cm.can_propose_law(1, law_type))
 	cm.agenda = {"type": "gundem_dindar", "until": cm.round_number + 1}
-	check("gundem baska ciftteyse bu yasa sunulamaz", not cm.can_propose_law(1, law_type))
+	check("gundem baska gruptayken de bu yasa sunulabilir", cm.can_propose_law(1, law_type))
 	cm.agenda = {"type": "gundem_isci", "until": cm.round_number + 1}
 	check("gundem ciftinin iki grubu icin de yasa sunulabilir", cm.can_propose_law(1, law_type) and cm.can_propose_law(1, cp.law_type("isci")))
 	cm._apply_law(1, law_type)
@@ -600,13 +600,20 @@ func _initialize() -> void:
 		if calendar[rr] != "":
 			no_early = false
 	check("ilk secimden once gundem yok", no_early, str(calendar))
-	var pattern_ok: bool = calendar[9] != "" and calendar[10] == "" and calendar[11] == "" and calendar[12] != "" \
-		and calendar[13] == "" and calendar[14] == "" and calendar[15] != "" and calendar[16] == "" and calendar[17] == "" and calendar[18] != ""
-	check("1 tur gundem, 2 tur ara", pattern_ok, str(calendar))
-	check("arka arkaya gelen gundemler farkli cift", cp.agenda_data(calendar[9])["pair"] != cp.agenda_data(calendar[12])["pair"] \
-		and cp.agenda_data(calendar[12])["pair"] != cp.agenda_data(calendar[15])["pair"])
-	check("gundem ciftinin iki grubu yasa icin acik", cp.agenda_groups(calendar[9]).size() == 2 \
-		and VoterGroups.opposite(cp.agenda_groups(calendar[9])[0]) == cp.agenda_groups(calendar[9])[1])
+	var pattern_ok := true
+	for rr in range(9, 20):
+		if calendar[rr] == "":
+			pattern_ok = false
+	check("ilk secimden sonra her tur gundem", pattern_ok, str(calendar))
+	var pairs_ok := true
+	for rr in range(9, 19):
+		if cp.agenda_data(calendar[rr])["pair"] == cp.agenda_data(calendar[rr + 1])["pair"]:
+			pairs_ok = false
+	check("arka arkaya gelen gundemler farkli cift", pairs_ok)
+	cm.round_number = 9
+	cm.agenda = {"type": calendar[9], "until": 10}
+	check("gundem tek grubu odullendirir", cm.agenda_groups().size() == 1 and cm.crisis_type() == "")
+	check("ideolojik keskinlik: karsit kayip oranlari x1.2", is_equal_approx(float(VoterGroups.data("emekli")["law_backlash"]), 0.36))
 
 	print("")
 	print("=== 14) GRUP YAKINLIGINA BAGLI VEKIL CALMA, IL TAVANI, SECIM HEDIYESI ===")

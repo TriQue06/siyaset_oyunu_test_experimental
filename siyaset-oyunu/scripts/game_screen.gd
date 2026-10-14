@@ -322,6 +322,9 @@ var _funding_panel: FundingPanel
 ## AFET YARDIMI paneli (YARDIM hamlesi).
 var _aid_panel: AidPanel
 var _aid_button: Button
+## FİNANSMAN SORUŞTURMASI hamlesi (eskiden sadece parti kartından) ve parti seçici.
+var _inquiry_button: Button
+var _inquiry_picker: PanelContainer
 var _inquiry_panel: PanelContainer
 var _inquiry_box: VBoxContainer
 var _inquiry_target: int = -1
@@ -818,8 +821,7 @@ func _refresh_band_crisis() -> void:
 		style.border_color = UiTheme.GOLD
 		_band_crisis_title.text = L.t("GÜNDEM · %s") % data["title"]
 		_band_crisis_title.add_theme_color_override("font_color", UiTheme.GOLD)
-		var pair: Array = CardPresets.agenda_groups(agenda)
-		_band_crisis_text.text = L.t("Yasa: %s ya da %s") % [VoterGroups.title(pair[0]), VoterGroups.title(pair[1])] if pair.size() == 2 else ""
+		_band_crisis_text.text = L.t("%s için yasa / toplantı ulusal destek getirir") % data["group_title"]
 	_band_crisis.add_theme_stylebox_override("panel", style)
 
 func _refresh_timer_bar() -> void:
@@ -3701,6 +3703,9 @@ func _build_action_buttons() -> void:
 	_aid_button = _action_button(L.t("YARDIM"), L.t("tutar serbest"), UiTheme.RED.darkened(0.15), "yardim")
 	_aid_button.pressed.connect(_on_aid_button_pressed)
 	_aid_button.tooltip_text = L.t("Afet bölgesine yardım götür: tutarı sen belirlersin. Hükümetsen devlet hazinesinden de ödeyebilirsin. Yatırımdan çok daha güçlü ve hemen etki eder; seçmen gruplarına dokunmaz.")
+	_inquiry_button = _action_button(L.t("SORUŞTURMA"), GameRules.cost_text(Economy.INQUIRY_FUNDS_COST), UiTheme.PURPLE.darkened(0.1), "sorusturma")
+	_inquiry_button.pressed.connect(_on_inquiry_button_pressed)
+	_inquiry_button.tooltip_text = L.t("Bir partinin harcamalarına finansman soruşturması aç: devlet parasıyla miting usulsüzlüktür, kendi kasasından ödeyen itibar kazanır.")
 
 ## Kongre bedeli oyuncunun yerine göre: genel başkan 10, üye 20.
 func _congress_cost_text() -> String:
@@ -3745,8 +3750,6 @@ func _action_block_reason(cost: float, is_law: bool = false) -> String:
 		return L.t("İlk seçime kadar meclis yok: yasa yapılamaz.")
 	if is_law and not CardManager.has_seats(me):
 		return L.t("Mecliste vekilin yok: yasa teklif edemezsin.")
-	if is_law and CardManager.agenda_type() == "":
-		return L.t("Gündem yok: yasa sadece gündemdeki seçmen grupları için sunulabilir.")
 	if not CardManager.can_act():
 		return L.t("Sıran değil.")
 	if is_law and CardManager.has_proposed_law_this_round(me):
@@ -3772,6 +3775,8 @@ func _refresh_action_buttons() -> void:
 	_congress_button.modulate.a = 1.0 if CardManager.can_call_congress(me) or _pending_congress else 0.45
 	if _aid_button != null:
 		_aid_button.modulate.a = 1.0 if CardManager.can_aid(me) else 0.45
+	if _inquiry_button != null:
+		_inquiry_button.modulate.a = 1.0 if CardManager.can_open_inquiry(me) else 0.45
 	# disabled kullanılmıyor: pasif butona dokununca neden olmadığı uyarı olarak çıksın.
 	_law_button.modulate.a = 1.0 if law_ok else 0.45
 	_org_button.modulate.a = 1.0 if org_ok or _pending_org else 0.45
@@ -3996,20 +4001,15 @@ func _refresh_law_designer() -> void:
 	_law_points_label.text = L.t("Kabul: +%d puan · %s") % [CardManager.law_pass_score(in_gov), GameRules.cost_text(GameRules.LAW_FUNDS_COST)]
 	var current := CardManager.agenda_type()
 	if current == "":
-		_law_agenda_label.text = L.t("Gündem yok: bu dönem grup yasası sunulamaz (vergi yasası gündemden bağımsızdır).")
+		_law_agenda_label.text = L.t("Gündem yok: her grup için yasa sunulabilir.")
 	else:
 		var data := CardPresets.agenda_data(current)
 		_law_agenda_label.text = L.t("Gündem: %s — %s.") % [data["title"], CardPresets.agenda_effect_text(current)]
-		var crisis_group := CardManager.crisis_group()
-		if crisis_group != "":
-			_law_agenda_label.text += L.t(" KRİZ: %s için yasa ulusal destek getirir.") % VoterGroups.title(crisis_group)
 	for child in _law_rows.get_children():
 		child.queue_free()
 	var groups_on_agenda := CardManager.agenda_groups()
-	if _law_group != "" and not groups_on_agenda.has(_law_group):
-		_law_group = ""
-	if _law_group == "" and not groups_on_agenda.is_empty():
-		_law_group = String(groups_on_agenda[0])
+	if _law_group == "":
+		_law_group = String(groups_on_agenda[0]) if not groups_on_agenda.is_empty() else String(VoterGroups.GROUP_IDS[0])
 	for group in VoterGroups.GROUP_IDS:
 		_law_rows.add_child(_law_group_button(group, groups_on_agenda.has(group)))
 	_refresh_law_detail()
@@ -4023,9 +4023,8 @@ func _law_group_button(group: String, on_agenda: bool) -> Control:
 	button.clip_text = false
 	var tint := VoterGroups.color(group)
 	UiSkin.skin_color_button(button, tint.darkened(0.45) if group != _law_group else tint.darkened(0.15))
-	button.disabled = not on_agenda
 	button.tooltip_text = L.t("%s\nTalepler: %s%s") % [VoterGroups.title(group), VoterGroups.issues_text(group),
-		"" if on_agenda else L.t("\nGündemde değil: bu dönem bu grup için yasa sunulamaz.")]
+		L.t("\nGÜNDEMDE: yasa daha güçlü ve ulusal destek getirir.") if on_agenda else ""]
 	var row := HBoxContainer.new()
 	row.set_anchors_preset(Control.PRESET_FULL_RECT)
 	row.offset_left = 4
@@ -4036,15 +4035,13 @@ func _law_group_button(group: String, on_agenda: bool) -> Control:
 	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(icon)
 	var label := Label.new()
-	label.text = VoterGroups.title(group)
+	label.text = ("★ " if on_agenda else "") + VoterGroups.title(group)
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	label.add_theme_font_size_override("font_size", 9)
-	label.add_theme_color_override("font_color", UiTheme.GOLD if group == _law_group else UiTheme.TEXT)
+	label.add_theme_color_override("font_color", UiTheme.GOLD if group == _law_group or on_agenda else UiTheme.TEXT)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(label)
-	if not on_agenda:
-		button.modulate = Color(1, 1, 1, 0.4)
 	button.pressed.connect(func():
 		_law_group = group
 		_refresh_law_designer())
@@ -4070,6 +4067,8 @@ func _refresh_law_detail() -> void:
 	var opposite := String(law["opposite"])
 	var backlash := float(VoterGroups.data(_law_group).get("law_backlash", 0.4))
 	var mult := PoliticianPresets.ACADEMIC_LAW_MULT if PoliticianPresets.has_background(me, "akademisyen") else 1.0
+	if CardManager.crisis_group() == _law_group:
+		mult *= PublicOpinion.AGENDA_LAW_MULT
 	_law_detail.add_child(VoterGroupUI.name_row(_law_group, "", UiTheme.TEXT, 13, 20.0))
 	var title := PopupKit.label(String(law["title"]), 12, UiTheme.GOLD)
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -4084,7 +4083,7 @@ func _refresh_law_detail() -> void:
 		EffectWords.adjective(VoterGroups.effective_delta(groups, _law_group, rejected), "group")], UiTheme.GREEN, VoterGroupUI.FS_NAME, 16.0, true))
 	_law_detail.add_child(VoterGroupUI.name_row(opposite, L.t("%s / %s kayıp") % [EffectWords.adjective(VoterGroups.effective_delta(groups, opposite, -passed * backlash), "group"),
 		EffectWords.adjective(VoterGroups.effective_delta(groups, opposite, -rejected * backlash), "group")], UiTheme.RED, VoterGroupUI.FS_NAME, 16.0, true))
-	var crisis_note := L.t(" Kriz bu grubu istiyor: ulusal destek de kazandırır.") if CardManager.crisis_group() == _law_group else ""
+	var crisis_note := L.t(" Gündemde: etki daha güçlü, ulusal destek de kazandırır.") if CardManager.crisis_group() == _law_group else ""
 	_law_detail.add_child(PopupKit.note(L.t("Meclis çoğunluğu gerekir.%s") % crisis_note, UiTheme.TEXT_DIM, 300))
 	var submit := Button.new()
 	submit.focus_mode = Control.FOCUS_NONE
@@ -4097,10 +4096,6 @@ func _refresh_law_detail() -> void:
 
 ## Eksen ucuna TIKLAMAK yasayı doğrudan meclise sunar (sürükleme yok).
 func _propose_law_clicked(law_type: String) -> void:
-	var current := CardManager.agenda_type()
-	if current != "" and not CardManager.law_on_agenda(law_type):
-		_show_toast(L.t("Bu grup gündemde değil: bu dönem %s.") % CardPresets.agenda_effect_text(current))
-		return
 	if not CardManager.can_propose_law(multiplayer.get_unique_id(), law_type):
 		_show_toast(_action_block_reason(CardManager.law_funds_cost(multiplayer.get_unique_id(), law_type), true))
 		return
@@ -4252,6 +4247,67 @@ func _on_funding_confirmed(share: float) -> void:
 			CardManager.miting(province_id, share)
 		else:
 			_show_toast(CardManager.funding_block_reason(me, "miting", share))
+
+## SORUŞTURMA hamlesi: önce hedef parti seçilir, sonra soruşturma paneli açılır.
+func _on_inquiry_button_pressed() -> void:
+	var me := multiplayer.get_unique_id()
+	if _inquiry_picker != null and is_instance_valid(_inquiry_picker):
+		_inquiry_picker.queue_free()
+		_inquiry_picker = null
+		return
+	var reason := CardManager.inquiry_block_reason(me)
+	if reason != "":
+		_show_toast(reason)
+		return
+	_law_designer.hide()
+	_cancel_targeting()
+	_inquiry_panel.hide()
+	_inquiry_picker = PanelContainer.new()
+	var style := UiSkin.stylebox(UiSkin.PANEL)
+	style.set_content_margin_all(UiTheme.PAD_M)
+	_inquiry_picker.add_theme_stylebox_override("panel", style)
+	_inquiry_picker.z_index = 108
+	_inquiry_picker.mouse_filter = Control.MOUSE_FILTER_STOP
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 5)
+	_inquiry_picker.add_child(box)
+	box.add_child(UiTheme.mono_label(L.t("SORUŞTURMA: HEDEF PARTİ"), 14, UiTheme.TEXT, true))
+	box.add_child(PopupKit.note(L.t("Harcamaları incelenecek partiyi seç (kendi partin de olabilir: bağımsız denetim)."), UiTheme.TEXT_DIM, 300))
+	for pid in CardManager.party_ids():
+		if PartyManager.is_independent(int(pid)):
+			continue
+		var party: Dictionary = PartyManager.data_of(int(pid))
+		var button := Button.new()
+		button.focus_mode = Control.FOCUS_NONE
+		button.custom_minimum_size = Vector2(300, 32)
+		button.text = "%s · %d" % [String(party.get("name", "?")), CardManager.inquiry_records(int(pid)).size()]
+		button.tooltip_text = L.t("İncelenebilecek işlem sayısı: %d") % CardManager.inquiry_records(int(pid)).size()
+		UiSkin.skin_color_button(button, Color(party.get("bg_color", UiTheme.PANEL_DARK)).darkened(0.35))
+		var target := int(pid)
+		button.pressed.connect(func():
+			if _inquiry_picker != null and is_instance_valid(_inquiry_picker):
+				_inquiry_picker.queue_free()
+				_inquiry_picker = null
+			_open_inquiry_panel(target))
+		box.add_child(button)
+	var close := Button.new()
+	close.text = L.t("Kapat")
+	UiSkin.skin_button(close)
+	close.pressed.connect(func():
+		if _inquiry_picker != null and is_instance_valid(_inquiry_picker):
+			_inquiry_picker.queue_free()
+			_inquiry_picker = null)
+	box.add_child(close)
+	add_child(_inquiry_picker)
+	_place_inquiry_picker.call_deferred()
+
+func _place_inquiry_picker() -> void:
+	if _inquiry_picker == null or not is_instance_valid(_inquiry_picker):
+		return
+	_inquiry_picker.reset_size()
+	var map := _r(R_MAP)
+	_inquiry_picker.position = Vector2(map.position.x + (map.size.x - _inquiry_picker.size.x) * 0.5,
+		maxf(map.position.y + 40.0, map.end.y - _inquiry_picker.size.y - 8.0))
 
 func _open_inquiry_panel(target: int) -> void:
 	_inquiry_target = CardManager.party_of(target)
@@ -4507,6 +4563,8 @@ func _on_early_button_pressed() -> void:
 			_show_toast(L.t("Mecliste vekilin yok: erken seçim önergesi veremezsin."))
 		elif CardManager.early_election_pending:
 			_show_toast(L.t("Erken seçim kararı zaten alındı."))
+		elif CardManager.early_request_used(me):
+			_show_toast(L.t("Partin bu seçim döneminde zaten erken seçim önergesi verdi."))
 		elif not GovernmentManager.can_submit_law():
 			_show_toast(L.t("Meclis şu an meşgul (oylama ya da hükümet kurma sürüyor)."))
 		else:
@@ -5024,7 +5082,7 @@ func _meeting_timing_text() -> String:
 	return bonus_text + L.t(" Seçime %d dönem var: seçime kadar söner.") % age
 
 ## Bir seçmen grubu düğmesi: simge + tam ad + partinin şu anki desteği.
-## Kriz bu grubu istiyorsa kırmızı çerçeveli not.
+## Gündem bu grubu istiyorsa altın not.
 func _speech_row(group: String, value: float) -> Control:
 	var button := Button.new()
 	button.focus_mode = Control.FOCUS_NONE
@@ -5035,7 +5093,7 @@ func _speech_row(group: String, value: float) -> Control:
 	button.tooltip_text = L.t("%s\nKonu: %s\nPartinin bu gruptaki desteği %s; toplantı bu dönem %s.%s") % [
 		VoterGroups.title(group), String(VoterGroups.data(group).get("meeting", "")), VoterGroups.percent_text(value),
 		EffectWords.change(PublicOpinion.MEETING_BONUS[0], "group"),
-		L.t("\nKRİZ bu grubu istiyor: ulusal destek de kazandırır.") if crisis else ""]
+		L.t("\nGÜNDEMDE: toplantı ulusal destek de kazandırır.") if crisis else ""]
 	var row := HBoxContainer.new()
 	row.set_anchors_preset(Control.PRESET_FULL_RECT)
 	row.offset_left = 4
@@ -5059,9 +5117,9 @@ func _speech_row(group: String, value: float) -> Control:
 	name.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	texts.add_child(name)
 	var sub := Label.new()
-	sub.text = L.t("destek %s%s") % [VoterGroups.percent_text(value), L.t(" · KRİZ") if crisis else ""]
+	sub.text = L.t("destek %s%s") % [VoterGroups.percent_text(value), L.t(" · GÜNDEM") if crisis else ""]
 	sub.add_theme_font_size_override("font_size", 9)
-	sub.add_theme_color_override("font_color", Color("ff8a94") if crisis else UiTheme.TEXT_MUTED)
+	sub.add_theme_color_override("font_color", UiTheme.GOLD if crisis else UiTheme.TEXT_MUTED)
 	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	texts.add_child(sub)
 	button.pressed.connect(func():

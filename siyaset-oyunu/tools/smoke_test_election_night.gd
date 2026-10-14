@@ -10,20 +10,22 @@ func _check(ok: bool, text: String) -> void:
 		_fails += 1
 
 func _initialize() -> void:
+	load("res://scripts/bot_brain.gd").skill_variance = false
+	await process_frame
 	var sim_script = load("res://scripts/election_night_sim.gd")
 	var model = load("res://scripts/election_model.gd")
-	var seats: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/province_seats.json"))
+	var seats: Dictionary = root.get_node("GameMap").seat_counts()
 	var parties := {
-		1: {"economic": 1, "social": 1, "administrative": 2},
-		2: {"economic": -2, "social": -1, "administrative": 1},
-		3: {"economic": 1, "social": 2, "administrative": 2},
-		4: {"economic": 2, "social": -2, "administrative": -1},
-		5: {"economic": -1, "social": -2, "administrative": -2},
-		6: {"economic": -1, "social": 2, "administrative": -2},
+		1: VoterGroups.start_affinities(["isveren", "milliyetci"]),
+		2: VoterGroups.start_affinities(["isci", "milliyetci"]),
+		3: VoterGroups.start_affinities(["dindar", "milliyetci"]),
+		4: VoterGroups.start_affinities(["isveren", "ilerici"]),
+		5: VoterGroups.start_affinities(["isci", "ozerkci"]),
+		6: VoterGroups.start_affinities(["dindar", "ozerkci"]),
 	}
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
-	var res: Dictionary = model.compute(parties, seats, model.load_province_voters(), 7.0, 1.0, rng)
+	var res: Dictionary = model.compute(parties, seats, model.load_province_voters(), 7.0, rng)
 	var sim = sim_script.new()
 	sim.setup(res["province_results"], res["vote_shares"], res["seats"], res["passed_threshold"], 7.0, 12345, 45.0)
 

@@ -1,7 +1,7 @@
 extends Node
 ## Autoload. Hükümet görevlerinin (koltukların) katalogu ve puan değerleri.
 ##
-## Toplam 8 görev: 1 başbakanlık, 1 başbakan yardımcılığı, 6 bakanlık.
+## Toplam 9 görev: 1 başbakanlık, 1 başbakan yardımcılığı, 7 bakanlık.
 ## Hükümetin BAŞI başbakanlıktır — birinci parti başbakanlığı ortağına
 ## verirse, ANA İKTİDAR PARTİSİ o ortak sayılır (bkz.
 ## GovernmentManager.main_gov_peer_id).
@@ -9,12 +9,13 @@ extends Node
 const POST_PM := "pm"
 const POST_DEPUTY_PM := "deputy_pm"
 
-const PM_POINTS := 3
-const DEPUTY_PM_POINTS := 2
-const MINISTRY_POINTS := 1
+## İKTİDAR ASIL ÖDÜL: makam puanları yasa/gensoru puanlarının çok üstünde.
+const PM_POINTS := 10
+const DEPUTY_PM_POINTS := 5
+const MINISTRY_POINTS := 3
 
-## Koalisyondan çekilen küçük ortağın puan cezası.
-const WITHDRAW_SCORE_PENALTY := 3
+## Koalisyondan çekilmenin PUAN cezası yok: etki sadece ulusal puanda
+## (bkz. PublicOpinion.WITHDRAW_NATIONAL_*).
 ## Ortağı çekildiği için TEK BAŞINA kalan ana iktidar partisi gensoruyla
 ## düşerse: çok daha büyük puan cezası.
 const ABANDONED_FALL_PENALTY := 8
@@ -29,6 +30,7 @@ const POSTS: Array[Dictionary] = [
 	{"id": "ministry_justice", "title": "Adalet Bakanlığı", "points": MINISTRY_POINTS},
 	{"id": "ministry_education", "title": "Milli Eğitim Bakanlığı", "points": MINISTRY_POINTS},
 	{"id": "ministry_health", "title": "Sağlık Bakanlığı", "points": MINISTRY_POINTS},
+	{"id": "ministry_defense", "title": "Milli Savunma Bakanlığı", "points": MINISTRY_POINTS},
 ]
 
 func post_ids() -> Array:
@@ -40,7 +42,7 @@ func post_ids() -> Array:
 func post_title(post_id: String) -> String:
 	for post in POSTS:
 		if post["id"] == post_id:
-			return post["title"]
+			return L.t(post["title"])
 	return post_id
 
 func post_points(post_id: String) -> int:

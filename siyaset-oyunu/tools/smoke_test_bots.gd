@@ -16,21 +16,28 @@ func check(label: String, ok: bool, detail: String = "") -> void:
 	print("  %s %s%s" % ["[OK] " if ok else "[HATA]", label, ("  -> " + detail) if detail != "" else ""])
 
 func _initialize() -> void:
+	load("res://scripts/bot_brain.gd").skill_variance = false
 	await process_frame
 	await process_frame
 	mm = root.get_node("MultiplayerManager")
 	pm = root.get_node("PartyManager")
 	cm = root.get_node("CardManager")
+	cm.allow_temporary_parties = false
+	cm.fixed_map_seed = 1950
 	gm = root.get_node("GovernmentManager")
 	# Test betiği autoload'lardan önce derlendiği için sınıf çalışma anında yüklenir.
 	var brain = load("res://scripts/bot_brain.gd")
 	var bm = root.get_node("BotManager")
 	bm.set_process(false)  # zamanlamasız sürüyoruz
+	# SABİT TOHUM: testin rastgele bir oyunda değil HER ZAMAN AYNI oyunda
+	# koşması için. Tohumsuzken "en az bir hükümet kuruldu" arada bir
+	# tutmuyordu ve hata tekrar üretilemiyordu.
+	cm.set_rng_seed(20260923)
+	# Bot adları, renkleri ve başlangıç görüşleri genel rastgeleliği kullanır: o da sabit.
+	seed(20260923)
 	mm.room_code = ""
 	gm.result_hold_seconds = 0.0
 	mm.election_threshold = 3.0
-	mm.axis_sharpness_start = 1.0
-	mm.axis_sharpness_increment = 0.1
 	mm.players = {}
 	pm.parties = {}
 	mm.stage = mm.Stage.PARTY_SETUP
@@ -51,6 +58,9 @@ func _initialize() -> void:
 	var last_bot := -1
 	while steps < 4000 and not cm.game_finished and cm.round_number <= 14:
 		steps += 1
+		if cm.congress_active:
+			cm.tick(30.0)  # kongre gösterisi: süre dolsun
+			continue
 		if gm.phase == gm.Phase.VOTING:
 			for bot in gm.eligible_voter_ids():
 				if not gm.has_voted(bot):
@@ -96,36 +106,40 @@ func _initialize() -> void:
 	check("botlar yasa sundu", int(played.get("law", 0)) > 0)
 	check("botlar teskilat kurdu", int(played.get("teskilat", 0)) > 0)
 	check("botlar miting yapti", int(played.get("miting", 0)) > 0)
-	check("botlar kart oynadi", int(played.get("karalama", 0)) + int(played.get("anket", 0)) + int(played.get("steal_weak", 0)) \
+	check("botlar kart oynadi", int(played.get("karalama", 0)) + int(played.get("steal_weak", 0)) \
 		+ int(played.get("steal_medium", 0)) + int(played.get("steal_strong", 0)) > 0)
 	var dealt := 0
 	for id in cm.turn_order:
 		dealt += cm.inventories.get(id, []).size()
 	check("botlara her sira otomatik kart verildi (kart oynandi ya da elde)", dealt > 0 or int(played.get("karalama", 0)) > 0)
 	check("bir turda birden cok hamle yapildi", max_actions >= 2, str(max_actions))
-	# Yarım adım kaymasının kendisi smoke_test_rules'ta; burada değerlerin geçerliliği.
+	# Grup desteklerinin geçerliliği (yasa/miting kaydırmaları sonrası).
 	var valid := true
+	var moved := false
 	for peer_id in pm.parties.keys():
-		for axis in pm.parties[peer_id]["ideology"].keys():
-			var v := float(pm.parties[peer_id]["ideology"][axis])
-			if absf(v) > 3.0 or not is_equal_approx(v * 2.0, roundf(v * 2.0)):
+		var g: Dictionary = pm.parties[peer_id].get("groups", {})
+		if g.size() != 8:
+			valid = false
+		for group in g.keys():
+			var v := float(g[group])
+			if v < 0.0 or v > 100.0:
 				valid = false
-				print("  gecersiz ideoloji degeri: ", v)
-	check("ideolojiler [-3, 3] ve 0.5 adimli", valid)
-	# Bilgi kısıtı: gözcü gönderilmemiş il bot için nötrdür.
+				print("  gecersiz grup destegi: ", group, " ", v)
+		var core: Array = pm.parties[peer_id].get("core", [])
+		if str(g) != str(VoterGroups.start_affinities(core)):
+			moved = true
+	check("grup destekleri 8 grupta, 0..100 araliginda", valid)
+	check("botlarin yasa/miting hamleleri grup desteklerini degistirdi", moved)
+	check("botlar grup toplantisi yapti", int(played.get("speech", 0)) > 0, str(played))
 	var bot0: int = cm.turn_order[0]
-	var known: Dictionary = brain._known_centers(bot0)
-	var unknown_ok := true
-	for province_id in known.keys():
-		if not cm.knows_leaning(bot0, province_id) and not (known[province_id] as Dictionary).is_empty():
-			unknown_ok = false
-	check("bot teskilati olmayan ilin gorusunu bilmez", unknown_ok)
+	var meeting: Dictionary = brain.choose_speech(bot0)
+	check("bot toplanti degerini grup adiyla hesaplar", VoterGroups.is_group(String(meeting.get("group", ""))), str(meeting))
 	check("botlar farkli hamle turleri yapti", played.size() >= 5, str(played))
-	var mana_ok := true
-	for peer_id in cm.mana.keys():
-		if cm.mana_of(peer_id) < 0:
-			mana_ok = false
-	check("mana hic eksiye dusmedi", mana_ok, str(cm.mana))
+	var funds_ok := true
+	for peer_id in cm.funds.keys():
+		if cm.funds_of(peer_id) < 0:
+			funds_ok = false
+	check("para hic eksiye dusmedi", funds_ok, str(cm.funds))
 
 	print("")
 	print("=== BOT BLOGU ===")
@@ -170,9 +184,14 @@ func _initialize() -> void:
 	cm.last_seats[human] = 150
 	for i in range(1, ids.size()):
 		cm.last_seats[ids[i]] = 50
-	pm.parties[human]["ideology"] = {"economic": 0, "social": 0, "administrative": 0}
-	pm.parties[ids[1]]["ideology"] = {"economic": -3, "social": -2, "administrative": -2}
-	pm.parties[ids[2]]["ideology"] = {"economic": 0.5, "social": 0, "administrative": 0}
+	pm.parties[human]["groups"] = VoterGroups.neutral_affinities()
+	var far_groups := VoterGroups.neutral_affinities()
+	for g in [["isci", 85.0], ["isveren", 15.0], ["ilerici", 80.0], ["dindar", 20.0], ["ozerkci", 80.0], ["milliyetci", 20.0]]:
+		far_groups[g[0]] = g[1]
+	pm.parties[ids[1]]["groups"] = far_groups
+	var near_groups := VoterGroups.neutral_affinities()
+	near_groups["isveren"] = 55.0
+	pm.parties[ids[2]]["groups"] = near_groups
 	var solo := {}
 	for post in gp2.POSTS:
 		solo[post["id"]] = human
@@ -182,7 +201,7 @@ func _initialize() -> void:
 	check("azinlik hukumetine uzak bot HAYIR", brain.choose_vote(ids[1]) == gm.VOTE_NO)
 	check("azinlik hukumetine cok yakin bot EVET", brain.choose_vote(ids[2]) == gm.VOTE_YES)
 	cm.last_seats[human] = 260
-	check("cogunluk hukumetinde olcut ideolojik yakinlik", brain.choose_vote(ids[1]) != gm.VOTE_YES)
+	check("cogunluk hukumetinde olcut secmen grubu yakinligi", brain.choose_vote(ids[1]) != gm.VOTE_YES)
 	cm.last_seats[human] = 150
 	var stingy := solo.duplicate()
 	stingy["ministry_health"] = ids[1]
@@ -201,9 +220,14 @@ func _initialize() -> void:
 	# parti (bot) muhalefette. Bot, hukumet cok yakin degilse EVET demeli.
 	var gov_bot: int = ids[1]
 	var other_bot: int = ids[2]
-	pm.parties[gov_bot]["ideology"] = {"economic": 3, "social": 3, "administrative": 3}
-	pm.parties[other_bot]["ideology"] = {"economic": -2, "social": 0, "administrative": -1}
-	pm.parties[human]["ideology"] = {"economic": 0, "social": 0, "administrative": 0}
+	var gov_groups := VoterGroups.start_affinities(["isci", "dindar"])
+	gov_groups["isci"] = 90.0
+	gov_groups["dindar"] = 90.0
+	gov_groups["isveren"] = 15.0
+	gov_groups["ilerici"] = 15.0
+	pm.parties[gov_bot]["groups"] = gov_groups
+	pm.parties[other_bot]["groups"] = VoterGroups.start_affinities(["isveren", "ilerici"])
+	pm.parties[human]["groups"] = VoterGroups.neutral_affinities()
 	cm.last_seats = {human: 150, gov_bot: 160, other_bot: 90}
 	var gov2 := {}
 	for post in load("res://scripts/government_presets.gd").POSTS:
@@ -213,7 +237,9 @@ func _initialize() -> void:
 	gm.proposal_kind = gm.KIND_CENSURE
 	gm.proposal_peer_id = human
 	check("muhalefet botu gensoruya evet", brain.choose_vote(other_bot) == gm.VOTE_YES)
-	pm.parties[other_bot]["ideology"] = {"economic": 3, "social": 3, "administrative": 2.5}
+	var close_groups: Dictionary = gov_groups.duplicate()
+	close_groups["isci"] = 88.0
+	pm.parties[other_bot]["groups"] = close_groups
 	check("hukumete cok yakin bot cekimser kalir", brain.choose_vote(other_bot) == gm.VOTE_ABSTAIN)
 	check("hukumet partisi hayir der", brain.choose_vote(gov_bot) == gm.VOTE_NO)
 	gm.government = {}

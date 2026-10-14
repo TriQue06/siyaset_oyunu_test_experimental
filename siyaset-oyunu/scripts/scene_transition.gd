@@ -12,6 +12,25 @@ func _ready() -> void:
 	fade_rect.color = Color(0, 0, 0, 0)
 	fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
+## Ekranın ŞU ANKİ görüntüsünü dondurup kararır: kararma sürerken alttaki
+## sahne güncellense bile (ör. seçim sonucu gelince paneller yeni meclise
+## geçer) oyuncu bunu görmez — seçim gecesi spoiler'ı böyle önlenir.
+func freeze_and_fade_to_scene(path: String, duration: float = FADE_DURATION) -> void:
+	var image := get_viewport().get_texture().get_image()
+	if image == null or image.is_empty():
+		await fade_to_scene(path, duration)  # görüntü alınamadı (ör. başsız test)
+		return
+	var frozen := TextureRect.new()
+	frozen.texture = ImageTexture.create_from_image(image)
+	frozen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	frozen.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	frozen.stretch_mode = TextureRect.STRETCH_SCALE
+	frozen.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(frozen)
+	move_child(frozen, fade_rect.get_index())
+	await fade_to_scene(path, duration)
+	frozen.queue_free()
+
 ## Ekranı karartır, sahneyi değiştirir, tekrar aydınlatır.
 func fade_to_scene(path: String, duration: float = FADE_DURATION) -> void:
 	fade_rect.mouse_filter = Control.MOUSE_FILTER_STOP

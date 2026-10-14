@@ -4,6 +4,8 @@
 [ext_resource type="Theme" uid="uid://cmjk3bfl8mavr" path="res://assets/ui/main_theme.tres" id="2"]
 [ext_resource type="Script" uid="uid://b0s8i0bj1nqrh" path="res://scripts/smooth_scroll_container.gd" id="3"]
 
+[ext_resource type="FontFile" path="res://assets/fonts/IBMPlexMono-Bold.ttf" id="99"]
+
 [node name="PartySetup" type="Control" unique_id=1479822869]
 layout_mode = 3
 anchors_preset = 15
@@ -21,7 +23,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.09, 0.1, 0.14, 1)
+color = Color(0.094, 0.078, 0.188, 1)
 
 [node name="TopBar" type="Control" parent="." unique_id=1133533483]
 layout_mode = 1
@@ -37,7 +39,24 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.13, 0.14, 0.19, 1)
+color = Color(0.11, 0.09, 0.22, 1)
+
+[node name="TitleLabel" type="Label" parent="TopBar" unique_id=1439790902]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 32.0
+offset_top = -18.0
+offset_right = 432.0
+offset_bottom = 18.0
+grow_vertical = 2
+theme_override_font_sizes/font_size = 26
+theme_override_fonts/font = ExtResource("99")
+theme_override_colors/font_color = Color(1, 0.788, 0.235, 1)
+text = "PARTİNİ KUR"
+vertical_alignment = 1
 
 [node name="TopBarBox" type="VBoxContainer" parent="TopBar" unique_id=2073647285]
 layout_mode = 1
@@ -126,7 +145,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.13, 0.14, 0.19, 1)
+color = Color(0.11, 0.09, 0.22, 1)
 
 [node name="Margin" type="MarginContainer" parent="RightPanel" unique_id=321717466]
 layout_mode = 1
@@ -150,15 +169,6 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 10
 
-[node name="TitleLabel" type="Label" parent="RightPanel/Margin/Scroll/VBox" unique_id=1439790902]
-layout_mode = 2
-theme_override_font_sizes/font_size = 26
-text = "PARTİNİ KUR"
-horizontal_alignment = 1
-
-[node name="HSeparator0" type="HSeparator" parent="RightPanel/Margin/Scroll/VBox" unique_id=695007347]
-layout_mode = 2
-
 [node name="NameLabel" type="Label" parent="RightPanel/Margin/Scroll/VBox" unique_id=2090511481]
 layout_mode = 2
 text = "Parti Adı"
@@ -174,7 +184,7 @@ alignment = 1
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
-text = "2-11 karakter"
+text = "1-12 karakter"
 horizontal_alignment = 1
 
 [node name="HSeparator1" type="HSeparator" parent="RightPanel/Margin/Scroll/VBox" unique_id=1380766236]
@@ -212,26 +222,17 @@ alignment = 1
 [node name="HSeparator3" type="HSeparator" parent="RightPanel/Margin/Scroll/VBox" unique_id=459483643]
 layout_mode = 2
 
-[node name="IdeologyLabel" type="Label" parent="RightPanel/Margin/Scroll/VBox" unique_id=979430651]
+[node name="CoreGroupLabel" type="Label" parent="RightPanel/Margin/Scroll/VBox" unique_id=979430651]
 layout_mode = 2
-text = "İdeoloji"
+text = "Çekirdek seçmen grupları (2 seç)"
 horizontal_alignment = 1
 
-[node name="IdeologyContainer" type="VBoxContainer" parent="RightPanel/Margin/Scroll/VBox" unique_id=481483727]
+[node name="CoreGroupContainer" type="VBoxContainer" parent="RightPanel/Margin/Scroll/VBox" unique_id=481483727]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 6
 
 [node name="HSeparator3b" type="HSeparator" parent="RightPanel/Margin/Scroll/VBox" unique_id=2089995144]
-layout_mode = 2
-
-[node name="RandomButton" type="Button" parent="RightPanel/Margin/Scroll/VBox" unique_id=493911054]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 48)
-layout_mode = 2
-text = "🎲 Beni Şaşırt"
-
-[node name="HSeparator4" type="HSeparator" parent="RightPanel/Margin/Scroll/VBox" unique_id=1623326340]
 layout_mode = 2
 
 [node name="ReadyButton" type="Button" parent="RightPanel/Margin/Scroll/VBox" unique_id=1401694460]

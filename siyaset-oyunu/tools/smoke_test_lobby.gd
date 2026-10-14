@@ -1,0 +1,115 @@
+extends SceneTree
+## LOBİ TESTİ: çevrim dışı mod ve ADAPTİF BOT ADLANDIRMA.
+##   godot --headless --path . --script res://tools/smoke_test_lobby.gd
+
+var _failed := 0
+var mm
+var cm
+
+func check(label: String, ok: bool, detail: String = "") -> void:
+	if not ok:
+		_failed += 1
+	print("  [%s]  %s%s" % ["OK" if ok else "HATA", label, ("  -> " + detail) if detail != "" else ""])
+
+func bot_names() -> Array:
+	var names: Array = []
+	for peer_id in mm.players.keys():
+		if mm.is_bot(peer_id):
+			names.append(String(mm.players[peer_id]["name"]))
+	return names
+
+func bot_id_of(name: String) -> int:
+	for peer_id in mm.players.keys():
+		if mm.is_bot(peer_id) and String(mm.players[peer_id]["name"]) == name:
+			return int(peer_id)
+	return -1
+
+func _initialize() -> void:
+	load("res://scripts/bot_brain.gd").skill_variance = false
+	await process_frame
+	mm = root.get_node("MultiplayerManager")
+	cm = root.get_node("CardManager")
+	cm.allow_temporary_parties = false
+	cm.speech_required = false  # meclis konuşması ayrıca test edilir
+
+	print("=== 1) CEVRIM DISI MOD ===")
+	mm.start_offline("Barış")
+	check("cevrim disi bayragi", mm.offline_mode)
+	check("oda kodu yok", mm.room_code == "", mm.room_code)
+	check("kendisi sahip ve host", mm.is_local_owner() and mm.is_host)
+	check("listede sadece oyuncunun kendisi var", mm.players.size() == 1, str(mm.players))
+	check("oyuncu adi kaydedildi", String(mm.players[mm.owner_id]["name"]) == "Barış")
+
+	print("")
+	print("=== 2) BOT EKLEME ===")
+	for i in 5:
+		mm.add_bot()
+	check("5 bot eklendi", bot_names().size() == 5, str(bot_names()))
+	check("adlar 1..5", bot_names() == ["Bot 1", "Bot 2", "Bot 3", "Bot 4", "Bot 5"], str(bot_names()))
+
+	print("")
+	print("=== 3) ADAPTIF ADLANDIRMA: ARADAN SILINCE NUMARALAR KAYAR ===")
+	var bot3 := bot_id_of("Bot 3")
+	var bot4 := bot_id_of("Bot 4")
+	var bot5 := bot_id_of("Bot 5")
+	mm.remove_bot(bot4)
+	mm.remove_bot(bot3)
+	check("3 bot kaldi", bot_names().size() == 3, str(bot_names()))
+	check("adlar tekrar 1..3", bot_names() == ["Bot 1", "Bot 2", "Bot 3"], str(bot_names()))
+	# Kullanıcının asıl şikâyeti: "Bot 5" adı 5 olarak kalıyordu.
+	check("eski Bot 5 artik Bot 3", String(mm.players[bot5]["name"]) == "Bot 3",
+		String(mm.players[bot5]["name"]))
+
+	print("")
+	print("=== 4) YENI BOT BOSLUGU DOLDURUR ===")
+	mm.add_bot()
+	check("adlar 1..4", bot_names() == ["Bot 1", "Bot 2", "Bot 3", "Bot 4"], str(bot_names()))
+	mm.remove_bot(bot_id_of("Bot 1"))
+	check("bastan silinince de kayar", bot_names() == ["Bot 1", "Bot 2", "Bot 3"], str(bot_names()))
+
+	print("")
+	print("=== 5) OYUN BASLATILABILIR ===")
+	while mm.players.size() < mm.MIN_PLAYERS_TO_START:
+		mm.add_bot()
+	mm.start_game()
+	check("cevrim disi oyun basladi", mm.stage == mm.Stage.PARTY_SETUP, str(mm.stage))
+
+	print("")
+	print("=== 6) PARTI KURULUMU: HAZIR VERINCE OYUN BASLAR ===")
+	var pm = root.get_node("PartyManager")
+	check("botlara parti verildi", pm.parties.size() == mm.players.size() - 1, str(pm.parties.keys()))
+	for bot_id in mm.bot_ids():
+		check("bot %d hazir" % bot_id, pm.is_ready(bot_id))
+	check("oyuncu henuz hazir degil", not pm.all_ready())
+	# Kullanıcının şikâyeti: çevrim dışında "Kilitle ve Hazır Ver" oyunu
+	# başlatmıyordu (hazır bayrağı sadece yerelde işaretleniyordu).
+	pm.set_party_and_ready("Deneme", 0, Color.WHITE, Color.RED,
+		["isveren", "ilerici"], true)
+	check("herkes hazir", pm.all_ready(), str(pm.parties))
+	check("OYUN BASLADI", mm.stage == mm.Stage.IN_GAME, str(mm.stage))
+	check("kartlar dagitildi", not cm.turn_order.is_empty(), str(cm.turn_order))
+
+	print("")
+	print("=== 7) ZAMANLAYICILAR CEVRIM DISINDA DA ISLER ===")
+	# Kullanıcının şikâyeti: botlar oynarken "Süre: 1:30" donuyordu. Sebebi
+	# _process'in room_code == "" görünce hiç tick etmemesiydi.
+	check("cevrim disi oyun 'sahne onizlemesi' sayilmaz", not mm.is_standalone_preview())
+	var gm = root.get_node("GovernmentManager")
+	var turn_before: float = cm.turn_seconds_left()
+	cm._process(1.0)
+	check("tur sayaci azaldi", cm.turn_seconds_left() < turn_before,
+		"%.1f -> %.1f" % [turn_before, cm.turn_seconds_left()])
+	# Hükümet kurma sayacı için önce bir kurma aşaması başlat.
+	cm.last_seats = {}
+	for peer_id in cm.turn_order:
+		cm.last_seats[peer_id] = 100
+	gm.start_formation()
+	var phase_before: float = gm.phase_seconds_left()
+	check("kurma asamasi basladi", phase_before > 0.0, "%.1f" % phase_before)
+	gm._process(1.0)
+	check("hukumet kurma sayaci azaldi", gm.phase_seconds_left() < phase_before,
+		"%.1f -> %.1f" % [phase_before, gm.phase_seconds_left()])
+
+	print("")
+	print("=== TUM TESTLER GECTI ===" if _failed == 0 else "=== %d TEST BASARISIZ ===" % _failed)
+	quit(1 if _failed > 0 else 0)

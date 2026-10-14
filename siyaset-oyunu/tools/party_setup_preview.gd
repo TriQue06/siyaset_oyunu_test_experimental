@@ -22,7 +22,7 @@ func _initialize() -> void:
 	var me: int = root.multiplayer.get_unique_id()
 	mm.room_code = ""
 	mm.players = {me: {"name": "Barış"}, 77: {"name": "Ayşe"}}
-	pm.parties = {77: {"name": "Yeşiller", "icon_index": 2, "icon_color": Color.WHITE, "bg_color": colors[0], "ideology": {}, "ready": true}}
+	pm.parties = {77: {"name": "Yeşiller", "icon_index": 2, "icon_color": Color.WHITE, "bg_color": colors[0], "core": ["isci", "dindar"], "groups": VoterGroups.start_affinities(["isci", "dindar"]), "ready": true}}
 	for i in 3:
 		var id: int = mm.BOT_ID_BASE - i
 		mm.players[id] = {"name": "Bot %d" % i, "bot": true}
@@ -33,15 +33,18 @@ func _initialize() -> void:
 	root.add_child(scene)
 	for i in 5:
 		await process_frame
+	# Parti adı artık boş gelir: önizleme için bir ad yaz.
+	scene.name_edit.text = "Deneme"
+	scene._on_name_changed("Deneme")
 	check("benim rengim Ayse'ninkinden farkli", not Color(pm.parties[me]["bg_color"]).is_equal_approx(colors[0]))
 	check("panelde 5 oyuncu", scene._players_list.get_child_count() == 5, str(scene._players_list.get_child_count()))
 
-	pm.set_my_party("Deneme", 1, Color.WHITE, colors[0], scene._ideology)
+	pm.set_my_party("Deneme", 1, Color.WHITE, colors[0], scene._core)
 	check("baskasinin rengi reddedildi", not Color(pm.parties[me]["bg_color"]).is_equal_approx(colors[0]))
 
 	var bot: int = mm.BOT_ID_BASE
 	var bot_color: Color = pm.parties[bot]["bg_color"]
-	pm.set_my_party("Deneme", 1, Color.WHITE, bot_color, scene._ideology)
+	pm.set_my_party("Deneme", 1, Color.WHITE, bot_color, scene._core)
 	check("botun rengini aldim", Color(pm.parties[me]["bg_color"]).is_equal_approx(bot_color))
 	check("bot baska renge gecti", not Color(pm.parties[bot]["bg_color"]).is_equal_approx(bot_color))
 	scene._selected_bg_color = bot_color
@@ -51,25 +54,18 @@ func _initialize() -> void:
 		await process_frame
 	if DisplayServer.get_name() != "headless":
 		root.get_texture().get_image().save_png("%s/party_setup.png" % OS.get_user_data_dir())
-	# İkon kategorileri: Kurgusal / Türkiye.
+	# İkonlar: tek kategori, düz .svg dosyaları (importer="keep").
 	var presets = root.get_node("PartyPresets")
 	check("18 parti rengi", colors.size() == 18)
-	check("27 Turkiye ikonu yuklendi", presets.icon_indices(1).size() == 27, str(presets.icon_indices(1).size()))
-	var turkiye_tab: Button = scene._icon_tabs.get_child(1)
-	turkiye_tab.pressed.emit()
-	await process_frame
-	var visible := 0
-	for btn in scene.icon_grid.get_children():
-		if btn.visible:
-			visible += 1
-	check("Turkiye sekmesi sadece Turkiye ikonlarini gosterir", visible == 27, str(visible))
-	var first_tr: int = presets.icon_indices(1)[0]
-	check("Turkiye ikonu rasterize edilir", presets.get_icon_texture(first_tr, 64) != null)
-	scene._on_icon_selected(first_tr + 6)
+	check("39 parti ikonu yuklendi ", presets.icon_count() == 39, str(presets.icon_count()))
+	check("ikon yollari .svg", String(presets.icon_paths[0]).ends_with(".svg"), String(presets.icon_paths[0]))
+	check("ikon rasterize edilir", presets.get_icon_texture(0, 64) != null)
+	check("gecersiz eski indeks ilk ikona cekilir", presets.clamp_icon_index(70) == 0)
+	# Kendi partimde ikon seç (partiyi PartyManager'a yazar, aşağıdaki
+	# "kendi partim" karşılaştırmaları bu duruma göre).
+	scene._on_icon_selected(6)
 	for i in 5:
 		await process_frame
-	if DisplayServer.get_name() != "headless":
-		root.get_texture().get_image().save_png("%s/party_setup_turkiye.png" % OS.get_user_data_dir())
 	# Oda sahibi bot partisini düzenler.
 	mm.owner_id = me
 	var my_before: Dictionary = pm.parties[me].duplicate()
@@ -78,7 +74,7 @@ func _initialize() -> void:
 	await _frames(3)
 	scene.name_edit.text = "Robotlar"
 	scene._on_name_changed("Robotlar")
-	scene._on_icon_selected(presets.icon_indices(1)[3])
+	scene._on_icon_selected(3)
 	var free_index := -1
 	for i in colors.size():
 		if pm.color_owner(colors[i], edited_bot) == -1:
@@ -87,11 +83,23 @@ func _initialize() -> void:
 	scene._on_bg_color_selected(free_index)
 	await _frames(3)
 	var bot_party: Dictionary = pm.parties[edited_bot]
-	check("oda sahibi botun adini, logosunu, rengini degistirdi", bot_party["name"] == "Robotlar" 		and int(bot_party["icon_index"]) == presets.icon_indices(1)[3] and Color(bot_party["bg_color"]).is_equal_approx(colors[free_index]), str(bot_party))
+	check("oda sahibi botun adini, logosunu, rengini degistirdi", bot_party["name"] == "Robotlar" 		and int(bot_party["icon_index"]) == 3 and Color(bot_party["bg_color"]).is_equal_approx(colors[free_index]), str(bot_party))
 	check("kendi partim degismedi", pm.parties[me]["name"] == my_before["name"] and int(pm.parties[me]["icon_index"]) == int(my_before["icon_index"]))
 	var taken_by_me: Color = pm.parties[me]["bg_color"]
 	pm.set_bot_party(edited_bot, "Robotlar", 0, taken_by_me)
 	check("bot baskasinin rengini alamaz", not Color(pm.parties[edited_bot]["bg_color"]).is_equal_approx(taken_by_me))
+	# Bot profilini rastgele yap: siyasetçiyle birlikte çekirdek gruplar da yenilenir.
+	var changed := 0
+	for n in 5:
+		var core_before: Array = (pm.parties[edited_bot]["core"] as Array).duplicate()
+		scene._bot_profile_button.pressed.emit()
+		await _frames(2)
+		var core_after: Array = pm.parties[edited_bot]["core"]
+		check("rastgele cekirdek gecerli", core_after.size() == 2 and core_after[0] != core_after[1], str(core_after))
+		check("ekrandaki cekirdek = partinin cekirdegi", scene._core == core_after, "%s / %s" % [scene._core, core_after])
+		if not (core_after.has(core_before[0]) and core_after.has(core_before[1])):
+			changed += 1
+	check("bot profili rastgele: cekirdek gruplar yenilendi", changed >= 4, "%d/5 degisti" % changed)
 	if DisplayServer.get_name() != "headless":
 		root.get_texture().get_image().save_png("%s/party_setup_bot_edit.png" % OS.get_user_data_dir())
 	scene._start_editing(-1)

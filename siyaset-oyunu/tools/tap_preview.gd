@@ -37,13 +37,13 @@ func _initialize() -> void:
 	for i in 3:
 		mm.players[ids[i]] = {"name": "Oyuncu %d" % i, "bot": i > 0}
 		pm.parties[ids[i]] = {"name": names[i], "icon_index": i * 5, "icon_color": Color.WHITE,
-			"bg_color": Color(colors[i]), "ideology": {"economic": 0, "social": 0, "administrative": 0}, "ready": true}
+			"bg_color": Color(colors[i]), "groups": VoterGroups.neutral_affinities(), "ready": true}
 	cm.set_rng_seed(11)
 	cm.init_game()
 	cm.turn_order = ids.duplicate()
 	cm.current_turn_index = 0
 	cm.inventories[me] = ["karalama", "karalama", "karalama"]
-	cm.mana[me] = 20
+	cm.funds[me] = 20
 	cm._push_state({"type": "full"}, true)
 
 	var scene: Node = (load("res://scenes/GameScreen.tscn") as PackedScene).instantiate()
@@ -56,13 +56,13 @@ func _initialize() -> void:
 	check("kart aciklamasi gorunuyor", scene._card_info.visible)
 	_shot("tap_card_selected")
 
-	scene._on_province_clicked("ankara")
+	scene._on_province_clicked(TestProvinces.id("ankara"))
 	await _frames(5)
-	check("ile ilk dokunus: sadece secildi, kart oynanmadi", scene._selected_province == "ankara" and cm.inventories[me].size() == 3)
+	check("ile ilk dokunus: sadece secildi, kart oynanmadi", scene._selected_province == TestProvinces.id("ankara") and cm.inventories[me].size() == 3)
 	check("ust yazida il ayrintisi var", String(scene._target_hint.text).find("Ankara") != -1, String(scene._target_hint.text))
 	_shot("tap_province_selected")
 
-	scene._on_province_clicked("ankara")
+	scene._on_province_clicked(TestProvinces.id("ankara"))
 	await _frames(10)
 	check("ayni ile ikinci dokunus: karalama hedef menusu acildi", scene._propaganda_menu.visible)
 	scene._propaganda_menu.hide()

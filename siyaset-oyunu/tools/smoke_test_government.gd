@@ -25,7 +25,7 @@ func setup_parties(seats: Dictionary) -> void:
 		pm.parties[peer_id] = {
 			"name": "Parti%d" % peer_id, "icon_index": i % 6,
 			"icon_color": Color.WHITE, "bg_color": Color(0.2 * i, 0.4, 0.6),
-			"ideology": {"economic": 0, "social": 0, "administrative": 0}, "ready": true,
+			"groups": VoterGroups.neutral_affinities(), "ready": true,
 		}
 		cm.last_seats[peer_id] = seats[peer_id]
 		cm.last_vote_shares[peer_id] = float(seats[peer_id])
@@ -33,11 +33,15 @@ func setup_parties(seats: Dictionary) -> void:
 	cm.turn_order = seats.keys()
 
 func _initialize() -> void:
+	load("res://scripts/bot_brain.gd").skill_variance = false
 	await process_frame
 	await process_frame
 	mm = root.get_node("MultiplayerManager")
 	pm = root.get_node("PartyManager")
 	cm = root.get_node("CardManager")
+	cm.allow_temporary_parties = false
+	cm.speech_required = false  # meclis konuşması ayrıca test edilir
+	cm.fixed_map_seed = 1950
 	gm = root.get_node("GovernmentManager")
 	gp = root.get_node("GovernmentPresets")
 	cp = root.get_node("CardPresets")
@@ -85,7 +89,7 @@ func _initialize() -> void:
 	gm._apply_vote(1, false)   # 100 hayir  => 100 < 195, gecmeli
 	check("hukumet KURULDU", gm.has_government())
 	check("hukumete HAYIR diyene puan cezasi yok (istikrar kaldirildi)", gm.score_of(1) == 0, str(gm.score_of(1)))
-	check("EVET diyenlere ceza yok", gm.score_of(2) == 0 and gm.score_of(3) == 0)
+	check("makam puani kurulusta yazildi", gm.score_of(2) == 31 and gm.score_of(3) == 5, "%d / %d" % [gm.score_of(2), gm.score_of(3)])
 	check("ana iktidar partisi = basbakanligi tutan", gm.main_gov_peer_id == 2, str(gm.main_gov_peer_id))
 	check("faz GOVERNING", gm.phase == gm.Phase.GOVERNING)
 	check("hukumet partileri [2,3]", gm.government_party_ids().has(2) and gm.government_party_ids().has(3),
@@ -93,14 +97,18 @@ func _initialize() -> void:
 	check("salt cogunluk VAR (290/390)", gm.has_majority(), "%d/%d" % [gm.government_seats(), gm.total_seats()])
 
 	print("")
-	print("=== 4) PUANLAR (bakanlik+1, byrd+2, basbakan+3) ===")
-	# 2: basbakanlik(3) + 6 bakanlik(6) = 9 ; 3: basbakan yrd (2)
-	check("2 tur puani 9", gm.round_points_of(2) == 9, str(gm.round_points_of(2)))
-	check("3 tur puani 2", gm.round_points_of(3) == 2, str(gm.round_points_of(3)))
-	gm.award_round_scores()
-	gm.award_round_scores()
-	check("puan BIRIKIYOR (2 tur -> 18)", gm.score_of(2) == 18, str(gm.score_of(2)))
-	check("puan BIRIKIYOR (2 tur -> 4)", gm.score_of(3) == 4, str(gm.score_of(3)))
+	print("=== 4) PUANLAR (bakanlik+3, byrd+5, basbakan+10) ===")
+	# 2: basbakanlik(10) + 7 bakanlik(21) = 31 ; 3: basbakan yrd (5)
+	check("2 tur puani 31", gm.round_points_of(2) == 31 and GovernmentPresets.POSTS.size() == 9, str(gm.round_points_of(2)))
+	check("3 tur puani 5", gm.round_points_of(3) == 5, str(gm.round_points_of(3)))
+	# Makam puani hukumet KURULURKEN tek sefer yazildi; tur sonlari eklemez.
+	var before_2: int = gm.score_of(2)
+	var before_3: int = gm.score_of(3)
+	check("kurulusta tek sefer yazildi", before_2 == 31 and before_3 == 5, "%d / %d" % [before_2, before_3])
+	cm._finish_round()
+	cm._finish_round()
+	check("tur sonlari puan EKLEMEZ", gm.score_of(2) == before_2 and gm.score_of(3) == before_3,
+		"%d / %d" % [gm.score_of(2), gm.score_of(3)])
 
 	print("")
 	print("=== 5) VEKIL CALMA ===")
@@ -113,7 +121,15 @@ func _initialize() -> void:
 	check("gecerli hedef", cm.is_valid_steal_target(1, 3))
 	var seats1: int = cm.last_seats[1]
 	cm.last_seats[1] = 0
-	check("vekilsiz (meclis disi) parti vekil calamaz", not cm.is_valid_steal_target(1, 3))
+	# Meclis dışı parti de çalabilir ama YARI verimle (son seçimde baraj altı).
+	cm.election_seats = {1: 0, 3: 110}
+	check("meclis disi parti de calabilir", cm.is_valid_steal_target(1, 3))
+	check("meclis disi yari verim", is_equal_approx(cm.steal_efficiency(1), 0.5), str(cm.steal_efficiency(1)))
+	var full: Dictionary = cp.steal_range("steal_strong", cm.group_closeness(1, 3))
+	var halved: Dictionary = cm.steal_range(1, 3, "steal_strong")
+	check("araliklar yariya indi", int(halved["max"]) <= int(full["max"]) / 2 + 1, "%s vs %s" % [halved, full])
+	cm.election_seats = {1: 150, 3: 110}
+	check("mecliste tam verim", is_equal_approx(cm.steal_efficiency(1), 1.0))
 	cm.last_seats[1] = seats1
 	cm._apply_steal(1, 2, "steal_strong")
 	check("toplam sandalye DEGISMEDI (sifir toplamli)", gm.total_seats() == before_total,
@@ -137,6 +153,11 @@ func _initialize() -> void:
 	var pool: Array = cm._draw_pool()
 	check("vekil calma kartlari destede (meclis var)", pool.has("steal_strong"))
 	check("gensoru destede yok (hamle)", not pool.has("gensoru"))
+	check("kart calma destede (meclis var)", pool.has("kart_calma"))
+	var seats_before_pool: Dictionary = cm.last_seats.duplicate()
+	cm.last_seats = {}
+	check("ilk secimden once kart calma destede yok", not cm._draw_pool().has("kart_calma"))
+	cm.last_seats = seats_before_pool
 	# Hukumeti azinliga dusur
 	cm.last_seats = {1: 300, 2: 50, 3: 40}
 	check("hukumet artik AZINLIK", not gm.has_majority(), "%d/%d" % [gm.government_seats(), gm.total_seats()])
@@ -158,7 +179,7 @@ func _initialize() -> void:
 	check("hukumet DUSTU", not gm.has_government())
 	check("yeniden kurma asamasi basladi", gm.phase == gm.Phase.FORMING)
 	check("gorev en buyuk partide (1)", gm.mandate_peer_id() == 1, str(gm.mandate_peer_id()))
-	check("puanlar KORUNDU", gm.score_of(2) == 18, str(gm.score_of(2)))
+	check("puanlar KORUNDU", gm.score_of(2) == 31, str(gm.score_of(2)))
 
 	print("")
 	print("=== 8) 3 TEKLIF HAKKI BITINCE SIRA DEVREDER ===")

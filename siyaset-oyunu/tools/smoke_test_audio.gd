@@ -1,0 +1,152 @@
+extends SceneTree
+## Ses altyapısı: bus'lar kuruldu mu, buton sesi evrensel bağlanıyor mu?
+## `godot --headless --path . --script res://tools/smoke_test_audio.gd`
+
+var _failed := 0
+
+func check(label: String, ok: bool, detail: String = "") -> void:
+	if not ok:
+		_failed += 1
+	print("  [%s]  %s%s" % ["OK" if ok else "HATA", label, ("  -> " + detail) if detail != "" else ""])
+
+func _initialize() -> void:
+	load("res://scripts/bot_brain.gd").skill_variance = false
+	await process_frame
+	var am = root.get_node("AudioManager")
+	var gs = root.get_node("GameSettings")
+
+	print("=== 1) BUS'LAR ===")
+	check("Muzik bus'i var", AudioServer.get_bus_index(am.BUS_MUSIC) != -1)
+	check("Efekt bus'i var", AudioServer.get_bus_index(am.BUS_SFX) != -1)
+	check("Efekt bus'i Master'a gider", AudioServer.get_bus_send(AudioServer.get_bus_index(am.BUS_SFX)) == "Master")
+
+	print("")
+	print("=== 2) SES DOSYALARI VE HAVUZ ===")
+	check("ui_click yuklendi", am._streams.has("ui_click"))
+	check("oynatici havuzu hazir", am._players.size() == am.POOL_SIZE)
+	for sound in am.SOUNDS:
+		check("dosya var: %s" % sound, ResourceLoader.exists(String(am.SOUNDS[sound])))
+
+	print("")
+	print("=== 3) BUTON SESI EVRENSEL ===")
+	var button := Button.new()
+	root.add_child(button)
+	await process_frame
+	check("sahneye giren buton otomatik baglandi", button.pressed.is_connected(am._on_button_pressed))
+	button.emit_signal("pressed")
+	check("basinca ses caldi", am._last_played.has("ui_click"))
+	am._last_played.clear()
+	var texture_button := TextureButton.new()
+	root.add_child(texture_button)
+	await process_frame
+	texture_button.emit_signal("pressed")
+	check("TextureButton (parti ikonu) da seslenir", am._last_played.has("ui_click"))
+	am._last_played.clear()
+	var check_box := CheckBox.new()
+	root.add_child(check_box)
+	await process_frame
+	check_box.emit_signal("pressed")
+	check("CheckBox da seslenir", am._last_played.has("ui_click"))
+	var muted := Button.new()
+	muted.set_meta("sessiz", true)
+	root.add_child(muted)
+	await process_frame
+	check("sessiz meta'li buton baglanmaz", not muted.pressed.is_connected(am._on_button_pressed))
+
+	print("")
+	print("=== 4) SES SEVIYESI AYARI ===")
+	gs.set_volume("sfx", 1.0)
+	var sfx_index := AudioServer.get_bus_index(am.BUS_SFX)
+	var ceiling: float = float(am.VOLUME_CEILING["sfx"])
+	check("%100 = oyunun dengeli sesi (tavan)", is_equal_approx(db_to_linear(AudioServer.get_bus_volume_db(sfx_index)), ceiling),
+		str(db_to_linear(AudioServer.get_bus_volume_db(sfx_index))))
+	gs.set_volume("sfx", 0.5)
+	check("yarim seviye tavanin yarisi", is_equal_approx(db_to_linear(AudioServer.get_bus_volume_db(sfx_index)), ceiling * 0.5),
+		str(db_to_linear(AudioServer.get_bus_volume_db(sfx_index))))
+	gs.set_volume("sfx", 0.0)
+	check("sifir seviye = susturur", AudioServer.is_bus_mute(sfx_index))
+	gs.set_volume("sfx", gs.DEFAULT_SFX_VOLUME)
+
+	print("")
+	print("=== 5) OYUN OLAYLARI ===")
+	var gm = root.get_node("GovernmentManager")
+	var cm = root.get_node("CardManager")
+	cm.speech_required = false  # meclis konuşması ayrıca test edilir
+	var heard := func(sound: String) -> bool:
+		return am._last_played.has(sound)
+	am._last_played.clear()
+	gm.proposal_kind = gm.KIND_CENSURE
+	gm.proposal_peer_id = 1
+	gm.phase = gm.Phase.VOTING
+	gm.votes = {}
+	gm.proposal_changed.emit()
+	check("gensoru oylamasi acilinca ses caldi", heard.call("censure_open"))
+	var me: int = root.multiplayer.get_unique_id()
+	gm.votes = {me: gm.VOTE_YES}
+	gm.proposal_changed.emit()
+	check("kendi EVET oyun seslendi", heard.call("vote_yes"))
+	am._last_played.erase("vote_yes")
+	gm.proposal_changed.emit()
+	check("ayni oy ikinci kez seslenmez", not heard.call("vote_yes"))
+	gm.votes[901] = gm.VOTE_NO
+	gm.votes[902] = gm.VOTE_ABSTAIN
+	gm.proposal_changed.emit()
+	check("baskalarinin oyu da duyulur", heard.call("vote_no") and heard.call("vote_abstain"))
+	am._last_played.clear()
+	gm.proposal_kind = gm.KIND_LAW
+	gm.votes = {}
+	gm.proposal_changed.emit()
+	gm.votes = {901: gm.VOTE_NO}
+	gm.proposal_changed.emit()
+	check("yasa oylamasinda baskasinin HAYIR'i duyulur", heard.call("vote_no"))
+	check("yasa oylamasinda gensoru cingili calmaz", not heard.call("censure_open"))
+	am._last_played.clear()
+	gm.proposal_resolved.emit(true, gm.KIND_LAW, 1)
+	check("yasa gecti sesi", heard.call("law_passed"))
+	am._last_played.clear()
+	gm.proposal_resolved.emit(false, gm.KIND_LAW, 1)
+	check("yasa reddedildi sesi", heard.call("law_rejected"))
+	am._last_played.clear()
+	gm.proposal_resolved.emit(true, gm.KIND_CENSURE, 1)
+	check("gensoru sonucu yasa sesi calmaz", not heard.call("law_passed"))
+	am._last_played.clear()
+	cm.card_played.emit(999, "karalama")
+	check("baskasinin oynadigi karti da duyariz", heard.call("card_played"))
+	am._last_played.clear()
+	cm.card_drawn.emit(999, "karalama")
+	check("baskasinin kart cekmesi duyulmaz", not heard.call("card_drawn"))
+	cm.card_drawn.emit(root.multiplayer.get_unique_id(), "karalama")
+	check("kendi kart cekisimiz duyulur", heard.call("card_drawn"))
+	gm.proposal_kind = ""
+	gm.votes = {}
+
+	print("")
+	print("=== 6) MUZIK ===")
+	check("iki parca da yuklendi", am._music_streams.has("game") and am._music_streams.has("election"))
+	for track in am._music_streams:
+		var stream = am._music_streams[track]
+		check("%s: motor dongusu kapali (fade ile donduruyoruz)" % track, not ("loop" in stream) or not stream.loop)
+	check("ikinci oyun muzigi yuklendi", am._music_streams.has("game2"))
+	var card_mgr = root.get_node("CardManager")
+	var seen := {}
+	for i in 40:
+		card_mgr._pick_music_track()
+		seen[card_mgr.music_track] = true
+	check("oyun muzigi iki parcadan rastgele secilir", seen.size() == 2 and seen.has("game") and seen.has("game2"), str(seen.keys()))
+	check("arka plan muzigi secim muziginden kisik",
+		float(am.MUSIC_GAIN["game"]) < float(am.MUSIC_GAIN["election"]), "%s dB / %s dB" % [am.MUSIC_GAIN["game"], am.MUSIC_GAIN["election"]])
+	check("arka plan fade'i uzun", float(am.MUSIC_FADE_IN["game"]) >= 2.0 and float(am.MUSIC_FADE_OUT["game"]) >= 2.0)
+	check("secim fade'i cok kisa", float(am.MUSIC_FADE_IN["election"]) <= 0.5 and float(am.MUSIC_FADE_OUT["election"]) <= 0.5)
+	am.play_music("game")
+	await process_frame
+	check("muzik calmaya basladi", am._music_name == "game" and am._music_player.playing)
+	check("sessizden acilir (fade in)", am._music_player.volume_db < float(am.MUSIC_GAIN["game"]))
+	check("ilk saniye atlanir", am._music_player.get_playback_position() >= 1.0,
+		str(am._music_player.get_playback_position()))
+	am._music_player.stop()
+	am._on_music_finished()
+	check("parca bitince bastan baslar (dongu)", am._music_player.playing)
+
+	print("")
+	print("=== TUM TESTLER GECTI ===" if _failed == 0 else "=== %d TEST BASARISIZ ===" % _failed)
+	quit(1 if _failed > 0 else 0)

@@ -1,6 +1,6 @@
 extends SceneTree
 ## 8 oyunculu oyun ekranı: seçimden önce (boş beyaz meclis) ve sonra.
-## Menü butonu / oyuncu kartları / mana çakışmalarını kontrol eder.
+## Menü butonu / oyuncu kartları / para çakışmalarını kontrol eder.
 ##   godot --resolution 1280x720 --script res://tools/crowded_preview.gd
 
 const COLORS := ["F20C1F", "1C48C9", "F2920C", "8C21C2", "29A33D", "13DBED", "E619A8", "59BD28"]
@@ -24,6 +24,7 @@ func _initialize() -> void:
 	var mm = root.get_node("MultiplayerManager")
 	var pm = root.get_node("PartyManager")
 	var cm = root.get_node("CardManager")
+	cm.speech_required = false  # önizleme: konuşma paneli ayrıca çekilir
 	root.get_node("BotManager").set_process(false)
 	mm.room_code = ""
 	mm.election_threshold = 3.0
@@ -34,7 +35,7 @@ func _initialize() -> void:
 		var id: int = me if i == 0 else 100 + i
 		mm.players[id] = {"name": "Oyuncu %d" % i, "bot": i > 0}
 		pm.parties[id] = {"name": "Partim%d" % i, "icon_index": i * 3, "icon_color": Color.WHITE,
-			"bg_color": Color(COLORS[i]), "ideology": {"economic": 0, "social": 0, "administrative": 0}, "ready": true}
+			"bg_color": Color(COLORS[i]), "groups": VoterGroups.neutral_affinities(), "ready": true}
 	cm.init_game()
 	var scene: Node = (load("res://scenes/GameScreen.tscn") as PackedScene).instantiate()
 	root.add_child(scene)
@@ -85,28 +86,19 @@ func _initialize() -> void:
 		_shot("layer_%d" % layer)
 		print("layer istendi ", layer, " -> ", scene._map_layer, " switching ", scene._layer_switching, " queued ", scene._queued_layer)
 	check("vekil katmaninda vekil daireleri gorunur", scene.map_holder.get_node("SeatMarkers").visible)
-	# Güç katmanı herkesin gücüyle hesaplanır: vekil çıkaramayan yeşil göremez,
-	# bir ilde en fazla iki parti koyu yeşil (vekillerin yarısı) olabilir.
+	# Güç katmanı her ilde (teşkilattan bağımsız) kesin tahminle, kırmızı-sarı-yeşil degrade.
 	var projection: Dictionary = cm.projection_all()
-	check("guc haritasi her ili boyar (anket gerekmez)", projection.size() == ids.size(), "%d/%d" % [projection.size(), ids.size()])
-	var green_without_seat := 0
-	var crowded_dark_green := 0
+	check("guc haritasi her ili gosterir", projection.size() == ids.size(), "%d/%d" % [projection.size(), ids.size()])
+	var t_ok := true
 	for province_id in projection.keys():
-		var dark := 0
-		for id in cm.turn_order:
-			var t: float = scene._strength_t(projection[province_id], id)
-			if t > 0.0 and int(projection[province_id][id]["seats"]) == 0:
-				green_without_seat += 1
-			if t >= 0.99:
-				dark += 1
-		if dark > 2:
-			crowded_dark_green += 1
-	check("guc haritasi: vekil cikaramayan ilde yesil yok", green_without_seat == 0, str(green_without_seat))
-	check("guc haritasi: bir ilde en fazla iki parti koyu yesil", crowded_dark_green == 0, str(crowded_dark_green))
+		var t: float = scene._strength_t(projection[province_id], me)
+		if t < -1.0 or t > 1.0:
+			t_ok = false
+	check("guc haritasi degrade degerleri [-1, 1]", t_ok)
 	scene._on_layer_button_pressed(2)
 	await create_timer(0.6).timeout
 	cm.current_turn_index = cm.turn_order.find(me)
-	cm.mana[me] = 5
+	cm.funds[me] = 5
 	cm._push_state({"type": "timer"})
 	await _frames(5)
 	scene._on_org_button_pressed()
@@ -115,7 +107,7 @@ func _initialize() -> void:
 	_shot("org_pending")
 	scene._on_org_button_pressed()
 	await create_timer(0.6).timeout
-	check("iptal: onceki katmana (guc) doner, mana harcanmaz", scene._map_layer == 2 and cm.mana_of(me) == 5)
+	check("iptal: onceki katmana (guc) doner, para harcanmaz", scene._map_layer == 2 and cm.funds_of(me) == 5)
 	scene._on_org_button_pressed()
 	var target := ""
 	for id in ids:
@@ -124,28 +116,28 @@ func _initialize() -> void:
 			break
 	scene._on_province_clicked(target)
 	scene._on_province_clicked(target)
-	check("teskilat kuruldu, 2 mana, il gorusu acildi", cm.organization_level(target, me) == 1 and cm.mana_of(me) == 3 and cm.knows_leaning(me, target))
+	check("teskilat kuruldu, 2 milyon, anket acildi", cm.organization_level(target, me) == 1 and cm.funds_of(me) == 3 and not cm.province_poll(me, target).is_empty())
 	await create_timer(0.3).timeout
 	check("kurunca bir an teskilat katmaninda kalir", scene._map_layer == 1)
 	await create_timer(1.6).timeout
 	check("sonra onceki katmana doner", scene._map_layer == 2)
 	_shot("my_turn")
 	scene._on_miting_button_pressed()
-	scene._on_province_clicked("konya")
+	scene._on_province_clicked(TestProvinces.id("konya"))
 	await _frames(3)
 	_shot("miting_pending")
 	check("miting: ilk dokunus riski gosterir", String(scene._target_hint.text).find("provokasyon") != -1)
-	scene._on_province_clicked("konya")
-	check("miting hamlesi yapildi (2 mana)", cm.mana_of(me) == 3 - GameRules.MITING_MANA_COST)
-	cm.mana[me] = 10
-	cm.inventories[me] = ["populizm", "mana_bonusu", "karalama"]
+	scene._on_province_clicked(TestProvinces.id("konya"))
+	check("miting hamlesi yapildi (2 milyon)", cm.funds_of(me) == 3 - GameRules.MITING_FUNDS_COST)
+	cm.funds[me] = 10
+	cm.inventories[me] = ["populizm", "bagis_kampanyasi", "karalama"]
 	cm._push_state({"type": "timer"})
 	await _frames(5)
 	scene._on_hand_card_clicked(0)
 	await _frames(3)
 	scene._on_hand_card_clicked(0)
 	await _frames(5)
-	check("populizm karti iki dokunusla kullanildi", cm.populism_rounds_left(me) == GameRules.POPULISM_ROUNDS and cm.mana_of(me) == 9)
+	check("populizm karti iki dokunusla kullanildi", cm.populism_rounds_left(me) == GameRules.POPULISM_ROUNDS and cm.funds_of(me) == 9)
 	scene._on_censure_button_pressed()
 	await _frames(3)
 	check("cogunluk yokken bile hukumet yoksa gensoru acilmaz", not scene._pending_censure)
@@ -154,7 +146,7 @@ func _initialize() -> void:
 	cm.inventories[me] = ["karalama"]
 	cm._push_state({"type": "timer"})
 	await _frames(3)
-	scene._ask_propaganda_target(0, "ankara")
+	scene._ask_propaganda_target(0, TestProvinces.id("ankara"))
 	await _frames(5)
 	_shot("propaganda_menu")
 	var badges := 0
@@ -164,11 +156,11 @@ func _initialize() -> void:
 	check("karalama menusunde her rakip partinin rozeti var", badges == cm.turn_order.size() - 1, str(badges))
 	scene._propaganda_menu.hide()
 	# Gündem bandı ve yasa paneli.
-	cm.agenda = {"type": "gundem_economic_n", "until": cm.round_number + 2}
+	cm.agenda = {"type": "gundem_isci", "until": cm.round_number + 2}
 	cm._push_state({"type": "timer"})
 	await _frames(3)
 	check("gundem bandi gorunur", scene._agenda_banner.visible)
-	check("gundem carpani: devletci 3, piyasaci 2, diger 1", is_equal_approx(cm.agenda_law_mult("law:economic:-1"), 3.0) 		and is_equal_approx(cm.agenda_law_mult("law:economic:1"), 2.0) and is_equal_approx(cm.agenda_law_mult("law:social:1"), 1.0))
+	check("gundem tek grubu odullendirir, yasa her gruba acik", cm.law_on_agenda("law:isci") and not cm.law_on_agenda("law:isveren") and not cm.law_on_agenda("law:dindar"))
 	scene._on_law_button_pressed()
 	await create_timer(0.3).timeout
 	_shot("law_designer")
@@ -183,7 +175,7 @@ func _initialize() -> void:
 	for id in ids:
 		if scouted == "" and cm.organization_level(id, me) >= 2 and cm.province_seat_count(id) >= 8:
 			scouted = id
-		if plain == "" and not cm.knows_leaning(me, id):
+		if plain == "" and cm.province_poll(me, id).is_empty():
 			plain = id
 	scene._on_province_clicked(scouted)
 	await _frames(5)
@@ -194,7 +186,7 @@ func _initialize() -> void:
 	await _frames(5)
 	_shot("panel_plain")
 	scene._province_panel.hide()
-	cm._end_game("32 tur tamamlandı. Son seçimle kurulan Partim3 hükümeti makam puanlarını aldı.")
+	cm._end_game("32 yıl tamamlandı. Son seçimle kurulan Partim3 hükümeti makam puanlarını aldı.")
 	await create_timer(0.4).timeout
 	_shot("game_over_fading")
 	await create_timer(3.0).timeout
@@ -213,5 +205,5 @@ func _layout_checks(scene: Node) -> void:
 	if menu != null:
 		check("menu butonu ilk oyuncuyla cakismiyor", not menu.get_global_rect().intersects(first), "%s / %s" % [menu.get_global_rect(), first])
 	print("panel ", (list.get_parent() as Control).get_global_rect(), " list ", list.get_global_rect(), " h ", scene._avatar_height)
-	var mana: Control = scene._mana_box
-	check("mana son oyuncuyla cakismiyor", not mana.get_global_rect().intersects(last), "%s / %s" % [mana.get_global_rect(), last])
+	var funds: Control = scene._funds_box
+	check("para son oyuncuyla cakismiyor", not funds.get_global_rect().intersects(last), "%s / %s" % [funds.get_global_rect(), last])

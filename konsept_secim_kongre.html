@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Seçim ve Kongre Konseptleri</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#181430;--ink:#100D22;--panel:#2B2352;--pl:#4A3F7A;--pd:#1C1738;--text:#F2EFFF;--mut:#A79BD6;--dim:#6B62A0;--gold:#FFC93C;--red:#E8402A}
+*{box-sizing:border-box}body{margin:0;background:var(--ink);color:var(--text);font-family:"IBM Plex Mono",monospace;padding:24px 16px 60px}
+h1{font-size:22px;margin:0 0 6px;color:var(--gold)}h2{font-size:18px;margin:40px 0 4px;color:var(--gold)}
+p.n{color:var(--mut);font-size:13px;max-width:980px;margin:4px 0 12px;line-height:1.5}
+.wrap{max-width:1000px;margin:auto}
+.stage{position:relative;width:100%;aspect-ratio:16/9;background:linear-gradient(var(--bg),var(--ink));overflow:hidden;border:2px solid var(--pl)}
+.bar{display:flex;gap:10px;align-items:center;margin:8px 0;flex-wrap:wrap}
+button{font:inherit;background:var(--panel);color:var(--text);border:2px solid var(--pl);padding:4px 12px;cursor:pointer}
+.tl{font-size:12px;color:var(--dim)}
+.tl b{color:var(--gold)}
+canvas{position:absolute;inset:0;width:100%;height:100%}
+</style></head><body><div class="wrap">
+<h1>SEÇİM GECESİ ve KONGRE · konseptler</h1>
+<p class="n">Hepsi canlı döngü. Ortak kararlar: seçim gecesinde <b>2× HIZ ve ATLA kalkıyor</b>; toplam süre 27,5 sn → <b>~24 sn</b> (sayım 22,5→19,5, sonuç bekleme 5→4,5). Kongre bu süreye bağlı olduğu için kendiliğinden kısalıyor; ayrıca oran 0,5→<b>0,4</b> (oyuncu partisi ≈ 9,6 sn, bot ≈ 6 sn yerine 4,8 sn). Kongrede adaylar parti renginin tonları yerine <b>ayrı canlı renkler</b> alıyor.</p>
+
+<h2>S1 · Sandık Dalgası</h2>
+<p class="n">Mevcut düzen korunur, hareket artar: açılan iller dalga gibi parlayıp renk alır, liderlik değişince ekranı süpüren "LİDER DEĞİŞTİ" şeridi, %25/%50/%75 eşiklerinde altın damga. Son 2 sn: sayım biter, kazanan partinin rengi ekranı kaplar, büyük logo + "BİRİNCİ PARTİ" + meclis yayı sekerek dolar.</p>
+<div class="stage" id="s1"><canvas></canvas></div>
+<div class="bar"><button data-r="s1">baştan</button><span class="tl">0–1,5 sn başlık çakılır · 1,5–19,5 sayım · <b>19,5–24 kazanan finali</b></span></div>
+
+<h2>S2 · Stüdyo Kameraları</h2>
+<p class="n">Ekran üç "kamera" arasında geçer: harita büyük → çubuk yarışı büyük → meclis büyük; diğer ikisi küçük pencerede. Her %25'te kamera değişir, geçişte TV flaşı. Çubuklarda ▲▼ ivme okları. Final: üç pencere birleşir, kazanan ortada.</p>
+<div class="stage" id="s2"><canvas></canvas></div>
+<div class="bar"><button data-r="s2">baştan</button><span class="tl">4 kamera bölümü × ~4,9 sn · final 4,5 sn</span></div>
+
+<h2>S3 · Sandık Sayacı</h2>
+<p class="n">Ekranın ortasında büyük, dönen "AÇILAN SANDIK" sayacı; partiler etrafında yarışan büyük yüzdeler (basamaklar slot gibi döner). Harita ve meclis yanlarda sabit. Daha sade, rakam odaklı; final yüzdelerin donup kazananın büyümesi.</p>
+<div class="stage" id="s3"><canvas></canvas></div>
+<div class="bar"><button data-r="s3">baştan</button></div>
+
+<h2>K1 · Delege Salonu</h2>
+<p class="n">Ekranın üstü salon: 1200 delegeyi temsil eden ~300 koltuk, oy verdikçe adayın rengine döner (sıra sıra dalga). Altta aday kartları: büyük renkli ad şeridi, sayaç, yarı çizgisi. İkinci turda elenenlerin koltukları griye döner ve iki adaya akar. Final: konfeti + "GENEL BAŞKAN" damgası.</p>
+<div class="stage" id="k1"><canvas></canvas></div>
+<div class="bar"><button data-r="k1">baştan</button><span class="tl">oyuncu partisi ≈ 9,6 sn</span></div>
+
+<h2>K2 · Pankart Kuleleri</h2>
+<p class="n">Her aday için dikey renkli kule (termometre) yükselir, tepesinde aday adı yazan sallanan pankart; arka planda bayrak sallayan kalabalık silueti. Yarı çizgisi yatay altın lazer. Kazananın kulesi taşar, ışık hüzmesi.</p>
+<div class="stage" id="k2"><canvas></canvas></div>
+<div class="bar"><button data-r="k2">baştan</button></div>
+
+<h2>K3 · Kürsü + Halka</h2>
+<p class="n">Ortada büyük halka grafik (delegelerin paylaşımı) dönerek dolar; çevresinde aday kartları halkadaki dilimleriyle aynı renkte. Sol üst köşede "YENİ YOL KONGRESİ" kürsü bandı, alt şeritte kayan delege yorumları.</p>
+<div class="stage" id="k3"><canvas></canvas></div>
+<div class="bar"><button data-r="k3">baştan</button></div>
+</div>
+<script>
+const F='"IBM Plex Mono",monospace';
+const P=[{n:"Anadolu",c:"#18d6e6"},{n:"Yeşiller",c:"#2fae4a"},{n:"Özgürlük",c:"#a33bd6"},{n:"Yeni Yol",c:"#e8202a"},{n:"Millet",c:"#f2901f"},{n:"Halkçı",c:"#2569cf"}];
+const FIN=[18.1,17.2,16.9,21.7,14.0,12.1];
+const CAND=[{n:"Barış",r:"Genel Başkan",c:"#ff3b5c"},{n:"Ufuk Sevinç",r:"Emekli Subay",c:"#3bd1ff"},{n:"Nazlı Kırtohum",r:"Sendikacı",c:"#ffc93c"},{n:"Nilgün Tatlı",r:"İlahiyatçı",c:"#9dff5c"}];
+const R1=[291,375,240,224],R2=[640,560];
+const COUNT=19.5,HOLD=4.5,TOT=COUNT+HOLD,KT=9.6;
+const ease=k=>1-Math.pow(1-k,3),cl=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+function rnd(s){return()=>(s=(s*16807)%2147483647)/2147483647}
+const R=rnd(7);const HEX=[];for(let y=0;y<11;y++)for(let x=0;x<18;x++){const nx=x/17-.5,ny=y/10-.5;if(nx*nx*1.1+ny*ny*2.4>.3)continue;HEX.push({x,y,p:(R()*6)|0,at:R()*.9+.05})}
+function shares(k){return FIN.map((f,i)=>f*(1+Math.sin(k*9+i*2)*.25*(1-k)))}
+function hex(c,x,y,r){c.beginPath();for(let i=0;i<6;i++){const a=Math.PI/3*i-Math.PI/6;c.lineTo(x+r*Math.cos(a),y+r*Math.sin(a))}c.closePath()}
+function txt(c,s,x,y,sz,col,al="left",w=700){c.font=`${w} ${sz}px ${F}`;c.fillStyle=col;c.textAlign=al;c.fillText(s,x,y)}
+function map(c,x0,y0,W,k,t){const r=W/28;for(const h of HEX){const x=x0+h.x*r*1.75+(h.y%2)*r*.87,y=y0+h.y*r*1.5;const lit=k>h.at;hex(c,x,y,r*.95);c.fillStyle=lit?P[h.p].c:"#2B2352";c.fill();const age=(k-h.at)*COUNT;if(lit&&age<.5){c.strokeStyle=`rgba(255,255,255,${1-age*2})`;c.lineWidth=3;hex(c,x,y,r*(1+age*1.6));c.stroke()}}}
+function parl(c,cx,cy,rad,k,bounce){let idx=0;const sh=shares(Math.max(k,.01)),sum=sh.reduce((a,b)=>a+b);const seq=[];sh.forEach((s,i)=>{for(let j=0;j<Math.round(200*s/sum);j++)seq.push(i)});
+ for(let row=0;row<8;row++){const rr=rad*(.45+row*.075),n=12+row*4;for(let j=0;j<n;j++){const a=Math.PI*(1-(j+.5)/n);const id=idx++;const on=id/180<k;const b=bounce?Math.max(0,Math.sin(cl(bounce*3-id/180*2)*Math.PI))*6:0;c.beginPath();c.arc(cx+rr*Math.cos(a),cy-rr*Math.sin(a)-b,rad*.028,0,7);c.fillStyle=on?P[seq[Math.floor(id/180*seq.length)%seq.length]].c:"#2B2352";c.fill()}}}
+function bars(c,x,y,W,H,k,arrows){const sh=shares(k).map(s=>s*k);const ord=sh.map((s,i)=>i).sort((a,b)=>sh[b]-sh[a]);const rh=H/6;ord.forEach((i,r)=>{const yy=y+r*rh;c.fillStyle=P[i].c;c.fillRect(x,yy+4,rh-8,rh-8);txt(c,P[i].n,x+rh,yy+rh*.55,rh*.32,"#F2EFFF");c.fillStyle="#100D22";c.fillRect(x+W*.42,yy+6,W*.45,rh-12);c.fillStyle=P[i].c;c.fillRect(x+W*.42,yy+6,W*.45*sh[i]/25,rh-12);txt(c,"%"+sh[i].toFixed(1),x+W,yy+rh*.6,rh*.34,"#F2EFFF","right");if(arrows){const d=Math.sin(k*30+i);txt(c,d>0?"▲":"▼",x+W*.39,yy+rh*.6,rh*.3,d>0?"#9dff5c":"#E8402A","right")}})}
+function header(c,W,t,k,label){c.fillStyle="#E8402A";c.fillRect(W*.015,W*.012,W*.1,W*.04);txt(c,"● CANLI",W*.065,W*.04,W*.017,"#fff","center");txt(c,label,W*.13,W*.042,W*.026,"#F2EFFF");txt(c,"AÇILAN SANDIK %"+(k*100).toFixed(1),W*.98,W*.04,W*.02,"#FFC93C","right");c.fillStyle="#FFC93C";c.fillRect(0,W*.062,W*k,W*.005)}
+const scenes={
+s1(c,W,H,t){const k=cl((t-1.5)/(COUNT-1.5));const slam=cl(t/0.5);
+ c.save();c.globalAlpha=slam;header(c,W,t,k,"SEÇİM GECESİ · ÖZEL YAYIN");c.restore();
+ if(t<1.5){c.save();c.translate(W/2,H/2);c.scale(2.4-1.4*ease(slam),2.4-1.4*ease(slam));txt(c,"SEÇİM GECESİ",0,0,W*.07,"#FFC93C","center");c.restore();return}
+ map(c,W*.03,H*.2,W*.55,k,t);bars(c,W*.58,H*.15,W*.4,H*.42,k,false);parl(c,W*.78,H*.95,W*.2,k,0);
+ for(const m of[.25,.5,.75]){const d=(k-m)*COUNT;if(d>0&&d<1.4){c.save();c.translate(W*.3,H*.55);c.rotate(-.12);c.globalAlpha=cl(1.4-d);const s=1+Math.max(0,.4-d)*3;c.scale(s,s);c.strokeStyle="#FFC93C";c.lineWidth=5;c.strokeRect(-W*.12,-H*.07,W*.24,H*.14);txt(c,"%"+m*100+" SANDIK",0,H*.025,W*.035,"#FFC93C","center");c.restore()}}
+ const lc=(k*COUNT)%6.5;if(k<1&&lc>4.5&&lc<6.2){const p=(lc-4.5)/1.7;c.fillStyle="#E8402A";c.fillRect(-W+p*W*2.4,H*.78,W,H*.08);txt(c,"LİDER DEĞİŞTİ: YENİ YOL ÖNE GEÇTİ",-W+p*W*2.4+W*.5,H*.835,W*.025,"#fff","center")}
+ if(t>COUNT){const f=cl((t-COUNT)/.6);c.fillStyle=`rgba(232,32,42,${.88*f})`;c.beginPath();c.arc(W/2,H/2,W*1.2*ease(f),0,7);c.fill();if(f>.5){c.save();c.translate(W/2,H*.38);const s=ease(cl((t-COUNT-.3)/.5));c.scale(s,s);c.fillStyle="#fff";c.fillRect(-W*.06,-W*.06,W*.12,W*.12);c.fillStyle="#e8202a";c.beginPath();c.arc(0,0,W*.035,0,7);c.fill();c.restore();txt(c,"BİRİNCİ PARTİ: YENİ YOL",W/2,H*.62,W*.045,"#fff","center");txt(c,"%21,7 · 132 vekil",W/2,H*.7,W*.025,"#FFC93C","center");parl(c,W/2,H*.98,W*.16,1,t-COUNT-.8)}}},
+s2(c,W,H,t){const k=cl(t/COUNT);header(c,W,t,k,"SEÇİM GECESİ · ÖZEL YAYIN");const cam=Math.min(3,Math.floor(k*4))%3;
+ const big=[W*.03,H*.13,W*.66,H*.8],sm1=[W*.71,H*.13,W*.26,H*.38],sm2=[W*.71,H*.55,W*.26,H*.38];const slots=[[big,sm1,sm2],[sm1,big,sm2],[sm2,sm1,big]][cam];
+ const draw=[(r)=>map(c,r[0],r[1]+r[3]*.08,r[2]*.92,k,t),(r)=>bars(c,r[0],r[1],r[2],r[3],k,true),(r)=>parl(c,r[0]+r[2]/2,r[1]+r[3]*.95,Math.min(r[2]*.5,r[3]*.9),k,0)];
+ if(t<COUNT){slots.forEach((r,i)=>{c.strokeStyle=r===big?"#FFC93C":"#4A3F7A";c.lineWidth=3;c.strokeRect(r[0],r[1],r[2],r[3]);c.save();c.beginPath();c.rect(r[0],r[1],r[2],r[3]);c.clip();draw[i](r);c.restore()});
+ const ph=(k*4)%1*COUNT/4;if(ph<.25){c.fillStyle=`rgba(255,255,255,${1-ph*4})`;c.fillRect(0,0,W,H)}}
+ else{const f=ease(cl((t-COUNT)/.8));bars(c,W*.25,H*.15,W*.5,H*.45,1,false);parl(c,W/2,H*.98,W*.22*f,1,t-COUNT);txt(c,"KAZANAN: YENİ YOL",W/2,H*.12,W*.04,"#FFC93C","center")}},
+s3(c,W,H,t){const k=cl(t/COUNT);header(c,W,t,k,"SEÇİM GECESİ · ÖZEL YAYIN");map(c,W*.02,H*.25,W*.28,k,t);parl(c,W*.86,H*.85,W*.13,k,0);
+ const v=Math.floor(k*174000);c.strokeStyle="#FFC93C";c.lineWidth=4;c.strokeRect(W*.35,H*.15,W*.3,H*.2);txt(c,"AÇILAN SANDIK",W*.5,H*.21,W*.018,"#A79BD6","center");txt(c,v.toLocaleString("tr"),W*.5,H*.31,W*.05,"#FFC93C","center");
+ const sh=shares(k);P.forEach((p,i)=>{const x=W*(.36+(i%3)*.1),y=H*(.48+Math.floor(i/3)*.24);const win=t>COUNT&&i==3;const s=win?1+ease(cl((t-COUNT)/.6))*.35:1;c.save();c.translate(x,y);c.scale(s,s);c.fillStyle=p.c;c.fillRect(-W*.045,-H*.08,W*.09,H*.18);txt(c,p.n,0,-H*.035,W*.013,"#100D22","center");txt(c,"%"+(sh[i]*k).toFixed(1),0,H*.05,W*.025,"#100D22","center");c.restore()})},
+k1(c,W,H,t){const T=t%(KT+1.5),k=cl(T/KT);const e=[.36,.46,.78];c.fillStyle="#E8402A";c.fillRect(W*.015,W*.012,W*.1,W*.04);txt(c,"● CANLI",W*.065,W*.04,W*.017,"#fff","center");txt(c,"YENİ YOL KONGRESİ · 1200 delege",W*.13,W*.042,W*.024,"#F2EFFF");
+ const r2=k>e[1];const fill=r2?cl((k-e[1])/(e[2]-e[1])):cl(k/e[0]);const N=300,cols=30;let tot=r2?R2:R1;const sum=tot.reduce((a,b)=>a+b);const seq=[];tot.forEach((v,i)=>{for(let j=0;j<Math.round(N*v/sum);j++)seq.push(r2?[0,1][i]:i)});
+ for(let i=0;i<N;i++){const row=Math.floor(i/cols),col=i%cols;const x=W*.1+col*W*.027+(row%2)*W*.013,y=H*.17+row*H*.045;const on=(i/N)<fill;c.fillStyle=on?CAND[seq[(i*7)%seq.length]].c:"#2B2352";c.beginPath();c.arc(x,y,W*.009+(on&&(fill*N-i)<10?3:0),0,7);c.fill()}
+ txt(c,r2?"2. TUR":"1. TUR",W*.5,H*.66,W*.022,"#FFC93C","center");
+ const show=r2?[0,1]:[0,1,2,3];show.forEach((ci,j)=>{const x=W*(.04+j*(r2?.47:.24)),w=W*(r2?.45:.22),y=H*.7;c.fillStyle="#2B2352";c.fillRect(x,y,w,H*.24);c.fillStyle=CAND[ci].c;c.fillRect(x,y,w,H*.05);txt(c,CAND[ci].n,x+8,y+H*.038,W*.016,"#100D22");txt(c,CAND[ci].r,x+8,y+H*.09,W*.012,"#A79BD6",undefined,400);const v=Math.round(tot[j]*ease(fill));txt(c,String(v),x+w-8,y+H*.17,W*.035,"#F2EFFF","right");c.fillStyle="#100D22";c.fillRect(x+8,y+H*.19,w-16,H*.03);c.fillStyle=CAND[ci].c;c.fillRect(x+8,y+H*.19,(w-16)*v/1200*1.6,H*.03);c.fillStyle="#fff";c.fillRect(x+8+(w-16)*.8,y+H*.185,2,H*.04)});
+ if(k>=e[2]){const f=(T-e[2]*KT);for(let i=0;i<80;i++){const r=rnd(i+3);c.fillStyle=CAND[i%4].c;c.fillRect(r()*W,(r()*H*.3+f*H*.5*(r()+.5))%H,6,10)}c.save();c.translate(W/2,H*.4);c.rotate(-.08);const s=1+Math.max(0,.3-f)*4;c.scale(s,s);c.fillStyle="#FFC93C";c.fillRect(-W*.25,-H*.07,W*.5,H*.13);txt(c,"GENEL BAŞKAN: BARIŞ",0,H*.025,W*.03,"#100D22","center");c.restore()}},
+k2(c,W,H,t){const T=t%(KT+1.5),k=cl(T/(KT*.78));for(let i=0;i<60;i++){const x=i/60*W,y=H*.92+Math.sin(t*4+i)*4;c.fillStyle="#2B2352";c.beginPath();c.arc(x,y,W*.016,0,7);c.fill();if(i%5==0){c.fillStyle=CAND[i%4].c;c.fillRect(x,y-H*.1+Math.sin(t*5+i)*6,W*.025,H*.04);c.fillStyle="#6B62A0";c.fillRect(x,y-H*.1,2,H*.1)}}
+ txt(c,"YENİ YOL KONGRESİ",W*.5,H*.08,W*.03,"#FFC93C","center");const half=H*.85-H*.6*.5/0.5*.5;c.strokeStyle="#FFC93C";c.setLineDash([10,6]);c.lineWidth=3;c.beginPath();c.moveTo(W*.08,H*.42);c.lineTo(W*.92,H*.42);c.stroke();c.setLineDash([]);txt(c,"YARI: 601",W*.92,H*.4,W*.014,"#FFC93C","right");
+ CAND.forEach((cd,i)=>{const x=W*(.14+i*.2),v=R1[i]*ease(k),h=H*.43*v/601;c.fillStyle="#100D22";c.fillRect(x,H*.15,W*.1,H*.7);c.fillStyle=cd.c;c.fillRect(x,H*.85-h,W*.1,h);c.save();c.translate(x+W*.05,H*.85-h-H*.07);c.rotate(Math.sin(t*3+i)*.08);c.fillStyle=cd.c;c.fillRect(-W*.08,-H*.04,W*.16,H*.06);txt(c,cd.n,0,H*.005,W*.012,"#100D22","center");c.restore();txt(c,String(Math.round(v)),x+W*.05,H*.83,W*.022,"#100D22","center")})},
+k3(c,W,H,t){const T=t%(KT+1.5),k=ease(cl(T/(KT*.78)));const cx=W/2,cy=H*.52,r=H*.3;let a0=-Math.PI/2;const sum=R1.reduce((a,b)=>a+b);
+ c.fillStyle="#E8402A";c.fillRect(0,H*.04,W*.4,H*.09);txt(c,"YENİ YOL KONGRESİ",W*.02,H*.105,W*.025,"#fff");
+ R1.forEach((v,i)=>{const a=v/sum*Math.PI*2*k;c.strokeStyle=CAND[i].c;c.lineWidth=r*.35;c.beginPath();c.arc(cx,cy,r,a0,a0+a);c.stroke();const m=a0+a/2;a0+=a;const px=cx+Math.cos(m)*r*1.9,py=cy+Math.sin(m)*r*1.35;c.fillStyle=CAND[i].c;c.fillRect(px-W*.09,py-H*.06,W*.18,H*.12);txt(c,CAND[i].n,px,py-H*.01,W*.014,"#100D22","center");txt(c,String(Math.round(v*k)),px,py+H*.045,W*.022,"#100D22","center")});
+ txt(c,String(Math.round(1200*k)),cx,cy+H*.02,W*.04,"#FFC93C","center");txt(c,"delege",cx,cy+H*.07,W*.014,"#A79BD6","center",400);
+ c.fillStyle="#1C1738";c.fillRect(0,H*.92,W,H*.08);txt(c,"Delege yorumu: \"Salonda hava gergin, ikinci tur kaçınılmaz görünüyor\" · Sandık başında uzun kuyruk ·",W-((t*120)%(W*2)),H*.97,W*.016,"#F2EFFF")}
+};
+const st={};document.querySelectorAll(".stage").forEach(s=>{const cv=s.querySelector("canvas");st[s.id]={cv,t0:performance.now()}});
+document.querySelectorAll("button[data-r]").forEach(b=>b.onclick=()=>st[b.dataset.r].t0=performance.now());
+function loop(now){for(const id in st){const o=st[id],cv=o.cv,W=cv.clientWidth,H=cv.clientHeight;if(cv.width!==W){cv.width=W;cv.height=H}const c=cv.getContext("2d");c.clearRect(0,0,W,H);let t=(now-o.t0)/1000;const L=id[0]=="s"?TOT+1:KT+1.5;if(t>L){o.t0=now;t=0}scenes[id](c,W,H,t)}requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+</script></body></html>

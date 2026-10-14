@@ -2,16 +2,24 @@ class_name PublicOpinion
 extends RefCounted
 ## GÜÇ kuralları — saf fonksiyonlar, durum CardManager'da.
 ##
-## Bir partinin bir ildeki seçim desteği iki YAKINLIKTAN oluşur:
-##   - İDEOLOJİK yakınlık: partinin görüşü ile ilin görüşü arasındaki mesafe
-##     (ElectionModel.support). İllerin görüşü oyun başında belirlenir ve
-##     değişmez (bkz. ProvinceIdeology); partiler NÖTR başlar, görüşleri
-##     sadece sundukları yasalarla kayar.
-##   - AKTİVİTE yakınlığı: o ilde yapılanlar — miting, yatırım, yasa etkileri,
-##     karalama (il puanı, tur sonunda söner) + İL BAŞKANLIĞI (seviye başına
-##     kalıcı puan).
-## Seçimde ideolojik destek şu çarpanla çarpılır:
+## Bir partinin bir ildeki seçim desteği iki katmandan oluşur:
+##   - GRUP UYUMU: partinin 8 seçmen grubundaki ULUSAL yakınlıkları ile ilin
+##     seçmen profilinin (4 ikili dağılım) uyumu (bkz. VoterGroups.appeal,
+##     ElectionModel.support). İl profilleri oyun boyunca DEĞİŞMEZ; değişen,
+##     partilerin gruplardaki yakınlığıdır:
+##       * YASA  : hedef grupta ulusal yakınlık (kalıcı), karşıt grupta daha
+##                 küçük kayıp,
+##       * MİTİNG: partinin hitabı ilin baskın gruplarına kayar: o gruplarda
+##                 ulusal yakınlık (kalıcı, azalan getirili), karşıtlarda
+##                 daha küçük kayıp,
+##       * GRUP TOPLANTISI: seçilen grupta GEÇİCİ bonus (+10 / +3 / +1, sonra 0).
+##   - AKTİVİTE (yerel memnuniyet): o ilde yapılanlar — miting, YATIRIM,
+##     karalama (il puanı, tur sonunda söner) + teşkilat (seviye başına kalıcı
+##     puan). Yatırım grup yakınlığına DOKUNMAZ; sadece burayı büyütür.
+## Seçimde grup uyumunun ağırlığı şu çarpanla çarpılır:
 ##   1 + EFFECT_PER_POINT * (ulusal + aktivite)    (MIN_MULT..MAX_MULT arasında)
+## Aynı etki iki kez yazılmaz: miting il aktivitesi + grup yakınlığı (iki ayrı
+## katman) yazar, artık ayrıca ulusal puan yazmaz.
 ##
 ## Dengeyi değiştirmek için sadece bu dosyadaki sabitleri düzenlemek yeterli.
 
@@ -24,29 +32,43 @@ const MAX_MULT := 2.0
 const LIMIT := 10.0
 ## Tur sonu sönme katsayıları (düşük = eski hamleler çabuk unutulur).
 const NATIONAL_DECAY := 0.75
-const LOCAL_DECAY := 0.62
+const LOCAL_DECAY := 0.72
 
 # --- Miting -----------------------------------------------------------------
+## Yerel etki: ildeki aktivite (söner).
 const MITING_LOCAL := 5.0
-const MITING_NATIONAL := 0.8
+## ULUSAL YANSIMA (siyasi hitap): ilde çiftin baskın tarafı s payındaysa
+## eğilim t = (s − 0,5) × 2; baskın gruba MITING_GROUP_GAIN × t ulusal
+## yakınlık, karşıt gruba bunun grubun miting_backlash oranı kadar kayıp.
+## t, MITING_MIN_LEAN'den küçükse (dengeli çift) o çiftte etki yok.
+const MITING_GROUP_GAIN := 5.0
+const MITING_MIN_LEAN := 0.1
+## AZALAN GETİRİ: aynı gruba art arda miting yorgunluk biriktirir:
+## kazanç × 1 / (1 + yorgunluk / FATIGUE_SCALE); yorgunluk her tur × DECAY.
+const MITING_FATIGUE_SCALE := 6.0
+const MITING_FATIGUE_DECAY := 0.6
 const PROVOCATION_LOCAL := -2.5
 const PROVOCATION_NATIONAL := -1.0
-## Provokasyon riski: partinin ideolojisi ile ilin MEVCUT siyasi dengesi
-## arasındaki mesafe SAFE_DISTANCE'tan küçükse risk yok; FULL_DISTANCE'a
-## yaklaştıkça MAX_RISK'e çıkar. İl başkanlığı riski seviye başına azaltır.
+## Provokasyon riski: partinin ildeki GRUP UYUMU (0..100) SAFE_APPEAL ve
+## üstündeyse risk yok; FULL_APPEAL'e indikçe MAX_RISK'e çıkar (il seçmeni
+## partinin hitap ettiği gruplara uzak). İl başkanlığı riski seviye başına azaltır.
 const PROVOCATION_MAX_RISK := 0.5
-const PROVOCATION_SAFE_DISTANCE := 1.5
-const PROVOCATION_FULL_DISTANCE := 9.0
-## İlin siyasi dengesinde: il görüşünün ağırlığı 1; bir partinin ağırlığı
-## = oy payı (0..1) * SHARE_WEIGHT + pozitif aktivite * LOCAL_WEIGHT.
-const BALANCE_SHARE_WEIGHT := 0.5
-const BALANCE_LOCAL_WEIGHT := 0.25
+const PROVOCATION_SAFE_APPEAL := 50.0
+const PROVOCATION_FULL_APPEAL := 40.0
 
 # --- Yatırım (sadece hükümet partileri) ---------------------------------------
-## Yatırım mitingden etkilidir (miting il +5, ulusal +0.8; üstelik risksiz).
-const INVEST_LOCAL := 7.0
-const INVEST_NATIONAL := 1.2
-const INVEST_PARTNER_LOCAL := 2.5
+## YEREL MEMNUNİYET: yatırım partinin siyasi kimliğine (grup yakınlığına)
+## dokunmaz; ildeki herkesin partiye yaklaşmasını sağlar (il aktivitesi).
+## Toplam etki; Economy.INVEST_IMMEDIATE'i hemen, kalanı sonraki turlarda.
+## Ekonomik yansıması ayrı bir ulusal puan DEĞİLDİR: yatırım ekonomi ivmesini
+## büyütür, o da hükümetin seçmen memnuniyetine yansır (bkz. Economy).
+## Azalan getiri: il puanı LIMIT ile sınırlı; aynı ile art arda yatırım tavana
+## dayanınca daha az getirir.
+## PAYLAŞIM (0.0.190): toplam etkinin INVEST_OWN_SHARE'i getiren partiye; kalanı
+## hükümet partilerine makam puanlarıyla (başbakanlık, bakanlıklar…) doğru
+## orantılı dağıtılır (getiren parti de makamı oranında pay alır).
+const INVEST_LOCAL := 16.0
+const INVEST_OWN_SHARE := 0.5
 
 # --- Popülizm bonusu -----------------------------------------------------------
 ## Popülizm süren partinin KENDİ hamlelerinin (miting, yatırım, yasa, oy,
@@ -70,30 +92,39 @@ const GOVERNMENT_FATIGUE := 1.1
 
 # --- Gensoru ------------------------------------------------------------------
 ## Reddedilen gensoruyu getiren parti bu kadar ulusal destek kaybeder.
-const CENSURE_REJECTED_NATIONAL := -2.0
+const CENSURE_REJECTED_NATIONAL := -0.25
+## GÜNDEME YANIT: gündemdeki gruba yasa sunan, o yasaya EVET diyen ya da o
+## grupla toplantı yapan parti bu kadar ulusal puan kazanır (eski kriz 0,4).
+const CRISIS_RESPONSE_NATIONAL := 0.6
+## Gündemdeki gruba sunulan yasanın grup etkisi (sunana) bu kadar büyür.
+const AGENDA_LAW_MULT := 1.3
 
 # --- Teşkilat ------------------------------------------------------------------
 ## Seviyeye göre KALICI aktivite (sönmez): 1 az, 2 orta, 3 yüksek oy bonusu.
-const ORG_ACTIVITY_BY_LEVEL := [0.0, 1.5, 3.5, 6.0]
+## Seviye 0, 1, 2 (2 = tavan; eski 3. seviyenin bonusu buraya taşındı).
+const ORG_ACTIVITY_BY_LEVEL := [0.0, 2.5, 6.0]
+## MİTİNG ve KARALAMA artık teşkilat ister; izin kontrolü CardManager'da
+## (can_miting / can_play_card) yapılır. Buradaki çarpan sadece ETKİ içindir:
+## 2. seviye teşkilatın olduğu ilde miting ve karalama biraz daha vurur.
+## (Seviye 0 zaten hamle yapamaz; çarpanı 1.0 bırakıyoruz ki kural tek yerde
+## dursun ve yanlışlıkla "etkisiz miting" oluşmasın.)
+const ORG_ACTION_MULT := [1.0, 1.0, 1.3]
 ## Seviye başına miting provokasyon riskinin azalma oranı.
-const ORG_RISK_REDUCTION_PER_LEVEL := 0.25
+const ORG_RISK_REDUCTION_PER_LEVEL := 0.35
 
 # --- Yasalar ------------------------------------------------------------------
-## UYUM: ilin yasa eksenindeki değeri × yasanın yönü / 3  (−1..+1).
-## Getiren parti, il başına: PROPOSER_POINTS × uyum; kabul edilirse × PASSED_MULT.
-## (Meclis yokken sunulan yasa = seçim vaadi: kabul edilmemiş gibi.)
-const LAW_PROPOSER_POINTS := 2.0
-## GÜNDEM ARTIK ETKİYİ BÜYÜTMEZ: sadece hangi eksende yasa sunulabileceğini
-## belirler. Yasanın il etkisi her zaman tek kat (1.0). Partilerin ideolojisi
-## zaten her yasada oylarla (sunan 1, evet/hayır 0.5 adım) kayıyor.
-const AGENDA_AXIS_MULT := 1.0
-const AGENDA_MATCH_MULT := 1.0
-const LAW_PASSED_MULT := 2.0
-## Oy veren parti (EVET +1 / HAYIR −1, çekimser etkisiz), il başına:
-##   VOTE_IDEOLOGY × uyum × oy  (+ aşağıdaki duruş etkisi, sadece EVET'te)
-const LAW_VOTE_IDEOLOGY := 1.5
-## İktidar partisi muhalefetin yasasına EVET: her ilde (gündemi kaptırdı).
-## Yasaya uyumlu illerde ideolojik artı bunu nötre/artıya çevirebilir.
+## Yasa bir SEÇMEN GRUBUNU hedefler (gündemdeki çiftten). Etki ULUSALDIR ve
+## grup yakınlığına yazılır (il il aktiviteye değil: aynı etki iki kez sayılmaz).
+## Sunan parti: hedef grupta +GAIN (kabul edilirse PASSED, edilmezse/meclis
+## yokken vaat olarak REJECTED); karşıt grupta GAIN × grubun law_backlash'ı kadar kayıp.
+const LAW_GROUP_GAIN_PASSED := 7.0
+const LAW_GROUP_GAIN_REJECTED := 2.5
+## Oy veren parti (genel başkanın oyu): EVET → hedef grupta +YES, karşıtta
+## YES × backlash kayıp; HAYIR → karşıt grupta +NO, hedefte NO × backlash
+## kayıp; çekimser etkisiz.
+const LAW_VOTE_YES_GAIN := 1.5
+const LAW_VOTE_NO_GAIN := 1.0
+## İktidar partisi muhalefetin yasasına EVET: gündemi kaptırdı (ulusal puan).
 const LAW_GOV_YES_ON_OPPOSITION := -1.0
 ## KOALİSYON UYUMU (ulusal puan, kısmi): başbakanın partisinin yasasına ortak
 ## EVET derse uyumlu görünür ve kazanır; HAYIR derse kendisi küçük, başbakanın
@@ -102,9 +133,41 @@ const LAW_PARTNER_YES_NATIONAL := 0.5
 const LAW_PARTNER_NO_NATIONAL := -0.4
 const LAW_PM_PARTNER_NO_NATIONAL := -0.8
 
+# --- Grup toplantısı ------------------------------------------------------------
+## GEÇİCİ destek: toplantının yapıldığı tur, sonraki tur, ondan sonraki tur
+## seçilen grupta bu kadar yakınlık bonusu (sonra 0). Bonus kalıcı yakınlığı
+## DEĞİŞTİRMEZ, seçim hesabında üstüne eklenir; aynı gruba yeni toplantı
+## bonusları TOPLAMAZ (en büyüğü geçerli). Toplantı yapmamanın cezası YOK.
+const MEETING_BONUS := [10.0, 3.0, 1.0]
+
+# --- Koalisyondan çekilme ---------------------------------------------------
+## Çekilmek PUAN TABLOSUNA dokunmaz; sadece sonraki seçime yansıyan ulusal
+## puanı düşürür. Etki kısmî: taban + bıraktığın bakanlık başına küçük bir ek
+## (ne kadar çok görev aldıysan sözünden dönmen o kadar göze batar).
+const WITHDRAW_NATIONAL_BASE := -0.5
+const WITHDRAW_NATIONAL_PER_POST := -0.25
+const WITHDRAW_NATIONAL_LIMIT := -2.0
+## Hükümetin sandalyelerinin en az bu kadarını taşıyan ortak çekilirse koalisyon
+## fiilen çöker: kalan ortaklar da dağınık görünür ve çekilenin cezasının bu
+## oranı kadar (daha az) ulusal puan kaybeder.
+const WITHDRAW_BIG_PARTNER_SEAT_SHARE := 0.4
+const WITHDRAW_ALLY_SHARE := 0.4
+
+## Koalisyondan çekilen ortağın ulusal puan kaybı (bıraktığı görev sayısına bağlı).
+static func withdraw_national(posts: int) -> float:
+	var posts_f := float(maxi(posts, 0))
+	return maxf(WITHDRAW_NATIONAL_LIMIT, WITHDRAW_NATIONAL_BASE + WITHDRAW_NATIONAL_PER_POST * posts_f)
+
+## Büyük ortak çekilince koalisyonda KALAN ortakların kaybı (daha küçük).
+static func withdraw_ally_national(leaver_penalty: float) -> float:
+	return leaver_penalty * WITHDRAW_ALLY_SHARE
+
 # --- Kaset / itibar suikastı ------------------------------------------------------
 ## Hedefin ULUSAL desteğinden doğrudan düşer (il puanlarına dokunmaz).
 const REPUTATION_NATIONAL_DAMAGE := 4.0
+## İÇ KARIŞIKLIK: hedefin ulusal desteğini düşürür ve partide (gizli)
+## karışıklık çıkarır (bkz. TURMOIL_REBELLION).
+const REBELLION_NATIONAL_DAMAGE := 1.5
 # --- Karalama -----------------------------------------------------------------
 ## Hedefin kaybı = DAMAGE / (1 + DEFENSE_FACTOR × hedefin il gücü)
 ## Karalayanın kazancı = GAIN × (1 + ATTACK_FACTOR × karalayanın il gücü)
@@ -113,11 +176,11 @@ const PROPAGANDA_DAMAGE := 5.0
 ## ilden silinmez, karşı kampanyayla toparlanabilir.
 const PROPAGANDA_FLOOR := -3.0
 const PROPAGANDA_GAIN := 1.5
-const PROPAGANDA_DEFENSE_FACTOR := 0.5
+const PROPAGANDA_DEFENSE_FACTOR := 0.2
 const PROPAGANDA_ATTACK_FACTOR := 0.3
-## Bir partinin bir ildeki GÜCÜ = IDEOLOGY_WEIGHT × ideolojik yakınlık (0..1)
-## + ACTIVITY_WEIGHT × pozitif aktivite.
-const STRENGTH_IDEOLOGY_WEIGHT := 3.0
+## Bir partinin bir ildeki GÜCÜ = APPEAL_WEIGHT × grup uyumu (0..1, bkz.
+## appeal_closeness) + ACTIVITY_WEIGHT × pozitif aktivite.
+const STRENGTH_APPEAL_WEIGHT := 3.0
 const STRENGTH_ACTIVITY_WEIGHT := 0.4
 
 # --- Anket --------------------------------------------------------------------
@@ -128,12 +191,83 @@ const POLL_ERROR := 0.2
 ## Vekil transferi seçmene meşru görünmez: ÇALAN parti çalınan vekil başına
 ## küçük bir ulusal destek kaybeder, ÇALINAN parti "mağduriyet" olarak küçük bir
 ## destek kazanır. İkisi de kısmidir: hamleyi caydırmaz, bedava da bırakmaz.
-const STEAL_THIEF_NATIONAL_PER_SEAT := -0.03
-const STEAL_THIEF_NATIONAL_LIMIT := -1.0
-const STEAL_VICTIM_NATIONAL_PER_SEAT := 0.025
-const STEAL_VICTIM_NATIONAL_LIMIT := 0.8
+## MECLİS DIŞI PARTİ (son seçimde baraj altı) vekil çalarken yarı verimlidir.
+## Kartla meclise girse bile ceza sonraki seçime kadar sürer.
+const STEAL_OUTSIDER_EFFICIENCY := 0.5
 
-const AXES := ["economic", "social", "administrative"]
+## Vekil çalmanın ulusal bedeli neredeyse simgesel: oyuncular çalmaktan
+## caymasın, sadece "bedava değil" hissi kalsın.
+const STEAL_THIEF_NATIONAL_PER_SEAT := -0.008
+const STEAL_THIEF_NATIONAL_LIMIT := -0.25
+const STEAL_VICTIM_NATIONAL_PER_SEAT := 0.012
+const STEAL_VICTIM_NATIONAL_LIMIT := 0.35
+
+## İl menüsünde "seçmen sana yakın/uzak": grup uyumu (0..100) bu aralıkta
+## 0..1'e çevrilir (bkz. appeal_closeness); CLOSENESS_NEAR (uyum 50, nötr) üstü "yakın".
+const APPEAL_LOW := 40.0
+const APPEAL_HIGH := 60.0
+const CLOSENESS_NEAR := 0.5
+
+# --- Karışıklık ve bölünme ------------------------------------------------------
+## GİZLİ KARIŞIKLIK: iç karışıklık kartı çok, kaset biraz yazar. Her tur
+## TURMOIL_DECAY ile söner, olumlu hamleler (miting, teşkilat, yatırım, kabul
+## edilen yasa, hükümete girmek) toparlar.
+const TURMOIL_REBELLION := 3.5
+const TURMOIL_REPUTATION := 1.5
+const TURMOIL_DECAY := 0.85
+const TURMOIL_EASE_MITING := 0.3
+const TURMOIL_EASE_ORG := 0.2
+const TURMOIL_EASE_INVEST := 0.5
+const TURMOIL_EASE_LAW := 0.8
+const TURMOIL_EASE_GOVERNMENT := 1.5
+## Karışıklık bunu aşan (ve en az SPLIT_MIN_SEATS vekili olan) parti tur sonunda
+## BÖLÜNÜR: vekillerinin SPLIT_SEAT_SHARE_MIN..MAX'ı aynı grup yakınlıklarıyla yeni partiye
+## geçer, teşkilatlarının bir kısmı (SPLIT_ORG_CHANCE) onunla gider.
+const SPLIT_TURMOIL := 7.0
+const SPLIT_MIN_SEATS := 8
+const SPLIT_SEAT_SHARE_MIN := 0.35
+const SPLIT_SEAT_SHARE_MAX := 0.5
+const SPLIT_ORG_CHANCE := 0.4
+const SPLIT_NATIONAL_DAMAGE := -1.0
+const SPLIT_AFTER_TURMOIL := 4.0
+## Ayrılan parti en erken SPLIT_MIN, en geç SPLIT_MAX seçim atlattıktan sonra
+## döner; erken dönüş için ana partinin karışıklığı REUNION_TURMOIL'e inmeli.
+const SPLIT_MIN_ELECTIONS := 1
+const SPLIT_MAX_ELECTIONS := 4
+const REUNION_TURMOIL := 2.0
+
+## Grup uyumunun (0..100) 0..1 karşılığı (il menüsü ve güç hesabı için).
+static func appeal_closeness(appeal: float) -> float:
+	return clampf((appeal - APPEAL_LOW) / (APPEAL_HIGH - APPEAL_LOW), 0.0, 1.0)
+
+## Grup toplantısının toplantıdan `age` tur sonraki bonusu.
+static func meeting_bonus(age: int) -> float:
+	if age < 0 or age >= MEETING_BONUS.size():
+		return 0.0
+	return float(MEETING_BONUS[age])
+
+## Miting yorgunluğunun kazanç çarpanı.
+static func miting_fatigue_mult(fatigue: float) -> float:
+	return 1.0 / (1.0 + maxf(0.0, fatigue) / MITING_FATIGUE_SCALE)
+
+## Mitingin bir ildeki siyasi hitap etkisi (azalan getiri öncesi ham değerler):
+## [{"group": baskın grup, "gain": kazanç, "loss_group": karşıt, "loss": kayıp}].
+static func miting_positioning(profile: Dictionary, mult: float = 1.0) -> Array:
+	var result: Array = []
+	for pair in VoterGroups.PAIR_IDS:
+		var groups: Array = VoterGroups.PAIRS[pair]
+		var s := VoterGroups.share(profile, groups[0])
+		var lead: String = groups[0] if s >= 0.5 else groups[1]
+		var lean := absf(s - 0.5) * 2.0
+		if lean < MITING_MIN_LEAN:
+			continue
+		var gain := MITING_GROUP_GAIN * lean * mult
+		result.append({"group": lead, "gain": gain, "loss_group": VoterGroups.opposite(lead),
+			"loss": gain * float(VoterGroups.data(lead).get("miting_backlash", 0.3))})
+	return result
+
+static func org_action_mult(level: int) -> float:
+	return float(ORG_ACTION_MULT[clampi(level, 0, ORG_ACTION_MULT.size() - 1)])
 
 static func org_activity(level: int) -> float:
 	return float(ORG_ACTIVITY_BY_LEVEL[clampi(level, 0, ORG_ACTIVITY_BY_LEVEL.size() - 1)])
@@ -144,58 +278,14 @@ static func clamp_points(value: float) -> float:
 static func multiplier(national: float, local: float) -> float:
 	return clampf(1.0 + EFFECT_PER_POINT * (national + local), MIN_MULT, MAX_MULT)
 
-## İlin mevcut siyasi dengesi (3 eksenli bir nokta).
-##   voter_center : ilin görüşü
-##   shares       : peer_id -> o ildeki son seçim oy yüzdesi (0..100)
-##   local        : peer_id -> o ildeki aktivite
-##   ideologies   : peer_id -> parti ideolojisi
-static func balance_center(voter_center: Dictionary, shares: Dictionary, local: Dictionary, ideologies: Dictionary) -> Dictionary:
-	var sum := {}
-	for axis in AXES:
-		sum[axis] = float(voter_center.get(axis, 0.0))
-	var total_weight := 1.0
-	for peer_id in ideologies.keys():
-		var weight: float = float(shares.get(peer_id, 0.0)) / 100.0 * BALANCE_SHARE_WEIGHT \
-			+ maxf(0.0, float(local.get(peer_id, 0.0))) * BALANCE_LOCAL_WEIGHT
-		if weight <= 0.0:
-			continue
-		var ideology: Dictionary = ideologies[peer_id]
-		for axis in AXES:
-			sum[axis] = float(sum[axis]) + float(ideology.get(axis, 0)) * weight
-		total_weight += weight
-	var center := {}
-	for axis in AXES:
-		center[axis] = float(sum[axis]) / total_weight
-	return center
-
-## 0..PROVOCATION_MAX_RISK arası provokasyon olasılığı.
-static func provocation_risk(party_ideology: Dictionary, center: Dictionary, org_level: int = 0) -> float:
-	var d := ElectionModel.distance(party_ideology, center)
-	var t: float = clampf((d - PROVOCATION_SAFE_DISTANCE) / (PROVOCATION_FULL_DISTANCE - PROVOCATION_SAFE_DISTANCE), 0.0, 1.0)
+## 0..PROVOCATION_MAX_RISK arası provokasyon olasılığı (appeal: ildeki grup uyumu).
+static func provocation_risk(appeal: float, org_level: int = 0) -> float:
+	var t: float = clampf((PROVOCATION_SAFE_APPEAL - appeal) / (PROVOCATION_SAFE_APPEAL - PROVOCATION_FULL_APPEAL), 0.0, 1.0)
 	return PROVOCATION_MAX_RISK * t * maxf(0.0, 1.0 - ORG_RISK_REDUCTION_PER_LEVEL * org_level)
 
-## Yasanın bir ille uyumu: −1 (tam zıt) .. +1 (tam uyumlu).
-static func law_alignment(center: Dictionary, axis: String, dir: int) -> float:
-	return clampf(float(center.get(axis, 0.0)) * dir / 3.0, -1.0, 1.0)
-
-## Yasayı getiren partinin bir ildeki güç değişimi.
-static func law_proposer_delta(alignment: float, passed: bool) -> float:
-	return LAW_PROPOSER_POINTS * alignment * (LAW_PASSED_MULT if passed else 1.0)
-
-## Oy veren partinin bir ildeki güç değişimi. choice: +1 EVET, 0 ÇEKİMSER, −1 HAYIR.
-static func law_vote_delta(alignment: float, choice: int, voter_in_gov: bool, proposer_in_gov: bool) -> float:
-	if choice == 0:
-		return 0.0
-	var delta := LAW_VOTE_IDEOLOGY * alignment * float(choice)
-	if choice > 0:
-		if voter_in_gov and not proposer_in_gov:
-			delta += LAW_GOV_YES_ON_OPPOSITION
-	return delta
-
 ## Bir partinin bir ildeki gücü (karalamada saldırı/savunma).
-static func party_strength(party_ideology: Dictionary, center: Dictionary, activity: float) -> float:
-	var closeness := clampf(ElectionModel.support(party_ideology, center) - ElectionModel.SUPPORT_FLOOR, 0.0, 1.0)
-	return STRENGTH_IDEOLOGY_WEIGHT * closeness + STRENGTH_ACTIVITY_WEIGHT * maxf(0.0, activity)
+static func party_strength(appeal: float, activity: float) -> float:
+	return STRENGTH_APPEAL_WEIGHT * appeal_closeness(appeal) + STRENGTH_ACTIVITY_WEIGHT * maxf(0.0, activity)
 
 static func propaganda_damage(defender_strength: float) -> float:
 	return PROPAGANDA_DAMAGE / (1.0 + PROPAGANDA_DEFENSE_FACTOR * maxf(0.0, defender_strength))

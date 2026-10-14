@@ -2,20 +2,15 @@ extends Node2D
 ## ProvinceMap'in ÇOCUĞU olarak eklenir (bkz. Map.tscn). İllerin üstüne, o
 ## ildeki milletvekili sandalyelerini noktalar halinde çizer.
 ##
-## Noktalar bir raster texture (Sprite2D) yerine _draw()/draw_circle ile
-## VEKTÖR olarak çiziliyor (antialiased) — harita hangi ölçekte gösterilirse
-## gösterilsin (ne kadar büyütülürse büyütülsün) her zaman keskin/pürüzsüz
-## kalır, pikselleşmez.
+## Noktalar SVG gibi NET: her nokta düz bir dörtgen, rengini ve dairesini
+## ParliamentDiagram.SEAT_SHADER çizer (her piksel daireye uzaklığını kendisi
+## hesaplar, kenar ekranda tam 1 piksel yumuşar, kontur en az 1 piksel).
+## Harita hareket ettikçe / büyüdükçe (olay logundaki odak yakınlaşması)
+## noktalar her karede o anki ekran ölçeğinde YENİDEN çizilir: büyütülmüş eski
+## bir çizim gerilip bulanıklaşmaz.
 ##
-## Yerleşim algoritması, geliştiricinin "projeksiyon_hesaplayici" web
-## uygulamasındaki getDotLayout()'un GDScript'e taşınmış halidir: her il bir
-## "dot grubu" oluşturur (n sandalye için satır/sütun grid'i), grup HER ZAMAN
-## tam olarak ilin (manuel override varsa onun, yoksa piksel-ızgaranın)
-## merkezinde durur — dinamik çarpışma-önleyici fizik YOK (bkz. aşağıdaki not:
-## kaldırıldı, çünkü tools/seat_marker_editor.html'de simüle edilemiyordu ve
-## editör/oyun arasında sürekli tutarsızlığa yol açıyordu). Komşu illerin
-## grupları görsel olarak çakışıyorsa, bunu tools/seat_marker_editor.html ile
-## elle düzeltmek gerekir.
+## Yerleşim: her il bir "nokta grubu" (n sandalye için satır/sütun ızgarası)
+## oluşturur ve grup ilin merkezine (GameMap.center_of) oturur.
 
 @export var dot_radius: float = 4.6     # nokta yarıçapı (harita/viewBox birimi)
 @export var dot_outline_width: float = 2.0  # siyah kontur kalınlığı
@@ -30,15 +25,7 @@ extends Node2D
 ## en az bu kadar gerçek piksel boşluk kalmasını garanti eder.
 @export var min_screen_gap_px: int = 1
 
-## Bu haritaya ÖZGÜ, STATİK milletvekili konum belgesi: il -> [x, y] MERKEZ
-## noktası (province_pixel_map.json ile AYNI birim: ham piksel-ızgara
-## koordinatı). Her ilin nokta grubu TAM OLARAK burada yazan merkeze çizilir;
-## çalışma zamanında hiçbir otomatik kaydırma/çakışma çözme YOKTUR — böylece
-## tools/seat_marker_editor.html'de gördüğünle oyunda gördüğün her zaman
-## birebir aynıdır. Belge normalde illerin TAMAMINI içerir; bir il eksik
-## kalırsa (ör. haritaya yeni il eklenip belge güncellenmediyse) o il için
-## ilin piksel-merkezi yedek olarak kullanılır.
-@export var seat_centers_path: String = "res://data/province_seat_centers.json"
+## Nokta grupları bölgenin merkezine (GameMap.center_of) çizilir.
 var _seat_centers: Dictionary = {}  # province_id -> Vector2 (harita/local birimi)
 
 # province_id -> Array[Color] (o ildeki her sandalye için bir renk, parti rengi)
@@ -51,26 +38,28 @@ var _groups: Array = []
 
 @onready var _province_map = get_parent()
 
+var _white_texture: Texture2D
+
 func _ready() -> void:
 	_load_seat_centers()
+	var image := Image.create(1, 1, false, Image.FORMAT_RGBA8)
+	image.fill(Color.WHITE)
+	_white_texture = ImageTexture.create_from_image(image)
+	var shader := Shader.new()
+	shader.code = ParliamentDiagram.SEAT_SHADER
+	var shader_material := ShaderMaterial.new()
+	shader_material.shader = shader
+	material = shader_material
+	# Harita (ebeveyn) yakınlaşınca/kayınca yeniden çiz: ölçek o anki ekrana göre.
+	set_notify_transform(true)
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSFORM_CHANGED:
+		queue_redraw()
+
+## Altıgen haritada merkezler GameMap'ten gelir (bölgenin iç hücresi).
 func _load_seat_centers() -> void:
 	_seat_centers.clear()
-	if not FileAccess.file_exists(seat_centers_path):
-		push_warning("Seat centers file not found: %s" % seat_centers_path)
-		return
-	var file := FileAccess.open(seat_centers_path, FileAccess.READ)
-	var parsed = JSON.parse_string(file.get_as_text())
-	if parsed == null:
-		push_warning("Seat centers file could not be parsed: %s" % seat_centers_path)
-		return
-	var unit_scale: float = _province_map.MAP_UNIT_SCALE if _province_map != null else 4.0
-	for province_id in parsed.keys():
-		var p: Array = parsed[province_id]
-		# editor, ham piksel-ızgara koordinatını yazıyor (province_pixel_map.json
-		# "centers" ile birebir aynı birim/hizalama: +0.5 piksel merkezi, sonra
-		# harita birimine çevirmek için MAP_UNIT_SCALE ile çarpılıyor).
-		_seat_centers[province_id] = (Vector2(p[0], p[1]) + Vector2(0.5, 0.5)) * unit_scale
 
 ## O ilin sandalye/renk listesini ayarlar ve tüm noktaları yeniden hesaplar.
 ## seat_colors: her eleman bir Color (o koltuktaki partinin rengi).
@@ -154,14 +143,6 @@ func _rebuild() -> void:
 			"half_h": grid_h * 0.5,
 		})
 
-	# ÖNEMLİ: Burada hiçbir otomatik yerleştirme/çakışma çözme YOK. Grup konumu
-	# HER ZAMAN doğrudan seat_centers_path belgesindeki merkez. Vaktiyle burada
-	# canlı bir çarpışma-önleyici fizik vardı; tools/seat_marker_editor.html
-	# onu simüle edemediği için editörde "gayet güzel" görünen yerleşim oyunda
-	# bambaşka çıkıyordu. Tek doğruluk kaynağı statik belge olunca editör ile
-	# oyun matematiksel olarak birebir aynı sonucu veriyor. Çakışan/kötü duran
-	# iller SADECE editörden elle düzeltilir.
-
 	# Sınır kelepçesi: büyük illerde (ör. çok sandalyeli İstanbul) nokta
 	# kümesi, ilin kendi küçük piksel alanına göre ÇOK daha büyük olabiliyor
 	# — hele merkez haritanın kenarına yakınsa (İstanbul kuzeyde), fizik
@@ -239,10 +220,14 @@ func _draw() -> void:
 	var cell := dot_radius * 2.0 + dot_spacing
 	var step_px: int = maxi(outline_half_px * 2 + min_screen_gap_px, int(roundf(cell * scale)))
 
-	# Kontur ve renkli kareler AYRI geçişlerde çizilmeli ki bir noktanın
-	# konturu komşu noktanın renkli karesinin ÜSTÜNE binmesin.
-	for pass_index in 2:
-		var half_px: int = outline_half_px if pass_index == 0 else dot_half_px
+	# Tek geçiş: shader konturu ve dolguyu aynı dörtgende çizer; adım konturlu
+	# çapın üstünde olduğundan noktalar birbirine binmez.
+	var shader_material := material as ShaderMaterial
+	if shader_material != null:
+		shader_material.set_shader_parameter("outline_color", dot_outline_color)
+		shader_material.set_shader_parameter("inner_ratio", float(dot_half_px) / float(outline_half_px))
+	for pass_index in 1:
+		var half_px: int = outline_half_px
 		for g in _groups:
 			var layout: Array = g["layout"]
 			var colors: Array = g["colors"]
@@ -257,7 +242,7 @@ func _draw() -> void:
 				for col in cols:
 					if idx >= colors.size():
 						break
-					var color: Color = dot_outline_color if pass_index == 0 else colors[idx]
+					var color: Color = colors[idx]
 					var center_px := Vector2(x0_px + col * step_px, y_px)
 					_draw_circle_at_screen_px(inv, scale, center_px, half_px, color)
 					idx += 1
@@ -267,4 +252,7 @@ func _draw() -> void:
 ## ekranda aynı tam sayılara oturduğu için kenar yumuşatması her birinde birebir
 ## aynı görünür; adım konturlu çapın üstünde olduğundan daireler değmez.
 func _draw_circle_at_screen_px(inv: Transform2D, screen_scale: float, center_px: Vector2, half_px: int, color: Color) -> void:
-	draw_circle(inv * center_px, float(half_px) / screen_scale, color, true, -1.0, true)
+	var half_local := float(half_px) / screen_scale
+	var center: Vector2 = inv * center_px
+	draw_texture_rect(_white_texture, Rect2(center - Vector2(half_local, half_local), Vector2(half_local, half_local) * 2.0),
+		false, color)

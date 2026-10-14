@@ -9,8 +9,8 @@ extends Control
 const FADE_SECONDS := 0.9
 const ROW_DELAY := 0.12
 const ROW_FADE_SECONDS := 0.35
-const GOLD := Color(1.0, 0.85, 0.35)
-const DIM := Color(1, 1, 1, 0.6)
+const GOLD := UiTheme.GOLD
+const DIM := UiTheme.TEXT_MUTED
 
 var _reveal: Array = []  # sırayla beliren düğümler
 
@@ -21,7 +21,7 @@ func _ready() -> void:
 
 	var backdrop := ColorRect.new()
 	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	backdrop.color = Color(0.04, 0.05, 0.07, 0.94)
+	backdrop.color = Color(UiTheme.INK.r, UiTheme.INK.g, UiTheme.INK.b, 0.95)
 	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(backdrop)
 
@@ -34,7 +34,7 @@ func _ready() -> void:
 	center.add_child(vbox)
 
 	var ranking: Array = CardManager.final_ranking
-	var over := _label("OYUN BİTTİ", 16, DIM)
+	var over := _label(L.t("OYUN BİTTİ"), 16, DIM)
 	vbox.add_child(over)
 	_reveal.append(over)
 
@@ -46,9 +46,9 @@ func _ready() -> void:
 		badge.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		winner_box.add_child(badge)
-		winner_box.add_child(_label("KAZANAN", 13, DIM))
+		winner_box.add_child(_label(L.t("KAZANAN"), 13, DIM))
 		winner_box.add_child(_label(String(winner.get("name", "?")), 30, Color(winner.get("color", Color.WHITE)).lightened(0.35)))
-		winner_box.add_child(_label("%s  ·  %d puan" % [winner.get("leader", "?"), int(winner.get("score", 0))], 15, GOLD))
+		winner_box.add_child(_label(L.t("%s  ·  %d puan") % [winner.get("leader", "?"), int(winner.get("score", 0))], 15, GOLD))
 		vbox.add_child(winner_box)
 		_reveal.append(winner_box)
 
@@ -67,7 +67,7 @@ func _ready() -> void:
 		_reveal.append(row)
 
 	var button := Button.new()
-	button.text = "Ana Menüye Dön"
+	button.text = L.t("Ana Menüye Dön")
 	button.custom_minimum_size = Vector2(220, 44)
 	button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	UiSkin.skin_button(button)
@@ -91,22 +91,17 @@ func _play_intro(backdrop: ColorRect) -> void:
 func _ranking_row(index: int, entry: Dictionary, is_me: bool) -> Control:
 	var color: Color = entry.get("color", Color(0.5, 0.5, 0.5))
 	var panel := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.1, 0.11, 0.15, 0.95)
-	style.set_corner_radius_all(8)
-	style.border_width_left = 6
-	style.border_color = color
+	var style := UiSkin.stylebox(UiSkin.PANEL_DARK)
 	style.content_margin_left = 12
 	style.content_margin_right = 14
-	style.content_margin_top = 3
-	style.content_margin_bottom = 3
-	if is_me:
-		style.shadow_color = Color(GOLD, 0.5)
-		style.shadow_size = 5
-	panel.add_theme_stylebox_override("panel", style)
+	style.content_margin_top = 4
+	style.content_margin_bottom = 4
+	UiSkin.apply_style(panel, "panel", style)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	panel.add_child(row)
+	# Solda parti renginde şerit; kazanan/kendi satırın altın renkli olur.
+	row.add_child(UiTheme.stripe(GOLD if is_me else color))
 	var rank := _label("%d." % (index + 1), 18, GOLD if index == 0 else Color.WHITE)
 	rank.custom_minimum_size = Vector2(34, 0)
 	row.add_child(rank)
@@ -119,10 +114,10 @@ func _ranking_row(index: int, entry: Dictionary, is_me: bool) -> Control:
 	names.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var party_name := _label(String(entry.get("name", "?")), 17, GOLD if is_me else Color.WHITE)
 	names.add_child(party_name)
-	var leader := _label(String(entry.get("leader", "?")) + ("  (sen)" if is_me else ""), 12, DIM)
+	var leader := _label(String(entry.get("leader", "?")) + (L.t("  (sen)") if is_me else ""), 12, DIM)
 	names.add_child(leader)
 	row.add_child(names)
-	var seats := _label("%d mv" % int(entry.get("seats", 0)), 13, DIM)
+	var seats := _label(L.t("%d mv") % int(entry.get("seats", 0)), 13, DIM)
 	seats.custom_minimum_size = Vector2(56, 0)
 	seats.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	row.add_child(seats)
@@ -135,7 +130,7 @@ func _ranking_row(index: int, entry: Dictionary, is_me: bool) -> Control:
 
 ## Rozet için parti verisi: oyuncu ayrıldıysa sıralamadaki renkle yedek.
 func _party_for(entry: Dictionary) -> Dictionary:
-	var party: Dictionary = PartyManager.parties.get(int(entry.get("peer_id", -1)), {})
+	var party: Dictionary = PartyManager.data_of(int(entry.get("peer_id", -1)))
 	if party.is_empty():
 		party = {"name": entry.get("name", "?"), "icon_index": 0, "icon_color": Color.WHITE, "bg_color": entry.get("color", Color.GRAY)}
 	return party

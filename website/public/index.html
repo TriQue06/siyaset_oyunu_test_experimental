@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PROJE: SİYASET OYUNU</title>
+<meta name="description" content="Arkadaşlarınla parti kur, seçmen gruplarını kazan, seçim gecesini izle, hükümeti kur. Android ve Windows için ücretsiz indir.">
+<meta property="og:title" content="PROJE: SİYASET OYUNU">
+<meta property="og:description" content="Parti kur, seçim kazan, hükümeti kur. Android ve Windows için indir.">
+<meta property="og:image" content="/img/oyun.webp">
+<meta name="theme-color" content="#181430">
+<link rel="icon" href="/img/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header class="band" id="top">
+  <a class="live" href="#top" aria-label="Başa dön"><span class="dot"></span>CANLI</a>
+  <span class="band-title"><span class="proj">PROJE:</span> SİYASET OYUNU</span>
+  <span class="band-sub" id="band-version">Android · Windows</span>
+  <nav class="band-nav" aria-label="Bölümler">
+    <a href="#oyun">Oyun</a>
+    <a href="#kartlar">Kartlar</a>
+    <a href="#indir">İndir</a>
+  </nav>
+</header>
+
+<main>
+  <section class="hero">
+    <canvas class="hero-map" id="hero-map" aria-hidden="true"></canvas>
+    <div class="hero-inner">
+      <p class="eyebrow">&gt; ÖZEL YAYIN · 1950'DEN BUGÜNE</p>
+      <h1 class="title"><span class="proj-stamp">PROJE:</span><span>SİYASET</span><span class="gold">OYUNU</span></h1>
+      <p class="lead">Arkadaşlarınla birer siyasetçi ol, partini kur, seçmen gruplarını kazan. Seçim gecesinde sandıklar açılırken nefesini tut, mecliste koalisyon pazarlığına otur.</p>
+
+      <div class="downloads" id="indir">
+        <a class="dl dl-android" id="dl-apk" href="https://raw.githubusercontent.com/TriQue06/siyaset_oyunu_test_experimental/oyun-duzeltmeleri/builds/SiyasetOyunu.apk">
+          <svg class="dl-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm0 3v13h10V5H7Zm4 14.5h2v1h-2v-1Z"/></svg>
+          <span class="dl-text">
+            <span class="dl-main">ANDROID İÇİN İNDİR</span>
+            <span class="dl-meta" id="meta-apk">APK</span>
+          </span>
+        </a>
+        <a class="dl dl-windows" id="dl-exe" href="https://raw.githubusercontent.com/TriQue06/siyaset_oyunu_test_experimental/oyun-duzeltmeleri/builds/SiyasetOyunu-Windows.zip">
+          <svg class="dl-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-7v2h3v2H7v-2h3v-2H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm1 2v9h16V6H4Z"/></svg>
+          <span class="dl-text">
+            <span class="dl-main">WINDOWS İÇİN İNDİR</span>
+            <span class="dl-meta" id="meta-exe">EXE · zip</span>
+          </span>
+        </a>
+      </div>
+      <p class="dl-note" id="dl-note">Ücretsiz · Türkçe ve İngilizce · Botlarla tek başına ya da arkadaşlarınla çevrim içi</p>
+    </div>
+    <canvas class="hero-parl" id="hero-parl" aria-hidden="true"></canvas>
+  </section>
+
+  <div class="ticker" aria-hidden="true">
+    <span class="ticker-tag">SON DAKİKA</span>
+    <div class="ticker-track">
+      <span>Gensoru reddedildi: hükümet ayakta · Muhalefet erken seçim istiyor · Kaset skandalı siyaseti sarstı · Kongrede sürpriz: yeni genel başkan belli oldu · Hazineye vergi geliri girdi · Koalisyonda çatlak büyüyor · </span>
+      <span>Gensoru reddedildi: hükümet ayakta · Muhalefet erken seçim istiyor · Kaset skandalı siyaseti sarstı · Kongrede sürpriz: yeni genel başkan belli oldu · Hazineye vergi geliri girdi · Koalisyonda çatlak büyüyor · </span>
+    </div>
+  </div>
+
+  <section class="stats" aria-label="Oyun bir bakışta">
+    <div class="stat" data-reveal="pop"><span class="stat-n" data-count="500">500</span><span class="stat-l">sandalyeli meclis</span></div>
+    <div class="stat" data-reveal="pop"><span class="stat-n" data-count="8">8</span><span class="stat-l">seçmen grubu</span></div>
+    <div class="stat" data-reveal="pop"><span class="stat-n" data-count="8">8</span><span class="stat-l">oyuncuya kadar oda</span></div>
+    <div class="stat" data-reveal="pop"><span class="stat-n" data-count="39">39</span><span class="stat-l">parti logosu</span></div>
+  </section>
+
+  <div id="oyun" class="features">
+
+    <article class="feature" data-reveal="left">
+      <figure class="shot"><img src="/img/oyun.webp" alt="Oyun ekranı: solda parti skor tablosu, ortada altıgen il haritası, sağda meclis ve hükümet, altta eldeki kartlar ve hamleler" loading="lazy" width="1920" height="1080"></figure>
+      <div class="copy">
+        <p class="kicker">&gt; HABER STÜDYOSU</p>
+        <h2>Ülke senin haritan</h2>
+        <p>Her tur sıra sana geldiğinde miting yap, il il teşkilat kur, yasa sun ya da elindeki kartı oyna. Harita her hamlede canlanır; hangi ilde kimin güçlü olduğunu vekil noktalarından okursun.</p>
+        <ul class="ticks"><li>Miting, teşkilat, yatırım, yasa, toplantı</li><li>Vekiller, teşkilat, güç ve seçmen katmanları</li><li>Kararlarının sonucu canlı olay akışında</li></ul>
+      </div>
+    </article>
+
+    <article class="feature flip" data-reveal="right">
+      <figure class="shot"><img src="/img/secim.webp" alt="Seçim gecesi: sandıklar açılırken boyanan harita, oy oranı çubukları ve dolan meclis" loading="lazy" width="1920" height="1080"></figure>
+      <div class="copy">
+        <p class="kicker red">&gt; SEÇİM GECESİ · ÖZEL YAYIN</p>
+        <h2>Sandıklar açılıyor</h2>
+        <p>Seçim gecesi canlı yayın gibi akar: iller sayıldıkça haritaya renk gelir, oy oranları yarışır, meclis koltuk koltuk dolar. Baraj çizgisinin altında kalmamak için son sandığa kadar beklersin.</p>
+      </div>
+    </article>
+
+    <article class="feature" data-reveal="left">
+      <figure class="shot"><img src="/img/hukumet.webp" alt="Hükümet kurma ekranı: ortaklar, makam dağılımı ve meclis aritmetiği" loading="lazy" width="1920" height="1080"></figure>
+      <div class="copy">
+        <p class="kicker">&gt; KOALİSYON MASASI</p>
+        <h2>Hükümeti sen kur</h2>
+        <p>En çok vekili çıkaran görev alır ama çoğunluk her zaman tek başına gelmez. Ortak seç, Başbakanlıktan bakanlıklara makamları dağıt, sonra meclisten güvenoyu iste. Bakanlıkların devlet hazinesinden payını da belirler.</p>
+      </div>
+    </article>
+
+    <article class="feature flip" data-reveal="toss">
+      <figure class="shot"><img src="/img/gazete.webp" alt="Olay gazetesi: Siyaseti sarsan kaset manşeti oyun ekranının ortasına düşmüş" loading="lazy" width="1920" height="1080"></figure>
+      <div class="copy">
+        <p class="kicker red">&gt; SON DAKİKA</p>
+        <h2>Manşetlere taşınan anlar</h2>
+        <p>Kaset skandalı, partide çatlak, gensoruyla düşen hükümet... Büyük olaylar ekrana fırlatılan bir gazete manşetiyle gelir. Rakibini karalarken kendi adının manşete çıkmamasına dikkat et.</p>
+      </div>
+    </article>
+
+    <article class="feature" data-reveal="left">
+      <figure class="shot"><img src="/img/kongre.webp" alt="Kongre gecesi: delegelerin oyları canlı sayılıyor" loading="lazy" width="1920" height="1080"></figure>
+      <div class="copy">
+        <p class="kicker">&gt; KONGRE GECESİ</p>
+        <h2>Koltuğun sağlam mı?</h2>
+        <p>Genel başkanlık ömür boyu değil. Kongre gecesi delegeler oy verir; kazanırsan koltuğunu korursun, kaybedersen partinde üye olarak devam edip kongre istemeyi beklersin.</p>
+      </div>
+    </article>
+
+    <article class="feature flip" data-reveal="right">
+      <figure class="shot"><img src="/img/ekonomi.webp" alt="Ekonomi paneli ve yatırımın finansmanı: devlet hazinesi ile parti kasası arasında paylaşım" loading="lazy" width="1920" height="1080"></figure>
+      <div class="copy">
+        <p class="kicker">&gt; HAZİNE VE KASA</p>
+        <h2>Para el değiştirir</h2>
+        <p>Vergiyi artırırsan hazine dolar ama seçmen kızar. İktidardaysan illere yatırım götürürsün; devletin parasını partin için harcamak ise soruşturma kapısını açar.</p>
+      </div>
+    </article>
+
+    <article class="feature" data-reveal="left">
+      <figure class="shot"><img src="/img/parti.webp" alt="Parti kurma ekranı: parti adı, logo, renk ve çekirdek seçmen grupları" loading="lazy" width="1920" height="1080"></figure>
+      <div class="copy">
+        <p class="kicker">&gt; PARTİNİ KUR</p>
+        <h2>Her oyun yeni bir parti</h2>
+        <p>Adını koy, 39 logodan birini ve rengini seç, iki çekirdek seçmen grubunu belirle. İşçiler mi işverenler mi, gençler mi emekliler mi? Kimi kazanırsan karşıtını biraz kaybedersin.</p>
+      </div>
+    </article>
+  </div>
+
+  <section class="cards" id="kartlar" aria-labelledby="kartlar-baslik">
+    <p class="kicker center">&gt; ELİNDEKİ KOZLAR</p>
+    <h2 id="kartlar-baslik" class="center">Kartını oyna, dengeleri değiştir</h2>
+    <p class="center narrow">Karalama, kaset, iç karışıklık, vekil transferi, bağış kampanyası... Her kartın bir bedeli ve bir hedefi var.</p>
+    <div class="fan" data-reveal="fan">
+      <img src="/img/cards/kaset.webp" alt="Kaset kartı" loading="lazy" width="384" height="576">
+      <img src="/img/cards/karalama.webp" alt="Karalama kartı" loading="lazy" width="384" height="576">
+      <img src="/img/cards/vekil_guclu.webp" alt="Güçlü vekil çalma kartı" loading="lazy" width="384" height="576">
+      <img src="/img/cards/populizm.webp" alt="Popülizm kartı" loading="lazy" width="384" height="576">
+      <img src="/img/cards/bagis.webp" alt="Bağış kampanyası kartı" loading="lazy" width="384" height="576">
+      <img src="/img/cards/isyan.webp" alt="İç karışıklık kartı" loading="lazy" width="384" height="576">
+      <img src="/img/cards/kart_calma.webp" alt="Kart çalma kartı" loading="lazy" width="384" height="576">
+    </div>
+  </section>
+
+  <section class="final" data-reveal="pop">
+    <h2>Meclis toplanıyor. <span class="gold">Yerini al.</span></h2>
+    <div class="downloads">
+      <a class="dl dl-android" href="https://raw.githubusercontent.com/TriQue06/siyaset_oyunu_test_experimental/oyun-duzeltmeleri/builds/SiyasetOyunu.apk" data-mirror="apk">
+        <span class="dl-text"><span class="dl-main">ANDROID · APK</span><span class="dl-meta" data-meta="apk">&nbsp;</span></span>
+      </a>
+      <a class="dl dl-windows" href="https://raw.githubusercontent.com/TriQue06/siyaset_oyunu_test_experimental/oyun-duzeltmeleri/builds/SiyasetOyunu-Windows.zip" data-mirror="exe">
+        <span class="dl-text"><span class="dl-main">WINDOWS · EXE</span><span class="dl-meta" data-meta="exe">&nbsp;</span></span>
+      </a>
+    </div>
+    <p class="dl-note small">Android'de kurulum için "bilinmeyen kaynaklardan yükleme" iznini açman gerekebilir. Windows sürümü zip içinde gelir: klasöre çıkarıp SiyasetOyunu.exe'yi çalıştır; SmartScreen uyarısında "Ek bilgi → Yine de çalıştır" seçilir.</p>
+  </section>
+</main>
+
+<footer class="foot">
+  <span>PROJE: SİYASET OYUNU</span>
+  <span id="foot-version"></span>
+  <a href="#top">Başa dön ↑</a>
+</footer>
+
+<script src="/app.js"></script>
+</body>
+</html>

@@ -4,16 +4,27 @@ extends Node
 
 signal streamer_mode_changed(enabled: bool)
 signal display_mode_changed(mode: int)
+signal province_view_changed(mode: int)
 
 ## Sadece iki ekran modu var: pencereli veya tam ekran. Çerçevesiz tam ekran
 ## kaldırıldı (kasıtlı — karmaşayı azaltmak için).
 enum DisplayMode { WINDOWED, FULLSCREEN }
+## İL İNCELEME: PANEL = il bilgisi sağ sütundaki "Seçili" sekmesinde (fareyle
+## canlı); PENCERE = ile tıklayınca haritanın üstünde açılan pencere (eski).
+enum ProvinceView { PANEL, WINDOW }
 
 const CONFIG_PATH := "user://settings.cfg"
 const DEFAULT_FPS_LIMIT := 144
 const DEFAULT_VSYNC := true
 const DEFAULT_DISPLAY_MODE := DisplayMode.WINDOWED
 const DEFAULT_STREAMER_MODE := false
+const DEFAULT_PROVINCE_VIEW := ProvinceView.PANEL
+## Ses seviyeleri 0.0 - 1.0. %100 = oyunun DENGELİ sesi; kaydırıcılar bu
+## noktanın üstüne çıkmaz (bkz. AudioManager.VOLUME_CEILING). Varsayılan da
+## %100'dür: oyun kutudan çıktığı gibi doğru seviyede.
+const DEFAULT_MASTER_VOLUME := 1.0
+const DEFAULT_MUSIC_VOLUME := 1.0
+const DEFAULT_SFX_VOLUME := 1.0
 
 var fps_limit: int = DEFAULT_FPS_LIMIT
 var vsync_enabled: bool = DEFAULT_VSYNC
@@ -22,10 +33,27 @@ var display_mode: int = DEFAULT_DISPLAY_MODE
 # (yapıştırılsa da elle yazılsa da) gizlenir — yayın yaparken kod ekranda
 # görünmesin diye.
 var streamer_mode: bool = DEFAULT_STREAMER_MODE
+## Olay gazetesi ve olay animasyonları (EventFx). Kapalıyken hiç oynamaz.
+var event_fx: bool = true
+var master_volume: float = DEFAULT_MASTER_VOLUME
+var music_volume: float = DEFAULT_MUSIC_VOLUME
+var sfx_volume: float = DEFAULT_SFX_VOLUME
+var province_view: int = DEFAULT_PROVINCE_VIEW
+## Arayüz dili ("tr" / "en"). İlk açılışta sistem dili İngilizce değilse Türkçe.
+var language: String = "tr" if not OS.get_locale_language().begins_with("en") else "en"
 
 func _ready() -> void:
 	_load()
+	# Test/önizleme betikleri (-s) oyuncunun dil seçimine bakmaz: Türkçe başlar
+	# (İngilizce isteyen betik dili kendisi ayarlar).
+	if get_tree() != null and get_tree().get_script() != null:
+		language = "tr"
 	_apply()
+
+func set_language(code: String) -> void:
+	language = code if L.LOCALES.has(code) else "tr"
+	TranslationServer.set_locale(language)
+	_save()
 
 func set_fps_limit(value: int) -> void:
 	fps_limit = max(0, value)  # 0 = sınırsız
@@ -47,12 +75,35 @@ func set_display_mode(mode: int) -> void:
 func toggle_display_mode() -> void:
 	set_display_mode(DisplayMode.WINDOWED if display_mode == DisplayMode.FULLSCREEN else DisplayMode.FULLSCREEN)
 
+## volume_kind: "master" | "music" | "sfx"
+func set_volume(kind: String, value: float) -> void:
+	value = clampf(value, 0.0, 1.0)
+	match kind:
+		"master": master_volume = value
+		"music": music_volume = value
+		"sfx": sfx_volume = value
+		_: return
+	AudioManager.apply_volumes()
+	_save()
+
+func set_province_view(mode: int) -> void:
+	if not mode in [ProvinceView.PANEL, ProvinceView.WINDOW]:
+		return
+	province_view = mode
+	_save()
+	province_view_changed.emit(province_view)
+
+func set_event_fx(value: bool) -> void:
+	event_fx = value
+	_save()
+
 func set_streamer_mode(value: bool) -> void:
 	streamer_mode = value
 	streamer_mode_changed.emit(streamer_mode)
 	_save()
 
 func _apply() -> void:
+	TranslationServer.set_locale(language)
 	Engine.max_fps = fps_limit
 	DisplayServer.window_set_vsync_mode(
 		DisplayServer.VSYNC_ENABLED if vsync_enabled else DisplayServer.VSYNC_DISABLED
@@ -74,11 +125,26 @@ func _load() -> void:
 		# vardı; kaydedilmiş eski bir değer varsa Tam Ekran'a düşürüyoruz.
 		display_mode = loaded_mode if loaded_mode in [DisplayMode.WINDOWED, DisplayMode.FULLSCREEN] else DisplayMode.FULLSCREEN
 		streamer_mode = config.get_value("settings", "streamer_mode", DEFAULT_STREAMER_MODE)
+		event_fx = bool(config.get_value("settings", "event_fx", true))
+		master_volume = float(config.get_value("settings", "master_volume", DEFAULT_MASTER_VOLUME))
+		music_volume = float(config.get_value("settings", "music_volume", DEFAULT_MUSIC_VOLUME))
+		sfx_volume = float(config.get_value("settings", "sfx_volume", DEFAULT_SFX_VOLUME))
+		province_view = int(config.get_value("settings", "province_view", DEFAULT_PROVINCE_VIEW))
+		language = String(config.get_value("settings", "language", language))
 
 func _save() -> void:
+	# Test/önizleme betikleri (-s) oyuncunun ayar dosyasına yazmaz.
+	if get_tree() != null and get_tree().get_script() != null:
+		return
 	var config := ConfigFile.new()
 	config.set_value("settings", "fps_limit", fps_limit)
 	config.set_value("settings", "vsync_enabled", vsync_enabled)
 	config.set_value("settings", "display_mode", display_mode)
 	config.set_value("settings", "streamer_mode", streamer_mode)
+	config.set_value("settings", "event_fx", event_fx)
+	config.set_value("settings", "master_volume", master_volume)
+	config.set_value("settings", "music_volume", music_volume)
+	config.set_value("settings", "sfx_volume", sfx_volume)
+	config.set_value("settings", "province_view", province_view)
+	config.set_value("settings", "language", language)
 	config.save(CONFIG_PATH)

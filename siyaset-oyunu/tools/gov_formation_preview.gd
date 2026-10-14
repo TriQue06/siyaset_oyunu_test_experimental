@@ -3,6 +3,19 @@ extends SceneTree
 ## `godot --path . --resolution 1280x720 --script res://tools/gov_formation_preview.gd`
 
 func _initialize() -> void:
+	# PREVIEW_SIZE=1280x720 gibi: kullanıcının tam ekran ayarına dokunmadan pencere boyutu.
+	await process_frame
+	if OS.get_environment("PREVIEW_LANG") != "":
+		# Ayar dosyasına yazmadan (GameSettings açılışta dili yükledikten sonra).
+		root.get_node("GameSettings").language = OS.get_environment("PREVIEW_LANG")
+		TranslationServer.set_locale(OS.get_environment("PREVIEW_LANG"))
+	var forced := OS.get_environment("PREVIEW_SIZE")
+	if forced != "":
+		var parts := forced.split("x")
+		for i in 3:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+			DisplayServer.window_set_size(Vector2i(int(parts[0]), int(parts[1])))
+			await process_frame
 	await process_frame
 	await process_frame
 	var mm = root.get_node("MultiplayerManager")
@@ -19,7 +32,7 @@ func _initialize() -> void:
 		mm.players[ids[i]] = {"name": "Lider %d" % i, "bot": i != 0}
 		pm.parties[ids[i]] = {
 			"name": "Parti %d" % i, "icon_index": i, "icon_color": Color.WHITE,
-			"bg_color": colors[i], "ideology": {"economic": 0, "social": 0, "administrative": 0}, "ready": true,
+			"bg_color": colors[i], "groups": VoterGroups.neutral_affinities(), "ready": true,
 		}
 	cm.init_game()
 	cm.last_seats = {me: 150, 2: 110, 3: 80, 4: 60}

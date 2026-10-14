@@ -7,10 +7,14 @@ extends SceneTree
 ##   - şans: aynı girdilerle seçimi farklı tohumlarla tekrarlayınca birinci
 ##     partinin değişme oranı ve vekil sapması,
 ##   - iktidar partilerinin bir sonraki seçimde vekil değişimi,
-##   - karalanan partinin o ilde yine de vekil çıkarabilme oranı.
-##   godot --headless --script res://tools/balance_sim.gd -- --games=40 --out=C:/yol/sonuc.json
+##   - karalanan partinin o ilde yine de vekil çıkarabilme oranı,
+##   - EKONOMİ (tur başına): devlet hazinesi, vergi kademesi, ekonomi endeksi,
+##     parti kasaları (ortalama / en yüksek), teşkilat sayısı ve geliri,
+##     partizan harcama ve soruşturma sonuçları.
+##   godot --headless --script res://tools/balance_sim.gd -- --games=40 --first=0 --out=C:/yol/sonuc.json
 
 const LUCK_RESEEDS := 10
+var _last_done: Dictionary = {}
 
 var mm
 var pm
@@ -21,10 +25,13 @@ var bm
 
 func _initialize() -> void:
 	var games := 20
+	var first := 0
 	var out := "user://balance_sim.json"
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--games="):
 			games = int(arg.substr(8))
+		elif arg.begins_with("--first="):
+			first = int(arg.substr(8))
 		elif arg.begins_with("--out="):
 			out = arg.substr(6)
 	await process_frame
@@ -32,6 +39,7 @@ func _initialize() -> void:
 	mm = root.get_node("MultiplayerManager")
 	pm = root.get_node("PartyManager")
 	cm = root.get_node("CardManager")
+	cm.allow_temporary_parties = false
 	gm = root.get_node("GovernmentManager")
 	brain = load("res://scripts/bot_brain.gd")
 	bm = root.get_node("BotManager")
@@ -40,13 +48,12 @@ func _initialize() -> void:
 	gm.result_hold_seconds = 0.0
 
 	var report := {"games": [], "elections": [], "config": {
-		"threshold": mm.election_threshold, "sharpness_start": mm.axis_sharpness_start,
-		"sharpness_increment": mm.axis_sharpness_increment, "max_rounds": GameRules.MAX_ROUNDS,
+		"threshold": mm.election_threshold, "max_rounds": GameRules.MAX_ROUNDS,
 		"province_noise": ElectionModel.PROVINCE_NOISE, "national_swing": ElectionModel.NATIONAL_SWING,
 	}}
 	var started := Time.get_ticks_msec()
 	for g in games:
-		_play_game(g, report)
+		_play_game(first + g, report)
 		print("oyun %d/%d bitti (%.0f sn)" % [g + 1, games, (Time.get_ticks_msec() - started) / 1000.0])
 	var file := FileAccess.open(out, FileAccess.WRITE)
 	file.store_string(JSON.stringify(report))
@@ -78,6 +85,14 @@ func _play_game(g: int, report: Dictionary) -> void:
 	var prev_election_round := 0
 	var prev_election_seats := {}
 	var marks := {}  # province_id -> {hedef: true} (son seçimden beri karalananlar)
+	var econ_rounds := []
+	var inquiries := {"clean": 0, "scandal": 0, "none": 0}
+	var on_inquiry := func(data: Dictionary):
+		_bump(inquiries, String(data.get("result", "none")))
+	cm.inquiry_resolved.connect(on_inquiry)
+	var partisan := 0
+	var invest_state := 0.0
+	var invest_party := 0.0
 	var steps := 0
 	var turn_actions := 0
 	var last_bot := -1
@@ -90,10 +105,16 @@ func _play_game(g: int, report: Dictionary) -> void:
 			marks = {}
 		if cm.round_number != last_round:
 			last_round = cm.round_number
+			econ_rounds.append(_econ_snapshot())
 			round_snapshot = cm.local_support.duplicate(true)
 			for peer_id in gm.government_party_ids():
+				if not stats.has(peer_id):
+					stats[peer_id] = {"actions": {}, "propaganda_received": 0, "gov_rounds": 0}
 				stats[peer_id]["gov_rounds"] = int(stats[peer_id]["gov_rounds"]) + 1
 
+		if cm.congress_active:
+			cm.tick(30.0)  # kongre gösterisi: süre dolsun
+			continue
 		if gm.phase == gm.Phase.VOTING:
 			for bot in gm.eligible_voter_ids():
 				if not gm.has_voted(bot):
@@ -108,11 +129,15 @@ func _play_game(g: int, report: Dictionary) -> void:
 			continue
 
 		var bot: int = cm.current_turn_peer_id()
+		# Oyun içinde doğan kanatlar / yeni partiler de izlenir.
+		if not stats.has(bot):
+			stats[bot] = {"actions": {}, "propaganda_received": 0, "gov_rounds": 0}
 		var actions: Dictionary = stats[bot]["actions"]
 		if bot != last_bot:
 			last_bot = bot
 			turn_actions = 0
 		var done: Dictionary = bm.do_action(bot) if turn_actions < 12 else {}
+		_last_done = done
 		turn_actions += 1
 		if done.is_empty():
 			cm._apply_pass(bot, true)
@@ -127,8 +152,15 @@ func _play_game(g: int, report: Dictionary) -> void:
 				_bump(actions, "teskilat")
 			"miting":
 				_bump(actions, "miting")
+				var led: Array = cm.economy.get("ledger", [])
+				if not led.is_empty() and float(led[-1].get("state_million", 0.0)) > 0.0 and String(led[-1]["kind"]) == "miting":
+					partisan += 1
 			"invest":
 				_bump(actions, "yatirim")
+				var led2: Array = cm.economy.get("ledger", [])
+				if not led2.is_empty():
+					invest_state += float(led2[-1].get("state_million", 0.0))
+					invest_party += float(led2[-1].get("party_million", 0.0))
 			"censure":
 				_bump(actions, "gensoru")
 			"draw":
@@ -139,21 +171,65 @@ func _play_game(g: int, report: Dictionary) -> void:
 				if card == "karalama":
 					var target := int(done["peer"])
 					var province_id := String(done["province"])
-					stats[target]["propaganda_received"] = int(stats[target]["propaganda_received"]) + 1
+					if stats.has(target):
+						stats[target]["propaganda_received"] = int(stats[target]["propaganda_received"]) + 1
 					var entry: Dictionary = marks.get(province_id, {})
 					entry[target] = true
 					marks[province_id] = entry
 
+	if not cm.game_finished:
+		print("TAKILDI: tur %d faz %d sıra %d kasa %.1f son hamle %s" % [cm.round_number, gm.phase, cm.current_turn_peer_id(),
+			cm.funds_of(cm.current_turn_peer_id()), str(_last_done)])
 	var parties := []
 	for rank in cm.final_ranking.size():
 		var row: Dictionary = cm.final_ranking[rank]
 		var peer_id: int = int(row["peer_id"])
 		parties.append({
 			"rank": rank + 1, "score": int(row["score"]), "seats": int(row["seats"]),
-			"actions": stats[peer_id]["actions"], "gov_rounds": stats[peer_id]["gov_rounds"],
-			"propaganda_received": stats[peer_id]["propaganda_received"],
+			"actions": stats.get(peer_id, {}).get("actions", {}), "gov_rounds": stats.get(peer_id, {}).get("gov_rounds", 0),
+			"propaganda_received": stats.get(peer_id, {}).get("propaganda_received", 0),
+			"orgs": _org_count(peer_id), "funds_end": cm.funds_of(peer_id),
 		})
-	report["games"].append({"game": g, "steps": steps, "parties": parties, "law_types": law_types})
+	cm.inquiry_resolved.disconnect(on_inquiry)
+	report["games"].append({"game": g, "steps": steps, "parties": parties, "law_types": law_types,
+		"econ_rounds": econ_rounds, "inquiries": inquiries, "partisan_mitings": partisan,
+		"invest_state_million": invest_state, "invest_party_million": invest_party})
+
+func _org_count(peer_id: int) -> int:
+	var pid: int = cm.party_of(peer_id)
+	var n := 0
+	for province_id in cm.organizations.keys():
+		if int((cm.organizations[province_id] as Dictionary).get(pid, 0)) > 0:
+			n += 1
+	return n
+
+func _econ_snapshot() -> Dictionary:
+	var funds := []
+	var org_count := {}
+	var incomes := []
+	for peer_id in cm.turn_order:
+		funds.append(cm.funds_of(peer_id))
+		incomes.append(cm.org_income(peer_id))
+	for province_id in cm.organizations.keys():
+		for pid in (cm.organizations[province_id] as Dictionary).keys():
+			if int(cm.organizations[province_id][pid]) > 0:
+				org_count[pid] = int(org_count.get(pid, 0)) + 1
+	var total_orgs := 0
+	var max_orgs := 0
+	for pid in org_count.keys():
+		total_orgs += int(org_count[pid])
+		max_orgs = maxi(max_orgs, int(org_count[pid]))
+	var fsum := 0.0
+	var fmax := 0.0
+	for f in funds:
+		fsum += float(f)
+		fmax = maxf(fmax, float(f))
+	var imax := 0
+	for i in incomes:
+		imax = maxi(imax, int(i))
+	return {"round": cm.round_number, "treasury": cm.state_treasury(), "tax": cm.tax_level(),
+		"index": cm.economy_index(), "funds_avg": fsum / maxf(1.0, funds.size()), "funds_max": fmax,
+		"orgs_total": total_orgs, "orgs_max": max_orgs, "org_income_max": imax}
 
 func _top_party(seats: Dictionary) -> int:
 	var best := -1
@@ -192,8 +268,8 @@ func _record_election(g: int, round_snapshot: Dictionary, prev_seats: Dictionary
 	for s in LUCK_RESEEDS:
 		var rng := RandomNumberGenerator.new()
 		rng.seed = 100000 + g * 100 + s
-		var r := ElectionModel.compute(inputs["ideologies"], seat_counts, inputs["voters"], float(inputs["threshold"]),
-			float(inputs["sharpness"]), rng, mods)
+		var r := ElectionModel.compute(inputs["groups"], seat_counts, inputs["voters"], float(inputs["threshold"]),
+			rng, mods, inputs.get("alliances", {}))
 		if _top_party(r["seats"]) != base_top:
 			top_changes += 1
 		for peer_id in r["seats"].keys():

@@ -15,7 +15,7 @@ var player_name: String = "":
 func _ready() -> void:
 	_load()
 	if player_name == "":
-		player_name = "Oyuncu%d" % randi_range(1000, 9999)
+		player_name = L.t("Oyuncu%d") % randi_range(1000, 9999)
 
 func _load() -> void:
 	var config := ConfigFile.new()

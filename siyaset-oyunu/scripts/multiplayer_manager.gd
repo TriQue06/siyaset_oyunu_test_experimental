@@ -67,25 +67,11 @@ const THRESHOLD_DEFAULT := 0.0
 # Parti kurulum süresi seçenekleri (saniye). 0 = SINIRSIZ (süre yok, sadece
 # herkes hazır verince başlar). Sadece bu değerler geçerlidir.
 
-# --- Eksen keskinliği: her kart oynanışında ideoloji kayması, giderek büyüyen
-# bir çarpanla ölçeklenir (bkz. CardManager.current_axis_sharpness). Oyun
-# başında AXIS_SHARPNESS_START_DEFAULT'tan başlar, her kartta
-# AXIS_SHARPNESS_INCREMENT_DEFAULT kadar artar; "sınırlı" seçildiyse
-# AXIS_SHARPNESS_CAP_OPTIONS'taki bir tavanda durur.
-const AXIS_SHARPNESS_START_MIN := 0.5
-const AXIS_SHARPNESS_START_MAX := 2.0
-const AXIS_SHARPNESS_START_DEFAULT := 0.5
-const AXIS_SHARPNESS_INCREMENT_MIN := 0.0
-const AXIS_SHARPNESS_INCREMENT_MAX := 1.0
-const AXIS_SHARPNESS_INCREMENT_DEFAULT := 0.125
-## Keskinlik hiçbir ayarda 2'yi aşamaz (iller tek partiye kilitlenmesin).
-const AXIS_SHARPNESS_HARD_MAX := 2.0
-const AXIS_SHARPNESS_CAP_OPTIONS: Array[float] = [1.0, 1.25, 1.5, 1.75, 2.0]
-const AXIS_SHARPNESS_MAX_ENABLED_DEFAULT := true
-const AXIS_SHARPNESS_MAX_VALUE_DEFAULT := 2.0
 
 var room_code: String = ""
 var is_host: bool = false
+## ÇEVRİM DIŞI: ağ yok, oda kodu yok, sadece bu cihaz ve botlar.
+var offline_mode: bool = false
 var owner_id: int = 1
 var local_player_name: String = "Oyuncu"
 # peer_id -> {"name": String}
@@ -95,11 +81,158 @@ var players: Dictionary = {}
 var election_threshold: float = THRESHOLD_DEFAULT
 ## Oyun süresi: seçimler kaç turda bir ve kaç seçim olacak (bkz. GameRules.configure).
 var election_interval: int = GameRules.DEFAULT_ELECTION_INTERVAL
+const WORLD_DEFAULTS := {"province_scale": 1.0, "province_seats": 300, "national_seats": 200, "turn_seconds": 60}
+const WORLD_OPTIONS := {"province_scale": [0.75, 1.0, 1.25], "province_seats": [150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750], "national_seats": [0, 50, 100, 150, 200, 250, 300], "turn_seconds": [30, 45, 60, 75, 90, 105, 120]}
+var world_settings: Dictionary = WORLD_DEFAULTS.duplicate()
+var vote_timeout: int = 30
+const VOTE_TIME_OPTIONS := [15, 30, 45, 60]
+
 var election_count: int = GameRules.DEFAULT_ELECTION_COUNT
-var axis_sharpness_start: float = AXIS_SHARPNESS_START_DEFAULT
-var axis_sharpness_increment: float = AXIS_SHARPNESS_INCREMENT_DEFAULT
-var axis_sharpness_max_enabled: bool = AXIS_SHARPNESS_MAX_ENABLED_DEFAULT
-var axis_sharpness_max_value: float = AXIS_SHARPNESS_MAX_VALUE_DEFAULT
+## HARİTA TOHUMU (lobi ayarı): "" = her oyunda rastgele. Aynı tohum her zaman
+## aynı ülkeyi üretir. Oyundaki tohum ESC menüsünde görünür ve kopyalanabilir.
+const MAP_SEED_MAX_DIGITS := 9
+var map_seed: String = ""
+## Bu oyunun kesinleşmiş harita tohumu (oyun başlarken belirlenir; 0 = henüz yok).
+var game_map_seed: int = 0
+## RASTGELE PARTİLER (lobi ayarı, varsayılan KAPALI (0.0.186)): seçimlerden sonra arada
+## bir yeni bir bot partisi katılır (bkz. CardManager._maybe_add_temporary_party).
+var random_parties: bool = false
+
+func set_random_parties(value: bool) -> void:
+	if not is_local_owner():
+		return
+	if is_host:
+		random_parties = value
+		if room_code != "":
+			_sync_random_parties.rpc(random_parties)
+			_sync_bot_funds_penalty.rpc(bot_funds_penalty)
+		settings_updated.emit()
+	else:
+		_request_set_random_parties.rpc_id(1, value)
+
+@rpc("any_peer", "reliable")
+func _request_set_random_parties(value: bool) -> void:
+	if not is_host or multiplayer.get_remote_sender_id() != owner_id:
+		return
+	random_parties = value
+	_sync_random_parties.rpc(random_parties)
+	_sync_bot_funds_penalty.rpc(bot_funds_penalty)
+	settings_updated.emit()
+
+@rpc("authority", "reliable")
+func _sync_random_parties(value: bool) -> void:
+	random_parties = value
+	settings_updated.emit()
+
+## OYUNDAN DÜŞEN OYUNCU: "bot" (varsayılan) yerine bot oynar, "passive" ise
+## sırası kendiliğinden geçer, oylarda çekimser kalır. Lobi sahibi değiştirir.
+## Oyuncu aynı cihazdan (aynı UID) yeniden katılınca kaldığı yerden devam eder.
+const AWAY_BOT := "bot"
+const AWAY_PASSIVE := "passive"
+var away_mode: String = AWAY_BOT
+
+func set_away_mode(value: String) -> void:
+	if not is_local_owner() or not [AWAY_BOT, AWAY_PASSIVE].has(value):
+		return
+	if is_host:
+		away_mode = value
+		if room_code != "":
+			_sync_away_mode.rpc(away_mode)
+		settings_updated.emit()
+	else:
+		_request_set_away_mode.rpc_id(1, value)
+
+@rpc("any_peer", "reliable")
+func _request_set_away_mode(value: String) -> void:
+	if not is_host or multiplayer.get_remote_sender_id() != owner_id or not [AWAY_BOT, AWAY_PASSIVE].has(value):
+		return
+	away_mode = value
+	_sync_away_mode.rpc(away_mode)
+	settings_updated.emit()
+
+@rpc("authority", "reliable")
+func _sync_away_mode(value: String) -> void:
+	away_mode = value
+	settings_updated.emit()
+
+## BOT PARA ZAYIFLATMASI: botlar her tur başında ve bağış kampanyası kartlarından
+## bu kadar AZ para alır (lobi kuralı; 0 = kapalı). Gerçek oyuncuları ve
+## yerine bot oynayan düşmüş oyuncuyu etkilemez.
+const BOT_FUNDS_PENALTY_OPTIONS := [0.0, 5.0, 10.0, 15.0]
+const BOT_FUNDS_PENALTY_DEFAULT := 5.0
+var bot_funds_penalty: float = BOT_FUNDS_PENALTY_DEFAULT
+
+func set_bot_funds_penalty(value: float) -> void:
+	if not is_local_owner() or not BOT_FUNDS_PENALTY_OPTIONS.has(value):
+		return
+	if is_host:
+		bot_funds_penalty = value
+		if room_code != "":
+			_sync_bot_funds_penalty.rpc(bot_funds_penalty)
+		settings_updated.emit()
+	else:
+		_request_set_bot_funds_penalty.rpc_id(1, value)
+
+@rpc("any_peer", "reliable")
+func _request_set_bot_funds_penalty(value: float) -> void:
+	if not is_host or multiplayer.get_remote_sender_id() != owner_id or not BOT_FUNDS_PENALTY_OPTIONS.has(value):
+		return
+	bot_funds_penalty = value
+	_sync_bot_funds_penalty.rpc(bot_funds_penalty)
+	settings_updated.emit()
+
+@rpc("authority", "reliable")
+func _sync_bot_funds_penalty(value: float) -> void:
+	bot_funds_penalty = value
+	settings_updated.emit()
+
+## Oyundan düşmüş (bağlantısı kopmuş) oyuncu mu?
+func is_away(peer_id: int) -> bool:
+	return bool(players.get(peer_id, {}).get("away", false))
+
+## Bu oyuncunun hamlelerini yapay zekâ mı yapıyor? (bot ya da bot modunda düşmüş oyuncu)
+func is_ai_controlled(peer_id: int) -> bool:
+	return is_bot(peer_id) or (is_away(peer_id) and away_mode == AWAY_BOT)
+
+## Pasif modda düşmüş oyuncu: sırası geçer, oyu çekimser.
+func is_passive_away(peer_id: int) -> bool:
+	return is_away(peer_id) and away_mode == AWAY_PASSIVE
+
+## KALICI OYUNCU KİMLİĞİ: cihazda bir kez üretilir, odaya katılırken gönderilir.
+## Oyundan düşen oyuncu aynı kimlikle dönünce eski yerine oturur.
+const UID_PATH := "user://player_uid.cfg"
+var player_uid: String = ""
+
+func _load_player_uid() -> void:
+	var config := ConfigFile.new()
+	if config.load(UID_PATH) == OK:
+		player_uid = String(config.get_value("player", "uid", ""))
+	if player_uid == "":
+		var rng := RandomNumberGenerator.new()
+		rng.randomize()
+		player_uid = "%08x%08x%08x" % [rng.randi(), rng.randi(), Time.get_ticks_usec() & 0xffffffff]
+		config.set_value("player", "uid", player_uid)
+		config.save(UID_PATH)
+
+## SAYIM YÖNTEMİ (anayasa değişikliğiyle değişir; yeni oyunda D'Hondt).
+const DEFAULT_SEAT_METHOD := "dhondt"
+var seat_method: String = DEFAULT_SEAT_METHOD
+
+func reset_seat_method() -> void:
+	seat_method = DEFAULT_SEAT_METHOD
+	ElectionModel.seat_method = seat_method
+
+func _set_seat_method(method: String) -> void:
+	if not ElectionModel.SEAT_METHODS.has(method):
+		return
+	seat_method = method
+	ElectionModel.seat_method = method
+
+@rpc("authority", "reliable")
+func _sync_seat_method(method: String) -> void:
+	_set_seat_method(method)
+	settings_updated.emit()
+
 
 var _pending_code: String = ""
 var _has_synced_once: bool = false
@@ -112,6 +245,7 @@ var stage: int = Stage.LOBBY
 var last_close_reason: String = ""
 
 func _ready() -> void:
+	_load_player_uid()
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	multiplayer.connected_to_server.connect(_on_connected_to_server)
 	multiplayer.connection_failed.connect(_on_connection_failed)
@@ -149,7 +283,7 @@ static func relay_url() -> String:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--relay="):
 			return arg.substr("--relay=".length())
-	var env := OS.get_environment("SIYASET_RELAY_URL")
+	var env := OS.get_environment(L.t("SIYASET_RELAY_URL"))
 	if env != "":
 		return env
 	return str(ProjectSettings.get_setting(RELAY_URL_SETTING, DEFAULT_RELAY_URL))
@@ -172,35 +306,61 @@ static func snap_threshold(value: float) -> float:
 	value = clampf(value, THRESHOLD_MIN, THRESHOLD_MAX)
 	return round(value / THRESHOLD_STEP) * THRESHOLD_STEP
 
-static func snap_axis_sharpness_start(value: float) -> float:
-	return clampf(value, AXIS_SHARPNESS_START_MIN, AXIS_SHARPNESS_START_MAX)
+## AKTİF BİR OYUN YOK MU? (örn. bir sahne editörde tek başına çalıştırılıyor)
+## DİKKAT: çevrim dışı oyun AKTİF bir oyundur — oda kodu boş olsa da burada
+## false döner. "RPC atma" kararı için room_code == "" bakmaya devam edilir;
+## bu fonksiyon "oyun mantığını hiç çalıştırma" kararı içindir.
+func is_standalone_preview() -> bool:
+	return room_code == "" and not offline_mode
 
-static func snap_axis_sharpness_increment(value: float) -> float:
-	return clampf(value, AXIS_SHARPNESS_INCREMENT_MIN, AXIS_SHARPNESS_INCREMENT_MAX)
-
-static func snap_axis_sharpness_max_value(value: float) -> float:
-	var closest: float = AXIS_SHARPNESS_CAP_OPTIONS[0]
-	for option in AXIS_SHARPNESS_CAP_OPTIONS:
-		if absf(option - value) < absf(closest - value):
-			closest = option
-	return closest
+## ÇEVRİM DIŞI MOD: röle sunucusu, oda kodu ve katılma yok. Ağ peer'i hiç
+## kurulmaz; oyun tamamen bu cihazda döner (CardManager._is_local_only()
+## zaten room_code == "" olduğunda yerel çalışır). Sadece bot eklenebilir.
+func start_offline(player_name: String) -> void:
+	_reset_state()
+	offline_mode = true
+	local_player_name = player_name if player_name != "" else L.t("Oyuncu")
+	# OfflineMultiplayerPeer: ağ yok ama bu instance "sunucu" sayılır, unique_id
+	# 1 olur ve RPC'ler kimseye gitmez. Böylece host tarafındaki tüm yerel
+	# mantık (bot ekleme, oyunu başlatma, CardManager) olduğu gibi çalışır.
+	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
+	is_host = true
+	room_code = ""
+	map_seed = ""
+	random_parties = false
+	game_map_seed = 0
+	reset_seat_method()
+	election_threshold = THRESHOLD_DEFAULT
+	election_interval = GameRules.DEFAULT_ELECTION_INTERVAL
+	election_count = GameRules.DEFAULT_ELECTION_COUNT
+	vote_timeout = 30
+	_apply_world_settings(WORLD_DEFAULTS)
+	GameRules.configure(election_interval, election_count)
+	players.clear()
+	owner_id = multiplayer.get_unique_id()
+	players[owner_id] = {"name": local_player_name}
+	player_list_updated.emit()
+	room_created.emit("")
 
 ## Röle sunucusu üzerinden bir oda kurar (bu oyuncu host + lobi sahibi olur).
 ## Sonuç asenkrondur: başarılı olursa room_created(code), olmazsa
 ## connection_error(reason) sinyali yayınlanır.
 func create_room(player_name: String) -> void:
-	local_player_name = player_name if player_name != "" else "Host"
+	offline_mode = false
+	local_player_name = player_name if player_name != "" else L.t("Host")
 	is_host = true
 	room_code = ""
 	_closing = false
+	map_seed = ""
+	away_mode = AWAY_BOT
+	bot_funds_penalty = BOT_FUNDS_PENALTY_DEFAULT
+	reset_seat_method()
 	election_threshold = THRESHOLD_DEFAULT
 	election_interval = GameRules.DEFAULT_ELECTION_INTERVAL
 	election_count = GameRules.DEFAULT_ELECTION_COUNT
+	vote_timeout = 30
+	_apply_world_settings(WORLD_DEFAULTS)
 	GameRules.configure(election_interval, election_count)
-	axis_sharpness_start = AXIS_SHARPNESS_START_DEFAULT
-	axis_sharpness_increment = AXIS_SHARPNESS_INCREMENT_DEFAULT
-	axis_sharpness_max_enabled = AXIS_SHARPNESS_MAX_ENABLED_DEFAULT
-	axis_sharpness_max_value = AXIS_SHARPNESS_MAX_VALUE_DEFAULT
 	players.clear()
 	var peer := RelayMultiplayerPeerScript.new()
 	_connect_error_reported = false
@@ -237,7 +397,8 @@ func _on_relay_error(reason: String) -> void:
 
 ## Röle sunucusu üzerinden, verilen 5 haneli oda koduna katılmayı dener.
 func join_room(code: String, player_name: String) -> void:
-	local_player_name = player_name if player_name != "" else "Oyuncu"
+	offline_mode = false
+	local_player_name = player_name if player_name != "" else L.t("Oyuncu")
 	_pending_code = code.to_upper()
 	room_code = _pending_code
 	_has_synced_once = false
@@ -266,7 +427,7 @@ func leave_room() -> void:
 func leave_game() -> void:
 	if room_code != "" and is_host and multiplayer.multiplayer_peer != null:
 		_closing = true
-		_notify_room_closed.rpc("Oda sahibi oyundan ayrıldı, oda kapatıldı.")
+		_notify_room_closed.rpc(L.t("Oda sahibi oyundan ayrıldı, oda kapatıldı."))
 		# RPC'nin ağa çıkması için birkaç kare bekle.
 		for i in 3:
 			await get_tree().process_frame
@@ -283,7 +444,6 @@ func leave_game() -> void:
 
 ## Gerçek peer id'leriyle çakışmasın diye çok büyük sayılardan geriye doğru.
 const BOT_ID_BASE := 2000000000
-var _next_bot_index: int = 0
 
 func is_bot(peer_id: int) -> bool:
 	return bool(players.get(peer_id, {}).get("bot", false))
@@ -327,19 +487,101 @@ func remove_bot(peer_id: int) -> void:
 func _apply_add_bot() -> void:
 	if players.size() >= MAX_PLAYERS or stage != Stage.LOBBY:
 		return
-	_next_bot_index += 1
-	players[BOT_ID_BASE - _next_bot_index] = {"name": "Bot %d" % _next_bot_index, "bot": true}
+	players[_free_bot_id()] = {"name": "", "bot": true}
+	_renumber_bots()
 	_broadcast_player_list()
 
 func _apply_remove_bot(peer_id: int) -> void:
 	if not is_bot(peer_id) or stage != Stage.LOBBY:
 		return
 	players.erase(peer_id)
+	_renumber_bots()
 	_broadcast_player_list()
+
+## OYUN İÇİ BÖLÜNME: karışıklıktan doğan parti oyuna yapay zekâ (bot) olarak
+## girer; ana partisine dönünce çıkar (bkz. CardManager._split_party).
+func add_splinter_bot(leader_name: String) -> int:
+	var id := _free_bot_id()
+	players[id] = {"name": leader_name, "bot": true, "splinter": true}
+	_broadcast_player_list()
+	return id
+
+func remove_splinter_bot(peer_id: int) -> void:
+	if not is_bot(peer_id):
+		return
+	players.erase(peer_id)
+	_broadcast_player_list()
+
+## Kullanılmayan en küçük bot id'si. Id'ler sabit kalır; görünen AD adaptiftir.
+func _free_bot_id() -> int:
+	var index := 1
+	while players.has(BOT_ID_BASE - index):
+		index += 1
+	return BOT_ID_BASE - index
+
+## BOT ADLARI ADAPTİF: botlar her zaman 1..N diye numaralanır. Bot 5 varken
+## Bot 3 ve Bot 4 silinirse Bot 5, Bot 3 olur — arada boşluk kalmaz.
+## Kullanıcının elle verdiği ad (parti kurma ekranı) varsa dokunulmaz.
+func _renumber_bots() -> void:
+	var index := 0
+	for peer_id in players.keys():
+		if not is_bot(peer_id):
+			continue
+		index += 1
+		var entry: Dictionary = players[peer_id]
+		var current := String(entry.get("name", ""))
+		if current == "" or current.begins_with("Bot "):
+			entry["name"] = L.t("Bot %d") % index
+			players[peer_id] = entry
+
+## Lobiden oyuncu atma: sadece lobi sahibi, sadece LOBİ aşamasında ve kendisi
+## dışında birini atabilir. Bot ise sadece listeden silinir; insan oyuncuya
+## önce sebep bildirilir, sonra ağ bağlantısı kesilir.
+func kick_player(peer_id: int) -> void:
+	if not is_local_owner() or peer_id == owner_id or stage != Stage.LOBBY:
+		return
+	if is_bot(peer_id):
+		remove_bot(peer_id)
+		return
+	if is_host:
+		_apply_kick(peer_id)
+	else:
+		_request_kick.rpc_id(1, peer_id)
+
+func _apply_kick(peer_id: int) -> void:
+	if stage != Stage.LOBBY or peer_id == owner_id or not players.has(peer_id):
+		return
+	if is_bot(peer_id):
+		_apply_remove_bot(peer_id)
+		return
+	players.erase(peer_id)
+	_broadcast_player_list()
+	if multiplayer.multiplayer_peer == null:
+		return
+	_notify_kicked.rpc_id(peer_id)
+	# Bildirimin ağa çıkması için birkaç kare bekleyip bağlantıyı kesiyoruz.
+	for i in 3:
+		await get_tree().process_frame
+	if multiplayer.multiplayer_peer != null:
+		multiplayer.multiplayer_peer.disconnect_peer(peer_id)
+
+@rpc("any_peer", "reliable")
+func _request_kick(peer_id: int) -> void:
+	if is_host and multiplayer.get_remote_sender_id() == owner_id:
+		_apply_kick(peer_id)
+
+@rpc("authority", "reliable")
+func _notify_kicked() -> void:
+	_reset_state()
+	room_closed.emit("Oda sahibi seni lobiden çıkardı.")
 
 func _broadcast_player_list() -> void:
 	if room_code != "" and multiplayer.multiplayer_peer != null:
-		_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+		_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
+		_sync_world_settings.rpc(world_settings)
+		_sync_map_seed.rpc(map_seed)
+		_sync_random_parties.rpc(random_parties)
+		_sync_bot_funds_penalty.rpc(bot_funds_penalty)
 	player_list_updated.emit()
 
 @rpc("any_peer", "reliable")
@@ -365,10 +607,33 @@ func transfer_ownership(new_owner_id: int) -> void:
 		return
 	if is_host:
 		owner_id = new_owner_id
-		_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+		_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
+		_sync_world_settings.rpc(world_settings)
+		_sync_map_seed.rpc(map_seed)
+		_sync_random_parties.rpc(random_parties)
+		_sync_bot_funds_penalty.rpc(bot_funds_penalty)
 		player_list_updated.emit()
 	else:
 		_request_transfer_ownership.rpc_id(1, new_owner_id)
+
+## ANAYASA DEĞİŞİKLİĞİ: meclis 2/3 çoğunlukla kabul ettiyse oyunun kuralları
+## değişir. Lobi ayarından farkı: oyun İÇİNDE, oylamayla ve sahiplik aranmadan
+## uygulanır (host yazar, herkese senkronlanır).
+func apply_constitution(payload: Dictionary) -> void:
+	var local_only := room_code == ""
+	if not is_host and not local_only:
+		return
+	election_threshold = snap_threshold(float(payload.get("threshold", election_threshold)))
+	election_interval = clampi(int(payload.get("interval", election_interval)), GameRules.ELECTION_INTERVAL_MIN, GameRules.ELECTION_INTERVAL_MAX)
+	GameRules.configure(election_interval, election_count)
+	_set_seat_method(String(payload.get("seat_method", seat_method)))
+	CardManager.alliances_enabled = bool(payload.get("alliances_enabled", CardManager.alliances_enabled))
+	if not CardManager.alliances_enabled:
+		CardManager.alliances.clear()
+	if not local_only:
+		_sync_settings.rpc(election_threshold, election_interval, election_count, vote_timeout)
+		_sync_seat_method.rpc(seat_method)
+	settings_updated.emit()
 
 ## Seçim barajını (%) ayarlar. Sadece mevcut lobi sahibi çağırabilir.
 ## value 0-10 arasına ve 0.5'in katlarına yuvarlanır.
@@ -378,7 +643,7 @@ func set_election_threshold(value: float) -> void:
 	var snapped := snap_threshold(value)
 	if is_host:
 		election_threshold = snapped
-		_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+		_sync_settings.rpc(election_threshold, election_interval, election_count, vote_timeout)
 		settings_updated.emit()
 	else:
 		_request_set_threshold.rpc_id(1, snapped)
@@ -394,61 +659,10 @@ func set_game_length(interval: int, count: int) -> void:
 		election_interval = interval
 		election_count = count
 		GameRules.configure(election_interval, election_count)
-		_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+		_sync_settings.rpc(election_threshold, election_interval, election_count, vote_timeout)
 		settings_updated.emit()
 	else:
 		_request_set_game_length.rpc_id(1, interval, count)
-
-## Eksen keskinliğinin başlangıç değerini ayarlar (0.5-5.0). Sadece mevcut
-## lobi sahibi çağırabilir.
-func set_axis_sharpness_start(value: float) -> void:
-	if not is_local_owner():
-		return
-	var snapped := snap_axis_sharpness_start(value)
-	if is_host:
-		axis_sharpness_start = snapped
-		_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
-		settings_updated.emit()
-	else:
-		_request_set_axis_sharpness_start.rpc_id(1, snapped)
-
-## Eksen keskinliğinin her kartta artış miktarını ayarlar (0.0-1.0). Sadece
-## mevcut lobi sahibi çağırabilir.
-func set_axis_sharpness_increment(value: float) -> void:
-	if not is_local_owner():
-		return
-	var snapped := snap_axis_sharpness_increment(value)
-	if is_host:
-		axis_sharpness_increment = snapped
-		_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
-		settings_updated.emit()
-	else:
-		_request_set_axis_sharpness_increment.rpc_id(1, snapped)
-
-## Eksen keskinliğinin bir tavanı olup olmayacağını (sınırlı/sınırsız) ayarlar.
-## Sadece mevcut lobi sahibi çağırabilir.
-func set_axis_sharpness_max_enabled(enabled: bool) -> void:
-	if not is_local_owner():
-		return
-	if is_host:
-		axis_sharpness_max_enabled = enabled
-		_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
-		settings_updated.emit()
-	else:
-		_request_set_axis_sharpness_max_enabled.rpc_id(1, enabled)
-
-## Eksen keskinliği "sınırlı" iken kullanılacak tavan değerini ayarlar
-## (5/10/15/20/25). Sadece mevcut lobi sahibi çağırabilir.
-func set_axis_sharpness_max_value(value: float) -> void:
-	if not is_local_owner():
-		return
-	var snapped := snap_axis_sharpness_max_value(value)
-	if is_host:
-		axis_sharpness_max_value = snapped
-		_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
-		settings_updated.emit()
-	else:
-		_request_set_axis_sharpness_max_value.rpc_id(1, snapped)
 
 ## Oyunu başlatır: herkesi Parti Kurulum ekranına geçirir. Sadece mevcut lobi
 ## sahibi çağırabilir; en az MIN_PLAYERS_TO_START oyuncu gerekir.
@@ -467,24 +681,24 @@ func _reset_state() -> void:
 	players.clear()
 	room_code = ""
 	is_host = false
+	offline_mode = false
 	owner_id = 1
+	map_seed = ""
+	reset_seat_method()
 	election_threshold = THRESHOLD_DEFAULT
 	election_interval = GameRules.DEFAULT_ELECTION_INTERVAL
 	election_count = GameRules.DEFAULT_ELECTION_COUNT
+	vote_timeout = 30
+	_apply_world_settings(WORLD_DEFAULTS)
 	GameRules.configure(election_interval, election_count)
-	axis_sharpness_start = AXIS_SHARPNESS_START_DEFAULT
-	axis_sharpness_increment = AXIS_SHARPNESS_INCREMENT_DEFAULT
-	axis_sharpness_max_enabled = AXIS_SHARPNESS_MAX_ENABLED_DEFAULT
-	axis_sharpness_max_value = AXIS_SHARPNESS_MAX_VALUE_DEFAULT
 	_has_synced_once = false
 	_closing = false
 	stage = Stage.LOBBY
-	_next_bot_index = 0
 
 # --- Bağlantı olayları -------------------------------------------------
 
 func _on_connected_to_server() -> void:
-	_request_join.rpc_id(1, _pending_code, local_player_name, network_signature())
+	_request_join.rpc_id(1, _pending_code, local_player_name, network_signature(), player_uid)
 
 ## Ağ sürüm imzası = oyun sürümü. Godot RPC'leri SIRA NUMARASIYLA eşler; iki
 ## cihazda farklı sürüm varsa istemcinin istekleri sunucuda yanlış fonksiyona
@@ -520,11 +734,33 @@ func _on_peer_disconnected(id: int) -> void:
 	if not is_host or _closing:
 		return
 	var was_player := players.has(id)
+	# OYUN SÜRERKEN DÜŞEN OYUNCU SİLİNMEZ: "ayrıldı" olarak kalır; yerine bot
+	# oynar ya da pasif kalır (lobi ayarı). Aynı UID ile dönünce devam eder.
+	if was_player and (stage == Stage.IN_GAME or stage == Stage.PARTY_SETUP) and not is_bot(id):
+		players[id]["away"] = true
+		if id == owner_id:
+			owner_id = multiplayer.get_unique_id()
+		_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
+		_sync_world_settings.rpc(world_settings)
+		player_list_updated.emit()
+		if stage == Stage.PARTY_SETUP:
+			PartyManager.auto_ready_away(id)
+			if PartyManager.all_ready():
+				finish_party_setup()
+		else:
+			CardManager.log_event(L.t("%s oyundan düştü: %s.") % [PoliticianPresets.display_name(id),
+				L.t("yerine bot oynuyor") if away_mode == AWAY_BOT else L.t("dönene kadar pasif")], id, "", "party_change")
+			CardManager._push_state({"type": "player_away", "peer_id": id})
+		return
 	players.erase(id)
 	if id == owner_id:
 		# Host olmayan lobi sahibi ayrıldı: oda kapanmaz, sahiplik host'a geçer.
 		owner_id = multiplayer.get_unique_id()
-	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
+	_sync_world_settings.rpc(world_settings)
+	_sync_map_seed.rpc(map_seed)
+	_sync_random_parties.rpc(random_parties)
+	_sync_bot_funds_penalty.rpc(bot_funds_penalty)
 	player_list_updated.emit()
 	if not was_player:
 		return
@@ -551,10 +787,15 @@ func _close_room(reason: String) -> void:
 ## Sadece host çağırır: parti verilerini sıfırlayıp herkesi oyuna başlatır.
 func _broadcast_game_start() -> void:
 	stage = Stage.PARTY_SETUP
+	# HARİTA ŞİMDİ KURULUR: siyasetçi profilinde memleket haritadan seçildiği
+	# için ülke parti kurulumundan önce belli olmalı. Lobide tohum girildiyse o,
+	# yoksa rastgele; herkes aynı tohumla aynı haritayı üretir.
+	game_map_seed = int(map_seed) if map_seed != "" else randi_range(1, 999999999)
+	GameMap.generate_new(game_map_seed)
 	PartyManager.reset()
 	for bot in bot_ids():
 		PartyManager.add_bot_party(bot)
-	_notify_game_start.rpc()
+	_notify_game_start.rpc(game_map_seed)
 	game_started.emit()
 
 ## Sadece host çağırır (Parti Kurulum ekranındaki geri sayım host'ta bitince):
@@ -578,33 +819,90 @@ func _notify_party_setup_finished() -> void:
 # --- RPC'ler -------------------------------------------------------------
 
 @rpc("any_peer", "reliable")
-func _request_join(code: String, player_name: String, signature: String) -> void:
+func _request_join(code: String, player_name: String, signature: String, uid: String = "") -> void:
 	if not is_host:
 		return
 	var sender_id := multiplayer.get_remote_sender_id()
 	if signature != network_signature():
-		_join_rejected.rpc_id(sender_id, "Oyun sürümleri farklı (sen %s, oda %s). İki cihazda da aynı güncel sürümü kullanın." % [
+		_join_rejected.rpc_id(sender_id, L.t("Oyun sürümleri farklı (sen %s, oda %s). İki cihazda da aynı güncel sürümü kullanın.") % [
 			signature, game_version()])
 		multiplayer.multiplayer_peer.disconnect_peer(sender_id)
 		return
 	if code != room_code:
-		_join_rejected.rpc_id(sender_id, "Kod hatalı.")
+		_join_rejected.rpc_id(sender_id, L.t("Kod hatalı."))
 		multiplayer.multiplayer_peer.disconnect_peer(sender_id)
 		return
 	if players.size() >= MAX_PLAYERS and (bot_ids().is_empty() or stage != Stage.LOBBY):
-		_join_rejected.rpc_id(sender_id, "Oda dolu.")
+		_join_rejected.rpc_id(sender_id, L.t("Oda dolu."))
 		multiplayer.multiplayer_peer.disconnect_peer(sender_id)
 		return
 	if stage != Stage.LOBBY:
-		_join_rejected.rpc_id(sender_id, "Bu odada oyun zaten başladı.")
+		# YENİDEN KATILMA: aynı UID'li, oyundan düşmüş bir oyuncu kaldığı yere döner.
+		var old_id := _away_player_with_uid(uid)
+		if old_id != -1:
+			_rejoin(old_id, sender_id, player_name)
+			return
+		_join_rejected.rpc_id(sender_id, L.t("Bu odada oyun zaten başladı."))
 		multiplayer.multiplayer_peer.disconnect_peer(sender_id)
 		return
 	# Oda botlarla doluysa en son eklenen bot insan oyuncuya yer açar.
 	if players.size() >= MAX_PLAYERS:
 		players.erase(bot_ids().back())
-	players[sender_id] = {"name": player_name}
-	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+	players[sender_id] = {"name": player_name, "uid": uid}
+	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
+	_sync_world_settings.rpc(world_settings)
+	_sync_map_seed.rpc(map_seed)
+	_sync_random_parties.rpc(random_parties)
+	_sync_bot_funds_penalty.rpc(bot_funds_penalty)
 	player_list_updated.emit()
+
+func _away_player_with_uid(uid: String) -> int:
+	if uid == "":
+		return -1
+	for peer_id in players.keys():
+		if is_away(int(peer_id)) and String(players[peer_id].get("uid", "")) == uid:
+			return int(peer_id)
+	return -1
+
+## Host: düşmüş oyuncu yeni bağlantısıyla döndü. Eski peer id'ye bağlı bütün
+## kayıtlar (sıra, para, el, parti, siyasetçi, puan, oylar) yeni id'ye taşınır;
+## istemciye tam durum gönderilir ve oyun ekranına geçer.
+func _rejoin(old_id: int, new_id: int, player_name: String) -> void:
+	var entry: Dictionary = players[old_id].duplicate()
+	entry.erase("away")
+	entry["name"] = player_name if player_name != "" else String(entry.get("name", L.t("Oyuncu")))
+	players.erase(old_id)
+	players[new_id] = entry
+	if owner_id == old_id:
+		owner_id = new_id
+	CardManager.rekey_player(old_id, new_id)
+	# Önce istemciye "geri döndün" denir (lobi ekranına gitmesin), sonra her şey.
+	_notify_rejoined.rpc_id(new_id, stage, game_map_seed)
+	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
+	_sync_world_settings.rpc(world_settings)
+	_sync_map_seed.rpc_id(new_id, map_seed)
+	_sync_random_parties.rpc_id(new_id, random_parties)
+	_sync_away_mode.rpc_id(new_id, away_mode)
+	_sync_bot_funds_penalty.rpc_id(new_id, bot_funds_penalty)
+	_sync_seat_method.rpc_id(new_id, seat_method)
+	PartyManager.broadcast()
+	if stage == Stage.IN_GAME:
+		CardManager.send_full_state(new_id)
+		GovernmentManager._push_state()
+		CardManager.log_event(L.t("%s oyuna geri döndü.") % PoliticianPresets.display_name(new_id), new_id, "", "party_change")
+		CardManager._push_state({"type": "player_back", "peer_id": new_id})
+	player_list_updated.emit()
+
+## İstemci: oyuna geri döndük. Haritayı kur, doğru ekrana geç.
+@rpc("authority", "reliable")
+func _notify_rejoined(rejoin_stage: int, seed_value: int) -> void:
+	_has_synced_once = true
+	stage = rejoin_stage
+	game_map_seed = seed_value
+	GameMap.generate_new(seed_value)
+	CardManager._load_province_seat_counts()
+	var scene := "res://scenes/GameScreen.tscn" if rejoin_stage == Stage.IN_GAME else "res://scenes/PartySetup.tscn"
+	get_tree().change_scene_to_file(scene)
 
 @rpc("authority", "reliable")
 func _join_rejected(reason: String) -> void:
@@ -612,17 +910,14 @@ func _join_rejected(reason: String) -> void:
 	join_failed.emit(reason)
 
 @rpc("authority", "reliable")
-func _sync_player_list(new_players: Dictionary, new_owner: int, threshold: float, interval: int, count: int, axis_start: float, axis_increment: float, axis_max_enabled: bool, axis_max_value: float) -> void:
+func _sync_player_list(new_players: Dictionary, new_owner: int, threshold: float, interval: int, count: int, vote_seconds: int = 30) -> void:
+	vote_timeout = vote_seconds
 	players = new_players
 	owner_id = new_owner
 	election_threshold = threshold
 	election_interval = interval
 	election_count = count
 	GameRules.configure(election_interval, election_count)
-	axis_sharpness_start = axis_start
-	axis_sharpness_increment = axis_increment
-	axis_sharpness_max_enabled = axis_max_enabled
-	axis_sharpness_max_value = axis_max_value
 	if not is_host and not _has_synced_once:
 		_has_synced_once = true
 		join_succeeded.emit()
@@ -637,7 +932,11 @@ func _request_transfer_ownership(new_owner_id: int) -> void:
 	if sender_id != owner_id or not players.has(new_owner_id) or is_bot(new_owner_id):
 		return
 	owner_id = new_owner_id
-	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
+	_sync_world_settings.rpc(world_settings)
+	_sync_map_seed.rpc(map_seed)
+	_sync_random_parties.rpc(random_parties)
+	_sync_bot_funds_penalty.rpc(bot_funds_penalty)
 	player_list_updated.emit()
 
 ## Host-olmayan mevcut sahip, baraj değiştirmek istediğinde host'a istek yollar.
@@ -649,7 +948,7 @@ func _request_set_threshold(value: float) -> void:
 	if sender_id != owner_id:
 		return
 	election_threshold = snap_threshold(value)
-	_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+	_sync_settings.rpc(election_threshold, election_interval, election_count, vote_timeout)
 	settings_updated.emit()
 
 ## Host-olmayan mevcut sahip, oyun süresini değiştirmek istediğinde host'a istek yollar.
@@ -662,61 +961,54 @@ func _request_set_game_length(interval: int, count: int) -> void:
 	election_interval = clampi(interval, GameRules.ELECTION_INTERVAL_MIN, GameRules.ELECTION_INTERVAL_MAX)
 	election_count = clampi(count, GameRules.ELECTION_COUNT_MIN, GameRules.ELECTION_COUNT_MAX)
 	GameRules.configure(election_interval, election_count)
-	_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
-	settings_updated.emit()
-
-## Host-olmayan mevcut sahip, eksen keskinliği ayarlarından birini değiştirmek
-## istediğinde host'a istek yollar.
-@rpc("any_peer", "reliable")
-func _request_set_axis_sharpness_start(value: float) -> void:
-	if not is_host:
-		return
-	if multiplayer.get_remote_sender_id() != owner_id:
-		return
-	axis_sharpness_start = snap_axis_sharpness_start(value)
-	_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
-	settings_updated.emit()
-
-@rpc("any_peer", "reliable")
-func _request_set_axis_sharpness_increment(value: float) -> void:
-	if not is_host:
-		return
-	if multiplayer.get_remote_sender_id() != owner_id:
-		return
-	axis_sharpness_increment = snap_axis_sharpness_increment(value)
-	_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
-	settings_updated.emit()
-
-@rpc("any_peer", "reliable")
-func _request_set_axis_sharpness_max_enabled(enabled: bool) -> void:
-	if not is_host:
-		return
-	if multiplayer.get_remote_sender_id() != owner_id:
-		return
-	axis_sharpness_max_enabled = enabled
-	_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
-	settings_updated.emit()
-
-@rpc("any_peer", "reliable")
-func _request_set_axis_sharpness_max_value(value: float) -> void:
-	if not is_host:
-		return
-	if multiplayer.get_remote_sender_id() != owner_id:
-		return
-	axis_sharpness_max_value = snap_axis_sharpness_max_value(value)
-	_sync_settings.rpc(election_threshold, election_interval, election_count, axis_sharpness_start, axis_sharpness_increment, axis_sharpness_max_enabled, axis_sharpness_max_value)
+	_sync_settings.rpc(election_threshold, election_interval, election_count, vote_timeout)
 	settings_updated.emit()
 
 @rpc("authority", "reliable")
-func _sync_settings(threshold: float, interval: int, count: int, axis_start: float, axis_increment: float, axis_max_enabled: bool, axis_max_value: float) -> void:
+func _sync_settings(threshold: float, interval: int, count: int, vote_seconds: int = 30) -> void:
+	vote_timeout = vote_seconds
 	election_threshold = threshold
 	election_interval = interval
 	election_count = count
 	GameRules.configure(election_interval, election_count)
-	axis_sharpness_start = axis_start
-	axis_sharpness_increment = axis_increment
-	axis_sharpness_max_enabled = axis_max_enabled
-	axis_sharpness_max_value = axis_max_value
+	settings_updated.emit()
+
+## Harita tohumunu ayarlar (sadece rakam; boş = rastgele). Sadece lobi sahibi.
+func set_map_seed(text: String) -> void:
+	if not is_local_owner():
+		return
+	var clean := clean_map_seed(text)
+	if is_host:
+		map_seed = clean
+		if room_code != "":
+			_sync_map_seed.rpc(map_seed)
+			_sync_random_parties.rpc(random_parties)
+			_sync_bot_funds_penalty.rpc(bot_funds_penalty)
+		settings_updated.emit()
+	else:
+		_request_set_map_seed.rpc_id(1, clean)
+
+static func clean_map_seed(text: String) -> String:
+	var digits := ""
+	for ch in text.strip_edges():
+		if ch >= "0" and ch <= "9":
+			digits += ch
+	digits = digits.left(MAP_SEED_MAX_DIGITS)
+	return "" if digits == "" or int(digits) == 0 else str(int(digits))
+
+@rpc("any_peer", "reliable")
+func _request_set_map_seed(text: String) -> void:
+	if not is_host or multiplayer.get_remote_sender_id() != owner_id:
+		return
+	map_seed = clean_map_seed(text)
+	_sync_map_seed.rpc(map_seed)
+	_sync_random_parties.rpc(random_parties)
+	_sync_bot_funds_penalty.rpc(bot_funds_penalty)
+	settings_updated.emit()
+
+@rpc("authority", "reliable")
+func _sync_map_seed(value: String) -> void:
+	map_seed = value
 	settings_updated.emit()
 
 ## Host-olmayan mevcut sahip, oyunu başlatmak istediğinde host'a istek yollar.
@@ -733,9 +1025,12 @@ func _request_start_game() -> void:
 
 ## Host'tan istemcilere: oyun başlıyor, Parti Kurulum ekranına geç.
 @rpc("authority", "reliable")
-func _notify_game_start() -> void:
+func _notify_game_start(seed_value: int) -> void:
 	if is_host:
 		return
+	game_map_seed = seed_value
+	GameMap.generate_new(seed_value)
+	CardManager._load_province_seat_counts()  # vekil sayıları yeni haritadan
 	game_started.emit()
 
 ## Host'tan istemcilere: oda kapatılıyor, herkes lobiden çıkmalı.
@@ -745,3 +1040,59 @@ func _notify_room_closed(reason: String) -> void:
 		return
 	_reset_state()
 	room_closed.emit(reason)
+
+func set_vote_timeout(seconds: int) -> void:
+	if not is_local_owner() or not VOTE_TIME_OPTIONS.has(seconds):
+		return
+	if is_host or room_code == "":
+		_apply_vote_timeout(seconds)
+	else:
+		_request_vote_timeout.rpc_id(1, seconds)
+
+func _apply_vote_timeout(seconds: int) -> void:
+	if not VOTE_TIME_OPTIONS.has(seconds):
+		return
+	vote_timeout = seconds
+	if room_code != "":
+		_sync_settings.rpc(election_threshold, election_interval, election_count, vote_timeout)
+	settings_updated.emit()
+
+@rpc("any_peer", "reliable")
+func _request_vote_timeout(seconds: int) -> void:
+	if is_host and multiplayer.get_remote_sender_id() == owner_id:
+		_apply_vote_timeout(seconds)
+
+func set_world_setting(key: String, value: Variant) -> void:
+	if not is_local_owner() or not WORLD_OPTIONS.has(key) or not (WORLD_OPTIONS[key] as Array).has(value):
+		return
+	if is_host or room_code == "":
+		var updated := world_settings.duplicate()
+		updated[key] = value
+		_apply_world_settings(updated)
+		if room_code != "":
+			_sync_world_settings.rpc(world_settings)
+	else:
+		_request_world_setting.rpc_id(1, key, value)
+
+func _apply_world_settings(values: Dictionary) -> void:
+	for key in WORLD_DEFAULTS:
+		var value = values.get(key, WORLD_DEFAULTS[key])
+		world_settings[key] = value if (WORLD_OPTIONS[key] as Array).has(value) else WORLD_DEFAULTS[key]
+	GameRules.TURN_TIMEOUT = float(world_settings["turn_seconds"])
+	ElectionModel.NATIONAL_LIST_SEATS = int(world_settings["national_seats"])
+	var cards := get_node_or_null("/root/CardManager")
+	if cards != null:
+		cards._load_province_seat_counts()
+	settings_updated.emit()
+
+@rpc("authority", "reliable")
+func _sync_world_settings(values: Dictionary) -> void:
+	_apply_world_settings(values)
+
+@rpc("any_peer", "reliable")
+func _request_world_setting(key: String, value: Variant) -> void:
+	if is_host and multiplayer.get_remote_sender_id() == owner_id and WORLD_OPTIONS.has(key) and (WORLD_OPTIONS[key] as Array).has(value):
+		var updated := world_settings.duplicate()
+		updated[key] = value
+		_apply_world_settings(updated)
+		_sync_world_settings.rpc(world_settings)

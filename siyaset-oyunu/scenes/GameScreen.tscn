@@ -6,15 +6,18 @@
 [ext_resource type="Script" path="res://scripts/parliament_diagram.gd" id="4"]
 [ext_resource type="Script" path="res://scripts/vote_share_panel.gd" id="5"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_turnindicator"]
-bg_color = Color(0.13, 0.14, 0.19, 0.95)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
-shadow_color = Color(0, 0, 0, 0.38)
-shadow_size = 8
-shadow_offset = Vector2(0, 3)
+[ext_resource type="Texture2D" path="res://assets/ui/ui_panel.png" id="6"]
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxFlat_turnindicator"]
+texture = ExtResource("6")
+texture_margin_left = 5.0
+texture_margin_top = 5.0
+texture_margin_right = 5.0
+texture_margin_bottom = 5.0
+content_margin_left = 12.0
+content_margin_top = 8.0
+content_margin_right = 12.0
+content_margin_bottom = 8.0
 
 [node name="GameScreen" type="Control" unique_id=958546920]
 layout_mode = 3
@@ -35,26 +38,10 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.09, 0.1, 0.14, 1)
+color = Color(0.094, 0.078, 0.188, 1)
 
 [node name="MapHolder" parent="." unique_id=1009808577 instance=ExtResource("3")]
 unique_name_in_owner = true
-
-[node name="DeckButton" type="TextureButton" parent="." unique_id=3821004411]
-unique_name_in_owner = true
-layout_mode = 1
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -148.0
-offset_top = -276.0
-offset_right = -52.0
-offset_bottom = -148.0
-grow_horizontal = 0
-grow_vertical = 0
-ignore_texture_size = true
-stretch_mode = 5
 
 [node name="PassButton" type="Button" parent="." unique_id=3821004430]
 unique_name_in_owner = true
@@ -78,20 +65,30 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = -200.0
 offset_top = 76.0
+offset_right = -16.0
 offset_bottom = -286.0
 grow_horizontal = 0
 grow_vertical = 2
 
-[node name="PlayerPanelList" type="GridContainer" parent="PlayerPanel" unique_id=2066101759]
+[node name="PlayerPanelBox" type="VBoxContainer" parent="PlayerPanel" unique_id=2066101760]
 unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-grow_horizontal = 2
-grow_vertical = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 0
+grow_vertical = 1
+theme_override_constants/separation = 6
+
+[node name="PlayerTabs" type="HBoxContainer" parent="PlayerPanel/PlayerPanelBox" unique_id=2066101761]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="PlayerPanelList" type="GridContainer" parent="PlayerPanel/PlayerPanelBox" unique_id=2066101759]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
 theme_override_constants/h_separation = 6
 theme_override_constants/v_separation = 6
 
@@ -99,7 +96,6 @@ theme_override_constants/v_separation = 6
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15
-anchor_top = 0.54
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
@@ -113,12 +109,13 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 offset_top = 8.0
 offset_bottom = -6.0
-grow_horizontal = 2
+grow_horizontal = 1
 grow_vertical = 2
 mouse_filter = 2
 theme_override_constants/separation = 4
 
 [node name="ParliamentChamber" type="MarginContainer" parent="BottomArea/ChamberSplit" unique_id=3821004442]
+clip_contents = true
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
@@ -132,7 +129,13 @@ layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 4
 
-[node name="ParliamentDiagram" type="Control" parent="BottomArea/ChamberSplit/ParliamentChamber/ParliamentVBox" unique_id=3821004445]
+[node name="ParliamentBoard" type="PanelContainer" parent="BottomArea/ChamberSplit/ParliamentChamber/ParliamentVBox" unique_id=3821004480]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="ParliamentDiagram" type="Control" parent="BottomArea/ChamberSplit/ParliamentChamber/ParliamentVBox/ParliamentBoard" unique_id=3821004445]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
@@ -142,23 +145,19 @@ script = ExtResource("4")
 [node name="VoteButtonRow" type="HBoxContainer" parent="BottomArea/ChamberSplit/ParliamentChamber/ParliamentVBox" unique_id=3821004461]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_horizontal = 4
-theme_override_constants/separation = 14
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
 
-[node name="VoteYesButton" type="TextureButton" parent="BottomArea/ChamberSplit/ParliamentChamber/ParliamentVBox/VoteButtonRow" unique_id=3821004462]
+[node name="VoteYesButton" type="Button" parent="BottomArea/ChamberSplit/ParliamentChamber/ParliamentVBox/VoteButtonRow" unique_id=3821004462]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(48, 48)
+custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
-ignore_texture_size = true
-stretch_mode = 0
 texture_filter = 1
 
-[node name="VoteNoButton" type="TextureButton" parent="BottomArea/ChamberSplit/ParliamentChamber/ParliamentVBox/VoteButtonRow" unique_id=3821004463]
+[node name="VoteNoButton" type="Button" parent="BottomArea/ChamberSplit/ParliamentChamber/ParliamentVBox/VoteButtonRow" unique_id=3821004463]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(48, 48)
+custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
-ignore_texture_size = true
-stretch_mode = 0
 texture_filter = 1
 
 [node name="ProposalLabel" type="Label" parent="BottomArea/ChamberSplit/ParliamentChamber/ParliamentVBox" unique_id=3821004464]
@@ -173,112 +172,115 @@ autowrap_mode = 2
 max_lines_visible = 3
 text_overrun_behavior = 3
 
-[node name="TurnIndicator" type="PanelContainer" parent="." unique_id=3821004420]
+[node name="ActionsPanel" type="PanelContainer" parent="BottomArea/ChamberSplit" unique_id=3821004481]
 unique_name_in_owner = true
-theme_override_styles/panel = SubResource("StyleBoxFlat_turnindicator")
-layout_mode = 1
-anchors_preset = 3
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -200.0
-offset_top = -96.0
-offset_right = -16.0
-offset_bottom = -16.0
-grow_horizontal = 0
-grow_vertical = 0
-
-[node name="TurnIndicatorMargin" type="MarginContainer" parent="TurnIndicator" unique_id=3821004421]
 layout_mode = 2
-theme_override_constants/margin_left = 8
+
+[node name="ActionsMargin" type="MarginContainer" parent="BottomArea/ChamberSplit/ActionsPanel" unique_id=3821004482]
+layout_mode = 2
+theme_override_constants/margin_left = 10
 theme_override_constants/margin_top = 8
 theme_override_constants/margin_right = 10
 theme_override_constants/margin_bottom = 8
 
-[node name="TurnIndicatorRow" type="HBoxContainer" parent="TurnIndicator/TurnIndicatorMargin" unique_id=3821004422]
-layout_mode = 2
-alignment = 0
-theme_override_constants/separation = 8
-
-[node name="TurnIndicatorBadgeSlot" type="Control" parent="TurnIndicator/TurnIndicatorMargin/TurnIndicatorRow" unique_id=3821004423]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(32, 32)
-layout_mode = 2
-
-[node name="TurnIndicatorLabel" type="Label" parent="TurnIndicator/TurnIndicatorMargin/TurnIndicatorRow" unique_id=3821004424]
+[node name="ActionsVBox" type="VBoxContainer" parent="BottomArea/ChamberSplit/ActionsPanel/ActionsMargin" unique_id=3821004483]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 4
-text = "Sıra: -"
+theme_override_constants/separation = 6
+
+[node name="ActionsTitle" type="Label" parent="BottomArea/ChamberSplit/ActionsPanel/ActionsMargin/ActionsVBox" unique_id=3821004484]
+layout_mode = 2
 theme_override_font_sizes/font_size = 13
-text_overrun_behavior = 3
-clip_text = true
+text = "> HAMLELER"
 
-[node name="LeftPanel" type="PanelContainer" parent="." unique_id=3821004470]
+[node name="LeftPanel" type="Panel" parent="." unique_id=3821004470]
 unique_name_in_owner = true
+clip_contents = true
 layout_mode = 1
 anchors_preset = 9
 anchor_bottom = 1.0
 offset_right = 260.0
+grow_horizontal = 0
 grow_vertical = 2
 
 [node name="LeftMargin" type="MarginContainer" parent="LeftPanel" unique_id=3821004472]
-layout_mode = 2
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 theme_override_constants/margin_left = 14
 theme_override_constants/margin_top = 14
 theme_override_constants/margin_right = 14
 theme_override_constants/margin_bottom = 14
 
-[node name="LeftVBox" type="VBoxContainer" parent="LeftPanel/LeftMargin" unique_id=3821004471]
+[node name="LeftScroll" type="ScrollContainer" parent="LeftPanel/LeftMargin" unique_id=3821004499]
 layout_mode = 2
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 3
+
+[node name="LeftVBox" type="VBoxContainer" parent="LeftPanel/LeftMargin/LeftScroll" unique_id=3821004471]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
 theme_override_constants/separation = 10
 
-[node name="GameSettingsLabel" type="Label" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004450]
+[node name="InfoPlate" type="PanelContainer" parent="LeftPanel/LeftMargin/LeftScroll/LeftVBox" unique_id=3821004485]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+
+[node name="GameSettingsLabel" type="Label" parent="LeftPanel/LeftMargin/LeftScroll/LeftVBox/InfoPlate" unique_id=3821004450]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
 text = "Baraj: %0"
 autowrap_mode = 2
 
-[node name="Separator1" type="HSeparator" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004474]
+[node name="Separator1" type="HSeparator" parent="LeftPanel/LeftMargin/LeftScroll/LeftVBox" unique_id=3821004474]
 layout_mode = 2
 
-[node name="GovernmentVBox" type="VBoxContainer" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004473]
+[node name="GovernmentVBox" type="VBoxContainer" parent="LeftPanel/LeftMargin/LeftScroll/LeftVBox" unique_id=3821004473]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="Separator2" type="HSeparator" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004475]
-layout_mode = 2
-
-[node name="VoteTitle" type="Label" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004448]
-layout_mode = 2
-theme_override_font_sizes/font_size = 12
-modulate = Color(1, 1, 1, 0.6)
-text = "SON SEÇİM — OY ORANLARI"
-
-[node name="VoteScroll" type="ScrollContainer" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004447]
+[node name="TurnSpacer" type="Control" parent="LeftPanel/LeftMargin/LeftScroll/LeftVBox" unique_id=3821004486]
 layout_mode = 2
 size_flags_vertical = 3
-horizontal_scroll_mode = 0
+mouse_filter = 2
 
-[node name="VoteSharePanel" type="VBoxContainer" parent="LeftPanel/LeftMargin/LeftVBox/VoteScroll" unique_id=3821004449]
+[node name="TurnIndicator" type="PanelContainer" parent="LeftPanel/LeftMargin/LeftScroll/LeftVBox" unique_id=3821004420]
+unique_name_in_owner = true
+theme_override_styles/panel = SubResource("StyleBoxFlat_turnindicator")
+layout_mode = 2
+
+[node name="TurnIndicatorMargin" type="MarginContainer" parent="LeftPanel/LeftMargin/LeftScroll/LeftVBox/TurnIndicator" unique_id=3821004421]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
+
+[node name="TurnIndicatorRow" type="HBoxContainer" parent="LeftPanel/LeftMargin/LeftScroll/LeftVBox/TurnIndicator/TurnIndicatorMargin" unique_id=3821004422]
+layout_mode = 2
+alignment = 0
+theme_override_constants/separation = 8
+
+[node name="TurnIndicatorBadgeSlot" type="Control" parent="LeftPanel/LeftMargin/LeftScroll/LeftVBox/TurnIndicator/TurnIndicatorMargin/TurnIndicatorRow" unique_id=3821004423]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(32, 32)
+layout_mode = 2
+
+[node name="TurnIndicatorLabel" type="Label" parent="LeftPanel/LeftMargin/LeftScroll/LeftVBox/TurnIndicator/TurnIndicatorMargin/TurnIndicatorRow" unique_id=3821004424]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-mouse_filter = 2
-script = ExtResource("5")
-compact = true
-
-[node name="Separator3" type="HSeparator" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004446]
-layout_mode = 2
-
-[node name="ScoreVBox" type="VBoxContainer" parent="LeftPanel/LeftMargin/LeftVBox" unique_id=3821004476]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 6
+size_flags_vertical = 4
+text = "Sıra: -"
+theme_override_font_sizes/font_size = 13
+autowrap_mode = 2
 
 [node name="HandArea" type="Control" parent="." unique_id=3821004412]
 unique_name_in_owner = true

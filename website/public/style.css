@@ -53,6 +53,11 @@ a { color: var(--gold); }
 .dot { width: 10px; height: 10px; border-radius: 50%; background: #fff; animation: blink 1.4s steps(2, start) infinite; }
 @keyframes blink { to { opacity: .25; } }
 .band-title { font-weight: 700; font-size: 18px; letter-spacing: .04em; }
+.proj { color: var(--gold); }
+/* Geçici ad: başlığın üstünde altın çerçeveli "PROJE:" damgası. */
+.title .proj-stamp { flex-basis: 100%; font-size: clamp(18px, 3vw, 30px); letter-spacing: .3em; color: var(--gold);
+  text-shadow: none; margin-bottom: 10px; animation-delay: 0s; }
+.title .proj-stamp::before, .title .proj-stamp::after { content: "■"; font-size: .5em; vertical-align: middle; margin: 0 .6em; opacity: .7; }
 .band-sub { color: var(--gold); font-size: 13px; }
 .band-nav { margin-left: auto; display: flex; gap: 8px; }
 .band-nav a { font-size: 13px; font-weight: 600; color: var(--text); text-decoration: none; padding: 4px 12px; background: var(--panel); box-shadow: inset 2px 2px 0 var(--panel-light), inset -2px -2px 0 var(--panel-dark), 3px 3px 0 var(--ink); }
@@ -73,7 +78,8 @@ a { color: var(--gold); }
 .title { font-family: var(--mono); font-weight: 700; margin: 0; line-height: .95; font-size: clamp(56px, 12vw, 148px); letter-spacing: -.02em;
   display: flex; flex-wrap: wrap; justify-content: center; gap: 0 .35em; text-shadow: 6px 6px 0 var(--ink); }
 .title span { display: inline-block; opacity: 0; transform: translateY(40px) rotate(-3deg); animation: rise .8s cubic-bezier(.2, .9, .25, 1.2) forwards; }
-.title span:nth-child(2) { animation-delay: .15s; }
+.title span:nth-child(2) { animation-delay: .12s; }
+.title span:nth-child(3) { animation-delay: .24s; }
 .gold { color: var(--gold); }
 @keyframes rise { to { opacity: 1; transform: none; } }
 .lead { max-width: 62ch; margin: 20px auto 0; color: #d4ccf5; font-size: clamp(16px, 2vw, 19px); opacity: 0; animation: fade .8s .4s forwards; }

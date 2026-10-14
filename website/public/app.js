@@ -3,10 +3,13 @@
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const PARTY = ["#a33bd6", "#f2c230", "#9dc94b", "#2569cf", "#e8202a", "#e8458f", "#27c9c9", "#f27e1f"];
 
-  // --- En güncel sürüm: downloads/version.json (tools/site_publish.py yazar) ---
+  // --- En güncel sürüm: GitHub'daki builds/version.json (website/publish.py yazar).
+  // Dosyalar da oradan iner; GitHub'a ulaşılamazsa sitedeki yedek bilgi kullanılır.
+  const RAW = "https://raw.githubusercontent.com/TriQue06/siyaset_oyunu_test_experimental/oyun-duzeltmeleri/builds/";
   const mb = (bytes) => (bytes / 1048576).toFixed(0) + " MB";
-  fetch("/downloads/version.json", { cache: "no-cache" })
-    .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+  const getJson = (url) => fetch(url, { cache: "no-cache" }).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
+  getJson(RAW + "version.json")
+    .catch(() => getJson("/version.json"))
     .then((v) => {
       const set = (sel, text) => document.querySelectorAll(sel).forEach((el) => (el.textContent = text));
       if (v.apk) {
@@ -15,7 +18,7 @@
       }
       if (v.exe) {
         document.querySelectorAll('#dl-exe, [data-mirror="exe"]').forEach((a) => (a.href = v.exe.url));
-        set("#meta-exe, [data-meta='exe']", `Sürüm ${v.version} · ${mb(v.exe.size)}`);
+        set("#meta-exe, [data-meta='exe']", `Sürüm ${v.version} · zip · ${mb(v.exe.size)}`);
       }
       set("#band-version", `Sürüm ${v.version}`);
       set("#foot-version", `Son sürüm ${v.version} · ${v.date}`);

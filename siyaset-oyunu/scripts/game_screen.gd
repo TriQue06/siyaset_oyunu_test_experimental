@@ -1824,12 +1824,21 @@ func _build_plaque(pid: int, width: float) -> Control:
 	var inner: float = width - 12.0 - PLAQUE_BADGE - 7.0
 	var name_label := _avatar_label(name_text, _fit_font_size(name_text, inner - tags_width - 34.0, 14, 8),
 		UiTheme.GOLD if mine else UiTheme.TEXT)
-	name_label.clip_text = false
+	name_label.clip_text = true
+	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	name_label.tooltip_text = name_text
 	name_label.add_theme_font_override("font", UiTheme.mono(true))
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(name_label)
 	for tag in tags:
 		var tag_control := _avatar_tag(String(tag[0]), tag[1], tag[2])
+		# Etiketler metnin doğal genişliğiyle plaketi büyütmesin; logo ve
+		# parti adına yer bırakıp uzun ittifak adlarını üç noktayla göster.
+		var tag_limit := minf(60.0, maxf(8.0, (inner - 50.0) / maxf(1.0, tags.size())))
+		(tag_control as Label).clip_text = true
+		(tag_control as Label).text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		tag_control.custom_minimum_size.x = minf(tag_limit, String(tag[0]).length() * 6.0 + 6.0)
+		tag_control.tooltip_text = String(tag[0])
 		tag_control.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		head.add_child(tag_control)
 	var seats_label := _avatar_label(seats_text, 15, UiTheme.TEXT)
@@ -1847,7 +1856,8 @@ func _build_plaque(pid: int, width: float) -> Control:
 	var share: float = float(CardManager.last_vote_shares.get(pid, 0.0))
 	var share_text := (L.t("%%%.1f") % share) if has_seats else ""
 	var leader := _avatar_label(leader_text, _fit_font_size(leader_text, inner - 44.0, 11, 7), UiTheme.TEXT_MUTED)
-	leader.clip_text = false
+	leader.clip_text = true
+	leader.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	leader.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	foot.add_child(leader)
 	var share_label := _avatar_label(share_text, 12, UiTheme.TEXT)

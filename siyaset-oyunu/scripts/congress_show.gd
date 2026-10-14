@@ -10,15 +10,14 @@ extends Control
 ##      iki finaliste akar.
 ##   SONUÇ: konfeti + "GENEL BAŞKAN" damgası, ardından sonuç gazetesi (EventFx)
 ##   bu ekranda oynar ve ekran kapanır.
-## Adaylar parti renginin tonları yerine ayrı canlı renkler alır (CANDIDATE_COLORS).
+## Adaylar partinin renk skalasından ayrı tonlar alır (palette); ATLA / 2×
+## 0.0.181'de kaldırıldı.
 ## Süre: CardManager.congress_duration (gazete hariç).
 
 const BG_TOP := UiTheme.BG
 const BG_BOTTOM := UiTheme.INK
 const GOLD := UiTheme.GOLD
 const RED := UiTheme.RED
-const CANDIDATE_COLORS := [Color("FF3B5C"), Color("3BD1FF"), Color("FFC93C"), Color("9DFF5C"),
-	Color("C77DFF"), Color("FF8A3B")]
 ## Salondaki koltuk sayısı (her koltuk 1200 / SEATS delegeyi temsil eder).
 const SEATS := 300
 const HALL_ROWS := 10
@@ -50,9 +49,9 @@ func _ready() -> void:
 	z_index = 200
 	_duration = maxf(2.0, float(data.get("duration", 6.0)))
 	_build()
+	_hall.colors = palette(data.get("color", GOLD))
 	_build_cards(range((data.get("candidates", []) as Array).size()))
 	_hall.setup(data)
-	_build_skip_controls()
 	_event_fx = EventFx.new()
 	add_child(_event_fx)
 
@@ -62,55 +61,12 @@ func _phase_ends() -> Array:
 		return [_duration * 0.62, _duration * 0.62, _duration * 0.62]
 	return [_duration * 0.36, _duration * 0.46, _duration * 0.78]
 
-## ATLA / 2× (0.0.179): yalnız bu ekran; kongre sonucu host'ta önceden
-## hesaplandığı için atlamak sonucu değiştirmez. ATLA (Boşluk / Esc) önce
-## sonucu gösterir, ikinci basış gazeteye geçer.
-var _speed := 1.0
-var _skip_row: HBoxContainer
-
-func skip_or_close() -> void:
-	var ends := _phase_ends()
-	if _t < float(ends[2]) + 0.01:
-		_t = float(ends[2]) + 0.01
-	elif not _paper_started:
-		_start_paper()
-
-func _unhandled_input(event: InputEvent) -> void:
-	if _paper_started:
-		return  # gazeteyi EventFx kendisi geçirir
-	if event is InputEventKey and event.pressed and not event.echo \
-			and (event.keycode == KEY_SPACE or event.keycode == KEY_ESCAPE):
-		skip_or_close()
-		get_viewport().set_input_as_handled()
-
-func _build_skip_controls() -> void:
-	_skip_row = HBoxContainer.new()
-	_skip_row.add_theme_constant_override("separation", 6)
-	var speed := Button.new()
-	speed.text = L.t("2× HIZ")
-	speed.toggle_mode = true
-	speed.toggled.connect(func(on: bool): _speed = 2.0 if on else 1.0)
-	var skip := Button.new()
-	skip.text = L.t("ATLA ▸▸")
-	skip.pressed.connect(skip_or_close)
-	for b: Button in [speed, skip]:
-		UiSkin.skin_button(b)
-		b.focus_mode = Control.FOCUS_NONE
-		b.add_theme_font_override("font", UiTheme.mono())
-		b.add_theme_font_size_override("font_size", 13)
-		b.custom_minimum_size = Vector2(0, 32)
-		_skip_row.add_child(b)
-	add_child(_skip_row)
-	_skip_row.reset_size()
-	var view := get_viewport_rect().size
-	_skip_row.position = Vector2(view.x - _skip_row.size.x - 16.0, view.y - _skip_row.size.y - 16.0)
-
 func _process(delta: float) -> void:
 	if _paper_started:
 		if not _event_fx.is_playing():
 			queue_free()
 		return
-	_t += delta * _speed
+	_t += delta
 	var ends := _phase_ends()
 	var candidates: Array = data.get("candidates", [])
 	var round1: Array = data.get("round1", [])
@@ -167,7 +123,6 @@ func _show_winner(candidates: Array) -> void:
 ## kapalıysa hemen) ekran kapanır.
 func _start_paper() -> void:
 	_paper_started = true
-	_skip_row.visible = false
 	var candidates: Array = data.get("candidates", [])
 	var w := int(data.get("winner", 0))
 	if w < 0 or w >= candidates.size():
@@ -191,8 +146,18 @@ func _start_paper() -> void:
 	if not shown:
 		queue_free()
 
-static func candidate_color(index: int) -> Color:
-	return CANDIDATE_COLORS[index % CANDIDATE_COLORS.size()]
+## Partinin renk skalası: ana renk, açık, koyu, çok açık, iki yana kayık ton.
+## Birbirinden ayırt edilsin diye açıklık ve ton birlikte oynar.
+static func palette(base: Color) -> Array:
+	base.a = 1.0
+	var shift := func(dh: float, dv: float) -> Color:
+		return Color.from_hsv(fposmod(base.h + dh, 1.0), clampf(base.s * (0.85 if dv > 0.0 else 1.0), 0.0, 1.0),
+			clampf(base.v + dv, 0.25, 1.0))
+	return [base, base.lerp(Color.WHITE, 0.45), base.darkened(0.42), base.lerp(Color.WHITE, 0.72),
+		shift.call(0.07, 0.08), shift.call(-0.07, -0.12)]
+
+func candidate_color(index: int) -> Color:
+	return _hall.colors[index % _hall.colors.size()]
 
 func _enter_round2(round2: Array) -> void:
 	if _second_built:
@@ -362,7 +327,7 @@ func _build_cards(indices: Array) -> void:
 		name_label.text = "  " + String(c.get("name", "?"))
 		name_label.add_theme_font_override("font", UiTheme.mono(true))
 		name_label.add_theme_font_size_override("font_size", 19)
-		name_label.add_theme_color_override("font_color", UiTheme.INK)
+		name_label.add_theme_color_override("font_color", UiTheme.INK if color.get_luminance() > 0.45 else Color.WHITE)
 		name_label.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
 		name_label.clip_text = false
 		name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -440,6 +405,7 @@ class Hall extends Control:
 	var mode := 0        # 0: 1. tur, 1: turlar arası, 2: 2. tur
 	var k := 0.0
 	var confetti_t := -1.0
+	var colors: Array = []
 
 	func setup(d: Dictionary) -> void:
 		var total := float(CardManager.CONGRESS_DELEGATES)
@@ -522,6 +488,9 @@ class Hall extends Control:
 		var per_row := SEATS / HALL_ROWS
 		return absf(float(i % per_row) / per_row - 0.5) * 2.0 + float(i / per_row) * 0.09
 
+	func _color(i: int) -> Color:
+		return colors[i % colors.size()]
+
 	func show_round1(value: float) -> void:
 		mode = 0
 		k = value
@@ -558,16 +527,16 @@ class Hall extends Control:
 			var radius := r
 			if mode == 0:
 				if rank[i] < lit_count:
-					color = CongressShow.candidate_color(owner_r1[i])
+					color = _color(owner_r1[i])
 					if lit_count - rank[i] < 8:
 						radius = r * 1.35  # yeni oy veren delege "parlar"
 			elif transfer_rank[i] < 0:
-				color = CongressShow.candidate_color(owner_r1[i])
+				color = _color(owner_r1[i])
 			elif mode == 1:
 				# Elenen adayların koltukları griye döner.
-				color = CongressShow.candidate_color(owner_r1[i]).lerp(UiTheme.PANEL_LIGHT, k)
+				color = _color(owner_r1[i]).lerp(UiTheme.PANEL_LIGHT, k)
 			elif transfer_rank[i] < transfer_lit:
-				color = CongressShow.candidate_color(owner_r2[i])
+				color = _color(owner_r2[i])
 				if transfer_lit - transfer_rank[i] < 6:
 					radius = r * 1.35
 			else:
@@ -586,7 +555,7 @@ class Hall extends Control:
 			if y < -20.0 or y > size.y + 20.0:
 				continue
 			var x := x0 + sin(confetti_t * 3.0 + n) * 14.0
-			var c := CongressShow.candidate_color(n)
+			var c := _color(n)
 			if n % 3 == 0:
 				c = GOLD
 			draw_set_transform(Vector2(x, y), confetti_t * 4.0 + n, Vector2.ONE)

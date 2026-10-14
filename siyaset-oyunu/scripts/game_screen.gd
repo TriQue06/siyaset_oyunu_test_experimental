@@ -261,7 +261,8 @@ var _funds_box: HBoxContainer
 var _funds_label: Label
 ## Hamle ızgarası: artık parlamento diyagramının SAĞINDAKİ panelde, iki
 ## sütunlu. Butonlar paneli paylaşır, bu yüzden asgari ölçü küçük tutulur.
-const ACTION_BUTTON_WIDTH := 92.0
+## 5 sütun (0.0.181, YARDIM eklendi): (392 - 4 × 8) / 5.
+const ACTION_BUTTON_WIDTH := 72.0
 const ACTION_BUTTON_HEIGHT := 64.0
 const ACTION_BUTTON_GAP := 8
 var _action_grid: GridContainer
@@ -318,6 +319,9 @@ var _tax_selected: int = -1
 ## FİNANSMAN: yatırım / miting için il seçilince açılan kaydırıcılı panel;
 ## finansman soruşturması paneli ve sonuç kartı.
 var _funding_panel: FundingPanel
+## AFET YARDIMI paneli (YARDIM hamlesi).
+var _aid_panel: AidPanel
+var _aid_button: Button
 var _inquiry_panel: PanelContainer
 var _inquiry_box: VBoxContainer
 var _inquiry_target: int = -1
@@ -969,7 +973,7 @@ func _refresh_parliament_summary() -> void:
 ## log), Seçili (dokunulan il / parti). Eski bilgi kutusu ve sıra göstergesi
 ## buradan kalktı (tarih haritada, sıra masada).
 func _setup_side_column() -> void:
-	var vbox := left_panel.get_node_or_null("LeftMargin/LeftVBox") as VBoxContainer
+	var vbox := left_panel.get_node_or_null("LeftMargin/LeftScroll/LeftVBox") as VBoxContainer
 	if vbox == null:
 		return
 	var margin := left_panel.get_node_or_null("LeftMargin") as MarginContainer
@@ -1199,12 +1203,18 @@ func _build_event_fx() -> void:
 	CardManager.event_presented.connect(_headline_for_event)
 	GovernmentManager.coalition_changed.connect(_headline_for_coalition)
 	tree_exiting.connect(_event_fx.skip_all)
+	# Afet seçim gecesinde başladıysa gazetesi oyun ekranına dönünce oynar.
+	if CardManager.has_disaster():
+		get_tree().create_timer(0.8).timeout.connect(func(): _headline_for_disaster(CardManager.active_disaster()))
+	_refresh_disaster.call_deferred()
 
 func _fx_party_name(peer_id: int) -> String:
 	return String(PartyManager.data_of(peer_id).get("name", "?"))
 
 ## Kart ve parti olayları (CardManager.event_presented).
 func _headline_for_event(event: Dictionary, version: int) -> void:
+	if event.has("disaster"):
+		_headline_for_disaster(event["disaster"])
 	var type := String(event.get("type", ""))
 	var message := String(event.get("message", ""))
 	var key := "cm|%d|%s" % [version, type]
@@ -1301,7 +1311,7 @@ func _build_event_log() -> void:
 	_event_log = EventLogPanel.new()
 	_event_log.name = L.t("EventLog")
 	_event_log.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	var spacer := left_panel.get_node_or_null("LeftMargin/LeftVBox/TurnSpacer")
+	var spacer := left_panel.get_node_or_null("LeftMargin/LeftScroll/LeftVBox/TurnSpacer")
 	if spacer != null:
 		spacer.get_parent().add_child(_event_log)
 		spacer.get_parent().move_child(_event_log, spacer.get_index())
@@ -2751,6 +2761,7 @@ func _select_target_province(province_id: String) -> void:
 # --- Davet / başvuru şeridi ------------------------------------------------------
 
 func _on_opinion_changed() -> void:
+	_refresh_disaster()
 	_refresh_economy()
 	_refresh_score_panel()
 	_refresh_agenda_banner()
@@ -3649,7 +3660,7 @@ func _build_action_buttons() -> void:
 	# genişliğini büyütünce komşusunun üstüne biniyordu. Izgara bunu yapısal
 	# olarak önler.
 	_action_grid = GridContainer.new()
-	_action_grid.columns = 4
+	_action_grid.columns = 5
 	_action_grid.add_theme_constant_override("h_separation", ACTION_BUTTON_GAP)
 	_action_grid.add_theme_constant_override("v_separation", ACTION_BUTTON_GAP)
 	# Izgara panelin ÜSTÜNE oturur; altındaki boşluğu esnek bir ayraç doldurur.
@@ -3686,6 +3697,10 @@ func _build_action_buttons() -> void:
 	_congress_button = _action_button(L.t("KONGRE"), _congress_cost_text(), UiTheme.PURPLE.darkened(0.3), "kongre")
 	_congress_button.pressed.connect(_on_congress_button_pressed)
 	_congress_button.tooltip_text = L.t("Genel başkan: partini kongreye götür, liderliğini tazele. Üye: kongre iste, başkanlığı geri almaya çalış.")
+	# AFET YARDIMI: sadece bir afet sürerken; tutarı oyuncu belirler.
+	_aid_button = _action_button(L.t("YARDIM"), L.t("tutar serbest"), UiTheme.RED.darkened(0.15), "yardim")
+	_aid_button.pressed.connect(_on_aid_button_pressed)
+	_aid_button.tooltip_text = L.t("Afet bölgesine yardım götür: tutarı sen belirlersin. Hükümetsen devlet hazinesinden de ödeyebilirsin. Yatırımdan çok daha güçlü ve hemen etki eder; seçmen gruplarına dokunmaz.")
 
 ## Kongre bedeli oyuncunun yerine göre: genel başkan 10, üye 20.
 func _congress_cost_text() -> String:
@@ -3712,9 +3727,14 @@ func _action_button(title: String, cost_text: String, color: Color, icon_name: S
 ## kısaltılmaz).
 func _set_action_text(button: Button, title: String, cost_text: String) -> void:
 	button.text = "%s\n%s" % [title, cost_text]
+	# İki satır ayrı ölçülür, düğmenin yazı tipiyle (5 sütunda kutu dar).
 	var width := ACTION_BUTTON_WIDTH - 10.0
-	var longest := title if title.length() >= cost_text.length() else cost_text
-	button.add_theme_font_size_override("font_size", _fit_font_size(longest, width, UiTheme.FS_TINY - 2, 8))
+	var font := UiTheme.mono()
+	var size := UiTheme.FS_TINY - 2
+	while size > 6 and (font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width
+			or font.get_string_size(cost_text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width):
+		size -= 1
+	button.add_theme_font_size_override("font_size", size)
 
 ## Neden şu an bu hamle yapılamıyor? (Buton ipucu ve uyarı yazısı.)
 func _action_block_reason(cost: float, is_law: bool = false) -> String:
@@ -3750,6 +3770,8 @@ func _refresh_action_buttons() -> void:
 	_censure_button.modulate.a = 1.0 if CardManager.can_censure(me) or _pending_censure else 0.45
 	_early_button.modulate.a = 1.0 if CardManager.can_early_election(me) or _pending_early else 0.45
 	_congress_button.modulate.a = 1.0 if CardManager.can_call_congress(me) or _pending_congress else 0.45
+	if _aid_button != null:
+		_aid_button.modulate.a = 1.0 if CardManager.can_aid(me) else 0.45
 	# disabled kullanılmıyor: pasif butona dokununca neden olmadığı uyarı olarak çıksın.
 	_law_button.modulate.a = 1.0 if law_ok else 0.45
 	_org_button.modulate.a = 1.0 if org_ok or _pending_org else 0.45
@@ -4177,6 +4199,11 @@ func _build_funding_ui() -> void:
 	_funding_panel.confirmed.connect(_on_funding_confirmed)
 	_funding_panel.cancelled.connect(_cancel_targeting)
 	add_child(_funding_panel)
+	_aid_panel = AidPanel.new()
+	_aid_panel.hide()
+	_aid_panel.confirmed.connect(_on_aid_confirmed)
+	_aid_panel.cancelled.connect(func(): _aid_panel.hide())
+	add_child(_aid_panel)
 	_inquiry_panel = PanelContainer.new()
 	var style := UiSkin.stylebox(UiSkin.PANEL)
 	style.set_content_margin_all(UiTheme.PAD_M)
@@ -4314,6 +4341,65 @@ func _on_law_button_pressed() -> void:
 	_law_designer.position = Vector2(
 		viewport_size.x - RIGHT_COLUMN_WIDTH - _law_designer.size.x - 12.0,
 		maxf(12.0, _top_area_height() - _law_designer.size.y))
+
+# --- AFET (0.0.181) --------------------------------------------------------------
+
+## Haritadaki afet işareti ve açık yardım paneli güncel durumla eşlenir.
+func _refresh_disaster() -> void:
+	var active := CardManager.active_disaster()
+	if map_holder != null and map_holder.has_method("set_disaster"):
+		map_holder.set_disaster(active.get("provinces", []), String(active.get("kind", "")))
+	if _aid_panel != null and _aid_panel.visible:
+		if active.is_empty() or not CardManager.can_choose_main_action(multiplayer.get_unique_id()):
+			_aid_panel.hide()
+
+func _on_aid_button_pressed() -> void:
+	var me := multiplayer.get_unique_id()
+	if _aid_panel.visible:
+		_aid_panel.hide()
+		return
+	_deselect_hand_card()
+	_law_designer.hide()
+	_cancel_targeting()
+	var reason := CardManager.aid_block_reason(me)
+	if reason != "":
+		_show_toast(reason)
+		return
+	_aid_panel.open(me)
+	_place_aid_panel.call_deferred()
+
+func _place_aid_panel() -> void:
+	if not _aid_panel.visible:
+		return
+	_aid_panel.reset_size()
+	var map := _r(R_MAP)
+	var panel_size := _aid_panel.size
+	_aid_panel.position = Vector2(map.position.x + (map.size.x - panel_size.x) * 0.5,
+		maxf(map.position.y + 40.0, map.end.y - panel_size.y - 8.0))
+
+func _on_aid_confirmed(party_m: float, state_m: float) -> void:
+	var me := multiplayer.get_unique_id()
+	var reason := CardManager.aid_block_reason(me, party_m, state_m)
+	_aid_panel.hide()
+	if reason != "":
+		_show_toast(reason)
+		return
+	CardManager.aid(party_m, state_m)
+
+## Afetin gazetesi (tur başında; seçim gecesinden dönünce de bir kez).
+func _headline_for_disaster(info: Dictionary) -> void:
+	if not is_inside_tree() or info.is_empty() or _event_fx == null:
+		return
+	var kind := String(info.get("kind", ""))
+	var provinces: Array = info.get("provinces", [])
+	var names: Array = []
+	for province_id in provinces:
+		names.append(ElectionNightSim.province_name(String(province_id)))
+	_event_fx.present("ds|%d" % int(info.get("id", 0)), {
+		"headline": Disaster.headline(kind, provinces.size()),
+		"subtitle": L.t("%s: %s. Partiler bu tur bölgeye yardım götürebilir.") % [Disaster.title(kind), ", ".join(PackedStringArray(names))],
+		"art": Disaster.art(kind), "accent": Disaster.color(kind), "style": "scandal",
+		"status": L.t("AFET BÖLGESİ"), "sound": "paper_slap"})
 
 func _invest_block_reason() -> String:
 	if CardManager.can_act() and not CardManager.is_government_party(multiplayer.get_unique_id()):

@@ -33,6 +33,8 @@ var _seed_copy: Button
 var _leave_note: Label
 var _save_button: Button
 var _tutorial_button: Button
+## Kodla eklenen satırlar: dil değişince silinip yeni dilde yeniden kurulur.
+var _dynamic: Array = []
 ## "Oyundan Ayrıl" iki adımlı: ilk basış onay ister.
 var _leave_armed: bool = false
 
@@ -161,12 +163,14 @@ func _build_language_row() -> void:
 			if GameSettings.language == code:
 				return
 			GameSettings.set_language(code)
-			close()
-			get_tree().reload_current_scene())
+			# Menü açık kalır: önce arkadaki ekran, sonra bu panel yeni dilde kurulur.
+			get_tree().reload_current_scene()
+			_rebuild_for_language.call_deferred())
 		row.add_child(button)
 
 ## Yeni satırı "Kapat" butonunun hemen üstüne yerleştirir.
 func _insert_before_close(box: VBoxContainer, node: Control) -> void:
+	_dynamic.append(node)
 	box.add_child(node)
 	box.move_child(node, close_button.get_index())
 
@@ -342,6 +346,28 @@ func _on_leave_pressed() -> void:
 		return
 	close_menu()
 	MultiplayerManager.leave_game()
+
+## Dil değişince: ayarlar paneli açık kalır, kodla kurulan bütün yazılar
+## (satırlar ve oyun menüsü) yeni dilde yeniden kurulur.
+func _rebuild_for_language() -> void:
+	var menu_open := _menu.visible
+	for node in _dynamic:
+		if is_instance_valid(node):
+			node.get_parent().remove_child(node)
+			node.queue_free()
+	_dynamic.clear()
+	_menu.get_parent().remove_child(_menu)
+	_menu.queue_free()
+	_build_province_view_row()
+	_build_language_row()
+	_build_event_fx_row()
+	_build_volume_rows()
+	_apply_pixel_style()
+	_update_fps_label()
+	_build_menu()
+	if menu_open:
+		open_menu()
+	panel.show()
 
 ## Diğer ekranlardaki "Ayarlar" butonlarının da aynı paneli açması için.
 func open() -> void:

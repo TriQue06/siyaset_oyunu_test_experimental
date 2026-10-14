@@ -110,6 +110,8 @@ static func do_action(bot: int) -> Dictionary:
 			CardManager._apply_miting_move(bot, String(action["province"]), BotBrain.miting_state_share(bot))
 		"invest":
 			CardManager._apply_invest_move(bot, String(action["province"]), BotBrain.invest_state_share(bot))
+		"aid":
+			CardManager._apply_aid_move(bot, float(action["party"]), float(action["state"]))
 		"censure":
 			CardManager._apply_censure_move(bot)
 		"inquiry":

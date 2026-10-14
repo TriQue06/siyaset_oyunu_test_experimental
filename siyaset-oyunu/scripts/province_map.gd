@@ -176,6 +176,8 @@ func _draw() -> void:
 		draw_mesh(_border_mesh, null)
 	if _hovered_id != "":
 		_draw_region_outline(_hovered_id, HOVER_COLOR, 1.8)
+	if not _disaster_ids.is_empty():
+		_draw_disaster()
 	if not _pulse.is_empty():
 		_draw_pulse()
 
@@ -204,14 +206,56 @@ func pulse_province(province_id: String, color: Color, icon: String = "", durati
 	queue_redraw()
 
 func _process(delta: float) -> void:
+	_disaster_t += delta
 	if _pulse.is_empty():
-		set_process(false)
+		if _disaster_ids.is_empty():
+			set_process(false)
+		queue_redraw()
 		return
 	_pulse["time"] = float(_pulse["time"]) + delta
 	if float(_pulse["time"]) >= float(_pulse["duration"]):
 		_pulse = {}
-		set_process(false)
+		if _disaster_ids.is_empty():
+			set_process(false)
 	queue_redraw()
+
+# --- AFET BÖLGESİ (0.0.181) ---------------------------------------------------------
+## Afet sürdüğü tur boyunca etkilenen iller çizgili örtü + nabız gibi atan
+## kalın sınırla işaretlenir; bölgenin ortasında afet simgesi.
+var _disaster_ids: Array = []
+var _disaster_kind := ""
+var _disaster_t := 0.0
+
+func set_disaster(ids: Array, kind: String) -> void:
+	if ids == _disaster_ids and kind == _disaster_kind:
+		return
+	_disaster_ids = ids.duplicate()
+	_disaster_kind = kind
+	set_process(not _disaster_ids.is_empty() or not _pulse.is_empty())
+	queue_redraw()
+
+func _draw_disaster() -> void:
+	var color := Disaster.color(_disaster_kind)
+	var glow: float = sin(_disaster_t * 3.2) * 0.5 + 0.5
+	var fill := Color(color, 0.18 + 0.14 * glow)
+	var center := Vector2.ZERO
+	for id in _disaster_ids:
+		for cell in GameMap.region_cells(String(id)):
+			draw_colored_polygon(GameMap.cell_corners(cell, CELL_INSET), fill)
+		center += GameMap.center_of(String(id))
+	# Koyu alt çizgi + afet renginde nabız: her il renginin üstünde okunur.
+	for id in _disaster_ids:
+		_draw_region_outline(String(id), Color(UiTheme.INK, 0.85), 5.0)
+	for id in _disaster_ids:
+		_draw_region_outline(String(id), Color(color.lightened(0.25), 0.75 + 0.25 * glow), 2.4 + 1.6 * glow)
+	center /= float(_disaster_ids.size())
+	# Büyük uyarı rozeti: koyu daire, afet renginde üçgen, ünlem.
+	var pos := center - Vector2(0, 6.0 + 4.0 * glow)
+	draw_circle(pos, 15.0, Color(UiTheme.INK, 0.92))
+	draw_arc(pos, 15.0, 0.0, TAU, 32, color.lightened(0.3), 2.0, true)
+	draw_colored_polygon(PackedVector2Array([pos + Vector2(0, -10), pos + Vector2(10, 8), pos + Vector2(-10, 8)]), color)
+	draw_line(pos + Vector2(0, -4), pos + Vector2(0, 2.5), UiTheme.INK, 2.4)
+	draw_circle(pos + Vector2(0, 5.2), 1.4, UiTheme.INK)
 
 func _draw_pulse() -> void:
 	var t: float = clampf(float(_pulse["time"]) / float(_pulse["duration"]), 0.0, 1.0)
@@ -256,6 +300,11 @@ func _draw_micro_icon(icon: String, pos: Vector2, color: Color, alpha: float) ->
 		"factory":
 			draw_colored_polygon(PackedVector2Array([pos + Vector2(-6, 6), pos + Vector2(-6, -1), pos + Vector2(-2, 1),
 				pos + Vector2(-2, -1), pos + Vector2(2, 1), pos + Vector2(2, -6), pos + Vector2(5, -6), pos + Vector2(5, 6)]), fg)
+		"alert":
+			# Uyarı üçgeni (afet)
+			draw_colored_polygon(PackedVector2Array([pos + Vector2(0, -6), pos + Vector2(6, 5), pos + Vector2(-6, 5)]), fg)
+			draw_line(pos + Vector2(0, -2), pos + Vector2(0, 1.5), Color(color.darkened(0.4), alpha), 1.6)
+			draw_circle(pos + Vector2(0, 3.3), 0.9, Color(color.darkened(0.4), alpha))
 		"flag":
 			draw_line(pos + Vector2(-4, -6), pos + Vector2(-4, 6), fg, 1.4)
 			draw_colored_polygon(PackedVector2Array([pos + Vector2(-4, -6), pos + Vector2(5, -3), pos + Vector2(-4, 0)]), fg)

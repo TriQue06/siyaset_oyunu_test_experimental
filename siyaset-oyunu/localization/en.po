@@ -3,6 +3,123 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: en\n"
 
+msgid "AFET YARDIMI"
+msgstr "DISASTER RELIEF"
+
+msgid "PARTİ KASASINDAN"
+msgstr "FROM PARTY FUNDS"
+
+msgid "DEVLET HAZİNESİNDEN"
+msgstr "FROM STATE TREASURY"
+
+msgid "%s · yardım götür"
+msgstr "%s · send relief"
+
+msgid "Afet bölgesi: %s. Afet bu tur sürer."
+msgstr "Disaster zone: %s. The disaster lasts this round."
+
+msgid "Henüz kimse yardım götürmedi."
+msgstr "No one has sent relief yet."
+
+msgid "Şimdiye kadar: %s"
+msgstr "So far: %s"
+
+msgid "Etki: afetteki %d ilin her birinde +%s yerel puan"
+msgstr "Effect: in each of the %d provinces hit, +%s local points"
+
+msgid "Etki: ilde +%s yerel puan"
+msgstr "Effect: +%s local points in the province"
+
+msgid "Hemen etki eder, seçmen gruplarına dokunmaz. Aynı afete tekrar yardım daha az getirir."
+msgstr "Takes effect at once and does not touch voter groups. More relief to the same disaster brings less."
+
+msgid "YARDIM GÖTÜR · %s milyon ₺"
+msgstr "SEND RELIEF · %s million ₺"
+
+msgid "YAPILAMIYOR"
+msgstr "NOT POSSIBLE"
+
+msgid "Şu an yardım bekleyen bir afet yok."
+msgstr "There is no disaster awaiting relief right now."
+
+msgid "Yardım için en az %s gerekir."
+msgstr "Relief needs at least %s."
+
+msgid "Tutar %s adımlarla seçilir."
+msgstr "The amount is chosen in steps of %s."
+
+msgid "%s yardımı — %s getirdi (%s)"
+msgstr "%s relief — sent by %s (%s)"
+
+msgid "%s, afet bölgesi %s iline %s yardım götürdü."
+msgstr "%s sent relief to the disaster-hit province of %s: %s."
+
+msgid "%s, afetteki %d ile %s yardım götürdü."
+msgstr "%s sent relief to the %d disaster-hit provinces: %s."
+
+msgid "%s afeti"
+msgstr "%s disaster"
+
+msgid "AFET: %s — %s. Bu tur boyunca YARDIM GÖTÜR hamlesiyle bölgeye yardım edilebilir."
+msgstr "DISASTER: %s — %s. Parties can send relief with the RELIEF move during this round."
+
+msgid "%s afeti sona erdi: bölgeye hiçbir parti yardım götürmedi."
+msgstr "The %s disaster is over: no party sent relief to the region."
+
+msgid "%s afeti sona erdi. Yardımlar: %s."
+msgstr "The %s disaster is over. Relief: %s."
+
+msgid "Sel"
+msgstr "Flood"
+
+msgid "Toprak Kayması"
+msgstr "Landslide"
+
+msgid "Çığ"
+msgstr "Avalanche"
+
+msgid "Orman Yangını"
+msgstr "Wildfire"
+
+msgid "Deprem"
+msgstr "Earthquake"
+
+msgid "Afet"
+msgstr "Disaster"
+
+msgid "DEPREM: %d İLDE YIKIM!"
+msgstr "EARTHQUAKE: DEVASTATION IN %d PROVINCES!"
+
+msgid "ORMANLAR YANIYOR: %d İL ALEV ALTINDA!"
+msgstr "FORESTS ABLAZE: %d PROVINCES IN FLAMES!"
+
+msgid "SEL FELAKETİ!"
+msgstr "FLOOD DISASTER!"
+
+msgid "TOPRAK KAYDI, YOLLAR KAPANDI!"
+msgstr "LANDSLIDE CUTS OFF THE ROADS!"
+
+msgid "ÇIĞ DÜŞTÜ, KÖYLER MAHSUR!"
+msgstr "AVALANCHE STRANDS VILLAGES!"
+
+msgid "AFET!"
+msgstr "DISASTER!"
+
+msgid "YARDIM"
+msgstr "RELIEF"
+
+msgid "tutar serbest"
+msgstr "any amount"
+
+msgid "Afet bölgesine yardım götür: tutarı sen belirlersin. Hükümetsen devlet hazinesinden de ödeyebilirsin. Yatırımdan çok daha güçlü ve hemen etki eder; seçmen gruplarına dokunmaz."
+msgstr "Send relief to the disaster zone: you choose the amount. In government you can also pay from the state treasury. Much stronger than investment and immediate; it does not touch voter groups."
+
+msgid "%s: %s. Partiler bu tur bölgeye yardım götürebilir."
+msgstr "%s: %s. Parties can send relief to the region this round."
+
+msgid "AFET BÖLGESİ"
+msgstr "DISASTER ZONE"
+
 msgid "OYUNCU"
 msgstr "PLAYER"
 

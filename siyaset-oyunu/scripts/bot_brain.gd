@@ -283,6 +283,14 @@ static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 			best = {"type": "invest", "province": invest["province"]}
 			best_score = float(invest["score"]) - GameRules.INVEST_FUNDS_COST * funds_value + invest_noise
 
+	var aid := eval_aid(bot)
+	if not aid.is_empty():
+		var aid_score := float(aid["score"]) - float(aid["party"]) * funds_value + _jitter(bot)
+		candidates.append({"type": "aid", "party": aid["party"], "state": aid["state"]})
+		if aid_score > best_score:
+			best = {"type": "aid", "party": aid["party"], "state": aid["state"]}
+			best_score = aid_score
+
 	var inquiry := _eval_inquiry(bot)
 	if not inquiry.is_empty():
 		var inquiry_score := float(inquiry["score"]) - Economy.INQUIRY_FUNDS_COST * funds_value + _jitter(bot)
@@ -768,6 +776,29 @@ static func _eval_investment(bot: int) -> Dictionary:
 			best_province = province_id
 	# İl başkanlığı ve mitingle aynı ölçek (vekil/30).
 	return {"score": (0.8 + best_value / 30.0 * 1.2 * (1.3 if _election_soon() else 1.0)) * timing, "peer": -1, "province": best_province}
+
+## AFET YARDIMI: partisi bu afete henüz yardım etmediyse kasasının ~%40'ı,
+## hükümetteyse kotasının yarısı (en çok 60 milyon ₺) devletten. Değer:
+## miting ölçeğinde (vekil/30), afet yardımı güçlü olduğu için ×1,6.
+static func eval_aid(bot: int) -> Dictionary:
+	if not CardManager.can_aid(bot) or CardManager.disaster_aid_of(bot) > 0.0:
+		return {}
+	var lim := CardManager.aid_limits(bot)
+	var party_m := Disaster.snap_amount(minf(float(lim["party_max"]), CardManager.funds_of(bot) * 0.4))
+	var state_m := Disaster.snap_amount(minf(float(lim["state_max"]), minf(60.0, CardManager.state_quota(bot) * 0.5)))
+	if party_m + state_m < Disaster.AID_MIN:
+		party_m = Disaster.AID_MIN if float(lim["party_max"]) >= Disaster.AID_MIN else party_m
+	if not CardManager.can_aid(bot, party_m, state_m):
+		return {}
+	var provinces: Array = CardManager.active_disaster().get("provinces", [])
+	var gain := Disaster.local_gain(0.0, party_m + state_m, provinces.size())
+	var value := 0.0
+	for province_id in provinces:
+		var seats := float(CardManager.province_seat_count(String(province_id)))
+		var closeness := PublicOpinion.appeal_closeness(CardManager.appeal_of(String(province_id), bot))
+		value += minf(gain, PublicOpinion.LIMIT - CardManager.local_of(String(province_id), bot)) / PublicOpinion.MITING_LOCAL * seats / 30.0 * (0.5 + closeness)
+	value += Disaster.national_gain(0.0, party_m + state_m) * 0.5
+	return {"score": value * 1.4 * 1.6 * (1.4 if _election_soon() else 1.0), "party": party_m, "state": state_m}
 
 ## En büyük rakibi, en çok vekilli ve onun zayıf, botun güçlü olduğu ilde karala.
 static func _eval_propaganda(bot: int) -> Dictionary:

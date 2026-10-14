@@ -212,6 +212,13 @@ var funds: Dictionary = {}
 ## EKONOMİ (bkz. Economy): vergi kademesi, hissedilen vergi baskısı, ekonomi
 ## endeksi, yatırım ivmesi, DEVLET HAZİNESİ, bekleyen yatırım dilimleri.
 var economy: Dictionary = Economy.start_state()
+## AFET (bkz. Disaster): {"active": {} ya da {"id", "kind", "provinces",
+## "round", "aid": {parti: toplam milyon ₺}}, "term_count": bu seçim
+## döneminde çıkan afet, "owed": önceki dönemde hiç çıkmadı (garanti),
+## "next_id"}.
+var disaster: Dictionary = {}
+## Tur başında çıkan afetin gazete bilgisi (sonraki _push_state olaya ekler).
+var _pending_disaster_fx: Dictionary = {}
 ## Tur sonu ekonomi olayı: bir sonraki durum yayınına iliştirilir.
 var _pending_econ: Dictionary = {}
 
@@ -479,6 +486,156 @@ func _request_constitution(payload: Dictionary) -> void:
 func has_proposed_law_this_round(peer_id: int) -> bool:
 	return int(law_rounds.get(party_of(peer_id), 0)) == round_number
 
+# --- Afet ve YARDIM GÖTÜR (bkz. Disaster) -------------------------------------
+
+func active_disaster() -> Dictionary:
+	return disaster.get("active", {})
+
+func has_disaster() -> bool:
+	return not active_disaster().is_empty()
+
+## Bu oyuncunun partisinin bu afete şimdiye kadar yaptığı yardım (milyon ₺).
+func disaster_aid_of(peer_id: int) -> float:
+	return float((active_disaster().get("aid", {}) as Dictionary).get(party_of(peer_id), 0.0))
+
+## Yardım tutarlarının üst sınırları: {"party_max", "state_max", "state_allowed"}
+## (AID_STEP'e yuvarlanmış). Devlet payı hükümet partisinin hazine kotasıyla sınırlı.
+func aid_limits(peer_id: int) -> Dictionary:
+	var state_allowed := is_government_party(peer_id) and not is_party_member(peer_id) and not PartyManager.is_independent(peer_id)
+	var state_max := minf(state_quota(peer_id), state_treasury()) if state_allowed else 0.0
+	return {"party_max": Disaster.snap_amount(funds_of(peer_id)), "state_max": Disaster.snap_amount(state_max),
+		"state_allowed": state_allowed}
+
+## Yardım neden yapılamıyor ("" = yapılabilir). Tutarlar verilmezse (< 0)
+## sadece "en az AID_MIN ödenebiliyor mu" bakılır.
+func aid_block_reason(peer_id: int, party_m: float = -1.0, state_m: float = -1.0) -> String:
+	if not has_disaster():
+		return L.t("Şu an yardım bekleyen bir afet yok.")
+	if not can_choose_main_action(peer_id):
+		return L.t("Sıra sende değil.")
+	var lim := aid_limits(peer_id)
+	if party_m < 0.0 or state_m < 0.0:
+		if float(lim["party_max"]) + float(lim["state_max"]) < Disaster.AID_MIN:
+			return L.t("Yardım için en az %s gerekir.") % Economy.money_full(Disaster.AID_MIN)
+		return ""
+	if party_m + state_m < Disaster.AID_MIN - 0.001:
+		return L.t("Yardım için en az %s gerekir.") % Economy.money_full(Disaster.AID_MIN)
+	if not is_equal_approx(Disaster.snap_amount(party_m + 0.001), party_m) or not is_equal_approx(Disaster.snap_amount(state_m + 0.001), state_m):
+		return L.t("Tutar %s adımlarla seçilir.") % Economy.money_full(Disaster.AID_STEP)
+	if state_m > 0.0 and not bool(lim["state_allowed"]):
+		return L.t("Devlet hazinesini sadece hükümet partileri kullanabilir.")
+	if state_m > state_treasury() + 0.001:
+		return L.t("Devlet hazinesi yetmiyor (%s var).") % Economy.money_full(state_treasury())
+	if state_m > state_quota(peer_id) + 0.001:
+		return L.t("Bu dönemki hazine kotan yetmiyor (%s kaldı).") % Economy.money_full(state_quota(peer_id))
+	if party_m > funds_of(peer_id) + 0.001:
+		return L.t("Parti kasası yetmiyor (%s gerekir).") % GameRules.cost_text(party_m)
+	return ""
+
+func can_aid(peer_id: int, party_m: float = -1.0, state_m: float = -1.0) -> bool:
+	return aid_block_reason(peer_id, party_m, state_m) == ""
+
+## YARDIM GÖTÜR: party_m parti kasasından, state_m devlet hazinesinden (milyon ₺).
+func aid(party_m: float, state_m: float) -> void:
+	if not can_aid(multiplayer.get_unique_id(), party_m, state_m):
+		return
+	if _is_authority():
+		_apply_aid_move(multiplayer.get_unique_id(), party_m, state_m)
+	else:
+		_request_aid.rpc_id(1, party_m, state_m)
+
+@rpc("any_peer", "reliable")
+func _request_aid(party_m: float, state_m: float) -> void:
+	if not MultiplayerManager.is_host:
+		return
+	_apply_aid_move(multiplayer.get_remote_sender_id(), party_m, state_m)
+
+func _apply_aid_move(peer_id: int, party_m: float, state_m: float) -> void:
+	if not can_aid(peer_id, party_m, state_m):
+		return
+	var active := active_disaster()
+	var provinces: Array = active.get("provinces", [])
+	var total := party_m + state_m
+	funds[peer_id] = funds_of(peer_id) - party_m
+	var before := state_treasury()
+	if state_m > 0.0:
+		_spend_quota(peer_id, state_m)
+		economy["treasury"] = before - state_m
+	_record_funding(peer_id, "aid", String(provinces[0]), {"party": party_m, "state": state_m}, total)
+	var pid := party_of(peer_id)
+	var aid_map: Dictionary = active.get("aid", {})
+	var prev := float(aid_map.get(pid, 0.0))
+	aid_map[pid] = prev + total
+	active["aid"] = aid_map
+	var gain := Disaster.local_gain(prev, prev + total, provinces.size())
+	for province_id in provinces:
+		_add_local(String(province_id), peer_id, gain)
+		_log_province(String(province_id), L.t("%s yardımı — %s getirdi (%s)") % [
+			Disaster.title(String(active["kind"])), _party_name(peer_id), Economy.money_full(total)])
+	_add_national(peer_id, Disaster.national_gain(prev, prev + total))
+	var message := L.t("%s, afet bölgesi %s iline %s yardım götürdü.") % [_party_name(peer_id), _province_name(String(provinces[0])), Economy.money_full(total)] 		if provinces.size() == 1 else L.t("%s, afetteki %d ile %s yardım götürdü.") % [_party_name(peer_id), provinces.size(), Economy.money_full(total)]
+	var event := {"type": "aid", "peer_id": peer_id, "province": String(provinces[0]), "message": message}
+	if state_m > 0.0:
+		event["econ"] = {"kind": "invest", "peer_id": peer_id, "province": String(provinces[0]), "cost": state_m,
+			"party_cost": party_m, "before": before, "after": state_treasury()}
+	_push_state(event)
+
+## Tur başı (host): afet zarı. Dönemde en fazla TERM_MAX; önceki dönem hiç
+## çıkmadıysa bu dönemin son turunda hâlâ yoksa kesin çıkar.
+func _roll_disaster() -> void:
+	var count := int(disaster.get("term_count", 0))
+	if count >= Disaster.TERM_MAX:
+		return
+	var forced: bool = bool(disaster.get("owed", false)) and count == 0 and GameRules.is_election_round(round_number)
+	if not forced and _rng.randf() >= Disaster.round_chance():
+		return
+	start_disaster(Disaster.pick_kind(_rng))
+
+## Afeti başlatır (testler de doğrudan çağırır). Dönüş: etkilenen iller.
+func start_disaster(kind: String, provinces: Array = []) -> Array:
+	if provinces.is_empty():
+		provinces = Disaster.pick_region(kind, _rng, GameMap.province_ids())
+	if provinces.is_empty():
+		return []
+	var id := int(disaster.get("next_id", 1))
+	disaster["next_id"] = id + 1
+	disaster["term_count"] = int(disaster.get("term_count", 0)) + 1
+	disaster["owed"] = false
+	disaster["active"] = {"id": id, "kind": kind, "provinces": provinces, "round": round_number, "aid": {}}
+	var names: Array = []
+	for province_id in provinces:
+		names.append(_province_name(String(province_id)))
+		_log_province(String(province_id), L.t("%s afeti") % Disaster.title(kind))
+	_pending_log.append({"text": L.t("AFET: %s — %s. Bu tur boyunca YARDIM GÖTÜR hamlesiyle bölgeye yardım edilebilir.") % [
+		Disaster.title(kind), ", ".join(PackedStringArray(names))], "peer_id": -1, "province": String(provinces[0]), "kind": "disaster"})
+	_pending_disaster_fx = {"id": id, "kind": kind, "provinces": provinces}
+	return provinces
+
+## Tur bitti: afet sona erer, kimin ne kadar yardım ettiği loga düşer.
+func _end_disaster() -> void:
+	var active := active_disaster()
+	if active.is_empty():
+		return
+	var aid_map: Dictionary = active.get("aid", {})
+	var text := ""
+	if aid_map.is_empty():
+		text = L.t("%s afeti sona erdi: bölgeye hiçbir parti yardım götürmedi.") % Disaster.title(String(active["kind"]))
+	else:
+		var parts: Array = []
+		var ids: Array = aid_map.keys()
+		ids.sort_custom(func(a, b): return float(aid_map[a]) > float(aid_map[b]))
+		for pid in ids:
+			parts.append("%s %s" % [_party_name(int(pid)), Economy.money_full(float(aid_map[pid]))])
+		text = L.t("%s afeti sona erdi. Yardımlar: %s.") % [Disaster.title(String(active["kind"])), ", ".join(PackedStringArray(parts))]
+	_pending_log.append({"text": text, "peer_id": -1, "province": String((active.get("provinces", [""]) as Array)[0]), "kind": "disaster"})
+	disaster["active"] = {}
+
+## Yeni seçim dönemi: sayaç sıfırlanır; biten dönemde hiç afet çıkmadıysa
+## yenisinde en az bir tane garanti.
+func _disaster_new_term() -> void:
+	disaster["owed"] = int(disaster.get("term_count", 0)) == 0
+	disaster["term_count"] = 0
+
 ## Yatırım hamlesi: sadece hükümet partileri; DEVLET HAZİNESİNDEN ödenir
 ## (Economy.INVEST_COST; hazine yetmezse kalanı parti kasasından).
 ## state: devletin payı (0..1); -1 = uygun bir paylaşım var mı.
@@ -545,6 +702,9 @@ func inquiry_records(target: int) -> Array:
 	var pid := party_of(target)
 	var result: Array = []
 	for entry in economy.get("ledger", []):
+		# Afet yardımı soruşturma kapsamı dışında (meşru, açık harcama).
+		if String(entry.get("kind", "")) == "aid":
+			continue
 		if int(entry["party"]) == pid and not bool(entry.get("investigated", false)) \
 				and round_number - int(entry["round"]) <= Economy.INQUIRY_SCOPE_ROUNDS:
 			result.append(entry)
@@ -1225,6 +1385,8 @@ func init_game() -> void:
 	election_groups = {}
 	former_parties = {}
 	economy = Economy.start_state()
+	disaster = {}
+	_pending_disaster_fx = {}
 	national_list = {}
 	round_number = 1
 	last_election_round = 0
@@ -2545,6 +2707,17 @@ func _finish_round() -> void:
 	# etkisi sayılmaz).
 	_pending_log.append({"text": _advance_economy(), "peer_id": -1, "province": "", "kind": "economy"})
 	_pending_econ = {"kind": "round", "revenue": float(economy["revenue"])}
+	# AFET: bitmiş turun afeti sona erer; yeni tur için zar atılır. Bu tur
+	# seçimle bitiyorsa yeni afet YENİ seçim dönemine sayılır.
+	_end_disaster()
+	var will_elect: bool = finished_round >= GameRules.MAX_ROUNDS or early_election_pending \
+		or GameRules.is_election_round(finished_round) \
+		or (not last_seats.is_empty() and not GovernmentManager.has_government()
+			and GovernmentManager.phase == GovernmentManager.Phase.IDLE)
+	if will_elect:
+		_disaster_new_term()
+	if finished_round < GameRules.MAX_ROUNDS:
+		_roll_disaster()
 
 	if finished_round >= GameRules.MAX_ROUNDS:
 		# SON SEÇİM: kurulan hükümet puanlarını alınca oyun biter (bkz. on_block_state_changed).
@@ -3733,6 +3906,7 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"election_groups": election_groups,
 		"former_parties": former_parties,
 		"economy": economy,
+		"disaster": disaster,
 		"funds": funds,
 		"game_finished": game_finished,
 		"final_ranking": final_ranking,
@@ -3789,6 +3963,7 @@ func _apply_state(state: Dictionary) -> void:
 	former_parties = state.get("former_parties", {})
 	# Eski sürüm durumunda ekonomi yoktur: güvenli başlangıç değerleri.
 	economy = Economy.normalized(state.get("economy", {}))
+	disaster = state.get("disaster", {})
 	# PARTİ KASASI (milyon ₺). 0.0.166 öncesi durumda alan "mana" adındaydı;
 	# para ölçeği eski değerlerle birebir kurulduğu için (bkz. GameRules) değer
 	# aynen taşınır. İkisi de yoksa boş başlar (herkes 0).
@@ -3829,6 +4004,10 @@ func _push_state(event: Dictionary, include_results: bool = false) -> void:
 		event = event.duplicate()
 		event["dealt"] = _pending_dealt
 		_pending_dealt = {}
+	if not _pending_disaster_fx.is_empty():
+		event = event.duplicate()
+		event["disaster"] = _pending_disaster_fx
+		_pending_disaster_fx = {}
 	if not _pending_econ.is_empty():
 		event = event.duplicate()
 		if not event.has("econ"):

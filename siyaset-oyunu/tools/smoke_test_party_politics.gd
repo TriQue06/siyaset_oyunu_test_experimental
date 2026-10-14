@@ -137,7 +137,7 @@ func _initialize() -> void:
 	cm._advance_turn()
 	check("3 seçimdir kongre yoksa sıra gelince kongre başlar", cm.congress_active and cm.elections_since_congress(cm.party_of(b1)) == 0)
 	check("kongre sürerken tur akışı durur", cm.is_turn_blocked())
-	cm.tick(cm.congress_duration(false) + 0.5)
+	cm.tick(cm.congress_duration(false) + GameRules.ELECTION_NIGHT_PAPER + 0.5)  # gösteri + sonuç gazetesi
 	check("gösteri bitince tur akışı devam eder", not cm.congress_active)
 
 	print("=== BAŞKANLIĞI KAYBETMEK ===")

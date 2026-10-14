@@ -266,6 +266,15 @@ const ACTION_BUTTON_WIDTH := 72.0
 const ACTION_BUTTON_HEIGHT := 64.0
 const ACTION_BUTTON_GAP := 8
 var _action_grid: GridContainer
+## HAMLE SEKMELERİ (0.0.189): hamleler kategorilere ayrılır; ızgarada yalnız
+## seçili sekmenin hamleleri görünür. Yeni hamle = _action_button(..., kategori).
+enum ActionTab { SAHA, MECLIS, PARTI, SIYASET }
+const ACTION_TAB_TITLES := ["SAHA", "MECLİS", "PARTİ", "SİYASET"]
+var _action_tab := ActionTab.SAHA
+var _action_tab_bar: HBoxContainer
+var _action_tab_buttons: Array = []
+## Buton -> sekme (ActionTab).
+var _action_tab_of: Dictionary = {}
 var _law_button: Button
 var _org_button: Button
 var _miting_button: Button
@@ -3703,8 +3712,9 @@ func _build_action_buttons() -> void:
 	# konuma oturtuluyordu; uzun bir yazı (TEŞKİLATLANMA) butonun asgari
 	# genişliğini büyütünce komşusunun üstüne biniyordu. Izgara bunu yapısal
 	# olarak önler.
+	_build_action_tabs()
 	_action_grid = GridContainer.new()
-	_action_grid.columns = 5
+	_action_grid.columns = 4
 	_action_grid.add_theme_constant_override("h_separation", ACTION_BUTTON_GAP)
 	_action_grid.add_theme_constant_override("v_separation", ACTION_BUTTON_GAP)
 	# Izgara panelin ÜSTÜNE oturur; altındaki boşluğu esnek bir ayraç doldurur.
@@ -3714,38 +3724,38 @@ func _build_action_buttons() -> void:
 	filler.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	filler.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	actions_vbox.add_child(filler)
-	_law_button = _action_button(L.t("YASA"), GameRules.cost_text(GameRules.LAW_FUNDS_COST), UiTheme.PURPLE)
+	_law_button = _action_button(L.t("YASA"), GameRules.cost_text(GameRules.LAW_FUNDS_COST), UiTheme.PURPLE, "", ActionTab.MECLIS)
 	_law_button.pressed.connect(_on_law_button_pressed)
 	_law_button.tooltip_text = L.t("Bir seçmen grubu için yasa sun: o grupta destek kazanırsın, karşıt grup biraz soğur. Geçerse puan. Dönemde bir kez.")
-	_miting_button = _action_button(L.t("MİTİNG"), GameRules.cost_text(GameRules.MITING_FUNDS_COST), UiTheme.RED, "miting")
+	_miting_button = _action_button(L.t("MİTİNG"), GameRules.cost_text(GameRules.MITING_FUNDS_COST), UiTheme.RED, "miting", ActionTab.SAHA)
 	_miting_button.pressed.connect(_on_miting_button_pressed)
 	_miting_button.tooltip_text = L.t("İlde oy kazandırır ve partini ilin kalabalık seçmen gruplarına yaklaştırır. Teşkilat ister; provokasyon riski vardır.")
-	_org_button = _action_button(L.t("TEŞKİLAT"), GameRules.cost_text(GameRules.ORG_FUNDS_COST), UiTheme.BLUE, "teskilat")
+	_org_button = _action_button(L.t("TEŞKİLAT"), GameRules.cost_text(GameRules.ORG_FUNDS_COST), UiTheme.BLUE, "teskilat", ActionTab.SAHA)
 	_org_button.pressed.connect(_on_org_button_pressed)
 	_org_button.tooltip_text = L.t("İlde kalıcı güç ve anket; yerel bağışlarla kasana düzenli para getirir.")
-	_invest_button = _action_button(L.t("YATIRIM"), GameRules.cost_text(Economy.INVEST_COST), UiTheme.GREEN_DARK, "yatirim")
+	_invest_button = _action_button(L.t("YATIRIM"), GameRules.cost_text(Economy.INVEST_COST), UiTheme.GREEN_DARK, "yatirim", ActionTab.SAHA)
 	_invest_button.pressed.connect(_on_invest_button_pressed)
 	_invest_button.tooltip_text = L.t("Güçlü yerel etki: ildeki bütün seçmen memnun olur. Devlet hazinesinden (gerekirse parti kasasından) ödenir; sadece hükümet partileri.")
-	_censure_button = _action_button(L.t("GENSORU"), GameRules.cost_text(GameRules.CENSURE_FUNDS_COST), UiTheme.RED_DARK, "gensoru")
+	_censure_button = _action_button(L.t("GENSORU"), GameRules.cost_text(GameRules.CENSURE_FUNDS_COST), UiTheme.RED_DARK, "gensoru", ActionTab.MECLIS)
 	_censure_button.pressed.connect(_on_censure_button_pressed)
 	_censure_button.tooltip_text = L.t("Hükümeti düşürmeye çalış: meclis oylar. Reddedilirse küçük bir itibar kaybı.")
-	_early_button = _action_button(L.t("ERKEN SEÇİM"), GameRules.cost_text(GameRules.EARLY_ELECTION_FUNDS_COST), UiTheme.GOLD, "erken_secim")
+	_early_button = _action_button(L.t("ERKEN SEÇİM"), GameRules.cost_text(GameRules.EARLY_ELECTION_FUNDS_COST), UiTheme.GOLD, "erken_secim", ActionTab.MECLIS)
 	_early_button.pressed.connect(_on_early_button_pressed)
 	_early_button.tooltip_text = L.t("Erken seçim önergesi: kabul edilirse dönem sonunda sandık kurulur.")
 	# GRUP TOPLANTISI: sıra sendeyken açık, sırada bir kez.
-	_speech_button = _action_button(L.t("TOPLANTI"), GameRules.cost_text(GameRules.SPEECH_FUNDS_COST), UiTheme.GOLD_DIM, "grup_toplantisi")
+	_speech_button = _action_button(L.t("TOPLANTI"), GameRules.cost_text(GameRules.SPEECH_FUNDS_COST), UiTheme.GOLD_DIM, "grup_toplantisi", ActionTab.PARTI)
 	_speech_button.tooltip_text = L.t("Grup toplantısı: bir seçmen grubunun sorunlarını konuş. O grupta kısa süreli destek (bu dönem güçlü, sonra hızla söner). Dönemde bir kez, isteğe bağlı.")
 	_speech_button.pressed.connect(_on_speech_button_pressed)
 	# KONGRE: genel başkan kendi sırasında (en az bir seçim geçtiyse) kongreye
 	# gider; partide üye kalan eski başkan kongre ister.
-	_congress_button = _action_button(L.t("KONGRE"), _congress_cost_text(), UiTheme.PURPLE.darkened(0.3), "kongre")
+	_congress_button = _action_button(L.t("KONGRE"), _congress_cost_text(), UiTheme.PURPLE.darkened(0.3), "kongre", ActionTab.PARTI)
 	_congress_button.pressed.connect(_on_congress_button_pressed)
 	_congress_button.tooltip_text = L.t("Genel başkan: partini kongreye götür, liderliğini tazele. Üye: kongre iste, başkanlığı geri almaya çalış.")
 	# AFET YARDIMI: sadece bir afet sürerken; tutarı oyuncu belirler.
-	_aid_button = _action_button(L.t("YARDIM"), L.t("tutar serbest"), UiTheme.RED.darkened(0.15), "yardim")
+	_aid_button = _action_button(L.t("YARDIM"), L.t("tutar serbest"), UiTheme.RED.darkened(0.15), "yardim", ActionTab.SAHA)
 	_aid_button.pressed.connect(_on_aid_button_pressed)
 	_aid_button.tooltip_text = L.t("Afet bölgesine yardım götür: tutarı sen belirlersin. Hükümetsen devlet hazinesinden de ödeyebilirsin. Yatırımdan çok daha güçlü ve hemen etki eder; seçmen gruplarına dokunmaz.")
-	_inquiry_button = _action_button(L.t("SORUŞTURMA"), GameRules.cost_text(Economy.INQUIRY_FUNDS_COST), UiTheme.PURPLE.darkened(0.1), "sorusturma")
+	_inquiry_button = _action_button(L.t("SORUŞTURMA"), GameRules.cost_text(Economy.INQUIRY_FUNDS_COST), UiTheme.PURPLE.darkened(0.1), "sorusturma", ActionTab.SIYASET)
 	_inquiry_button.pressed.connect(_on_inquiry_button_pressed)
 	_inquiry_button.tooltip_text = L.t("Bir partinin harcamalarına finansman soruşturması aç: devlet parasıyla miting usulsüzlüktür, kendi kasasından ödeyen itibar kazanır.")
 
@@ -3757,7 +3767,7 @@ func _congress_cost_text() -> String:
 
 ## Hamle butonu: ızgaraya eklenir, sabit kutu boyutunda kalır ve yazı taşarsa
 ## kırpılır — böylece hiçbir buton komşusunu itemez.
-func _action_button(title: String, cost_text: String, color: Color, icon_name: String = "") -> Button:
+func _action_button(title: String, cost_text: String, color: Color, icon_name: String = "", tab: int = ActionTab.SAHA) -> Button:
 	var button := Button.new()
 	button.custom_minimum_size = Vector2(ACTION_BUTTON_WIDTH, ACTION_BUTTON_HEIGHT)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -3767,7 +3777,51 @@ func _action_button(title: String, cost_text: String, color: Color, icon_name: S
 	UiSkin.skin_color_button(button, color)
 	UiSkin.set_top_icon(button, icon_name, 18)
 	_action_grid.add_child(button)
+	_action_tab_of[button] = tab
+	button.visible = tab == _action_tab
 	return button
+
+## Sekme şeridi: harita katman düğmeleriyle aynı dil (kare, seçili olan altın).
+## Düğmede, o sekmede şu an yapılabilir hamle sayısı yazar.
+func _build_action_tabs() -> void:
+	_action_tab_bar = HBoxContainer.new()
+	_action_tab_bar.add_theme_constant_override("separation", 0)
+	actions_vbox.add_child(_action_tab_bar)
+	for i in ACTION_TAB_TITLES.size():
+		var button := Button.new()
+		button.focus_mode = Control.FOCUS_NONE
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.custom_minimum_size = Vector2(0, 30)
+		button.clip_text = true
+		button.add_theme_font_size_override("font_size", 12)
+		button.pressed.connect(_select_action_tab.bind(i))
+		_action_tab_bar.add_child(button)
+		_action_tab_buttons.append(button)
+
+func _select_action_tab(tab: int) -> void:
+	_action_tab = tab
+	for button in _action_tab_of:
+		(button as Control).visible = int(_action_tab_of[button]) == tab
+	_refresh_action_tabs()
+
+func _refresh_action_tabs() -> void:
+	var ready := {}
+	for button in _action_tab_of:
+		if (button as Control).modulate.a > 0.9:
+			var t := int(_action_tab_of[button])
+			ready[t] = int(ready.get(t, 0)) + 1
+	for i in _action_tab_buttons.size():
+		var button: Button = _action_tab_buttons[i]
+		var active := i == _action_tab
+		var count := int(ready.get(i, 0))
+		button.text = "%s %d" % [L.t(ACTION_TAB_TITLES[i]), count] if count > 0 else L.t(ACTION_TAB_TITLES[i])
+		var color := UiTheme.GOLD if active else UiTheme.PANEL
+		for state in ["normal", "hover", "pressed", "focus"]:
+			var c := color.lightened(0.08) if state == "hover" and not active else color
+			button.add_theme_stylebox_override(state, _layer_button_style(c, false, false))
+		var font := UiTheme.INK if active else (UiTheme.TEXT if count > 0 else UiTheme.TEXT.darkened(0.4))
+		for key in ["font_color", "font_hover_color", "font_pressed_color"]:
+			button.add_theme_color_override(key, font)
 
 ## Hamle düğmesinin iki satırı (ad + bedel). DAR KUTUYA SIĞSIN: en uzun satır
 ## düğmeye sığana kadar yazı küçülür (İngilizce "EARLY ELECTION" gibi; ad
@@ -3826,6 +3880,7 @@ func _refresh_action_buttons() -> void:
 	# TOPLANTI: sıra sendeyken açık; sırada bir kez (konuşunca söner).
 	if _speech_button != null:
 		_speech_button.modulate.a = 1.0 if CardManager.can_act() and CardManager.needs_speech(me) else 0.45
+	_refresh_action_tabs()
 
 func _build_agenda_banner() -> void:
 	_agenda_banner = PanelContainer.new()

@@ -3416,3 +3416,15 @@ msgstr "You already proposed a voter group law this term (tax laws and constitut
 
 msgid "Seçim zaten bu turun sonunda: erken seçim önergesine gerek yok."
 msgstr "The election is already at the end of this round: no need for an early election motion."
+
+msgid "SAHA"
+msgstr "FIELD"
+
+msgid "MECLİS"
+msgstr "PARLIAMENT"
+
+msgid "PARTİ"
+msgstr "PARTY"
+
+msgid "SİYASET"
+msgstr "POLITICS"

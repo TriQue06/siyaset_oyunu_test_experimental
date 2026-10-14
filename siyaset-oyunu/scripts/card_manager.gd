@@ -119,6 +119,10 @@ var current_turn_index: int = 0
 var _pending_dealt: Dictionary = {}
 ## Oyuncunun en son yasa sunduğu tur: peer_id -> round_number (turda 1 yasa).
 var law_rounds: Dictionary = {}
+## 0.0.185: yasa hakları AYRI: grup yasası (law_rounds), vergi yasası ve
+## anayasa değişikliği her biri dönemde bir; aynı turda üçü de sunulabilir.
+var tax_rounds: Dictionary = {}
+var constitution_rounds: Dictionary = {}
 ## Popülizm bonusu: peer_id -> bittiği tur (o turdan önceki son tura kadar sürer).
 var populism: Dictionary = {}
 ## KARIŞIKLIK (GİZLİ, sadece host; oyunculara hiç gösterilmez): peer_id -> puan.
@@ -243,6 +247,8 @@ var _province_seat_counts: Dictionary = {}
 
 var _turn_time_left: float = GameRules.TURN_TIMEOUT
 var _turn_deadline_ms: int = 0
+## Son durumla gelen kalan süre (oylama gibi engellerde sayaç bunda durur).
+var _turn_time_synced: float = GameRules.TURN_TIMEOUT
 var _round_end_pending: bool = false
 ## Son turun seçimi yapıldı: hükümet kurulunca (ya da kurulamayınca) oyun biter.
 var final_election_pending: bool = false
@@ -336,6 +342,9 @@ func member_count(peer_id: int) -> int:
 
 ## Hükümet kurulurken, mecliste bir teklif oylanırken ya da oyun bittiyse
 ## TUR DURUR: kimse kart çekemez, oynayamaz, pas geçemez.
+## Oylamadan dönünce sıra sahibine en az bu kadar süre kalır.
+const VOTE_RETURN_MIN_SECONDS := 8.0
+
 func is_turn_blocked() -> bool:
 	return game_finished or congress_active \
 		or GovernmentManager.phase == GovernmentManager.Phase.FORMING \
@@ -365,7 +374,8 @@ static func funds_text(value: float) -> String:
 ## Sıradaki oyuncunun kalan süresi (saniye).
 func turn_seconds_left() -> float:
 	if is_turn_blocked():
-		return GameRules.TURN_TIMEOUT
+		# Engel (oylama, kongre...) sırasında sayaç DURUR; baştan başlamış gibi görünmez.
+		return maxf(0.0, _turn_time_left if _is_authority() else _turn_time_synced)
 	if _is_authority():
 		return maxf(0.0, _turn_time_left)
 	return maxf(0.0, float(_turn_deadline_ms - Time.get_ticks_msec()) / 1000.0)
@@ -404,7 +414,7 @@ func can_propose_law(peer_id: int, law_type: String = "") -> bool:
 	if not has_seats(peer_id):
 		return false  # meclis dışı parti yasa teklif edemez
 	# Gündem şartı yok (0.0.182): her grup için yasa sunulabilir; gündem ödüllendirir.
-	if has_proposed_law_this_round(peer_id):
+	if has_proposed_law_this_round(peer_id, "group"):
 		return false
 	if law_type != "" and not CardPresets.is_law_card(law_type):
 		return false
@@ -427,8 +437,8 @@ func tax_law_block_reason(peer_id: int, level: int = -1) -> String:
 		return L.t("Yasayı partinin genel başkanı sunar.")
 	if not has_seats(peer_id):
 		return L.t("Mecliste vekilin yok.")
-	if has_proposed_law_this_round(peer_id):
-		return L.t("Partin bu dönem yasa hakkını kullandı.")
+	if has_proposed_law_this_round(peer_id, "tax"):
+		return L.t("Partin bu dönem zaten bir vergi yasası sundu.")
 	if not GovernmentManager.can_submit_law():
 		return L.t("Mecliste başka bir oylama sürüyor.")
 	if not can_choose_main_action(peer_id):
@@ -451,7 +461,7 @@ func can_propose_constitution(peer_id: int) -> bool:
 		return false
 	if not has_seats(peer_id):
 		return false
-	if has_proposed_law_this_round(peer_id):
+	if has_proposed_law_this_round(peer_id, "constitution"):
 		return false
 	return not last_seats.is_empty() and GovernmentManager.can_submit_law()
 
@@ -472,7 +482,7 @@ func _apply_constitution_proposal(peer_id: int, payload: Dictionary) -> void:
 	_event_message = ""
 	if not GovernmentManager.submit_constitution(peer_id, payload):
 		return
-	law_rounds[party_of(peer_id)] = round_number
+	constitution_rounds[party_of(peer_id)] = round_number
 	_push_state({"type": "law", "peer_id": peer_id, "law": "anayasa"})
 
 @rpc("any_peer", "reliable")
@@ -481,9 +491,19 @@ func _request_constitution(payload: Dictionary) -> void:
 		return
 	_apply_constitution_proposal(multiplayer.get_remote_sender_id(), payload)
 
-## Yasa hakkı PARTİYE aittir: dönemde bir yasa (partinin iki üyesinden biri sunar).
-func has_proposed_law_this_round(peer_id: int) -> bool:
-	return int(law_rounds.get(party_of(peer_id), 0)) == round_number
+## Yasa hakkı PARTİYE aittir (partinin iki üyesinden biri sunar). Her tür
+## dönemde bir: kind "group" (seçmen grubu yasası), "tax", "constitution";
+## "" = herhangi biri sunuldu mu.
+func has_proposed_law_this_round(peer_id: int, kind: String = "") -> bool:
+	var pid := party_of(peer_id)
+	match kind:
+		"group":
+			return int(law_rounds.get(pid, 0)) == round_number
+		"tax":
+			return int(tax_rounds.get(pid, 0)) == round_number
+		"constitution":
+			return int(constitution_rounds.get(pid, 0)) == round_number
+	return int(law_rounds.get(pid, 0)) == round_number or int(tax_rounds.get(pid, 0)) == round_number 		or int(constitution_rounds.get(pid, 0)) == round_number
 
 # --- Afet ve YARDIM GÖTÜR (bkz. Disaster) -------------------------------------
 
@@ -1373,6 +1393,8 @@ func init_game() -> void:
 	current_turn_index = 0
 	_grant_turn_income()
 	law_rounds = {}
+	tax_rounds = {}
+	constitution_rounds = {}
 	speech_rounds = {}
 	early_requests = {}
 	congress_rounds = {}
@@ -1729,7 +1751,10 @@ func _apply_law(peer_id: int, law_type: String) -> void:
 	if not GovernmentManager.submit_law(peer_id, law_type):
 		return
 	funds[peer_id] = funds_of(peer_id) - law_funds_cost(peer_id, law_type)
-	law_rounds[party_of(peer_id)] = round_number
+	if CardPresets.is_tax_law(law_type):
+		tax_rounds[party_of(peer_id)] = round_number
+	else:
+		law_rounds[party_of(peer_id)] = round_number
 	var event := {"type": "law", "peer_id": peer_id, "law": law_type}
 	if _event_message != "":
 		event["message"] = _event_message
@@ -2909,13 +2934,18 @@ func ranking_score(peer_id: int) -> int:
 ## GovernmentManager, tur akışını engelleyen bir aşamadan (kurma/oylama)
 ## çıkıldığında çağırır: sıradaki oyuncunun süresi baştan başlar ve ertelenmiş
 ## bir tur sonu varsa şimdi işlenir.
-func on_block_state_changed() -> void:
+func on_block_state_changed(after_vote: bool = false) -> void:
 	if not _is_authority() or turn_order.is_empty() or game_finished or is_turn_blocked():
 		return
 	if final_election_pending:
 		_finish_final_election()
 		return
-	_turn_time_left = GameRules.TURN_TIMEOUT
+	# Oylama bitince sıra süresi BAŞTAN başlamaz: oylama sırasında durmuştu,
+	# kaldığı yerden sürer (bitmek üzereyse kısa bir pay tanınır).
+	if after_vote:
+		_turn_time_left = maxf(_turn_time_left, VOTE_RETURN_MIN_SECONDS)
+	else:
+		_turn_time_left = GameRules.TURN_TIMEOUT
 	if _round_end_pending:
 		_finish_round()
 	else:
@@ -3873,6 +3903,8 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"turn_order": turn_order,
 		"turn_index": current_turn_index,
 		"law_rounds": law_rounds,
+		"tax_rounds": tax_rounds,
+		"constitution_rounds": constitution_rounds,
 		"populism": populism,
 		"splinters": splinters,
 		"speech_done": speech_done,
@@ -3929,6 +3961,8 @@ func _apply_state(state: Dictionary) -> void:
 	turn_order = state["turn_order"]
 	current_turn_index = int(state["turn_index"])
 	law_rounds = state.get("law_rounds", {})
+	tax_rounds = state.get("tax_rounds", {})
+	constitution_rounds = state.get("constitution_rounds", {})
 	populism = state.get("populism", {})
 	splinters = state.get("splinters", {})
 	speech_done = bool(state.get("speech_done", false))
@@ -3943,6 +3977,7 @@ func _apply_state(state: Dictionary) -> void:
 	national_list = state.get("national_list", {})
 	round_number = int(state["round"])
 	_turn_deadline_ms = Time.get_ticks_msec() + int(float(state["turn_time_left"]) * 1000.0)
+	_turn_time_synced = float(state["turn_time_left"])
 	last_election_round = int(state["last_election_round"])
 	last_election_was_early = bool(state["early"])
 	last_vote_shares = state["vote_shares"]

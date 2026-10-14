@@ -1053,7 +1053,15 @@ func _ensure_board() -> void:
 
 ## Puan tablosu: siyasetçiler puana göre sıralı; satırda sıra, parti rengi,
 ## siyasetçi ve partisi, puan, partinin ulusal puanı (kamuoyu).
+## Bir durum güncellemesinde birkaç sinyal aynı paneli yeniden kuruyordu
+## (kare başına 20-35 ms); artık kare sonunda BİR kez kurulur (performans).
 func _refresh_score_table() -> void:
+	if _deferred_ui.has("_refresh_score_table"):
+		return
+	_deferred_ui["_refresh_score_table"] = true
+	_run_deferred_ui.call_deferred("_refresh_score_table")
+
+func _refresh_score_table_now() -> void:
 	if _score_box == null or not _score_scroll.visible:
 		return
 	for child in _score_box.get_children():
@@ -1403,7 +1411,15 @@ func _refresh_results_panels() -> void:
 ## Parlamento diyagramı: koltuklar parti renginde; oylama sırasında oy vermiş
 ## partilerin koltukları verdikleri oyun rengine (EVET/ÇEKİMSER/HAYIR) bürünür.
 ## Parti sırası sabit kalır, koltuklar yer değiştirmez.
+## Bir durum güncellemesinde birkaç sinyal aynı paneli yeniden kuruyordu
+## (kare başına 20-35 ms); artık kare sonunda BİR kez kurulur (performans).
 func _refresh_parliament_diagram() -> void:
+	if _deferred_ui.has("_refresh_parliament_diagram"):
+		return
+	_deferred_ui["_refresh_parliament_diagram"] = true
+	_run_deferred_ui.call_deferred("_refresh_parliament_diagram")
+
+func _refresh_parliament_diagram_now() -> void:
 	var ids: Array = CardManager.last_seats.keys()
 	ids.sort_custom(func(a, b):
 		return float(CardManager.last_vote_shares.get(a, 0.0)) > float(CardManager.last_vote_shares.get(b, 0.0)))
@@ -1638,7 +1654,15 @@ func _player_row_values(peer_id: int, is_self: bool) -> Array:
 				return [_table_value(CardManager.funds_text(CardManager.funds_of(peer_id)), 58.0, FUNDS_COLOR)]
 			return [_table_value("·", 58.0, UiTheme.TEXT_DIM)]
 
+## Bir durum güncellemesinde birkaç sinyal aynı paneli yeniden kuruyordu
+## (kare başına 20-35 ms); artık kare sonunda BİR kez kurulur (performans).
 func _rebuild_player_panel() -> void:
+	if _deferred_ui.has("_rebuild_player_panel"):
+		return
+	_deferred_ui["_rebuild_player_panel"] = true
+	_run_deferred_ui.call_deferred("_rebuild_player_panel")
+
+func _rebuild_player_panel_now() -> void:
 	if player_panel_list == null:
 		return
 	_ensure_board()
@@ -1947,6 +1971,15 @@ func _fit_hand_width(count: int) -> void:
 			separation = int(floor((available - count * CARD_DISPLAY_SIZE.x) / float(count - 1)))
 	hand_container.add_theme_constant_override("separation", separation)
 
+var _live_mouse := Vector2(-1, -1)
+var _deferred_ui: Dictionary = {}
+
+func _run_deferred_ui(name: String) -> void:
+	_deferred_ui.erase(name)
+	if is_inside_tree():
+		call(name + "_now")
+var _live_wait := 0.0
+
 func _process(delta: float) -> void:
 	_refresh_countdowns()
 	_sync_parliament_to_slot()
@@ -1954,7 +1987,14 @@ func _process(delta: float) -> void:
 	if _drag_ghost != null:
 		_update_drag()
 	else:
-		_update_live_province()
+		# Fare kımıldamadıysa il / parti tespiti her karede yapılmaz (performans);
+		# yine de arada bir tazelenir (altındaki içerik değişmiş olabilir).
+		var mouse := get_viewport().get_mouse_position()
+		_live_wait -= delta
+		if mouse != _live_mouse or _live_wait <= 0.0:
+			_live_mouse = mouse
+			_live_wait = 0.25
+			_update_live_province()
 
 	var i := _hand_holders.size() - 1
 	while i >= 0:
@@ -3752,8 +3792,8 @@ func _action_block_reason(cost: float, is_law: bool = false) -> String:
 		return L.t("Mecliste vekilin yok: yasa teklif edemezsin.")
 	if not CardManager.can_act():
 		return L.t("Sıran değil.")
-	if is_law and CardManager.has_proposed_law_this_round(me):
-		return L.t("Bu dönem zaten bir yasa sundun (dönemde 1 yasa).")
+	if is_law and CardManager.has_proposed_law_this_round(me, "group"):
+		return L.t("Bu dönem zaten bir seçmen grubu yasası sundun (vergi yasası ve anayasa ayrı haklardır).")
 	if CardManager.funds_of(me) < cost:
 		return L.t("Parti kasası yetmiyor (%s gerekir).") % GameRules.cost_text(cost)
 	return L.t("Şu an yapılamaz.")

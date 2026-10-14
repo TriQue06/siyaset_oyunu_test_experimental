@@ -283,6 +283,7 @@ func _initialize() -> void:
 	check("300 EVET (2/3 alti): REDDEDILIR, referandum yok", is_equal_approx(mm.election_threshold, 0.0)
 		and gm.last_resolution_reason.find("REDDEDİLDİ") != -1 and not "referendum" in cm, gm.last_resolution_reason)
 	cm.law_rounds = {}
+	cm.constitution_rounds = {}
 	cm.funds[1] = 20.0
 	cm._apply_constitution_proposal(1, change)
 	gm._apply_vote(2, gm.VOTE_YES)
@@ -292,6 +293,7 @@ func _initialize() -> void:
 	mm.election_threshold = 0.0
 	mm.reset_seat_method()
 	cm.law_rounds = {}
+	cm.constitution_rounds = {}
 	gm._clear_proposal()
 	gm._set_phase(gm.Phase.IDLE)  # önceki turlarda seçim/kurma açılmış olabilir
 	cm.last_seats = {1: 150, 2: 200, 3: 150}
@@ -301,6 +303,7 @@ func _initialize() -> void:
 	gm._apply_vote(3, gm.VOTE_YES)
 	check("2/3 ile sayim 'kazanan hepsini alir' olur", mm.seat_method == "wta" and ElectionModel.seat_method == "wta", gm.last_resolution_reason)
 	cm.law_rounds = {}
+	cm.constitution_rounds = {}
 	cm._apply_constitution_proposal(1, {"threshold": 0.0, "interval": 2, "seat_method": "yok"})
 	check("gecersiz sayim yontemi reddedilir", gm.proposal_kind == "")
 	new_game({1: groups(["isveren", "dindar"]), 2: groups(["isci", "ilerici"])})

@@ -90,7 +90,7 @@ static func do_action(bot: int) -> Dictionary:
 	var treasury_before := CardManager.state_treasury()
 	var ledger_before := int(CardManager.economy.get("next_id", 1))
 	var hand_before: int = CardManager.inventories.get(bot, []).size()
-	var laws_before := CardManager.has_proposed_law_this_round(bot)
+	var laws_before := [CardManager.has_proposed_law_this_round(bot, "group"), CardManager.has_proposed_law_this_round(bot, "tax"), CardManager.has_proposed_law_this_round(bot, "constitution")]
 	var blocked_before := CardManager.is_turn_blocked()
 	var speech_before := CardManager.speech_done
 	match String(action["type"]):
@@ -98,11 +98,11 @@ static func do_action(bot: int) -> Dictionary:
 			CardManager._apply_speech(bot, String(action["group"]))
 		"law":
 			CardManager._apply_law(bot, String(action["law"]))
-			if CardManager.has_proposed_law_this_round(bot):
+			if CardManager.has_proposed_law_this_round(bot, "tax" if CardPresets.is_tax_law(String(action["law"])) else "group"):
 				BotBrain.note_law(bot, String(action["law"]))
 		"constitution":
 			CardManager._apply_constitution_proposal(bot, action["payload"])
-			if CardManager.has_proposed_law_this_round(bot):
+			if CardManager.has_proposed_law_this_round(bot, "constitution"):
 				BotBrain.note_constitution(bot)
 		"organization":
 			CardManager._apply_organization(bot, String(action["province"]))
@@ -134,7 +134,7 @@ static func do_action(bot: int) -> Dictionary:
 	var applied: bool = CardManager.funds_of(bot) != funds_before or CardManager.current_turn_peer_id() != bot \
 		or CardManager.state_treasury() != treasury_before or int(CardManager.economy.get("next_id", 1)) != ledger_before \
 		or CardManager.inventories.get(bot, []).size() != hand_before \
-		or CardManager.has_proposed_law_this_round(bot) != laws_before \
+		or [CardManager.has_proposed_law_this_round(bot, "group"), CardManager.has_proposed_law_this_round(bot, "tax"), CardManager.has_proposed_law_this_round(bot, "constitution")] != laws_before \
 		or CardManager.is_turn_blocked() != blocked_before or CardManager.speech_done != speech_before
 	return action if applied else {}
 

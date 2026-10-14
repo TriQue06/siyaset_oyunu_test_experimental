@@ -113,6 +113,8 @@ var state_version: int = 0
 var _phase_time_left: float = 0.0
 var _phase_deadline_ms: int = 0
 var _last_blocked: bool = false
+## Son engel bir meclis oylamasıydı (sıra süresi sıfırlanmaz, kaldığı yerden sürer).
+var _last_block_was_vote := false
 ## Herkes oy verince sonuç bu kadar saniye bekletilir: kimin ne verdiği mecliste
 ## (koltuk renkleri, profil etiketleri) görünsün. Testler 0 yapar.
 var result_hold_seconds: float = 2.5
@@ -1008,9 +1010,12 @@ func _push_state() -> void:
 	_emit_all()
 	var blocked := phase == Phase.FORMING or phase == Phase.VOTING
 	var was_blocked := _last_blocked
+	var was_vote := _last_block_was_vote
 	_last_blocked = blocked
+	if blocked:
+		_last_block_was_vote = phase == Phase.VOTING
 	if was_blocked and not blocked:
-		CardManager.on_block_state_changed()
+		CardManager.on_block_state_changed(was_vote)
 
 func _emit_all() -> void:
 	phase_changed.emit()

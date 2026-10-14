@@ -131,6 +131,7 @@ func _initialize() -> void:
 	gm._apply_vote(3, gm.VOTE_NO)
 	check("2/3 yoksa reddedilir", is_equal_approx(mm.election_threshold, 7.0), gm.last_resolution_reason)
 	cm.law_rounds = {}
+	cm.constitution_rounds = {}
 	cm._apply_constitution_proposal(1, {"threshold": 3.0, "interval": 6})
 	gm._apply_vote(1, gm.VOTE_YES)
 	gm._apply_vote(2, gm.VOTE_YES)
@@ -139,6 +140,18 @@ func _initialize() -> void:
 		"baraj %.1f, aralik %d" % [mm.election_threshold, mm.election_interval])
 	check("takvim son secimden itibaren yeni aralikla", GameRules.ELECTION_INTERVAL == 12 		and cm.election_anchor == 8 and GameRules.is_election_round(20), str(GameRules.ELECTION_ANCHOR))
 	check("ayni donemde ikinci yasa hakki yok", not cm.can_propose_constitution(1))
+	# 0.0.185: grup yasasi, vergi yasasi ve anayasa AYRI haklar.
+	check("anayasa sunan parti ayni turda grup yasasini da sunabilir", cm.can_propose_law(1, cp.law_type("isci")),
+		"grup %s vergi %s anayasa %s" % [cm.has_proposed_law_this_round(1, "group"), cm.has_proposed_law_this_round(1, "tax"), cm.has_proposed_law_this_round(1, "constitution")])
+	cm._apply_law(1, cp.law_type("isci"))
+	check("grup yasasi sunuldu, anayasa hakki ayrica kullanilmis", cm.has_proposed_law_this_round(1, "group") and cm.has_proposed_law_this_round(1, "constitution"))
+	check("ayni turda ikinci grup yasasi yok", not cm.can_propose_law(1, cp.law_type("isveren")))
+	# Oylama bitince sira suresi bastan baslamaz.
+	cm._turn_time_left = 3.0
+	gm._apply_vote(1, gm.VOTE_YES)
+	gm._apply_vote(2, gm.VOTE_YES)
+	gm._apply_vote(3, gm.VOTE_YES)
+	check("oylamadan sonra sure kaldigi yerden (en az 8 sn), 90'a donmez", cm._turn_time_left >= 7.9 and cm._turn_time_left < 20.0, str(cm._turn_time_left))
 
 	print("")
 	print("=== TUM TESTLER GECTI ===" if _failed == 0 else "=== %d TEST BASARISIZ ===" % _failed)

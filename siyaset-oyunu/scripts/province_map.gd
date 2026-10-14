@@ -205,12 +205,22 @@ func pulse_province(province_id: String, color: Color, icon: String = "", durati
 	set_process(true)
 	queue_redraw()
 
+## Animasyonlu çizimler (afet nabzı) saniyede en çok bu kadar yeniden çizilir:
+## haritanın tamamı her karede baştan çizilmesin (performans).
+const FX_REDRAW_INTERVAL := 1.0 / 30.0
+var _fx_redraw_wait := 0.0
+
 func _process(delta: float) -> void:
 	_disaster_t += delta
 	if _pulse.is_empty():
 		if _disaster_ids.is_empty():
 			set_process(false)
-		queue_redraw()
+			queue_redraw()
+			return
+		_fx_redraw_wait -= delta
+		if _fx_redraw_wait <= 0.0:
+			_fx_redraw_wait = FX_REDRAW_INTERVAL
+			queue_redraw()
 		return
 	_pulse["time"] = float(_pulse["time"]) + delta
 	if float(_pulse["time"]) >= float(_pulse["duration"]):
@@ -225,12 +235,18 @@ func _process(delta: float) -> void:
 var _disaster_ids: Array = []
 var _disaster_kind := ""
 var _disaster_t := 0.0
+var _disaster_cells: Array = []
 
 func set_disaster(ids: Array, kind: String) -> void:
 	if ids == _disaster_ids and kind == _disaster_kind:
 		return
 	_disaster_ids = ids.duplicate()
 	_disaster_kind = kind
+	# Hücre köşeleri bir kez hesaplanır (her karede yeniden değil).
+	_disaster_cells = []
+	for id in _disaster_ids:
+		for cell in GameMap.region_cells(String(id)):
+			_disaster_cells.append(GameMap.cell_corners(cell, CELL_INSET))
 	set_process(not _disaster_ids.is_empty() or not _pulse.is_empty())
 	queue_redraw()
 
@@ -239,9 +255,9 @@ func _draw_disaster() -> void:
 	var glow: float = sin(_disaster_t * 3.2) * 0.5 + 0.5
 	var fill := Color(color, 0.18 + 0.14 * glow)
 	var center := Vector2.ZERO
+	for corners in _disaster_cells:
+		draw_colored_polygon(corners, fill)
 	for id in _disaster_ids:
-		for cell in GameMap.region_cells(String(id)):
-			draw_colored_polygon(GameMap.cell_corners(cell, CELL_INSET), fill)
 		center += GameMap.center_of(String(id))
 	# Koyu alt çizgi + afet renginde nabız: her il renginin üstünde okunur.
 	for id in _disaster_ids:

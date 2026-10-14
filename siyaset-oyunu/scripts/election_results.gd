@@ -623,7 +623,7 @@ func _pane_targets() -> Array:
 		return [Rect2(c.position, Vector2(left_w, c.size.y)),
 			Rect2(right.position, Vector2(right.size.x, half)),
 			Rect2(right.position + Vector2(0, half + gap), Vector2(right.size.x, half))]
-	var big_w := c.size.x * 0.66
+	var big_w := c.size.x * 0.55
 	var small_x := c.position.x + big_w + gap
 	var small_w := c.size.x - big_w - gap
 	var small_h := (c.size.y - gap) * 0.5

@@ -3407,3 +3407,9 @@ msgstr " · AGENDA"
 
 msgid "Partin bu seçim döneminde zaten erken seçim önergesi verdi."
 msgstr "Your party already filed an early election motion this term."
+
+msgid "Partin bu dönem zaten bir vergi yasası sundu."
+msgstr "Your party already proposed a tax law this term."
+
+msgid "Bu dönem zaten bir seçmen grubu yasası sundun (vergi yasası ve anayasa ayrı haklardır)."
+msgstr "You already proposed a voter group law this term (tax laws and constitutional amendments are separate rights)."

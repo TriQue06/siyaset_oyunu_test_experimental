@@ -52,8 +52,12 @@ func _ready() -> void:
 	_hall.colors = palette(data.get("color", GOLD))
 	_build_cards(range((data.get("candidates", []) as Array).size()))
 	_hall.setup(data)
+	# Gazete kendi katmanında: salonun (top_level, z 200) üstünde kesin görünür.
+	var layer := CanvasLayer.new()
+	layer.layer = 20
+	add_child(layer)
 	_event_fx = EventFx.new()
-	add_child(_event_fx)
+	layer.add_child(_event_fx)
 
 func _phase_ends() -> Array:
 	# [1. tur sayımı biter, 2. tur başlar, 2. tur biter]
@@ -63,6 +67,9 @@ func _phase_ends() -> Array:
 
 func _process(delta: float) -> void:
 	if _paper_started:
+		# Gazete oynarken salon donmasın: konfeti sürer.
+		_t += delta
+		_hall.confetti_t = _t - _end_t
 		if not _event_fx.is_playing():
 			queue_free()
 		return

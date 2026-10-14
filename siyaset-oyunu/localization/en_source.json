@@ -1165,5 +1165,7 @@
 "İncelenebilecek işlem sayısı: %d": "Transactions that can be examined: %d",
 "\nGÜNDEMDE: toplantı ulusal destek de kazandırır.": "\nON THE AGENDA: a meeting also brings national support.",
 " · GÜNDEM": " · AGENDA",
-"Partin bu seçim döneminde zaten erken seçim önergesi verdi.": "Your party already filed an early election motion this term."
+"Partin bu seçim döneminde zaten erken seçim önergesi verdi.": "Your party already filed an early election motion this term.",
+"Partin bu dönem zaten bir vergi yasası sundu.": "Your party already proposed a tax law this term.",
+"Bu dönem zaten bir seçmen grubu yasası sundun (vergi yasası ve anayasa ayrı haklardır).": "You already proposed a voter group law this term (tax laws and constitutional amendments are separate rights)."
 }

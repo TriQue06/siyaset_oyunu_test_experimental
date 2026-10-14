@@ -1,0 +1,33 @@
+{
+  "hosting": {
+    "public": "public",
+    "ignore": ["firebase.json", "**/.*"],
+    "cleanUrls": true,
+    "headers": [
+      {
+        "source": "/downloads/*.apk",
+        "headers": [
+          {"key": "Content-Type", "value": "application/vnd.android.package-archive"},
+          {"key": "Content-Disposition", "value": "attachment"},
+          {"key": "Cache-Control", "value": "no-cache"}
+        ]
+      },
+      {
+        "source": "/downloads/*.exe",
+        "headers": [
+          {"key": "Content-Type", "value": "application/octet-stream"},
+          {"key": "Content-Disposition", "value": "attachment"},
+          {"key": "Cache-Control", "value": "no-cache"}
+        ]
+      },
+      {
+        "source": "/downloads/version.json",
+        "headers": [{"key": "Cache-Control", "value": "no-cache"}]
+      },
+      {
+        "source": "**/*.@(webp|png|ttf|svg)",
+        "headers": [{"key": "Cache-Control", "value": "public, max-age=604800"}]
+      }
+    ]
+  }
+}

@@ -36,6 +36,16 @@ func run() -> void:
 		if not slot.is_queued_for_deletion():
 			check((slot.get_meta("card") as Control).size.is_equal_approx(card_size), "visible player frames equal")
 	check(lobby._lobby_columns.size.x <= lobby.size.x, "lobby fits viewport horizontally")
+	var base_height: float = lobby._lobby_columns.get_child(0).size.y
+	for i in 3:
+		mm.add_bot()
+		for frame in 4:
+			await process_frame
+		check(is_equal_approx(lobby._lobby_columns.get_child(0).size.y, base_height), "adding bot preserves panel height")
+		for slot in lobby.player_list_box.get_children():
+			var card: Control = slot.get_meta("card")
+			check(is_equal_approx(card.size.y, 71.0), "empty and occupied cards fixed height")
+	slots = lobby.player_list_box.get_children()
 	lobby.world_controls["turn_seconds"].value = 90
 	check(int(mm.world_settings["turn_seconds"]) == 90, "slider changes server setting")
 	var skin = load("res://scripts/ui_skin.gd")

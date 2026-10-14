@@ -83,6 +83,7 @@ func _ready() -> void:
 
 func _refresh() -> void:
 	for child in player_list_box.get_children():
+		player_list_box.remove_child(child)
 		child.queue_free()
 
 	var am_owner := MultiplayerManager.is_local_owner()
@@ -97,15 +98,6 @@ func _refresh() -> void:
 		else:
 			player_list_box.add_child(_build_slot(_build_empty_card(i), am_owner, i == order.size()))
 
-	var shared_size := SLOT_SIZE
-	for slot in player_list_box.get_children():
-		if slot.has_meta("card_minimum") and not slot.is_queued_for_deletion():
-			var minimum: Vector2 = (slot.get_meta("card") as Control).get_combined_minimum_size()
-			shared_size.x = maxf(shared_size.x, minimum.x + BOT_BUTTON_SIZE * 0.45)
-			shared_size.y = maxf(shared_size.y, minimum.y + BOT_BUTTON_SIZE * 0.45)
-	for slot in player_list_box.get_children():
-		if not slot.is_queued_for_deletion():
-			slot.custom_minimum_size = shared_size
 	var count := MultiplayerManager.players.size()
 	if MultiplayerManager.offline_mode:
 		# Çevrim dışında katılan olmaz: boş yuvalar "bot ekle" demektir.
@@ -159,8 +151,9 @@ func _build_player_card(peer_id: int, index: int, am_owner: bool, local_id: int)
 	var avatar := PanelContainer.new()
 	avatar.custom_minimum_size = Vector2(44, 44)
 	# Kare rozet (pixel tarz): koyu çizgi + düz renk.
-	UiSkin.apply_style(avatar, "panel",
-		UiSkin.color_box(color if not is_bot else UiTheme.PANEL_LIGHT, UiSkin.BUTTON_TINT_NORMAL))
+	var badge_style := UiSkin.color_box(color if not is_bot else UiTheme.PANEL_LIGHT, UiSkin.BUTTON_TINT_NORMAL)
+	badge_style.set_content_margin_all(0)
+	UiSkin.apply_style(avatar, "panel", badge_style)
 	if is_bot:
 		var robot := RobotIcon.new()
 		robot.custom_minimum_size = Vector2(44, 44)
@@ -195,17 +188,19 @@ func _build_player_card(peer_id: int, index: int, am_owner: bool, local_id: int)
 	if not tags.is_empty():
 		var tag_label := Label.new()
 		tag_label.text = "  ·  ".join(tags)
+		tag_label.clip_text = true
 		tag_label.add_theme_font_size_override("font_size", 12)
 		tag_label.modulate = UiTheme.GOLD if peer_id == MultiplayerManager.owner_id else UiTheme.TEXT_MUTED
 		info.add_child(tag_label)
 	row.add_child(info)
 
 	if am_owner and peer_id != local_id:
-		var actions := VBoxContainer.new()
-		actions.add_theme_constant_override("separation", UiTheme.GAP_S)
+		var actions := HBoxContainer.new()
+		actions.add_theme_constant_override("separation", 4)
 		actions.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		var action := Button.new()
 		UiSkin.skin_button(action)
+		_compact_player_action(action)
 		if is_bot:
 			action.text = L.t("Çıkar")
 			action.pressed.connect(func(): MultiplayerManager.remove_bot(peer_id))
@@ -218,6 +213,7 @@ func _build_player_card(peer_id: int, index: int, am_owner: bool, local_id: int)
 			# Oyuncu atma: sadece lobi sahibinde ve kendisi dışındakiler için.
 			var kick := Button.new()
 			UiSkin.skin_color_button(kick, UiTheme.RED)
+			_compact_player_action(kick)
 			kick.text = L.t("At")
 			kick.tooltip_text = L.t("Lobiden At")
 			kick.pressed.connect(func(): MultiplayerManager.kick_player(peer_id))
@@ -245,11 +241,11 @@ func _build_slot(card: Control, show_bot_button: bool, enabled: bool) -> Control
 	# Container minimums must not independently size occupied/empty cards.
 	card.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	var fit_card := func():
-		var reserve := BOT_BUTTON_SIZE * 0.45
+		var reserve := roundf(BOT_BUTTON_SIZE * 0.45)
 		frame.position = Vector2.ZERO
-		frame.size = slot.size
+		frame.size = Vector2(slot.size.x, SLOT_SIZE.y)
 		card.position = Vector2(0, reserve)
-		card.size = Vector2(slot.size.x - reserve, slot.size.y - reserve)
+		card.size = Vector2(slot.size.x - reserve, SLOT_SIZE.y - reserve)
 	slot.resized.connect(fit_card)
 	fit_card.call_deferred()
 	if not show_bot_button:
@@ -721,3 +717,10 @@ func _skin_lobby_panel(panel: PanelContainer) -> void:
 	var style := UiSkin.stylebox(UiSkin.PANEL)
 	style.set_content_margin_all(14)
 	UiSkin.apply_style(panel, "panel", style)
+
+func _compact_player_action(button: Button) -> void:
+	button.add_theme_font_size_override("font_size", 11)
+	for key in ["normal", "hover", "pressed", "focus", "disabled"]:
+		var style := button.get_theme_stylebox(key).duplicate() as StyleBox
+		style.set_content_margin_all(3)
+		UiSkin.apply_style(button, key, style)

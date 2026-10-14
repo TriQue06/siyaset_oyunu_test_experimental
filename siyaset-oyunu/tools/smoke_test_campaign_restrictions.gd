@@ -31,6 +31,11 @@ func run() -> void:
 	var screen = load("res://scenes/GameScreen.tscn").instantiate()
 	root.add_child(screen)
 	await process_frame
+	var skin = load("res://scripts/ui_skin.gd")
+	for button in screen._action_tab_of:
+		var style = button.get_theme_stylebox("normal")
+		check(style is StyleBoxTexture and style.texture.resource_path == skin.BUTTON_TINT_NORMAL, "universal action frame " + button.text.split("\n")[0])
+		check(is_equal_approx(button.modulate.a, 1.0), "action frame stays opaque")
 	var markers = screen.map_holder.get_node("SeatMarkers")
 	var count := 0
 	for id in cm._province_ids:

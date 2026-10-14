@@ -3552,7 +3552,8 @@ func _style_vote_button(button: Button, title: String, icon_name: String, color:
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.clip_text = true
 	button.add_theme_font_size_override("font_size", 10)
-	UiSkin.skin_color_button(button, color)
+	button.set_meta("action_color", color)
+	UiSkin.skin_action_button(button, color, true)
 	UiSkin.set_top_icon(button, icon_name, 20)
 
 ## Oylama butonları: teklif yokken (ya da oyumu kullandıysam) koyu ve
@@ -3835,7 +3836,8 @@ func _action_button(title: String, cost_text: String, color: Color, icon_name: S
 	button.clip_text = true
 	button.add_theme_constant_override("line_spacing", -1)
 	_set_action_text(button, title, cost_text)
-	UiSkin.skin_color_button(button, color)
+	button.set_meta("action_color", color)
+	UiSkin.skin_action_button(button, color, true)
 	UiSkin.set_top_icon(button, icon_name, 18)
 	_action_grid.add_child(button)
 	_action_tab_of[button] = tab
@@ -3933,24 +3935,24 @@ func _refresh_action_buttons() -> void:
 	var org_ok := CardManager.can_choose_main_action(me) and funds_now >= CardManager.org_cost_for(me)
 	_set_action_text(_org_button, L.t("TEŞKİLAT"), GameRules.cost_text(CardManager.org_cost_for(me)))
 	var miting_ok := CardManager.can_miting(me)
-	_miting_button.modulate.a = 1.0 if miting_ok or _pending_miting else 0.45
-	_invest_button.modulate.a = 1.0 if CardManager.can_invest(me) or _pending_invest else 0.45
-	_censure_button.modulate.a = 1.0 if CardManager.can_censure(me) or _pending_censure else 0.45
-	_early_button.modulate.a = 1.0 if CardManager.can_early_election(me) or _pending_early else 0.45
-	_congress_button.modulate.a = 1.0 if CardManager.can_call_congress(me) or _pending_congress else 0.45
+	_set_action_available(_miting_button, miting_ok or _pending_miting)
+	_set_action_available(_invest_button, CardManager.can_invest(me) or _pending_invest)
+	_set_action_available(_censure_button, CardManager.can_censure(me) or _pending_censure)
+	_set_action_available(_early_button, CardManager.can_early_election(me) or _pending_early)
+	_set_action_available(_congress_button, CardManager.can_call_congress(me) or _pending_congress)
 	if _aid_button != null:
-		_aid_button.modulate.a = 1.0 if CardManager.can_aid(me) else 0.45
+		_set_action_available(_aid_button, CardManager.can_aid(me))
 	if _inquiry_button != null:
-		_inquiry_button.modulate.a = 1.0 if CardManager.can_open_inquiry(me) else 0.45
+		_set_action_available(_inquiry_button, CardManager.can_open_inquiry(me))
 	if _alliance_button != null:
-		_alliance_button.modulate.a = 1.0 if CardManager.alliances_enabled else 0.45
+		_set_action_available(_alliance_button, CardManager.alliances_enabled)
 	# disabled kullanılmıyor: pasif butona dokununca neden olmadığı uyarı olarak çıksın.
-	_law_button.modulate.a = 1.0 if law_ok else 0.45
-	_org_button.modulate.a = 1.0 if org_ok or _pending_org else 0.45
+	_set_action_available(_law_button, law_ok)
+	_set_action_available(_org_button, org_ok or _pending_org)
 	_set_action_text(_congress_button, L.t("KONGRE"), _congress_cost_text())
 	# TOPLANTI: sıra sendeyken açık; sırada bir kez (konuşunca söner).
 	if _speech_button != null:
-		_speech_button.modulate.a = 1.0 if CardManager.can_act() and CardManager.needs_speech(me) else 0.45
+		_set_action_available(_speech_button, CardManager.can_act() and CardManager.needs_speech(me))
 	if _alliance_panel != null and _alliance_panel.visible:
 		_refresh_alliance_panel()
 	_refresh_action_tabs()
@@ -5582,3 +5584,7 @@ func _show_party_picker(title: String, targets: Array, selected: Callable) -> vo
 
 func _map_tint(color: Color, strength: float) -> Color:
 	return Color(color, clampf(strength, 0.0, 1.0))
+
+func _set_action_available(button: Button, available: bool) -> void:
+	button.modulate = Color.WHITE
+	UiSkin.skin_action_button(button, button.get_meta("action_color", UiTheme.PANEL_LIGHT), available)

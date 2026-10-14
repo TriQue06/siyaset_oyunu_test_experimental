@@ -200,3 +200,12 @@ static func apply_style(control: Control, key: StringName, original: StyleBox) -
 				box.set_content_margin(side, maxf(3.0, flat.get_content_margin(side)))
 			shared = box
 	control.add_theme_stylebox_override(key, shared)
+
+## Pasif hamleler de opak konturunu korur; yalnız gövde ve yazı söner.
+## Button.disabled kullanılmaz: basınca engelin nedeni açıklanabilir.
+static func skin_action_button(button: Button, color: Color, available: bool) -> void:
+	skin_color_button(button, color if available else color.darkened(0.4))
+	if not available:
+		for key in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+			button.add_theme_color_override(key, UiTheme.TEXT_MUTED)
+	_tint_icon(button)

@@ -17,6 +17,7 @@ func run() -> void:
 	if "--capture" in OS.get_cmdline_user_args():
 		await RenderingServer.frame_post_draw
 		root.get_texture().get_image().save_png(ProjectSettings.globalize_path("res://../build/lobby-a.png"))
+	check(lobby._setting_sections.size() == 3, "A three setting groups")
 	check(lobby.settings_side_panel.visible, "A rules panel always visible")
 	check(lobby._lobby_columns.columns == 2, "A desktop columns")
 	check(lobby.world_controls["turn_seconds"] is HSlider, "turn duration uses slider")
@@ -43,6 +44,10 @@ func run() -> void:
 	check(style is StyleBoxTexture and style.texture.resource_path == skin.BUTTON_TINT_NORMAL, "information rectangle uses menu frame")
 	check(style.get_content_margin(SIDE_LEFT) == 9, "frame preserves layout margins")
 	panel.free()
+	mm.owner_id = 99
+	lobby._refresh()
+	check(not lobby.world_controls["turn_seconds"].editable, "guest sees read-only sliders")
+	check(lobby.settings_side_panel.visible, "guest sees rules panel")
 	lobby.queue_free()
 	await process_frame
 	quit(1 if fails else 0)

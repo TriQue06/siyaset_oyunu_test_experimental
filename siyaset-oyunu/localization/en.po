@@ -3590,3 +3590,12 @@ msgstr "Transfer"
 
 msgid "At"
 msgstr "Kick"
+
+msgid "BOTLAR VE DİĞER AYARLAR"
+msgstr "BOTS AND OTHER SETTINGS"
+
+msgid "SÜRELER VE SEÇİMLER"
+msgstr "TIMING AND ELECTIONS"
+
+msgid "HARİTA VE TEMSİL"
+msgstr "MAP AND REPRESENTATION"

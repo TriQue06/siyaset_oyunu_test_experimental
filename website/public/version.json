@@ -1,13 +1,13 @@
 {
-  "version": "0.0.199",
+  "version": "0.0.200",
   "date": "15.10.2026",
   "apk": {
     "url": "https://raw.githubusercontent.com/TriQue06/siyaset_oyunu_test_experimental/oyun-duzeltmeleri/builds/SiyasetOyunu.apk",
-    "size": 46923532
+    "size": 46927628
   },
   "exe": {
     "url": "https://raw.githubusercontent.com/TriQue06/siyaset_oyunu_test_experimental/oyun-duzeltmeleri/builds/SiyasetOyunu-Windows.zip",
-    "size": 56202997,
+    "size": 56204026,
     "zip": true
   }
 }

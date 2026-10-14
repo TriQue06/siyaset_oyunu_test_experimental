@@ -43,6 +43,7 @@ var vote_time_buttons: Array[Button] = []
 var threshold_value_label: Label
 
 var _settings_open: bool = false
+var _setting_sections: Dictionary = {}
 var _sections_box: VBoxContainer
 var _center_base_x: float = 0.0
 
@@ -229,6 +230,7 @@ func _build_player_card(peer_id: int, index: int, am_owner: bool, local_id: int)
 func _build_slot(card: Control, show_bot_button: bool, enabled: bool) -> Control:
 	var slot := Control.new()
 	slot.custom_minimum_size = SLOT_SIZE
+	slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	card.custom_minimum_size = Vector2.ZERO
 	slot.set_meta("card_minimum", card.get_combined_minimum_size())
 	card.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -433,7 +435,8 @@ func _build_settings_panel() -> void:
 		density_row.add_child(button)
 		density_buttons.append(button)
 	for key in ["province_seats", "national_seats", "turn_seconds"]:
-		world_values[key] = _value_row(world_box, labels[key])
+		var target_box: VBoxContainer = _setting_sections["timing"] if key == "turn_seconds" else world_box
+		world_values[key] = _value_row(target_box, labels[key])
 		var control := HSlider.new()
 		var values: Array = MultiplayerManager.WORLD_OPTIONS[key]
 		control.min_value = float(values[0])
@@ -441,7 +444,7 @@ func _build_settings_panel() -> void:
 		control.step = float(values[1]) - float(values[0])
 		control.set_meta("key", key)
 		control.value_changed.connect(func(value: float): MultiplayerManager.set_world_setting(String(control.get_meta("key")), int(value)))
-		world_box.add_child(control)
+		target_box.add_child(control)
 		world_controls[key] = control
 	var map_box := _section(L.t("HARİTA"), L.t("Aynı tohum her zaman aynı ülkeyi üretir. Boş bırakırsan her oyunda rastgele."))
 	map_seed_edit = LineEdit.new()
@@ -486,19 +489,32 @@ func _build_settings_panel() -> void:
 
 ## Başlıklı, çerçeveli bir ayar bölümü; içeriğin ekleneceği kutuyu döner.
 func _section(title_text: String, note_text: String) -> VBoxContainer:
-	var panel := PanelContainer.new()
-	var style := UiSkin.stylebox(UiSkin.PANEL_DARK)
-	style.set_content_margin_all(UiTheme.PAD_M)
-	UiSkin.apply_style(panel, "panel", style)
-	_sections_box.add_child(panel)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 4)
-	panel.add_child(box)
-	var title := Label.new()
-	title.text = title_text
-	title.add_theme_font_size_override("font_size", 13)
-	title.add_theme_color_override("font_color", SECTION_COLOR)
-	box.add_child(title)
+	var category := "bots"
+	var heading := L.t("BOTLAR VE DİĞER AYARLAR")
+	if title_text in [L.t("OYUN SÜRESİ"), L.t("SEÇİM"), L.t("MECLİS OYLAMA SÜRESİ")]:
+		category = "timing"
+		heading = L.t("SÜRELER VE SEÇİMLER")
+	elif title_text in [L.t("HARİTA VE MECLİS"), L.t("HARİTA")]:
+		category = "map"
+		heading = L.t("HARİTA VE TEMSİL")
+	var box: VBoxContainer
+	if _setting_sections.has(category):
+		box = _setting_sections[category]
+		box.add_child(HSeparator.new())
+		box.add_child(UiTheme.mono_label(title_text, 12, SECTION_COLOR, true))
+	else:
+		var panel := PanelContainer.new()
+		var style := UiSkin.stylebox(UiSkin.PANEL_DARK)
+		style.set_content_margin_all(UiTheme.PAD_M)
+		UiSkin.apply_style(panel, "panel", style)
+		_sections_box.add_child(panel)
+		if category == "map":
+			_sections_box.move_child(panel, 0)
+		box = VBoxContainer.new()
+		box.add_theme_constant_override("separation", 6)
+		panel.add_child(box)
+		box.add_child(UiTheme.mono_label(heading, 13, SECTION_COLOR, true))
+		_setting_sections[category] = box
 	if note_text != "":
 		_note(box, note_text)
 	return box

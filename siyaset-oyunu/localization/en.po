@@ -3434,3 +3434,9 @@ msgstr "GROUP LAW"
 
 msgid "ANAYASA"
 msgstr "CONSTITUTION"
+
+msgid "Botun genel başkanının adı"
+msgstr "Name of the bot party leader"
+
+msgid "Genel başkan"
+msgstr "Party leader"

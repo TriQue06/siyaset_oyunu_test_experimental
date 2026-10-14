@@ -248,7 +248,7 @@ func _initialize() -> void:
 	var mods_now: Dictionary = cm.election_modifiers()
 	var local_now: float = float(mods_now["local"].get(inv_province, {}).get(1, 0.0)) \
 		- (cm.activity_of(inv_province, 1) - cm.local_of(inv_province, 1))
-	check("seçim girdisinde yatırımın sadece gelen payı var", near(local_now, PublicOpinion.INVEST_LOCAL * Economy.INVEST_IMMEDIATE, 0.01),
+	check("seçim girdisinde yatırımın sadece gelen payı var", near(local_now, float(cm.investment_shares(1)[1]) * Economy.INVEST_IMMEDIATE, 0.01),
 		"%.2f" % local_now)
 
 	print("")
@@ -435,7 +435,7 @@ func _initialize() -> void:
 	check("işlem kaydı doğru", int(rec["party"]) == 1 and String(rec["kind"]) == "invest" and String(rec["province"]) == prov2
 		and near(float(rec["party_million"]), 70.0) and near(float(rec["state_million"]), 30.0) and int(rec["round"]) == cm.round_number
 		and not bool(rec["investigated"]), str(rec))
-	check("yatırımın etkisi paylaşımdan bağımsız (aynı il etkisi)", near(cm.local_of(prov2, 1), PublicOpinion.INVEST_LOCAL * Economy.INVEST_IMMEDIATE))
+	check("yatırımın etkisi paylaşımdan bağımsız (aynı il etkisi)", near(cm.local_of(prov2, 1), float(cm.investment_shares(1)[1]) * Economy.INVEST_IMMEDIATE))
 	give_turn(3)
 	cm.funds[3] = 100.0
 	var opp_province := ""

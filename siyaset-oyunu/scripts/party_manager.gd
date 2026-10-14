@@ -52,16 +52,17 @@ func _claim_color(peer_id: int, color: Color) -> bool:
 		return true
 	if not MultiplayerManager.is_bot(owner) or MultiplayerManager.is_bot(peer_id):
 		return false
-	parties[owner]["bg_color"] = _free_color(color)
+	parties[owner]["bg_color"] = _free_color(color, owner)
 	return true
 
-func _free_color(also_avoid: Color) -> Color:
-	var colors: Array = []
-	for color in PartyPresets.COLORS:
-		if color.is_equal_approx(Color.WHITE) or color.is_equal_approx(also_avoid) or color_owner(color) != -1:
-			continue
-		colors.append(color)
-	return colors[randi_range(0, colors.size() - 1)] if not colors.is_empty() else PartyPresets.COLORS[0]
+## Rengini oyuncuya kaptıran botun yeni rengi: alınan renge ve diğer bütün
+## partilerin renklerine yakın olmayan rastgele bir palet rengi.
+func _free_color(also_avoid: Color, bot_id: int) -> Color:
+	var avoid: Array = [also_avoid]
+	for peer_id in parties.keys():
+		if int(peer_id) != bot_id and parties[peer_id].has("bg_color"):
+			avoid.append(Color(parties[peer_id]["bg_color"]))
+	return _pick_distinct_color(avoid)
 
 # --- PARTİ ÜYELİĞİ -------------------------------------------------------------------
 ## Bir PARTİ, genel başkanının peer_id'siyle tutulur (anahtar = genel başkan).
@@ -226,8 +227,9 @@ func reset() -> void:
 ## BOT PARTİ ADLARI: "XP" biçiminde; X %75 iki harf, %25 tek harf ("AKP", "MP").
 const BOT_NAME_LETTERS := "ABCDEFGHKLMNORSTUVY"
 const BOT_NAME_TWO_LETTER_CHANCE := 0.75
-## Bot rengi oyunculara ve diğer botlara bundan yakın olmasın (0..1 algısal
-## mesafe; paletteki komşu maviler/turkuazlar bunun altında kalır).
+## Bot YENİ renk seçerken (oluşturulurken ya da oyuncu rengini alınca) diğer
+## partilere bundan yakın renk seçmez (0..1 algısal mesafe). 0.0.193: botlar
+## yakın renk yüzünden kendiliğinden renk DEĞİŞTİRMEZ.
 const BOT_COLOR_MIN_DISTANCE := 0.2
 
 static func _bot_party_name(used: Array) -> String:
@@ -267,32 +269,14 @@ func _pick_distinct_color(avoid: Array) -> Color:
 			best = color
 	return good[randi_range(0, good.size() - 1)] if not good.is_empty() else best
 
-## Host: botların renklerini oyunculara ve birbirlerine göre ayarlar. Oda
-## sahibinin elle seçtiği bot rengi ("color_locked") korunur. Değişiklik
-## olduysa true döner.
-func _adjust_bot_colors() -> bool:
+## Host: yeni botun ilk rengi, diğer partilere yakın olmayan bir palet rengi.
+func _assign_new_bot_color(bot_id: int) -> void:
 	var avoid: Array = []
-	var bots: Array = []
 	for peer_id in parties.keys():
-		if MultiplayerManager.is_bot(int(peer_id)) and not bool(parties[peer_id].get("color_locked", false)):
-			bots.append(int(peer_id))
-		elif parties[peer_id].has("bg_color"):
-			avoid.append(Color(parties[peer_id]["bg_color"]))
-	bots.sort()
-	var changed := false
-	for bot in bots:
-		var current := Color(parties[bot].get("bg_color", Color.TRANSPARENT))
-		var too_close := current.a <= 0.0
-		for other in avoid:
-			if color_distance(current, other) < BOT_COLOR_MIN_DISTANCE:
-				too_close = true
-				break
-		if too_close:
-			current = _pick_distinct_color(avoid)
-			parties[bot]["bg_color"] = current
-			changed = true
-		avoid.append(current)
-	return changed
+		var c := Color(parties[peer_id].get("bg_color", Color.TRANSPARENT))
+		if int(peer_id) != bot_id and c.a > 0.0:
+			avoid.append(c)
+	parties[bot_id]["bg_color"] = _pick_distinct_color(avoid)
 
 ## Host: parti kurulumunda düşen oyuncu: partisi eksikse rastgele tamamlanır
 ## ve hazır sayılır (oyun onu beklemesin).
@@ -346,7 +330,7 @@ func add_bot_party(peer_id: int) -> void:
 	var bot_name := PoliticianPresets.random_name(PoliticianPresets.used_surnames(peer_id))
 	politicians[peer_id] = PoliticianPresets.make(bot_name["first_name"], bot_name["surname"],
 		background, String(homes[randi() % homes.size()]) if not homes.is_empty() else "", bot_name["gender"])
-	_adjust_bot_colors()
+	_assign_new_bot_color(peer_id)
 	if MultiplayerManager.room_code != "":
 		_broadcast_parties()
 	parties_updated.emit()
@@ -431,7 +415,6 @@ func _apply_party_local_only(party_name: String, icon_index: int, icon_color: Co
 		"groups": VoterGroups.start_affinities(core),
 		"ready": was_ready,
 	}
-	_adjust_bot_colors()
 	parties_updated.emit()
 
 func _apply_party(peer_id: int, party_name: String, icon_index: int, icon_color: Color, bg_color: Color, core: Array) -> void:
@@ -449,7 +432,6 @@ func _apply_party(peer_id: int, party_name: String, icon_index: int, icon_color:
 		"groups": VoterGroups.start_affinities(core),
 		"ready": was_ready,
 	}
-	_adjust_bot_colors()
 	_broadcast_parties()
 	parties_updated.emit()
 
@@ -467,7 +449,6 @@ func _apply_party_and_ready(peer_id: int, party_name: String, icon_index: int, i
 		"groups": VoterGroups.start_affinities(core),
 		"ready": is_ready_value,
 	}
-	_adjust_bot_colors()
 	_broadcast_parties()
 	parties_updated.emit()
 	if is_ready_value and all_ready():
@@ -504,7 +485,6 @@ func _apply_color(peer_id: int, bg_color: Color) -> void:
 	if not parties.has(peer_id):
 		parties[peer_id] = {"ready": false}
 	parties[peer_id]["bg_color"] = bg_color
-	_adjust_bot_colors()
 	if MultiplayerManager.room_code != "":
 		_broadcast_parties()
 	parties_updated.emit()
@@ -575,6 +555,34 @@ func _randomize_bot_politician(bot_id: int) -> void:
 	var home := String(homes[randi() % homes.size()]) if not homes.is_empty() else ""
 	_apply_politician(bot_id, PoliticianPresets.make(bot_name["first_name"], bot_name["surname"],
 		PoliticianPresets.random_background(), home, bot_name["gender"]))
+
+## Oda sahibi: botun siyasetçisinin adını ve soyadını değiştirir (geçmiş,
+## memleket ve cinsiyet korunur). Ad oyuncu profilindeki kurallarla temizlenir.
+func set_bot_politician_name(bot_id: int, first_name: String, surname: String) -> void:
+	if not MultiplayerManager.is_local_owner() or not MultiplayerManager.is_bot(bot_id):
+		return
+	if MultiplayerManager.room_code == "" or MultiplayerManager.is_host:
+		_set_bot_politician_name(bot_id, first_name, surname)
+	else:
+		_request_set_bot_politician_name.rpc_id(1, bot_id, first_name, surname)
+
+func _set_bot_politician_name(bot_id: int, first_name: String, surname: String) -> void:
+	if not politicians.has(bot_id):
+		return
+	var data: Dictionary = (politicians[bot_id] as Dictionary).duplicate()
+	data["first_name"] = PoliticianPresets.normalize_name(first_name)
+	data["surname"] = PoliticianPresets.normalize_name(surname)
+	if not PoliticianPresets.is_valid(data):
+		parties_updated.emit()
+		return
+	_apply_politician(bot_id, data)
+
+@rpc("any_peer", "reliable")
+func _request_set_bot_politician_name(bot_id: int, first_name: String, surname: String) -> void:
+	if not MultiplayerManager.is_host or multiplayer.get_remote_sender_id() != MultiplayerManager.owner_id \
+			or not MultiplayerManager.is_bot(bot_id):
+		return
+	_set_bot_politician_name(bot_id, first_name, surname)
 
 @rpc("any_peer", "reliable")
 func _request_randomize_bot_politician(bot_id: int) -> void:

@@ -60,6 +60,10 @@ var _players_list: VBoxContainer
 ## Sağ paneldeki kontrollerin düzenlediği parti: kendi partim ya da (oda
 ## sahibiysem) bir bot. Bot düzenlenirken kendi seçimlerim burada saklanır.
 var _edit_target: int = -1
+## Bot düzenlenirken botun siyasetçisinin adı ve soyadı (0.0.193).
+var _bot_name_row: HBoxContainer
+var _bot_first_edit: LineEdit
+var _bot_surname_edit: LineEdit
 var _own_backup: Dictionary = {}
 var _bot_profile_button: Button
 @onready var title_label: Label = $TopBar/TitleLabel
@@ -153,6 +157,8 @@ func _refresh_ready_button() -> void:
 	ready_button.disabled = _editing_bot() or (not _is_locked and not PartyManager.is_valid_name(_party_name))
 	if _bot_profile_button != null:
 		_bot_profile_button.visible = _editing_bot()
+	if _bot_name_row != null:
+		_bot_name_row.visible = _editing_bot()
 
 ## Oda sahibi bot düzenlerken: botun siyasetçisini (cinsiyet, ad, soyad,
 ## geçmiş, memleket) rastgele yeniden üretir. Sınırsız basılabilir.
@@ -169,6 +175,47 @@ func _build_bot_profile_button() -> void:
 			_randomize_bot_core())
 	ready_button.get_parent().add_child(_bot_profile_button)
 	ready_button.get_parent().move_child(_bot_profile_button, ready_button.get_index())
+	# Botun genel başkanının adı ve soyadı: Enter ya da alandan çıkınca kaydedilir.
+	_bot_name_row = HBoxContainer.new()
+	_bot_name_row.add_theme_constant_override("separation", 6)
+	_bot_name_row.visible = false
+	var leader := Label.new()
+	leader.text = L.t("Genel başkan")
+	leader.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
+	_bot_name_row.add_child(leader)
+	_bot_first_edit = _bot_name_edit(L.t("Ad"))
+	_bot_surname_edit = _bot_name_edit(L.t("Soyad"))
+	_bot_name_row.add_child(_bot_first_edit)
+	_bot_name_row.add_child(_bot_surname_edit)
+	# Parti adının hemen altında: bot düzenlenirken kaydırmadan görünsün.
+	name_hint_label.get_parent().add_child(_bot_name_row)
+	name_hint_label.get_parent().move_child(_bot_name_row, name_hint_label.get_index() + 1)
+
+func _bot_name_edit(placeholder: String) -> LineEdit:
+	var edit := LineEdit.new()
+	edit.placeholder_text = placeholder
+	edit.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	edit.max_length = PoliticianPresets.PART_MAX_LENGTH
+	edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	edit.custom_minimum_size = Vector2(0, 36)
+	edit.tooltip_text = L.t("Botun genel başkanının adı")
+	edit.text_submitted.connect(func(_t): _push_bot_name())
+	edit.focus_exited.connect(_push_bot_name)
+	return edit
+
+func _push_bot_name() -> void:
+	if _editing_bot():
+		PartyManager.set_bot_politician_name(_edit_target, _bot_first_edit.text, _bot_surname_edit.text)
+
+## Düzenlenen botun güncel adını alanlara yazar (yazılırken üzerine yazmaz).
+func _refresh_bot_name_fields() -> void:
+	if _bot_first_edit == null or not _editing_bot():
+		return
+	var data: Dictionary = PartyManager.politicians.get(_edit_target, {})
+	if not _bot_first_edit.has_focus():
+		_bot_first_edit.text = String(data.get("first_name", ""))
+	if not _bot_surname_edit.has_focus():
+		_bot_surname_edit.text = String(data.get("surname", ""))
 
 ## Düzenlenen botun çekirdek seçmen gruplarını rastgele yenile (öncekinden
 ## farklı bir çift gelsin diye birkaç kez dener).
@@ -234,6 +281,7 @@ func _on_parties_updated() -> void:
 			_selected_bg_color = party["bg_color"]
 			_update_preview()
 		_build_color_row()
+		_refresh_bot_name_fields()
 		return
 	if _is_taken_by_player(_selected_bg_color):
 		_selected_bg_color = _first_free_color(_selected_bg_color)
@@ -586,6 +634,7 @@ func _start_editing(bot_id: int) -> void:
 	_build_core_buttons()
 	_update_preview()
 	_refresh_players_panel()
+	_refresh_bot_name_fields()
 
 ## "Kilitle ve Hazır Ver" / iptal: kilitliyken tüm seçim kontrolleri
 ## devre dışı kalır (yanlışlıkla değiştirilemesin diye), tekrar basınca açılır.

@@ -475,10 +475,26 @@ func _initialize() -> void:
 			if pm.color_distance(colors[ci], colors[cj]) < pm.BOT_COLOR_MIN_DISTANCE:
 				close_pair = true
 	check("bot renkleri oyunculara ve birbirine cok yakin degil", not close_pair, str(colors))
-	pm.parties[10]["bg_color"] = colors[1]
-	pm._adjust_bot_colors()
-	check("oyuncu botun rengine yakin renk secince bot uzaklasir",
-		pm.color_distance(Color(pm.parties[11]["bg_color"]), colors[1]) >= pm.BOT_COLOR_MIN_DISTANCE)
+	pm._apply_color(10, colors[1].lightened(0.05))
+	check("oyuncu botun rengine YAKIN renk secince bot rengini degistirmez",
+		Color(pm.parties[11]["bg_color"]).is_equal_approx(colors[1]))
+	pm._apply_color(10, colors[1])
+	var moved: Color = Color(pm.parties[11]["bg_color"])
+	check("oyuncu botun AYNI rengini alinca bot baska renge gecer", Color(pm.parties[10]["bg_color"]).is_equal_approx(colors[1]) \
+		and not moved.is_equal_approx(colors[1]))
+	check("botun yeni rengi diger partilere yakin degil",
+		pm.color_distance(moved, colors[1]) >= pm.BOT_COLOR_MIN_DISTANCE \
+		and pm.color_distance(moved, Color(pm.parties[12]["bg_color"])) >= pm.BOT_COLOR_MIN_DISTANCE, str(moved))
+	var keep_owner: int = mm.owner_id
+	mm.owner_id = mm.multiplayer.get_unique_id()
+	var keep_bg: String = String(pm.politicians[11]["background"])
+	pm.set_bot_politician_name(11, "ayşe", "yılmaz")
+	check("oda sahibi bot adini degistirir", String(pm.politicians[11]["first_name"]) == "Ayşe" \
+		and String(pm.politicians[11]["surname"]) == "Yılmaz" and String(pm.politicians[11]["background"]) == keep_bg,
+		str(pm.politicians[11]))
+	pm.set_bot_politician_name(11, "", "Kaya")
+	check("bos ad reddedilir", String(pm.politicians[11]["first_name"]) == "Ayşe")
+	mm.owner_id = keep_owner
 
 	print("")
 	print("=== 11) BOTLAR ANAYASA DEGISIKLIGI ONERIR ===")

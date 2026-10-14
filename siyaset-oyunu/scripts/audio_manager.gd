@@ -40,6 +40,8 @@ const SOUNDS := {
 	## Kartlar: oynanan kartı herkes duyar, çekme sesi sadece çekene çalar.
 	"card_played": "res://assets/audio/ui/card_played.ogg",
 	"card_drawn": "res://assets/audio/ui/card_drawn.ogg",
+	## Olay gazetesi masaya çarptığı an (tools/make_paper_sfx.py ile sentezlendi).
+	"paper_slap": "res://assets/audio/ui/paper_slap.wav",
 }
 
 ## MÜZİK. Oyuncular Discord'da konuşarak oynadığı için arka plan müziği

@@ -64,6 +64,9 @@ signal game_over
 ## OLAY LOGU: yeni bir kayıt eklendi (bkz. event_log). Oyun ekranının sol
 ## panelindeki log bunu dinler.
 signal event_logged(entry: Dictionary)
+## SUNUM: her olay (host'ta ve istemcide) uygulandıktan SONRA bir kez; sürüm
+## numarası olayın kimliğidir (EventFx aynı olayı iki kez oynatmaz).
+signal event_presented(event: Dictionary, version: int)
 ## Kongre gösterisi başlıyor (herkes): data = CardManager._compute_congress sonucu.
 signal congress_started(data: Dictionary)
 ## EKONOMİ OLAYI (herkeste): {"kind": "tax", "from", "to"} vergi değişti,
@@ -3868,6 +3871,7 @@ func _emit_post_event(event: Dictionary) -> void:
 		log_event(str(event["message"]), int(event.get("peer_id", -1)), String(event.get("province", "")), _log_kind(event))
 	for extra in event.get("extra_log", []):
 		log_event(String(extra["text"]), int(extra["peer_id"]), String(extra["province"]), String(extra["kind"]))
+	event_presented.emit(event, state_version)
 	match type:
 		"round":
 			log_event(L.t("%s başladı.") % GameRules.period_label(round_number), -1, "", "round")

@@ -57,6 +57,7 @@ func _ready() -> void:
 
 	_build_province_view_row()
 	_build_language_row()
+	_build_event_fx_row()
 	_build_volume_rows()
 	_apply_pixel_style()
 
@@ -123,6 +124,21 @@ func _build_province_view_row() -> void:
 
 ## DİL: Türkçe / English. Değişince açık ekran yeniden kurulur (metinler
 ## kurulurken çevrildiği için); oyun durumu yöneticilerde olduğundan kaybolmaz.
+## OLAY ANİMASYONLARI: büyük olaylardan sonra fırlatılan gazete (EventFx).
+func _build_event_fx_row() -> void:
+	var box := panel.get_node("CenterBox") as VBoxContainer
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	var label := Label.new()
+	label.text = L.t("Olay Animasyonları")
+	row.add_child(label)
+	var check := CheckButton.new()
+	check.button_pressed = GameSettings.event_fx
+	check.toggled.connect(GameSettings.set_event_fx)
+	row.add_child(check)
+	_insert_before_close(box, row)
+
 func _build_language_row() -> void:
 	var box := panel.get_node("CenterBox") as VBoxContainer
 	var title := UiTheme.section_label(L.t("Dil"))

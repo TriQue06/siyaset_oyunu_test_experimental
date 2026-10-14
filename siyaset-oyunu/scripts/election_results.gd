@@ -8,8 +8,12 @@ extends Control
 ##   - Üstte CANLI etiketi, yayın saati ve açılan sandık oranı; altta SON DAKİKA
 ##     bandı ve kayan haber yazısı.
 ## Sayımın kendisi ElectionNightSim'de; her karede yeniden hesaplanıp çizilir
-## (harita GPU paletiyle boyanır, bkz. province_overlay.gd). Yayın ATLANAMAZ:
-## süre bitince kesin sonuç bir süre ekranda kalır, sonra GameScreen'e dönülür.
+## (harita GPU paletiyle boyanır, bkz. province_overlay.gd). Süre bitince
+## kesin sonuç bir süre ekranda kalır, sonra GameScreen'e dönülür.
+## ATLA / 2× (0.0.179, yalnız bu ekranda, oyun akışını değiştirmez): ATLA
+## (ya da Boşluk / Esc) sayımı bitirip kesin sonucu gösterir, ikinci basış
+## oyun ekranına döner. Kesin sonuç oynatılsa da atlansa da aynıdır
+## (ElectionNightSim'in son örneği host'un hesapladığı sonuçtur).
 ## Host hükümet kurma süresine bu yayının süresini ekler (bkz.
 ## CardManager._hold_election).
 
@@ -118,6 +122,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_layout()
 	_laid_out = true
+	_build_skip_controls()
 	_refresh()
 	_refresh_map()
 	_ticker_label.text = _ticker_text()
@@ -136,7 +141,7 @@ func _process(delta: float) -> void:
 	if not _laid_out:
 		return
 	if not _finished:
-		_t = minf(_t + delta, DURATION)
+		_t = minf(_t + delta * _speed, DURATION)
 	# Her karede: sayım, harita ve meclis kare hızında akar.
 	_refresh()
 	_refresh_map()
@@ -386,10 +391,54 @@ func _ticker_text() -> String:
 	_ticker_round += 1
 	return "     ●     ".join(PackedStringArray(parts))
 
+var _speed := 1.0
+var _speed_button: Button
+
+func _build_skip_controls() -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	row.top_level = true
+	row.z_index = 20
+	_speed_button = Button.new()
+	_speed_button.text = L.t("2× HIZ")
+	_speed_button.toggle_mode = true
+	_speed_button.toggled.connect(func(on: bool): _speed = 2.0 if on else 1.0)
+	var skip := Button.new()
+	skip.text = L.t("ATLA ▸▸")
+	skip.pressed.connect(skip_or_leave)
+	for b: Button in [_speed_button, skip]:
+		UiSkin.skin_button(b)
+		b.focus_mode = Control.FOCUS_NONE
+		b.add_theme_font_override("font", UiTheme.mono())
+		b.add_theme_font_size_override("font_size", 13)
+		b.custom_minimum_size = Vector2(0, 32)
+		row.add_child(b)
+	add_child(row)
+	row.reset_size()
+	var view := get_viewport_rect().size
+	row.position = Vector2(view.x - row.size.x - 16.0, view.y - row.size.y - 44.0)
+
+## Sayım sürüyorsa kesin sonuca atlar; sonuç ekrandaysa oyun ekranına döner.
+func skip_or_leave() -> void:
+	if not _laid_out:
+		return
+	if not _finished:
+		_t = DURATION
+		_refresh()
+	else:
+		_leave()
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo \
+			and (event.keycode == KEY_SPACE or event.keycode == KEY_ESCAPE):
+		skip_or_leave()
+		get_viewport().set_input_as_handled()
+
 func _leave() -> void:
 	if _leaving:
 		return
 	_leaving = true
+	EventFx.pending_election = true
 	SceneTransition.fade_to_scene("res://scenes/GameScreen.tscn")
 
 # --- Parti bilgisi ---------------------------------------------------------------

@@ -40,7 +40,7 @@ static func adjective(value: float, scale: String = "national") -> String:
 static func change(value: float, scale: String = "national", noun: String = "destek") -> String:
 	if absf(value) < NEGLIGIBLE:
 		return L.t("belirgin bir etki yok")
-	return "%s %s %s" % [adjective(value, scale), noun, L.t("artışı") if value > 0.0 else L.t("kaybı")]
+	return "%s %s %s" % [adjective(value, scale), L.t(noun), L.t("artışı") if value > 0.0 else L.t("kaybı")]
 
 ## Aynı ifadenin cümle başı hali ("Hafif destek artışı").
 static func change_cap(value: float, scale: String = "national", noun: String = "destek") -> String:

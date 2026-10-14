@@ -3122,3 +3122,120 @@ msgstr "left in your quota: %s"
 
 msgid "Bu dönemki kotan: %s (bakanlık puanına göre hazinenin %%%d'i)."
 msgstr "Your quota this term: %s (%d%% of the treasury, by ministry points)."
+
+msgid "2× HIZ"
+msgstr "2× SPEED"
+
+msgid "ATLA ▸▸"
+msgstr "SKIP ▸▸"
+
+msgid "Tıkla ya da Boşluk: geç"
+msgstr "Click or Space: skip"
+
+msgid "SİYASET GÜNDEMİ"
+msgstr "POLITICAL AGENDA"
+
+msgid "%s · ÖZEL BASKI"
+msgstr "%s · SPECIAL EDITION"
+
+msgid "SİYASETİ SARSAN KASET!"
+msgstr "THE TAPE THAT SHOOK POLITICS!"
+
+msgid "İTİBAR SUİKASTI"
+msgstr "CHARACTER ASSASSINATION"
+
+msgid "PARTİDE ÇATLAK BÜYÜYOR!"
+msgstr "CRACKS DEEPEN IN THE PARTY!"
+
+msgid "İÇ KARIŞIKLIK"
+msgstr "INTERNAL STRIFE"
+
+msgid "MECLİSTE DENGELER DEĞİŞTİ!"
+msgstr "PARLIAMENT'S BALANCE SHIFTS!"
+
+msgid "VEKİL TRANSFERİ"
+msgstr "MP DEFECTION"
+
+msgid "PARTİ KASASINA DEV DESTEK!"
+msgstr "HUGE BOOST FOR PARTY COFFERS!"
+
+msgid "%s büyük bir bağış kampanyası düzenledi."
+msgstr "%s held a major fundraising campaign."
+
+msgid "PARTİ İKİYE BÖLÜNDÜ!"
+msgstr "PARTY SPLITS IN TWO!"
+
+msgid "BÖLÜNDÜ"
+msgstr "SPLIT"
+
+msgid "HÜKÜMET GENSORUYLA DÜŞTÜ!"
+msgstr "GOVERNMENT FALLS TO NO-CONFIDENCE!"
+
+msgid "DÜŞTÜ"
+msgstr "FALLEN"
+
+msgid "GENSORU KABUL"
+msgstr "MOTION PASSED"
+
+msgid "HÜKÜMET GENSORUYU ATLATTI"
+msgstr "GOVERNMENT SURVIVES NO-CONFIDENCE"
+
+msgid "AYAKTA"
+msgstr "STANDING"
+
+msgid "GENSORU REDDEDİLDİ"
+msgstr "MOTION REJECTED"
+
+msgid "ÜLKE YENİDEN SANDIĞA GİDİYOR!"
+msgstr "THE COUNTRY HEADS BACK TO THE POLLS!"
+
+msgid "YENİ HÜKÜMET GÜVENOYU ALDI!"
+msgstr "NEW GOVERNMENT WINS CONFIDENCE!"
+
+msgid "GÜVENOYU"
+msgstr "CONFIDENCE"
+
+msgid "ANAYASA DEĞİŞTİ!"
+msgstr "CONSTITUTION AMENDED!"
+
+msgid "KABUL"
+msgstr "PASSED"
+
+msgid "KOALİSYONDA YOLUN SONU!"
+msgstr "END OF THE ROAD FOR THE COALITION!"
+
+msgid "KOALİSYON"
+msgstr "COALITION"
+
+msgid "SANDIKTAN TEK PARTİ ÇOĞUNLUĞU!"
+msgstr "SINGLE-PARTY MAJORITY AT THE POLLS!"
+
+msgid "SANDIKTAN KOALİSYON MECLİSİ ÇIKTI!"
+msgstr "BALLOT BOX DELIVERS A HUNG PARLIAMENT!"
+
+msgid "%d seçimi: %s %d vekille birinci (oy oranı %s)."
+msgstr "%d election: %s comes first with %d MPs (%s of the vote)."
+
+msgid "BİRİNCİ PARTİ"
+msgstr "FIRST PLACE"
+
+msgid "%d VEKİL"
+msgstr "%d MPs"
+
+msgid "GENEL BAŞKAN KOLTUĞUNU KORUDU!"
+msgstr "LEADER HOLDS ON TO THE CHAIR!"
+
+msgid "YENİ GENEL BAŞKAN BELLİ OLDU!"
+msgstr "A NEW PARTY LEADER IS CHOSEN!"
+
+msgid "%s kongresi: %s, %d delegenin oyuyla genel başkan."
+msgstr "%s congress: %s elected leader with %d delegate votes."
+
+msgid "GENEL BAŞKAN"
+msgstr "LEADER"
+
+msgid "Olay Animasyonları"
+msgstr "Event Animations"
+
+msgid "destek"
+msgstr "support"

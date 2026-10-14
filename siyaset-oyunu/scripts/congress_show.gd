@@ -36,6 +36,7 @@ func _ready() -> void:
 	_duration = maxf(2.0, float(data.get("duration", 6.0)))
 	_build()
 	_build_rows(range((data.get("candidates", []) as Array).size()), data.get("round1", []))
+	_build_skip_controls()
 
 func _phase_ends() -> Array:
 	# [1. tur sayımı biter, 2. tur başlar, 2. tur biter]
@@ -43,8 +44,48 @@ func _phase_ends() -> Array:
 		return [_duration * 0.62, _duration * 0.62, _duration * 0.62]
 	return [_duration * 0.36, _duration * 0.46, _duration * 0.78]
 
+## ATLA / 2× (0.0.179): yalnız bu ekran; kongre sonucu host'ta önceden
+## hesaplandığı için atlamak sonucu değiştirmez. ATLA (Boşluk / Esc) önce
+## sonucu gösterir, ikinci basış ekranı kapatır.
+var _speed := 1.0
+
+func skip_or_close() -> void:
+	var ends := _phase_ends()
+	if _t < float(ends[2]) + 0.01:
+		_t = float(ends[2]) + 0.01
+	else:
+		queue_free()
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo \
+			and (event.keycode == KEY_SPACE or event.keycode == KEY_ESCAPE):
+		skip_or_close()
+		get_viewport().set_input_as_handled()
+
+func _build_skip_controls() -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	var speed := Button.new()
+	speed.text = L.t("2× HIZ")
+	speed.toggle_mode = true
+	speed.toggled.connect(func(on: bool): _speed = 2.0 if on else 1.0)
+	var skip := Button.new()
+	skip.text = L.t("ATLA ▸▸")
+	skip.pressed.connect(skip_or_close)
+	for b: Button in [speed, skip]:
+		UiSkin.skin_button(b)
+		b.focus_mode = Control.FOCUS_NONE
+		b.add_theme_font_override("font", UiTheme.mono())
+		b.add_theme_font_size_override("font_size", 13)
+		b.custom_minimum_size = Vector2(0, 32)
+		row.add_child(b)
+	add_child(row)
+	row.reset_size()
+	var view := get_viewport_rect().size
+	row.position = Vector2(view.x - row.size.x - 16.0, view.y - row.size.y - 16.0)
+
 func _process(delta: float) -> void:
-	_t += delta
+	_t += delta * _speed
 	var ends := _phase_ends()
 	var candidates: Array = data.get("candidates", [])
 	var round2: Array = data.get("round2", [])

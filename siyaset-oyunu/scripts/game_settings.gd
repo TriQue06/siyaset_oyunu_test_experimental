@@ -33,6 +33,8 @@ var display_mode: int = DEFAULT_DISPLAY_MODE
 # (yapıştırılsa da elle yazılsa da) gizlenir — yayın yaparken kod ekranda
 # görünmesin diye.
 var streamer_mode: bool = DEFAULT_STREAMER_MODE
+## Olay gazetesi ve olay animasyonları (EventFx). Kapalıyken hiç oynamaz.
+var event_fx: bool = true
 var master_volume: float = DEFAULT_MASTER_VOLUME
 var music_volume: float = DEFAULT_MUSIC_VOLUME
 var sfx_volume: float = DEFAULT_SFX_VOLUME
@@ -91,6 +93,10 @@ func set_province_view(mode: int) -> void:
 	_save()
 	province_view_changed.emit(province_view)
 
+func set_event_fx(value: bool) -> void:
+	event_fx = value
+	_save()
+
 func set_streamer_mode(value: bool) -> void:
 	streamer_mode = value
 	streamer_mode_changed.emit(streamer_mode)
@@ -119,6 +125,7 @@ func _load() -> void:
 		# vardı; kaydedilmiş eski bir değer varsa Tam Ekran'a düşürüyoruz.
 		display_mode = loaded_mode if loaded_mode in [DisplayMode.WINDOWED, DisplayMode.FULLSCREEN] else DisplayMode.FULLSCREEN
 		streamer_mode = config.get_value("settings", "streamer_mode", DEFAULT_STREAMER_MODE)
+		event_fx = bool(config.get_value("settings", "event_fx", true))
 		master_volume = float(config.get_value("settings", "master_volume", DEFAULT_MASTER_VOLUME))
 		music_volume = float(config.get_value("settings", "music_volume", DEFAULT_MUSIC_VOLUME))
 		sfx_volume = float(config.get_value("settings", "sfx_volume", DEFAULT_SFX_VOLUME))
@@ -134,6 +141,7 @@ func _save() -> void:
 	config.set_value("settings", "vsync_enabled", vsync_enabled)
 	config.set_value("settings", "display_mode", display_mode)
 	config.set_value("settings", "streamer_mode", streamer_mode)
+	config.set_value("settings", "event_fx", event_fx)
 	config.set_value("settings", "master_volume", master_volume)
 	config.set_value("settings", "music_volume", music_volume)
 	config.set_value("settings", "sfx_volume", sfx_volume)

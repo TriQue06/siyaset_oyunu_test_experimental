@@ -352,6 +352,7 @@ func _ready() -> void:
 	CardManager.card_drawn.connect(_on_card_drawn)
 	CardManager.card_played.connect(_on_card_played)
 	CardManager.congress_started.connect(_on_congress_started)
+	_build_event_fx()
 	CardManager.event_logged.connect(_pulse_logged_province)
 	CardManager.election_completed.connect(_on_election_completed)
 	CardManager.round_advanced.connect(_on_round_advanced)
@@ -1182,8 +1183,161 @@ func _on_game_over() -> void:
 	# Puan tablosu geldiği an jenerik müziği başlar.
 	AudioManager.play_music("credits")
 
-func _on_proposal_resolved(_accepted: bool, _kind: String, _proposer_id: int) -> void:
-	pass  # sonuç metni olay loguna CardManager üzerinden düşer
+func _on_proposal_resolved(accepted: bool, kind: String, proposer_id: int) -> void:
+	# Sonuç metni olay loguna CardManager üzerinden düşer; büyük sonuçlar ayrıca
+	# gazete manşeti olur.
+	_headline_for_proposal(accepted, kind, proposer_id)
+
+# --- OLAY GAZETESİ (EventFx, 0.0.179) -------------------------------------------
+## Büyük olaylar gazete manşeti olarak sunulur. Sadece GÖSTERİM: veriler oyun
+## durumundan okunur (olay zaten uygulanmıştır), hiçbir şey değiştirilmez.
+var _event_fx: EventFx
+
+func _build_event_fx() -> void:
+	_event_fx = EventFx.new()
+	add_child(_event_fx)
+	CardManager.event_presented.connect(_headline_for_event)
+	GovernmentManager.coalition_changed.connect(_headline_for_coalition)
+	tree_exiting.connect(_event_fx.skip_all)
+	if EventFx.pending_election:
+		EventFx.pending_election = false
+		get_tree().create_timer(0.7).timeout.connect(_headline_for_election)
+
+func _fx_party_name(peer_id: int) -> String:
+	return String(PartyManager.data_of(peer_id).get("name", "?"))
+
+## Kart ve parti olayları (CardManager.event_presented).
+func _headline_for_event(event: Dictionary, version: int) -> void:
+	var type := String(event.get("type", ""))
+	var message := String(event.get("message", ""))
+	var key := "cm|%d|%s" % [version, type]
+	match type:
+		"played":
+			var card := String(event.get("card", ""))
+			var target := int(event.get("target", -1))
+			var actor := int(event.get("peer_id", -1))
+			match card:
+				CardPresets.REPUTATION_CARD_TYPE:
+					_event_fx.present(key, {"headline": L.t("SİYASETİ SARSAN KASET!"), "subtitle": message,
+						"art": CardPresets.get_card_texture(card), "party": target, "accent": UiTheme.RED,
+						"style": "scandal", "status": L.t("İTİBAR SUİKASTI")})
+				CardPresets.REBELLION_CARD_TYPE:
+					_event_fx.present(key, {"headline": L.t("PARTİDE ÇATLAK BÜYÜYOR!"), "subtitle": message,
+						"art": CardPresets.get_card_texture(card), "party": target,
+						"accent": PartyManager.data_of(target).get("bg_color", UiTheme.GREEN_DARK),
+						"style": "conflict", "status": L.t("İÇ KARIŞIKLIK")})
+				CardPresets.STEAL_STRONG_CARD_TYPE:
+					if bool(event.get("seats_changed", false)):
+						_event_fx.present(key, {"headline": L.t("MECLİSTE DENGELER DEĞİŞTİ!"), "subtitle": message,
+							"art": CardPresets.get_card_texture(card), "party": actor, "accent": UiTheme.GOLD,
+							"status": L.t("VEKİL TRANSFERİ")})
+				CardPresets.FUNDS_BONUS_STRONG_CARD_TYPE:
+					_event_fx.present(key, {"headline": L.t("PARTİ KASASINA DEV DESTEK!"),
+						"subtitle": message if message != "" else L.t("%s büyük bir bağış kampanyası düzenledi.") % _fx_party_name(actor),
+						"art": CardPresets.get_card_texture(card), "party": actor, "accent": UiTheme.GREEN_DARK,
+						"stamp": "+" + GameRules.cost_text(GameRules.FUNDS_BONUS_STRONG)})
+		"party_split":
+			var parent := int(event.get("peer_id", -1))
+			_event_fx.present(key, {"headline": L.t("PARTİ İKİYE BÖLÜNDÜ!"), "subtitle": message,
+				"art": CardPresets.get_card_texture(CardPresets.REBELLION_CARD_TYPE), "party": parent,
+				"accent": PartyManager.data_of(parent).get("bg_color", UiTheme.RED), "style": "conflict",
+				"stamp": L.t("BÖLÜNDÜ")})
+
+## Meclis oylamalarının büyük sonuçları (gensoru, erken seçim, güvenoyu, anayasa).
+func _headline_for_proposal(accepted: bool, kind: String, proposer_id: int) -> void:
+	var reason := GovernmentManager.last_resolution_reason
+	var key := "gm|%s|%d|%d|%d|%d" % [kind, proposer_id, int(accepted), CardManager.round_number, reason.hash()]
+	match kind:
+		GovernmentManager.KIND_CENSURE:
+			if accepted:
+				_event_fx.present(key, {"headline": L.t("HÜKÜMET GENSORUYLA DÜŞTÜ!"), "subtitle": reason,
+					"party": proposer_id, "accent": UiTheme.RED, "stamp": L.t("DÜŞTÜ"), "sound": "vote_no",
+					"status": L.t("GENSORU KABUL")})
+			else:
+				_event_fx.present(key, {"headline": L.t("HÜKÜMET GENSORUYU ATLATTI"), "subtitle": reason,
+					"party": GovernmentManager.main_gov_peer_id, "accent": UiTheme.GREEN_DARK,
+					"stamp": L.t("AYAKTA"), "sound": "vote_yes", "status": L.t("GENSORU REDDEDİLDİ")})
+		GovernmentManager.KIND_EARLY:
+			if accepted:
+				_event_fx.present(key, {"headline": L.t("ÜLKE YENİDEN SANDIĞA GİDİYOR!"), "subtitle": reason,
+					"art": CardPresets.get_card_texture(CardPresets.EARLY_ELECTION_CARD_TYPE), "party": proposer_id,
+					"accent": UiTheme.GOLD_DIM, "stamp": L.t("ERKEN SEÇİM")})
+		GovernmentManager.KIND_GOVERNMENT:
+			if accepted:
+				_event_fx.present(key, {"headline": L.t("YENİ HÜKÜMET GÜVENOYU ALDI!"), "subtitle": reason,
+					"party": proposer_id, "accent": UiTheme.GREEN_DARK, "stamp": L.t("GÜVENOYU"),
+					"sound": "law_passed"})
+		GovernmentManager.KIND_CONSTITUTION:
+			if accepted:
+				_event_fx.present(key, {"headline": L.t("ANAYASA DEĞİŞTİ!"), "subtitle": reason,
+					"party": proposer_id, "accent": UiTheme.PURPLE, "stamp": L.t("KABUL"), "sound": "law_passed"})
+
+## Koalisyondan çekilme (GovernmentManager.coalition_changed). Aynı sinyal
+## "ortaklar anlaştı" için de gelir; sadece çekilme manşet olur.
+func _headline_for_coalition(text: String) -> void:
+	if not _is_withdrawal_text(text):
+		return
+	_event_fx.present("co|%d|%d" % [CardManager.round_number, text.hash()], {
+		"headline": L.t("KOALİSYONDA YOLUN SONU!"), "subtitle": text,
+		"party": GovernmentManager.main_gov_peer_id, "accent": UiTheme.RED_DARK, "style": "conflict",
+		"status": L.t("KOALİSYON")})
+
+## Çekilme metni host'un dilinde gelir: bütün dillerdeki kalıpla karşılaştırılır.
+static func _is_withdrawal_text(text: String) -> bool:
+	var template := "%s koalisyondan çekildi: %s.%s%s%s"
+	var fragments: Array = [template.split("%s")[1]]
+	for locale in L.LOCALES:
+		var translation := TranslationServer.get_translation_object(locale)
+		if translation != null:
+			var translated := String(translation.get_message(template))
+			if translated != "" and translated.split("%s").size() > 1:
+				fragments.append(translated.split("%s")[1])
+	for fragment in fragments:
+		if String(fragment).strip_edges() != "" and text.contains(String(fragment)):
+			return true
+	return false
+
+## Seçim gecesinden dönünce: kesin sonuç manşeti (birinci parti, vekil, oy).
+func _headline_for_election() -> void:
+	if not is_inside_tree() or CardManager.last_election_round <= 0 or CardManager.last_seats.is_empty():
+		return
+	var winner := -1
+	for peer_id in CardManager.last_seats.keys():
+		if winner == -1 or int(CardManager.last_seats[peer_id]) > int(CardManager.last_seats[winner]):
+			winner = int(peer_id)
+	var seats := int(CardManager.last_seats.get(winner, 0))
+	var majority := seats * 2 > GovernmentManager.total_seats()
+	_event_fx.present("el|%d" % CardManager.last_election_round, {
+		"headline": L.t("SANDIKTAN TEK PARTİ ÇOĞUNLUĞU!") if majority else L.t("SANDIKTAN KOALİSYON MECLİSİ ÇIKTI!"),
+		"subtitle": L.t("%d seçimi: %s %d vekille birinci (oy oranı %s).") % [
+			GameRules.election_year(CardManager.last_election_round), _fx_party_name(winner), seats,
+			L.pct(float(CardManager.last_vote_shares.get(winner, 0.0)))],
+		"party": winner, "accent": UiTheme.GOLD, "stamp": L.t("BİRİNCİ PARTİ"), "sound": "law_passed",
+		"status": L.t("%d VEKİL") % seats})
+
+## Kongre gecesi kapanınca (bittiğinde ya da atlanınca): sonuç manşeti.
+func _headline_for_congress(data: Dictionary) -> void:
+	if not is_inside_tree() or is_queued_for_deletion() or _event_fx == null:
+		return
+	var candidates: Array = data.get("candidates", [])
+	var w := int(data.get("winner", 0))
+	if w < 0 or w >= candidates.size():
+		return
+	var winner: Dictionary = candidates[w]
+	var round2: Array = data.get("round2", [])
+	var round1: Array = data.get("round1", [])
+	var delegates := 0
+	if round2.size() >= 4:
+		delegates = int(round2[2]) if int(round2[0]) == w else int(round2[3])
+	elif w < round1.size():
+		delegates = int(round1[w])
+	var kept := bool(winner.get("incumbent", false))
+	_event_fx.present("cg|%d|%d|%s" % [int(data.get("pid", -1)), CardManager.round_number, String(winner.get("name", ""))], {
+		"headline": L.t("GENEL BAŞKAN KOLTUĞUNU KORUDU!") if kept else L.t("YENİ GENEL BAŞKAN BELLİ OLDU!"),
+		"subtitle": L.t("%s kongresi: %s, %d delegenin oyuyla genel başkan.") % [
+			String(data.get("party", "")), String(winner.get("name", "?")), delegates],
+		"party": int(data.get("pid", -1)), "accent": data.get("color", UiTheme.GOLD),
+		"stamp": L.t("GENEL BAŞKAN"), "sound": "law_passed"})
 
 ## OLAY LOGU: sol panelde hükümet bilgisi ile sıra göstergesi arasındaki boşluk.
 ## (Eski üst bant yazısı kaldırıldı; her olay ve uyarı buraya düşer.)
@@ -1234,6 +1388,7 @@ func _on_congress_started(data: Dictionary) -> void:
 	var congress_view: Control = preload("res://scripts/congress_show.gd").new()
 	congress_view.data = data
 	add_child(congress_view)
+	congress_view.tree_exited.connect(_headline_for_congress.bind(data))
 
 ## Haritada bir hamle olunca (ili olan her log kaydı) ilin üstünde, log
 ## kaydına dokununca oynayan animasyonun YAKINLAŞTIRMASIZ hâli oynar.

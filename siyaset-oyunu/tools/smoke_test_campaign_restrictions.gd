@@ -28,6 +28,18 @@ func run() -> void:
 	cm.disaster["owed"] = true
 	cm._roll_disaster()
 	check(not cm.has_disaster(), "campaign random disaster blocked")
+	var screen = load("res://scenes/GameScreen.tscn").instantiate()
+	root.add_child(screen)
+	await process_frame
+	var markers = screen.map_holder.get_node("SeatMarkers")
+	var count := 0
+	for id in cm._province_ids:
+		var marker_count: int = markers._seats.get(id, []).size()
+		check(marker_count == cm._province_seat_counts[id], "pre-election hollow seats " + id)
+		count += marker_count
+	check(count > 0, "campaign seat markers visible")
+	screen.queue_free()
+	await process_frame
 	cm.last_election_round = 1
 	check(cm.needs_speech(1), "meeting available after first election")
 	check(not cm.start_disaster("deprem", [province]).is_empty(), "disaster available after first election")

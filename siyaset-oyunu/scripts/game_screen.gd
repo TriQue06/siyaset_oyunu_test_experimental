@@ -1535,6 +1535,16 @@ func _refresh_map_seat_markers() -> void:
 	if seat_markers == null:
 		return
 	seat_markers.clear_all()
+	# İlk seçimden önce de her ilin çıkaracağı vekiller sayılabilmeli.
+	if CardManager.last_province_results.is_empty():
+		var neutral := {}
+		for province_id in GameMap.province_ids():
+			var colors: Array = []
+			colors.resize(GameMap.seat_counts().get(province_id, 0))
+			colors.fill(Color.WHITE)
+			neutral[province_id] = colors
+		seat_markers.set_all(neutral)
+		return
 	for province_id in CardManager.last_province_results.keys():
 		var entry: Dictionary = CardManager.last_province_results[province_id]
 		var colors: Array = []

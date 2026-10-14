@@ -54,7 +54,9 @@ void fragment() {
  float px = max(fwidth(d), 0.0001);
  float outer = 1.0 - smoothstep(1.0 - px, 1.0 + px, d);
  float hole = smoothstep(inner_ratio - px, inner_ratio + px, d);
- COLOR = vec4(COLOR.rgb, COLOR.a * outer * hole);
+ float edge = smoothstep(1.0 - px * 2.5, 1.0 - px, d);
+ vec3 ring_color = mix(mix(COLOR.rgb, vec3(1.0), 0.45), vec3(0.06, 0.05, 0.13), edge);
+ COLOR = vec4(ring_color, COLOR.a * outer * hole);
 }
 """
 	var shader_material := ShaderMaterial.new()

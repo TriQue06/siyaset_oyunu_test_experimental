@@ -1589,7 +1589,7 @@ func abandon_game() -> void:
 ## Bu oyuncu için desteden çekilebilecek kartlar ve ağırlıkları.
 ##   - karalama her zaman,
 ##   - popülizm ve bağış kampanyası her zaman,
-##   - vekil çalma ilk seçimden (meclis oluştuktan) sonra.
+##   - vekil çalma ve kart çalma ilk seçimden (meclis oluştuktan) sonra.
 func _draw_weights(peer_id: int = -1) -> Dictionary:
 	var weights := {}
 	weights[CardPresets.PROPAGANDA_CARD_TYPE] = WEIGHT_PROPAGANDA
@@ -1604,7 +1604,9 @@ func _draw_weights(peer_id: int = -1) -> Dictionary:
 	weights[CardPresets.FUNDS_BONUS_CARD_TYPE] = WEIGHT_FUNDS_BONUS
 	weights[CardPresets.FUNDS_BONUS_STRONG_CARD_TYPE] = WEIGHT_FUNDS_BONUS_STRONG
 	weights[CardPresets.BONUS_CARD_TYPE] = WEIGHT_BONUS_CARD
-	weights[CardPresets.CARD_THEFT_CARD_TYPE] = WEIGHT_CARD_THEFT
+	# Kart çalma da ilk seçimden önce desteye girmez (0.0.191).
+	if not last_seats.is_empty():
+		weights[CardPresets.CARD_THEFT_CARD_TYPE] = WEIGHT_CARD_THEFT
 	return weights
 
 ## Geriye uyumluluk / testler: desteye girebilecek kart türleri.

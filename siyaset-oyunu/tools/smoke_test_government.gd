@@ -153,6 +153,11 @@ func _initialize() -> void:
 	var pool: Array = cm._draw_pool()
 	check("vekil calma kartlari destede (meclis var)", pool.has("steal_strong"))
 	check("gensoru destede yok (hamle)", not pool.has("gensoru"))
+	check("kart calma destede (meclis var)", pool.has("kart_calma"))
+	var seats_before_pool: Dictionary = cm.last_seats.duplicate()
+	cm.last_seats = {}
+	check("ilk secimden once kart calma destede yok", not cm._draw_pool().has("kart_calma"))
+	cm.last_seats = seats_before_pool
 	# Hukumeti azinliga dusur
 	cm.last_seats = {1: 300, 2: 50, 3: 40}
 	check("hukumet artik AZINLIK", not gm.has_majority(), "%d/%d" % [gm.government_seats(), gm.total_seats()])

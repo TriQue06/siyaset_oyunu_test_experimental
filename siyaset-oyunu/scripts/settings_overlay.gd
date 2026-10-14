@@ -39,6 +39,8 @@ var _dynamic: Array = []
 var _leave_armed: bool = false
 
 func _ready() -> void:
+	# Oyun duraklatılınca menü ve ayarlar çalışmaya devam etsin.
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	fps_slider.min_value = 0
 	fps_slider.max_value = FPS_OPTIONS.size() - 1
 	fps_slider.step = 1
@@ -320,9 +322,20 @@ func open_menu() -> void:
 	_tutorial_button.visible = scene_path == "res://scenes/GameScreen.tscn"
 	_seed_copy.text = L.t("Kopyala")
 	_menu.show()
+	_sync_pause()
 
 func close_menu() -> void:
 	_menu.hide()
+	_sync_pause()
+
+## ÇEVRİM DIŞI DURAKLATMA (0.0.191): menü ya da ayarlar açıkken çevrim dışı
+## oyun tamamen durur (tur sayacı, botlar, oylama ve kurma süreleri). Çevrim
+## içi oyunda diğer oyuncular beklemez, orada durmaz.
+func _sync_pause() -> void:
+	var scene := get_tree().current_scene
+	var in_game := scene != null and scene.scene_file_path in ["res://scenes/GameScreen.tscn",
+		"res://scenes/GovernmentFormation.tscn", "res://scenes/ElectionResults.tscn"]
+	get_tree().paused = MultiplayerManager.offline_mode and in_game and (_menu.visible or panel.visible)
 
 func _on_menu_button_pressed() -> void:
 	if panel.visible:
@@ -372,9 +385,11 @@ func _rebuild_for_language() -> void:
 ## Diğer ekranlardaki "Ayarlar" butonlarının da aynı paneli açması için.
 func open() -> void:
 	panel.show()
+	_sync_pause()
 
 func close() -> void:
 	panel.hide()
+	_sync_pause()
 
 func _on_fps_slider_changed(value: float) -> void:
 	var fps: int = FPS_OPTIONS[int(value)]

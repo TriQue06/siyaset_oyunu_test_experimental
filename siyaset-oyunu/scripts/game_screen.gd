@@ -2162,7 +2162,7 @@ func _card_art_edge(color: Color) -> Control:
 	style.draw_center = false
 	style.set_border_width_all(2)
 	style.border_color = color
-	style.set_corner_radius_all(4)
+	style.set_corner_radius_all(0)
 	edge.add_theme_stylebox_override("panel", style)
 	return edge
 

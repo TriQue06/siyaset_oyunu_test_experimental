@@ -100,7 +100,7 @@ func _refresh() -> void:
 	var shared_size := SLOT_SIZE
 	for slot in player_list_box.get_children():
 		if slot.has_meta("card_minimum") and not slot.is_queued_for_deletion():
-			var minimum: Vector2 = slot.get_meta("card_minimum")
+			var minimum: Vector2 = (slot.get_meta("card") as Control).get_combined_minimum_size()
 			shared_size.x = maxf(shared_size.x, minimum.x + BOT_BUTTON_SIZE * 0.45)
 			shared_size.y = maxf(shared_size.y, minimum.y + BOT_BUTTON_SIZE * 0.45)
 	for slot in player_list_box.get_children():
@@ -233,7 +233,8 @@ func _build_slot(card: Control, show_bot_button: bool, enabled: bool) -> Control
 	slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	card.custom_minimum_size = Vector2.ZERO
 	slot.set_meta("card_minimum", card.get_combined_minimum_size())
-	card.set_anchors_preset(Control.PRESET_FULL_RECT)
+	slot.set_meta("card", card)
+	card.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	card.offset_top = BOT_BUTTON_SIZE * 0.45
 	card.offset_right = -BOT_BUTTON_SIZE * 0.45
 	var frame := Control.new()

@@ -3599,3 +3599,6 @@ msgstr "TIMING AND ELECTIONS"
 
 msgid "HARİTA VE TEMSİL"
 msgstr "MAP AND REPRESENTATION"
+
+msgid "Grup toplantısı ilk seçimden sonra yapılabilir."
+msgstr "Group meetings are available after the first election."

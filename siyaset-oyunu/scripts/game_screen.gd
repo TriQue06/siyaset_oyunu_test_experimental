@@ -59,7 +59,7 @@ const PLAYER_TAB_COLUMNS := [
 	[["OY", 56.0], ["VEKİL", 50.0]],
 	[["VEKİL", 46.0], ["ULUSAL", 52.0], ["PUAN", 44.0]],
 ]
-const PLAYER_TAB_HEIGHT := 30.0
+const PLAYER_TAB_HEIGHT := 34.0
 ## Sütun başlığı satırının yüksekliği ve iki satırlık kartın alt sınırı.
 const PLAYER_HEADER_HEIGHT := 20.0
 ## Alt haznede meclisin (sol) aldığı pay; kalan sağ kısım el kartlarına.
@@ -1021,7 +1021,7 @@ func _setup_side_column() -> void:
 			tab.focus_mode = Control.FOCUS_NONE
 			tab.add_theme_font_size_override("font_size", 11)
 			tab.add_theme_font_override("font", UiTheme.mono(true))
-			tab.custom_minimum_size = Vector2(0, 28)
+			tab.custom_minimum_size = Vector2(0, PLAYER_TAB_HEIGHT)
 			tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			tab.pressed.connect(_on_side_tab.bind(i))
 			_side_tabs.add_child(tab)
@@ -1614,7 +1614,7 @@ func _build_player_tabs() -> void:
 		button.tooltip_text = PLAYER_TAB_TOOLTIPS[i]
 		button.focus_mode = Control.FOCUS_NONE
 		button.clip_text = true
-		button.custom_minimum_size = Vector2(0, 28)
+		button.custom_minimum_size = Vector2(0, PLAYER_TAB_HEIGHT)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.add_theme_font_size_override("font_size", UiTheme.FS_TINY)
 		button.pressed.connect(_on_player_tab_pressed.bind(i))
@@ -1632,10 +1632,10 @@ func _on_player_tab_pressed(index: int) -> void:
 func _refresh_player_tabs() -> void:
 	for i in _player_tab_buttons.size():
 		var button := _player_tab_buttons[i] as Button
-		UiSkin.skin_color_button(button, UiTheme.GOLD if i == _player_tab else UiTheme.PANEL_LIGHT)
+		_style_tab_button(button, i == _player_tab, true)
 		button.add_theme_color_override("font_color", UiTheme.INK if i == _player_tab else UiTheme.TEXT_MUTED)
 		button.add_theme_font_override("font", UiTheme.mono(true))
-		button.add_theme_font_size_override("font_size", 11)
+		button.add_theme_font_size_override("font_size", 13)
 
 ## Tablonun sütun başlıkları: parti adının sağında, satırlarla aynı hizada.
 func _build_player_header() -> Control:
@@ -3376,7 +3376,7 @@ func _avatar_tag(text: String, bg: Color, fg: Color) -> Control:
 	style.content_margin_right = 3
 	style.content_margin_top = 0
 	style.content_margin_bottom = 0
-	UiSkin.apply_style(tag, "normal", style)
+	tag.add_theme_stylebox_override("normal", style)
 	tag.add_theme_constant_override("line_spacing", 0)
 	return tag
 
@@ -3871,6 +3871,9 @@ func _refresh_action_tabs() -> void:
 ## Sekme düğmesi (hamle ve yasa sekmeleri): harita katman düğmeleri gibi kare,
 ## seçili olan altın; lit false ise yazı sönük.
 func _style_tab_button(button: Button, active: bool, lit: bool) -> void:
+	button.add_theme_font_override("font", UiTheme.mono(true))
+	button.add_theme_font_size_override("font_size", 13)
+	button.custom_minimum_size.y = PLAYER_TAB_HEIGHT
 	var color := UiTheme.GOLD if active else UiTheme.PANEL
 	for state in ["normal", "hover", "pressed", "focus"]:
 		var c := color.lightened(0.08) if state == "hover" and not active else color
@@ -4988,7 +4991,7 @@ func _ensure_map_clip() -> void:
 
 func _build_layer_bar() -> void:
 	_layer_bar = HBoxContainer.new()
-	_layer_bar.add_theme_constant_override("separation", 0)
+	_layer_bar.add_theme_constant_override("separation", 6)
 	_layer_bar.z_index = 5
 	add_child(_layer_bar)
 	for i in MAP_LAYER_TITLES.size():
@@ -5007,18 +5010,18 @@ func _build_layer_bar() -> void:
 	add_child(_layer_legend)
 	# Seçmen katmanı: 8 grup simgesi (katman açıkken düğmelerin altında).
 	_group_picker = HBoxContainer.new()
-	_group_picker.add_theme_constant_override("separation", 2)
+	_group_picker.add_theme_constant_override("separation", 6)
 	_group_picker.z_index = 6
 	add_child(_group_picker)
 	for group in VoterGroups.GROUP_IDS:
 		# Hap düğme: madalyon + (seçiliyse) grubun tam adı.
 		var pick := Button.new()
 		pick.focus_mode = Control.FOCUS_NONE
-		pick.custom_minimum_size = Vector2(44, 44)
+		pick.custom_minimum_size = Vector2(34, 34)
 		pick.tooltip_text = VoterGroups.title(group)
-		var icon := VoterGroupIcon.make(group, 38.0)
+		var icon := VoterGroupIcon.make(group, 28.0)
 		icon.position = Vector2(3, 3)
-		icon.size = Vector2(38, 38)
+		icon.size = Vector2(28, 28)
 		pick.add_child(icon)
 		var name_label := Label.new()
 		name_label.name = L.t("Title")
@@ -5027,8 +5030,8 @@ func _build_layer_bar() -> void:
 		name_label.add_theme_color_override("font_color", Color.WHITE)
 		name_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.45))
 		name_label.add_theme_constant_override("outline_size", 3)
-		name_label.position = Vector2(46, 0)
-		name_label.size = Vector2(0, 44)
+		name_label.position = Vector2(36, 0)
+		name_label.size = Vector2(0, 34)
 		name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		pick.add_child(name_label)
@@ -5091,11 +5094,11 @@ func _refresh_layer_bar() -> void:
 			var color := VoterGroups.color(group)
 			var title: Label = pick.get_node("Title")
 			title.visible = selected
-			var width := 44.0
+			var width := 34.0
 			if selected:
-				width = 46.0 + title.get_theme_font("font").get_string_size(title.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x + 14.0
-			(pick as Button).custom_minimum_size = Vector2(width, 44)
-			(pick as Button).size = Vector2(width, 44)
+				width = 36.0 + title.get_theme_font("font").get_string_size(title.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x + 14.0
+			(pick as Button).custom_minimum_size = Vector2(width, 34)
+			(pick as Button).size = Vector2(width, 34)
 			for state in ["normal", "hover", "pressed", "focus"]:
 				var pill := StyleBoxFlat.new()
 				pill.set_corner_radius_all(0)
@@ -5119,7 +5122,7 @@ func _rebuild_layer_legend() -> void:
 	match _map_layer:
 		MapLayer.ORGANIZATION:
 			for level in GameRules.ORG_MAX_LEVEL + 1:
-				swatches.append([MAP_BLANK_COLOR.lerp(mine, float(level) / GameRules.ORG_MAX_LEVEL), str(level)])
+				swatches.append([_map_tint(mine, float(level) / GameRules.ORG_MAX_LEVEL), str(level)])
 			swatches.append([null, L.t("teşkilat seviyem")])
 		MapLayer.STRENGTH:
 			swatches.append([null, L.t("vekil yok")])
@@ -5130,7 +5133,7 @@ func _rebuild_layer_legend() -> void:
 			var span := _group_layer_span()
 			swatches.append([null, L.t("%%%d") % int(span.x)])
 			for i in 4:
-				swatches.append([MAP_BLANK_COLOR.lerp(_group_layer_color(), float(i) / 3.0), ""])
+				swatches.append([_map_tint(_group_layer_color(), float(i) / 3.0), ""])
 			swatches.append([null, L.t("%%%d") % int(span.y)])
 	_layer_legend.visible = not swatches.is_empty()
 	for entry in swatches:
@@ -5179,7 +5182,8 @@ func _apply_map_layer_colors() -> void:
 	var mine: Color = PartyManager.data_of(me).get("bg_color", Color(0.5, 0.5, 0.5))
 	mine.a = 1.0
 	var colors := {}
-	map_holder.set_dark_borders(_map_layer == MapLayer.ORGANIZATION)
+	map_holder.set_dark_borders(false)
+	map_holder.set_white_borders(_map_layer in [MapLayer.GROUPS, MapLayer.ORGANIZATION])
 	if _map_layer == MapLayer.SEATS:
 		colors = _seat_layer_colors.duplicate()
 	else:
@@ -5194,9 +5198,9 @@ func _apply_map_layer_colors() -> void:
 				MapLayer.GROUPS:
 					var pct := float(VoterGroups.percent(CardManager.province_profile(province_id), _map_group))
 					var t := clampf((pct - span.x) / maxf(1.0, span.y - span.x), 0.0, 1.0)
-					colors[province_id] = MAP_BLANK_COLOR.lerp(_group_layer_color(), t)
+					colors[province_id] = _map_tint(_group_layer_color(), t)
 				MapLayer.ORGANIZATION:
-					colors[province_id] = MAP_BLANK_COLOR.lerp(mine, float(CardManager.organization_level(province_id, me)) / GameRules.ORG_MAX_LEVEL)
+					colors[province_id] = _map_tint(mine, float(CardManager.organization_level(province_id, me)) / GameRules.ORG_MAX_LEVEL)
 				MapLayer.STRENGTH:
 					if projection.has(province_id):
 						colors[province_id] = gradient.sample((_strength_t(projection[province_id], me) + 1.0) * 0.5)
@@ -5393,6 +5397,9 @@ func _build_speech_panel() -> void:
 
 func _on_speech_button_pressed() -> void:
 	var me := multiplayer.get_unique_id()
+	if CardManager.last_election_round <= 0:
+		_show_toast(L.t("Grup toplantısı ilk seçimden sonra yapılabilir."))
+		return
 	if not CardManager.can_act():
 		_show_toast(L.t("Sıran değil."))
 		return
@@ -5562,3 +5569,6 @@ func _show_party_picker(title: String, targets: Array, selected: Callable) -> vo
 	box.add_child(close)
 	add_child(_inquiry_picker)
 	_place_inquiry_picker.call_deferred()
+
+func _map_tint(color: Color, strength: float) -> Color:
+	return Color(color, clampf(strength, 0.0, 1.0))

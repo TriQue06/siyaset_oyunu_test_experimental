@@ -46,7 +46,17 @@ func _ready() -> void:
 	image.fill(Color.WHITE)
 	_white_texture = ImageTexture.create_from_image(image)
 	var shader := Shader.new()
-	shader.code = ParliamentDiagram.SEAT_SHADER
+	shader.code = """
+shader_type canvas_item;
+uniform float inner_ratio = 0.65;
+void fragment() {
+ float d = length(UV - vec2(0.5)) * 2.0;
+ float px = max(fwidth(d), 0.0001);
+ float outer = 1.0 - smoothstep(1.0 - px, 1.0 + px, d);
+ float hole = smoothstep(inner_ratio - px, inner_ratio + px, d);
+ COLOR = vec4(COLOR.rgb, COLOR.a * outer * hole);
+}
+"""
 	var shader_material := ShaderMaterial.new()
 	shader_material.shader = shader
 	material = shader_material
@@ -224,8 +234,7 @@ func _draw() -> void:
 	# çapın üstünde olduğundan noktalar birbirine binmez.
 	var shader_material := material as ShaderMaterial
 	if shader_material != null:
-		shader_material.set_shader_parameter("outline_color", dot_outline_color)
-		shader_material.set_shader_parameter("inner_ratio", float(dot_half_px) / float(outline_half_px))
+		shader_material.set_shader_parameter("inner_ratio", 0.65)
 	for pass_index in 1:
 		var half_px: int = outline_half_px
 		for g in _groups:

@@ -534,7 +534,7 @@ func can_choose_main_action(peer_id: int) -> bool:
 ## dönem partisi toplandıysa toplanamaz; kasası yetmiyorsa da hakkı yok. (Önbellekteki speech_done'a güvenilmez: turun ilk oyuncusunun
 ## sırası tur numarası artmadan başlar, eski dönemin bilgisi taşınıyordu.)
 func needs_speech(peer_id: int) -> bool:
-	return speech_required and not turn_order.is_empty() and peer_id == current_turn_peer_id() and not is_party_member(peer_id) \
+	return last_election_round > 0 and speech_required and not turn_order.is_empty() and peer_id == current_turn_peer_id() and not is_party_member(peer_id) \
 		and int(speech_rounds.get(party_of(peer_id), 0)) != round_number and funds_of(peer_id) >= GameRules.SPEECH_FUNDS_COST
 
 ## Bu oyuncu şu an bir yasa sunabilir mi? (law_type verilirse o yasa geçerli mi.)
@@ -737,6 +737,8 @@ func _apply_aid_move(peer_id: int, party_m: float, state_m: float) -> void:
 ## Tur başı (host): afet zarı. Dönemde en fazla TERM_MAX; önceki dönem hiç
 ## çıkmadıysa bu dönemin son turunda hâlâ yoksa kesin çıkar.
 func _roll_disaster() -> void:
+	if last_election_round <= 0:
+		return
 	var count := int(disaster.get("term_count", 0))
 	if count >= Disaster.TERM_MAX:
 		return
@@ -747,6 +749,8 @@ func _roll_disaster() -> void:
 
 ## Afeti başlatır (testler de doğrudan çağırır). Dönüş: etkilenen iller.
 func start_disaster(kind: String, provinces: Array = []) -> Array:
+	if last_election_round <= 0:
+		return []
 	if provinces.is_empty():
 		provinces = Disaster.pick_region(kind, _rng, GameMap.province_ids())
 	if provinces.is_empty():

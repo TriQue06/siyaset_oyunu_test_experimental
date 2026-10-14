@@ -189,7 +189,7 @@ static func apply_style(control: Control, key: StringName, original: StyleBox) -
 	if original is StyleBoxFlat:
 		var flat := original as StyleBoxFlat
 		# Saydam hedef halkaları ve yuvarlak simgeler yüzey değildir.
-		if flat.bg_color.a > 0.0 and flat.corner_radius_top_left <= 8 and flat.corner_radius_top_right <= 8 and flat.corner_radius_bottom_left <= 8 and flat.corner_radius_bottom_right <= 8:
+		if flat.draw_center and flat.bg_color.a > 0.0 and flat.corner_radius_top_left <= 8 and flat.corner_radius_top_right <= 8 and flat.corner_radius_bottom_left <= 8 and flat.corner_radius_bottom_right <= 8:
 			var texture_path := BUTTON_TINT_NORMAL
 			if key == &"pressed" or key == &"hover_pressed":
 				texture_path = BUTTON_TINT_PRESSED

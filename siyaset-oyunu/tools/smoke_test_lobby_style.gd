@@ -43,6 +43,14 @@ func run() -> void:
 	var style = panel.get_theme_stylebox("panel")
 	check(style is StyleBoxTexture and style.texture.resource_path == skin.BUTTON_TINT_NORMAL, "information rectangle uses menu frame")
 	check(style.get_content_margin(SIDE_LEFT) == 9, "frame preserves layout margins")
+	var outline := StyleBoxFlat.new()
+	outline.draw_center = false
+	skin.apply_style(panel, "panel", outline)
+	check(panel.get_theme_stylebox("panel") == outline, "card outline remains transparent")
+	for slot in slots:
+		if not slot.is_queued_for_deletion():
+			var card: Control = slot.get_meta("card")
+			check(card.position.y + card.size.y <= slot.size.y + 1.0, "player card bottom border inside slot")
 	panel.free()
 	mm.owner_id = 99
 	lobby._refresh()

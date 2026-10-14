@@ -46,6 +46,7 @@ var _colors_dirty := true
 ## Odak parıltısı: {"id", "color", "time", "duration", "icon"}; boşsa yok.
 var _pulse: Dictionary = {}
 var _dark_borders := false
+var _white_borders := false
 
 func _ready() -> void:
 	for child in get_children():
@@ -104,7 +105,7 @@ func _build_geometry() -> void:
 			if other >= 0 and other < region:
 				continue  # ortak sınırı bir kez çiz
 			var width := COAST_WIDTH if other < 0 else REGION_BORDER_WIDTH
-			var color := COAST_COLOR if other < 0 else (REGION_BORDER_DARK if _dark_borders else REGION_BORDER_COLOR)
+			var color := Color.WHITE if _white_borders else (COAST_COLOR if other < 0 else (REGION_BORDER_DARK if _dark_borders else REGION_BORDER_COLOR))
 			_append_segment(a, b, width, color)
 	_land_mesh = ArrayMesh.new()
 	_border_mesh = ArrayMesh.new()
@@ -374,4 +375,11 @@ func set_province_colors(id_to_color: Dictionary) -> void:
 func clear_overlay() -> void:
 	_colors.clear()
 	_colors_dirty = true
+	queue_redraw()
+
+func set_white_borders(enabled: bool) -> void:
+	if enabled == _white_borders:
+		return
+	_white_borders = enabled
+	_build_geometry()
 	queue_redraw()

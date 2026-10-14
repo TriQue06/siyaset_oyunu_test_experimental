@@ -23,7 +23,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.094, 0.078, 0.188, 1)
+color = Color(0.227, 0.102, 0.122, 1)
 
 [node name="TopBar" type="Control" parent="." unique_id=1133533483]
 layout_mode = 1
@@ -39,7 +39,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.11, 0.09, 0.22, 1)
+color = Color(0.165, 0.102, 0.063, 1)
 
 [node name="TitleLabel" type="Label" parent="TopBar" unique_id=1439790902]
 unique_name_in_owner = true
@@ -54,7 +54,7 @@ offset_bottom = 18.0
 grow_vertical = 2
 theme_override_font_sizes/font_size = 26
 theme_override_fonts/font = ExtResource("99")
-theme_override_colors/font_color = Color(1, 0.788, 0.235, 1)
+theme_override_colors/font_color = Color(0.894, 0.706, 0.235, 1)
 text = "PARTİNİ KUR"
 vertical_alignment = 1
 
@@ -145,7 +145,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.11, 0.09, 0.22, 1)
+color = Color(0.165, 0.102, 0.063, 1)
 
 [node name="Margin" type="MarginContainer" parent="RightPanel" unique_id=321717466]
 layout_mode = 1

@@ -18,13 +18,14 @@ const MAP_UNIT_SCALE := 1.0
 ## 1 = altıgenler arası boşluk yok: sadece il sınırları görünür.
 const CELL_INSET := 1.0
 const LAND_COLOR := Color(0.27, 0.30, 0.40)
-const SEA_COLOR := Color(0.14, 0.17, 0.27, 0.55)
+## Masa teması: kâğıt paftaya basılmış soluk mavi-yeşil deniz.
+const SEA_COLOR := Color(0.55, 0.68, 0.70, 0.55)
 const REGION_BORDER_COLOR := Color(0.94, 0.95, 0.98, 0.9)
 ## Açık zeminli katmanlarda (ör. teşkilat: seviye 0 = neredeyse beyaz) beyaz
 ## sınır kaybolur; o zaman koyu sınır kullanılır (bkz. set_dark_borders).
 const REGION_BORDER_DARK := Color(0.10, 0.11, 0.18, 0.95)
 const REGION_BORDER_WIDTH := 1.7
-const COAST_COLOR := Color(0.62, 0.72, 0.92, 0.8)
+const COAST_COLOR := Color(0.36, 0.48, 0.52, 0.8)
 const COAST_WIDTH := 1.4
 const HOVER_COLOR := Color(1, 1, 1, 0.85)
 

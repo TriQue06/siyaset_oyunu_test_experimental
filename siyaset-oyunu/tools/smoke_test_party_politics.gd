@@ -37,6 +37,7 @@ func free_color(except_peer: int) -> Color:
 	return Color.RED
 
 func _initialize() -> void:
+	seed(20240607)  # global RNG: harita tohumu, sıra karıştırma, bot isim/memleket -> deterministik
 	load("res://scripts/bot_brain.gd").skill_variance = false
 	await process_frame
 	PP = load("res://scripts/politician_presets.gd")
@@ -355,7 +356,7 @@ func _initialize() -> void:
 	for step in cm.turn_order.size():
 		var wrapped: bool = cm._advance_turn()
 		if not cm.turn_order.has(temp):
-			gone_at = -2 if wrapped else cm.current_turn_index
+			gone_at = -2 if wrapped else step + 1  # kaçıncı hamlede (sıradan silinince indeks kayabilir)
 			break
 	check("tur ortasında feshetti", gone_at >= 1, str(gone_at))
 	check("geçici parti en geç iki seçimde feshedip çıktı", not cm.turn_order.has(temp) and not pm.parties.has(temp)

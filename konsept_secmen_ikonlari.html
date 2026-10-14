@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seçmen Simgeleri Konseptleri</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;700&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#120e22;--panel:#1d1735;--panel2:#251d45;--slot:#0d0a1a;--text:#e9e4ff;--dim:#9a90c4;--gold:#f2c14e;--ink:#0b0f16}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"IBM Plex Sans",sans-serif;padding:24px 16px 60px}
+h1{font-family:"IBM Plex Mono";font-size:22px;margin:0 0 4px;color:var(--gold)}
+.lead{color:var(--dim);margin:0 0 24px;max-width:900px;line-height:1.5}
+.concept{background:var(--panel);border:2px solid #3a2f6b;margin:0 0 28px;padding:18px;max-width:1180px}
+.concept h2{font-family:"IBM Plex Mono";font-size:17px;margin:0 0 4px}
+.concept h2 b{color:var(--gold)}
+.concept p.desc{color:var(--dim);margin:0 0 16px;line-height:1.5;font-size:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:18px}
+.box{background:var(--panel2);padding:12px 14px;border:1px solid #3a2f6b}
+.lbl{font-family:"IBM Plex Mono";font-size:11px;color:var(--gold);letter-spacing:.08em;margin:0 0 10px;font-weight:700}
+.row{display:flex;align-items:center;gap:8px;margin:0 0 6px}
+.name{flex:1;font-size:14px;white-space:nowrap}
+.pct{font-family:"IBM Plex Mono";font-weight:700;font-size:15px}
+.bar{height:7px;background:var(--slot);position:relative;margin:2px 0 9px}
+.bar i{position:absolute;left:0;top:0;bottom:0}
+.bar s{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:rgba(0,0,0,.6)}
+.strip{display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:#1a1530;padding:8px;border:1px solid #3a2f6b}
+.cur{display:flex;align-items:center;gap:8px;padding:4px 14px 4px 4px;border-radius:0;font-size:14px;color:#fff}
+.now{font-size:12px;color:var(--dim);margin:6px 0 0}
+.verdict{font-size:13px;color:var(--dim);margin:12px 0 0;line-height:1.5}
+.verdict b{color:var(--text)}
+.chip{display:flex;align-items:center;justify-content:center}
+.big{font-family:"IBM Plex Mono";font-weight:700;font-size:20px}
+.tile{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 2px;background:var(--slot);border-bottom:3px solid}
+.tile .v{font-family:"IBM Plex Mono";font-weight:700;font-size:15px}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.tag{display:inline-block;font-family:"IBM Plex Mono";font-size:10px;padding:1px 5px;margin-left:6px;vertical-align:middle;background:#3a2f6b;color:var(--gold)}
+@media (max-width:600px){.tiles{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<h1>SEÇMEN GRUBU SİMGELERİ — KONSEPTLER</h1>
+<p class="lead">Şu an il / parti panelinde madalyon ~16 px, içindeki sembol ~6 px; şeritte madalyon 28 px, sembol ~10 px. Aşağıdaki dört konsept aynı verilerle (Pertek ili seçmen profili, Yeni Yol'un grup destekleri) çizildi. Her birinde panel satırı, parti kartı ve harita şeridi var. Kodda bu boyutlar tek yerden (VoterGroupIcon + VoterGroupUI) değiştiği için hepsi her ekrana birlikte yansır.</p>
+
+<div id="concepts"></div>
+
+<script>
+const G=[
+ {id:"isci",t:"İşçiler ve Sendikalar",c:"#E85D75",i:"hardhat"},
+ {id:"isveren",t:"İşverenler ve İşletmeler",c:"#3D8BDB",i:"briefcase"},
+ {id:"genc",t:"Gençler ve Öğrenciler",c:"#F2B632",i:"gradcap"},
+ {id:"emekli",t:"Emekliler",c:"#8B70D6",i:"heart"},
+ {id:"dindar",t:"Dindar Topluluklar",c:"#2EAA79",i:"dome"},
+ {id:"ilerici",t:"LGBT ve Ateist İlericiler",c:"#E65AB7",i:"rainbow"},
+ {id:"ozerkci",t:"Özerkçiler",c:"#16A6A1",i:"pin"},
+ {id:"milliyetci",t:"Milliyetçiler",c:"#E87532",i:"flag"}];
+const PROV=[73,27,33,67,77,23,41,59];   // Pertek seçmen profili
+const PARTY=[68,40,50,50,40,64];  // Yeni Yol grup destekleri (oyun önizlemesinde görünen ilk 6)
+// 24x24 kutuda sembol (beyaz çizgi / dolgu)
+function sym(n,ink){const s=`stroke="${ink}" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"`,f=`fill="${ink}"`;
+ return {
+ hardhat:`<path ${s} d="M5 16a7 7 0 0 1 14 0"/><path ${s} d="M3 16h18"/><path ${s} d="M12 9v3"/>`,
+ briefcase:`<rect ${s} x="4" y="8" width="16" height="11" rx="1"/><path ${s} d="M9 8V6h6v2M4 13h16"/>`,
+ gradcap:`<path ${f} d="M12 5 2 10l10 5 10-5z"/><path ${s} d="M7 12.5V16c3 2 7 2 10 0v-3.5M21 10v5"/>`,
+ heart:`<path ${f} d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>`,
+ dome:`<path ${f} d="M6 17a6 6 0 0 1 12 0z"/><path ${s} d="M4 19h16M12 6v4"/><circle ${f} cx="12" cy="5" r="1.4"/>`,
+ rainbow:`<path ${s} d="M4 17a8 8 0 0 1 16 0"/><path ${s} d="M8 17a4 4 0 0 1 8 0"/>`,
+ pin:`<path ${f} d="M12 21s-6-6.2-6-11a6 6 0 0 1 12 0c0 4.8-6 11-6 11z"/><circle fill="#0b0f16" cx="12" cy="10" r="2.2"/>`,
+ flag:`<path ${s} d="M6 21V4"/><path ${f} d="M6 4h12l-3 4 3 4H6z"/>`}[n]}
+// Bugünkü madalyon (hale + koyu kontur + küçük sembol)
+function medal(g,px,symScale=0.6,halo=true){const r=12;let body=r;let h="";
+ if(halo){h=`<circle cx="12" cy="12" r="11.2" fill="none" stroke="${g.c}" stroke-opacity=".45" stroke-width="1.5"/>`;body=r-2.5}
+ const inner=body-1;const k=inner*symScale/12*2/1.0;
+ return `<svg width="${px}" height="${px}" viewBox="0 0 24 24">${h}<circle cx="12" cy="12" r="${body}" fill="#0b0f16"/><circle cx="12" cy="12" r="${inner}" fill="${g.c}"/><g transform="translate(12 12) scale(${(inner*symScale)/9}) translate(-12 -12)">${sym(g.i,"#fff")}</g></svg>`}
+// A: dolu madalyon, hale yok, sembol büyük
+function coin(g,px){return `<svg width="${px}" height="${px}" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="#0b0f16"/><circle cx="12" cy="12" r="10.8" fill="${g.c}"/><g transform="translate(12 12) scale(.82) translate(-12 -12)">${sym(g.i,"#fff")}</g></svg>`}
+// B: köşeli karo (oyunun keskin köşeli diline uygun)
+function tileIcon(g,px){return `<svg width="${px}" height="${px}" viewBox="0 0 24 24"><rect width="24" height="24" fill="#0b0f16"/><rect x="1.5" y="1.5" width="21" height="21" fill="${g.c}"/><rect x="1.5" y="18.5" width="21" height="4" fill="#000" fill-opacity=".22"/><g transform="translate(12 11) scale(.78) translate(-12 -12)">${sym(g.i,"#fff")}</g></svg>`}
+// C: çıplak sembol (rozetsiz), grubun renginde
+function bareIcon(g,px){return `<svg width="${px}" height="${px}" viewBox="0 0 24 24">${sym(g.i,g.c)}</svg>`}
+
+function barHTML(v,c,h=7){return `<div class="bar" style="height:${h}px"><i style="width:${v}%;background:${c}"></i><s></s></div>`}
+function rows(icon,px,fs,pctfs,barh,vals,opts={}){return G.slice(0,vals.length).map((g,k)=>`
+ <div class="row">${icon(g,px)}<span class="name" style="font-size:${fs}px;color:${opts.tint?lighten(g.c):'var(--text)'}">${g.t}</span><span class="pct" style="font-size:${pctfs}px">%${vals[k]}</span></div>
+ ${barHTML(vals[k],g.c,barh)}`).join("")}
+function lighten(h){const n=parseInt(h.slice(1),16);let r=n>>16,g=n>>8&255,b=n&255;const m=x=>Math.round(x+(255-x)*.35);return `rgb(${m(r)},${m(g)},${m(b)})`}
+function strip(icon,px,sel=0,label=true,gap=6){return `<div class="strip" style="gap:${gap}px">`+G.map((g,k)=>k===sel&&label
+ ?`<div class="cur" style="background:${g.c}">${icon(g,px)}<span>${g.t}</span></div>`
+ :`<div class="chip" style="width:${px+8}px;height:${px+8}px">${icon(g,px)}</div>`).join("")+`<span class="now" style="margin:0 0 0 8px;font-family:IBM Plex Mono">%20 ▢▢▢▢ %84</span></div>`}
+
+const C=[
+{key:"ŞU AN",title:"Bugünkü hâl (karşılaştırma için)",desc:"Madalyon dışta yarı saydam hale ve koyu konturla küçülüyor; sembol iç dairenin %60'ı. Panelde 16 px, şeritte 28 px.",
+ prov:rows((g,p)=>medal(g,p),16,13,14,7,PROV,{tint:true}),party:rows((g,p)=>medal(g,p),16,13,14,7,PARTY,{tint:true}),
+ strip:strip((g,p)=>medal(g,p),28),verdict:"Sorun: 16 px'te sembol ~6 px kalıyor; hale ve kontur alanın üçte birini yiyor."},
+{key:"A",title:"Dolu Madalyon",desc:"Hale kalkar, ince koyu kontur kalır; sembol dairenin %82'sine çıkar. Panelde 22 px, yüzde büyür (16 px), çubuk 9 px. Şeritte 36 px, seçili grup adıyla hap.",
+ prov:rows(coin,22,14,16,9,PROV,{tint:true}),party:rows(coin,22,14,16,9,PARTY,{tint:true}),strip:strip(coin,36),
+ verdict:"<b>En az değişiklik:</b> bugünkü dil korunur, sembol ~2,5 kat büyür. Panel satırı ~6 px uzar (8 grup ≈ 48 px)."},
+{key:"B",title:"Keskin Karo",desc:"Yuvarlak yerine köşeli karo (kartlar ve düğmelerle aynı keskin dil), altta gölge şeridi. Panelde 24 px; yüzde sağda büyük, çubuk karonun altına hizalı. Şeritte 38 px karo.",
+ prov:rows(tileIcon,24,14,17,9,PROV),party:rows(tileIcon,24,14,17,9,PARTY),strip:strip(tileIcon,38,0,true,4),
+ verdict:"<b>Oyunun piksel / keskin köşe diline en uygun olanı.</b> Renk alanı en büyük; ad beyaz yazılır (renk karoda)."},
+{key:"C",title:"Karo Izgarası (panelde 4×2)",desc:"Panelde liste yerine 4×2 ızgara: büyük sembol (26 px), altında yüzde ve grup renginde alt çizgi; tam ad üstüne gelince / dokununca. Şeritte rozetsiz büyük renkli sembol (30 px), seçili olanın altı çizili.",
+ prov:`<div class="tiles">${G.map((g,k)=>`<div class="tile" style="border-color:${g.c}">${tileIcon(g,26)}<span class="v">%${PROV[k]}</span></div>`).join("")}</div>`,
+ party:`<div class="tiles">${G.slice(0,PARTY.length).map((g,k)=>`<div class="tile" style="border-color:${g.c}">${tileIcon(g,26)}<span class="v">%${PARTY[k]}</span></div>`).join("")}</div>`,
+ strip:`<div class="strip" style="gap:10px">`+G.map((g,k)=>`<div class="chip" style="flex-direction:column;gap:2px">${bareIcon(g,30)}<div style="height:3px;width:30px;background:${k===0?g.c:'transparent'}"></div></div>`).join("")+`<span style="margin-left:6px">İşçiler ve Sendikalar</span></div>`,
+ verdict:"<b>En kompakt:</b> panelde 8 grup yarı yüksekliğe sığar ama grup adı ekranda değil (yalnız ipucu). Tam ad kuralına ters düştüğü için ipucu yerine karonun altında küçük ad da yazılabilir."},
+];
+document.getElementById("concepts").innerHTML=C.map(c=>`
+<div class="concept"><h2><b>${c.key}</b> · ${c.title}</h2><p class="desc">${c.desc}</p>
+<div class="grid">
+ <div class="box"><div class="lbl">İL PANELİ · SEÇMEN PROFİLİ (PERTEK)</div>${c.prov}</div>
+ <div class="box"><div class="lbl">PARTİ KARTI · SEÇMEN GRUPLARI (YENİ YOL)</div>${c.party}</div>
+</div>
+<div class="box" style="margin-top:14px"><div class="lbl">HARİTA ŞERİDİ · SEÇMEN KATMANI</div>${c.strip}</div>
+<p class="verdict">${c.verdict}</p></div>`).join("");
+</script>
+</body>
+</html>

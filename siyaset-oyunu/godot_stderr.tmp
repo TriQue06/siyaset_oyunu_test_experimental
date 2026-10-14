@@ -1,0 +1,7 @@
+ERROR: Failed to open log file for writing: user://logs/godot.log
+   at: rotate_file (core/io/logger.cpp:169)
+SCRIPT ERROR: Invalid assignment of property or key '_hovered_peer_id' with value of type 'int' on a base object of type 'Control (game_screen.gd)'.
+   at: _initialize (res://tools/game_screen_preview.gd:76)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tools/game_screen_preview.gd:76)
+       [1] _frames (res://tools/game_screen_preview.gd:25)

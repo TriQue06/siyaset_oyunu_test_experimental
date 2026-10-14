@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><title>Yasa Paneli Konseptleri</title>
+<style>
+:root{--bg:#14161c;--panel:#1f232c;--slot:#2a2f3a;--ink:#e9e4d6;--dim:#8d8a80;--gold:#d8b45a;--red:#c8483e;--green:#3f8f55}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 "Segoe UI",sans-serif;padding:24px}
+h1{margin:0 0 4px}h2{margin:40px 0 4px;color:var(--gold)}p.n{color:var(--dim);max-width:860px;margin:4px 0 14px}
+.wrap{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start}
+.mock{background:var(--panel);width:440px;padding:12px;border:1px solid #333a47}
+.pc{color:var(--dim);font-size:13px;max-width:360px}.pc b{color:var(--ink)}
+.hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-weight:700}
+.x{background:var(--slot);padding:2px 8px;font-size:11px;font-weight:400}
+.tabs{display:flex;margin-bottom:10px}.tab{flex:1;padding:7px 4px;text-align:center;background:var(--slot);font-weight:700;font-size:12px;cursor:pointer}
+.tab.on{background:var(--gold);color:#14161c}
+.dot{display:inline-block;width:12px;height:12px;background:var(--c);margin:0 6px;vertical-align:-1px}
+.axis{display:flex;gap:2px;margin-bottom:5px;cursor:pointer}
+.side{flex:1;padding:8px;background:var(--slot);font-size:12px;font-weight:700;border-bottom:3px solid var(--c)}
+.side.r{text-align:right}.side.off{opacity:.35;cursor:default}.side.sel{background:#3a4152;outline:1px solid var(--gold)}
+.mid{width:34px;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:11px;background:#171a21}
+.star{color:var(--gold)}
+.det{background:#171a21;padding:10px;margin-top:8px;border-left:3px solid var(--gold)}
+.det h4{margin:0 0 4px;color:var(--gold);font-size:13px}.s{color:var(--dim);font-size:11px}
+.eff{display:flex;justify-content:space-between;font-size:12px;padding:3px 0}.up{color:#6fc786}.dn{color:#e07066}
+.go{margin-top:8px;background:var(--green);text-align:center;padding:8px;font-weight:700;cursor:pointer}.go.dis{opacity:.4}
+.agenda{background:#2b2618;border:1px solid #6b5a2a;padding:6px 8px;font-size:12px;margin-bottom:8px;color:var(--gold)}
+.steps{display:flex;gap:4px;margin-bottom:10px;font-size:11px}.steps span{flex:1;padding:4px;background:var(--slot);text-align:center;color:var(--dim)}.steps span.on{color:#14161c;background:var(--gold);font-weight:700}
+.kind{background:var(--slot);padding:10px;margin-bottom:6px;cursor:pointer;border-left:4px solid var(--c)}.kind b{display:block}.kind small{color:var(--dim)}
+.big{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.card{background:var(--slot);border-top:4px solid var(--c);padding:10px;cursor:pointer}.card.sel{outline:1px solid var(--gold)}
+.card b{display:block;font-size:13px}.card small{color:var(--dim);font-size:11px}
+.fold{margin-top:8px;font-size:11px;color:var(--dim);background:#171a21;padding:6px 8px;cursor:pointer}
+.chips{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px}.chip{font-size:10px;padding:2px 6px;background:var(--slot);border-left:3px solid var(--c);opacity:.5}
+.foot{font-size:11px;color:var(--dim);margin-top:8px;border-top:1px solid #333a47;padding-top:6px}
+.row{display:flex;gap:6px;align-items:center;margin:4px 0;font-size:12px}.row .k{width:60px;color:var(--dim)}
+.st{background:var(--slot);padding:2px 9px}.val{font-family:Consolas,monospace;min-width:70px;text-align:center}
+</style></head><body>
+<h1>Yasa paneli — yeniden tasarım konseptleri</h1>
+<p class="n"><b>Şu an tek panelde alt alta:</b> başlık ve kazanç satırı, gündem satırı, vergi bağlantısı, 8 seçmen grubu (2 sütun, çoğu sönük), seçili grubun ayrıntısı ve etki tablosu, en altta anayasa değişikliği (baraj, seçim aralığı, sayım, ayrı buton ve açıklama). Üç ayrı yasa türü tek kutuda; panel uzuyor.</p>
+<p class="n">Mockuplar tıklanabilir. Etki satırlarındaki köşeli parantezli kelimeler yer tutucu; oyunda bugünkü gerçek hesap kullanılır. Grup adları, renkleri, karşıtlıkları ve yasa adları oyundan alındı. Vergi ve anayasa değerleri örnek.</p>
+
+<h2>A · Yasa türü sekmeleri</h2>
+<p class="n">Panel üstte üç sekmeye bölünür: GRUP YASASI · VERGİ · ANAYASA. Her sekme yalnız kendi içeriğini gösterir. Hamleler panelindeki sekmelerle aynı görsel dil.</p>
+<div class="wrap"><div class="mock" id="A"></div><div class="pc"><b>Artı:</b> en kolay geçiş; vergi ayrı panel olmaktan çıkar, anayasa en alttan kurtulur; panel boyu kabaca üçte birine iner.<br><b>Eksi:</b> grup seçimi hâlâ 8 butonlu ızgara (B ya da D ile birleşebilir).</div></div>
+
+<h2>B · Eksen satırları (karşıt gruplar yan yana)</h2>
+<p class="n">8 buton yerine 4 satır: her satır bir karşıt çift (İşçiler ↔ İşverenler…). Yasa bir tarafı kazandırıp karşısını kaybettirdiği için bedel seçerken görünür. Gündemdeki çift parlak, diğerleri sönük; bir tarafa dokununca ayrıntı açılır.</p>
+<div class="wrap"><div class="mock" id="B"></div><div class="pc"><b>Artı:</b> oyunun ikili yapısını (kazanan/kaybeden) görselleştirir; 8 dağınık buton yerine 4 net satır.<br><b>Eksi:</b> ayrıntı kutusu hâlâ aynı panelde; dar ekranda punto küçülür (adlar kısaltılmaz).</div></div>
+
+<h2>C · Adım adım (sihirbaz)</h2>
+<p class="n">1) Ne tür yasa? → 2) Hangi grup / hangi ayar? → 3) Önizleme ve SUN. Her adımda tek karar, panel her adımda kısa.</p>
+<div class="wrap"><div class="mock" id="C"></div><div class="pc"><b>Artı:</b> yeni oyuncu için en anlaşılır; yeni yasa türü eklemek = 1. adıma bir satır.<br><b>Eksi:</b> deneyimli oyuncu için 3 tık; hızlı karşılaştırma zor.</div></div>
+
+<h2>D · Yalnız seçilebilenler büyük</h2>
+<p class="n">Gündem varsa sadece gündemdeki 2 grup büyük kart olur; diğer 6 grup altta katlanmış "gündem dışı" şeridinde. Vergi ve anayasa alt satırda bağlantı.</p>
+<div class="wrap"><div class="mock" id="D"></div><div class="pc"><b>Artı:</b> kapalı seçeneklerle uğraşılmaz; en az okuma.<br><b>Eksi:</b> gündem yokken 8 grubun hepsi açık olur; o durumda B'nin satırlarına dönmek gerekir.</div></div>
+
+<p class="n" style="margin-top:40px">Önerim: <b>A + B</b> birlikte — sekmeler (Grup yasası / Vergi / Anayasa), Grup yasası sekmesinde eksen satırları.</p>
+
+<script>
+const G={isci:["İşçiler ve Sendikalar","#E85D75","Asgari Ücret ve Sendika Hakları Yasası"],isveren:["İşverenler ve İşletmeler","#3D8BDB","Vergi İndirimi ve Yatırım Teşvik Yasası"],genc:["Gençler ve Öğrenciler","#F2B632","Burs, Yurt ve Genç İstihdamı Yasası"],emekli:["Emekliler","#8B70D6","Emekli Aylığı ve Sağlık Güvencesi Yasası"],dindar:["Dindar Topluluklar","#2EAA79","İnanç Özgürlüğü ve Din Eğitimi Yasası"],ilerici:["LGBT ve Ateist İlericiler","#E65AB7","Ayrımcılık Karşıtı Eşit Yurttaşlık Yasası"],ozerkci:["Özerkçiler","#16A6A1","Yerel Yönetimler ve Bölgesel Temsil Yasası"],milliyetci:["Milliyetçiler","#E87532","Ulusal Güvenlik ve Birlik Yasası"]};
+const P=[["isci","isveren"],["genc","emekli"],["dindar","ilerici"],["ozerkci","milliyetci"]];
+const AG=["isci","isveren"];const F=P.flat();const opp=g=>F[F.indexOf(g)^1];
+const dot=g=>`<span class="dot" style="--c:${G[g][1]}"></span>`;
+const HD=`<div class="hd">YASA TEKLİFİ<span class="x">Kapat</span></div>`;
+function det(g){return `<div class="det"><h4>${G[g][2]}</h4><div class="s">Kalıcı etki (kabul / ret)</div>
+<div class="eff"><span>${dot(g)}${G[g][0]}</span><span class="up">[artış] / [az artış]</span></div>
+<div class="eff"><span>${dot(opp(g))}${G[opp(g)][0]}</span><span class="dn">[kayıp] / [az kayıp]</span></div>
+<div class="s">Meclis çoğunluğu gerekir · Kabul: +puan</div><div class="go">TEKLİFİ SUN · bedel</div></div>`}
+function tax(){return `<div class="s" style="margin-bottom:6px">Bugünkü vergi politikası paneli buraya taşınır (sadece hükümet sunar).</div>`+["Düşük","Orta","Yüksek"].map((t,i)=>`<div class="kind" style="--c:${i==1?'#d8b45a':'#3a4152'}"><b>${t} vergi</b><small>${i==1?'şu anki kademe (örnek)':'kademe değiştir'}</small></div>`).join("")+`<div class="go dis">VERGİ YASASINI SUN</div>`}
+function cons(){return [["Baraj","%7,0"],["Seçim","4 yıl"],["Sayım","D'Hondt"]].map(r=>`<div class="row"><span class="k">${r[0]}</span><span class="st">−</span><span class="val">${r[1]}</span><span class="st">+</span></div>`).join("")+`<div class="foot">Meclisin 2/3'ü gerekir. Gündem şartı yok.</div><div class="go dis" style="background:#8a6f2e">ANAYASAYI DEĞİŞTİR</div>`}
+function axes(sel){return P.map(([a,b])=>{const on=AG.includes(a);const s=(g,r)=>`<div class="side ${r?'r':''} ${on?'':'off'} ${sel==g?'sel':''}" style="--c:${G[g][1]}" data-g="${on?g:''}">${r?'':dot(g)}${on?'<span class=star>★ </span>':''}${G[g][0]}${r?dot(g):''}</div>`;return `<div class="axis">${s(a,0)}<div class="mid">↔</div>${s(b,1)}</div>`}).join("")}
+// A
+let aT=0,aG="isci";function rA(){const T=["GRUP YASASI","VERGİ","ANAYASA"];let h=HD+`<div class="tabs">${T.map((t,i)=>`<div class="tab ${i==aT?'on':''}" data-t="${i}">${t}</div>`).join("")}</div>`;
+if(aT==0){h+=`<div class="agenda">Gündem: Hayat Pahalılığı</div><div class="big">${Object.keys(G).map(g=>`<div class="card ${g==aG?'sel':''}" data-g="${AG.includes(g)?g:''}" style="--c:${G[g][1]};padding:6px;${AG.includes(g)?'':'opacity:.35'}"><b style="font-size:11px">${AG.includes(g)?'★ ':''}${G[g][0]}</b></div>`).join("")}</div>${det(aG)}`}else h+=aT==1?tax():cons();
+A.innerHTML=h;A.querySelectorAll(".tab").forEach(e=>e.onclick=()=>{aT=+e.dataset.t;rA()});A.querySelectorAll(".card").forEach(e=>e.onclick=()=>{if(e.dataset.g){aG=e.dataset.g;rA()}})}rA();
+// B
+let bG="isci";function rB(){B.innerHTML=HD+`<div class="agenda">Gündem: Hayat Pahalılığı — İşçiler ↔ İşverenler</div>${axes(bG)}${det(bG)}`;B.querySelectorAll(".side").forEach(e=>e.onclick=()=>{if(e.dataset.g){bG=e.dataset.g;rB()}})}rB();
+// C
+let cS=0,cK=0,cG="isci";function rC(){let h=HD+`<div class="steps">${["1 Tür","2 Seçim","3 Sun"].map((t,i)=>`<span class="${i==cS?'on':''}">${t}</span>`).join("")}</div>`;
+if(cS==0)h+=[["Grup yasası","Gündemdeki bir seçmen grubu için","#3f8f55"],["Vergi yasası","Sadece hükümet partileri","#d8b45a"],["Anayasa değişikliği","Meclisin 2/3'ü gerekir","#8b5cc4"]].map((k,i)=>`<div class="kind" data-k="${i}" style="--c:${k[2]}"><b>${k[0]}</b><small>${k[1]}</small></div>`).join("");
+else if(cS==1)h+=cK==0?`<div class="agenda">Gündem: Hayat Pahalılığı</div>`+AG.map(g=>`<div class="kind" data-g="${g}" style="--c:${G[g][1]}"><b>${G[g][0]}</b><small>${G[g][2]}</small></div>`).join("")+`<div class="fold">Gündem dışı 6 grup bu dönem seçilemez</div>`:cK==1?tax():cons();
+else h+=det(cG);
+if(cS>0)h+=`<div class="fold" data-back="1">‹ Geri</div>`;C.innerHTML=h;
+C.querySelectorAll("[data-k]").forEach(e=>e.onclick=()=>{cK=+e.dataset.k;cS=1;rC()});C.querySelectorAll(".kind[data-g]").forEach(e=>e.onclick=()=>{cG=e.dataset.g;cS=2;rC()});C.querySelectorAll("[data-back]").forEach(e=>e.onclick=()=>{cS--;rC()})}rC();
+// D
+let dG="isci",dOpen=false;function rD(){const rest=Object.keys(G).filter(g=>!AG.includes(g));D.innerHTML=HD+`<div class="agenda">Gündem: Hayat Pahalılığı</div><div class="big">${AG.map(g=>`<div class="card ${g==dG?'sel':''}" data-g="${g}" style="--c:${G[g][1]}"><b>★ ${G[g][0]}</b><small>${G[g][2]}</small></div>`).join("")}</div>${det(dG)}<div class="fold" id="fd">Gündem dışı (${rest.length}) ${dOpen?'▴':'▾'}${dOpen?`<div class="chips">${rest.map(g=>`<span class="chip" style="--c:${G[g][1]}">${G[g][0]}</span>`).join("")}</div>`:''}</div><div class="foot">Vergi politikası ›  ·  Anayasa değişikliği ›</div>`;
+D.querySelectorAll(".card").forEach(e=>e.onclick=()=>{dG=e.dataset.g;rD()});fd.onclick=()=>{dOpen=!dOpen;rD()}}rD();
+</script></body></html>

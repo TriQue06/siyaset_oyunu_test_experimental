@@ -3581,3 +3581,12 @@ msgstr "Average"
 
 msgid "Fazla"
 msgstr "Many"
+
+msgid "OYUN KURALLARI"
+msgstr "GAME RULES"
+
+msgid "Devret"
+msgstr "Transfer"
+
+msgid "At"
+msgstr "Kick"

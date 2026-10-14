@@ -99,10 +99,10 @@ func _field(placeholder: String, max_length: int) -> LineEdit:
 	edit.add_theme_font_size_override("font_size", UiTheme.FS_HEAD)
 	var style := UiSkin.stylebox(UiSkin.SLOT)
 	style.set_content_margin_all(UiTheme.PAD_S)
-	edit.add_theme_stylebox_override("normal", style)
+	UiSkin.apply_style(edit, "normal", style)
 	var focus := UiSkin.color_box(UiTheme.GOLD, UiSkin.SLOT)
 	focus.set_content_margin_all(UiTheme.PAD_S)
-	edit.add_theme_stylebox_override("focus", focus)
+	UiSkin.apply_style(edit, "focus", focus)
 	return edit
 
 func _small_label(text: String) -> Label:
@@ -127,7 +127,7 @@ func _build_card() -> void:
 	profile_style.set_content_margin_all(8)
 	profile_style.content_margin_left = 16
 	profile_style.content_margin_right = 10
-	profile.add_theme_stylebox_override("panel", profile_style)
+	UiSkin.apply_style(profile, "panel", profile_style)
 	profile.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	column.add_child(profile)
 	var profile_row := HBoxContainer.new()
@@ -149,7 +149,7 @@ func _build_card() -> void:
 	card.custom_minimum_size = Vector2(CARD_WIDTH, 0)
 	var card_style := _panel_style(true, 24)
 	card_style.set_content_margin_all(18)
-	card.add_theme_stylebox_override("panel", card_style)
+	UiSkin.apply_style(card, "panel", card_style)
 	column.add_child(card)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)

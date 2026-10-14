@@ -402,7 +402,7 @@ func _ready() -> void:
 	if info_plate != null:
 		var plate_style := UiSkin.stylebox(UiSkin.SLOT)
 		plate_style.set_content_margin_all(UiTheme.PAD_S)
-		info_plate.add_theme_stylebox_override("panel", plate_style)
+		UiSkin.apply_style(info_plate, "panel", plate_style)
 	game_settings_label.add_theme_font_override("font", UiTheme.mono())
 	game_settings_label.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
 	# Sıra göstergesi de aynı monospace ailede.
@@ -412,7 +412,7 @@ func _ready() -> void:
 	var board := get_node_or_null("%ParliamentBoard") as PanelContainer
 	if board != null:
 		# Rozetin içinde ayrı bir çerçeve olmasın: diyagram rozet zeminine oturur.
-		board.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+		UiSkin.apply_style(board, "panel", StyleBoxEmpty.new())
 	var actions_panel := get_node_or_null("%ActionsPanel") as PanelContainer
 	if actions_panel != null:
 		UiSkin.skin_panel(actions_panel, UiSkin.PANEL_DARK)
@@ -535,7 +535,7 @@ func _place_card_bar() -> void:
 		style.bg_color = DESK_COLOR
 		style.border_color = UiTheme.INK
 		style.border_width_top = 2
-		_card_bar_panel.add_theme_stylebox_override("panel", style)
+		UiSkin.apply_style(_card_bar_panel, "panel", style)
 		add_child(_card_bar_panel)
 		move_child(_card_bar_panel, 1)
 	_set_rect(_card_bar_panel, _r(R_DESK))
@@ -650,7 +650,7 @@ func _apply_layout() -> void:
 		strip_style.bg_color = Color("1d1838")
 		strip_style.border_color = UiTheme.INK
 		strip_style.border_width_bottom = 2
-		_strip_bg.add_theme_stylebox_override("panel", strip_style)
+		UiSkin.apply_style(_strip_bg, "panel", strip_style)
 		_strip_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(_strip_bg)
 		move_child(_strip_bg, 1)
@@ -700,7 +700,7 @@ func _detach_actions_panel() -> void:
 				margin.add_theme_constant_override("margin_" + side, 6)
 	if panel == null:
 		return
-	panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	UiSkin.apply_style(panel, "panel", StyleBoxEmpty.new())
 	var margin2 := panel.get_node_or_null("ActionsMargin") as MarginContainer
 	if margin2 != null:
 		for side in ["left", "right", "top", "bottom"]:
@@ -715,7 +715,7 @@ func _ensure_map_bg(rect: Rect2) -> void:
 		style.bg_color = Color("141a36")
 		style.border_color = UiTheme.INK
 		style.set_border_width_all(2)
-		_map_bg.add_theme_stylebox_override("panel", style)
+		UiSkin.apply_style(_map_bg, "panel", style)
 		_map_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(_map_bg)
 		move_child(_map_bg, 1)
@@ -776,7 +776,7 @@ func _place_date_chip(_map_rect: Rect2) -> void:
 		turn_style.set_border_width_all(2)
 		turn_style.content_margin_left = 8
 		turn_style.content_margin_right = 8
-		_band_turn.add_theme_stylebox_override("panel", turn_style)
+		UiSkin.apply_style(_band_turn, "panel", turn_style)
 		_band_turn.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_band_turn.clip_contents = true
 		_band_turn_row = HBoxContainer.new()
@@ -848,7 +848,7 @@ func _refresh_band_crisis() -> void:
 		_band_crisis_title.text = L.t("GÜNDEM · %s") % data["title"]
 		_band_crisis_title.add_theme_color_override("font_color", UiTheme.GOLD)
 		_band_crisis_text.text = L.t("%s için yasa / toplantı ulusal destek getirir") % data["group_title"]
-	_band_crisis.add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(_band_crisis, "panel", style)
 
 func _refresh_timer_bar() -> void:
 	if _timer_bar == null:
@@ -911,7 +911,7 @@ func _place_parliament_badge() -> void:
 		style.bg_color = Color("15112b")
 		style.border_color = Color("3f3775")
 		style.set_border_width_all(1)
-		_parl_bg.add_theme_stylebox_override("panel", style)
+		UiSkin.apply_style(_parl_bg, "panel", style)
 		_parl_bg.mouse_filter = Control.MOUSE_FILTER_STOP
 		add_child(_parl_bg)
 		move_child(_parl_bg, bottom_area.get_index())
@@ -1119,7 +1119,7 @@ func _refresh_score_table_now() -> void:
 		style.content_margin_right = 6
 		style.content_margin_top = 3
 		style.content_margin_bottom = 3
-		row.add_theme_stylebox_override("panel", style)
+		UiSkin.apply_style(row, "panel", style)
 		var line := HBoxContainer.new()
 		line.add_theme_constant_override("separation", 6)
 		row.add_child(line)
@@ -1773,7 +1773,7 @@ func _build_plaque(pid: int, width: float) -> Control:
 	style.content_margin_right = 6
 	style.content_margin_top = 3
 	style.content_margin_bottom = 4
-	card.add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(card, "panel", style)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 7)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1891,7 +1891,7 @@ func _build_plaque(pid: int, width: float) -> Control:
 	var halo := Panel.new()
 	halo.name = L.t("TargetHalo")
 	halo.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	halo.add_theme_stylebox_override("panel", UiSkin.color_box(UiTheme.GOLD, UiSkin.TARGET))
+	UiSkin.apply_style(halo, "panel", UiSkin.color_box(UiTheme.GOLD, UiSkin.TARGET))
 	halo.visible = false
 	card.add_child(halo)
 	card.gui_input.connect(func(event: InputEvent):
@@ -2260,7 +2260,7 @@ func _card_art_edge(color: Color) -> Control:
 	style.set_border_width_all(2)
 	style.border_color = color
 	style.set_corner_radius_all(0)
-	edge.add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(edge, "panel", style)
 	return edge
 
 ## TEK DOKUNUŞ (hover yok, tablette de çalışır):
@@ -2332,7 +2332,7 @@ func _card_title_banner(card_type: String, crowded: bool = false) -> Control:
 	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var style := UiSkin.stylebox(UiSkin.PANEL_DARK)
 	style.set_content_margin_all(4)
-	banner.add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(banner, "panel", style)
 	var title := Label.new()
 	title.text = CardPresets.card_short_title(card_type)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if crowded else HORIZONTAL_ALIGNMENT_CENTER
@@ -2354,7 +2354,7 @@ func _card_cost_badge(cost: int) -> Control:
 	style.content_margin_right = 8
 	style.content_margin_top = 2
 	style.content_margin_bottom = 2
-	badge.add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(badge, "panel", style)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 2)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -3157,7 +3157,7 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 	#   2. satır: partisi + açık sekmenin sayı sütunları (başlıklarla hizalı)
 	style.content_margin_top = 1 if _avatar_height < 40.0 else 3
 	style.content_margin_bottom = 1 if _avatar_height < 40.0 else 3
-	card.add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(card, "panel", style)
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 5)
@@ -3245,14 +3245,14 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 	var halo := Panel.new()
 	halo.name = L.t("TargetHalo")
 	halo.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	halo.add_theme_stylebox_override("panel", UiSkin.color_box(UiTheme.GOLD, UiSkin.TARGET))
+	UiSkin.apply_style(halo, "panel", UiSkin.color_box(UiTheme.GOLD, UiSkin.TARGET))
 	halo.visible = false
 	card.add_child(halo)
 	if is_turn:
 		var frame := Panel.new()
 		frame.name = L.t("TurnFrame")
 		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		frame.add_theme_stylebox_override("panel", UiSkin.color_box(UiTheme.TEXT, UiSkin.TARGET))
+		UiSkin.apply_style(frame, "panel", UiSkin.color_box(UiTheme.TEXT, UiSkin.TARGET))
 		card.add_child(frame)
 		var pulse := frame.create_tween().set_loops()
 		pulse.tween_property(frame, "modulate:a", 0.35, 0.7).set_trans(Tween.TRANS_SINE)
@@ -3317,7 +3317,7 @@ func _ensure_left_dock() -> void:
 	if _left_dock != null:
 		return
 	_left_dock = Panel.new()
-	_left_dock.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	UiSkin.apply_style(_left_dock, "panel", StyleBoxEmpty.new())
 	_left_dock.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_left_dock.mouse_filter = Control.MOUSE_FILTER_STOP
 	_left_dock.clip_contents = true
@@ -3376,7 +3376,7 @@ func _avatar_tag(text: String, bg: Color, fg: Color) -> Control:
 	style.content_margin_right = 3
 	style.content_margin_top = 0
 	style.content_margin_bottom = 0
-	tag.add_theme_stylebox_override("normal", style)
+	UiSkin.apply_style(tag, "normal", style)
 	tag.add_theme_constant_override("line_spacing", 0)
 	return tag
 
@@ -3569,7 +3569,7 @@ func _refresh_proposer_chip() -> void:
 		_proposer_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var style := UiSkin.stylebox(UiSkin.SLOT)
 		style.set_content_margin_all(6)
-		_proposer_chip.add_theme_stylebox_override("panel", style)
+		UiSkin.apply_style(_proposer_chip, "panel", style)
 		_proposer_row = HBoxContainer.new()
 		_proposer_row.add_theme_constant_override("separation", 6)
 		_proposer_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -3670,7 +3670,7 @@ func _build_trash_button() -> void:
 	_trash_panel.tooltip_text = L.t("Bir kart seç, sonra buraya tıkla: kart bozulur, bedelinin yarısı kasaya döner.")
 	var style := UiSkin.stylebox(UiSkin.SLOT)
 	style.set_content_margin_all(UiTheme.PAD_S)
-	_trash_panel.add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(_trash_panel, "panel", style)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -3717,7 +3717,7 @@ func _build_action_buttons() -> void:
 	funds_style.content_margin_right = UiTheme.PAD_S
 	funds_style.content_margin_top = 2
 	funds_style.content_margin_bottom = 2
-	_funds_plate.add_theme_stylebox_override("panel", funds_style)
+	UiSkin.apply_style(_funds_plate, "panel", funds_style)
 	add_child(_funds_plate)
 	_funds_box = HBoxContainer.new()
 	_funds_box.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -3874,7 +3874,7 @@ func _style_tab_button(button: Button, active: bool, lit: bool) -> void:
 	var color := UiTheme.GOLD if active else UiTheme.PANEL
 	for state in ["normal", "hover", "pressed", "focus"]:
 		var c := color.lightened(0.08) if state == "hover" and not active else color
-		button.add_theme_stylebox_override(state, _layer_button_style(c, false, false))
+		UiSkin.apply_style(button, state, _layer_button_style(c, false, false))
 	var font := UiTheme.INK if active else (UiTheme.TEXT if lit else UiTheme.TEXT.darkened(0.4))
 	for key in ["font_color", "font_hover_color", "font_pressed_color"]:
 		button.add_theme_color_override(key, font)
@@ -3946,7 +3946,7 @@ func _build_agenda_banner() -> void:
 	_agenda_banner = PanelContainer.new()
 	var style := UiSkin.color_box(UiTheme.GOLD.darkened(0.45), UiSkin.BUTTON_TINT_NORMAL)
 	style.set_content_margin_all(UiTheme.PAD_S)
-	_agenda_banner.add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(_agenda_banner, "panel", style)
 	_agenda_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_agenda_label = Label.new()
 	_agenda_label.add_theme_font_override("font", UiTheme.mono())
@@ -3980,7 +3980,7 @@ func _build_alliance_panel() -> void:
 	_alliance_panel = PanelContainer.new()
 	var style := UiSkin.stylebox(UiSkin.PANEL)
 	style.set_content_margin_all(UiTheme.PAD_M)
-	_alliance_panel.add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(_alliance_panel, "panel", style)
 	_alliance_panel.z_index = 108
 	_alliance_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	var box := VBoxContainer.new()
@@ -4186,7 +4186,7 @@ func _build_law_designer() -> void:
 	_law_designer = PanelContainer.new()
 	var style := UiSkin.stylebox(UiSkin.PANEL)
 	style.set_content_margin_all(UiTheme.PAD_M)
-	_law_designer.add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(_law_designer, "panel", style)
 	_law_designer.z_index = 108
 	_law_designer.mouse_filter = Control.MOUSE_FILTER_STOP
 	var box := VBoxContainer.new()
@@ -4535,7 +4535,7 @@ func _build_tax_panel() -> void:
 	_tax_panel = PanelContainer.new()
 	var style := UiSkin.stylebox(UiSkin.PANEL)
 	style.set_content_margin_all(UiTheme.PAD_M)
-	_tax_panel.add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(_tax_panel, "panel", style)
 	_tax_panel.z_index = 108
 	_tax_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	_tax_box = VBoxContainer.new()
@@ -4601,7 +4601,7 @@ func _build_funding_ui() -> void:
 	_inquiry_panel = PanelContainer.new()
 	var style := UiSkin.stylebox(UiSkin.PANEL)
 	style.set_content_margin_all(UiTheme.PAD_M)
-	_inquiry_panel.add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(_inquiry_panel, "panel", style)
 	_inquiry_panel.z_index = 108
 	_inquiry_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	_inquiry_box = VBoxContainer.new()
@@ -5079,7 +5079,7 @@ func _refresh_layer_bar() -> void:
 		var last := i == _layer_buttons.size() - 1
 		for state in ["normal", "hover", "pressed", "focus"]:
 			var c := color.lightened(0.08) if state == "hover" and not active else color
-			button.add_theme_stylebox_override(state, _layer_button_style(c, first, last))
+			UiSkin.apply_style(button, state, _layer_button_style(c, first, last))
 		button.add_theme_color_override("font_color", UiTheme.INK if active else UiTheme.TEXT)
 		button.add_theme_color_override("font_hover_color", UiTheme.INK if active else UiTheme.TEXT)
 		button.add_theme_color_override("font_pressed_color", UiTheme.INK)
@@ -5144,7 +5144,7 @@ func _rebuild_layer_legend() -> void:
 			continue
 		var swatch := Panel.new()
 		swatch.custom_minimum_size = Vector2(maxf(22.0, 8.0 + 7.0 * String(entry[1]).length()), 16)
-		swatch.add_theme_stylebox_override("panel", UiSkin.color_box(entry[0], UiSkin.BUTTON_TINT_NORMAL))
+		UiSkin.apply_style(swatch, "panel", UiSkin.color_box(entry[0], UiSkin.BUTTON_TINT_NORMAL))
 		if String(entry[1]) != "":
 			var num := Label.new()
 			num.text = String(entry[1])
@@ -5353,7 +5353,7 @@ func _build_speech_panel() -> void:
 	_speech_panel = PanelContainer.new()
 	var style := UiSkin.stylebox(UiSkin.PANEL)
 	style.set_content_margin_all(UiTheme.PAD_S)
-	_speech_panel.add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(_speech_panel, "panel", style)
 	_speech_panel.z_index = 109
 	_speech_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	var box := VBoxContainer.new()

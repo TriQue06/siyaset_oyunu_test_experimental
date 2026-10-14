@@ -96,7 +96,7 @@ func _ranking_row(index: int, entry: Dictionary, is_me: bool) -> Control:
 	style.content_margin_right = 14
 	style.content_margin_top = 4
 	style.content_margin_bottom = 4
-	panel.add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(panel, "panel", style)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	panel.add_child(row)

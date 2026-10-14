@@ -33,6 +33,11 @@ static func _texture(path: String) -> Texture2D:
 
 ## PNG'den 9-slice bir StyleBox üretir (panel/buton zeminleri için).
 static func stylebox(path: String, margin: int = SLICE_MARGIN) -> StyleBoxTexture:
+	if path == PANEL or path == PANEL_DARK or path == SLOT:
+		var color := UiTheme.PANEL if path == PANEL else (UiTheme.PANEL_DARK if path == PANEL_DARK else UiTheme.INK)
+		var shared := stylebox(BUTTON_TINT_NORMAL, margin)
+		shared.modulate_color = color
+		return shared
 	var box := StyleBoxTexture.new()
 	box.texture = _texture(path)
 	box.texture_margin_left = margin
@@ -176,3 +181,22 @@ static func panel_background(path: String = PANEL) -> NinePatchRect:
 	var rect := color_surface(Color.WHITE, path)
 	rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 	return rect
+
+## Menü düğmesindeki 3px dış çizgi ve 2px pah, tüm dikdörtgen yüzeylerin
+## ortak geometrisidir. Bilgi kutusu yalnız normal durumunu kullanır.
+static func apply_style(control: Control, key: StringName, original: StyleBox) -> void:
+	var shared: StyleBox = original
+	if original is StyleBoxFlat:
+		var flat := original as StyleBoxFlat
+		# Saydam hedef halkaları ve yuvarlak simgeler yüzey değildir.
+		if flat.bg_color.a > 0.0 and flat.corner_radius_top_left <= 8 and flat.corner_radius_top_right <= 8 and flat.corner_radius_bottom_left <= 8 and flat.corner_radius_bottom_right <= 8:
+			var texture_path := BUTTON_TINT_NORMAL
+			if key == &"pressed" or key == &"hover_pressed":
+				texture_path = BUTTON_TINT_PRESSED
+			elif key == &"hover" or key == &"focus":
+				texture_path = BUTTON_TINT_HOVER
+			var box := color_box(flat.bg_color, texture_path)
+			for side in [SIDE_LEFT, SIDE_TOP, SIDE_RIGHT, SIDE_BOTTOM]:
+				box.set_content_margin(side, maxf(3.0, flat.get_content_margin(side)))
+			shared = box
+	control.add_theme_stylebox_override(key, shared)

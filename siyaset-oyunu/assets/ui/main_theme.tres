@@ -9,7 +9,7 @@
 [ext_resource type="Texture2D" uid="uid://kvux287nned1" path="res://assets/ui/button_pressed.png" id="3"]
 [ext_resource type="Texture2D" uid="uid://c61um0fvvjmn5" path="res://assets/ui/button_disabled.png" id="4"]
 [ext_resource type="Texture2D" path="res://assets/ui/ui_panel.png" id="5"]
-[ext_resource type="Texture2D" path="res://assets/ui/ui_slot.png" id="6"]
+[ext_resource type="Texture2D" path="res://assets/ui/ui_button_tint_normal.png" id="6"]
 [ext_resource type="FontFile" path="res://assets/fonts/IBMPlexMono-SemiBold.ttf" id="7"]
 [ext_resource type="Texture2D" path="res://assets/ui/ui_fill.png" id="8"]
 [ext_resource type="Texture2D" path="res://assets/ui/ui_track.png" id="9"]
@@ -72,6 +72,7 @@ content_margin_bottom = 14.0
 
 [sub_resource type="StyleBoxTexture" id="SB_slot"]
 texture = ExtResource("6")
+modulate_color = Color(0.062745, 0.05098, 0.133333, 1)
 texture_margin_left = 5.0
 texture_margin_top = 5.0
 texture_margin_right = 5.0

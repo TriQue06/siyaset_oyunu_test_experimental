@@ -35,7 +35,7 @@ func _init() -> void:
 	z_index = 107
 	var style := UiSkin.stylebox(UiSkin.PANEL)
 	style.set_content_margin_all(UiTheme.PAD_S + 2)
-	add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(self, "panel", style)
 	custom_minimum_size = Vector2(WIDTH, 0)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 4)

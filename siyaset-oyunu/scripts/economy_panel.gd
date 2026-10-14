@@ -104,7 +104,7 @@ func _make_tile(key: String, caption: String, tip: String) -> Control:
 	style.content_margin_right = 5
 	style.content_margin_top = 1
 	style.content_margin_bottom = 2
-	panel.add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(panel, "panel", style)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", -3)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -141,7 +141,7 @@ func _make_treasury_row() -> Control:
 	style.content_margin_right = 6
 	style.content_margin_top = 1
 	style.content_margin_bottom = 2
-	panel.add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(panel, "panel", style)
 	var line := HBoxContainer.new()
 	line.add_theme_constant_override("separation", 5)
 	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -312,7 +312,7 @@ func _refresh_summary() -> void:
 	style.content_margin_right = 6
 	style.content_margin_top = 3
 	style.content_margin_bottom = 4
-	_summary.add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(_summary, "panel", style)
 	for child in _summary_box.get_children():
 		_summary_box.remove_child(child)
 		child.queue_free()
@@ -545,7 +545,7 @@ static func _policy_card(me: int, level: int, current: int, selected: int, on_se
 		style.border_color = color if is_current else (UiTheme.TEXT if is_selected else TILE_BORDER)
 		style.set_border_width_all(2 if is_current or is_selected else 1)
 		style.border_width_top = 4 if is_current or is_selected else 1
-		button.add_theme_stylebox_override(state, style)
+		UiSkin.apply_style(button, state, style)
 	button.disabled = is_current
 	button.pressed.connect(func(): on_select.call(level))
 	var box := VBoxContainer.new()
@@ -766,7 +766,7 @@ static func inquiry_result_card(data: Dictionary) -> PanelContainer:
 	style.content_margin_bottom = 10
 	style.shadow_color = Color(UiTheme.INK, 0.7)
 	style.shadow_size = 6
-	card.add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(card, "panel", style)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 3)
 	card.add_child(box)
@@ -784,7 +784,7 @@ static func inquiry_result_card(data: Dictionary) -> PanelContainer:
 	stamp_style.set_border_width_all(2)
 	stamp_style.content_margin_left = 8
 	stamp_style.content_margin_right = 8
-	stamp.add_theme_stylebox_override("panel", stamp_style)
+	UiSkin.apply_style(stamp, "panel", stamp_style)
 	stamp.add_child(UiTheme.mono_label(String(tag[0]), 12, color.lightened(0.2), true))
 	stamp.rotation_degrees = -2.0
 	top.add_child(stamp)

@@ -743,7 +743,7 @@ func _layout_flash() -> void:
 
 func _panel(color: Color) -> Panel:
 	var panel := Panel.new()
-	panel.add_theme_stylebox_override("panel", UiSkin.color_box(color))
+	UiSkin.apply_style(panel, "panel", UiSkin.color_box(color))
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return panel
 

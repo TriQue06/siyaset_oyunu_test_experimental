@@ -153,7 +153,7 @@ func _background_card(id: String) -> Button:
 	ring.bg_color = Color(UiTheme.GOLD, 0.08)
 	ring.border_color = UiTheme.GOLD
 	ring.set_border_width_all(3)
-	frame.add_theme_stylebox_override("panel", ring)
+	UiSkin.apply_style(frame, "panel", ring)
 	frame.visible = false
 	button.add_child(frame)
 	var margin := MarginContainer.new()

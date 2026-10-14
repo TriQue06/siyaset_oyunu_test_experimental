@@ -229,7 +229,7 @@ func _build() -> void:
 
 	# Üst yayın bandı
 	var top := PanelContainer.new()
-	top.add_theme_stylebox_override("panel", UiSkin.color_box(UiTheme.PANEL_DARK))
+	UiSkin.apply_style(top, "panel", UiSkin.color_box(UiTheme.PANEL_DARK))
 	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(top)
 	var top_row := HBoxContainer.new()
@@ -237,7 +237,7 @@ func _build() -> void:
 	top_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	top.add_child(top_row)
 	var live := PanelContainer.new()
-	live.add_theme_stylebox_override("panel", UiSkin.color_box(RED))
+	UiSkin.apply_style(live, "panel", UiSkin.color_box(RED))
 	live.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	live.add_child(_label(L.t("  ●  CANLI  "), 18, Color.WHITE))
 	top_row.add_child(live)
@@ -288,7 +288,7 @@ func _build() -> void:
 
 	# Sonuç damgası (salonun ortasına, hafif eğik)
 	_stamp = PanelContainer.new()
-	_stamp.add_theme_stylebox_override("panel", UiSkin.color_box(GOLD))
+	UiSkin.apply_style(_stamp, "panel", UiSkin.color_box(GOLD))
 	_stamp.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_stamp.rotation = deg_to_rad(-4.0)
 	_stamp.visible = false
@@ -318,7 +318,7 @@ func _build_cards(indices: Array) -> void:
 		var color := candidate_color(int(i))
 		var panel := PanelContainer.new()
 		panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		panel.add_theme_stylebox_override("panel", UiSkin.color_box(UiTheme.PANEL))
+		UiSkin.apply_style(panel, "panel", UiSkin.color_box(UiTheme.PANEL))
 		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_cards_box.add_child(panel)
 		var col := VBoxContainer.new()
@@ -327,7 +327,7 @@ func _build_cards(indices: Array) -> void:
 		panel.add_child(col)
 		# Adayın renkli ad şeridi
 		var strip := PanelContainer.new()
-		strip.add_theme_stylebox_override("panel", UiSkin.color_box(color))
+		UiSkin.apply_style(strip, "panel", UiSkin.color_box(color))
 		strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		col.add_child(strip)
 		var name_label := Label.new()

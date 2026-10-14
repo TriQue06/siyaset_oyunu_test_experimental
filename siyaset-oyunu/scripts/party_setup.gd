@@ -307,7 +307,7 @@ func _build_players_panel() -> void:
 	panel.offset_bottom = -12
 	var style := UiSkin.stylebox(UiSkin.PANEL_DARK)
 	style.set_content_margin_all(UiTheme.PAD_M)
-	panel.add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(panel, "panel", style)
 	add_child(panel)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
@@ -469,7 +469,7 @@ func _build_color_row() -> void:
 		var selected := color.is_equal_approx(_selected_bg_color)
 		var style := UiSkin.color_box(color, UiSkin.BUTTON_TINT_HOVER if selected else UiSkin.BUTTON_TINT_NORMAL)
 		for state in ["normal", "hover", "pressed", "disabled"]:
-			btn.add_theme_stylebox_override(state, style)
+			UiSkin.apply_style(btn, state, style)
 		if selected:
 			var ring := UiSkin.color_surface(UiTheme.GOLD, UiSkin.TARGET)
 			ring.set_anchors_preset(Control.PRESET_FULL_RECT)

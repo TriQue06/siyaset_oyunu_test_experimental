@@ -25,7 +25,7 @@ static func frame(width: float, accent: Color, panel: PanelContainer = null) -> 
 	if panel == null:
 		panel = PanelContainer.new()
 	if embedded:
-		panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+		UiSkin.apply_style(panel, "panel", StyleBoxEmpty.new())
 		panel.custom_minimum_size = Vector2(width, 0)
 		var plain := VBoxContainer.new()
 		plain.add_theme_constant_override("separation", GAP)
@@ -42,7 +42,7 @@ static func frame(width: float, accent: Color, panel: PanelContainer = null) -> 
 	style.shadow_size = 0
 	style.shadow_offset = Vector2(4, 5)
 	style.set_corner_radius_all(0)
-	panel.add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(panel, "panel", style)
 	panel.custom_minimum_size = Vector2(width, 0)
 	var outer := VBoxContainer.new()
 	outer.add_theme_constant_override("separation", 0)
@@ -159,7 +159,7 @@ static func chip(text: String, color: Color) -> Control:
 	style.content_margin_right = 6
 	style.content_margin_top = 1
 	style.content_margin_bottom = 1
-	panel.add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(panel, "panel", style)
 	var l := UiTheme.mono_label(text, 10, color.lightened(0.25), true)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(l)
@@ -180,7 +180,7 @@ static func meter(key: String, value: float, maximum: float, color: Color, value
 	track.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var track_style := StyleBoxFlat.new()
 	track_style.bg_color = UiTheme.SLOT
-	track.add_theme_stylebox_override("panel", track_style)
+	UiSkin.apply_style(track, "panel", track_style)
 	row.add_child(track)
 	var fill := ColorRect.new()
 	fill.color = color

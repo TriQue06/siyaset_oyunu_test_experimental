@@ -8,7 +8,7 @@ const SLIDE_DURATION := 0.2
 @onready var player_list_box: GridContainer = %PlayerListBox
 
 ## 8 sabit oyuncu kartı, 2 sütun. Robot butonu kartın sağ üst köşesine taşar.
-const SLOT_SIZE := Vector2(412, 74)
+const SLOT_SIZE := Vector2(230, 86)
 const BOT_BUTTON_SIZE := 34.0
 @onready var settings_button: Button = %SettingsButton
 @onready var start_button: Button = %StartButton
@@ -36,6 +36,9 @@ var random_parties_check: CheckButton
 var away_bot_check: CheckButton
 var bot_funds_buttons: Array = []
 var world_controls: Dictionary = {}
+var world_values: Dictionary = {}
+var density_buttons: Array[Button] = []
+var _lobby_columns: GridContainer
 var vote_time_buttons: Array[Button] = []
 var threshold_value_label: Label
 
@@ -44,6 +47,7 @@ var _sections_box: VBoxContainer
 var _center_base_x: float = 0.0
 
 func _ready() -> void:
+	_build_concept_a()
 	_build_settings_panel()
 	_refresh_code_display()
 	GameSettings.streamer_mode_changed.connect(_on_streamer_mode_changed)
@@ -115,8 +119,7 @@ func _refresh() -> void:
 	start_button.visible = am_owner
 	start_button.disabled = count < MultiplayerManager.MIN_PLAYERS_TO_START
 
-	if not am_owner and _settings_open:
-		_close_settings_panel()
+	# Konsept A: kurallar herkese görünür; yalnız sahibi düzenler.
 
 	threshold_slider.editable = am_owner
 	map_seed_edit.editable = am_owner
@@ -155,7 +158,7 @@ func _build_player_card(peer_id: int, index: int, am_owner: bool, local_id: int)
 	var avatar := PanelContainer.new()
 	avatar.custom_minimum_size = Vector2(44, 44)
 	# Kare rozet (pixel tarz): koyu çizgi + düz renk.
-	avatar.add_theme_stylebox_override("panel",
+	UiSkin.apply_style(avatar, "panel",
 		UiSkin.color_box(color if not is_bot else UiTheme.PANEL_LIGHT, UiSkin.BUTTON_TINT_NORMAL))
 	if is_bot:
 		var robot := RobotIcon.new()
@@ -176,7 +179,10 @@ func _build_player_card(peer_id: int, index: int, am_owner: bool, local_id: int)
 	info.add_theme_constant_override("separation", 0)
 	var name_label := Label.new()
 	name_label.text = player_name
-	name_label.add_theme_font_size_override("font_size", 18)
+	name_label.add_theme_font_size_override("font_size", 14)
+	name_label.clip_text = true
+	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	name_label.tooltip_text = player_name
 	info.add_child(name_label)
 	var tags: Array[String] = []
 	if peer_id == MultiplayerManager.owner_id:
@@ -203,14 +209,16 @@ func _build_player_card(peer_id: int, index: int, am_owner: bool, local_id: int)
 			action.text = L.t("Çıkar")
 			action.pressed.connect(func(): MultiplayerManager.remove_bot(peer_id))
 		else:
-			action.text = L.t("Sahipliği Devret")
+			action.text = L.t("Devret")
+			action.tooltip_text = L.t("Sahipliği Devret")
 			action.pressed.connect(func(): MultiplayerManager.transfer_ownership(peer_id))
 		actions.add_child(action)
 		if not is_bot:
 			# Oyuncu atma: sadece lobi sahibinde ve kendisi dışındakiler için.
 			var kick := Button.new()
 			UiSkin.skin_color_button(kick, UiTheme.RED)
-			kick.text = L.t("Lobiden At")
+			kick.text = L.t("At")
+			kick.tooltip_text = L.t("Lobiden At")
 			kick.pressed.connect(func(): MultiplayerManager.kick_player(peer_id))
 			actions.add_child(kick)
 		row.add_child(actions)
@@ -287,11 +295,19 @@ class RobotIcon extends Control:
 
 func _refresh_settings_display() -> void:
 	for key in world_controls:
-		var control: OptionButton = world_controls[key]
-		control.select((MultiplayerManager.WORLD_OPTIONS[key] as Array).find(MultiplayerManager.world_settings[key]))
-		control.disabled = not MultiplayerManager.is_local_owner()
+		var control: HSlider = world_controls[key]
+		control.set_value_no_signal(float(MultiplayerManager.world_settings[key]))
+		world_values[key].text = str(MultiplayerManager.world_settings[key]) + (" s" if key == "turn_seconds" else "")
+		control.editable = MultiplayerManager.is_local_owner()
 
+	for button in density_buttons:
+		var on := is_equal_approx(float(button.get_meta("value")), float(MultiplayerManager.world_settings["province_scale"]))
+		button.set_pressed_no_signal(on)
+		button.disabled = not MultiplayerManager.is_local_owner()
+		UiSkin.skin_color_button(button, UiTheme.GOLD if on else UiTheme.PANEL_LIGHT)
 	for button in vote_time_buttons:
+		var selected := int(button.get_meta("seconds")) == MultiplayerManager.vote_timeout
+		UiSkin.skin_color_button(button, UiTheme.GOLD if selected else UiTheme.PANEL_LIGHT)
 		button.set_pressed_no_signal(int(button.get_meta("seconds")) == MultiplayerManager.vote_timeout)
 		button.disabled = not MultiplayerManager.is_local_owner()
 
@@ -345,7 +361,8 @@ func _change_game_length(interval_delta: int, count_delta: int) -> void:
 func _build_settings_panel() -> void:
 	settings_vbox.add_theme_constant_override("separation", 8)
 	var title := settings_vbox.get_node("HeaderRow/TitleLabel") as Label
-	title.add_theme_font_size_override("font_size", 20)
+	title.text = L.t("OYUN KURALLARI")
+	title.add_theme_font_size_override("font_size", 16)
 	# Bölümler kaydırılabilir bir alanda: başlık ve ✕ hep görünür kalır.
 	var scroll := ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -362,6 +379,7 @@ func _build_settings_panel() -> void:
 	var close_bottom := Button.new()
 	close_bottom.text = L.t("Kapat")
 	close_bottom.custom_minimum_size = Vector2(0, 40)
+	close_bottom.hide()
 	close_bottom.focus_mode = Control.FOCUS_NONE
 	close_bottom.pressed.connect(_close_settings_panel)
 	settings_vbox.add_child(close_bottom)
@@ -391,21 +409,38 @@ func _build_settings_panel() -> void:
 		var button := Button.new()
 		button.text = "%d s" % seconds
 		button.toggle_mode = true
+		button.custom_minimum_size = Vector2(56, 34)
 		button.set_meta("seconds", seconds)
 		UiSkin.skin_button(button)
 		button.pressed.connect(func(): MultiplayerManager.set_vote_timeout(int(button.get_meta("seconds"))))
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		votes_row.add_child(button)
 		vote_time_buttons.append(button)
 	var world_box := _section(L.t("HARİTA VE MECLİS"), "")
 	var labels := {"province_scale": L.t("İl sayısı"), "province_seats": L.t("İl milletvekilleri"), "national_seats": L.t("Ulusal milletvekilleri"), "turn_seconds": L.t("Tur süresi")}
-	for key in MultiplayerManager.WORLD_OPTIONS:
-		world_box.add_child(UiTheme.mono_label(labels[key], 12, UiTheme.TEXT))
-		var control := OptionButton.new()
+	world_box.add_child(UiTheme.mono_label(labels["province_scale"], 12, UiTheme.TEXT))
+	var density_row := HBoxContainer.new()
+	density_row.add_theme_constant_override("separation", 6)
+	world_box.add_child(density_row)
+	for i in 3:
+		var button := Button.new()
+		button.text = [L.t("Az"), L.t("Ortalama"), L.t("Fazla")][i]
+		button.toggle_mode = true
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.custom_minimum_size = Vector2(56, 34)
+		button.set_meta("value", MultiplayerManager.WORLD_OPTIONS["province_scale"][i])
+		button.pressed.connect(func(): MultiplayerManager.set_world_setting("province_scale", button.get_meta("value")))
+		density_row.add_child(button)
+		density_buttons.append(button)
+	for key in ["province_seats", "national_seats", "turn_seconds"]:
+		world_values[key] = _value_row(world_box, labels[key])
+		var control := HSlider.new()
 		var values: Array = MultiplayerManager.WORLD_OPTIONS[key]
-		for i in values.size():
-			control.add_item([L.t("Az"), L.t("Ortalama"), L.t("Fazla")][i] if key == "province_scale" else str(values[i]) + (" s" if key == "turn_seconds" else ""))
-		control.item_selected.connect(func(index: int): MultiplayerManager.set_world_setting(String(control.get_meta("key")), (MultiplayerManager.WORLD_OPTIONS[control.get_meta("key")] as Array)[index]))
+		control.min_value = float(values[0])
+		control.max_value = float(values[-1])
+		control.step = float(values[1]) - float(values[0])
 		control.set_meta("key", key)
+		control.value_changed.connect(func(value: float): MultiplayerManager.set_world_setting(String(control.get_meta("key")), int(value)))
 		world_box.add_child(control)
 		world_controls[key] = control
 	var map_box := _section(L.t("HARİTA"), L.t("Aynı tohum her zaman aynı ülkeyi üretir. Boş bırakırsan her oyunda rastgele."))
@@ -454,7 +489,7 @@ func _section(title_text: String, note_text: String) -> VBoxContainer:
 	var panel := PanelContainer.new()
 	var style := UiSkin.stylebox(UiSkin.PANEL_DARK)
 	style.set_content_margin_all(UiTheme.PAD_M)
-	panel.add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(panel, "panel", style)
 	_sections_box.add_child(panel)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 4)
@@ -554,20 +589,10 @@ func _on_settings_pressed() -> void:
 		_open_settings_panel()
 
 func _open_settings_panel() -> void:
-	_settings_open = true
 	settings_side_panel.show()
-	var tween := create_tween()
-	tween.set_trans(Tween.TRANS_SINE)
-	tween.set_ease(Tween.EASE_OUT)
-	tween.tween_property(center_box, "position:x", _center_base_x - SETTINGS_SHIFT, SLIDE_DURATION)
 
 func _close_settings_panel() -> void:
-	_settings_open = false
-	var tween := create_tween()
-	tween.set_trans(Tween.TRANS_SINE)
-	tween.set_ease(Tween.EASE_IN)
-	tween.tween_property(center_box, "position:x", _center_base_x, SLIDE_DURATION)
-	tween.finished.connect(func(): settings_side_panel.hide())
+	settings_side_panel.show()
 
 func _on_start_pressed() -> void:
 	MultiplayerManager.start_game()
@@ -582,3 +607,90 @@ func _on_leave_pressed() -> void:
 func _on_room_closed(reason: String) -> void:
 	info_label.text = reason
 	get_tree().change_scene_to_file("res://scenes/Lobby.tscn")
+
+## A konsepti: oda başlığı, eşit oyuncu yuvaları ve kalıcı kural sütunu.
+func _build_concept_a() -> void:
+	settings_button.hide()
+	side_close_button.hide()
+	var original_panel := settings_side_panel
+	var margin := MarginContainer.new()
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	for side in ["left", "top", "right", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, 24)
+	add_child(margin)
+	var root_box := VBoxContainer.new()
+	root_box.add_theme_constant_override("separation", 16)
+	margin.add_child(root_box)
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 16)
+	root_box.add_child(header)
+	var title := UiTheme.mono_label(L.t("SİYASET OYUNU"), 24, UiTheme.TEXT, true)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(title)
+	var code_row := center_box.get_node("CodeRow")
+	code_row.reparent(header)
+	UiSkin.skin_button(copy_code_button)
+	var menu_space := Control.new()
+	menu_space.custom_minimum_size.x = 124
+	header.add_child(menu_space)
+	var main_scroll := ScrollContainer.new()
+	main_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	main_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root_box.add_child(main_scroll)
+	_lobby_columns = GridContainer.new()
+	_lobby_columns.columns = 2
+	_lobby_columns.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_lobby_columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_lobby_columns.add_theme_constant_override("h_separation", 20)
+	_lobby_columns.add_theme_constant_override("v_separation", 16)
+	main_scroll.add_child(_lobby_columns)
+	var left := PanelContainer.new()
+	_skin_lobby_panel(left)
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_lobby_columns.add_child(left)
+	center_box.reparent(left)
+	center_box.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	center_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center_box.add_theme_constant_override("separation", 10)
+	var heading := UiTheme.mono_label(L.t("OYUNCULAR"), 16, UiTheme.GOLD, true)
+	center_box.add_child(heading)
+	center_box.move_child(heading, 0)
+	for child in center_box.get_children():
+		if child is HSeparator or child.name == "HintLabel":
+			child.hide()
+	player_list_box.add_theme_constant_override("h_separation", 8)
+	player_list_box.add_theme_constant_override("v_separation", 8)
+	threshold_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	threshold_label.add_theme_font_size_override("font_size", 12)
+	center_box.move_child(threshold_label, center_box.get_child_count() - 1)
+	var right := PanelContainer.new()
+	_skin_lobby_panel(right)
+	right.custom_minimum_size = Vector2(380, 480)
+	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_lobby_columns.add_child(right)
+	settings_vbox.reparent(right)
+	settings_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	settings_side_panel = right
+	original_panel.hide()
+	var footer := HBoxContainer.new()
+	footer.add_theme_constant_override("separation", 10)
+	root_box.add_child(footer)
+	info_label.reparent(footer)
+	info_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	leave_button.reparent(footer)
+	leave_button.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	UiSkin.skin_button(leave_button)
+	start_button.reparent(footer)
+	UiSkin.skin_color_button(start_button, UiTheme.GREEN_DARK)
+	resized.connect(_fit_concept_a)
+	_fit_concept_a()
+
+func _fit_concept_a() -> void:
+	if _lobby_columns != null:
+		_lobby_columns.columns = 1 if size.x < 1000.0 else 2
+
+func _skin_lobby_panel(panel: PanelContainer) -> void:
+	var style := UiSkin.stylebox(UiSkin.PANEL)
+	style.set_content_margin_all(14)
+	UiSkin.apply_style(panel, "panel", style)

@@ -127,7 +127,7 @@ func _refresh() -> void:
 		var style := UiSkin.color_box(color if not swatch.disabled else color.darkened(0.6),
 			UiSkin.BUTTON_TINT_HOVER if selected else UiSkin.BUTTON_TINT_NORMAL)
 		for state in ["normal", "hover", "pressed", "disabled"]:
-			swatch.add_theme_stylebox_override(state, style)
+			UiSkin.apply_style(swatch, state, style)
 		swatch.text = "✕" if swatch.disabled else ("●" if selected else "")
 	for child in _preview.get_children():
 		child.queue_free()

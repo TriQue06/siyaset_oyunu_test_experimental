@@ -232,7 +232,7 @@ static func _stat(value: String, caption: String, color: Color) -> Control:
 	style.bg_color = UiTheme.SLOT
 	style.content_margin_top = 4
 	style.content_margin_bottom = 4
-	tile.add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(tile, "panel", style)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", -2)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE

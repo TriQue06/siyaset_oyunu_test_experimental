@@ -87,7 +87,7 @@ func _build_panel() -> void:
 	style.content_margin_bottom = 10
 	style.shadow_color = Color(UiTheme.INK, 0.7)
 	style.shadow_size = 8
-	_panel.add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(_panel, "panel", style)
 	_panel.hide()
 	add_child(_panel)
 	var box := VBoxContainer.new()

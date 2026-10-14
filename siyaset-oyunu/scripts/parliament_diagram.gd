@@ -142,7 +142,7 @@ func _build_count_plate() -> void:
 	style.content_margin_right = 10
 	style.content_margin_top = 2
 	style.content_margin_bottom = 2
-	_count_plate.add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(_count_plate, "panel", style)
 	_count_label = Label.new()
 	_count_label.add_theme_font_override("font", UiTheme.mono(true))
 	_count_label.add_theme_font_size_override("font_size", COUNT_FONT_SIZE)

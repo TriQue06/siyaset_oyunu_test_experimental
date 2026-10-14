@@ -142,13 +142,13 @@ func _build_compact_row(e: Dictionary, max_percent: float) -> Control:
 	var track := Panel.new()
 	track.custom_minimum_size = Vector2(0, 10)
 	track.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	track.add_theme_stylebox_override("panel", UiSkin.stylebox(UiSkin.TRACK, 2))
+	UiSkin.apply_style(track, "panel", UiSkin.stylebox(UiSkin.TRACK, 2))
 	box.add_child(track)
 	var fill := Panel.new()
 	fill.set_anchors_preset(Control.PRESET_LEFT_WIDE)
 	fill.anchor_right = clampf(float(e["percent"]) / max_percent, 0.02, 1.0)
 	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	fill.add_theme_stylebox_override("panel", UiSkin.color_box(color))
+	UiSkin.apply_style(fill, "panel", UiSkin.color_box(color))
 	track.add_child(fill)
 	box.add_child(foot)
 	return margin
@@ -165,7 +165,7 @@ func _badge_or_dot(e: Dictionary, color: Color, badge_size: float) -> Control:
 	dot.custom_minimum_size = Vector2(10, 10)
 	dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	dot.add_theme_stylebox_override("panel", UiSkin.color_box(color))
+	UiSkin.apply_style(dot, "panel", UiSkin.color_box(color))
 	return dot
 
 ## Monospace etiket (rakamlar ve rozetler her yerde monospace).
@@ -215,7 +215,7 @@ func _build_row(party_name: String, color: Color, percent: float, seats: int, ma
 	seat_badge.custom_minimum_size = Vector2(SEAT_BADGE_WIDTH, 0)
 	var badge_style := UiSkin.stylebox(UiSkin.TRACK, 2)
 	badge_style.set_content_margin_all(3)
-	seat_badge.add_theme_stylebox_override("panel", badge_style)
+	UiSkin.apply_style(seat_badge, "panel", badge_style)
 	var seat_label := Label.new()
 	seat_label.text = str(seats)
 	seat_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -228,14 +228,14 @@ func _build_row(party_name: String, color: Color, percent: float, seats: int, ma
 	var bar_bg := Panel.new()
 	bar_bg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar_bg.custom_minimum_size = Vector2(0, BAR_HEIGHT * (0.8 if compact else 1.0))
-	bar_bg.add_theme_stylebox_override("panel", UiSkin.stylebox(UiSkin.TRACK, 2))
+	UiSkin.apply_style(bar_bg, "panel", UiSkin.stylebox(UiSkin.TRACK, 2))
 
 	var fill_width_ratio: float = clampf(percent / max_percent, 0.0, 1.0)
 
 	var bar_fill := Panel.new()
 	bar_fill.set_anchors_preset(Control.PRESET_LEFT_WIDE)
 	bar_fill.anchor_right = fill_width_ratio
-	bar_fill.add_theme_stylebox_override("panel", UiSkin.color_box(color))
+	UiSkin.apply_style(bar_fill, "panel", UiSkin.color_box(color))
 	bar_bg.add_child(bar_fill)
 
 	# eksen_projeksiyon'daki clip-path ikilisi: dolu kısımda BEYAZ, boş

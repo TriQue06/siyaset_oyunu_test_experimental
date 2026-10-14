@@ -5,7 +5,7 @@ extends PanelContainer
 ## (PARTİ KASASI / DEVLET HAZİNESİ), altında paylaşım çubuğu, iki kaynağın
 ## ödediği tutar ve işlem sonrası kalan bakiye, toplam, gerekiyorsa TEK kısa
 ## not (kısıt ya da partizan harcama uyarısı), ONAYLA / Vazgeç. Değerler
-## nokta kaydıkça anında güncellenir. İki kaynak da milyon ₺.
+## nokta kaydıkça anında güncellenir. İki kaynak da milyon ¤.
 
 signal confirmed(share: float)
 signal cancelled
@@ -144,15 +144,15 @@ func _refresh() -> void:
 	var split := _split()
 	var party_million := float(split["party"])
 	var state_million := float(split["state"])
-	_party_pay.text = L.t("%s milyon ₺") % Economy.money_text(party_million)
+	_party_pay.text = L.t("%s milyon ¤") % Economy.money_text(party_million)
 	_party_left.text = L.t("kasada kalır: %s") % GameRules.money_text(CardManager.funds_of(peer_id) - party_million)
-	_state_pay.text = L.t("%s milyon ₺") % Economy.money_text(state_million)
+	_state_pay.text = L.t("%s milyon ¤") % Economy.money_text(state_million)
 	_state_left.text = L.t("kotanda kalır: %s") % Economy.money_text(CardManager.state_quota(peer_id) - state_million)
 	# Hangi kaynak daha çok ödüyor: o uç parlak, diğeri sönük.
 	var party_more := party_million > state_million
 	_party_end.modulate.a = 1.0 if party_more or is_equal_approx(party_million, state_million) else 0.55
 	_state_end.modulate.a = 1.0 if not party_more else 0.55
-	_total.text = L.t("Toplam %s milyon ₺") % Economy.money_text(float(_range["total"]))
+	_total.text = L.t("Toplam %s milyon ¤") % Economy.money_text(float(_range["total"]))
 	var reason := CardManager.funding_block_reason(peer_id, kind, _slider.share)
 	var note := ""
 	if float(_range["min"]) > float(_range["max"]) + 0.001:
@@ -175,7 +175,7 @@ func _refresh() -> void:
 		_note.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
 	_note.visible = _note.text != ""
 	if reason == "":
-		_confirm.text = L.t("ONAYLA · %s milyon ₺") % Economy.money_text(float(_range["total"]))
+		_confirm.text = L.t("ONAYLA · %s milyon ¤") % Economy.money_text(float(_range["total"]))
 		UiSkin.skin_color_button(_confirm, UiTheme.GREEN_DARK)
 		_confirm.disabled = false
 	else:

@@ -128,7 +128,7 @@ func _make_tile(key: String, caption: String, tip: String) -> Control:
 	_tiles[key] = {"panel": panel, "style": style, "value": value, "delta": delta}
 	return panel
 
-## DEVLET HAZİNESİ şeridi: "HAZİNE  613 milyon ₺  ▲140 ........ +96 / dönem".
+## DEVLET HAZİNESİ şeridi: "HAZİNE  613 milyon ¤  ▲140 ........ +96 / dönem".
 func _make_treasury_row() -> Control:
 	var panel := PanelContainer.new()
 	panel.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -153,7 +153,7 @@ func _make_treasury_row() -> Control:
 	var value := UiTheme.mono_label("—", VALUE_SIZE + 1, UiTheme.GOLD, true)
 	value.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	line.add_child(value)
-	var unit := UiTheme.mono_label(L.t("milyon ₺"), DELTA_SIZE, UiTheme.TEXT_MUTED)
+	var unit := UiTheme.mono_label(L.t("milyon ¤"), DELTA_SIZE, UiTheme.TEXT_MUTED)
 	unit.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	unit.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	line.add_child(unit)
@@ -565,7 +565,7 @@ static func _policy_card(me: int, level: int, current: int, selected: int, on_se
 	money.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(money)
 	var diff := revenue - CardManager.expected_revenue(current)
-	var sub := L.t("milyon ₺ / dönem") if is_current else L.t("%s%s / dönem") % ["+" if diff > 0.0 else "−", Economy.money_text(absf(diff))]
+	var sub := L.t("milyon ¤ / dönem") if is_current else L.t("%s%s / dönem") % ["+" if diff > 0.0 else "−", Economy.money_text(absf(diff))]
 	box.add_child(PopupKit.label(sub, 9, UiTheme.TEXT_DIM if is_current else (UiTheme.GREEN if diff > 0.0 else UiTheme.RED)))
 	# Seçmen etkisi (tam yerleşince başbakanın partisinde, şimdiki kademeye göre).
 	var effects := _tax_mood_change(level, current)
@@ -615,7 +615,7 @@ static func _fill_policy_detail(detail: VBoxContainer, me: int, level: int, curr
 	detail.add_child(UiTheme.mono_label(CardPresets.card_title(law_type), 13, TAX_COLORS[level], true))
 	var revenue_now := CardManager.expected_revenue(current)
 	var revenue_new := CardManager.expected_revenue(level)
-	detail.add_child(PopupKit.kv(L.t("Hazine geliri"), L.t("%s → %s milyon ₺ / dönem") % [Economy.money_text(revenue_now), Economy.money_text(revenue_new)],
+	detail.add_child(PopupKit.kv(L.t("Hazine geliri"), L.t("%s → %s milyon ¤ / dönem") % [Economy.money_text(revenue_now), Economy.money_text(revenue_new)],
 		UiTheme.GREEN if revenue_new > revenue_now else UiTheme.RED))
 	var after := Economy.pressure_after_change(float(CardManager.economy["pressure"]), level)
 	var probe := {"tax": level, "pressure": after}

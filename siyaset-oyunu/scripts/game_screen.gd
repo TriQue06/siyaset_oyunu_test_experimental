@@ -351,7 +351,8 @@ var _alliance_button: Button
 var _alliance_panel: PanelContainer
 var _alliance_list: VBoxContainer
 var _alliance_name: LineEdit
-var _alliance_color: ColorPickerButton
+var _alliance_color: Color = PartyPresets.COLORS[0]
+var _alliance_swatches: Array[Button] = []
 var _alliance_create_button: Button
 
 func _ready() -> void:
@@ -3743,7 +3744,7 @@ func _build_action_buttons() -> void:
 	_funds_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	amount_box.add_child(_funds_label)
 	var unit := Label.new()
-	unit.text = L.t("milyon ₺")
+	unit.text = L.t("milyon ¤")
 	unit.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	unit.add_theme_font_override("font", UiTheme.mono(true))
 	unit.add_theme_font_size_override("font_size", 10)
@@ -4014,11 +4015,20 @@ func _build_alliance_panel() -> void:
 	_alliance_name.max_length = 28
 	_alliance_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	create_row.add_child(_alliance_name)
-	_alliance_color = ColorPickerButton.new()
-	_alliance_color.color = UiTheme.GOLD
-	_alliance_color.custom_minimum_size = Vector2(42, 34)
-	_alliance_color.tooltip_text = L.t("İttifak rengini seç")
-	create_row.add_child(_alliance_color)
+	var palette := GridContainer.new()
+	palette.columns = 8
+	box.add_child(palette)
+	for color in PartyPresets.COLORS:
+		var swatch := Button.new()
+		swatch.custom_minimum_size = Vector2(32, 28)
+		swatch.toggle_mode = true
+		swatch.set_meta("color", color)
+		UiSkin.skin_color_button(swatch, color)
+		swatch.pressed.connect(func():
+			_alliance_color = color
+			_refresh_alliance_palette())
+		palette.add_child(swatch)
+		_alliance_swatches.append(swatch)
 	_alliance_create_button = Button.new()
 	_alliance_create_button.text = L.t("KUR")
 	_alliance_create_button.focus_mode = Control.FOCUS_NONE
@@ -4050,7 +4060,7 @@ func _on_alliance_create_pressed() -> void:
 	if _alliance_name.text.strip_edges() == "":
 		_show_toast(L.t("İttifaka bir ad ver."))
 		return
-	CardManager.create_alliance(me, _alliance_name.text, _alliance_color.color)
+	CardManager.create_alliance(me, _alliance_name.text, _alliance_color)
 	_alliance_name.clear()
 
 func _alliance_action_reason(peer_id: int) -> String:
@@ -4064,7 +4074,25 @@ func _alliance_action_reason(peer_id: int) -> String:
 		return L.t("İttifaka katılmak veya davet göndermek için sıranı bekle.")
 	return ""
 
+func _refresh_alliance_palette() -> void:
+	var available: Array[Color] = []
+	for button in _alliance_swatches:
+		var color: Color = button.get_meta("color")
+		var used := false
+		for alliance in CardManager.alliances.values():
+			if color.is_equal_approx(Color(alliance.get("color", Color.WHITE))):
+				used = true
+		button.disabled = used
+		button.modulate.a = 0.25 if used else 1.0
+		if not used:
+			available.append(color)
+	if not available.has(_alliance_color) and not available.is_empty():
+		_alliance_color = available[0]
+	for button in _alliance_swatches:
+		button.set_pressed_no_signal(not button.disabled and Color(button.get_meta("color")).is_equal_approx(_alliance_color))
+
 func _refresh_alliance_panel() -> void:
+	_refresh_alliance_palette()
 	if _alliance_list == null or not is_instance_valid(_alliance_list):
 		return
 	for child in _alliance_list.get_children():
@@ -4136,20 +4164,13 @@ func _on_alliance_invite_pressed(alliance_id: int) -> void:
 	if reason != "":
 		_show_toast(reason)
 		return
-	var picker := PopupMenu.new()
+	var targets: Array = []
 	for pid in CardManager.party_ids():
-		if PartyManager.is_independent(int(pid)) or CardManager.alliance_of(int(pid)) >= 0 or int(pid) == CardManager.party_of(multiplayer.get_unique_id()):
-			continue
-		picker.add_item(String(PartyManager.data_of(int(pid)).get("name", "?")), int(pid))
-	if picker.item_count == 0:
-		_show_toast(L.t("Davet edilebilecek başka parti yok."))
-		return
-	add_child(picker)
-	picker.id_pressed.connect(func(pid: int):
+		if not PartyManager.is_independent(int(pid)) and CardManager.alliance_of(int(pid)) < 0 and int(pid) != CardManager.party_of(multiplayer.get_unique_id()):
+			targets.append(int(pid))
+	_show_party_picker(L.t("İTTİFAKA DAVET ET"), targets, func(pid: int):
 		CardManager.invite_alliance_party(multiplayer.get_unique_id(), alliance_id, pid)
-		_refresh_alliance_panel()
-		picker.queue_free())
-	picker.popup()
+		_refresh_alliance_panel())
 
 func _place_alliance_panel() -> void:
 	if not _alliance_panel.visible:
@@ -4502,7 +4523,7 @@ func _on_economy_event(data: Dictionary) -> void:
 ## bakiyesi, etkinin zamanlaması.
 func _invest_preview(pname: String) -> String:
 	var before := CardManager.state_treasury()
-	return L.t("%s yatırımı · devlet hazinesi %s → %s milyon ₺\nGüçlü yerel etki: yarısı hemen, kalanı %d dönemde · ekonomi canlanır") % [
+	return L.t("%s yatırımı · devlet hazinesi %s → %s milyon ¤\nGüçlü yerel etki: yarısı hemen, kalanı %d dönemde · ekonomi canlanır") % [
 		pname, Economy.money_text(before), Economy.money_text(before - Economy.INVEST_COST), Economy.INVEST_DELAY_ROUNDS]
 
 static func _one_decimal(value: float) -> String:
@@ -4640,44 +4661,11 @@ func _on_inquiry_button_pressed() -> void:
 	_law_designer.hide()
 	_cancel_targeting()
 	_inquiry_panel.hide()
-	_inquiry_picker = PanelContainer.new()
-	var style := UiSkin.stylebox(UiSkin.PANEL)
-	style.set_content_margin_all(UiTheme.PAD_M)
-	_inquiry_picker.add_theme_stylebox_override("panel", style)
-	_inquiry_picker.z_index = 108
-	_inquiry_picker.mouse_filter = Control.MOUSE_FILTER_STOP
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 5)
-	_inquiry_picker.add_child(box)
-	box.add_child(UiTheme.mono_label(L.t("SORUŞTURMA: HEDEF PARTİ"), 14, UiTheme.TEXT, true))
-	box.add_child(PopupKit.note(L.t("Harcamaları incelenecek partiyi seç (kendi partin de olabilir: bağımsız denetim)."), UiTheme.TEXT_DIM, 300))
+	var targets: Array = []
 	for pid in CardManager.party_ids():
-		if PartyManager.is_independent(int(pid)):
-			continue
-		var party: Dictionary = PartyManager.data_of(int(pid))
-		var button := Button.new()
-		button.focus_mode = Control.FOCUS_NONE
-		button.custom_minimum_size = Vector2(300, 32)
-		button.text = "%s · %d" % [String(party.get("name", "?")), CardManager.inquiry_records(int(pid)).size()]
-		button.tooltip_text = L.t("İncelenebilecek işlem sayısı: %d") % CardManager.inquiry_records(int(pid)).size()
-		UiSkin.skin_color_button(button, Color(party.get("bg_color", UiTheme.PANEL_DARK)).darkened(0.35))
-		var target := int(pid)
-		button.pressed.connect(func():
-			if _inquiry_picker != null and is_instance_valid(_inquiry_picker):
-				_inquiry_picker.queue_free()
-				_inquiry_picker = null
-			_open_inquiry_panel(target))
-		box.add_child(button)
-	var close := Button.new()
-	close.text = L.t("Kapat")
-	UiSkin.skin_button(close)
-	close.pressed.connect(func():
-		if _inquiry_picker != null and is_instance_valid(_inquiry_picker):
-			_inquiry_picker.queue_free()
-			_inquiry_picker = null)
-	box.add_child(close)
-	add_child(_inquiry_picker)
-	_place_inquiry_picker.call_deferred()
+		if not PartyManager.is_independent(int(pid)):
+			targets.append(int(pid))
+	_show_party_picker(L.t("SORUŞTURMA: HEDEF PARTİ"), targets, _open_inquiry_panel)
 
 func _place_inquiry_picker() -> void:
 	if _inquiry_picker == null or not is_instance_valid(_inquiry_picker):
@@ -5522,49 +5510,55 @@ func _build_propaganda_menu() -> void:
 
 ## Karalama kartı bir ile bırakıldı: hedef parti seçtirilir, sonra oynanır.
 func _ask_propaganda_target(hand_index: int, province_id: String) -> void:
-	for child in _propaganda_menu.get_children():
-		child.queue_free()
-	var margin := MarginContainer.new()
-	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 10)
-	_propaganda_menu.add_child(margin)
+	var targets: Array = []
+	var mine := CardManager.party_of(multiplayer.get_unique_id())
+	for pid in CardManager.party_ids():
+		if int(pid) != mine:
+			targets.append(int(pid))
+	_show_party_picker(L.t("%s: kimi karalayacaksın?") % ElectionNightSim.province_name(province_id), targets,
+		func(pid: int): CardManager.play_card(hand_index, pid, province_id))
+
+func _show_party_picker(title: String, targets: Array, selected: Callable) -> void:
+	if _inquiry_picker != null and is_instance_valid(_inquiry_picker):
+		_inquiry_picker.queue_free()
+	if targets.is_empty():
+		_show_toast(L.t("Seçilebilecek parti yok."))
+		return
+	_inquiry_picker = PanelContainer.new()
+	UiSkin.skin_panel(_inquiry_picker, UiSkin.PANEL)
+	_inquiry_picker.z_index = 120
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
-	margin.add_child(box)
-	var title := Label.new()
-	title.text = L.t("%s: kimi karalayacaksın?") % ElectionNightSim.province_name(province_id)
-	title.add_theme_font_size_override("font_size", 14)
-	box.add_child(title)
-	var me := multiplayer.get_unique_id()
-	for peer_id in _ordered_peer_ids():
-		if peer_id == me:
-			continue
+	_inquiry_picker.add_child(box)
+	box.add_child(UiTheme.mono_label(title, 14, UiTheme.TEXT, true))
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(340, 220)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	box.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(list)
+	for pid in targets:
+		var party: Dictionary = PartyManager.data_of(int(pid))
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 8)
-		var badge := PartyBadge.build(PartyManager.data_of(peer_id), Vector2(34, 34), BADGE_ICON_PIXEL_SIZE)
-		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		row.add_child(badge)
+		row.add_child(PartyBadge.build(party, Vector2(34, 34), BADGE_ICON_PIXEL_SIZE))
 		var button := Button.new()
-		UiSkin.skin_button(button)
+		button.text = String(party.get("name", "?"))
+		button.clip_text = true
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		button.text = "%s  (%s)" % [_party_name_of(peer_id), _leader_name_of(peer_id)]
+		UiSkin.skin_color_button(button, Color(party.get("bg_color", UiTheme.PANEL_DARK)).darkened(0.35))
 		button.pressed.connect(func():
-			_propaganda_menu.hide()
-			CardManager.play_card(hand_index, peer_id, province_id))
+			_inquiry_picker.queue_free()
+			_inquiry_picker = null
+			selected.call(int(pid)))
 		row.add_child(button)
-		box.add_child(row)
-	var cancel := Button.new()
-	UiSkin.skin_button(cancel)
-	cancel.text = L.t("İptal")
-	cancel.pressed.connect(func(): _propaganda_menu.hide())
-	box.add_child(cancel)
-	var mouse := get_viewport().get_mouse_position()
-	_propaganda_menu.show()
-	await get_tree().process_frame
-	_propaganda_menu.reset_size()
-	var viewport_size := get_viewport_rect().size
-	_propaganda_menu.position = Vector2(
-		clampf(mouse.x + 12.0, 8.0, maxf(8.0, viewport_size.x - _propaganda_menu.size.x - 8.0)),
-		clampf(mouse.y + 12.0, 8.0, maxf(8.0, viewport_size.y - _propaganda_menu.size.y - 8.0)))
+		list.add_child(row)
+	var close := Button.new()
+	close.text = L.t("İptal")
+	UiSkin.skin_button(close)
+	close.pressed.connect(func():
+		_inquiry_picker.queue_free()
+		_inquiry_picker = null)
+	box.add_child(close)
+	add_child(_inquiry_picker)
+	_place_inquiry_picker.call_deferred()

@@ -26,10 +26,10 @@ const TERM_MAX := 2
 
 const AID_MIN := 5.0
 const AID_STEP := 5.0
-## İl başına yerel puan = AID_LOCAL_K × √(o ile düşen milyon ₺).
-## Örnek: tek ilde 20 milyon ₺ → +6,7 (miting +5 / 15 milyon; yatırım +10 / 100 milyon, yarısı sonra).
+## İl başına yerel puan = AID_LOCAL_K × √(o ile düşen milyon ¤).
+## Örnek: tek ilde 20 milyon ¤ → +6,7 (miting +5 / 15 milyon; yatırım +10 / 100 milyon, yarısı sonra).
 const AID_LOCAL_K := 1.5
-## Ulusal puan = AID_NATIONAL_K × √(toplam milyon ₺).
+## Ulusal puan = AID_NATIONAL_K × √(toplam milyon ¤).
 const AID_NATIONAL_K := 0.2
 
 ## Seçim aralığı uzunsa (anayasa) tur başına olasılık düşer: dönemde ~1.

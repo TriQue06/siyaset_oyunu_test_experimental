@@ -31,6 +31,10 @@ static func build(peer_id: int, my_id: int, on_action: Callable = Callable(), wi
 	if MultiplayerManager.is_bot(peer_id):
 		sub += L.t(" · bot")
 	box.add_child(PopupKit.header(title, sub, PartyBadge.build(party, Vector2(40, 40), 64), on_close))
+	var alliance_id := CardManager.alliance_of(peer_id)
+	if alliance_id >= 0:
+		var alliance: Dictionary = CardManager.alliances[alliance_id]
+		box.add_child(PopupKit.kv(L.t("İttifak"), String(alliance.get("name", "")), alliance.get("color", UiTheme.GOLD)))
 	# GENEL BAŞKANIN PROFİLİ: eski mesleği (ve memleketi).
 	var leader_id := CardManager.party_of(peer_id) if not independent else peer_id
 	var job := PoliticianPresets.title(PoliticianPresets.background_of(leader_id))

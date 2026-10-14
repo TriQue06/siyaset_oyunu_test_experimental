@@ -19,7 +19,7 @@ extends RefCounted
 ##   index     : EKONOMİ (0..100, 50 = olağan). Her tur hedefine ECONOMY_ADJUST
 ##               kadar yaklaşır; hedef = 50 + vergi etkisi + yatırım ivmesi.
 ##   boost     : yatırım ivmesi (her yatırım +INVEST_ECONOMY, tur sonunda söner)
-##   treasury  : DEVLET HAZİNESİ (milyon ₺). Tur sonunda vergi geliri girer,
+##   treasury  : DEVLET HAZİNESİ (milyon ¤). Tur sonunda vergi geliri girer,
 ##               yatırım hazineden ödenir. Parti kasalarından AYRIDIR.
 ##   enflasyon ve işsizlik ayrı durum değildir: ekonomiden, vergiden ve
 ##   yatırım ivmesinden hesaplanır (tek kaynak, tutarsızlık olmaz).
@@ -38,9 +38,9 @@ const TAX_IDS := ["dusuk", "normal", "yuksek"]
 const START_TAX := TAX_NORMAL
 
 # --- Hazine -----------------------------------------------------------------------
-## Oyun başında devlet hazinesi (milyon ₺).
+## Oyun başında devlet hazinesi (milyon ¤).
 const START_TREASURY := 200.0
-## Tur sonu vergi geliri (milyon ₺), ekonomi 50 iken. Ekonomi büyüdükçe artar:
+## Tur sonu vergi geliri (milyon ¤), ekonomi 50 iken. Ekonomi büyüdükçe artar:
 ## gelir × (REVENUE_ECONOMY_BASE + REVENUE_ECONOMY_SLOPE × ekonomi / 100).
 const TAX_REVENUE := [70.0, 100.0, 140.0]
 const REVENUE_ECONOMY_BASE := 0.6
@@ -229,12 +229,12 @@ static func tax_mood_at(level: int) -> Dictionary:
 	return result
 
 # --- Finansman paylaşımı ----------------------------------------------------------
-## İki AYRI kaynak, aynı birim (milyon ₺): PARTİ KASASI (partinin parası) ve
+## İki AYRI kaynak, aynı birim (milyon ¤): PARTİ KASASI (partinin parası) ve
 ## DEVLET HAZİNESİ (kamu parası, sadece hükümet yetkisiyle).
 ## Kaydırıcı %5'lik adımlarla durur (0/100 ve 100/0 dahil).
 const FUND_STEP := 0.05
 
-## state: devletin payı (0..1) → {"share", "state": milyon ₺, "party": milyon ₺}.
+## state: devletin payı (0..1) → {"share", "state": milyon ¤, "party": milyon ¤}.
 static func split_cost(total: float, state: float) -> Dictionary:
 	var s := snap_share(state)
 	var state_million := total * s
@@ -269,10 +269,10 @@ static func snap_share(state: float) -> float:
 ## SİLİNMEZ. LEDGER_LIMIT sadece bunlardan sonra uygulanan güvenlik sınırıdır.
 const LEDGER_LIMIT := 400
 ## Soruşturma bedeli (soruşturan partinin kasasından), kapsamı (son kaç tur).
-const INQUIRY_FUNDS_COST := 15
+const INQUIRY_FUNDS_COST := 20
 const INQUIRY_SCOPE_ROUNDS := 8
 ## ŞEFFAFLIK ÖDÜLÜ (hedefe, ulusal destek): kendi kasasından ödenmiş toplam
-## T milyon ₺ için min(MAX, PER_SQRT × √T); T < MIN ise ödül yok (küçük
+## T milyon ¤ için min(MAX, PER_SQRT × √T); T < MIN ise ödül yok (küçük
 ## harcamalarla oy toplanamaz). Her işlem bir kez incelenir.
 const TRANSPARENCY_MIN := 20.0
 const TRANSPARENCY_PER_SQRT := 0.12
@@ -284,7 +284,7 @@ const TRANSPARENCY_MAX := 1.5
 const MITING_TRANSPARENCY_WEIGHT := 0.25
 const SELF_AUDIT_FACTOR := 0.5
 
-## İşlemin şeffaflık ödülüne giren tutarı (milyon ₺).
+## İşlemin şeffaflık ödülüne giren tutarı (milyon ¤).
 static func transparency_amount(entry: Dictionary) -> float:
 	var weight := MITING_TRANSPARENCY_WEIGHT if is_partisan(String(entry.get("kind", ""))) else 1.0
 	return float(entry.get("party_million", 0.0)) * weight
@@ -315,9 +315,9 @@ static func scandal_damage(improper_million: float) -> float:
 static func money_text(value: float) -> String:
 	return L.thousands(value)
 
-## "1.240 milyon ₺"
+## "1.240 milyon ¤"
 static func money_full(value: float) -> String:
-	return L.t("%s milyon ₺") % money_text(value)
+	return L.t("%s milyon ¤") % money_text(value)
 
 ## "%8,4"
 static func percent_text(value: float) -> String:

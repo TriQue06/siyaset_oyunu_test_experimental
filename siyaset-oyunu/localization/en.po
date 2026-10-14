@@ -33,8 +33,8 @@ msgstr "Effect: +%s local points in the province"
 msgid "Hemen etki eder, seçmen gruplarına dokunmaz. Aynı afete tekrar yardım daha az getirir."
 msgstr "Takes effect at once and does not touch voter groups. More relief to the same disaster brings less."
 
-msgid "YARDIM GÖTÜR · %s milyon ₺"
-msgstr "SEND RELIEF · %s million ₺"
+msgid "YARDIM GÖTÜR · %s milyon ¤"
+msgstr "SEND RELIEF · %s million ¤"
 
 msgid "YAPILAMIYOR"
 msgstr "NOT POSSIBLE"
@@ -507,8 +507,8 @@ msgstr "%s dissolved itself (%d MPs scattered)."
 msgid "%s koalisyondan çekildi: %s.%s%s%s"
 msgstr "%s left the coalition: %s.%s%s%s"
 
-msgid "%s milyon ₺"
-msgstr "%s million ₺"
+msgid "%s milyon ¤"
+msgstr "%s million ¤"
 
 msgid "%s miting yaptı"
 msgstr "%s held a rally"
@@ -543,8 +543,8 @@ msgstr "%s organization level %d: %s"
 msgid "%s yatırımı tamamlandı"
 msgstr "%s investment completed"
 
-msgid "%s yatırımı · devlet hazinesi %s → %s milyon ₺\nGüçlü yerel etki: yarısı hemen, kalanı %d dönemde · ekonomi canlanır"
-msgstr "%s investment · state treasury %s → %s million ₺\nStrong local effect: half now, the rest within %d terms · the economy picks up"
+msgid "%s yatırımı · devlet hazinesi %s → %s milyon ¤\nGüçlü yerel etki: yarısı hemen, kalanı %d dönemde · ekonomi canlanır"
+msgstr "%s investment · state treasury %s → %s million ¤\nStrong local effect: half now, the rest within %d terms · the economy picks up"
 
 msgid "%s · %s · memleket %s"
 msgstr "%s · %s · hometown %s"
@@ -570,8 +570,8 @@ msgstr "%s takes the lead!  (%.1f%%)"
 msgid "%s — %s   (%d sandalye)"
 msgstr "%s — %s   (%d seats)"
 
-msgid "%s → %s milyon ₺ / dönem"
-msgstr "%s → %s million ₺ / term"
+msgid "%s → %s milyon ¤ / dönem"
+msgstr "%s → %s million ¤ / term"
 
 msgid "%s%s / dönem"
 msgstr "%s%s / term"
@@ -936,8 +936,8 @@ msgstr "Add bot"
 msgid "Botlarla Oyna"
 msgstr "Play with Bots"
 
-msgid "Botların dönemlik geliri ve bağış kampanyaları seçilen tutar kadar (milyon ₺) azalır. 0 = zayıflatma yok."
-msgstr "Bots' income per term and fundraising campaigns are reduced by the chosen amount (million ₺). 0 = no handicap."
+msgid "Botların dönemlik geliri ve bağış kampanyaları seçilen tutar kadar (milyon ¤) azalır. 0 = zayıflatma yok."
+msgstr "Bots' income per term and fundraising campaigns are reduced by the chosen amount (million ¤). 0 = no handicap."
 
 msgid "Bozdurmak için KART BOZDUR yuvasına bırak"
 msgstr "Drop on the CASH IN CARD slot to cash it in"
@@ -1842,8 +1842,8 @@ msgstr "EXTRAORDINARY CONGRESS (called by the leader)"
 msgid "OLAĞANÜSTÜ KONGRE (üyenin talebi)"
 msgstr "EXTRAORDINARY CONGRESS (member's request)"
 
-msgid "ONAYLA · %s milyon ₺"
-msgstr "CONFIRM · %s million ₺"
+msgid "ONAYLA · %s milyon ¤"
+msgstr "CONFIRM · %s million ¤"
 
 msgid "OY ORANLARI"
 msgstr "VOTE SHARES"
@@ -2382,8 +2382,8 @@ msgstr "Organize: tap a province, tap again to build or upgrade (%s)  ·  Tap th
 msgid "Teşkilatların daha çok oy getirir."
 msgstr "Your organizations bring more votes."
 
-msgid "Toplam %s milyon ₺"
-msgstr "Total %s million ₺"
+msgid "Toplam %s milyon ¤"
+msgstr "Total %s million ¤"
 
 msgid "Toplantıyı kapat (TOPLANTI düğmesiyle yeniden açılır)."
 msgstr "Close the meeting (reopen with the MEETING button)."
@@ -2793,11 +2793,11 @@ msgstr "partly close"
 msgid "meclise sunulur"
 msgstr "submitted to parliament"
 
-msgid "milyon ₺"
-msgstr "million ₺"
+msgid "milyon ¤"
+msgstr "million ¤"
 
-msgid "milyon ₺ / dönem"
-msgstr "million ₺ / term"
+msgid "milyon ¤ / dönem"
+msgstr "million ¤ / term"
 
 msgid "mv"
 msgstr "MPs"
@@ -3548,3 +3548,12 @@ msgstr "enabled"
 
 msgid "kapalı"
 msgstr "disabled"
+
+msgid "MECLİS OYLAMA SÜRESİ"
+msgstr "PARLIAMENT VOTING TIME"
+
+msgid "İTTİFAKA DAVET ET"
+msgstr "INVITE TO ALLIANCE"
+
+msgid "Seçilebilecek parti yok."
+msgstr "There are no eligible parties."

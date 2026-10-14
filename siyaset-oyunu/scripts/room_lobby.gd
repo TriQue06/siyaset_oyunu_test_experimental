@@ -35,6 +35,7 @@ var map_seed_edit: LineEdit
 var random_parties_check: CheckButton
 var away_bot_check: CheckButton
 var bot_funds_buttons: Array = []
+var vote_time_buttons: Array[Button] = []
 var threshold_value_label: Label
 
 var _settings_open: bool = false
@@ -270,6 +271,10 @@ class RobotIcon extends Control:
 		draw_rect(Rect2(c + Vector2(0.29, -0.06) * s, Vector2(0.07, 0.14) * s), color)
 
 func _refresh_settings_display() -> void:
+	for button in vote_time_buttons:
+		button.set_pressed_no_signal(int(button.get_meta("seconds")) == MultiplayerManager.vote_timeout)
+		button.disabled = not MultiplayerManager.is_local_owner()
+
 	if map_seed_edit != null and not map_seed_edit.has_focus():
 		map_seed_edit.text = MultiplayerManager.map_seed
 	if random_parties_check != null:
@@ -359,6 +364,18 @@ func _build_settings_panel() -> void:
 	threshold_slider = HSlider.new()
 	election.add_child(threshold_slider)
 
+	var votes_box := _section(L.t("MECLİS OYLAMA SÜRESİ"), "")
+	var votes_row := HBoxContainer.new()
+	votes_box.add_child(votes_row)
+	for seconds in MultiplayerManager.VOTE_TIME_OPTIONS:
+		var button := Button.new()
+		button.text = "%d s" % seconds
+		button.toggle_mode = true
+		button.set_meta("seconds", seconds)
+		UiSkin.skin_button(button)
+		button.pressed.connect(func(): MultiplayerManager.set_vote_timeout(int(button.get_meta("seconds"))))
+		votes_row.add_child(button)
+		vote_time_buttons.append(button)
 	var map_box := _section(L.t("HARİTA"), L.t("Aynı tohum her zaman aynı ülkeyi üretir. Boş bırakırsan her oyunda rastgele."))
 	map_seed_edit = LineEdit.new()
 	map_seed_edit.placeholder_text = L.t("Rastgele")
@@ -383,7 +400,7 @@ func _build_settings_panel() -> void:
 		MultiplayerManager.AWAY_BOT if on else MultiplayerManager.AWAY_PASSIVE))
 	away_box.add_child(away_bot_check)
 
-	var bot_box := _section(L.t("BOT GELİR ZAYIFLATMASI"), L.t("Botların dönemlik geliri ve bağış kampanyaları seçilen tutar kadar (milyon ₺) azalır. 0 = zayıflatma yok."))
+	var bot_box := _section(L.t("BOT GELİR ZAYIFLATMASI"), L.t("Botların dönemlik geliri ve bağış kampanyaları seçilen tutar kadar (milyon ¤) azalır. 0 = zayıflatma yok."))
 	var bot_row := HBoxContainer.new()
 	bot_row.add_theme_constant_override("separation", 6)
 	bot_box.add_child(bot_row)

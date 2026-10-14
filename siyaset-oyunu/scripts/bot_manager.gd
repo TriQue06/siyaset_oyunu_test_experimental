@@ -22,6 +22,7 @@ var _vote_key := ""
 var _vote_due: Dictionary = {}
 var _form_key := ""
 var _form_due := 0.0
+var _alliance_due: Dictionary = {}
 
 func _ready() -> void:
 	_rng.randomize()
@@ -43,6 +44,7 @@ func step(now: float) -> void:
 		_vote_key = ""
 		_form_key = ""
 		return
+	_handle_alliance_invitations(now)
 	if GovernmentManager.phase == GovernmentManager.Phase.VOTING:
 		_handle_votes(now)
 	else:
@@ -189,3 +191,26 @@ func _handle_formation(now: float) -> void:
 		# bot bir daha denemez ve kurma süresi boşuna yanar.
 		_form_due = INF if GovernmentManager.phase == GovernmentManager.Phase.VOTING \
 			else now + _delay(FORM_SECONDS)
+
+func _handle_alliance_invitations(now: float) -> void:
+	var pending := {}
+	for alliance_id in CardManager.alliances:
+		for pid in CardManager.alliances[alliance_id].get("invitations", []):
+			if not MultiplayerManager.is_ai_controlled(int(pid)) or CardManager.alliance_of(int(pid)) >= 0:
+				continue
+			var key := "%d:%d" % [int(alliance_id), int(pid)]
+			pending[key] = true
+			if not _alliance_due.has(key):
+				_alliance_due[key] = now + _delay(VOTE_SECONDS)
+			elif now >= float(_alliance_due[key]):
+				var decision := BotBrain.choose_alliance_decision(int(pid), true)
+				if not decision.is_empty():
+					if decision["type"] == "join":
+						CardManager._apply_join_alliance(int(pid), int(decision["alliance_id"]), true)
+					else:
+						CardManager._apply_decline_alliance_invitation(int(pid), int(decision["alliance_id"]))
+				_alliance_due.erase(key)
+				return
+	for key in _alliance_due.keys():
+		if not pending.has(key):
+			_alliance_due.erase(key)

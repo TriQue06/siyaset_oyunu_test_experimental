@@ -228,7 +228,7 @@ var funds: Dictionary = {}
 ## endeksi, yatırım ivmesi, DEVLET HAZİNESİ, bekleyen yatırım dilimleri.
 var economy: Dictionary = Economy.start_state()
 ## AFET (bkz. Disaster): {"active": {} ya da {"id", "kind", "provinces",
-## "round", "aid": {parti: toplam milyon ₺}}, "term_count": bu seçim
+## "round", "aid": {parti: toplam milyon ¤}}, "term_count": bu seçim
 ## döneminde çıkan afet, "owed": önceki dönemde hiç çıkmadı (garanti),
 ## "next_id"}.
 var disaster: Dictionary = {}
@@ -397,6 +397,11 @@ func _apply_create_alliance(peer_id: int, alliance_name: String, color: Color) -
 	var name := alliance_name.strip_edges().substr(0, 28)
 	if not can_manage_alliance(peer_id) or not alliances_enabled or name == "" or alliance_of(peer_id) >= 0:
 		return
+	if not PartyPresets.COLORS.has(color):
+		return
+	for existing in alliances.values():
+		if Color(existing.get("color", Color.WHITE)).is_equal_approx(color):
+			return
 	var next_id := 1
 	for key in alliances:
 		next_id = maxi(next_id, int(key) + 1)
@@ -404,8 +409,9 @@ func _apply_create_alliance(peer_id: int, alliance_name: String, color: Color) -
 	var message := L.t("%s ittifakı kuruldu; %s ittifakın kurucu partisi oldu.") % [name, _party_name(peer_id)]
 	_push_state({"type": "alliance_created", "peer_id": peer_id, "alliance_id": next_id, "message": message})
 
-func _apply_join_alliance(peer_id: int, alliance_id: int) -> void:
-	if not can_manage_alliance(peer_id) or not alliances_enabled or alliance_of(peer_id) >= 0 or not alliances.has(alliance_id):
+func _apply_join_alliance(peer_id: int, alliance_id: int, bot_reply: bool = false) -> void:
+	var invited_bot := bot_reply and MultiplayerManager.is_ai_controlled(peer_id) and alliances.has(alliance_id) and (alliances[alliance_id].get("invitations", []) as Array).has(party_of(peer_id))
+	if (not can_manage_alliance(peer_id) and not invited_bot) or not alliances_enabled or alliance_of(peer_id) >= 0 or not alliances.has(alliance_id):
 		return
 	var alliance: Dictionary = alliances[alliance_id]
 	var pid := party_of(peer_id)
@@ -642,7 +648,7 @@ func active_disaster() -> Dictionary:
 func has_disaster() -> bool:
 	return not active_disaster().is_empty()
 
-## Bu oyuncunun partisinin bu afete şimdiye kadar yaptığı yardım (milyon ₺).
+## Bu oyuncunun partisinin bu afete şimdiye kadar yaptığı yardım (milyon ¤).
 func disaster_aid_of(peer_id: int) -> float:
 	return float((active_disaster().get("aid", {}) as Dictionary).get(party_of(peer_id), 0.0))
 
@@ -683,7 +689,7 @@ func aid_block_reason(peer_id: int, party_m: float = -1.0, state_m: float = -1.0
 func can_aid(peer_id: int, party_m: float = -1.0, state_m: float = -1.0) -> bool:
 	return aid_block_reason(peer_id, party_m, state_m) == ""
 
-## YARDIM GÖTÜR: party_m parti kasasından, state_m devlet hazinesinden (milyon ₺).
+## YARDIM GÖTÜR: party_m parti kasasından, state_m devlet hazinesinden (milyon ¤).
 func aid(party_m: float, state_m: float) -> void:
 	if not can_aid(multiplayer.get_unique_id(), party_m, state_m):
 		return
@@ -795,7 +801,7 @@ func can_invest(peer_id: int, province_id: String = "", state: float = -1.0) -> 
 
 # --- Finansman paylaşımı ------------------------------------------------------
 
-## Hamlenin finansman seçenekleri: {"kind", "total" (milyon ₺), "min", "max"
+## Hamlenin finansman seçenekleri: {"kind", "total" (milyon ¤), "min", "max"
 ## (devlet payının izinli aralığı), "default", "state_allowed"}. min > max ise
 ## hiçbir paylaşım ödenemez.
 func funding_range(peer_id: int, kind: String) -> Dictionary:
@@ -4279,7 +4285,7 @@ func _apply_state(state: Dictionary) -> void:
 	# Eski sürüm durumunda ekonomi yoktur: güvenli başlangıç değerleri.
 	economy = Economy.normalized(state.get("economy", {}))
 	disaster = state.get("disaster", {})
-	# PARTİ KASASI (milyon ₺). 0.0.166 öncesi durumda alan "mana" adındaydı;
+	# PARTİ KASASI (milyon ¤). 0.0.166 öncesi durumda alan "mana" adındaydı;
 	# para ölçeği eski değerlerle birebir kurulduğu için (bkz. GameRules) değer
 	# aynen taşınır. İkisi de yoksa boş başlar (herkes 0).
 	funds = state.get("funds", state.get("mana", {}))

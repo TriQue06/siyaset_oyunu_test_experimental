@@ -18,7 +18,7 @@ extends RefCounted
 const PASS_THRESHOLD := 0.4
 ## Ana hamlelerin taban puanları.
 const PASS_ACTION_SCORE := 0.7
-## 1 milyon ₺ bedelin puan karşılığı (hamle puanından bedel × bu değer düşülür).
+## 1 milyon ¤ bedelin puan karşılığı (hamle puanından bedel × bu değer düşülür).
 const FUNDS_VALUE := 0.03
 ## Grup uyumundaki 1 puanlık ülke geneli artışın ulusal puan karşılığı
 ## (SHARPNESS / EFFECT_PER_POINT: ikisi de oy ağırlığını aynı ölçüde büyütür).
@@ -222,8 +222,10 @@ static func choose_action(bot: int) -> Dictionary:
 
 ## Botlar ittifak kurmaz; davetleri kendi turlarında değerlendirir ve
 ## baraj/ortak oy hesabı lehlerineyse açık ittifaklara katılabilir.
-static func choose_alliance_decision(bot: int) -> Dictionary:
-	if not CardManager.alliances_enabled or not CardManager.can_manage_alliance(bot):
+static func choose_alliance_decision(bot: int, invitations_only: bool = false) -> Dictionary:
+	if not CardManager.alliances_enabled or CardManager.alliance_of(bot) >= 0 or PartyManager.is_independent(bot) or CardManager.is_party_member(bot):
+		return {}
+	if not invitations_only and not CardManager.can_manage_alliance(bot):
 		return {}
 	var pid := CardManager.party_of(bot)
 	var threshold := MultiplayerManager.election_threshold
@@ -236,11 +238,11 @@ static func choose_alliance_decision(bot: int) -> Dictionary:
 		if (alliance.get("invitations", []) as Array).has(pid):
 			var pooled := _alliance_share(int(alliance_id))
 			var helps_threshold := threshold > 0.0 and own_share + pooled >= threshold
-			if struggling or helps_threshold:
+			if struggling or (helps_threshold and randf() < 0.65):
 				return {"type": "join", "alliance_id": int(alliance_id)}
 			return {"type": "decline", "alliance_id": int(alliance_id)}
 	# Davetsiz katılım kararı: ancak ortak liste baraj avantajı sağlıyorsa katıl.
-	if struggling:
+	if struggling and not invitations_only:
 		var best_id := -1
 		var best_share := own_share
 		for alliance_id in CardManager.alliances:
@@ -824,7 +826,7 @@ static func _eval_investment(bot: int) -> Dictionary:
 	return {"score": (0.8 + best_value / 30.0 * 1.2 * (1.3 if _election_soon() else 1.0)) * timing, "peer": -1, "province": best_province}
 
 ## AFET YARDIMI: partisi bu afete henüz yardım etmediyse kasasının ~%40'ı,
-## hükümetteyse kotasının yarısı (en çok 60 milyon ₺) devletten. Değer:
+## hükümetteyse kotasının yarısı (en çok 60 milyon ¤) devletten. Değer:
 ## miting ölçeğinde (vekil/30), afet yardımı güçlü olduğu için ×1,6.
 static func eval_aid(bot: int) -> Dictionary:
 	if not CardManager.can_aid(bot) or CardManager.disaster_aid_of(bot) > 0.0:

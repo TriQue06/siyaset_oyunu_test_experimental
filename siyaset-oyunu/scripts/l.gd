@@ -6,7 +6,7 @@ extends RefCounted
 ## zaman ham anahtar görmez.
 ##
 ## Kullanım: sabit metin L.t("Kapat"); biçimli cümlede ŞABLON çevrilir:
-## L.t("%s milyon ₺") % tutar  (İngilizce şablon "₺%s million" olabilir).
+## L.t("%s milyon ¤") % tutar  (İngilizce şablon "¤%s million" olabilir).
 ## Sayılar: L.pct(12.3) → "%12,3" / "12.3%", L.dec(2.5) → "2,5" / "2.5",
 ## L.thousands(1240) → "1.240" / "1,240". Parti, siyasetçi ve il adları
 ## çevrilmez (özel ad).

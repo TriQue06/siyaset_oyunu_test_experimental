@@ -339,7 +339,7 @@ func _set_phase(new_phase: int) -> void:
 		Phase.FORMING:
 			_phase_time_left = GameRules.FORMATION_TIMEOUT
 		Phase.VOTING:
-			_phase_time_left = GameRules.VOTE_TIMEOUT
+			_phase_time_left = float(MultiplayerManager.vote_timeout)
 		_:
 			_phase_time_left = 0.0
 

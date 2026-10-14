@@ -13,7 +13,7 @@ extends RefCounted
 ##     KURULDUĞU ANDA tek sefer yazılır, her tur tekrarlanmaz.
 ##   - HAMLE SINIRI YOK: sırası gelen oyuncu PARTİ KASASI yettiğince hamle
 ##     yapar, "Turu Bitir" ile sırayı devreder. Kasa birikir, üst sınır yok.
-##   - PARTİ KASASI (milyon ₺): herkes FUNDS_START ile başlar; SIRASI
+##   - PARTİ KASASI (milyon ¤): herkes FUNDS_START ile başlar; SIRASI
 ##     GELDİĞİNDE bağış ve aidat geliri +FUNDS_PER_ROUND (hükümette görevi
 ##     olan partiler +FUNDS_PER_ROUND_GOVERNMENT) ve teşkilat geliri (en fazla
 ##     ORG_INCOME_CAP) girer. Her seçimden sonra herkes +ELECTION_FUNDS_BONUS
@@ -70,7 +70,7 @@ static func configure(interval_years: int, count: int) -> void:
 static func set_election_anchor(round_number: int) -> void:
 	ELECTION_ANCHOR = FIRST_ELECTION_ROUND if round_number <= 0 else round_number
 
-## PARA ÖLÇEĞİ: bütün parti bedelleri ve gelirleri MİLYON ₺. Bir partinin
+## PARA ÖLÇEĞİ: bütün parti bedelleri ve gelirleri MİLYON ¤. Bir partinin
 ## dönemlik geliri (30–40) devletin dönemlik vergi gelirinin (70–140) üçte
 ## biri kadardır; tek bir kamu yatırımı (100) bir partinin üç dönemlik
 ## gelirine denk gelir. Eski "mana" değerleri bu ölçeğe birebir taşındı
@@ -78,17 +78,17 @@ static func set_election_anchor(round_number: int) -> void:
 ## bedeli kaldırıldı, mitingin toplam bedeli MITING_FUNDS_COST oldu.
 const FUNDS_START := 0
 const FUNDS_PER_ROUND := 30
-## Hükümette görevi olan partiler dönemde 10 milyon ₺ fazla alır (iktidar avantajı).
+## Hükümette görevi olan partiler dönemde 10 milyon ¤ fazla alır (iktidar avantajı).
 const FUNDS_PER_ROUND_GOVERNMENT := 40
 ## BEDEL YAZISI: ücretsiz hamleler her yerde "bedelsiz" diye geçer ("bedava"
-## ya da "0 milyon ₺" değil). Kart bozdurma yarım iade ettiği için ondalık da
+## ya da "0 milyon ¤" değil). Kart bozdurma yarım iade ettiği için ondalık da
 ## gerekirse basılır.
 static func cost_text(cost: float) -> String:
 	if cost <= 0.0:
 		return L.t("bedelsiz")
-	return L.t("%s milyon ₺") % money_text(cost)
+	return L.t("%s milyon ¤") % money_text(cost)
 
-## Tutar yazısı (milyon ₺, birimsiz): tam sayıysa "15", değilse "2,5".
+## Tutar yazısı (milyon ¤, birimsiz): tam sayıysa "15", değilse "2,5".
 static func money_text(value: float) -> String:
 	return L.dec(value, 1)
 
@@ -111,7 +111,7 @@ const CENSURE_FUNDS_COST := 0
 ## ERKEN SEÇİM hamlesi (eskiden kart): meclise önerge getirir.
 const EARLY_ELECTION_FUNDS_COST := 0
 ## Popülizm bonusu kartı bu kadar tur sürer. BAĞIŞ KAMPANYASI kartının iki
-## çeşidi var: zayıf +FUNDS_BONUS_WEAK, güçlü +FUNDS_BONUS_STRONG milyon ₺. Bonus kart BONUS_CARD_DRAW kart çeker.
+## çeşidi var: zayıf +FUNDS_BONUS_WEAK, güçlü +FUNDS_BONUS_STRONG milyon ¤. Bonus kart BONUS_CARD_DRAW kart çeker.
 const POPULISM_ROUNDS := 3
 const FUNDS_BONUS_WEAK := 30
 const FUNDS_BONUS_STRONG := 60
@@ -139,7 +139,7 @@ const GOVERNMENT_FUNDS_BONUS := 10
 ## ORG_UPGRADE_FUNDS_COST. Ucuz teşkilat botların haritayı kaplamasına yol açıyordu.
 const ORG_FUNDS_COST := 10
 ## TEŞKİLAT GELİRİ: her ildeki teşkilat tur başında yerel bağış getirir
-## (1. seviye +5, 2. seviye +10 milyon ₺), ama toplamı ORG_INCOME_CAP'i aşmaz:
+## (1. seviye +5, 2. seviye +10 milyon ¤), ama toplamı ORG_INCOME_CAP'i aşmaz:
 ## teşkilat sınırsız para makinesi olmasın (eskiden üst sınır yoktu).
 const ORG_INCOME := [0, 5, 10]
 const ORG_INCOME_CAP := 25
@@ -169,7 +169,7 @@ const ORG_MAX_LEVEL := 2
 ## hakkı yanar; oylama süresi dolarsa oy vermeyenler ÇEKİMSER sayılır.
 const TURN_TIMEOUT := 90.0
 const FORMATION_TIMEOUT := 120.0
-const VOTE_TIMEOUT := 45.0
+const VOTE_TIMEOUT := 30.0
 ## Seçim gecesi canlı sayım yayınının süresi ve bittikten sonra kesin sonucun
 ## ekranda kaldığı süre (bkz. election_results.gd); ardından seçim ekranında
 ## sonuç gazetesi (~2,8 sn, ELECTION_NIGHT_PAPER) oynar. Host, hükümet kurma

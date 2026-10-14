@@ -81,6 +81,9 @@ var players: Dictionary = {}
 var election_threshold: float = THRESHOLD_DEFAULT
 ## Oyun süresi: seçimler kaç turda bir ve kaç seçim olacak (bkz. GameRules.configure).
 var election_interval: int = GameRules.DEFAULT_ELECTION_INTERVAL
+var vote_timeout: int = 30
+const VOTE_TIME_OPTIONS := [15, 30, 45, 60]
+
 var election_count: int = GameRules.DEFAULT_ELECTION_COUNT
 ## HARİTA TOHUMU (lobi ayarı): "" = her oyunda rastgele. Aynı tohum her zaman
 ## aynı ülkeyi üretir. Oyundaki tohum ESC menüsünde görünür ve kopyalanabilir.
@@ -327,6 +330,7 @@ func start_offline(player_name: String) -> void:
 	election_threshold = THRESHOLD_DEFAULT
 	election_interval = GameRules.DEFAULT_ELECTION_INTERVAL
 	election_count = GameRules.DEFAULT_ELECTION_COUNT
+	vote_timeout = 30
 	GameRules.configure(election_interval, election_count)
 	players.clear()
 	owner_id = multiplayer.get_unique_id()
@@ -350,6 +354,7 @@ func create_room(player_name: String) -> void:
 	election_threshold = THRESHOLD_DEFAULT
 	election_interval = GameRules.DEFAULT_ELECTION_INTERVAL
 	election_count = GameRules.DEFAULT_ELECTION_COUNT
+	vote_timeout = 30
 	GameRules.configure(election_interval, election_count)
 	players.clear()
 	var peer := RelayMultiplayerPeerScript.new()
@@ -567,7 +572,7 @@ func _notify_kicked() -> void:
 
 func _broadcast_player_list() -> void:
 	if room_code != "" and multiplayer.multiplayer_peer != null:
-		_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count)
+		_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
 		_sync_map_seed.rpc(map_seed)
 		_sync_random_parties.rpc(random_parties)
 		_sync_bot_funds_penalty.rpc(bot_funds_penalty)
@@ -596,7 +601,7 @@ func transfer_ownership(new_owner_id: int) -> void:
 		return
 	if is_host:
 		owner_id = new_owner_id
-		_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count)
+		_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
 		_sync_map_seed.rpc(map_seed)
 		_sync_random_parties.rpc(random_parties)
 		_sync_bot_funds_penalty.rpc(bot_funds_penalty)
@@ -619,7 +624,7 @@ func apply_constitution(payload: Dictionary) -> void:
 	if not CardManager.alliances_enabled:
 		CardManager.alliances.clear()
 	if not local_only:
-		_sync_settings.rpc(election_threshold, election_interval, election_count)
+		_sync_settings.rpc(election_threshold, election_interval, election_count, vote_timeout)
 		_sync_seat_method.rpc(seat_method)
 	settings_updated.emit()
 
@@ -631,7 +636,7 @@ func set_election_threshold(value: float) -> void:
 	var snapped := snap_threshold(value)
 	if is_host:
 		election_threshold = snapped
-		_sync_settings.rpc(election_threshold, election_interval, election_count)
+		_sync_settings.rpc(election_threshold, election_interval, election_count, vote_timeout)
 		settings_updated.emit()
 	else:
 		_request_set_threshold.rpc_id(1, snapped)
@@ -647,7 +652,7 @@ func set_game_length(interval: int, count: int) -> void:
 		election_interval = interval
 		election_count = count
 		GameRules.configure(election_interval, election_count)
-		_sync_settings.rpc(election_threshold, election_interval, election_count)
+		_sync_settings.rpc(election_threshold, election_interval, election_count, vote_timeout)
 		settings_updated.emit()
 	else:
 		_request_set_game_length.rpc_id(1, interval, count)
@@ -676,6 +681,7 @@ func _reset_state() -> void:
 	election_threshold = THRESHOLD_DEFAULT
 	election_interval = GameRules.DEFAULT_ELECTION_INTERVAL
 	election_count = GameRules.DEFAULT_ELECTION_COUNT
+	vote_timeout = 30
 	GameRules.configure(election_interval, election_count)
 	_has_synced_once = false
 	_closing = false
@@ -726,7 +732,7 @@ func _on_peer_disconnected(id: int) -> void:
 		players[id]["away"] = true
 		if id == owner_id:
 			owner_id = multiplayer.get_unique_id()
-		_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count)
+		_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
 		player_list_updated.emit()
 		if stage == Stage.PARTY_SETUP:
 			PartyManager.auto_ready_away(id)
@@ -741,7 +747,7 @@ func _on_peer_disconnected(id: int) -> void:
 	if id == owner_id:
 		# Host olmayan lobi sahibi ayrıldı: oda kapanmaz, sahiplik host'a geçer.
 		owner_id = multiplayer.get_unique_id()
-	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count)
+	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
 	_sync_map_seed.rpc(map_seed)
 	_sync_random_parties.rpc(random_parties)
 	_sync_bot_funds_penalty.rpc(bot_funds_penalty)
@@ -833,7 +839,7 @@ func _request_join(code: String, player_name: String, signature: String, uid: St
 	if players.size() >= MAX_PLAYERS:
 		players.erase(bot_ids().back())
 	players[sender_id] = {"name": player_name, "uid": uid}
-	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count)
+	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
 	_sync_map_seed.rpc(map_seed)
 	_sync_random_parties.rpc(random_parties)
 	_sync_bot_funds_penalty.rpc(bot_funds_penalty)
@@ -861,7 +867,7 @@ func _rejoin(old_id: int, new_id: int, player_name: String) -> void:
 	CardManager.rekey_player(old_id, new_id)
 	# Önce istemciye "geri döndün" denir (lobi ekranına gitmesin), sonra her şey.
 	_notify_rejoined.rpc_id(new_id, stage, game_map_seed)
-	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count)
+	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
 	_sync_map_seed.rpc_id(new_id, map_seed)
 	_sync_random_parties.rpc_id(new_id, random_parties)
 	_sync_away_mode.rpc_id(new_id, away_mode)
@@ -892,7 +898,8 @@ func _join_rejected(reason: String) -> void:
 	join_failed.emit(reason)
 
 @rpc("authority", "reliable")
-func _sync_player_list(new_players: Dictionary, new_owner: int, threshold: float, interval: int, count: int) -> void:
+func _sync_player_list(new_players: Dictionary, new_owner: int, threshold: float, interval: int, count: int, vote_seconds: int = 30) -> void:
+	vote_timeout = vote_seconds
 	players = new_players
 	owner_id = new_owner
 	election_threshold = threshold
@@ -913,7 +920,7 @@ func _request_transfer_ownership(new_owner_id: int) -> void:
 	if sender_id != owner_id or not players.has(new_owner_id) or is_bot(new_owner_id):
 		return
 	owner_id = new_owner_id
-	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count)
+	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
 	_sync_map_seed.rpc(map_seed)
 	_sync_random_parties.rpc(random_parties)
 	_sync_bot_funds_penalty.rpc(bot_funds_penalty)
@@ -928,7 +935,7 @@ func _request_set_threshold(value: float) -> void:
 	if sender_id != owner_id:
 		return
 	election_threshold = snap_threshold(value)
-	_sync_settings.rpc(election_threshold, election_interval, election_count)
+	_sync_settings.rpc(election_threshold, election_interval, election_count, vote_timeout)
 	settings_updated.emit()
 
 ## Host-olmayan mevcut sahip, oyun süresini değiştirmek istediğinde host'a istek yollar.
@@ -941,11 +948,12 @@ func _request_set_game_length(interval: int, count: int) -> void:
 	election_interval = clampi(interval, GameRules.ELECTION_INTERVAL_MIN, GameRules.ELECTION_INTERVAL_MAX)
 	election_count = clampi(count, GameRules.ELECTION_COUNT_MIN, GameRules.ELECTION_COUNT_MAX)
 	GameRules.configure(election_interval, election_count)
-	_sync_settings.rpc(election_threshold, election_interval, election_count)
+	_sync_settings.rpc(election_threshold, election_interval, election_count, vote_timeout)
 	settings_updated.emit()
 
 @rpc("authority", "reliable")
-func _sync_settings(threshold: float, interval: int, count: int) -> void:
+func _sync_settings(threshold: float, interval: int, count: int, vote_seconds: int = 30) -> void:
+	vote_timeout = vote_seconds
 	election_threshold = threshold
 	election_interval = interval
 	election_count = count
@@ -1019,3 +1027,24 @@ func _notify_room_closed(reason: String) -> void:
 		return
 	_reset_state()
 	room_closed.emit(reason)
+
+func set_vote_timeout(seconds: int) -> void:
+	if not is_local_owner() or not VOTE_TIME_OPTIONS.has(seconds):
+		return
+	if is_host or room_code == "":
+		_apply_vote_timeout(seconds)
+	else:
+		_request_vote_timeout.rpc_id(1, seconds)
+
+func _apply_vote_timeout(seconds: int) -> void:
+	if not VOTE_TIME_OPTIONS.has(seconds):
+		return
+	vote_timeout = seconds
+	if room_code != "":
+		_sync_settings.rpc(election_threshold, election_interval, election_count, vote_timeout)
+	settings_updated.emit()
+
+@rpc("any_peer", "reliable")
+func _request_vote_timeout(seconds: int) -> void:
+	if is_host and multiplayer.get_remote_sender_id() == owner_id:
+		_apply_vote_timeout(seconds)

@@ -42,6 +42,10 @@ var language: String = "tr" if not OS.get_locale_language().begins_with("en") el
 
 func _ready() -> void:
 	_load()
+	# Test/önizleme betikleri (-s) oyuncunun dil seçimine bakmaz: Türkçe başlar
+	# (İngilizce isteyen betik dili kendisi ayarlar).
+	if get_tree() != null and get_tree().get_script() != null:
+		language = "tr"
 	_apply()
 
 func set_language(code: String) -> void:

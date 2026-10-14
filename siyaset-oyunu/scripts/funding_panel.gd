@@ -147,7 +147,7 @@ func _refresh() -> void:
 	_party_pay.text = L.t("%s milyon ₺") % Economy.money_text(party_million)
 	_party_left.text = L.t("kasada kalır: %s") % GameRules.money_text(CardManager.funds_of(peer_id) - party_million)
 	_state_pay.text = L.t("%s milyon ₺") % Economy.money_text(state_million)
-	_state_left.text = L.t("hazinede kalır: %s") % Economy.money_text(CardManager.state_treasury() - state_million)
+	_state_left.text = L.t("kotanda kalır: %s") % Economy.money_text(CardManager.state_quota(peer_id) - state_million)
 	# Hangi kaynak daha çok ödüyor: o uç parlak, diğeri sönük.
 	var party_more := party_million > state_million
 	_party_end.modulate.a = 1.0 if party_more or is_equal_approx(party_million, state_million) else 0.55

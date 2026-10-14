@@ -290,6 +290,43 @@ func _initialize() -> void:
 	check("durum yayını / arayüz yenilemesi ekonomiyi ilerletmez", str(econ_copy) == str(cm.economy))
 
 	print("")
+	print("=== 8b) HAZİNE KOTASI: BAKANLIK PUANINA ORANTILI ===")
+	new_game()
+	cm.economy["treasury"] = 400.0
+	var pm_share: float = cm.quota_share(1)
+	var dep_share: float = cm.quota_share(2)
+	var pm_pts: float = float(gm.round_points_of(1))
+	var dep_pts: float = float(gm.round_points_of(2))
+	check("paylar bakanlık puanıyla orantılı", near(pm_share, pm_pts / (pm_pts + dep_pts)) and near(dep_share, dep_pts / (pm_pts + dep_pts)),
+		"%.3f / %.3f (puan %d / %d)" % [pm_share, dep_share, int(pm_pts), int(dep_pts)])
+	check("paylar toplamı 1", near(pm_share + dep_share, 1.0))
+	check("muhalefetin kotası yok", near(cm.state_quota(3), 0.0))
+	give_turn(1)
+	cm.funds[1] = 1000.0
+	var spam := 0
+	for n in 10:
+		var range_now: Dictionary = cm.funding_range(1, "invest")
+		var share_now: float = float(range_now["max"])
+		if share_now <= 0.0:
+			break
+		cm._apply_invest_move(1, String(cm._province_ids[n % cm._province_ids.size()]), share_now)
+		spam += 1
+	var spent_by_pm: float = 400.0 - cm.state_treasury()
+	check("önce oynayan ortak hazineden kotasından fazlasını harcayamaz", spent_by_pm <= 400.0 * pm_share + 0.01,
+		"%.1f harcadı, kota %.1f (%d yatırım)" % [spent_by_pm, 400.0 * pm_share, spam])
+	check("sonra oynayan ortağın kotası duruyor", near(cm.state_quota(2), 400.0 * dep_share), "%.1f" % cm.state_quota(2))
+	check("kota bitince devlet payı 0", near(float(cm.funding_range(1, "invest")["max"]), 0.0))
+	check("kota bitince kendi kasasından yatırım yapabilir", cm.can_invest(1, String(cm._province_ids[0]), 0.0))
+	give_turn(2)
+	cm.funds[2] = 0.0
+	var dep_quota: float = cm.state_quota(2)
+	check("ortak kotası yetiyorsa hazineden yatırım yapabilir", (dep_quota >= Economy.INVEST_COST) == cm.can_invest(2, String(cm._province_ids[1]), 1.0),
+		"kota %.1f" % dep_quota)
+	end_round()
+	check("yeni dönemde kota yeni hazineden hesaplanır", near(cm.state_quota(1), cm.state_treasury() * pm_share, 0.01),
+		"%.1f / %.1f" % [cm.state_quota(1), cm.state_treasury() * pm_share])
+
+	print("")
 	print("=== 9) KAYIT / YÜKLEME (GEÇİŞ SIRASINDA) ===")
 	new_game()
 	pass_tax(Economy.TAX_HIGH)
@@ -376,7 +413,9 @@ func _initialize() -> void:
 	check("paylaşım %5 adıma oturur", near(float(Economy.split_cost(100.0, 0.33)["share"]), 0.35))
 	cm.economy["treasury"] = 40.0
 	r = cm.funding_range(1, "invest")
-	check("hazine 40 iken devlet payı en fazla %40", near(float(r["max"]), 0.4), str(r))
+	# Devlet payı hazineyle DEĞİL partinin kotasıyla sınırlı (40 × bakanlık payı).
+	var quota_cap: float = floorf(40.0 * cm.quota_share(1) / Economy.INVEST_COST / Economy.FUND_STEP + 0.0001) * Economy.FUND_STEP
+	check("hazine 40 iken devlet payı en fazla kota kadar", near(float(r["max"]), quota_cap), "%s / %.2f" % [str(r), quota_cap])
 	check("hazineyi aşan paylaşım reddedilir", not cm.can_invest(1, String(cm._province_ids[1]), 0.5)
 		and cm.funding_block_reason(1, "invest", 0.5).contains("hazine"))
 	cm.economy["treasury"] = 1000.0

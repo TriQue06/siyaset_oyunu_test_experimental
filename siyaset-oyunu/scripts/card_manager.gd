@@ -495,7 +495,8 @@ func funding_range(peer_id: int, kind: String) -> Dictionary:
 	var state_allowed := is_government_party(peer_id) and not is_party_member(peer_id) and not PartyManager.is_independent(peer_id)
 	var party_cap := maxf(0.0, funds_of(peer_id))
 	var lo := clampf(1.0 - party_cap / total, 0.0, 1.0)
-	var hi := clampf(state_treasury() / total, 0.0, 1.0) if state_allowed else 0.0
+	# Devlet payı partinin HAZİNE KOTASIYLA sınırlı (bkz. state_quota).
+	var hi := clampf(state_quota(peer_id) / total, 0.0, 1.0) if state_allowed else 0.0
 	# %5 adımlara oturt: alt sınır yukarı, üst sınır aşağı yuvarlanır (aşım olmaz).
 	lo = ceilf(lo / Economy.FUND_STEP - 0.0001) * Economy.FUND_STEP
 	hi = floorf(hi / Economy.FUND_STEP + 0.0001) * Economy.FUND_STEP
@@ -517,6 +518,8 @@ func funding_block_reason(peer_id: int, kind: String, state: float) -> String:
 	var split := Economy.split_cost(float(r["total"]), state)
 	if float(split["state"]) > state_treasury() + 0.001:
 		return L.t("Devlet hazinesi yetmiyor (%s var).") % Economy.money_full(state_treasury())
+	if float(split["state"]) > state_quota(peer_id) + 0.001:
+		return L.t("Bu dönemki hazine kotan yetmiyor (%s kaldı).") % Economy.money_full(state_quota(peer_id))
 	if float(split["state"]) > 0.0 and not bool(r["state_allowed"]):
 		return L.t("Devlet hazinesini sadece hükümet partileri kullanabilir.")
 	if float(split["party"]) > funds_of(peer_id) + 0.001:
@@ -820,6 +823,53 @@ func tax_level() -> int:
 
 func state_treasury() -> float:
 	return float(economy.get("treasury", 0.0))
+
+## HAZİNE KOTASI: hükümet partileri devlet hazinesini BAKANLIK PUANLARIYLA
+## ORANTILI paylaşır. Her parti bir dönemde, dönem başındaki hazinenin
+## (puanı / hükümetteki toplam puan) kadarını harcayabilir; aşanını kendi
+## kasasından öder. Sırada önce oynayan ortak hazineyi tek başına bitiremez.
+## Harcanmayan kota dönem sonunda yanar (hazine olduğu gibi devreder).
+func state_quota(peer_id: int) -> float:
+	if not is_government_party(peer_id) or is_party_member(peer_id) or PartyManager.is_independent(peer_id):
+		return 0.0
+	var pid := party_of(peer_id)
+	var left := quota_base() * quota_share(pid) - float(_quota_spent().get(pid, 0.0))
+	return clampf(left, 0.0, state_treasury())
+
+## Partinin hazinedeki payı: bakanlık puanı / hükümet partilerinin toplam puanı.
+func quota_share(pid: int) -> float:
+	var ids := GovernmentManager.government_party_ids()
+	if not ids.has(pid):
+		return 0.0
+	var total := 0
+	for gid in ids:
+		total += GovernmentManager.round_points_of(int(gid))
+	if total <= 0:
+		return 1.0 / float(ids.size())
+	return float(GovernmentManager.round_points_of(pid)) / float(total)
+
+## Kotanın hesaplandığı hazine: bu dönem ilk harcamadan önceki tutar.
+func quota_base() -> float:
+	if int(economy.get("quota_round", -1)) == round_number:
+		return float(economy.get("quota_base", 0.0))
+	return state_treasury()
+
+func _quota_spent() -> Dictionary:
+	if int(economy.get("quota_round", -1)) == round_number:
+		return economy.get("quota_spent", {})
+	return {}
+
+## Devlet hazinesinden harcamayı partinin kotasına yazar (hazineden düşmeden ÖNCE).
+func _spend_quota(peer_id: int, amount: float) -> void:
+	if amount <= 0.0:
+		return
+	if int(economy.get("quota_round", -1)) != round_number:
+		economy["quota_round"] = round_number
+		economy["quota_base"] = state_treasury()
+		economy["quota_spent"] = {}
+	var spent: Dictionary = economy["quota_spent"]
+	var pid := party_of(peer_id)
+	spent[pid] = float(spent.get(pid, 0.0)) + amount
 
 func economy_index() -> float:
 	return float(economy.get("index", Economy.START_INDEX))
@@ -1537,6 +1587,7 @@ func _apply_invest_move(peer_id: int, province_id: String, state: float = 1.0) -
 		return
 	var split := Economy.split_cost(Economy.INVEST_COST, state)
 	funds[peer_id] = funds_of(peer_id) - float(split["party"])
+	_spend_quota(peer_id, float(split["state"]))
 	var before := state_treasury()
 	economy["treasury"] = before - float(split["state"])
 	_record_funding(peer_id, "invest", province_id, split, Economy.INVEST_COST)
@@ -1560,6 +1611,7 @@ func _apply_miting_move(peer_id: int, province_id: String, state: float = 0.0) -
 	var total := float(GameRules.MITING_FUNDS_COST)
 	var split := Economy.split_cost(total, state)
 	funds[peer_id] = funds_of(peer_id) - float(split["party"])
+	_spend_quota(peer_id, float(split["state"]))
 	var before := state_treasury()
 	economy["treasury"] = before - float(split["state"])
 	_record_funding(peer_id, "miting", province_id, split, total)

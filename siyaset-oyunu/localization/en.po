@@ -3113,3 +3113,12 @@ msgstr "🔒 Lock and Get Ready"
 
 msgid "Botun adını, soyadını, geçmişini, memleketini ve çekirdek seçmen gruplarını rastgele değiştir"
 msgstr "Randomize the bot's first name, surname, background, hometown and core voter groups"
+
+msgid "Bu dönemki hazine kotan yetmiyor (%s kaldı)."
+msgstr "Your treasury quota for this term isn't enough (%s left)."
+
+msgid "kotanda kalır: %s"
+msgstr "left in your quota: %s"
+
+msgid "Bu dönemki kotan: %s (bakanlık puanına göre hazinenin %%%d'i)."
+msgstr "Your quota this term: %s (%d%% of the treasury, by ministry points)."

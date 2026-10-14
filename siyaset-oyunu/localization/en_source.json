@@ -1067,5 +1067,8 @@
 "📋 KOPYALA": "📋 COPY",
 "📋 Kopyala": "📋 Copy",
 "🔒 Kilitle ve Hazır Ver": "🔒 Lock and Get Ready",
-"Botun adını, soyadını, geçmişini, memleketini ve çekirdek seçmen gruplarını rastgele değiştir": "Randomize the bot's first name, surname, background, hometown and core voter groups"
+"Botun adını, soyadını, geçmişini, memleketini ve çekirdek seçmen gruplarını rastgele değiştir": "Randomize the bot's first name, surname, background, hometown and core voter groups",
+"Bu dönemki hazine kotan yetmiyor (%s kaldı).": "Your treasury quota for this term isn't enough (%s left).",
+"kotanda kalır: %s": "left in your quota: %s",
+"Bu dönemki kotan: %s (bakanlık puanına göre hazinenin %%%d'i).": "Your quota this term: %s (%d%% of the treasury, by ministry points)."
 }

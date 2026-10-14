@@ -223,6 +223,11 @@ func refresh() -> void:
 	_set_delta("treasury", prev, "treasury", CardManager.state_treasury(), true, false)
 	(_tiles["treasury"]["panel"] as Control).tooltip_text = L.t("Devlet hazinesi: %s. Dönem sonunda %s vergi geliri girer. Bir yatırım %s.") % [
 		Economy.money_full(CardManager.state_treasury()), Economy.money_full(CardManager.expected_revenue()), Economy.money_full(Economy.INVEST_COST)]
+	var me := multiplayer.get_unique_id()
+	if CardManager.is_government_party(me):
+		(_tiles["treasury"]["panel"] as Control).tooltip_text += "
+" + L.t("Bu dönemki kotan: %s (bakanlık puanına göre hazinenin %%%d'i).") % [
+			Economy.money_full(CardManager.state_quota(me)), int(round(CardManager.quota_share(CardManager.party_of(me)) * 100.0))]
 	_income_label.text = L.t("+%s / dönem") % Economy.money_text(CardManager.expected_revenue())
 	var election := not election_headline().is_empty()
 	# Sandık öncesi: özet göstergelerin yerini alır (hazine ve vergi özette).

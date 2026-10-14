@@ -107,6 +107,8 @@ static func start_state() -> Dictionary:
 	return {"tax": START_TAX, "pressure": float(TAX_PRESSURE[START_TAX]), "index": START_INDEX, "boost": 0.0,
 		"treasury": START_TREASURY, "revenue": 0.0, "prev": {}, "tax_round": 0, "tax_from": START_TAX,
 		"pressure_from": float(TAX_PRESSURE[START_TAX]), "investments": [], "ledger": [], "next_id": 1,
+		# HAZİNE KOTASI (CardManager.state_quota): dönem, dönem başı hazine, parti -> harcanan.
+		"quota_round": -1, "quota_base": 0.0, "quota_spent": {},
 		"inquiries": {}}
 
 ## Eski sürüm durumunda eksik alanlar güvenli varsayılanla doldurulur.

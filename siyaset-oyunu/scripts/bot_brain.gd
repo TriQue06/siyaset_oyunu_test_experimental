@@ -747,7 +747,9 @@ static func _eval_miting(bot: int) -> Dictionary:
 ## HAZİNE: seçim uzaksa bir yatırımlık yedek bırakır (hepsini harcamaz);
 ## yatırımın kalan dilimleri seçimden sonraya kalacaksa değeri düşer.
 static func _eval_investment(bot: int) -> Dictionary:
-	if not CardManager.is_government_party(bot) or CardManager.state_treasury() < Economy.INVEST_COST:
+	# Kotası yatırımın en az yarısını karşılamalı (kalanı kasadan).
+	if not CardManager.is_government_party(bot) or not CardManager.can_invest(bot) \
+			or CardManager.state_quota(bot) < Economy.INVEST_COST * 0.5:
 		return {}
 	var left := _rounds_to_election()
 	var reserve := Economy.INVEST_COST if left > TAX_CUT_LEAD else 0.0

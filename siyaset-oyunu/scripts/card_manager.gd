@@ -285,6 +285,27 @@ func _is_authority() -> bool:
 func set_rng_seed(value: int) -> void:
 	_rng.seed = value
 	_crisis_rng.seed = value + 7919
+	_roll_counts = {}
+
+## HAMLE SIRASINDAN BAĞIMSIZ ZARLAR (0.0.187): provokasyon zarı ve seçim
+## gürültüsü ortak _rng akışından değil, (oyun tohumu, tur, olay) üçlüsünden
+## türeyen kendi tohumlarından atılır. Böylece bir oyuncunun mitingi başka bir
+## oyuncunun zarını ya da seçimin sonucunu, hamlelerin sırasına göre kaydırmaz.
+## Aynı parti aynı ilde aynı turda tekrar miting yaparsa sayaç yeni zar verir.
+var _roll_counts: Dictionary = {}
+
+func _event_roll(key: String) -> float:
+	var full := "%d|%s" % [round_number, key]
+	var n := int(_roll_counts.get(full, 0))
+	_roll_counts[full] = n + 1
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash([_rng.seed, full, n])
+	return rng.randf()
+
+func _election_rng(at_round: int) -> RandomNumberGenerator:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash([_rng.seed, at_round, "election"])
+	return rng
 
 ## Host'un zamanlayıcıları (tur süresi, heartbeat). _process çağırır; testler
 ## doğrudan çağırabilir.
@@ -1907,7 +1928,7 @@ func _province_name(province_id: String) -> String:
 ## Miting: riski ilin mevcut siyasi dengesine göre hesaplanır, zar atılır.
 func _apply_miting(peer_id: int, province_id: String) -> void:
 	var risk := miting_risk(peer_id, province_id)
-	if _rng.randf() < risk:
+	if _event_roll("miting|%d|%s" % [party_of(peer_id), province_id]) < risk:
 		_add_local(province_id, peer_id, PublicOpinion.PROVOCATION_LOCAL, true)
 		_add_national(peer_id, PublicOpinion.PROVOCATION_NATIONAL, true)
 		_log_province(province_id, L.t("%s mitinginde PROVOKASYON: ilde ve ülkede destek kaybı") % _party_name(peer_id))
@@ -2322,8 +2343,13 @@ func _decay_group_effects(next_round: int) -> void:
 
 # --- Karışıklık ve bölünme ------------------------------------------------------------
 
+## HAMLE SIRASI FARK ETMESİN (0.0.187): tur İÇİNDE karışıklık ham toplam
+## olarak tutulur (eksiye düşebilir), okunurken 0'ın altı 0 sayılır; 0'a
+## kırpma yalnız TUR SONUNDA yapılır. Böylece "miting (−0,3) sonra kaset
+## (+1,5)" ile "kaset sonra miting" aynı sonucu (1,2) verir; eskiden önce
+## gelen miting 0'da boşa gidiyordu.
 func turmoil_of(peer_id: int) -> float:
-	return float(turmoil.get(party_of(peer_id), 0.0))
+	return maxf(0.0, float(turmoil.get(party_of(peer_id), 0.0)))
 
 func _add_turmoil(peer_id: int, amount: float) -> void:
 	if peer_id == -1 or not _is_authority():
@@ -2331,8 +2357,8 @@ func _add_turmoil(peer_id: int, amount: float) -> void:
 	peer_id = party_of(peer_id)
 	if amount > 0.0 and PoliticianPresets.party_has_background(peer_id, "emekli_subay"):
 		amount *= PoliticianPresets.OFFICER_TURMOIL_MULT
-	var value := maxf(0.0, turmoil_of(peer_id) + amount)
-	if value <= 0.0:
+	var value := float(turmoil.get(peer_id, 0.0)) + amount
+	if is_zero_approx(value):
 		turmoil.erase(peer_id)
 	else:
 		turmoil[peer_id] = value
@@ -2742,8 +2768,10 @@ func _finish_round() -> void:
 	# Ayrılan partiler dönebilir, çok karışan parti bölünür; sonra karışıklık söner.
 	_check_reunions()
 	_check_splits()
+	# Tur sonu: ham karışıklık 0'a kırpılır (turmoil_of) ve söner.
 	for peer_id in turmoil.keys():
 		turmoil[peer_id] = turmoil_of(int(peer_id)) * PublicOpinion.TURMOIL_DECAY
+	_roll_counts = {}
 	# EKONOMİ: tur başına tek sefer, SEÇİMDEN ÖNCE (sandık o ana kadar
 	# gerçekleşmiş etkileri görür; bekleyen dilimler ve yerleşmemiş vergi
 	# etkisi sayılmaz).
@@ -2822,7 +2850,7 @@ func _hold_election(finished_round: int, early: bool) -> void:
 		"seats_before": last_seats.duplicate(),
 	}
 	var result := ElectionModel.compute(groups, _province_seat_counts, province_voters(),
-		MultiplayerManager.election_threshold, _rng, mods)
+		MultiplayerManager.election_threshold, _election_rng(finished_round), mods)
 	_add_independent_seats(result, groups, mods, finished_round)
 	# Fesihten kalan Bağımsızlar bloğu seçimle dağılır (aşağıda sonuçlar yazılınca).
 	if PartyManager.parties.has(PartyManager.BLOC_ID):

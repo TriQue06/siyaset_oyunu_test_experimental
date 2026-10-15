@@ -1298,5 +1298,8 @@
 "Çekirdek gruplarda %%%d, diğerlerinde %%%d hitapla başlarsın; çekirdek gruplarda kazancın %d katıdır. Hitap yasa, miting ve toplantıyla büyür, rakipler senden seçmen çalabilir.": "You start with %%%d appeal in your core groups and %%%d in the others; gains in core groups are %dx. Appeal grows with laws, rallies and meetings, and rivals can steal voters from you.",
 "Burada miting yaparsan (odaksız; teşkilatla %d grup odağı seçebilirsin):": "If you rally here (unfocused; with your organisation you can pick %d focus groups):",
 "Burada miting yaparsan (teşkilatsız: etkisi düşük, odak seçilemez):": "If you rally here (no organisation: weak effect, no focus):",
-"SİYASET OYUNU": "POLITICS GAME"
+"SİYASET OYUNU": "POLITICS GAME",
+"onayla": "approve",
+"oy yok": "no vote",
+"reddet": "reject"
 }

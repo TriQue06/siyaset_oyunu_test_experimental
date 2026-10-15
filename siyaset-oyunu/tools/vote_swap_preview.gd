@@ -7,7 +7,14 @@ func _frames(n: int) -> void:
 	for i in n:
 		await process_frame
 
+var _scene: Node
+
 func _shot(name: String) -> void:
+	# Afet / olay gazetesi düğmeleri örtmesin.
+	if _scene != null and _scene.get("_event_fx") != null:
+		for i in 4:
+			_scene._event_fx.skip()
+	await process_frame
 	root.get_texture().get_image().save_png("%s/%s.png" % [OS.get_user_data_dir(), name])
 	print("screenshot: ", name)
 
@@ -44,23 +51,24 @@ func _initialize() -> void:
 			gm._apply_vote(mm.owner_id, gm.VOTE_YES)
 	var scene: Node = (load("res://scenes/GameScreen.tscn") as PackedScene).instantiate()
 	root.add_child(scene)
+	_scene = scene
 	await _frames(30)
 	if DisplayServer.get_name() == "headless":
 		quit()
 		return
-	_shot("vote_swap_0_before")
+	await _shot("vote_swap_0_before")
 	gm.result_hold_seconds = 999.0
 	gm.submit_law(mm.owner_id, "law:isveren")
 	print("oylama: ", gm.is_voting())
 	await create_timer(0.12).timeout
-	_shot("vote_swap_1_moving")
+	await _shot("vote_swap_1_moving")
 	await create_timer(1.0).timeout
-	_shot("vote_swap_2_swapped")
+	await _shot("vote_swap_2_swapped")
 	gm._clear_proposal()
 	gm._set_phase(gm.Phase.IDLE)
 	print("oylama bitti: ", not gm.is_voting())
 	await create_timer(0.3).timeout
-	_shot("vote_swap_3_wait")
+	await _shot("vote_swap_3_wait")
 	await create_timer(1.2).timeout
-	_shot("vote_swap_4_back")
+	await _shot("vote_swap_4_back")
 	quit()

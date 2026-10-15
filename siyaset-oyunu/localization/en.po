@@ -3806,3 +3806,12 @@ msgstr "If you rally here (no organisation: weak effect, no focus):"
 
 msgid "SİYASET OYUNU"
 msgstr "POLITICS GAME"
+
+msgid "onayla"
+msgstr "approve"
+
+msgid "oy yok"
+msgstr "no vote"
+
+msgid "reddet"
+msgstr "reject"

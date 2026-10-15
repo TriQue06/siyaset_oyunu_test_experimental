@@ -167,7 +167,7 @@ const ORG_MAX_LEVEL := 2
 ## Süre sınırları (saniye). AFK kalan tek bir oyuncu oyunu kilitleyemesin diye.
 ## Tur süresi dolarsa sıra otomatik devredilir; hükümet kurma süresi dolarsa o teklif
 ## hakkı yanar; oylama süresi dolarsa oy vermeyenler ÇEKİMSER sayılır.
-static var TURN_TIMEOUT := 60.0
+static var TURN_TIMEOUT := 75.0
 const FORMATION_TIMEOUT := 120.0
 const VOTE_TIMEOUT := 30.0
 ## Seçim gecesi canlı sayım yayınının süresi ve bittikten sonra kesin sonucun

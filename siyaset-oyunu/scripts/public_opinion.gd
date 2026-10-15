@@ -176,11 +176,11 @@ const REBELLION_NATIONAL_DAMAGE := 1.5
 # --- Karalama -----------------------------------------------------------------
 ## Hedefin kaybı = DAMAGE / (1 + DEFENSE_FACTOR × hedefin il gücü)
 ## Karalayanın kazancı = GAIN × (1 + ATTACK_FACTOR × karalayanın il gücü)
-const PROPAGANDA_DAMAGE := 5.0
+const PROPAGANDA_DAMAGE := 8.0
 ## Karalama bir partinin il puanını bunun altına İTEMEZ: parti sarsılır ama o
 ## ilden silinmez, karşı kampanyayla toparlanabilir.
-const PROPAGANDA_FLOOR := -3.0
-const PROPAGANDA_GAIN := 1.5
+const PROPAGANDA_FLOOR := -6.0
+const PROPAGANDA_GAIN := 2.5
 const PROPAGANDA_DEFENSE_FACTOR := 0.2
 const PROPAGANDA_ATTACK_FACTOR := 0.3
 ## Bir partinin bir ildeki GÜCÜ = APPEAL_WEIGHT × grup uyumu (0..1, bkz.

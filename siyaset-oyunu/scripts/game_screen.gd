@@ -3829,16 +3829,15 @@ func _congress_cost_text() -> String:
 
 ## Hamle butonu: ızgaraya eklenir, sabit kutu boyutunda kalır ve yazı taşarsa
 ## kırpılır — böylece hiçbir buton komşusunu itemez.
-func _action_button(title: String, cost_text: String, color: Color, icon_name: String = "", tab: int = ActionTab.SAHA) -> Button:
+func _action_button(title: String, cost_text: String, _color: Color, _icon_name: String = "", tab: int = ActionTab.SAHA) -> Button:
 	var button := Button.new()
 	button.custom_minimum_size = Vector2(ACTION_BUTTON_WIDTH, ACTION_BUTTON_HEIGHT)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.clip_text = true
 	button.add_theme_constant_override("line_spacing", -1)
 	_set_action_text(button, title, cost_text)
-	button.set_meta("action_color", color)
-	UiSkin.skin_action_button(button, color, true)
-	UiSkin.set_top_icon(button, icon_name, 18)
+	button.set_meta("action_color", UiTheme.GOLD)
+	UiSkin.skin_action_button(button, UiTheme.GOLD, true)
 	_action_grid.add_child(button)
 	_action_tab_of[button] = tab
 	button.visible = tab == _action_tab

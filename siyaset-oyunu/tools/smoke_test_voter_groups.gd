@@ -263,7 +263,7 @@ func _initialize() -> void:
 	var g_mid: Dictionary = pm.parties[1]["groups"].duplicate()
 	cm._apply_miting_move(1, mid)
 	var d_isci2 := float(pm.parties[1]["groups"]["isci"]) - float(g_mid["isci"])
-	check("ayni gruba art arda miting daha az getirir (azalan getiri)", d_isci2 > 0.0 and d_isci2 < d_isci * 0.85, "%.3f -> %.3f" % [d_isci, d_isci2])
+	check("art arda miting neredeyse ayni getirir (yorgunluk cok kisik)", d_isci2 < d_isci and d_isci2 > d_isci * 0.95, "%.3f -> %.3f" % [d_isci, d_isci2])
 	for i in 40:
 		cm._apply_miting_move(1, mid)
 		cm.local_support = {}

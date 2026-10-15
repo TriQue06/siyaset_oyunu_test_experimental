@@ -50,7 +50,8 @@ const MITING_CONVERT := 0.12
 const MITING_FOCUS_MULT := 2.5
 ## AZALAN GETİRİ: aynı gruba art arda miting yorgunluk biriktirir:
 ## kazanç × 1 / (1 + yorgunluk / FATIGUE_SCALE); yorgunluk her tur × DECAY.
-const MITING_FATIGUE_SCALE := 1.0
+## 0.0.217: çok kısık (miting art arda yapılabilmeli; sadece hafif dengeleme).
+const MITING_FATIGUE_SCALE := 25.0
 const MITING_FATIGUE_DECAY := 0.6
 const PROVOCATION_LOCAL := -2.5
 const PROVOCATION_NATIONAL := -1.0

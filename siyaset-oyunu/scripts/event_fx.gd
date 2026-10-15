@@ -9,7 +9,7 @@ extends Control
 ## kilitlemez (sadece gazetenin kendisi tıklanabilir: tıklamak geçer).
 ##   - present(anahtar, veri): aynı anahtar ikinci kez gösterilmez (anahtarlar
 ##     sahne değişse de hatırlanır: seçim gecesinden dönünce tekrar oynamaz).
-##   - Kuyruk: aynı anda tek gazete; en fazla QUEUE_MAX bekler, birikince
+##   - Kuyruk: aynı anda tek gazete; bütün haberler korunur, birikince
 ##     sıradakiler daha hızlı oynar.
 ##   - Geçme: gazeteye tıkla ya da Boşluk / Esc. skip_all() hepsini temizler.
 ##   - Ayarlar → "Olay Animasyonları" kapalıysa hiçbir şey oynamaz.
@@ -29,7 +29,7 @@ const SETTLE_TIME := 0.16
 const REVEAL_TIME := 0.22
 const HOLD_TIME := 1.75
 const OUT_TIME := 0.3
-const QUEUE_MAX := 3
+signal drained
 ## Kuyrukta bekleyen varken oynatma hızı (birikmesin).
 const CATCH_UP_SPEED := 1.7
 
@@ -42,6 +42,7 @@ var _holder: Control
 var _shadow: Control
 var _parts: Array = []        # sayfanın parçaları (bölünme için iki yarı)
 var _reveal_nodes: Array = []
+var _reveal_tween: Tween
 var _tween: Tween
 var _current: Dictionary = {}
 
@@ -63,8 +64,6 @@ func present(key: String, data: Dictionary) -> bool:
 	if not GameSettings.event_fx:
 		return false
 	_queue.append(data)
-	while _queue.size() > QUEUE_MAX:
-		_queue.pop_front()
 	if not _active:
 		_next()
 	return true
@@ -78,7 +77,7 @@ func skip() -> void:
 		return
 	_clear_current()
 	_active = false
-	_next.call_deferred()
+	_next()
 
 ## Hepsini temizler (sahne değişirken, oyun biterken).
 func skip_all() -> void:
@@ -86,15 +85,20 @@ func skip_all() -> void:
 	_clear_current()
 	_active = false
 
-func _unhandled_input(event: InputEvent) -> void:
+func _input(event: InputEvent) -> void:
 	if not _active:
 		return
-	if event is InputEventKey and event.pressed and not event.echo \
-			and (event.keycode == KEY_SPACE or event.keycode == KEY_ESCAPE):
+	var advance := event is InputEventKey and event.pressed and event.keycode in [KEY_SPACE, KEY_ESCAPE]
+	advance = advance or (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT)
+	advance = advance or (event is InputEventScreenTouch and event.pressed)
+	if advance:
 		skip()
 		get_viewport().set_input_as_handled()
 
 func _clear_current() -> void:
+	if _reveal_tween != null and _reveal_tween.is_valid():
+		_reveal_tween.kill()
+	_reveal_tween = null
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
 	_tween = null
@@ -106,7 +110,10 @@ func _clear_current() -> void:
 	_reveal_nodes.clear()
 
 func _next() -> void:
-	if _active or _queue.is_empty() or not is_inside_tree():
+	if _active or not is_inside_tree():
+		return
+	if _queue.is_empty():
+		drained.emit()
 		return
 	_active = true
 	_current = _queue.pop_front()
@@ -142,6 +149,7 @@ func _play(rate: float) -> void:
 
 func _reveal(rate: float) -> void:
 	var t := create_tween().set_speed_scale(rate).set_parallel(true)
+	_reveal_tween = t
 	for node in _reveal_nodes:
 		var item := node as CanvasItem
 		var c := node as Control

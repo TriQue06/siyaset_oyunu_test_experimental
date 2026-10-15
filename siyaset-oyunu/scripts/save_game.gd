@@ -89,6 +89,7 @@ static func _collect() -> Dictionary:
 			"my_politician": PartyManager.my_politician},
 		"cm": cm._pack_state(true),
 		"cm_host": {
+			"secret_news": cm._secret_news, "hidden_national_delta": cm._hidden_national_delta,
 			"turmoil": cm.turmoil, "final_election_pending": cm.final_election_pending,
 			"round_end_pending": cm._round_end_pending, "last_agenda_pair": cm._last_agenda_pair,
 			"rng_state": cm._rng.state, "rng_seed": cm._rng.seed,
@@ -173,6 +174,8 @@ static func apply(data: Dictionary) -> void:
 	CardManager._apply_state(cm_state)
 	var host: Dictionary = data["cm_host"]
 	CardManager.turmoil = host.get("turmoil", {})
+	CardManager._secret_news = host.get("secret_news", [])
+	CardManager._hidden_national_delta = host.get("hidden_national_delta", {})
 	CardManager.final_election_pending = bool(host.get("final_election_pending", false))
 	CardManager._round_end_pending = bool(host.get("round_end_pending", false))
 	CardManager._last_agenda_pair = String(host.get("last_agenda_pair", ""))

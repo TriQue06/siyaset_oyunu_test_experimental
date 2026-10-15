@@ -1139,7 +1139,7 @@ func _refresh_score_table_now() -> void:
 			party_text += L.t(" · üye")
 		names.add_child(_avatar_label(party_text, 10, UiTheme.TEXT_MUTED))
 		line.add_child(_table_value(str(GovernmentManager.score_of(peer_id)), 40.0, UiTheme.GOLD, 13))
-		var national := CardManager.national_of(pid)
+		var national := CardManager.visible_national_of(pid)
 		var trend_value := _table_value(EffectWords.arrows(national), 46.0, ProvincePanel._opinion_color(national), 12)
 		trend_value.tooltip_text = L.t("Ulusal kamuoyu: %s") % EffectWords.standing(national)
 		trend_value.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -1206,7 +1206,10 @@ func _on_election_completed() -> void:
 	_leaving_for_results = true
 	# Ekran donar: kararma sürerken paneller yeni meclisi / hükümet görevini
 	# gösterse de görünmez (seçimden önce sonucu ele veriyordu).
-	SceneTransition.freeze_and_fade_to_scene("res://scenes/ElectionResults.tscn")
+	if _event_fx != null and _event_fx.is_playing():
+		await _event_fx.drained
+	if is_inside_tree():
+		SceneTransition.freeze_and_fade_to_scene("res://scenes/ElectionResults.tscn")
 
 ## Seçimsiz bir tur bitti: hükümet puanlarını aldı, yeni tur başladı.
 func _on_round_advanced() -> void:
@@ -1259,7 +1262,7 @@ func _headline_for_event(event: Dictionary, version: int) -> void:
 		_headline_for_disaster(event["disaster"])
 	var type := String(event.get("type", ""))
 	var message := String(event.get("message", ""))
-	var key := "cm|%d|%s" % [version, type]
+	var key := "cm|%s|%s" % [str(event.get("news_id", version)), type]
 	match type:
 		"played":
 			var card := String(event.get("card", ""))
@@ -1695,7 +1698,7 @@ func _player_row_values(peer_id: int, is_self: bool) -> Array:
 			]
 		2:
 			var now: int = int(CardManager.last_seats.get(CardManager.party_of(peer_id), 0))
-			var national: float = CardManager.national_of(peer_id)
+			var national: float = CardManager.visible_national_of(peer_id)
 			return [
 				_table_value(str(now), 46.0, UiTheme.TEXT_MUTED),
 				_table_value(EffectWords.arrows(national), 52.0, ProvincePanel._opinion_color(national)),
@@ -3031,6 +3034,10 @@ func _play_draw_animation(card_type: String, old_hand_size: int) -> void:
 # --- Kart oynama animasyonu (HERKESİN ekranında) ---------------------------
 
 func _on_card_played(peer_id: int, card_type: String) -> void:
+	if CardManager.is_anonymous_card(card_type):
+		if peer_id == multiplayer.get_unique_id():
+			_show_toast(L.t("Gizli hamle uygulandı. Haber tur sonunda yayınlanacak."))
+		return
 	var origin_pos: Vector2
 	var origin_size: Vector2 = CARD_DISPLAY_SIZE
 	if peer_id == multiplayer.get_unique_id() and hand_container.get_child_count() > 0:

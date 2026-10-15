@@ -213,6 +213,10 @@ var last_election_inputs: Dictionary = {}
 ## GÜÇ (bkz. PublicOpinion)
 # peer_id -> float
 var national_support: Dictionary = {}
+## Hesap gerçek puanı anında kullanır; gizli hamlenin sunumu tur sonunu bekler.
+var _hidden_national_delta: Dictionary = {}
+var _visible_national_support: Dictionary = {}
+var _secret_news: Array = []
 # province_id -> { peer_id -> float }  — sönen il puanı (aktivitenin bir parçası)
 var local_support: Dictionary = {}
 # province_id -> Array[{"round": int, "text": String}] (en yeni sonda)
@@ -1106,6 +1110,39 @@ func can_play_card(peer_id: int, card_type: String, target_peer_id: int = -1, ta
 func national_of(peer_id: int) -> float:
 	return float(national_support.get(party_of(peer_id), 0.0))
 
+## Yalnız arayüz içindir. Botlar, seçim ve kurallar national_of kullanmayı sürdürür.
+func visible_national_of(peer_id: int) -> float:
+	var pid := party_of(peer_id)
+	if _is_authority():
+		return float(national_support.get(pid, 0.0)) - float(_hidden_national_delta.get(pid, 0.0))
+	return float(_visible_national_support.get(pid, national_of(pid)))
+
+func _visible_national() -> Dictionary:
+	if not _is_authority():
+		return _visible_national_support.duplicate()
+	var visible := national_support.duplicate()
+	for pid in _hidden_national_delta:
+		if visible.has(pid):
+			visible[pid] = float(visible[pid]) - float(_hidden_national_delta[pid])
+	return visible
+
+func _release_secret_news() -> void:
+	if _secret_news.is_empty():
+		return
+	var news := _secret_news.duplicate(true)
+	_secret_news.clear()
+	_hidden_national_delta.clear()
+	# Sunum sırası oyun RNG'sini ve oyun kurallarını etkilemez.
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	for i in range(news.size() - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var item = news[i]
+		news[i] = news[j]
+		news[j] = item
+	_push_state({"type": "secret_news", "news": news})
+
+
 func local_of(province_id: String, peer_id: int) -> float:
 	return float(local_support.get(province_id, {}).get(party_of(peer_id), 0.0))
 
@@ -1332,7 +1369,7 @@ func _noisy_poll(projection: Dictionary, error: float, seed_text: String, seat_c
 ## geçemezse herkes).
 func projected_eligible(mods: Dictionary = {}) -> Array:
 	if mods.is_empty():
-		mods = election_modifiers()
+		mods = election_modifiers(true)
 	var local_mods: Dictionary = mods["local"]
 	var groups := _group_profiles()
 	var national := {}
@@ -1372,7 +1409,7 @@ func _expected_national(mods: Dictionary) -> Dictionary:
 ## Şimdi seçim olsa bu ilde: peer_id -> {"percent", "seats"} (gürültüsüz beklenen
 ## oylar, ildeki vekiller D'Hondt ile; baraj yok sayılır). Gözcü raporu için.
 func province_projection(province_id: String) -> Dictionary:
-	var mods := election_modifiers()
+	var mods := election_modifiers(true)
 	var local_mods: Dictionary = mods["local"]
 	var shares := ElectionModel.expected_shares(_group_profiles(), province_profile(province_id),
 		mods["national"], local_mods.get(province_id, {}), _expected_national(mods))
@@ -1387,7 +1424,7 @@ func province_projection(province_id: String) -> Dictionary:
 ## "seat_count"}. quotient: ildeki son kazanan D'Hondt bölümü (bir vekile ne
 ## kadar yakın olunduğunu ölçmek için). peer_id = -1: tüm iller, gürültüsüz.
 func projection_all(viewer: int = -1) -> Dictionary:
-	var mods := election_modifiers()
+	var mods := election_modifiers(true)
 	var local_mods: Dictionary = mods["local"]
 	var groups := _group_profiles()
 	var eligible := projected_eligible(mods)
@@ -1577,6 +1614,9 @@ func init_game() -> void:
 		GameRules.configure(MultiplayerManager.election_interval, MultiplayerManager.election_count)
 	max_rounds_override = 0
 	national_support = {}
+	_hidden_national_delta.clear()
+	_visible_national_support.clear()
+	_secret_news.clear()
 	local_support = {}
 	province_events = {}
 	# YENİ ÜLKE: her oyunda rastgele altıgen harita (herkese tam durumla gider).
@@ -1682,6 +1722,9 @@ func abandon_game() -> void:
 		GameRules.configure(MultiplayerManager.election_interval, MultiplayerManager.election_count)
 	max_rounds_override = 0
 	national_support = {}
+	_hidden_national_delta.clear()
+	_visible_national_support.clear()
+	_secret_news.clear()
 	local_support = {}
 	province_events = {}
 	province_profiles = {}
@@ -1864,7 +1907,10 @@ func _apply_play(peer_id: int, hand_index: int, target_peer_id: int = -1, target
 	# Geçersiz hedefle / şartsız oynanan kart elde kalır, boşa harcanmaz.
 	if not can_play_card(peer_id, card_type, target_peer_id, target_province):
 		return
-	card_played.emit(-1 if is_anonymous_card(card_type) and peer_id != multiplayer.get_unique_id() else peer_id, card_type)
+	var anonymous := is_anonymous_card(card_type)
+	if not anonymous:
+		card_played.emit(peer_id, card_type)
+	var before_national := national_of(target_peer_id) if anonymous else 0.0
 	hand.remove_at(hand_index)
 	funds[peer_id] = funds_of(peer_id) - CardPresets.card_cost(card_type)
 	_event_message = ""
@@ -1873,10 +1919,18 @@ func _apply_play(peer_id: int, hand_index: int, target_peer_id: int = -1, target
 		"target": target_peer_id, "province": target_province, "seats_changed": seats_changed_now}
 	if _event_message != "":
 		event["message"] = _event_message
-	if is_anonymous_card(card_type):
-		# Kaset ve iç karışıklık anonim: logda hedefin simgesi görünür, atanın değil.
+	if anonymous:
+		var pid := party_of(target_peer_id)
+		_hidden_national_delta[pid] = float(_hidden_national_delta.get(pid, 0.0)) + national_of(target_peer_id) - before_national
 		event["peer_id"] = target_peer_id
-		event["actor_hidden"] = peer_id
+		event["actor_hidden"] = true
+		_secret_news.append(event)
+		# Herkese giden olayda kart, hedef ve mesaj bulunmaz.
+		event = {"type": "sync"}
+		if peer_id == multiplayer.get_unique_id():
+			card_played.emit(peer_id, card_type)
+		elif peer_id > 0 and not _is_local_only():
+			_secret_play_confirmed.rpc_id(peer_id, card_type)
 	# Hiçbir kart sırayı devretmez; tur sadece "Turu Bitir" ya da süreyle biter.
 	_push_state(event, seats_changed_now)
 	
@@ -2938,6 +2992,7 @@ func next_election_round() -> int:
 
 func _finish_round() -> void:
 	_round_end_pending = false
+	_release_secret_news()
 	# Makam puanları TUR SONUNDA DEĞİL, hükümet kurulduğu anda yazılır
 	# (bkz. GovernmentManager.award_formation_scores).
 	var finished_round := round_number
@@ -3013,8 +3068,8 @@ func _finish_round() -> void:
 ##   ulusal : ulusal puan + İKTİDAR DENGESİ + POPÜLİZM + VEKİL MOMENTUMU (seçimden bu
 ##            yana vekil çalarak büyüyen parti artıyla girer)
 ##   il     : aktivite (il puanı + il başkanlığı)
-func election_modifiers() -> Dictionary:
-	var national := national_support.duplicate()
+func election_modifiers(public_view: bool = false) -> Dictionary:
+	var national := _visible_national() if public_view else national_support.duplicate()
 	for peer_id in GovernmentManager.government_party_ids():
 		national[peer_id] = float(national.get(peer_id, 0.0)) + PublicOpinion.GOVERNMENT_FATIGUE
 	# Popülizm sürerken seçim: seçmen vaatleri hatırlar.
@@ -3637,7 +3692,7 @@ func _dissolve_temporary_party(pid: int) -> void:
 				temp_orgs[province_id] = int(organizations[province_id][pid])
 		_remember_former_party(deputy, pid, temp_orgs)
 		_make_independent(deputy, PartyManager.groups_of(pid).duplicate())
-	for table in [national_support, populism, turmoil, law_rounds, speech_rounds, congress_rounds,
+	for table in [national_support, _hidden_national_delta, _visible_national_support, populism, turmoil, law_rounds, speech_rounds, congress_rounds,
 			group_meetings, miting_fatigue, election_groups,
 			national_list, last_seats, election_seats, last_vote_shares, previous_vote_shares, inventories, funds, credibility]:
 		table.erase(pid)
@@ -4115,7 +4170,7 @@ func _rekey_party(old_id: int, new_id: int, new_member: int) -> void:
 			invitations[invitation_index] = new_id
 		alliance["invitations"] = invitations
 		alliances[alliance_id] = alliance
-	for table in [national_support, populism, turmoil, law_rounds, speech_rounds, congress_rounds,
+	for table in [national_support, _hidden_national_delta, _visible_national_support, populism, turmoil, law_rounds, speech_rounds, congress_rounds,
 			group_meetings, miting_fatigue, election_groups,
 			national_list, last_seats, election_seats, last_vote_shares, previous_vote_shares, party_congress]:
 		if table.has(old_id):
@@ -4195,6 +4250,7 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"max_rounds_override": max_rounds_override,
 		"passed": passed_threshold,
 		"national": national_support,
+		"visible_national": _visible_national(),
 		"local": local_support,
 		"events": province_events,
 		"organizations": organizations,
@@ -4281,6 +4337,7 @@ func _apply_state(state: Dictionary) -> void:
 	GameRules.set_election_anchor(election_anchor)
 	passed_threshold = state["passed"]
 	national_support = state["national"]
+	_visible_national_support = state.get("visible_national", national_support).duplicate()
 	local_support = state["local"]
 	province_events = state["events"]
 	organizations = state.get("organizations", {})
@@ -4380,7 +4437,18 @@ func _emit_post_event(event: Dictionary) -> void:
 		log_event(str(event["message"]), int(event.get("peer_id", -1)), String(event.get("province", "")), _log_kind(event))
 	for extra in event.get("extra_log", []):
 		log_event(String(extra["text"]), int(extra["peer_id"]), String(extra["province"]), String(extra["kind"]))
-	event_presented.emit(event, state_version)
+	if type == "secret_news":
+		for i in event.get("news", []).size():
+			var news: Dictionary = event["news"][i]
+			if news.has("message"):
+				opinion_event.emit(str(news["message"]))
+				log_event(str(news["message"]), int(news.get("peer_id", -1)), "", _log_kind(news))
+			# Batch içindeki her gazete ayrı kimlik alır.
+			news = news.duplicate()
+			news["news_id"] = "%d|%d" % [state_version, i]
+			event_presented.emit(news, state_version)
+	else:
+		event_presented.emit(event, state_version)
 	match type:
 		"round":
 			log_event(L.t("%s başladı.") % GameRules.period_label(round_number), -1, "", "round")
@@ -4390,6 +4458,10 @@ func _emit_post_event(event: Dictionary) -> void:
 			var trend := election_trend(mine)
 			if trend != "":
 				log_event(trend, mine, "", "election")
+
+@rpc("authority", "reliable")
+func _secret_play_confirmed(card_type: String) -> void:
+	card_played.emit(multiplayer.get_unique_id(), card_type)
 
 @rpc("authority", "reliable")
 func _receive_state(state: Dictionary, event: Dictionary) -> void:

@@ -387,8 +387,11 @@ func apply_group_deltas(changes: Array) -> Array:
 		if not parties.has(peer_id) or is_zero_approx(float(change["amount"])) or not VoterGroups.is_group(group):
 			continue
 		var groups: Dictionary = (parties[peer_id].get("groups", VoterGroups.neutral_affinities()) as Dictionary).duplicate()
-		var delta := VoterGroups.apply_delta(groups, group, float(change["amount"]))
+		var before := float(groups.get(group, VoterGroups.AFFINITY_NEUTRAL))
+		var delta := VoterGroups.apply_delta(groups, group, float(change["amount"]), parties[peer_id].get("core", []))
 		parties[peer_id]["groups"] = groups
+		if delta > 0.0:
+			_take_group_share(peer_id, group, delta, before)
 		if not is_zero_approx(delta):
 			actual.append({"peer": peer_id, "group": group, "delta": delta})
 	if actual.is_empty():
@@ -399,6 +402,23 @@ func apply_group_deltas(changes: Array) -> Array:
 	_broadcast_parties()
 	parties_updated.emit()
 	return actual
+
+## SEÇMEN ÇALMA: bir parti bir grupta `gained` kadar hitap kazanınca bu pay
+## kararsızlardan ve diğer partilerden, sahip oldukları payla orantılı alınır
+## (kazanan için evren: 100 − önceki hitabı). Hitap toplamı 100'ü aşamaz.
+func _take_group_share(peer_id: int, group: String, gained: float, before: float) -> void:
+	var universe := VoterGroups.AFFINITY_MAX - before
+	if universe <= 0.0:
+		return
+	for other in parties.keys():
+		if int(other) == peer_id or int(other) == BLOC_ID or not parties[other].has("groups"):
+			continue
+		var groups: Dictionary = (parties[other]["groups"] as Dictionary).duplicate()
+		var value := float(groups.get(group, VoterGroups.AFFINITY_NEUTRAL))
+		if value <= 0.0:
+			continue
+		groups[group] = maxf(0.0, value - gained * value / universe)
+		parties[other]["groups"] = groups
 
 func _apply_party_local_only(party_name: String, icon_index: int, icon_color: Color, bg_color: Color, core: Array) -> void:
 	var id := multiplayer.get_unique_id()

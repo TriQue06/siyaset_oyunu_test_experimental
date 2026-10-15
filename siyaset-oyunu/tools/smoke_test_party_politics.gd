@@ -433,6 +433,7 @@ func _initialize() -> void:
 	# İki yasa da aynı başlangıçtan (50) ölçülsün: azalan getiri karışmasın.
 	for g in ["dindar", "ilerici", "isci", "isveren"]:
 		pm.parties[crisis_bot]["groups"][g] = 50.0
+	pm.parties[crisis_bot]["core"] = []  # çekirdek çarpanı karşılaştırmayı bozmasın
 	var gb: Dictionary = (pm.parties[crisis_bot]["groups"] as Dictionary).duplicate()
 	cm.apply_law_result(crisis_bot, "law:dindar", {}, true, [])
 	var off_gain: float = float(pm.parties[crisis_bot]["groups"]["dindar"]) - float(gb["dindar"])

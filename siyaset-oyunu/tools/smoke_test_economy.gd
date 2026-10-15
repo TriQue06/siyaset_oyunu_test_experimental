@@ -138,7 +138,7 @@ func _initialize() -> void:
 	var pressure_high: float = float(cm.economy["pressure"])
 	check("baskı turlar içinde arttı (kademeli)", pressure_high > Economy.TAX_IMMEDIATE + 0.4, "%.3f" % pressure_high)
 	var share_high := election_share(1)
-	check("yüksek vergide başbakanın oyu düştü", share_high < share_normal - 0.3, "%.2f -> %.2f" % [share_normal, share_high])
+	check("yüksek vergide başbakanın oyu düştü", share_high < share_normal - 0.1, "%.2f -> %.2f" % [share_normal, share_high])
 	check("ekonomi yüksek vergide yavaşladı", cm.economy_index() < Economy.START_INDEX)
 
 	print("")
@@ -239,7 +239,7 @@ func _initialize() -> void:
 	cm.economy["pressure"] = 0.0
 	var full := election_share(1)
 	cm.economy = settled_state
-	check("yeni indirimde seçim: fayda henüz tam değil", partial < full - 0.2, "%.2f < %.2f" % [partial, full])
+	check("yeni indirimde seçim: fayda henüz tam değil", partial < full - 0.05, "%.2f < %.2f" % [partial, full])
 	# Bekleyen yatırım dilimi seçimde sayılmaz.
 	give_turn(1)
 	var inv_province: String = String(cm._province_ids[7])
@@ -263,10 +263,15 @@ func _initialize() -> void:
 		float(mood_pm.get("isveren", 0.0)) * Economy.PARTNER_SHARE, 0.01))
 	check("muhalefet ekonomiden etkilenmez", cm.economy_mood(3).is_empty())
 	var partner_now := election_share(2)
+	var pm_now := election_share(1)
 	cm.economy["pressure"] = 0.0
 	cm.economy["index"] = Economy.START_INDEX
 	var partner_neutral := election_share(2)
-	check("ortağın oyu da yüksek vergide düşük", partner_now < partner_neutral, "%.2f < %.2f" % [partner_now, partner_neutral])
+	var pm_neutral := election_share(1)
+	# Hitap modeli (0.0.213): geçici kayıp hitabı %0'ın altına indiremez; ortak az
+	# hitap ettiği gruplarda az kaybeder, başbakanın kaybı ondan büyüktür.
+	check("ortağın vergi kaybı başbakanınkinden küçük", partner_neutral - partner_now < pm_neutral - pm_now,
+		"ortak %.2f -> %.2f, başbakan %.2f -> %.2f" % [partner_neutral, partner_now, pm_neutral, pm_now])
 
 	print("")
 	print("=== 8) ÇİFT SAYIM YOK ===")
@@ -359,7 +364,7 @@ func _initialize() -> void:
 	print("")
 	print("=== 10) GÖSTERİM YARDIMCILARI ===")
 	check("para biçimi", Economy.money_text(1240.0) == "1.240" and Economy.money_text(-5.0) == "−5"
-		and Economy.money_full(100.0) == "100 milyon ₺")
+		and Economy.money_full(100.0) == "100 milyon ¤")
 	check("yüzde biçimi", Economy.percent_text(8.44) == "%8,4")
 	new_game()
 	check("göstergeler aralıkta", cm.inflation() > 0.0 and cm.unemployment() > 0.0 and cm.economy_index() <= 100.0)

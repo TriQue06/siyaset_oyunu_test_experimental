@@ -144,9 +144,19 @@ func _initialize() -> void:
 	print("")
 	print("=== 3) OY HESABI ===")
 	var mixed := {"emek": 70, "kusak": 40, "inanc": 55, "yonetim": 30}
-	check("notr parti her ilde uyum 50", near(VoterGroups.appeal(VoterGroups.neutral_affinities(), mixed), 50.0))
+	check("hic hitap etmeyen parti her ilde uyum 0", near(VoterGroups.appeal(VoterGroups.neutral_affinities(), mixed), 0.0))
+	check("yeni parti: her grupta %0, cekirdekte %10", near(float(groups(["isci", "dindar"])["isci"]), VoterGroups.CORE_START) \
+		and near(float(groups(["isci", "dindar"])["isveren"]), 0.0) and near(VoterGroups.CORE_START, 10.0))
+	var full_isci := ElectionModel.shares_in_group({1: with_group("isci", 100.0), 2: VoterGroups.neutral_affinities()}, "isci")
+	check("%100 hitap: diger partiler o gruptan 0 oy alir", near(float(full_isci[1]), 1.0) and near(float(full_isci[2]), 0.0), str(full_isci))
+	var nobody := ElectionModel.shares_in_group({1: VoterGroups.neutral_affinities(), 2: VoterGroups.neutral_affinities(), 3: VoterGroups.neutral_affinities()}, "emekli")
+	check("kimse hitap etmiyorsa grup homojen dagilir", near(float(nobody[1]), 1.0 / 3.0) and near(float(nobody[3]), 1.0 / 3.0), str(nobody))
+	var half := ElectionModel.shares_in_group({1: with_group("isci", 50.0), 2: VoterGroups.neutral_affinities()}, "isci")
+	check("%50 hitap + kararsizlarin esit payi: %75", near(float(half[1]), 0.75), str(half))
+	var over := ElectionModel.shares_in_group({1: with_group("isci", 80.0), 2: with_group("isci", 40.0)}, "isci")
+	check("hitap toplami 100'u asarsa paylar oranla kuculur", near(float(over[1]), 2.0 / 3.0), str(over))
 	var base_appeal := VoterGroups.appeal(VoterGroups.neutral_affinities(), mixed)
-	var plus := VoterGroups.appeal(with_group("isci", 70.0), mixed)
+	var plus := VoterGroups.appeal(with_group("isci", 20.0), mixed)
 	check("dort cift tek secmen: bir gruptaki +20, uyumu pay x 20 / 4 artirir", near(plus - base_appeal, 0.70 * 20.0 / 4.0), "%.3f" % (plus - base_appeal))
 	var zero := {}
 	for group in VoterGroups.GROUP_IDS:
@@ -185,34 +195,75 @@ func _initialize() -> void:
 		str(seats_by_method["dhondt"]) != str(seats_by_method["wta"]) or str(seats_by_method["hare"]) != str(seats_by_method["wta"]), str(seats_by_method))
 
 	print("")
-	print("=== 3b) MITING: YEREL + ULUSAL HITAP, CIFT SAYIM YOK ===")
+	print("=== 3b) MITING: YEREL + NUFUSLA ORANTILI HITAP, ODAK, SECMEN CALMA ===")
 	new_game({1: groups(["isci", "dindar"]), 2: groups(["isveren", "ilerici"])})
 	var mid: String = game_map.ids[0]
-	cm.province_profiles[mid] = {"emek": 80, "kusak": 50, "inanc": 30, "yonetim": 50}
-	var profile_before := str(cm.province_profiles)
+	var mid_profile: Dictionary = cm.province_profiles[mid].duplicate(true)
+	for pair in {"emek": 80, "kusak": 50, "inanc": 30, "yonetim": 50}:
+		VoterGroups.set_percent(mid_profile, VoterGroups.PAIRS[pair][0], {"emek": 80, "kusak": 50, "inanc": 30, "yonetim": 50}[pair])
+	mid_profile.erase("_counts")
+	cm.province_profiles[mid] = mid_profile
+	var profile_before := str(cm.province_profiles[mid])
 	cm.organizations[mid] = {1: 1}
 	cm.funds[1] = 500
 	cm.current_turn_index = 0
+	# Provokasyonu dışarıda bırak: ildeki seçmene yeterince hitap eden partide risk 0.
+	pm.parties[1]["groups"]["isci"] = 40.0
+	pm.parties[2]["groups"]["emekli"] = 20.0
 	var g_before: Dictionary = pm.parties[1]["groups"].duplicate()
+	var rival_before: Dictionary = pm.parties[2]["groups"].duplicate()
 	var nat_before: float = cm.national_of(1)
 	var loc_before: float = cm.local_of(mid, 1)
-	# Provokasyonu dışarıda bırak: uyumu yüksek ilde risk 0.
 	check("uyumlu ilde provokasyon riski yok", near(cm.miting_risk(1, mid), 0.0), "%.2f" % cm.miting_risk(1, mid))
-	cm._apply_miting_move(1, mid)
+	check("miting teskilat istemez", cm.can_miting(1, game_map.ids[4]) and cm.organization_level(game_map.ids[4], 1) == 0)
+	var g0 := float(cm.miting_group_gains(1, game_map.ids[4])[0]["gain"])
+	cm.organizations[game_map.ids[4]] = {1: 1}
+	var g1 := float(cm.miting_group_gains(1, game_map.ids[4])[0]["gain"])
+	cm.organizations[game_map.ids[4]] = {1: 2}
+	var g2 := float(cm.miting_group_gains(1, game_map.ids[4])[0]["gain"])
+	cm.organizations.erase(game_map.ids[4])
+	check("teskilat 0 / 1 / 2: etki 1x / 2x / 3x", g0 > 0.0 and near(g1, 2.0 * g0) and near(g2, 3.0 * g0), "%.3f / %.3f / %.3f" % [g0, g1, g2])
+	check("odak sayisi = teskilat seviyesi", cm.miting_focus_slots(1, mid) == 1 and cm.miting_focus_slots(1, game_map.ids[4]) == 0)
+	check("fazla odak kirpilir", cm._clean_focus(1, mid, ["emekli", "genc", "emekli"]) == ["emekli"])
+	var plain_emekli := 0.0
+	for effect in cm.miting_group_gains(1, mid):
+		if effect["group"] == "emekli":
+			plain_emekli = float(effect["gain"])
+	cm._apply_miting_move(1, mid, 0.0, ["emekli"])
 	var d_isci := float(pm.parties[1]["groups"]["isci"]) - float(g_before["isci"])
 	var d_isveren := float(pm.parties[1]["groups"]["isveren"]) - float(g_before["isveren"])
-	var d_ilerici := float(pm.parties[1]["groups"]["ilerici"]) - float(g_before["ilerici"])
-	check("yerel: il aktivitesi MITING_LOCAL artar", near(cm.local_of(mid, 1) - loc_before, PublicOpinion.MITING_LOCAL))
-	check("ulusal: ilin baskin gruplarina (isci, ilerici) yakinlik artar", d_isci > 0.5 and d_ilerici > 0.5, "%.2f / %.2f" % [d_isci, d_ilerici])
-	check("karsit grupta daha kucuk kayip", d_isveren < 0.0 and absf(d_isveren) < d_isci, "%.2f" % d_isveren)
-	check("dengeli ciftlerde etki yok", near(float(pm.parties[1]["groups"]["genc"]), float(g_before["genc"])) \
-		and near(float(pm.parties[1]["groups"]["ozerkci"]), float(g_before["ozerkci"])))
+	var d_emekli := float(pm.parties[1]["groups"]["emekli"]) - float(g_before["emekli"])
+	var d_genc := float(pm.parties[1]["groups"]["genc"]) - float(g_before["genc"])
+	check("yerel: il aktivitesi MITING_LOCAL x teskilat carpani artar", near(cm.local_of(mid, 1) - loc_before, PublicOpinion.MITING_LOCAL * 2.0))
+	check("ildeki her gruptan kazanir (kalabalik grupta daha cok)", d_isci > 0.0 and d_isveren > 0.0 and d_isci > d_isveren, "%.3f / %.3f" % [d_isci, d_isveren])
+	check("odak grup (emekli) odaksiz mitingin %s kati getirir" % PublicOpinion.MITING_FOCUS_MULT,
+		near(d_emekli, plain_emekli * PublicOpinion.MITING_FOCUS_MULT, 0.01) and d_genc > 0.0, "%.3f / %.3f" % [d_emekli, plain_emekli])
+	check("secmen calma: rakibin emekli hitabi azaldi", float(pm.parties[2]["groups"]["emekli"]) < float(rival_before["emekli"]),
+		"%.3f -> %.3f" % [float(rival_before["emekli"]), float(pm.parties[2]["groups"]["emekli"])])
+	var hitap_total := 0.0
+	for pid in [1, 2]:
+		hitap_total += float(pm.parties[pid]["groups"]["emekli"])
+	check("hitap toplami 100'u asmaz", hitap_total <= 100.0 + 0.001)
 	check("miting ayrica genel ulusal puan yazmaz (cift sayim yok)", near(cm.national_of(1), nat_before))
-	check("miting il profilini degistirmez", str(cm.province_profiles) == profile_before)
+	# KÜÇÜK İL: 3 vekil, %95 emekli; 2. seviye teşkilat + emekli odağı bile ~%1-2 getirir.
+	var tiny: String = game_map.ids[6]
+	var tiny_profile: Dictionary = cm.province_profiles[tiny].duplicate(true)
+	VoterGroups.set_percent(tiny_profile, "emekli", 95)
+	tiny_profile.erase("_counts")
+	tiny_profile["_electorate"] = 3 * HexGridGenerator.VOTERS_PER_SEAT
+	cm.province_profiles[tiny] = tiny_profile
+	cm.organizations[tiny] = {2: 2}
+	var tiny_gain := 0.0
+	for effect in cm.miting_group_gains(2, tiny, ["emekli"]):
+		if effect["group"] == "emekli":
+			tiny_gain = float(effect["gain"])
+	check("kucuk il (%95 emekli, 3 vekil): odakli miting emeklide en cok ~%2", tiny_gain > 0.3 and tiny_gain <= 2.5, "%.2f" % tiny_gain)
+	cm.organizations.erase(tiny)
+	check("miting il profilini degistirmez", str(cm.province_profiles[mid]) == profile_before)
 	var g_mid: Dictionary = pm.parties[1]["groups"].duplicate()
 	cm._apply_miting_move(1, mid)
 	var d_isci2 := float(pm.parties[1]["groups"]["isci"]) - float(g_mid["isci"])
-	check("ayni gruba art arda miting daha az getirir (azalan getiri)", d_isci2 > 0.0 and d_isci2 < d_isci * 0.85, "%.2f -> %.2f" % [d_isci, d_isci2])
+	check("ayni gruba art arda miting daha az getirir (azalan getiri)", d_isci2 > 0.0 and d_isci2 < d_isci * 0.85, "%.3f -> %.3f" % [d_isci, d_isci2])
 	for i in 40:
 		cm._apply_miting_move(1, mid)
 		cm.local_support = {}
@@ -327,6 +378,7 @@ func _initialize() -> void:
 	cm.funds[1] = 100.0
 	var org_pid: String = game_map.ids[2]
 	cm.organizations[org_pid] = {1: 1}
+	cm.last_election_round = 1  # toplantı ilk seçimden sonra
 	check("sira gelince toplanti hakki var", cm.needs_speech(1) and not cm.needs_speech(2))
 	check("toplantisiz da hamle yapilabilir", cm.can_choose_main_action(1) and cm.can_miting(1, org_pid) \
 		and cm.can_play_card(1, "bagis_kampanyasi"))
@@ -335,13 +387,13 @@ func _initialize() -> void:
 	var permanent: Dictionary = pm.parties[1]["groups"].duplicate()
 	var r0: int = cm.round_number
 	cm._apply_speech(1, "emekli")
-	check("toplanti bu tur +10 gecici destek", cm.speech_done and near(float(cm.effective_groups(1)["emekli"]), float(permanent["emekli"]) + 10.0))
+	check("toplanti bu tur +%s gecici destek" % PublicOpinion.MEETING_BONUS[0], cm.speech_done and near(float(cm.effective_groups(1)["emekli"]), float(permanent["emekli"]) + PublicOpinion.MEETING_BONUS[0]))
 	check("kalici destek degismez", str(pm.parties[1]["groups"]) == str(permanent))
 	check("bedel %d para" % GameRules.SPEECH_FUNDS_COST, near(cm.funds_of(1), 100.0 - GameRules.SPEECH_FUNDS_COST))
 	cm._apply_speech(1, "genc")
 	check("turda tek toplanti", cm.meeting_bonuses(1).size() == 1)
-	check("sonraki tur +3, sonraki +1, sonra 0", near(float(cm.meeting_bonuses(1, r0 + 1).get("emekli", 0.0)), 3.0) \
-		and near(float(cm.meeting_bonuses(1, r0 + 2).get("emekli", 0.0)), 1.0) and cm.meeting_bonuses(1, r0 + 3).is_empty())
+	check("sonraki turlarda azalir, sonra 0", near(float(cm.meeting_bonuses(1, r0 + 1).get("emekli", 0.0)), PublicOpinion.MEETING_BONUS[1]) \
+		and near(float(cm.meeting_bonuses(1, r0 + 2).get("emekli", 0.0)), PublicOpinion.MEETING_BONUS[2]) and cm.meeting_bonuses(1, r0 + 3).is_empty())
 	var nat1: float = cm.national_of(1)
 	cm._apply_pass(1, true)
 	check("toplanan partiye ceza yok", near(cm.national_of(1), nat1))
@@ -351,7 +403,7 @@ func _initialize() -> void:
 	check("toplanti yapmamak ulusal ceza getirmez", near(cm.national_of(2), nat2))
 	# Ardışık turlarda aynı gruba toplantı bonusu biriktirmez.
 	cm.group_meetings[1] = {"emekli": r0 + 1}
-	check("ardisik toplanti bonusu toplamaz (en fazla +10)", near(float(cm.meeting_bonuses(1, r0 + 1).get("emekli", 0.0)), 10.0))
+	check("ardisik toplanti bonusu toplamaz", near(float(cm.meeting_bonuses(1, r0 + 1).get("emekli", 0.0)), PublicOpinion.MEETING_BONUS[0]))
 	cm.group_meetings[1] = {"emekli": r0}
 	cm._decay_group_effects(r0 + 3)
 	check("suresi dolan toplanti kaydi silinir", not cm.group_meetings.has(1))
@@ -372,7 +424,7 @@ func _initialize() -> void:
 	var finished: int = cm.round_number
 	cm.group_meetings[1] = {"emekli": finished}
 	var at_election: Dictionary = cm._group_profiles(finished)
-	check("secim turunda yapilan toplanti secim hesabina tam girer", near(float(at_election[1]["emekli"]) - float(at_election[2]["emekli"]), 10.0))
+	check("secim turunda yapilan toplanti secim hesabina tam girer", near(float(at_election[1]["emekli"]) - float(at_election[2]["emekli"]), PublicOpinion.MEETING_BONUS[0]))
 
 	print("")
 	print("=== 9) KARISIKLIK, BOLUNME VE GERI DONUS ===")
@@ -519,6 +571,8 @@ func _initialize() -> void:
 	# Yasa da bedelsiz ve her gruba açık: bot geçen dönem yasa sundu sayılır ki
 	# anayasa yasa hakkıyla yarışsın (yasa sıklığı sınırı).
 	cm.law_rounds[1] = cm.round_number - 1
+	# Miting artık teşkilat istemiyor: anayasa kararı ölçülsün diye mitinge para yetmesin.
+	cm.funds[1] = GameRules.MITING_FUNDS_COST - 1
 	var action: Dictionary = brain.choose_action(1)
 	check("bot hamlesi anayasa teklifi", String(action.get("type", "")) == "constitution", str(action))
 	root.get_node("BotManager").do_action(1)

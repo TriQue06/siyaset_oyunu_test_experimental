@@ -54,13 +54,10 @@ static func load_province_voters() -> Dictionary:
 static func support(affinities: Dictionary, profile: Dictionary) -> float:
 	return VoterGroups.vote_weight(VoterGroups.appeal(affinities, profile))
 
-## GRUP BAZLI OY (0.0.186): ildeki her seçmen grubu (4 çiftin iki tarafı, ilin
-## profiline göre büyüklük) oyunu partiler arasında KENDİ içinde paylaştırır:
-## partinin o gruptaki ağırlığı exp(GROUP_SHARPNESS × (yakınlık − 50)) ×
-## kamuoyu. Bir gruba çok yakın parti (ör. emeklilerde 85, rakipler 50-60) o
-## grubun oylarının büyük kısmını alır; il payı grupların toplamıdır.
+## GRUP BAZLI OY: ildeki her seçmen grubu (4 çiftin iki tarafı, ilin
+## profiline göre büyüklük) oyunu partiler arasında KENDİ içinde paylaştırır
+## (bkz. shares_in_group: hitap payı + kararsızların eşit payı, × kamuoyu).
 ## weights: peer_id -> kamuoyu / dalgalanma çarpanı (> 0).
-const GROUP_SHARPNESS := 0.09
 
 static func group_vote_shares(parties: Dictionary, profile: Dictionary, weights: Dictionary) -> Dictionary:
 	var peer_ids: Array = parties.keys()
@@ -84,13 +81,25 @@ static func group_vote_shares(parties: Dictionary, profile: Dictionary, weights:
 				result[peer_id] = float(result[peer_id]) + size * float(in_group[peer_id])
 	return result
 
-## Bir grubun oylarının partiler arasındaki dağılımı (0..1).
+## Bir grubun oylarının partiler arasındaki dağılımı (0..1). Her parti hitap
+## payını (yakınlık / 100) alır; hitap toplamı 100'ü aşarsa (geçici bonuslar)
+## paylar oranla küçülür. Kimsenin hitap etmediği pay partilere EŞİT dağılır.
+## Sonra kamuoyu çarpanıyla ağırlıklanıp normalize edilir: %100 hitap eden
+## parti varsa diğerleri o gruptan 0 oy alır.
 static func shares_in_group(parties: Dictionary, group: String, weights: Dictionary = {}) -> Dictionary:
 	var raw := {}
 	var total := 0.0
+	var committed := {}
+	var committed_total := 0.0
 	for peer_id in parties.keys():
-		var aff := float((parties[peer_id] as Dictionary).get(group, VoterGroups.AFFINITY_NEUTRAL))
-		raw[peer_id] = exp(GROUP_SHARPNESS * (aff - VoterGroups.AFFINITY_NEUTRAL)) * float(weights.get(peer_id, 1.0))
+		var c := clampf(float((parties[peer_id] as Dictionary).get(group, VoterGroups.AFFINITY_NEUTRAL)) / VoterGroups.AFFINITY_MAX, 0.0, 1.0)
+		committed[peer_id] = c
+		committed_total += c
+	var scale := 1.0 / committed_total if committed_total > 1.0 else 1.0
+	var undecided := maxf(0.0, 1.0 - committed_total)
+	var count := maxi(1, parties.size())
+	for peer_id in parties.keys():
+		raw[peer_id] = (float(committed[peer_id]) * scale + undecided / count) * float(weights.get(peer_id, 1.0))
 		total += float(raw[peer_id])
 	for peer_id in raw.keys():
 		raw[peer_id] = float(raw[peer_id]) / maxf(total, 0.0001)

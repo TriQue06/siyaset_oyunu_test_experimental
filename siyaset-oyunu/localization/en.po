@@ -3441,114 +3441,6 @@ msgstr "Name of the bot party leader"
 msgid "Genel başkan"
 msgstr "Party leader"
 
-msgid "İTTİFAK"
-msgstr "ALLIANCE"
-
-msgid "görüntüle"
-msgstr "view"
-
-msgid "İttifakları görüntüle, kur veya partileri davet et ve katıl."
-msgstr "View alliances, create one, invite parties, or join."
-
-msgid "SEÇİM İTTİFAKLARI"
-msgstr "ELECTION ALLIANCES"
-
-msgid "Barajda ortak oy sayılır. Her ilde ittifakın vekilleri, üyelerin oy oranına göre paylaşılır."
-msgstr "Alliance votes count together toward the threshold. In each province, alliance seats are shared among members by their vote totals."
-
-msgid "YENİ İTTİFAK KUR"
-msgstr "FORM AN ALLIANCE"
-
-msgid "İttifak adı"
-msgstr "Alliance name"
-
-msgid "İttifak rengini seç"
-msgstr "Choose alliance color"
-
-msgid "KUR"
-msgstr "CREATE"
-
-msgid "Henüz kurulmuş bir seçim ittifakı yok."
-msgstr "No election alliances have been formed yet."
-
-msgid "Anayasa seçim ittifaklarını devre dışı bıraktı."
-msgstr "The constitution has disabled election alliances."
-
-msgid "Bağımsız siyasetçiler ittifaka katılamaz."
-msgstr "Independent politicians cannot join an alliance."
-
-msgid "İttifak kararını partinin genel başkanı verir."
-msgstr "Only the party leader can manage its alliance membership."
-
-msgid "İttifaka katılmak veya davet göndermek için sıranı bekle."
-msgstr "Wait for your turn to join or send an invitation."
-
-msgid "İttifaka bir ad ver."
-msgstr "Enter an alliance name."
-
-msgid "Üyeler: %s"
-msgstr "Members: %s"
-
-msgid "yok"
-msgstr "none"
-
-msgid "Davet bekliyor: %s"
-msgstr "Invitation pending: %s"
-
-msgid "DAVET ET"
-msgstr "INVITE"
-
-msgid "KATIL"
-msgstr "JOIN"
-
-msgid "Davet edilebilecek başka parti yok."
-msgstr "There are no other parties to invite."
-
-msgid "Anayasa ittifakları devre dışı bıraktı. Yeni seçim ittifakı kurulamaz ve ittifak hesabı yapılmaz."
-msgstr "The constitution has disabled alliances. No new alliance can form, and alliance rules do not apply."
-
-msgid "Seçim ittifakları açık"
-msgstr "Election alliances enabled"
-
-msgid "Meclisin 2/3'ü (%d vekil) EVET derse yürürlüğe girer, yoksa reddedilir. İttifaklar baraj için ortak sayılır; seçim çevresinde vekiller önce ittifaka, sonra üyelere dağıtılır."
-msgstr "It takes two thirds of parliament (%d seats) to pass. Alliances pool votes for the threshold; in each district, seats go first to the alliance and then to its members."
-
-msgid "%s ittifakı kuruldu; %s ittifakın kurucu partisi oldu."
-msgstr "%s was formed, with %s as its founding party."
-
-msgid "%s, %s ittifakına katıldı."
-msgstr "%s joined the %s alliance."
-
-msgid "%s, %s ittifakına davet edildi."
-msgstr "%s was invited to the %s alliance."
-
-msgid "%s, %s ittifakına katılmayı kabul etti."
-msgstr "%s accepted the invitation to join the %s alliance."
-
-msgid "%s, %s ittifakına katılma davetini reddetti."
-msgstr "%s declined the invitation to join the %s alliance."
-
-msgid "SANDIKTA GÜÇLER BİRLEŞİYOR!"
-msgstr "ALLIANCES TAKE SHAPE BEFORE THE VOTE!"
-
-msgid "İTTİFAK KURULDU"
-msgstr "ALLIANCE FORMED"
-
-msgid "İTTİFAK GENİŞLİYOR!"
-msgstr "ALLIANCE GROWS!"
-
-msgid "İTTİFAKA KATILDI"
-msgstr "JOINED THE ALLIANCE"
-
-msgid " Seçim ittifakları: %s."
-msgstr " Election alliances: %s."
-
-msgid "açık"
-msgstr "enabled"
-
-msgid "kapalı"
-msgstr "disabled"
-
 msgid "MECLİS OYLAMA SÜRESİ"
 msgstr "PARLIAMENT VOTING TIME"
 
@@ -3603,7 +3495,6 @@ msgstr "MAP AND REPRESENTATION"
 msgid "Grup toplantısı ilk seçimden sonra yapılabilir."
 msgstr "Group meetings are available after the first election."
 
-# Settings concept A
 msgid "Oyun menüsü"
 msgstr "Game menu"
 
@@ -3780,3 +3671,138 @@ msgstr "Your personal settings will return to their defaults."
 
 msgid "Gizli hamle uygulandı. Haber tur sonunda yayınlanacak."
 msgstr "Secret action applied. The news will be published at the end of the round."
+
+msgid "%s ittifakı kuruldu; %s ittifakın kurucu partisi oldu."
+msgstr "The %s alliance was founded; %s is its founding party."
+
+msgid "%s, %s ittifakına katıldı."
+msgstr "%s joined the %s alliance."
+
+msgid "%s, %s ittifakına davet edildi."
+msgstr "%s was invited to the %s alliance."
+
+msgid "%s, %s ittifakına katılma davetini reddetti."
+msgstr "%s declined the invitation to join the %s alliance."
+
+msgid "odak: %s"
+msgstr "focus: %s"
+
+msgid "SANDIKTA GÜÇLER BİRLEŞİYOR!"
+msgstr "FORCES UNITE AT THE BALLOT BOX!"
+
+msgid "İTTİFAK KURULDU"
+msgstr "ALLIANCE FOUNDED"
+
+msgid "İTTİFAK GENİŞLİYOR!"
+msgstr "THE ALLIANCE GROWS!"
+
+msgid "İTTİFAKA KATILDI"
+msgstr "JOINED THE ALLIANCE"
+
+msgid "MİTİNG ODAĞI · %s"
+msgstr "RALLY FOCUS · %s"
+
+msgid "%d / %d grup"
+msgstr "%d / %d groups"
+
+msgid "Teşkilat seviyesi %d: en çok %d gruba odaklanabilirsin. Odak gruplarda kazanç %s kat; seçmezsen odaksız miting."
+msgstr "Organisation level %d: you can focus on up to %d groups. Focus groups gain %sx; pick none for an unfocused rally."
+
+msgid "Beklenen hitap:%s"
+msgstr "Expected appeal:%s"
+
+msgid " · hitap:"
+msgstr " · appeal:"
+
+msgid "ONAYLA · %s"
+msgstr "CONFIRM · %s"
+
+msgid "%s: odak gruplarını seç, ONAYLA'ya bas (ya da ile tekrar dokun)  ·  Butona tekrar dokun: iptal"
+msgstr "%s: pick focus groups, press CONFIRM (or tap the province again)  ·  Tap the button again: cancel"
+
+msgid "İTTİFAK"
+msgstr "ALLIANCE"
+
+msgid "görüntüle"
+msgstr "view"
+
+msgid "İttifakları görüntüle, kur veya partileri davet et ve katıl."
+msgstr "View alliances, found one, invite parties or join."
+
+msgid "SEÇİM İTTİFAKLARI"
+msgstr "ELECTION ALLIANCES"
+
+msgid "Barajda ortak oy sayılır. Her ilde ittifakın vekilleri, üyelerin oy oranına göre paylaşılır."
+msgstr "Votes count jointly for the threshold. In each province the alliance's seats are shared by members' vote shares."
+
+msgid "YENİ İTTİFAK KUR"
+msgstr "FOUND NEW ALLIANCE"
+
+msgid "İttifak adı"
+msgstr "Alliance name"
+
+msgid "KUR"
+msgstr "FOUND"
+
+msgid "İttifaka bir ad ver."
+msgstr "Give the alliance a name."
+
+msgid "Anayasa seçim ittifaklarını devre dışı bıraktı."
+msgstr "The constitution has disabled election alliances."
+
+msgid "Bağımsız siyasetçiler ittifaka katılamaz."
+msgstr "Independent politicians cannot join an alliance."
+
+msgid "İttifak kararını partinin genel başkanı verir."
+msgstr "The party leader decides on alliances."
+
+msgid "İttifaka katılmak veya davet göndermek için sıranı bekle."
+msgstr "Wait for your turn to join an alliance or send invitations."
+
+msgid "Anayasa ittifakları devre dışı bıraktı. Yeni seçim ittifakı kurulamaz ve ittifak hesabı yapılmaz."
+msgstr "The constitution has disabled alliances. No new election alliance can be founded and alliances are not counted."
+
+msgid "Henüz kurulmuş bir seçim ittifakı yok."
+msgstr "No election alliance has been founded yet."
+
+msgid "İttifak"
+msgstr "Alliance"
+
+msgid "Üyeler: %s"
+msgstr "Members: %s"
+
+msgid "Davet bekliyor: %s"
+msgstr "Invitation pending: %s"
+
+msgid "DAVET ET"
+msgstr "INVITE"
+
+msgid "KATIL"
+msgstr "JOIN"
+
+msgid "Seçim ittifakları açık"
+msgstr "Election alliances enabled"
+
+msgid "Meclisin 2/3'ü (%d vekil) EVET derse yürürlüğe girer, yoksa reddedilir. İttifaklar baraj için ortak sayılır; seçim çevresinde vekiller önce ittifaka, sonra üyelere dağıtılır."
+msgstr "Takes effect if 2/3 of parliament (%d MPs) vote YES, otherwise rejected. Alliances count jointly for the threshold; in each district seats go first to the alliance, then to its members."
+
+msgid "açık"
+msgstr "on"
+
+msgid "kapalı"
+msgstr "off"
+
+msgid " Seçim ittifakları: %s."
+msgstr " Election alliances: %s."
+
+msgid "Çekirdek gruplarda %%%d, diğerlerinde %%%d hitapla başlarsın; çekirdek gruplarda kazancın %d katıdır. Hitap yasa, miting ve toplantıyla büyür, rakipler senden seçmen çalabilir."
+msgstr "You start with %%%d appeal in your core groups and %%%d in the others; gains in core groups are %dx. Appeal grows with laws, rallies and meetings, and rivals can steal voters from you."
+
+msgid "Burada miting yaparsan (odaksız; teşkilatla %d grup odağı seçebilirsin):"
+msgstr "If you rally here (unfocused; with your organisation you can pick %d focus groups):"
+
+msgid "Burada miting yaparsan (teşkilatsız: etkisi düşük, odak seçilemez):"
+msgstr "If you rally here (no organisation: weak effect, no focus):"
+
+msgid "SİYASET OYUNU"
+msgstr "POLITICS GAME"

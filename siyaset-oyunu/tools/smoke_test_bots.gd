@@ -190,7 +190,7 @@ func _initialize() -> void:
 		far_groups[g[0]] = g[1]
 	pm.parties[ids[1]]["groups"] = far_groups
 	var near_groups := VoterGroups.neutral_affinities()
-	near_groups["isveren"] = 55.0
+	near_groups["isveren"] = 5.0
 	pm.parties[ids[2]]["groups"] = near_groups
 	var solo := {}
 	for post in gp2.POSTS:

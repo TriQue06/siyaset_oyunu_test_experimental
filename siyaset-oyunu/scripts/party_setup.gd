@@ -532,8 +532,8 @@ func _build_core_buttons() -> void:
 	_core_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_core_note.add_theme_font_size_override("font_size", 10)
 	_core_note.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
-	_core_note.text = L.t("Çekirdek gruplarda %%%d, karşıtlarında %%%d, diğerlerinde %%%d destekle başlarsın. Oyunda yasa, miting ve toplantıyla değişir.") % [
-		int(VoterGroups.CORE_START), int(VoterGroups.CORE_OPPOSITE_START), int(VoterGroups.AFFINITY_NEUTRAL)]
+	_core_note.text = L.t("Çekirdek gruplarda %%%d, diğerlerinde %%%d hitapla başlarsın; çekirdek gruplarda kazancın %d katıdır. Hitap yasa, miting ve toplantıyla büyür, rakipler senden seçmen çalabilir.") % [
+		int(VoterGroups.CORE_START), int(VoterGroups.AFFINITY_NEUTRAL), int(VoterGroups.CORE_GAIN_MULT)]
 	core_container.add_child(_core_note)
 
 func _core_button(group: String) -> Button:

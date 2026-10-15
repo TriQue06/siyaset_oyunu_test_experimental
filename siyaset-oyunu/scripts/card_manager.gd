@@ -1029,10 +1029,42 @@ func can_miting(peer_id: int, province_id: String = "", state: float = -1.0) -> 
 	# BAĞIMSIZ siyasetçinin teşkilatı yoktur: her ilde miting yapabilir.
 	if PartyManager.is_independent(peer_id):
 		return province_id == "" or has_province(province_id)
-	if province_id == "":
-		return has_organization_anywhere(peer_id)
-	# Miting artik teskilat ister: once ilde orgutlenmis olmak gerekir.
-	return has_province(province_id) and organization_level(province_id, peer_id) > 0
+	# 0.0.213: miting teşkilat istemez (teşkilatsız miting az getirir).
+	return province_id == "" or has_province(province_id)
+
+## Bu ilde mitingte seçilebilecek grup odağı sayısı = teşkilat seviyesi.
+func miting_focus_slots(peer_id: int, province_id: String) -> int:
+	return organization_level(province_id, peer_id)
+
+## Odak listesini temizler: geçerli, tekrarsız, en çok teşkilat seviyesi kadar.
+func _clean_focus(peer_id: int, province_id: String, focus: Array) -> Array:
+	var result: Array = []
+	for group in focus:
+		if VoterGroups.is_group(String(group)) and not result.has(String(group)) \
+				and result.size() < miting_focus_slots(peer_id, province_id):
+			result.append(String(group))
+	return result
+
+## Ülkedeki grup seçmen sayıları.
+func national_group_counts() -> Dictionary:
+	return VoterGroups.national_counts(province_voters())
+
+## Mitingin bu ildeki grup kazançları (ham; yorgunluk dahil, azalan getiri hariç).
+func miting_group_gains(peer_id: int, province_id: String, focus: Array = []) -> Array:
+	var pid := party_of(peer_id)
+	var fatigue: Dictionary = miting_fatigue.get(pid, {})
+	var result: Array = []
+	for effect in PublicOpinion.miting_gains(province_profile(province_id), national_group_counts(),
+			_miting_mult(peer_id, province_id), focus):
+		var group := String(effect["group"])
+		result.append({"group": group, "gain": float(effect["gain"]) * PublicOpinion.miting_fatigue_mult(float(fatigue.get(group, 0.0)))})
+	return result
+
+func _miting_mult(peer_id: int, province_id: String) -> float:
+	var mult := PublicOpinion.miting_org_mult(organization_level(province_id, peer_id))
+	if PoliticianPresets.has_background(peer_id, "sendikaci"):
+		mult *= PoliticianPresets.UNION_MITING_MULT
+	return mult
 
 ## Partinin herhangi bir ilde teskilati var mi? (miting/karalama on sarti)
 func has_organization_anywhere(peer_id: int) -> bool:
@@ -1871,14 +1903,15 @@ func censure() -> void:
 	else:
 		_request_censure.rpc_id(1)
 
-## Miting hamlesi: seçilen ilde miting (MITING_FUNDS_COST).
-func miting(province_id: String, state: float = 0.0) -> void:
+## Miting hamlesi: seçilen ilde miting (MITING_FUNDS_COST). focus: odak gruplar
+## (en çok ildeki teşkilat seviyesi kadar).
+func miting(province_id: String, state: float = 0.0, focus: Array = []) -> void:
 	if not can_miting(multiplayer.get_unique_id(), province_id, state):
 		return
 	if _is_authority():
-		_apply_miting_move(multiplayer.get_unique_id(), province_id, state)
+		_apply_miting_move(multiplayer.get_unique_id(), province_id, state, focus)
 	else:
-		_request_miting.rpc_id(1, province_id, state)
+		_request_miting.rpc_id(1, province_id, state, focus)
 
 ## "Turu Bitir": sırayı bir sonraki oyuncuya devreder.
 func pass_turn() -> void:
@@ -2009,7 +2042,7 @@ func _apply_censure_move(peer_id: int) -> void:
 		"message": L.t("%s hükümete gensoru verdi: meclis oylaması başladı.") % _party_name(peer_id)})
 	GovernmentManager.submit_censure(peer_id)
 
-func _apply_miting_move(peer_id: int, province_id: String, state: float = 0.0) -> void:
+func _apply_miting_move(peer_id: int, province_id: String, state: float = 0.0, focus: Array = []) -> void:
 	if not can_miting(peer_id, province_id, state):
 		return
 	var total := float(GameRules.MITING_FUNDS_COST)
@@ -2022,7 +2055,7 @@ func _apply_miting_move(peer_id: int, province_id: String, state: float = 0.0) -
 	if float(split["state"]) > 0.0:
 		economy_event.emit({"kind": "invest", "cost": float(split["state"]), "before": before, "after": state_treasury()})
 	_event_message = ""
-	_apply_miting(peer_id, province_id)
+	_apply_miting(peer_id, province_id, _clean_focus(peer_id, province_id, focus))
 	# Bağımsızın ve üyenin mitingi kendi güvenilirliğini de artırır.
 	if PartyManager.is_independent(peer_id) or is_party_member(peer_id):
 		credibility_add(peer_id, MITING_CREDIBILITY)
@@ -2103,7 +2136,7 @@ func _province_name(province_id: String) -> String:
 	return GameMap.name_of(province_id)
 
 ## Miting: riski ilin mevcut siyasi dengesine göre hesaplanır, zar atılır.
-func _apply_miting(peer_id: int, province_id: String) -> void:
+func _apply_miting(peer_id: int, province_id: String, focus: Array = []) -> void:
 	var risk := miting_risk(peer_id, province_id)
 	if _event_roll("miting|%d|%s" % [party_of(peer_id), province_id]) < risk:
 		_add_local(province_id, peer_id, PublicOpinion.PROVOCATION_LOCAL, true)
@@ -2112,47 +2145,42 @@ func _apply_miting(peer_id: int, province_id: String) -> void:
 		_event_message = L.t("%s'da %s mitinginde provokasyon çıktı: parti ilde ve ülke genelinde destek kaybetti.") % [
 			_province_name(province_id), _party_name(peer_id)]
 	else:
-		var org_mult := PublicOpinion.org_action_mult(organization_level(province_id, peer_id))
-		if PoliticianPresets.has_background(peer_id, "sendikaci"):
-			org_mult *= PoliticianPresets.UNION_MITING_MULT
+		var org_mult := _miting_mult(peer_id, province_id)
 		# YEREL: ildeki aktivite (söner).
 		_add_local(province_id, peer_id, PublicOpinion.MITING_LOCAL * org_mult, true)
-		# ULUSAL YANSIMA: hitap ilin baskın gruplarına kayar (kalıcı, azalan getiri).
-		var moved := _apply_miting_positioning(peer_id, province_id, org_mult)
+		# ULUSAL HİTAP: ildeki grupların bir kısmı kazanılır (nüfusla orantılı, kalıcı).
+		var moved := _apply_miting_positioning(peer_id, province_id, focus)
 		_log_province(province_id, L.t("%s miting yaptı") % _party_name(peer_id))
 		_ease_turmoil(peer_id, PublicOpinion.TURMOIL_EASE_MITING)
 		_event_message = L.t("%s, %s'da miting yaptı.") % [_actor_name(peer_id), _province_name(province_id)]
 		if moved != "":
 			_event_message += L.t(" Hitabı %s.") % moved
 
-## MİTİNGİN SİYASİ HİTABI: ilin her çiftindeki baskın gruba ulusal yakınlık,
-## karşıt gruba daha küçük kayıp. Yorgunluk (aynı gruba art arda miting) ve
-## VoterGroups'un azalan getirisi uygulanır. Popülizm kazancı büyütür.
-## Dönüş: kısa özet ("ilin kalabalık gruplarına kaydı (İşçiler ve Sendikalar, ...)") ya da "".
-func _apply_miting_positioning(peer_id: int, province_id: String, mult: float) -> String:
+## MİTİNGİN SİYASİ HİTABI: ildeki her grubun nüfusla orantılı bir kısmı
+## kazanılır (odak gruplarda daha çok), diğer partilerden ve kararsızlardan
+## alınır. Yorgunluk (aynı gruba art arda miting), azalan getiri ve çekirdek
+## çarpanı uygulanır. Popülizm kazancı büyütür.
+## Dönüş: kısa özet ("odak: Emekliler") ya da "".
+func _apply_miting_positioning(peer_id: int, province_id: String, focus: Array = []) -> String:
 	var pid := party_of(peer_id)
 	var fatigue: Dictionary = miting_fatigue.get(pid, {})
 	var changes: Array = []
-	for effect in PublicOpinion.miting_positioning(province_profile(province_id), mult):
-		var group := String(effect["group"])
-		var damp := PublicOpinion.miting_fatigue_mult(float(fatigue.get(group, 0.0)))
-		var gain := _own_effect(pid, float(effect["gain"]) * damp)
-		changes.append({"peer": pid, "group": group, "amount": gain})
-		changes.append({"peer": pid, "group": String(effect["loss_group"]),
-			"amount": _own_effect(pid, -float(effect["loss"]) * damp)})
+	for effect in miting_group_gains(peer_id, province_id, focus):
+		changes.append({"peer": pid, "group": String(effect["group"]), "amount": _own_effect(pid, float(effect["gain"]))})
 	var actual := _shift_groups(changes)
-	var parts: PackedStringArray = []
 	for change in actual:
-		var group := String(change["group"])
 		var delta := float(change["delta"])
 		if delta > 0.0:
+			var group := String(change["group"])
 			fatigue[group] = float(fatigue.get(group, 0.0)) + delta
-			parts.append(VoterGroups.title(group))
 	if not fatigue.is_empty():
 		miting_fatigue[pid] = fatigue
-	if parts.is_empty():
+	if focus.is_empty():
 		return ""
-	return L.t("ilin kalabalık gruplarına kaydı (%s)") % ", ".join(parts)
+	var names: PackedStringArray = []
+	for group in focus:
+		names.append(VoterGroups.title(String(group)))
+	return L.t("odak: %s") % ", ".join(names)
 
 ## "1,8" gibi kısa sayı.
 static func _num(value: float) -> String:
@@ -4522,10 +4550,10 @@ func _request_censure() -> void:
 	_apply_censure_move(multiplayer.get_remote_sender_id())
 
 @rpc("any_peer", "reliable")
-func _request_miting(province_id: String, state: float = 0.0) -> void:
+func _request_miting(province_id: String, state: float = 0.0, focus: Array = []) -> void:
 	if not MultiplayerManager.is_host:
 		return
-	_apply_miting_move(multiplayer.get_remote_sender_id(), province_id, state)
+	_apply_miting_move(multiplayer.get_remote_sender_id(), province_id, state, focus)
 
 @rpc("any_peer", "reliable")
 func _request_pass() -> void:

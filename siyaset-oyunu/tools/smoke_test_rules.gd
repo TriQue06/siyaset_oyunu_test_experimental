@@ -115,8 +115,10 @@ func _initialize() -> void:
 			worst_appeal = id
 	# 0.0.186 GRUP BAZLI OY: bir grubu tek başına sahiplenen parti (3: işçi ve
 	# özerkçi çekirdeği kimsede yok) o grubun oylarının çoğunu alır.
-	var in_isci: Dictionary = ElectionModel.shares_in_group(parties, "isci")
-	check("grubu tek basina sahiplenen parti o grubun cogunu alir", float(in_isci[3]) > 0.6, str(in_isci))
+	var owner_parties: Dictionary = parties.duplicate(true)
+	owner_parties[3]["isci"] = 60.0
+	var in_isci: Dictionary = ElectionModel.shares_in_group(owner_parties, "isci")
+	check("grubun %60'ina hitap eden parti o grubun cogunu alir", float(in_isci[3]) > 0.6, str(in_isci))
 	var focused := {1: groups(["emekli", "dindar"]), 2: groups(["genc", "ilerici"]), 3: groups(["isci", "milliyetci"]),
 		4: groups(["isveren", "ozerkci"]), 5: groups(["isci", "dindar"]), 6: groups(["isveren", "milliyetci"])}
 	(focused[1] as Dictionary)["emekli"] = 88.0
@@ -306,8 +308,9 @@ func _initialize() -> void:
 		and cp.law_data(law_type)["opposite"] == "isci" and not cp.is_law_card("miting") and not cp.is_law_card("law:yok"))
 	cm.funds[1] = 10
 	check("ilk secimden once yasa yapilamaz (meclis yok)", not cm.can_propose_law(1))
+	var isveren_before := float(pm.parties[1]["groups"]["isveren"])
 	cm._apply_law(1, law_type)
-	check("secim oncesi yasa reddedildi: para ve grup destegi degismedi", cm.funds_of(1) == 10 and near(float(pm.parties[1]["groups"]["isveren"]), 50.0))
+	check("secim oncesi yasa reddedildi: para ve grup destegi degismedi", cm.funds_of(1) == 10 and near(float(pm.parties[1]["groups"]["isveren"]), isveren_before))
 	cm.last_seats = {1: 150, 2: 140, 3: 100}
 	cm.agenda = {}
 	check("gundem yokken de yasa sunulabilir (0.0.182)", cm.can_propose_law(1, law_type))
@@ -389,12 +392,12 @@ func _initialize() -> void:
 	cm.apply_law_result(1, cp.law_type("ilerici"), {1: 1, 2: 1, 3: -1}, true, [])
 	var gain1 := float(pm.parties[1]["groups"]["ilerici"]) - float(g1["ilerici"])
 	var loss1 := float(pm.parties[1]["groups"]["dindar"]) - float(g1["dindar"])
-	check("kabul: sunan hedef grupta kazanir, karsit grupta daha az kaybeder", gain1 > 3.0 and loss1 < 0.0 and absf(loss1) < gain1,
+	check("kabul: sunan hedef grupta kazanir, karsit grupta daha az kaybeder", gain1 > PublicOpinion.LAW_GROUP_GAIN_PASSED * 0.5 and loss1 <= 0.0 and absf(loss1) < gain1,
 		"%+.2f / %+.2f" % [gain1, loss1])
 	check("EVET hedef gruba yaklasir", float(pm.parties[2]["groups"]["ilerici"]) > float(g2["ilerici"]) \
-		and float(pm.parties[2]["groups"]["dindar"]) < float(g2["dindar"]))
+		and float(pm.parties[2]["groups"]["dindar"]) <= float(g2["dindar"]))
 	check("HAYIR karsit gruba yaklasir", float(pm.parties[3]["groups"]["dindar"]) > float(g3["dindar"]) \
-		and float(pm.parties[3]["groups"]["ilerici"]) < float(g3["ilerici"]))
+		and float(pm.parties[3]["groups"]["ilerici"]) <= float(g3["ilerici"]))
 	check("yasa diger gruplara dokunmaz", near(float(pm.parties[1]["groups"]["isci"]), float(g1["isci"])) \
 		and near(float(pm.parties[2]["groups"]["emekli"]), float(g2["emekli"])))
 	var g1b: Dictionary = pm.parties[1]["groups"].duplicate()
@@ -403,7 +406,12 @@ func _initialize() -> void:
 	check("ret: sunan yine kazanir ama kabulden az", rejected_gain > 0.0 and rejected_gain < gain1, "%.2f" % rejected_gain)
 	var g2c: Dictionary = pm.parties[2]["groups"].duplicate()
 	cm.apply_law_result(1, cp.law_type("ilerici"), {2: 0}, false, [])
-	check("cekimser grup destegi degismez", str(pm.parties[2]["groups"]) == str(g2c))
+	var abstain_gain := false
+	for group in VoterGroups.GROUP_IDS:
+		if float(pm.parties[2]["groups"][group]) > float(g2c[group]) + 0.0001:
+			abstain_gain = true
+	# Çekimser oy kendi başına bir şey kazandırmaz; sunan partinin kazancı ondan pay alabilir (seçmen çalma).
+	check("cekimser grup destegi kazandirmaz", not abstain_gain)
 	pm.parties[3]["groups"]["isveren"] = 99.5
 	pm.apply_group_deltas([{"peer": 3, "group": "isveren", "amount": 20.0}])
 	check("destek 100'u asamaz", float(pm.parties[3]["groups"]["isveren"]) <= 100.0)
@@ -411,7 +419,7 @@ func _initialize() -> void:
 	pm.apply_group_deltas([{"peer": 3, "group": "isci", "amount": -20.0}])
 	check("destek 0'in altina inmez", float(pm.parties[3]["groups"]["isci"]) >= 0.0)
 	check("il baskanligi miting riskini azaltir",
-		PublicOpinion.provocation_risk(30.0, 2) < PublicOpinion.provocation_risk(30.0, 0) and PublicOpinion.provocation_risk(55.0, 0) == 0.0)
+		PublicOpinion.provocation_risk(2.0, 2) < PublicOpinion.provocation_risk(2.0, 0) and PublicOpinion.provocation_risk(20.0, 0) == 0.0)
 
 	print("")
 	print("=== 10) VEKIL CALMA IL VERISIZ UYGULANMAZ ===")
@@ -602,8 +610,8 @@ func _initialize() -> void:
 		and not VoterGroups.is_valid_core(["isci", "isveren"]) and not VoterGroups.is_valid_core(["isci"]) \
 		and VoterGroups.is_valid_core(VoterGroups.random_core()))
 	var start := VoterGroups.start_affinities(["isci", "dindar"])
-	check("cekirdek yuksek, karsiti dusuk, digerleri notr", near(float(start["isci"]), VoterGroups.CORE_START) \
-		and near(float(start["isveren"]), VoterGroups.CORE_OPPOSITE_START) and near(float(start["genc"]), 50.0))
+	check("cekirdek %10, digerleri %0", near(float(start["isci"]), VoterGroups.CORE_START) \
+		and near(float(start["isveren"]), 0.0) and near(float(start["genc"]), 0.0))
 	check("desteden yasa ve ideoloji karti gelmez", not cm._draw_pool(1).has("capitalist") and not cm._draw_pool(1).has("law_privatization"))
 
 	print("")
@@ -655,7 +663,8 @@ func _initialize() -> void:
 	pm.parties[3]["groups"] = all_first.duplicate()
 	check("yakinlik: ayni grup profili 1, tamamen zit 0", is_equal_approx(cm.group_closeness(1, 3), 1.0) and is_equal_approx(cm.group_closeness(1, 2), 0.0))
 	var typical := VoterGroups.party_closeness(VoterGroups.start_affinities(["isci", "dindar"]), VoterGroups.start_affinities(["isveren", "ilerici"]))
-	check("baslangicta zit cekirdekli partiler orta yakinlikta", typical > 0.4 and typical < 0.8, "%.2f" % typical)
+	# Hitap modeli: herkes %0'dan (çekirdekte %10'dan) başlar; profiller oyun içinde ayrışır.
+	check("baslangicta zit cekirdekli partiler henuz birbirine yakin ama ayni degil", typical > 0.6 and typical < 1.0, "%.2f" % typical)
 	var capped := ElectionModel.cap_shares({1: 0.95, 2: 0.04, 3: 0.01})
 	check("il oy tavani: kimse %68'i asamaz, toplam 1", float(capped[1]) <= ElectionModel.PROVINCE_MAX_SHARE + 0.0001 \
 		and is_equal_approx(float(capped[1]) + float(capped[2]) + float(capped[3]), 1.0), str(capped))

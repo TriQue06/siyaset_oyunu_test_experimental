@@ -55,9 +55,10 @@ func _initialize() -> void:
 	var neighbor := String(gmap.neighbors().get(home, [""])[0])
 	check("hemsehri destegi memlekette", is_equal_approx(PP.hometown_activity(home, me), PP.HOMETOWN_ACTIVITY))
 	check("komsu il etkilenmez", PP.hometown_activity(neighbor, me) == 0.0)
-	check("oyun basinda gecmis bonusu uygulandi", is_equal_approx(float(pm.parties[me]["groups"]["isveren"]), float(boosted["isveren"])),
+	# Botların geçmiş bonusları da aynı gruptan pay alabilir (seçmen çalma): biraz eksik olabilir.
+	check("oyun basinda gecmis bonusu uygulandi", float(pm.parties[me]["groups"]["isveren"]) <= float(boosted["isveren"]) + 0.001 		and float(pm.parties[me]["groups"]["isveren"]) > float(boosted["isveren"]) * 0.8,
 		str(pm.parties[me]["groups"]))
-	check("cekirdek gruplar korundu", is_equal_approx(float(pm.parties[me]["groups"]["isci"]), VoterGroups.CORE_START))
+	check("cekirdek gruplar korundu (botlar az pay alabilir)", float(pm.parties[me]["groups"]["isci"]) <= VoterGroups.CORE_START + 0.001 and float(pm.parties[me]["groups"]["isci"]) > VoterGroups.CORE_START * 0.8, str(pm.parties[me]["groups"]["isci"]))
 	check("aktiviteye eklendi", cm.activity_of(home, me) >= PublicOpinion.org_activity(2) + PP.HOMETOWN_ACTIVITY - 0.01,
 		"%.2f" % cm.activity_of(home, me))
 	var all_bots_ok := true

@@ -164,17 +164,17 @@ func _build_appeal(me: int) -> void:
 	_body.add_child(PopupKit.section(L.t("Partin bu ilde"), L.t("seçmen grupları")))
 	_body.add_child(PopupKit.kv(L.t("Seçmen sana"), closeness_text, closeness_color))
 	var groups := CardManager.effective_groups(me)
-	var effects := PublicOpinion.miting_positioning(profile, PublicOpinion.org_action_mult(CardManager.organization_level(province_id, me)))
+	var core: Array = PartyManager.data_of(CardManager.party_of(me)).get("core", [])
+	var effects := CardManager.miting_group_gains(me, province_id)
 	if effects.is_empty():
 		return
-	_body.add_child(PopupKit.note(L.t("Burada miting yaparsan:"), DIM))
-	var fatigue: Dictionary = CardManager.miting_fatigue.get(CardManager.party_of(me), {})
-	for effect in effects:
-		var damp := PublicOpinion.miting_fatigue_mult(float(fatigue.get(String(effect["group"]), 0.0)))
+	var slots := CardManager.miting_focus_slots(me, province_id)
+	_body.add_child(PopupKit.note(L.t("Burada miting yaparsan (odaksız; teşkilatla %d grup odağı seçebilirsin):") % slots if slots > 0
+		else L.t("Burada miting yaparsan (teşkilatsız: etkisi düşük, odak seçilemez):"), DIM))
+	effects.sort_custom(func(a, b): return float(a["gain"]) > float(b["gain"]))
+	for effect in effects.slice(0, 4):
 		_body.add_child(VoterGroupUI.effect_row(String(effect["group"]),
-			VoterGroups.effective_delta(groups, String(effect["group"]), float(effect["gain"]) * damp)))
-		_body.add_child(VoterGroupUI.effect_row(String(effect["loss_group"]),
-			VoterGroups.effective_delta(groups, String(effect["loss_group"]), -float(effect["loss"]) * damp)))
+			VoterGroups.effective_delta(groups, String(effect["group"]), float(effect["gain"]), core)))
 
 ## Teşkilat seviyesi: dolu/boş kareler + seviye adı.
 func _level_row(level: int) -> Control:

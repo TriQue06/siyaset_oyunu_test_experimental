@@ -281,6 +281,11 @@ var _org_button: Button
 var _miting_button: Button
 ## Miting hamlesi için il seçme modu.
 var _pending_miting: bool = false
+## MİTİNG ODAĞI (0.0.213): ildeki teşkilat seviyesi kadar grup seçilir.
+var _miting_focus: Array = []
+var _focus_panel: PanelContainer
+var _focus_box: VBoxContainer
+var _focus_province := ""
 var _invest_button: Button
 var _censure_button: Button
 var _early_button: Button
@@ -629,18 +634,7 @@ func _apply_layout() -> void:
 	# oyuncu şeridi hariç kalan genişliğe sığacak şekilde ölçekleniyor —
 	# geniş, dikdörtgen bir alanı doldurması hedefleniyor.
 	var map_rect := _r(R_MAP)
-	_ensure_map_bg(map_rect)
-	var map_native_size: Vector2 = Vector2(map_holder.grid_width, map_holder.grid_height) * map_holder.MAP_UNIT_SCALE
-	var fit_scale: float = minf(map_rect.size.x / map_native_size.x, map_rect.size.y / map_native_size.y) * MAP_FILL_RATIO
-	_map_fit_scale = fit_scale
-	if _focus_tween == null or not _focus_tween.is_running():
-		map_holder.scale = Vector2(fit_scale, fit_scale)
-	var map_position := map_rect.position + (map_rect.size - map_native_size * fit_scale) * 0.5
-	_ensure_map_clip()
-	_map_clip.position = map_position
-	_map_clip.size = map_native_size * fit_scale
-	if (_map_slide_tween == null or not _map_slide_tween.is_running()) and (_focus_tween == null or not _focus_tween.is_running()):
-		map_holder.position = Vector2.ZERO
+	_place_map(_swap_map_rect if _swap_engaged else map_rect)
 	_place_layer_bar()
 
 	# CANLI YAYIN BANDI: CANLI · başlık + tarih · sıra kimde (Menü sağda).
@@ -681,6 +675,24 @@ func _apply_layout() -> void:
 		seat_markers.queue_redraw()
 	_place_right_column_controls()
 	_rebuild_player_panel()
+
+## Haritayı (zemin + kırpma kutusu + ölçek) verilen dikdörtgene sığdırır.
+func _place_map(map_rect: Rect2) -> void:
+	_ensure_map_bg(map_rect)
+	var map_native_size: Vector2 = Vector2(map_holder.grid_width, map_holder.grid_height) * map_holder.MAP_UNIT_SCALE
+	var fit_scale: float = minf(map_rect.size.x / map_native_size.x, map_rect.size.y / map_native_size.y) * MAP_FILL_RATIO
+	_map_fit_scale = fit_scale
+	if _focus_tween == null or not _focus_tween.is_running():
+		map_holder.scale = Vector2(fit_scale, fit_scale)
+	var map_position := map_rect.position + (map_rect.size - map_native_size * fit_scale) * 0.5
+	_ensure_map_clip()
+	_map_clip.position = map_position
+	_map_clip.size = map_native_size * fit_scale
+	if (_map_slide_tween == null or not _map_slide_tween.is_running()) and (_focus_tween == null or not _focus_tween.is_running()):
+		map_holder.position = Vector2.ZERO
+	var seat_markers := map_holder.get_node_or_null("SeatMarkers")
+	if seat_markers != null:
+		seat_markers.queue_redraw()
 
 ## Hamle paneli alt banda, kartların sağına taşınır (sahnede meclisin yanındaydı).
 func _detach_actions_panel() -> void:
@@ -901,6 +913,21 @@ func _refresh_band_turn() -> void:
 var _parl_slot: Control
 var _was_voting := false
 
+## OYLAMA KAMERASI (0.0.213): meclis oylaması sürerken harita ile meclis
+## diyagramı yer değiştirir (seçim gecesi kamerası gibi: pencereler üstel
+## yumuşamayla kayar, geçişte TV flaşı, büyük pencerede altın çerçeve).
+## Oylama bittikten VOTE_SWAP_RETURN_DELAY saniye sonra eski yerlerine döner.
+const VOTE_SWAP_RETURN_DELAY := 0.5
+const VOTE_SWAP_SPEED := 9.0
+var _vote_swapped := false
+var _vote_end_wait := 0.0
+var _swap_engaged := false
+var _swap_map_rect := Rect2()
+var _swap_parl_rect := Rect2()
+var _swap_home_parl := Rect2()
+var _swap_flash: ColorRect
+var _swap_frame: Panel
+
 func _place_parliament_badge() -> void:
 	var voting := GovernmentManager.is_voting()
 	var just_started := voting and not _was_voting
@@ -967,16 +994,107 @@ func _place_parliament_badge() -> void:
 func _sync_parliament_to_slot() -> void:
 	if _parl_bg == null:
 		return
-	var shown := _parl_slot != null and _parl_slot.is_visible_in_tree()
+	var shown := _swap_engaged or (_parl_slot != null and _parl_slot.is_visible_in_tree())
 	_parl_bg.visible = shown
 	bottom_area.visible = shown
 	if not shown:
 		return
-	var rect := _parl_slot.get_global_rect()
+	var rect := _swap_parl_rect if _swap_engaged else _parl_slot.get_global_rect()
 	if _parl_bg.position != rect.position or _parl_bg.size != rect.size:
 		_set_rect(_parl_bg, rect)
 		bottom_area.position = rect.position
 		bottom_area.size = rect.size
+
+## Her kare: oylama varsa harita meclisin yuvasına, meclis haritanın yerine
+## kayar; bitince (gecikmeyle) geri döner.
+func _update_vote_swap(delta: float) -> void:
+	if _parl_bg == null or _parl_slot == null or map_holder == null or map_holder.grid_width <= 0:
+		return
+	# Meclisin yuvası: sekme açıkken gerçek yeri; Log / Seçili açıkken son bilinen yeri
+	# (fareyle parti incelemek oylama kamerasını bozmasın).
+	if _parl_slot.is_visible_in_tree() and _parl_slot.size.y > 0.0:
+		_swap_home_parl = _parl_slot.get_global_rect()
+	elif not _swap_home_parl.has_area():
+		var side := _r(R_SIDE)
+		_swap_home_parl = Rect2(side.position + Vector2(0.0, 48.0), Vector2(side.size.x, PARL_SLOT_VOTE_HEIGHT * side.size.y / R_SIDE.size.y))
+	var voting := GovernmentManager.is_voting()
+	if voting:
+		_vote_end_wait = VOTE_SWAP_RETURN_DELAY
+	else:
+		_vote_end_wait = maxf(0.0, _vote_end_wait - delta)
+	var want := voting or _vote_end_wait > 0.0
+	var home_map := _r(R_MAP)
+	if not _swap_engaged:
+		_swap_map_rect = home_map
+		_swap_parl_rect = _swap_home_parl
+	if want != _vote_swapped:
+		_vote_swapped = want
+		_ensure_swap_fx()
+		_swap_flash.color.a = 0.6
+	if _swap_flash != null:
+		_swap_flash.color.a = move_toward(_swap_flash.color.a, 0.0, delta * 2.4)
+	var map_to: Rect2 = _swap_home_parl if _vote_swapped else home_map
+	var parl_to: Rect2 = home_map if _vote_swapped else _swap_home_parl
+	var k := 1.0 - exp(-VOTE_SWAP_SPEED * delta)
+	var arrived := true
+	for which in 2:
+		var now: Rect2 = _swap_map_rect if which == 0 else _swap_parl_rect
+		var to: Rect2 = map_to if which == 0 else parl_to
+		if now.position.distance_to(to.position) + now.size.distance_to(to.size) < 0.6:
+			now = to
+		else:
+			now = Rect2(now.position.lerp(to.position, k), now.size.lerp(to.size, k))
+			arrived = false
+		if which == 0:
+			_swap_map_rect = now
+		else:
+			_swap_parl_rect = now
+	var engaged := _vote_swapped or not arrived
+	if not engaged and not _swap_engaged:
+		return
+	_swap_engaged = engaged
+	_place_map(_swap_map_rect if engaged else home_map)
+	# Küçük harita sağ sütunun üstünde çizilsin; katman düğmeleri geçişte gizli.
+	var z := 5 if engaged else 0
+	_map_bg.z_index = z
+	_map_clip.z_index = z
+	if _layer_bar != null:
+		_layer_bar.visible = not engaged
+	if _layer_legend != null:
+		if engaged:
+			_layer_legend.visible = false
+		else:
+			_rebuild_layer_legend()
+	if _group_picker != null:
+		_group_picker.visible = not engaged and _map_layer == MapLayer.GROUPS
+	_ensure_swap_fx()
+	_swap_frame.visible = engaged
+	var big: Rect2 = _swap_parl_rect if _vote_swapped else _swap_map_rect
+	_swap_frame.position = big.position
+	_swap_frame.size = big.size
+	_sync_parliament_to_slot()
+
+## Flaş (harita + sağ sütun alanı) ve büyük pencerenin altın çerçevesi.
+func _ensure_swap_fx() -> void:
+	if _swap_flash == null:
+		_swap_flash = ColorRect.new()
+		_swap_flash.color = Color(1, 1, 1, 0)
+		_swap_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_swap_flash.z_index = 8
+		add_child(_swap_flash)
+		_swap_frame = Panel.new()
+		var box := StyleBoxFlat.new()
+		box.bg_color = Color(0, 0, 0, 0)
+		box.set_border_width_all(3)
+		box.border_color = UiTheme.GOLD
+		_swap_frame.add_theme_stylebox_override("panel", box)
+		_swap_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_swap_frame.z_index = 7
+		_swap_frame.visible = false
+		add_child(_swap_frame)
+	var area := _r(R_MAP).merge(_r(R_SIDE))
+	_swap_flash.position = area.position
+	_swap_flash.size = area.size
 
 func _refresh_parliament_summary() -> void:
 	if _parl_summary == null:
@@ -2052,6 +2170,7 @@ var _live_wait := 0.0
 
 func _process(delta: float) -> void:
 	_refresh_countdowns()
+	_update_vote_swap(delta)
 	_sync_parliament_to_slot()
 	_refresh_timer_bar()
 	if _drag_ghost != null:
@@ -2664,6 +2783,9 @@ func _cancel_targeting() -> void:
 	_pending_province_hand_index = -1
 	if _funding_panel != null:
 		_funding_panel.hide()
+	if _focus_panel != null:
+		_focus_panel.hide()
+	_miting_focus = []
 	if _pending_org:
 		# Harita teşkilat katmanında KALIR (oyuncu isterse kendisi değiştirir).
 		_pending_org = false
@@ -2694,15 +2816,17 @@ func _on_province_clicked(province_id: String) -> void:
 	if (_pending_org or _pending_miting or _pending_invest) and _selected_province != province_id:
 		_select_target_province(province_id)
 		return
+	if _pending_miting and _focus_panel != null and _focus_panel.visible:
+		_on_focus_confirmed()
+		return
 	if _pending_invest or (_pending_miting and _funding_panel.visible):
 		_on_funding_confirmed(_funding_panel.current_share())
 		return
 	if _pending_miting:
+		var focus := _miting_focus.duplicate()
 		_cancel_targeting()
 		if CardManager.can_miting(me, province_id):
-			CardManager.miting(province_id)
-		elif CardManager.organization_level(province_id, me) < 1 and not PartyManager.is_independent(me):
-			_show_toast(L.t("Bu ilde teşkilatın yok. Önce teşkilatlanmalısın."))
+			CardManager.miting(province_id, 0.0, focus)
 		else:
 			_show_toast(_action_block_reason(GameRules.MITING_FUNDS_COST))
 		return
@@ -2823,24 +2947,170 @@ func _show_province_window(province_id: String) -> void:
 	_province_panel.show_province(province_id)
 	_province_panel.clamp_to_height(map_rect.size.y - 64.0)
 
-## Mitingin bu ildeki seçmen grubu etkisinin kısa özeti (gerçek kuralla,
-## yorgunluk ve azalan getiri dahil; büyüklük nitel): " · hitap: İşçiler ve
-## Sendikalar (hafif), ...".
-func _miting_group_preview(me: int, province_id: String) -> String:
-	var groups := PartyManager.groups_of(CardManager.party_of(me))
-	var fatigue: Dictionary = CardManager.miting_fatigue.get(CardManager.party_of(me), {})
-	var mult := PublicOpinion.org_action_mult(CardManager.organization_level(province_id, me))
+## Mitingin bu ildeki en büyük üç grup hitap kazancı (gerçek kuralla:
+## yorgunluk, odak, çekirdek çarpanı ve azalan getiri dahil): " · hitap: Emekliler +%1,2, ...".
+func _miting_group_preview(me: int, province_id: String, focus: Array = []) -> String:
+	var gains := _miting_gain_list(me, province_id, focus)
 	var parts: PackedStringArray = []
-	for effect in PublicOpinion.miting_positioning(CardManager.province_profile(province_id), mult):
-		var damp := PublicOpinion.miting_fatigue_mult(float(fatigue.get(String(effect["group"]), 0.0)))
-		var delta := VoterGroups.effective_delta(groups, String(effect["group"]), float(effect["gain"]) * damp)
-		if absf(delta) < EffectWords.NEGLIGIBLE:
-			continue
-		parts.append("%s %s" % [VoterGroups.title(String(effect["group"])),
-			"(%s)" % EffectWords.adjective(delta, "group") if delta > 0.0 else L.t("(%s kayıp)") % EffectWords.adjective(delta, "group")])
+	for item in gains.slice(0, 3):
+		parts.append("%s +%%%s" % [VoterGroups.title(String(item["group"])), _one_decimal(float(item["delta"]))])
 	if parts.is_empty():
 		return L.t(" · grup desteğine etkisi yok")
 	return L.t(" · hitap: ") + ", ".join(parts)
+
+## [{"group", "delta"}] büyükten küçüğe: mitingin gerçekleşecek hitap kazançları.
+func _miting_gain_list(me: int, province_id: String, focus: Array = []) -> Array:
+	var pid := CardManager.party_of(me)
+	var groups := PartyManager.groups_of(pid)
+	var core: Array = PartyManager.data_of(pid).get("core", [])
+	var result: Array = []
+	for effect in CardManager.miting_group_gains(me, province_id, focus):
+		var delta := VoterGroups.effective_delta(groups, String(effect["group"]), float(effect["gain"]), core)
+		if delta >= 0.05:
+			result.append({"group": String(effect["group"]), "delta": delta})
+	result.sort_custom(func(a, b): return float(a["delta"]) > float(b["delta"]))
+	return result
+
+## MİTİNG ODAĞI paneli: ildeki teşkilat seviyesi kadar grup seçilir; her grupta
+## ildeki seçmen payı ve mitingin o gruba hitap kazancı görünür.
+func _open_focus_panel(province_id: String) -> void:
+	if _focus_panel == null:
+		_focus_panel = PanelContainer.new()
+		var style := UiSkin.stylebox(UiSkin.PANEL)
+		style.set_content_margin_all(UiTheme.PAD_M)
+		_focus_panel.add_theme_stylebox_override("panel", style)
+		_focus_panel.z_index = 108
+		_focus_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		_focus_box = VBoxContainer.new()
+		_focus_box.add_theme_constant_override("separation", 6)
+		_focus_box.custom_minimum_size = Vector2(404, 0)
+		_focus_panel.add_child(_focus_box)
+		add_child(_focus_panel)
+	_focus_province = province_id
+	_fill_focus_panel()
+	_focus_panel.show()
+	_place_focus_panel.call_deferred()
+
+func _fill_focus_panel() -> void:
+	for child in _focus_box.get_children():
+		_focus_box.remove_child(child)
+		child.queue_free()
+	var me := multiplayer.get_unique_id()
+	var province_id := _focus_province
+	var slots := CardManager.miting_focus_slots(me, province_id)
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 8)
+	_focus_box.add_child(header)
+	var title := UiTheme.mono_label(L.t("MİTİNG ODAĞI · %s") % ElectionNightSim.province_name(province_id), 14, UiTheme.TEXT, true)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(title)
+	header.add_child(PopupKit.chip(L.t("%d / %d grup") % [_miting_focus.size(), slots], UiTheme.GOLD))
+	_focus_box.add_child(PopupKit.note(L.t("Teşkilat seviyesi %d: en çok %d gruba odaklanabilirsin. Odak gruplarda kazanç %s kat; seçmezsen odaksız miting.") % [
+		slots, slots, _one_decimal(PublicOpinion.MITING_FOCUS_MULT)], UiTheme.TEXT_MUTED, 380))
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 4)
+	grid.add_theme_constant_override("v_separation", 4)
+	_focus_box.add_child(grid)
+	var profile := CardManager.province_profile(province_id)
+	for group in VoterGroups.GROUP_IDS:
+		grid.add_child(_focus_group_button(group, VoterGroups.share(profile, group), slots))
+	_focus_box.add_child(PopupKit.note(L.t("Beklenen hitap:%s") % _miting_group_preview(me, province_id, _miting_focus).trim_prefix(L.t(" · hitap:")), UiTheme.GREEN, 380))
+	var buttons := HBoxContainer.new()
+	buttons.add_theme_constant_override("separation", 6)
+	_focus_box.add_child(buttons)
+	var ok := Button.new()
+	ok.focus_mode = Control.FOCUS_NONE
+	ok.text = L.t("ONAYLA · %s") % GameRules.cost_text(GameRules.MITING_FUNDS_COST)
+	ok.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ok.custom_minimum_size = Vector2(0, 32)
+	UiSkin.skin_color_button(ok, UiTheme.GREEN_DARK)
+	ok.pressed.connect(_on_focus_confirmed)
+	buttons.add_child(ok)
+	var cancel := Button.new()
+	cancel.focus_mode = Control.FOCUS_NONE
+	cancel.text = L.t("İptal")
+	cancel.custom_minimum_size = Vector2(0, 32)
+	UiSkin.skin_button(cancel)
+	cancel.pressed.connect(_cancel_targeting)
+	buttons.add_child(cancel)
+
+## Odak paneli düğmesi: simge + tam ad + ildeki pay; seçiliyse altın yazı ve
+## parlak zemin. Odak dolduysa seçili olmayanlar sönük.
+func _focus_group_button(group: String, share: float, slots: int) -> Control:
+	var selected := _miting_focus.has(group)
+	var full := _miting_focus.size() >= slots and not selected
+	var button := Button.new()
+	button.focus_mode = Control.FOCUS_NONE
+	button.custom_minimum_size = Vector2(196, 30)
+	var tint := VoterGroups.color(group)
+	UiSkin.skin_color_button(button, tint.darkened(0.15) if selected else tint.darkened(0.45))
+	button.modulate.a = 0.45 if full else 1.0
+	var row := HBoxContainer.new()
+	row.set_anchors_preset(Control.PRESET_FULL_RECT)
+	row.offset_left = 4
+	row.offset_right = -6
+	row.add_theme_constant_override("separation", 4)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(row)
+	var icon := VoterGroupIcon.make(group, 18.0)
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(icon)
+	var label := Label.new()
+	label.text = ("★ " if selected else "") + VoterGroups.title(group)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.clip_text = true
+	label.add_theme_font_size_override("font_size", 9)
+	label.add_theme_color_override("font_color", UiTheme.GOLD if selected else UiTheme.TEXT)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(label)
+	var pct := Label.new()
+	pct.text = "%" + str(int(roundf(share * 100.0)))
+	pct.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	pct.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	pct.add_theme_font_size_override("font_size", 9)
+	pct.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
+	pct.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(pct)
+	button.pressed.connect(func():
+		if _miting_focus.has(group):
+			_miting_focus.erase(group)
+		elif _miting_focus.size() < slots:
+			_miting_focus.append(group)
+		_fill_focus_panel()
+		_place_focus_panel.call_deferred())
+	return button
+
+func _place_focus_panel() -> void:
+	if _focus_panel == null or not _focus_panel.visible:
+		return
+	_focus_panel.reset_size()
+	var map := _r(R_MAP)
+	var panel_size := _focus_panel.size
+	_focus_panel.position = Vector2(map.position.x + (map.size.x - panel_size.x) * 0.5,
+		maxf(map.position.y + 40.0, map.end.y - panel_size.y - 8.0))
+
+## Odak onaylandı: hükümet partisi devlet payı seçebiliyorsa finansman paneli
+## açılır, değilse miting hemen yapılır.
+func _on_focus_confirmed() -> void:
+	var me := multiplayer.get_unique_id()
+	var province_id := _selected_province
+	_focus_panel.hide()
+	if province_id == "":
+		_cancel_targeting()
+		return
+	if _miting_has_choice():
+		_open_funding(province_id)
+		_set_target_hint(L.t("%s: finansmanı aşağıdan ayarla, ONAYLA'ya bas (ya da ile tekrar dokun)  ·  Butona tekrar dokun: iptal") % ElectionNightSim.province_name(province_id))
+		return
+	var focus := _miting_focus.duplicate()
+	_cancel_targeting()
+	if CardManager.can_miting(me, province_id):
+		CardManager.miting(province_id, 0.0, focus)
+	else:
+		_show_toast(_action_block_reason(GameRules.MITING_FUNDS_COST))
 
 ## Hedef seçme modunda dokunulan il: vurgulanır, üstte ne olacağı yazar.
 func _select_target_province(province_id: String) -> void:
@@ -2849,6 +3119,16 @@ func _select_target_province(province_id: String) -> void:
 	var me := multiplayer.get_unique_id()
 	var pname := ElectionNightSim.province_name(province_id)
 	var detail := ""
+	if _pending_miting:
+		_miting_focus = []
+		if _funding_panel != null:
+			_funding_panel.hide()
+		if CardManager.miting_focus_slots(me, province_id) > 0:
+			_open_focus_panel(province_id)
+			_set_target_hint(L.t("%s: odak gruplarını seç, ONAYLA'ya bas (ya da ile tekrar dokun)  ·  Butona tekrar dokun: iptal") % pname)
+			return
+		if _focus_panel != null:
+			_focus_panel.hide()
 	if _pending_invest or (_pending_miting and _miting_has_choice()):
 		_open_funding(province_id)
 		_set_target_hint(L.t("%s: finansmanı aşağıdan ayarla, ONAYLA'ya bas (ya da ile tekrar dokun)  ·  Butona tekrar dokun: iptal") % pname)
@@ -4654,6 +4934,7 @@ func _on_funding_confirmed(share: float) -> void:
 	var me := multiplayer.get_unique_id()
 	var province_id := _selected_province
 	var investing := _pending_invest
+	var focus := _miting_focus.duplicate()
 	_cancel_targeting()
 	if province_id == "":
 		return
@@ -4664,7 +4945,7 @@ func _on_funding_confirmed(share: float) -> void:
 			_show_toast(CardManager.funding_block_reason(me, "invest", share) if CardManager.can_invest(me, province_id) else _invest_block_reason())
 	else:
 		if CardManager.can_miting(me, province_id, share):
-			CardManager.miting(province_id, share)
+			CardManager.miting(province_id, share, focus)
 		else:
 			_show_toast(CardManager.funding_block_reason(me, "miting", share))
 

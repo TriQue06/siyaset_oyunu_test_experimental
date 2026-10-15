@@ -36,6 +36,7 @@ func new_game() -> void:
 	cm.current_turn_index = 0
 	cm.last_seats = {1: 250, 2: 100, 3: 150}
 	cm.election_seats = cm.last_seats.duplicate()
+	cm.last_election_round = 1  # afet ilk seçimden sonra çıkar (kampanya dönemi afetsiz)
 	gm.government = {"pm": 1, "deputy_pm": 2}
 	gm.main_gov_peer_id = 1
 	gm._set_phase(gm.Phase.GOVERNING)

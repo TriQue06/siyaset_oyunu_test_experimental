@@ -130,22 +130,21 @@ const GROUPS := {
 const SHARPNESS := 0.14
 
 # --- Parti yakınlığı -----------------------------------------------------------------
+## HİTAP (0.0.213): bir partinin bir gruptaki değeri o grubun YÜZDE KAÇINA
+## hitap ettiğidir (0..100). Bütün partilerin toplamı en çok 100: %100 hitap
+## eden parti o grubun bütün oyunu alır, diğerleri o gruptan 0 oy alır. Kimsenin
+## hitap etmediği pay (100 − toplam) partiler arasında EŞİT dağılır (kamuoyu
+## çarpanı hariç). Bir parti kazandıkça bu payı diğerlerinden ve kararsızlardan
+## orantılı alır (bkz. PartyManager.apply_group_deltas: seçmen çalma).
 const AFFINITY_MIN := 0.0
 const AFFINITY_MAX := 100.0
-const AFFINITY_NEUTRAL := 50.0
-## Parti kurulurken 2 ÇEKİRDEK grup seçilir (aynı çiftten olamaz).
+## Varsayılan hitap: hiç.
+const AFFINITY_NEUTRAL := 0.0
+## Parti kurulurken 2 ÇEKİRDEK grup seçilir (aynı çiftten olamaz): bu gruplarda
+## CORE_START hitapla başlar ve kalıcı kazançları CORE_GAIN_MULT katıdır.
 const CORE_COUNT := 2
-const CORE_START := 64.0
-## Çekirdek grubun karşıtı bu değerle başlar (diğer gruplar nötr).
-const CORE_OPPOSITE_START := 40.0
-## AZALAN GETİRİ (kalıcı kazançlar): kazanç × (100 − yakınlık) / 50 (en çok 1);
-## kayıp × yakınlık / 50 (en çok 1).
-## ÇİFT DENGESİ: bir çiftin iki tarafında birden yükselmek zordur: iki yakınlığın
-## toplamı PAIR_BALANCE'ı aştıkça kazanç PAIR_SPAN içinde doğrusal azalır
-## (en az PAIR_MIN_FACTOR). Geniş koalisyon mümkün ama pahalıdır.
-const PAIR_BALANCE := 100.0
-const PAIR_SPAN := 60.0
-const PAIR_MIN_FACTOR := 0.15
+const CORE_START := 10.0
+const CORE_GAIN_MULT := 2.0
 
 ## Parti yakınlık profilleri arasındaki mesafe ölçeği (bkz. party_distance):
 ## ölçek, eski 3 eksenli modeldeki mesafe eşiklerine denk düşecek şekilde.
@@ -312,6 +311,23 @@ static func generate_profiles(rng: RandomNumberGenerator, province_ids: Array, s
 		result[province_id]["_counts"] = counts
 	return result
 
+## Bir ildeki grubun seçmen sayısı (sayılar yoksa pay × il nüfusu).
+static func group_count(profile: Dictionary, group: String) -> float:
+	var counts: Dictionary = profile.get("_counts", {})
+	if counts.has(group):
+		return float(counts[group])
+	return share(profile, group) * float(profile.get("_electorate", 100000))
+
+## Ülke genelinde her grubun seçmen sayısı (il nüfuslarının toplamı).
+static func national_counts(profiles: Dictionary) -> Dictionary:
+	var result := {}
+	for group in GROUP_IDS:
+		result[group] = 0.0
+	for province_id in profiles.keys():
+		for group in GROUP_IDS:
+			result[group] = float(result[group]) + group_count(profiles[province_id], group)
+	return result
+
 ## Ülke geneli (vekil ağırlıklı) grup payı 0..1.
 static func national_share(profiles: Dictionary, seats: Dictionary, group: String) -> float:
 	var total := 0.0
@@ -332,14 +348,12 @@ static func neutral_affinities() -> Dictionary:
 		result[group] = AFFINITY_NEUTRAL
 	return result
 
-## Kuruluş: seçilen çekirdek gruplar yüksek, onların karşıtları düşük, kalanlar nötr.
+## Kuruluş: her grupta %0, çekirdek gruplarda CORE_START.
 static func start_affinities(core: Array) -> Dictionary:
 	var result := neutral_affinities()
 	for group in core:
-		if not is_group(String(group)):
-			continue
-		result[group] = CORE_START
-		result[opposite(String(group))] = CORE_OPPOSITE_START
+		if is_group(String(group)):
+			result[group] = CORE_START
 	return result
 
 ## Çekirdek seçimi geçerli mi? (CORE_COUNT farklı grup, ikisi aynı çiftten değil.)
@@ -374,24 +388,24 @@ static func ranked_groups(affinities: Dictionary) -> Array:
 	ranked.sort_custom(func(a, b): return float(affinities.get(a, AFFINITY_NEUTRAL)) > float(affinities.get(b, AFFINITY_NEUTRAL)))
 	return ranked
 
-## Kalıcı bir değişikliğin GERÇEKLEŞEN miktarı (azalan getiri + çift dengesi).
-static func effective_delta(affinities: Dictionary, group: String, amount: float) -> float:
+## Kalıcı bir değişikliğin GERÇEKLEŞEN miktarı. Kazanç: çekirdek grupta
+## CORE_GAIN_MULT katı, azalan getiriyle (× kalan pay / 100; %100'e yaklaştıkça
+## zorlaşır). Kayıp: en çok mevcut hitap kadar.
+static func effective_delta(affinities: Dictionary, group: String, amount: float, core: Array = []) -> float:
 	var current := float(affinities.get(group, AFFINITY_NEUTRAL))
 	if amount > 0.0:
-		var headroom := clampf((AFFINITY_MAX - current) / 50.0, 0.0, 1.0)
-		var total := current + float(affinities.get(opposite(group), AFFINITY_NEUTRAL))
-		var balance := clampf(1.0 - maxf(0.0, total - PAIR_BALANCE) / PAIR_SPAN, PAIR_MIN_FACTOR, 1.0)
-		return minf(amount * headroom * balance, AFFINITY_MAX - current)
+		var mult := CORE_GAIN_MULT if core.has(group) else 1.0
+		var headroom := clampf((AFFINITY_MAX - current) / AFFINITY_MAX, 0.0, 1.0)
+		return minf(amount * mult * headroom, AFFINITY_MAX - current)
 	if amount < 0.0:
-		var exposure := clampf(current / 50.0, 0.0, 1.0)
-		return maxf(amount * exposure, AFFINITY_MIN - current)
+		return maxf(amount, AFFINITY_MIN - current)
 	return 0.0
 
 ## affinities'i yerinde günceller; gerçekleşen değişimi döner.
-static func apply_delta(affinities: Dictionary, group: String, amount: float) -> float:
+static func apply_delta(affinities: Dictionary, group: String, amount: float, core: Array = []) -> float:
 	if not is_group(group):
 		return 0.0
-	var delta := effective_delta(affinities, group, amount)
+	var delta := effective_delta(affinities, group, amount, core)
 	affinities[group] = clampf(float(affinities.get(group, AFFINITY_NEUTRAL)) + delta, AFFINITY_MIN, AFFINITY_MAX)
 	return delta
 

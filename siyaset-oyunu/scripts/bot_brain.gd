@@ -181,8 +181,9 @@ static func _national_shares() -> Dictionary:
 static func _appeal_gain(bot: int, changes: Array) -> float:
 	var before := _groups(bot)
 	var after := before.duplicate()
+	var core: Array = PartyManager.data_of(CardManager.party_of(bot)).get("core", [])
 	for change in changes:
-		VoterGroups.apply_delta(after, String(change["group"]), float(change["amount"]))
+		VoterGroups.apply_delta(after, String(change["group"]), float(change["amount"]), core)
 	return _national_appeal(after) - _national_appeal(before)
 
 static func _election_soon() -> bool:
@@ -367,9 +368,9 @@ static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 		var miting := _eval_miting(bot)
 		var miting_noise := _jitter(bot)
 		if not miting.is_empty():
-			candidates.append({"type": "miting", "province": miting["province"]})
+			candidates.append({"type": "miting", "province": miting["province"], "focus": miting["focus"]})
 		if not miting.is_empty() and float(miting["score"]) - GameRules.MITING_FUNDS_COST * funds_value + miting_noise > best_score:
-			best = {"type": "miting", "province": miting["province"]}
+			best = {"type": "miting", "province": miting["province"], "focus": miting["focus"]}
 			best_score = float(miting["score"]) - GameRules.MITING_FUNDS_COST * funds_value + miting_noise
 
 	return best
@@ -765,25 +766,21 @@ static func _attack_target(bot: int) -> int:
 ## Beklenen il gücü kazancı × ilin vekil sayısı × partinin o ildeki uyumu +
 ## mitingin siyasi hitabının (ilin baskın gruplarına kayma) ülke geneli değeri.
 static func _eval_miting(bot: int) -> Dictionary:
-	var pid := CardManager.party_of(bot)
-	var fatigue: Dictionary = CardManager.miting_fatigue.get(pid, {})
 	var best_province := ""
+	var best_focus: Array = []
 	var best_value := -INF
 	for province_id in _seats().keys():
-		# Miting teşkilat ister; örgütsüz iller elenir.
+		# Miting teşkilat istemez; teşkilat etkiyi ve odak sayısını artırır.
 		var org_level := CardManager.organization_level(String(province_id), bot)
-		if org_level < 1:
-			continue
-		var org_mult := PublicOpinion.org_action_mult(org_level)
+		var org_mult := PublicOpinion.miting_org_mult(org_level)
 		var risk := CardManager.miting_risk(bot, province_id)
 		var seats := float(CardManager.province_seat_count(province_id))
 		var closeness := PublicOpinion.appeal_closeness(CardManager.appeal_of(province_id, bot))
 		var expected := (1.0 - risk) * PublicOpinion.MITING_LOCAL + risk * PublicOpinion.PROVOCATION_LOCAL
+		var focus := _miting_focus(bot, province_id, org_level)
 		var changes: Array = []
-		for effect in PublicOpinion.miting_positioning(CardManager.province_profile(province_id), org_mult):
-			var damp := PublicOpinion.miting_fatigue_mult(float(fatigue.get(String(effect["group"]), 0.0)))
-			changes.append({"group": effect["group"], "amount": float(effect["gain"]) * damp})
-			changes.append({"group": effect["loss_group"], "amount": -float(effect["loss"]) * damp})
+		for effect in CardManager.miting_group_gains(bot, province_id, focus):
+			changes.append({"group": effect["group"], "amount": float(effect["gain"])})
 		var positioning := _appeal_gain(bot, changes) * APPEAL_TO_POINTS * PERMANENT_GAIN_VALUE
 		# İl başkanlığıyla aynı ölçek (vekil/30). Zaten güçlü olduğu ilde getirisi azalır.
 		var diminish := 1.0 / (1.0 + maxf(0.0, CardManager.activity_of(province_id, bot)) / 2.0)
@@ -793,10 +790,28 @@ static func _eval_miting(bot: int) -> Dictionary:
 		if value > best_value:
 			best_value = value
 			best_province = province_id
+			best_focus = focus
 	if best_province == "":
 		return {}
 	var score := best_value * 1.4 * (1.4 if _election_soon() else 1.0)
-	return {"score": score, "peer": -1, "province": best_province}
+	return {"score": score, "peer": -1, "province": best_province, "focus": best_focus}
+
+## Botun mitingte odaklanacağı gruplar: ildeki teşkilat seviyesi kadar, ülke
+## geneli uyumuna en çok katkı yapan gruplar (tek tek denenir).
+static func _miting_focus(bot: int, province_id: String, slots: int) -> Array:
+	if slots <= 0:
+		return []
+	var ranked: Array = []
+	for effect in CardManager.miting_group_gains(bot, province_id):
+		var value := _appeal_gain(bot, [{"group": effect["group"], "amount": float(effect["gain"]) * (PublicOpinion.MITING_FOCUS_MULT - 1.0)}])
+		ranked.append({"group": String(effect["group"]), "value": value})
+	ranked.sort_custom(func(a, b): return float(a["value"]) > float(b["value"]))
+	var focus: Array = []
+	for item in ranked:
+		if focus.size() >= slots:
+			break
+		focus.append(String(item["group"]))
+	return focus
 
 ## Yatırım: yerel memnuniyet. Büyük, partiye uyumlu ve aktivitesi henüz
 ## tavana dayanmamış il (azalan getiri: il puanı LIMIT'te durur).

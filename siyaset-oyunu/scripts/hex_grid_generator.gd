@@ -83,6 +83,9 @@ const ODD_ROW_NEIGHBORS := [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(1, -1), Ve
 ## Dönüş (ağ üzerinden gönderilebilir, sadece temel tipler):
 ##   {"seed", "cols", "rows", "cells": Array[int] (bölge indeksi, -1 deniz),
 ##    "regions": Array[{"id", "name", "seats", "coastal"}]}
+## NÜFUS (oyuncuya gösterilmez): her il milletvekili 100 bin seçmene denk gelir.
+const VOTERS_PER_SEAT := 100000
+
 static func generate(seed_value: int, province_scale: float = 1.0, seat_total: int = 300) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value
@@ -97,7 +100,7 @@ static func generate(seed_value: int, province_scale: float = 1.0, seat_total: i
 	var names := _names(cells, region_count, coastal, population, rng)
 	var regions: Array = []
 	for i in region_count:
-		regions.append({"id": "b%02d" % (i + 1), "name": names[i], "seats": int(seats[i]), "coastal": bool(coastal[i]), "electorate": maxi(10000, int(round(float(population[i]) * 25000.0)))})
+		regions.append({"id": "b%02d" % (i + 1), "name": names[i], "seats": int(seats[i]), "coastal": bool(coastal[i]), "electorate": int(seats[i]) * VOTERS_PER_SEAT})
 	return {"seed": seed_value, "cols": COLS, "rows": ROWS, "cells": cells, "regions": regions}
 
 # --- Yardımcılar -------------------------------------------------------------

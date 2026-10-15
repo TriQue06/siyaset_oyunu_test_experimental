@@ -35,26 +35,30 @@ const NATIONAL_DECAY := 0.75
 const LOCAL_DECAY := 0.72
 
 # --- Miting -----------------------------------------------------------------
-## Yerel etki: ildeki aktivite (söner).
-const MITING_LOCAL := 5.0
-## ULUSAL YANSIMA (siyasi hitap): ilde çiftin baskın tarafı s payındaysa
-## eğilim t = (s − 0,5) × 2; baskın gruba MITING_GROUP_GAIN × t ulusal
-## yakınlık, karşıt gruba bunun grubun miting_backlash oranı kadar kayıp.
-## t, MITING_MIN_LEAN'den küçükse (dengeli çift) o çiftte etki yok.
-const MITING_GROUP_GAIN := 5.0
-const MITING_MIN_LEAN := 0.1
+## Yerel etki: ildeki aktivite (söner), teşkilat çarpanıyla (MITING_ORG_MULT).
+const MITING_LOCAL := 2.5
+## TEŞKİLAT (0.0.213): miting teşkilat istemez ama teşkilatsız miting az getirir.
+## Seviye 0 / 1 / 2 → etki 1x / 2x / 3x; seviye kadar grup ODAĞI seçilebilir.
+const MITING_ORG_MULT := [1.0, 2.0, 3.0]
+## ULUSAL HİTAP: miting ildeki HER grubun bir kısmını kazanır, il nüfusuyla
+## orantılı: gruptaki kazanç (yüzde puan) = MITING_CONVERT × teşkilat çarpanı ×
+## ildeki grup seçmeni / ülkedeki grup seçmeni × 100. Odak gruplarda
+## MITING_FOCUS_MULT katı. Küçük bir ilde (3 vekil) %95 emekli olsa bile 2.
+## seviye teşkilatla odaklı miting emeklilerde ancak ~%1-2 getirir.
+const MITING_CONVERT := 0.15
+const MITING_FOCUS_MULT := 2.5
 ## AZALAN GETİRİ: aynı gruba art arda miting yorgunluk biriktirir:
 ## kazanç × 1 / (1 + yorgunluk / FATIGUE_SCALE); yorgunluk her tur × DECAY.
-const MITING_FATIGUE_SCALE := 6.0
+const MITING_FATIGUE_SCALE := 1.5
 const MITING_FATIGUE_DECAY := 0.6
 const PROVOCATION_LOCAL := -2.5
 const PROVOCATION_NATIONAL := -1.0
 ## Provokasyon riski: partinin ildeki GRUP UYUMU (0..100) SAFE_APPEAL ve
 ## üstündeyse risk yok; FULL_APPEAL'e indikçe MAX_RISK'e çıkar (il seçmeni
 ## partinin hitap ettiği gruplara uzak). İl başkanlığı riski seviye başına azaltır.
-const PROVOCATION_MAX_RISK := 0.5
-const PROVOCATION_SAFE_APPEAL := 50.0
-const PROVOCATION_FULL_APPEAL := 40.0
+const PROVOCATION_MAX_RISK := 0.3
+const PROVOCATION_SAFE_APPEAL := 8.0
+const PROVOCATION_FULL_APPEAL := 0.0
 
 # --- Yatırım (sadece hükümet partileri) ---------------------------------------
 ## YEREL MEMNUNİYET: yatırım partinin siyasi kimliğine (grup yakınlığına)
@@ -117,13 +121,14 @@ const ORG_RISK_REDUCTION_PER_LEVEL := 0.35
 ## grup yakınlığına yazılır (il il aktiviteye değil: aynı etki iki kez sayılmaz).
 ## Sunan parti: hedef grupta +GAIN (kabul edilirse PASSED, edilmezse/meclis
 ## yokken vaat olarak REJECTED); karşıt grupta GAIN × grubun law_backlash'ı kadar kayıp.
-const LAW_GROUP_GAIN_PASSED := 7.0
-const LAW_GROUP_GAIN_REJECTED := 2.5
+## (0.0.213: yüzde hitap ölçeğinde, mitinge oranla.)
+const LAW_GROUP_GAIN_PASSED := 3.0
+const LAW_GROUP_GAIN_REJECTED := 1.0
 ## Oy veren parti (genel başkanın oyu): EVET → hedef grupta +YES, karşıtta
 ## YES × backlash kayıp; HAYIR → karşıt grupta +NO, hedefte NO × backlash
 ## kayıp; çekimser etkisiz.
-const LAW_VOTE_YES_GAIN := 1.5
-const LAW_VOTE_NO_GAIN := 1.0
+const LAW_VOTE_YES_GAIN := 0.5
+const LAW_VOTE_NO_GAIN := 0.4
 ## İktidar partisi muhalefetin yasasına EVET: gündemi kaptırdı (ulusal puan).
 const LAW_GOV_YES_ON_OPPOSITION := -1.0
 ## KOALİSYON UYUMU (ulusal puan, kısmi): başbakanın partisinin yasasına ortak
@@ -138,7 +143,7 @@ const LAW_PM_PARTNER_NO_NATIONAL := -0.8
 ## seçilen grupta bu kadar yakınlık bonusu (sonra 0). Bonus kalıcı yakınlığı
 ## DEĞİŞTİRMEZ, seçim hesabında üstüne eklenir; aynı gruba yeni toplantı
 ## bonusları TOPLAMAZ (en büyüğü geçerli). Toplantı yapmamanın cezası YOK.
-const MEETING_BONUS := [10.0, 3.0, 1.0]
+const MEETING_BONUS := [4.0, 1.2, 0.4]
 
 # --- Koalisyondan çekilme ---------------------------------------------------
 ## Çekilmek PUAN TABLOSUNA dokunmaz; sadece sonraki seçime yansıyan ulusal
@@ -202,10 +207,10 @@ const STEAL_THIEF_NATIONAL_LIMIT := -0.25
 const STEAL_VICTIM_NATIONAL_PER_SEAT := 0.012
 const STEAL_VICTIM_NATIONAL_LIMIT := 0.35
 
-## İl menüsünde "seçmen sana yakın/uzak": grup uyumu (0..100) bu aralıkta
-## 0..1'e çevrilir (bkz. appeal_closeness); CLOSENESS_NEAR (uyum 50, nötr) üstü "yakın".
-const APPEAL_LOW := 40.0
-const APPEAL_HIGH := 60.0
+## İl menüsünde "seçmen sana yakın/uzak": grup uyumu (ildeki seçmenin yüzde
+## kaçına hitap ediyorsun) bu aralıkta 0..1'e çevrilir; CLOSENESS_NEAR üstü "yakın".
+const APPEAL_LOW := 0.0
+const APPEAL_HIGH := 20.0
 const CLOSENESS_NEAR := 0.5
 
 # --- Karışıklık ve bölünme ------------------------------------------------------
@@ -250,21 +255,24 @@ static func meeting_bonus(age: int) -> float:
 static func miting_fatigue_mult(fatigue: float) -> float:
 	return 1.0 / (1.0 + maxf(0.0, fatigue) / MITING_FATIGUE_SCALE)
 
-## Mitingin bir ildeki siyasi hitap etkisi (azalan getiri öncesi ham değerler):
-## [{"group": baskın grup, "gain": kazanç, "loss_group": karşıt, "loss": kayıp}].
-static func miting_positioning(profile: Dictionary, mult: float = 1.0) -> Array:
+## Mitingin bir ildeki grup hitap kazançları (azalan getiri ve çekirdek
+## çarpanı öncesi ham değerler): [{"group", "gain"}]. national: grup -> ülkedeki
+## seçmen sayısı (VoterGroups.national_counts), focus: odak gruplar.
+static func miting_gains(profile: Dictionary, national: Dictionary, mult: float = 1.0, focus: Array = []) -> Array:
 	var result: Array = []
-	for pair in VoterGroups.PAIR_IDS:
-		var groups: Array = VoterGroups.PAIRS[pair]
-		var s := VoterGroups.share(profile, groups[0])
-		var lead: String = groups[0] if s >= 0.5 else groups[1]
-		var lean := absf(s - 0.5) * 2.0
-		if lean < MITING_MIN_LEAN:
+	for group in VoterGroups.GROUP_IDS:
+		var here := VoterGroups.group_count(profile, group)
+		var total := float(national.get(group, 0))
+		if here <= 0.0 or total <= 0.0:
 			continue
-		var gain := MITING_GROUP_GAIN * lean * mult
-		result.append({"group": lead, "gain": gain, "loss_group": VoterGroups.opposite(lead),
-			"loss": gain * float(VoterGroups.data(lead).get("miting_backlash", 0.3))})
+		var gain := MITING_CONVERT * mult * here / total * VoterGroups.AFFINITY_MAX
+		if focus.has(group):
+			gain *= MITING_FOCUS_MULT
+		result.append({"group": group, "gain": gain})
 	return result
+
+static func miting_org_mult(level: int) -> float:
+	return float(MITING_ORG_MULT[clampi(level, 0, MITING_ORG_MULT.size() - 1)])
 
 static func org_action_mult(level: int) -> float:
 	return float(ORG_ACTION_MULT[clampi(level, 0, ORG_ACTION_MULT.size() - 1)])

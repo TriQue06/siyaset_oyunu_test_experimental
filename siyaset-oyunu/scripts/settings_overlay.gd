@@ -24,6 +24,11 @@ const FPS_DEFAULT_INDEX := 4  # 144
 @onready var streamer_mode_check: CheckButton = %StreamerModeCheck
 @onready var open_settings_button: Button = %OpenSettingsButton
 
+var _category := "game"
+var _building_category := ""
+var _pages: Dictionary = {}
+var _nav_buttons: Dictionary = {}
+var _content_scroll: ScrollContainer
 var _menu: Control
 var _leave_button: Button
 ## Oyundaki haritanın tohumu: görülür ve tek tuşla kopyalanır.
@@ -90,6 +95,7 @@ func _apply_pixel_style() -> void:
 ## SES seviyeleri: ana ses, müzik, efekt. Sahneye elle node eklemek yerine
 ## kod içinde kurulur (satırların hepsi aynı kalıpta).
 func _build_volume_rows() -> void:
+	_building_category = "sound"
 	var box := panel.get_node("CenterBox") as VBoxContainer
 	# "Kapat" butonu her zaman en altta kalsın: yeni satırlar onun ÜSTÜNE girer.
 	var title := UiTheme.section_label(L.t("Ses"))
@@ -100,6 +106,7 @@ func _build_volume_rows() -> void:
 
 ## İL İNCELEME: panel (sağ sütun, fareyle canlı) ya da pencere (tıklayınca).
 func _build_province_view_row() -> void:
+	_building_category = "play"
 	var box := panel.get_node("CenterBox") as VBoxContainer
 	var title := UiTheme.section_label(L.t("İl inceleme"))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -130,6 +137,7 @@ func _build_province_view_row() -> void:
 ## kurulurken çevrildiği için); oyun durumu yöneticilerde olduğundan kaybolmaz.
 ## OLAY ANİMASYONLARI: büyük olaylardan sonra fırlatılan gazete (EventFx).
 func _build_event_fx_row() -> void:
+	_building_category = "play"
 	var box := panel.get_node("CenterBox") as VBoxContainer
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
@@ -144,6 +152,7 @@ func _build_event_fx_row() -> void:
 	_insert_before_close(box, row)
 
 func _build_language_row() -> void:
+	_building_category = "language"
 	var box := panel.get_node("CenterBox") as VBoxContainer
 	var title := UiTheme.section_label(L.t("Dil"))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -172,6 +181,7 @@ func _build_language_row() -> void:
 
 ## Yeni satırı "Kapat" butonunun hemen üstüne yerleştirir.
 func _insert_before_close(box: VBoxContainer, node: Control) -> void:
+	node.set_meta("settings_category", _building_category)
 	_dynamic.append(node)
 	box.add_child(node)
 	box.move_child(node, close_button.get_index())
@@ -278,11 +288,12 @@ func _build_menu() -> void:
 	_leave_note.add_theme_font_size_override("font_size", 13)
 	_leave_note.modulate = UiTheme.GOLD
 	box.add_child(_leave_note)
+	_build_concept_a(box, center)
 
 func _menu_button(text: String, callback: Callable) -> Button:
 	var button := Button.new()
 	button.text = text
-	button.custom_minimum_size = Vector2(320, 52)
+	button.custom_minimum_size = Vector2(240, 48)
 	button.pressed.connect(callback)
 	return button
 
@@ -321,6 +332,7 @@ func open_menu() -> void:
 	_save_button.disabled = SaveGame.block_reason() != ""
 	_tutorial_button.visible = scene_path == "res://scenes/GameScreen.tscn"
 	_seed_copy.text = L.t("Kopyala")
+	_select_category("game")
 	_menu.show()
 	_sync_pause()
 
@@ -363,7 +375,13 @@ func _on_leave_pressed() -> void:
 ## Dil değişince: ayarlar paneli açık kalır, kodla kurulan bütün yazılar
 ## (satırlar ve oyun menüsü) yeni dilde yeniden kurulur.
 func _rebuild_for_language() -> void:
-	var menu_open := _menu.visible
+	# Sahnedeki sabit kontrolleri eski taşıyıcıya al; yeni düzen kurulurken korunurlar.
+	var box := panel.get_node("CenterBox") as VBoxContainer
+	for page in _pages.values():
+		if not is_instance_valid(page) or page == _pages.get("game"):
+			continue
+		for child in page.get_children():
+			child.reparent(box)
 	for node in _dynamic:
 		if is_instance_valid(node):
 			node.get_parent().remove_child(node)
@@ -378,18 +396,17 @@ func _rebuild_for_language() -> void:
 	_apply_pixel_style()
 	_update_fps_label()
 	_build_menu()
-	if menu_open:
-		open_menu()
-	panel.show()
+	open_menu()
+	_select_category("language")
 
-## Diğer ekranlardaki "Ayarlar" butonlarının da aynı paneli açması için.
+## Bütün giriş noktaları aynı kategori ekranını kullanır.
 func open() -> void:
-	panel.show()
-	_sync_pause()
+	open_menu()
+	_select_category("display")
 
 func close() -> void:
 	panel.hide()
-	_sync_pause()
+	close_menu()
 
 func _on_fps_slider_changed(value: float) -> void:
 	var fps: int = FPS_OPTIONS[int(value)]
@@ -413,3 +430,116 @@ func _refresh_display_mode_buttons() -> void:
 
 func _on_streamer_mode_toggled(pressed: bool) -> void:
 	GameSettings.set_streamer_mode(pressed)
+
+## Konsept A: sabit başlık ve sol gezinme; sağ içerik üstten başlar ve kayar.
+func _build_concept_a(session: VBoxContainer, old_center: CenterContainer) -> void:
+	_pages.clear()
+	_nav_buttons.clear()
+	var shell := VBoxContainer.new()
+	shell.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	shell.add_theme_constant_override("separation", 0)
+	_menu.add_child(shell)
+	var header := PanelContainer.new()
+	UiSkin.skin_panel(header)
+	shell.add_child(header)
+	var header_margin := _margin(header, 18)
+	var heading := HBoxContainer.new()
+	heading.add_theme_constant_override("separation", 18)
+	header_margin.add_child(heading)
+	var title := UiTheme.mono_label(L.t("Oyun Menüsü"), 24)
+	title.add_theme_color_override("font_color", UiTheme.GOLD)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	heading.add_child(title)
+	var resume := _menu_button(L.t("Devam Et (ESC)"), close_menu)
+	UiSkin.skin_color_button(resume, UiTheme.GOLD)
+	resume.add_theme_color_override("font_color", UiTheme.INK)
+	heading.add_child(resume)
+	var body := HBoxContainer.new()
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_theme_constant_override("separation", 0)
+	shell.add_child(body)
+	var nav_panel := PanelContainer.new()
+	UiSkin.skin_panel(nav_panel, UiSkin.PANEL_DARK)
+	nav_panel.custom_minimum_size.x = 190
+	body.add_child(nav_panel)
+	var nav_scroll := ScrollContainer.new()
+	nav_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_margin(nav_panel, 10).add_child(nav_scroll)
+	var nav := VBoxContainer.new()
+	nav.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	nav.add_theme_constant_override("separation", 10)
+	nav_scroll.add_child(nav)
+	_content_scroll = ScrollContainer.new()
+	_content_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_content_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_ALWAYS
+	_content_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.add_child(_content_scroll)
+	var content_margin := _margin(_content_scroll, 22)
+	content_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var stack := VBoxContainer.new()
+	stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content_margin.add_child(stack)
+	for entry in [["game", "Oyun Menüsü"], ["display", "Ekran Modu"], ["sound", "Ses"], ["play", "Ayarlar"], ["language", "Dil"]]:
+		var key: String = entry[0]
+		var button := Button.new()
+		button.text = L.t(entry[1])
+		button.custom_minimum_size = Vector2(0, 46)
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.add_theme_font_size_override("font_size", 14)
+		button.pressed.connect(func(): _select_category(key))
+		nav.add_child(button)
+		_nav_buttons[key] = button
+		var card := PanelContainer.new()
+		UiSkin.skin_panel(card)
+		stack.add_child(card)
+		var page := VBoxContainer.new()
+		page.add_theme_constant_override("separation", 18)
+		_margin(card, 20).add_child(page)
+		_pages[key] = page
+		card.set_meta("category", key)
+	var original := panel.get_node("CenterBox") as VBoxContainer
+	for child in original.get_children():
+		var key := String(child.get_meta("settings_category", "display"))
+		if child.name == "StreamerModeRow":
+			key = "play"
+		if child == close_button or child.name == "TitleLabel":
+			child.hide()
+			continue
+		child.reparent(_pages[key])
+		if child is Label:
+			child.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	for child in session.get_children():
+		# Eski ayrı Ayarlar düğmesinin yerini soldaki kategoriler alır.
+		if child is Button and child.text == L.t("Ayarlar"):
+			child.queue_free()
+		elif child is Label and child != _leave_note:
+			child.queue_free()
+		else:
+			child.reparent(_pages["game"])
+			if child is Button:
+				UiSkin.skin_color_button(child, UiTheme.RED_DARK if child == _leave_button else UiTheme.PANEL_LIGHT)
+	old_center.queue_free()
+	var footer := PanelContainer.new()
+	UiSkin.skin_panel(footer, UiSkin.PANEL_DARK)
+	shell.add_child(footer)
+	var hint := UiTheme.mono_label(L.t("F11 ile de değiştirebilirsin"), 12)
+	hint.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
+	_margin(footer, 12).add_child(hint)
+	_select_category("game")
+
+func _margin(parent: Node, padding: int) -> MarginContainer:
+	var margin := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, padding)
+	parent.add_child(margin)
+	return margin
+
+func _select_category(key: String) -> void:
+	_category = key
+	for category in _pages:
+		var page: VBoxContainer = _pages[category]
+		page.get_parent().get_parent().visible = category == key
+		var button: Button = _nav_buttons[category]
+		UiSkin.skin_color_button(button, UiTheme.GOLD if category == key else UiTheme.PANEL_LIGHT)
+		button.add_theme_color_override("font_color", UiTheme.INK if category == key else UiTheme.TEXT)
+	_content_scroll.scroll_vertical = 0

@@ -101,6 +101,14 @@ func _initialize() -> void:
 	check("sonraki secimler 19, 27 (16 degil)",
 		GameRules.is_election_round(19) and GameRules.is_election_round(27) and not GameRules.is_election_round(16))
 	check("bayrak temizlendi", not cm.early_election_pending)
+	# 0.0.218: oyun ortasi ayar senkronu (configure) kaymis takvimi silmemeli.
+	var max_after_early: int = GameRules.MAX_ROUNDS
+	GameRules.configure(4, 8)
+	check("ayar senkronu sonrasi cipa ve oyun sonu korunur", GameRules.ELECTION_ANCHOR == 11 and GameRules.MAX_ROUNDS == max_after_early,
+		"cipa %d son %d/%d" % [GameRules.ELECTION_ANCHOR, GameRules.MAX_ROUNDS, max_after_early])
+	var next_after: int = cm.next_election_round()
+	check("sonraki secim simdiki yildan sonra", next_after == 19 and GameRules.election_year(next_after) > GameRules.year_of_round(cm.round_number),
+		"tur %d sonraki %d (%d)" % [cm.round_number, next_after, GameRules.election_year(next_after)])
 
 	print("")
 	print("=== 4) MECLIS DISI PARTI YARI VERIMLE CALAR ===")
@@ -139,6 +147,8 @@ func _initialize() -> void:
 	check("2/3 varsa kurallar degisti", is_equal_approx(mm.election_threshold, 3.0) and mm.election_interval == 6,
 		"baraj %.1f, aralik %d" % [mm.election_threshold, mm.election_interval])
 	check("takvim son secimden itibaren yeni aralikla", GameRules.ELECTION_INTERVAL == 12 		and cm.election_anchor == 8 and GameRules.is_election_round(20), str(GameRules.ELECTION_ANCHOR))
+	check("anayasa sonrasi kalan secim sayisi korunur, son secim yeni araliga oturur (7 secim: 20..92)",
+		GameRules.MAX_ROUNDS == 92 and cm.remaining_elections() == 7, "son %d kalan %d" % [GameRules.MAX_ROUNDS, cm.remaining_elections()])
 	check("ayni donemde ikinci yasa hakki yok", not cm.can_propose_constitution(1))
 	# 0.0.185: grup yasasi, vergi yasasi ve anayasa AYRI haklar.
 	check("anayasa sunan parti ayni turda grup yasasini da sunabilir", cm.can_propose_law(1, cp.law_type("isci")),

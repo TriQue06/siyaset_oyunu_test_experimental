@@ -709,9 +709,10 @@ func _resolve_proposal() -> void:
 		last_resolution_reason = L.t("Anayasa değişikliği %s (EVET %d / gereken %d).") % [
 			L.t("KABUL EDİLDİ") if const_passed else L.t("REDDEDİLDİ"), totals.x, needed]
 		if const_passed:
+			var remaining := CardManager.remaining_elections()
 			MultiplayerManager.apply_constitution(payload)
-			# Takvim son seçimden itibaren yeni aralıkla işlesin.
-			CardManager.rebase_election_calendar()
+			# Takvim son seçimden itibaren yeni aralıkla işlesin; kalan seçim sayısı korunur.
+			CardManager.rebase_election_calendar(remaining)
 			last_resolution_reason += L.t(" Yeni baraj %%%s, seçimler %d yılda bir, sayım: %s.") % [
 				String.num(MultiplayerManager.election_threshold, 1), MultiplayerManager.election_interval,
 				ElectionModel.method_title(MultiplayerManager.seat_method)]

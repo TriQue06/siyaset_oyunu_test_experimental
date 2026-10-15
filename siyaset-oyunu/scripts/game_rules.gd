@@ -58,17 +58,30 @@ static var MAX_ROUNDS: int = DEFAULT_ELECTION_INTERVAL * ROUNDS_PER_YEAR * DEFAU
 ## kayar ve takvim oradan devam eder.
 static var ELECTION_ANCHOR: int = DEFAULT_ELECTION_INTERVAL * ROUNDS_PER_YEAR
 
+## Oyun içinde kaymış takvim (erken seçim / anayasa). configure() bunları
+## SİLMEZ (0.0.218): oyun ortasındaki ayar senkronu takvimi bozuyordu.
+static var _anchor_override: int = 0
+static var _max_rounds_override: int = 0
+static var _election_count: int = DEFAULT_ELECTION_COUNT
+
 static func configure(interval_years: int, count: int) -> void:
 	ELECTION_INTERVAL_YEARS = clampi(interval_years, ELECTION_INTERVAL_MIN, ELECTION_INTERVAL_MAX)
 	ELECTION_INTERVAL = ELECTION_INTERVAL_YEARS * ROUNDS_PER_YEAR
 	FIRST_ELECTION_ROUND = ELECTION_INTERVAL
-	ELECTION_ANCHOR = FIRST_ELECTION_ROUND
-	MAX_ROUNDS = ELECTION_INTERVAL * clampi(count, ELECTION_COUNT_MIN, ELECTION_COUNT_MAX)
+	_election_count = clampi(count, ELECTION_COUNT_MIN, ELECTION_COUNT_MAX)
+	ELECTION_ANCHOR = _anchor_override if _anchor_override > 0 else FIRST_ELECTION_ROUND
+	MAX_ROUNDS = _max_rounds_override if _max_rounds_override > 0 else ELECTION_INTERVAL * _election_count
 
 ## Erken seçim yapıldı: takvim bu tura sabitlenir, sonraki seçimler buradan
 ## itibaren aynı aralıkla gelir. 0 = varsayılan takvim.
 static func set_election_anchor(round_number: int) -> void:
+	_anchor_override = maxi(0, round_number)
 	ELECTION_ANCHOR = FIRST_ELECTION_ROUND if round_number <= 0 else round_number
+
+## Oyunun son seçim turu kaydıysa (erken seçim / anayasa); 0 = lobi uzunluğu.
+static func set_max_rounds_override(last_round: int) -> void:
+	_max_rounds_override = maxi(0, last_round)
+	MAX_ROUNDS = _max_rounds_override if _max_rounds_override > 0 else ELECTION_INTERVAL * _election_count
 
 ## PARA ÖLÇEĞİ: bütün parti bedelleri ve gelirleri MİLYON ¤. Bir partinin
 ## dönemlik geliri (30–40) devletin dönemlik vergi gelirinin (70–140) üçte

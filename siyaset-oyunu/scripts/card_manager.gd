@@ -1641,10 +1641,9 @@ func init_game() -> void:
 	early_election_pending = false
 	election_anchor = 0
 	GameRules.set_election_anchor(0)
-	if max_rounds_override > 0:
-		# Erken seçimle uzamış oyun: lobideki uzunluğa dön.
-		GameRules.configure(MultiplayerManager.election_interval, MultiplayerManager.election_count)
+	# Erken seçimle uzamış oyun: lobideki uzunluğa dön.
 	max_rounds_override = 0
+	GameRules.set_max_rounds_override(0)
 	national_support = {}
 	_hidden_national_delta.clear()
 	_visible_national_support.clear()
@@ -1750,9 +1749,8 @@ func abandon_game() -> void:
 	early_election_pending = false
 	election_anchor = 0
 	GameRules.set_election_anchor(0)
-	if max_rounds_override > 0:
-		GameRules.configure(MultiplayerManager.election_interval, MultiplayerManager.election_count)
 	max_rounds_override = 0
+	GameRules.set_max_rounds_override(0)
 	national_support = {}
 	_hidden_national_delta.clear()
 	_visible_national_support.clear()
@@ -3058,13 +3056,29 @@ func _finish_round_if_needed(wrapped: bool) -> void:
 		return
 	_finish_round()
 
+## Bu turdan (dahil) oyun sonuna kadar kalan seçim sayısı (mevcut takvimle).
+func remaining_elections() -> int:
+	var n := 0
+	for r in range(maxi(1, round_number), GameRules.MAX_ROUNDS + 1):
+		if GameRules.is_election_round(r):
+			n += 1
+	return n
+
 ## Anayasa değişikliği seçim aralığını değiştirdi: takvim SON SEÇİMDEN
 ## itibaren yeni aralıkla işlesin (yoksa çıpa eski aralığa göre kalır).
-func rebase_election_calendar() -> void:
+## remaining >= 0 verilirse kalan seçim sayısı korunur ve son seçim yeni
+## aralığa oturur (eskiden eski bitiş turu kalıp seçimler üst üste gelebiliyordu).
+func rebase_election_calendar(remaining: int = -1) -> void:
 	election_anchor = maxi(last_election_round, 0)
 	if election_anchor <= 0:
 		election_anchor = GameRules.FIRST_ELECTION_ROUND
 	GameRules.set_election_anchor(election_anchor)
+	if remaining > 0:
+		var first := election_anchor
+		while first < round_number:
+			first += GameRules.ELECTION_INTERVAL
+		max_rounds_override = first + (remaining - 1) * GameRules.ELECTION_INTERVAL
+		GameRules.set_max_rounds_override(max_rounds_override)
 
 ## Meclis erken seçimi kabul etti (GovernmentManager çağırır).
 func schedule_early_election() -> void:
@@ -3134,7 +3148,7 @@ func _finish_round() -> void:
 		election_anchor = finished_round
 		GameRules.set_election_anchor(election_anchor)
 		max_rounds_override = finished_round + maxi(1, remaining - 1) * GameRules.ELECTION_INTERVAL
-		GameRules.MAX_ROUNDS = max_rounds_override
+		GameRules.set_max_rounds_override(max_rounds_override)
 		_hold_election(finished_round, false)
 		_schedule_agenda()
 		return
@@ -4418,8 +4432,7 @@ func _apply_state(state: Dictionary) -> void:
 	early_election_pending = bool(state.get("early_election_pending", false))
 	election_anchor = int(state.get("election_anchor", 0))
 	max_rounds_override = int(state.get("max_rounds_override", 0))
-	if max_rounds_override > 0:
-		GameRules.MAX_ROUNDS = max_rounds_override
+	GameRules.set_max_rounds_override(max_rounds_override)
 	# Takvim çıpası her istemcide aynı olmalı (erken seçim sonrası).
 	GameRules.set_election_anchor(election_anchor)
 	passed_threshold = state["passed"]

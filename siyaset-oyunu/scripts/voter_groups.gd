@@ -157,8 +157,8 @@ const SMOOTHING_PASSES := 1
 const SELF_WEIGHT := 0.4
 ## Her çiftin ülke ortalaması 50 ± bu kadar (her oyunda farklı).
 const PAIR_CENTER_JITTER := 8.0
-## Ortalamadan en uç sapma (yüzde puanı).
-const PROFILE_SPREAD := 36.0
+## Ortalamadan en uç sapma (yüzde puanı). 0.0.214: ortalama il ~%70/%30.
+const PROFILE_SPREAD := 48.0
 ## Bir çiftin bir tarafı bundan az / çok olamaz.
 const PROFILE_MIN := 6
 const PROFILE_MAX := 94
@@ -169,7 +169,7 @@ const HOTSPOT_STRENGTH := 2.6
 ## Büyük seçim çevreleri daha karma (ülke ortalamasına yakın) olur.
 const HOMOGENEOUS_SEATS_FROM := 6
 const HOMOGENEOUS_SEATS_TO := 20
-const HOMOGENEOUS_MIN_FACTOR := 0.32
+const HOMOGENEOUS_MIN_FACTOR := 0.6
 
 static func is_group(group: String) -> bool:
 	return GROUPS.has(group)

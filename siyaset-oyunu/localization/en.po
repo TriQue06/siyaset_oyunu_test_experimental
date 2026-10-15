@@ -3602,3 +3602,178 @@ msgstr "MAP AND REPRESENTATION"
 
 msgid "Grup toplantısı ilk seçimden sonra yapılabilir."
 msgstr "Group meetings are available after the first election."
+
+# Settings concept A
+msgid "Oyun menüsü"
+msgstr "Game menu"
+
+msgid "Görüntü"
+msgstr "Display"
+
+msgid "Oynanış"
+msgstr "Gameplay"
+
+msgid "Oyuna devam et, kaydet veya oturumdan ayrıl."
+msgstr "Resume, save or leave the session."
+
+msgid "Ekran modu ve performans tercihleri."
+msgstr "Display mode and performance preferences."
+
+msgid "Müzik ve efektleri ayrı ayrı ayarla."
+msgstr "Adjust music and effects separately."
+
+msgid "Bilgi panelleri ve olay gösterimleri."
+msgstr "Information panels and event presentations."
+
+msgid "Arayüzün dilini seç."
+msgstr "Choose the interface language."
+
+msgid "OYUN MENÜSÜ"
+msgstr "GAME MENU"
+
+msgid "SİYASET OYUNU / AYARLAR"
+msgstr "POLITICS GAME / SETTINGS"
+
+msgid "DEVAM ET · ESC"
+msgstr "RESUME · ESC"
+
+msgid "OTURUM"
+msgstr "SESSION"
+
+msgid "KİŞİSEL AYARLAR"
+msgstr "PERSONAL SETTINGS"
+
+msgid "GÖRÜNTÜ"
+msgstr "DISPLAY"
+
+msgid "SES"
+msgstr "SOUND"
+
+msgid "OYNANIŞ"
+msgstr "GAMEPLAY"
+
+msgid "DİL"
+msgstr "LANGUAGE"
+
+msgid "Ayarlar için soldaki kategorileri kullan."
+msgstr "Use the categories on the left for settings."
+
+msgid "Tercihler değiştirildiğinde anında uygulanır."
+msgstr "Preferences apply immediately when changed."
+
+msgid "ESC · Oyuna dön\n\nF11 · Tam ekran"
+msgstr "ESC · Resume\n\nF11 · Fullscreen"
+
+msgid "AYARLARI SIFIRLA"
+msgstr "RESET SETTINGS"
+
+msgid "Oyuna dön"
+msgstr "Resume game"
+
+msgid "Kaldığın yerden devam et. Kısayol: ESC"
+msgstr "Continue where you left off. Shortcut: ESC"
+
+msgid "DEVAM ET →"
+msgstr "RESUME →"
+
+msgid "OYUNU KAYDET"
+msgstr "SAVE GAME"
+
+msgid "Oyun kaydı"
+msgstr "Save game"
+
+msgid "Çevrim dışı oyunun ilerlemesini kaydet."
+msgstr "Save your offline game progress."
+
+msgid "Harita tohumu"
+msgstr "Map seed"
+
+msgid "Aynı ülke haritasını yeniden oluşturmak için."
+msgstr "Use this to recreate the same country map."
+
+msgid "REHBERİ AÇ"
+msgstr "OPEN GUIDE"
+
+msgid "İlk oyun rehberi"
+msgstr "First game guide"
+
+msgid "Oynanışı anlatan rehberi yeniden başlat."
+msgstr "Restart the guide explaining how to play."
+
+msgid "OYUNDAN AYRIL"
+msgstr "LEAVE GAME"
+
+msgid "Oyundan ayrıl"
+msgstr "Leave game"
+
+msgid "Ayrılmadan önce onay istenir."
+msgstr "Confirmation is required before leaving."
+
+msgid "Ekran modu"
+msgstr "Display mode"
+
+msgid "F11 ile de değiştirebilirsin."
+msgstr "You can also switch with F11."
+
+msgid "Tam ekran"
+msgstr "Fullscreen"
+
+msgid "FPS sınırı"
+msgstr "FPS limit"
+
+msgid "Dikey eşitleme"
+msgstr "Vertical sync"
+
+msgid "Görüntü yırtılmasını azaltır."
+msgstr "Reduces screen tearing."
+
+msgid "Tüm seslerin genel seviyesi."
+msgstr "Overall volume for all sounds."
+
+msgid "Oyun ve seçim gecesi müzikleri."
+msgstr "Game and election night music."
+
+msgid "Butonlar, kartlar ve oylama sesleri."
+msgstr "Button, card and voting sounds."
+
+msgid "İl ayrıntılarının nasıl açılacağını seç."
+msgstr "Choose how province details open."
+
+msgid "Olay animasyonları"
+msgstr "Event animations"
+
+msgid "Gazete ve haber manşeti gösterimleri."
+msgstr "Newspaper and news headline presentations."
+
+msgid "Yayıncı modu"
+msgstr "Streamer mode"
+
+msgid "Yayın sırasında gizlilik tercihi."
+msgstr "Privacy preference while streaming."
+
+msgid "Oyun dili"
+msgstr "Game language"
+
+msgid "Arayüzde kullanılacak dil."
+msgstr "Language used in the interface."
+
+msgid "● Çevrim dışı · Oyun duraklatıldı"
+msgstr "● Offline · Game paused"
+
+msgid "● Çevrim içi · Oyun devam ediyor"
+msgstr "● Online · Game continues"
+
+msgid "● SİYASET OYUNU"
+msgstr "● POLITICS GAME"
+
+msgid "KOPYALA"
+msgstr "COPY"
+
+msgid "TEKRAR BAS · AYRIL"
+msgstr "PRESS AGAIN · LEAVE"
+
+msgid "TEKRAR BAS · SIFIRLA"
+msgstr "PRESS AGAIN · RESET"
+
+msgid "Kişisel ayarların varsayılan değerlerine dönecek."
+msgstr "Your personal settings will return to their defaults."

@@ -88,7 +88,7 @@ func skip_all() -> void:
 func _input(event: InputEvent) -> void:
 	if not _active:
 		return
-	var advance := event is InputEventKey and event.pressed and event.keycode in [KEY_SPACE, KEY_ESCAPE]
+	var advance: bool = event is InputEventKey and event.pressed and event.keycode in [KEY_SPACE, KEY_ESCAPE]
 	advance = advance or (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT)
 	advance = advance or (event is InputEventScreenTouch and event.pressed)
 	if advance:

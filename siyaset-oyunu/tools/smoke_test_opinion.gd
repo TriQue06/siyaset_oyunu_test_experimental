@@ -184,7 +184,7 @@ func _initialize() -> void:
 	check("ortaga makam puaniyla orantili pay", near(float(inv_shares.get(2, 0.0)), rest * pts2 / float(pts1 + pts2)), "%.2f" % float(inv_shares.get(2, 0.0)))
 	check("ortagin makami var", pts1 > 0 and pts2 > 0, "%d / %d" % [pts1, pts2])
 	check("yatirim ayrica ulusal puan yazmaz (ekonomi ivmesi uzerinden)", near(cm.national_of(1), 0.0))
-	check("yatirim grup yakinligina dokunmaz", str(pm.parties[1]["groups"]) == str(groups(["isci", "dindar"])))
+	check("yatirim getirene ildeki gruplardan hitap kazandirir", float(pm.parties[1]["groups"]["isveren"]) > 0.0 		and float(pm.parties[3]["groups"]["isci"]) <= float(groups(["isveren", "ilerici"])["isci"]))
 	check("yatirim destede degil (hamle)", not cm._draw_weights(1).has("yatirim"))
 
 	print("")

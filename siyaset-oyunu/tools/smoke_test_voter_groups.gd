@@ -284,11 +284,36 @@ func _initialize() -> void:
 	var gi: Dictionary = pm.parties[1]["groups"].duplicate()
 	var prof_inv := str(cm.province_profiles[inv])
 	cm._apply_invest_move(1, inv)
-	check("yatirim il aktivitesini artirir (hemen gelen pay)", near(cm.local_of(inv, 1), PublicOpinion.INVEST_LOCAL * Economy.INVEST_IMMEDIATE))
-	check("yatirim grup yakinligini degistirmez", str(pm.parties[1]["groups"]) == str(gi))
-	check("yatirim il profilini degistirmez", str(cm.province_profiles[inv]) == prof_inv)
+	check("yatirim il aktivitesini artirir (hemen gelen pay)", near(cm.local_of(inv, 1), minf(PublicOpinion.LIMIT, PublicOpinion.INVEST_LOCAL * Economy.INVEST_IMMEDIATE)))
+	check("yatirim ildeki gruplardan hitap kazandirir", float(pm.parties[1]["groups"]["isveren"]) > float(gi["isveren"]))
+	# ÜST ÜSTE YATIRIM: aynı ile ikinci yatırım da birincisi kadar işe yarar
+	# (il puanı LIMIT'e takılmaz, INVEST_LIMIT'e kadar çıkar; hitap kazancı da aynı).
+	new_game({1: groups(["isci", "dindar"]), 2: groups(["isveren", "ilerici"])})
+	prof_inv = str(cm.province_profiles[inv])  # yeni oyun: yeni ülke
+	cm.funds[1] = 500
+	cm.current_turn_index = 0
+	gm.government = {"pm": 1}
+	gm.main_gov_peer_id = 1
+	cm.economy["treasury"] = 1000.0
+	var l0: float = cm.local_of(inv, 1)
+	var h0: float = float(pm.parties[1]["groups"]["isveren"])
 	cm._apply_invest_move(1, inv)
-	check("ayni ile ikinci yatirim tavana dayanir (azalan getiri)", cm.local_of(inv, 1) <= PublicOpinion.LIMIT + 0.001)
+	var l1: float = cm.local_of(inv, 1)
+	var h1: float = float(pm.parties[1]["groups"]["isveren"])
+	cm._apply_invest_move(1, inv)
+	var l2: float = cm.local_of(inv, 1)
+	var h2: float = float(pm.parties[1]["groups"]["isveren"])
+	check("ikinci yatirim il puanina birincisi kadar ekler (tavana takilmaz)", near(l2 - l1, l1 - l0) and l2 > PublicOpinion.LIMIT,
+		"%.2f -> %.2f -> %.2f" % [l0, l1, l2])
+	check("ikinci yatirim hitapta birincisi kadar kazandirir", h2 - h1 > (h1 - h0) * 0.97, "%.3f / %.3f" % [h1 - h0, h2 - h1])
+	cm._apply_miting_move(1, inv)
+	check("miting yatirimin tavan ustu puanini kirpmaz", cm.local_of(inv, 1) >= l2 - 0.001, "%.2f" % cm.local_of(inv, 1))
+	gm.government = {"pm": 1}
+	gi = pm.parties[1]["groups"].duplicate()
+	check("yatirim il profilini degistirmez", str(cm.province_profiles[inv]) == prof_inv)
+	check("yatirim grup hitabini (kendi kazanci disinda) degistirmez", str(pm.parties[1]["groups"]) == str(gi))
+	cm._apply_invest_move(1, inv)
+	check("yatirim il puani INVEST_LIMIT'i asmaz", cm.local_of(inv, 1) <= PublicOpinion.INVEST_LIMIT + 0.001)
 	gm.government = {}
 	gm.main_gov_peer_id = -1
 

@@ -2020,16 +2020,17 @@ func _apply_organization(peer_id: int, province_id: String) -> void:
 ## TEK SEFER düşer: devlet payı hazineden, parti payı (+ sabit hamle bedeli)
 ## parti kasasından; gerçek paylaşım kayda geçer.
 func _apply_invest_move(peer_id: int, province_id: String, state: float = 1.0) -> void:
+	var amount := Economy.INVEST_COST
 	if not can_invest(peer_id, province_id, state):
 		return
-	var split := Economy.split_cost(Economy.INVEST_COST, state)
+	var split := Economy.split_cost(amount, state)
 	funds[peer_id] = funds_of(peer_id) - float(split["party"])
 	_spend_quota(peer_id, float(split["state"]))
 	var before := state_treasury()
 	economy["treasury"] = before - float(split["state"])
-	_record_funding(peer_id, "invest", province_id, split, Economy.INVEST_COST)
+	_record_funding(peer_id, "invest", province_id, split, amount)
 	_event_message = ""
-	_apply_investment(peer_id, province_id)
+	_apply_investment(peer_id, province_id, amount)
 	_push_state({"type": "invest", "peer_id": peer_id, "province": province_id, "message": _event_message,
 		"econ": {"kind": "invest", "peer_id": peer_id, "province": province_id, "cost": float(split["state"]),
 			"party_cost": float(split["party"]), "before": before, "after": state_treasury()}})
@@ -2212,23 +2213,72 @@ func investment_shares(investor: int) -> Dictionary:
 		shares[pid] = float(shares.get(pid, 0.0)) + rest * float(points[pid]) / float(sum)
 	return shares
 
-func _apply_investment(peer_id: int, province_id: String) -> void:
+func _apply_investment(peer_id: int, province_id: String, amount: float = Economy.INVEST_COST) -> void:
 	var investor := party_of(peer_id)
+	var scale := amount / Economy.INVEST_COST
 	var shares := investment_shares(investor)
 	var later := {}
 	for pid in shares.keys():
-		_add_local(province_id, int(pid), float(shares[pid]) * Economy.INVEST_IMMEDIATE)
-		later[pid] = float(shares[pid]) * (1.0 - Economy.INVEST_IMMEDIATE) / float(Economy.INVEST_DELAY_ROUNDS)
+		_add_local(province_id, int(pid), float(shares[pid]) * scale * Economy.INVEST_IMMEDIATE, false, PublicOpinion.INVEST_LIMIT)
+		later[pid] = float(shares[pid]) * scale * (1.0 - Economy.INVEST_IMMEDIATE) / float(Economy.INVEST_DELAY_ROUNDS)
+	# SEÇMEN KARŞILIĞI: ildeki her grubun nüfusla orantılı bir kısmı getirene geçer.
+	var changes: Array = []
+	for effect in investment_group_gains(province_id, amount):
+		changes.append({"peer": investor, "group": String(effect["group"]), "amount": float(effect["gain"])})
+	_shift_groups(changes)
 	var pending: Array = economy.get("investments", [])
 	pending.append({"province": province_id, "party": investor, "round": round_number,
 		"rounds_left": Economy.INVEST_DELAY_ROUNDS, "amounts": later})
 	economy["investments"] = pending
-	economy["boost"] = minf(Economy.BOOST_MAX, float(economy.get("boost", 0.0)) + Economy.INVEST_ECONOMY)
-	_ease_turmoil(peer_id, PublicOpinion.TURMOIL_EASE_INVEST)
+	economy["boost"] = minf(Economy.BOOST_MAX, float(economy.get("boost", 0.0)) + Economy.INVEST_ECONOMY * scale)
+	_ease_turmoil(peer_id, PublicOpinion.TURMOIL_EASE_INVEST * minf(1.0, scale))
 	_log_province(province_id, L.t("Hükümet yatırımı — %s getirdi (%s; etkisi %d dönemde tamamlanır)") % [
-		_party_name(peer_id), Economy.money_full(Economy.INVEST_COST), Economy.INVEST_DELAY_ROUNDS])
-	_event_message = L.t("%s, %s'a hükümet yatırımı getirdi: devlet hazinesinden %s.") % [_party_name(peer_id),
-		_province_name(province_id), Economy.money_full(Economy.INVEST_COST)]
+		_party_name(peer_id), Economy.money_full(amount), Economy.INVEST_DELAY_ROUNDS])
+	_event_message = L.t("%s, %s'a hükümet yatırımı getirdi: %s.") % [_party_name(peer_id),
+		_province_name(province_id), Economy.money_full(amount)]
+
+## Yatırımın ildeki grup kazançları (ham): [{"group", "gain"}], tutarla orantılı.
+func investment_group_gains(province_id: String, amount: float = Economy.INVEST_COST) -> Array:
+	var result: Array = []
+	var national := national_group_counts()
+	var profile := province_profile(province_id)
+	for group in VoterGroups.GROUP_IDS:
+		var here := VoterGroups.group_count(profile, group)
+		var total := float(national.get(group, 0.0))
+		if here <= 0.0 or total <= 0.0:
+			continue
+		result.append({"group": group, "gain": PublicOpinion.INVEST_CONVERT * amount / Economy.INVEST_COST * here / total * VoterGroups.AFFINITY_MAX})
+	return result
+
+## Partinin her gruptaki TAHMİNİ OY PAYI (0..100): ildeki her grubun oyu
+## partiler arasında hitap + kararsızların eşit payı × kamuoyu (ulusal + il)
+## çarpanıyla paylaşılır, iller grup seçmeni ağırlığıyla toplanır. Grupların
+## (büyüklükleriyle ağırlıklı) ortalaması ülke geneli oy oranına yaklaşır.
+func group_vote_estimates(peer_id: int) -> Dictionary:
+	var pid := party_of(peer_id)
+	var parties := _group_profiles()
+	var result := {}
+	if not parties.has(pid):
+		return result
+	var mods := election_modifiers(true)
+	var national_mod: Dictionary = mods["national"]
+	var local_mod: Dictionary = mods["local"]
+	var profiles := province_voters()
+	for group in VoterGroups.GROUP_IDS:
+		var votes := 0.0
+		var total := 0.0
+		for province_id in profiles.keys():
+			var count := VoterGroups.group_count(profiles[province_id], group)
+			if count <= 0.0:
+				continue
+			var weights := {}
+			var local_here: Dictionary = local_mod.get(province_id, {})
+			for p in parties.keys():
+				weights[p] = PublicOpinion.multiplier(float(national_mod.get(p, 0.0)), float(local_here.get(p, 0.0)))
+			votes += count * float(ElectionModel.shares_in_group(parties, group, weights).get(pid, 0.0))
+			total += count
+		result[group] = votes / total * 100.0 if total > 0.0 else 0.0
+	return result
 
 ## TUR SONU EKONOMİSİ (host, tur başına TEK SEFER, seçimden önce): vergi
 ## geliri hazineye, vergi baskısı ve ekonomi bir adım yerleşir, bekleyen
@@ -2241,7 +2291,7 @@ func _advance_economy() -> String:
 		var amounts: Dictionary = entry.get("amounts", {})
 		for pid in amounts.keys():
 			if PartyManager.parties.has(int(pid)):
-				_add_local(province_id, int(pid), float(amounts[pid]))
+				_add_local(province_id, int(pid), float(amounts[pid]), false, PublicOpinion.INVEST_LIMIT)
 		entry["rounds_left"] = int(entry["rounds_left"]) - 1
 		if int(entry["rounds_left"]) > 0:
 			still.append(entry)
@@ -2485,14 +2535,23 @@ func _add_national(peer_id: int, amount: float, own: bool = false) -> void:
 	peer_id = party_of(peer_id)
 	national_support[peer_id] = PublicOpinion.clamp_points(national_of(peer_id) + amount)
 
-func _add_local(province_id: String, peer_id: int, amount: float, own: bool = false) -> void:
+## cap: bu hamlenin il puanını çıkarabileceği en yüksek değer (yatırım
+## INVEST_LIMIT, diğerleri LIMIT). Tavanın üstündeki puan kırpılmaz: miting
+## yatırımın biriktirdiği fazlayı silmez, sadece üstüne ekleyemez.
+func _add_local(province_id: String, peer_id: int, amount: float, own: bool = false, cap: float = PublicOpinion.LIMIT) -> void:
 	if own:
 		amount = _own_effect(peer_id, amount)
 	if amount == 0.0 or peer_id == -1:
 		return
 	peer_id = party_of(peer_id)
 	var entry: Dictionary = local_support.get(province_id, {})
-	entry[peer_id] = PublicOpinion.clamp_points(float(entry.get(peer_id, 0.0)) + amount)
+	var current := float(entry.get(peer_id, 0.0))
+	var value := current + amount
+	if amount > 0.0:
+		value = minf(value, maxf(cap, current))
+	else:
+		value = maxf(value, minf(-PublicOpinion.LIMIT, current))
+	entry[peer_id] = value
 	local_support[province_id] = entry
 
 func _log_province(province_id: String, text: String) -> void:

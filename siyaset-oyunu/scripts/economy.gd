@@ -90,6 +90,7 @@ const UNEMPLOYMENT_PER_INDEX := 0.15
 # --- Yatırım ----------------------------------------------------------------------
 ## Yatırım DEVLET HAZİNESİNDEN ödenir (+ partiden GameRules.INVEST_FUNDS_COST).
 const INVEST_COST := 100.0
+
 ## Yerel etkinin bu payı hemen, kalanı INVEST_DELAY_ROUNDS tur sonunda eşit
 ## dilimlerle gelir (yatırım açılışı: tamamlanmadan başarı sayılmaz).
 const INVEST_IMMEDIATE := 0.5

@@ -68,6 +68,7 @@ static func build(peer_id: int, my_id: int, on_action: Callable = Callable(), wi
 
 	var role := role_text(peer_id)
 	var role_row := HBoxContainer.new()
+	role_row.add_theme_constant_override("separation", 6)
 	role_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	role_row.add_child(PopupKit.chip(role, UiTheme.GREEN if role.begins_with("Hükümet:") else UiTheme.TEXT_MUTED))
 	box.add_child(role_row)
@@ -188,37 +189,79 @@ static func role_text(peer_id: int) -> String:
 		return L.t("Muhalefet")
 	return L.t("Hükümet: ") + ", ".join(PackedStringArray(posts))
 
-## SEÇMEN GRUPLARI: partinin 8 gruptaki ulusal desteği + en güçlü / en zayıf özeti.
+## SEÇMEN GRUPLARI (0.0.216): her grupta partinin TAHMİNİ OY PAYI dikey sütun
+## grafiği (üstte yüzde, altta grup simgesi), altında sıkı tablo: tam ad, oy
+## payı, hitap (kalıcı) ve son seçimden beri hitap değişimi. Grupların oy
+## payları ülke geneli oy oranı hakkında doğrudan fikir verir.
 static func _add_group_section(box: VBoxContainer, peer_id: int) -> void:
 	var pid := CardManager.party_of(peer_id)
 	var groups := PartyManager.groups_of(pid)
-	var bonuses := CardManager.meeting_bonuses(pid)
 	var before: Dictionary = CardManager.election_groups.get(pid, {})
-	box.add_child(PopupKit.section(L.t("Seçmen grupları"), L.t("ulusal destek")))
-	var ranked := VoterGroups.ranked_groups(groups)
-	box.add_child(PopupKit.note(L.t("En güçlü: %s · en zayıf: %s") % [VoterGroups.title(ranked[0]), VoterGroups.title(ranked[-1])],
-		UiTheme.TEXT_MUTED, _text_width()))
-	var list := VBoxContainer.new()
-	list.add_theme_constant_override("separation", 3)
-	list.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(list)
+	var votes := CardManager.group_vote_estimates(pid)
+	box.add_child(PopupKit.section(L.t("Seçmen grupları"), L.t("tahmini oy payın")))
+	box.add_child(_group_chart(votes))
+	# Sıkı tablo: ad · oy · hitap ▲▼ (adlar kısaltılmaz, yazı küçük).
+	var table := GridContainer.new()
+	table.columns = 3
+	table.add_theme_constant_override("h_separation", 4)
+	table.add_theme_constant_override("v_separation", 1)
+	table.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(table)
+	for head in [L.t("Grup"), L.t("Oy"), L.t("Hitap")]:
+		var h := _label(head, 8, DIM)
+		if head != L.t("Grup"):
+			h.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		table.add_child(h)
 	for group in VoterGroups.GROUP_IDS:
 		var value := float(groups.get(group, VoterGroups.AFFINITY_NEUTRAL))
 		var delta := value - float(before[group]) if before.has(group) else 0.0
-		list.add_child(VoterGroupUI.affinity_row(group, value, float(bonuses.get(group, 0.0)), delta))
-	box.add_child(PopupKit.note(L.t("▲▼ son seçimden beri"), DIM, _text_width()))
-	# HÜKÜMETTE: ekonomi (vergi, büyüme, enflasyon) seçimde bu desteklere
-	# geçici olarak eklenir (kalıcı desteğe yazılmaz).
-	var mood := CardManager.economy_mood(pid)
-	if not mood.is_empty():
-		var share := CardManager.economy_share(pid)
-		box.add_child(PopupKit.section(L.t("Ekonomi etkisi"), L.t("başbakan") if share >= 1.0 else "ortak"))
-		var by_size: Array = mood.keys()
-		by_size.sort_custom(func(a, b): return absf(float(mood[a])) > absf(float(mood[b])))
-		for i in mini(4, by_size.size()):
-			box.add_child(VoterGroupUI.effect_row(String(by_size[i]), float(mood[by_size[i]])))
-		box.add_child(PopupKit.note(L.t("Vergi %s. Hükümette kaldıkça seçimde bu gruplara yansır.") % Economy.tax_title(CardManager.tax_level()).to_lower(),
-			DIM, _text_width()))
+		var name := _label(VoterGroups.title(group), 8, VoterGroups.color(group).lightened(0.25))
+		name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		table.add_child(name)
+		table.add_child(_num_cell(L.pct(float(votes.get(group, 0.0)), 0), UiTheme.TEXT))
+		var arrow := "▲" if delta >= 0.05 else ("▼" if delta <= -0.05 else "")
+		table.add_child(_num_cell(L.pct(value, 0) + arrow, UiTheme.GREEN if delta >= 0.05 else (UiTheme.RED if delta <= -0.05 else DIM)))
+	box.add_child(PopupKit.note(L.t("Oy: gruptaki tahmini oy payın · Hitap: grubun sana bağlı kısmı (▲▼ son seçimden beri)"), DIM, _text_width()))
+
+static func _num_cell(text: String, color: Color) -> Label:
+	var label := _label(text, 8, color)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	label.custom_minimum_size = Vector2(40, 0)
+	return label
+
+## 8 dikey sütun: grup renginde, yüksekliği oy payıyla orantılı (en yüksek
+## sütun kutuyu doldurur), üstte yüzde, altta grup simgesi.
+static func _group_chart(votes: Dictionary) -> Control:
+	var top := 1.0
+	for group in VoterGroups.GROUP_IDS:
+		top = maxf(top, float(votes.get(group, 0.0)))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 3)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for group in VoterGroups.GROUP_IDS:
+		var value := float(votes.get(group, 0.0))
+		var col := VBoxContainer.new()
+		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		col.add_theme_constant_override("separation", 2)
+		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		col.tooltip_text = "%s: %s" % [VoterGroups.title(group), L.pct(value, 1)]
+		row.add_child(col)
+		var pct := _label(L.pct(value, 0), 9, UiTheme.TEXT)
+		pct.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		col.add_child(pct)
+		var well := Control.new()
+		well.custom_minimum_size = Vector2(0, 34)
+		well.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var color := VoterGroups.color(group)
+		well.draw.connect(func():
+			var h := well.size.y * clampf(value / top, 0.0, 1.0)
+			well.draw_rect(Rect2(Vector2(2, 0), Vector2(well.size.x - 4, well.size.y)), UiTheme.SLOT, true)
+			well.draw_rect(Rect2(Vector2(2, well.size.y - h), Vector2(well.size.x - 4, h)), color, true))
+		col.add_child(well)
+		var icon := VoterGroupIcon.make(group, 16.0)
+		icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		col.add_child(icon)
+	return row
 
 ## Sarmalı notların genişliği (çerçeveli kartta iç boşluk düşülür).
 static func _text_width() -> float:

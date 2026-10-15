@@ -389,14 +389,14 @@ static func ranked_groups(affinities: Dictionary) -> Array:
 	return ranked
 
 ## Kalıcı bir değişikliğin GERÇEKLEŞEN miktarı. Kazanç: çekirdek grupta
-## CORE_GAIN_MULT katı, azalan getiriyle (× kalan pay / 100; %100'e yaklaştıkça
-## zorlaşır). Kayıp: en çok mevcut hitap kadar.
+## CORE_GAIN_MULT katı, azalan getiriyle: kalan pay × (1 − e^(−kazanç/100)).
+## Üstel biçim: aynı toplam kazanç bir kerede ya da parça parça verilse de
+## sonuç birebir aynıdır (100 yerine 50 + 50). Kayıp: en çok mevcut hitap kadar.
 static func effective_delta(affinities: Dictionary, group: String, amount: float, core: Array = []) -> float:
 	var current := float(affinities.get(group, AFFINITY_NEUTRAL))
 	if amount > 0.0:
 		var mult := CORE_GAIN_MULT if core.has(group) else 1.0
-		var headroom := clampf((AFFINITY_MAX - current) / AFFINITY_MAX, 0.0, 1.0)
-		return minf(amount * mult * headroom, AFFINITY_MAX - current)
+		return maxf(0.0, AFFINITY_MAX - current) * (1.0 - exp(-amount * mult / AFFINITY_MAX))
 	if amount < 0.0:
 		return maxf(amount, AFFINITY_MIN - current)
 	return 0.0

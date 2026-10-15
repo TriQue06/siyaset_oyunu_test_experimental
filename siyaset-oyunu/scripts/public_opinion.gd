@@ -27,7 +27,8 @@ extends RefCounted
 ## şanstan daha çok belirlesin, son turların hamleleri ağır bassın.
 const EFFECT_PER_POINT := 0.10
 const MIN_MULT := 0.3
-const MAX_MULT := 2.0
+## 0.0.216: 2,0 → 3,5 (tavan üstü yatırım puanı seçimde karşılık bulsun).
+const MAX_MULT := 3.5
 ## Bir puanın mutlak değer olarak ulaşabileceği en yüksek seviye.
 const LIMIT := 10.0
 ## Tur sonu sönme katsayıları (düşük = eski hamleler çabuk unutulur).
@@ -45,11 +46,11 @@ const MITING_ORG_MULT := [1.0, 2.0, 3.0]
 ## ildeki grup seçmeni / ülkedeki grup seçmeni × 100. Odak gruplarda
 ## MITING_FOCUS_MULT katı. Küçük bir ilde (3 vekil) %95 emekli olsa bile 2.
 ## seviye teşkilatla odaklı miting emeklilerde ancak ~%1-2 getirir.
-const MITING_CONVERT := 0.15
+const MITING_CONVERT := 0.12
 const MITING_FOCUS_MULT := 2.5
 ## AZALAN GETİRİ: aynı gruba art arda miting yorgunluk biriktirir:
 ## kazanç × 1 / (1 + yorgunluk / FATIGUE_SCALE); yorgunluk her tur × DECAY.
-const MITING_FATIGUE_SCALE := 1.5
+const MITING_FATIGUE_SCALE := 1.0
 const MITING_FATIGUE_DECAY := 0.6
 const PROVOCATION_LOCAL := -2.5
 const PROVOCATION_NATIONAL := -1.0
@@ -71,7 +72,15 @@ const PROVOCATION_FULL_APPEAL := 0.0
 ## PAYLAŞIM (0.0.190): toplam etkinin INVEST_OWN_SHARE'i getiren partiye; kalanı
 ## hükümet partilerine makam puanlarıyla (başbakanlık, bakanlıklar…) doğru
 ## orantılı dağıtılır (getiren parti de makamı oranında pay alır).
-const INVEST_LOCAL := 16.0
+const INVEST_LOCAL := 20.0
+## YATIRIMIN SEÇMEN KARŞILIĞI (0.0.216): 100 milyonluk yatırım ildeki her
+## grubun INVEST_CONVERT'ü kadarını getirene kazandırır (nüfusla orantılı,
+## mitingdeki gibi: ildeki grup seçmeni / ülkedeki grup seçmeni × 100).
+const INVEST_CONVERT := 0.3
+## ÜST ÜSTE YATIRIM (0.0.216): yatırım il puanını LIMIT'in üstüne, bu tavana kadar
+## çıkarabilir; aynı ile ikinci yatırım da birincisi kadar işe yarar. Diğer
+## hamleler LIMIT üstündeki puanı kırpmaz (bkz. CardManager._add_local).
+const INVEST_LIMIT := 30.0
 const INVEST_OWN_SHARE := 0.5
 
 # --- Popülizm bonusu -----------------------------------------------------------

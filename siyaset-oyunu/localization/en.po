@@ -3815,3 +3815,30 @@ msgstr "no vote"
 
 msgid "reddet"
 msgstr "reject"
+
+msgid "%s, %s'a hükümet yatırımı getirdi: %s."
+msgstr "%s brought a government investment to %s: %s."
+
+msgid "YATIRIM TUTARI"
+msgstr "INVESTMENT AMOUNT"
+
+msgid "Yatırım ödenemiyor: hazinede %s, kasanda %s; ikisi birlikte en az %s etmeli."
+msgstr "Investment can't be paid: %s in the treasury, %s in your funds; together they must be at least %s."
+
+msgid "Yatırım (tutarı sen seçersin, parti kasası ve devlet hazinesi arasında bölünebilir): haritada bir ile dokun  ·  Butona tekrar dokun: iptal"
+msgstr "Investment (you choose the amount, it can be split between party funds and the state treasury): tap a province on the map  ·  Tap the button again: cancel"
+
+msgid "tahmini oy payın"
+msgstr "your estimated vote share"
+
+msgid "Grup"
+msgstr "Group"
+
+msgid "Oy"
+msgstr "Vote"
+
+msgid "Hitap"
+msgstr "Appeal"
+
+msgid "Oy: gruptaki tahmini oy payın · Hitap: grubun sana bağlı kısmı (▲▼ son seçimden beri)"
+msgstr "Vote: your estimated share of the group's vote · Appeal: the part of the group committed to you (▲▼ since the last election)"

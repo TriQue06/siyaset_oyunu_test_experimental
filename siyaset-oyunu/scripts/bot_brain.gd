@@ -831,7 +831,7 @@ static func _eval_investment(bot: int) -> Dictionary:
 	var best_province := ""
 	var best_value := -INF
 	for province_id in _seats().keys():
-		var room := clampf((PublicOpinion.LIMIT - CardManager.local_of(province_id, bot)) / PublicOpinion.INVEST_LOCAL, 0.0, 1.0)
+		var room := clampf((PublicOpinion.INVEST_LIMIT - CardManager.local_of(province_id, bot)) / PublicOpinion.INVEST_LOCAL, 0.0, 1.0)
 		var value := float(CardManager.province_seat_count(province_id)) \
 			* (0.5 + PublicOpinion.appeal_closeness(CardManager.appeal_of(province_id, bot))) * room
 		if value > best_value:

@@ -1301,5 +1301,14 @@
 "SİYASET OYUNU": "POLITICS GAME",
 "onayla": "approve",
 "oy yok": "no vote",
-"reddet": "reject"
+"reddet": "reject",
+"%s, %s'a hükümet yatırımı getirdi: %s.": "%s brought a government investment to %s: %s.",
+"YATIRIM TUTARI": "INVESTMENT AMOUNT",
+"Yatırım ödenemiyor: hazinede %s, kasanda %s; ikisi birlikte en az %s etmeli.": "Investment can't be paid: %s in the treasury, %s in your funds; together they must be at least %s.",
+"Yatırım (tutarı sen seçersin, parti kasası ve devlet hazinesi arasında bölünebilir): haritada bir ile dokun  ·  Butona tekrar dokun: iptal": "Investment (you choose the amount, it can be split between party funds and the state treasury): tap a province on the map  ·  Tap the button again: cancel",
+"tahmini oy payın": "your estimated vote share",
+"Grup": "Group",
+"Oy": "Vote",
+"Hitap": "Appeal",
+"Oy: gruptaki tahmini oy payın · Hitap: grubun sana bağlı kısmı (▲▼ son seçimden beri)": "Vote: your estimated share of the group's vote · Appeal: the part of the group committed to you (▲▼ since the last election)"
 }

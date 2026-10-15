@@ -189,7 +189,7 @@ func _initialize() -> void:
 	var local_before: float = cm.local_of(province, 1)
 	var treasury_before_round: float = cm.state_treasury()
 	end_round()
-	var expected_local: float = PublicOpinion.clamp_points(local_before + tranche) * PublicOpinion.LOCAL_DECAY
+	var expected_local: float = minf(local_before + tranche, PublicOpinion.INVEST_LIMIT) * PublicOpinion.LOCAL_DECAY
 	check("1. dilim tur sonunda geldi (sonra söndü)", near(cm.local_of(province, 1), expected_local, 0.01),
 		"%.2f / %.2f" % [cm.local_of(province, 1), expected_local])
 	check("tur sonunda hazineden tekrar yatırım bedeli düşmez", cm.state_treasury() > treasury_before_round)

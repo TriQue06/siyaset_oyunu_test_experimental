@@ -128,8 +128,8 @@ func _initialize() -> void:
 	check("seçmen grubu yakınlığı değişmez", groups_before == pm.parties[3]["groups"])
 	# Yatırımla kıyas: aynı paraya yatırımdan daha güçlü (yatırım 100 milyon → +5 hemen).
 	var single: float = D.local_gain(0.0, 40.0, 1)
-	check("tek ilde 40 milyon yardım, 100 milyonluk yatırımın hemen gelen etkisinden büyük",
-		single > PublicOpinion.INVEST_LOCAL * Economy.INVEST_IMMEDIATE, "%.2f" % single)
+	check("yardım milyon başına yatırımın hemen gelen etkisinden güçlü (40 milyon yardım)",
+		single / 40.0 > PublicOpinion.INVEST_LOCAL * Economy.INVEST_IMMEDIATE / Economy.INVEST_COST, "%.2f" % single)
 	var second: float = D.local_gain(40.0, 80.0, region.size())
 	check("aynı afete ikinci yardım daha az getirir", second < gain, "%.2f < %.2f" % [second, gain])
 	give_turn(1)

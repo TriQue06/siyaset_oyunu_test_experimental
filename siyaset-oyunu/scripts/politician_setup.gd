@@ -19,6 +19,9 @@ var _background_id: String = ""
 var _hometown: String = ""
 var _hovered: String = ""
 var _gender: String = "m"
+## Rastgele isimlerin dili (dil düğmesi sırayla değiştirir); oyun diliyle başlar.
+var _name_lang: String = "en" if L.is_en() else "tr"
+var _lang_button: Button
 var _gender_buttons: Dictionary = {}   # "m"/"f" -> Button
 var _first_name: String = ""
 var _surname: String = ""
@@ -118,6 +121,17 @@ func _build_left() -> Control:
 		dice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		dice.pressed.connect(_reroll_name.bind(spec[2], spec[3]))
 		dice_row.add_child(dice)
+	# Dil düğmesi: dil kendi dilinde yazar ("Türkçe", "English"); basınca sıradaki
+	# dile geçer ve ad-soyad o dilden yeniden üretilir.
+	_lang_button = Button.new()
+	_lang_button.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	_lang_button.text = PoliticianPresets.name_lang_title(_name_lang)
+	_lang_button.tooltip_text = L.t("İsim dilini değiştir")
+	_lang_button.focus_mode = Control.FOCUS_NONE
+	_lang_button.custom_minimum_size = Vector2(0, 36)
+	_lang_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_lang_button.pressed.connect(_on_name_lang_pressed)
+	dice_row.add_child(_lang_button)
 	_reroll_name(true, true)
 
 	body.add_child(PopupKit.section(L.t("Geçmiş"), L.t("partini bir seçmen grubuna biraz yaklaştırır")))
@@ -269,15 +283,20 @@ func _style_gender_buttons() -> void:
 			for prop in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 				gb.add_theme_color_override(prop, UiTheme.TEXT_MUTED)
 
+func _on_name_lang_pressed() -> void:
+	_name_lang = PoliticianPresets.next_name_lang(_name_lang)
+	_lang_button.text = PoliticianPresets.name_lang_title(_name_lang)
+	_reroll_name(true, true)
+
 func _reroll_name(first: bool, last: bool) -> void:
 	_style_gender_buttons()
 	if first:
-		_first_name = PoliticianPresets.random_first_name(_gender, _first_name)
+		_first_name = PoliticianPresets.random_first_name(_gender, _first_name, null, _name_lang)
 	if last:
 		var avoid := PoliticianPresets.used_surnames(multiplayer.get_unique_id())
 		if _surname != "":
 			avoid.append(_surname)  # her basışta farklı bir soyad
-		_surname = PoliticianPresets.random_surname(avoid)
+		_surname = PoliticianPresets.random_surname(avoid, null, _name_lang)
 	_first_edit.text = _first_name
 	_surname_edit.text = _surname
 	if _continue != null:

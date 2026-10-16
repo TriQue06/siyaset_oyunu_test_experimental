@@ -130,6 +130,39 @@ const BANNED_SURNAMES := ["Erdoğan", "Kılıçdaroğlu", "Bahçeli", "Akşener"
 	"Ceylanpınar", "Kızılay", "Bilgiç", "Ünal", "Çelik", "Kurt", "Doğan", "Şimşek", "Polat", "Kalkan",
 	"Elitaş", "Ağbal", "Bostancı", "Tüfenkci", "Zeybekci", "Fidan", "Bayraktar", "Kacır", "Göktaş"]
 
+## İSİM DİLİ (0.0.222): siyasetçi kurulumundaki dil düğmesi ad ve soyadı bu
+## dillerden birinin havuzundan üretir; sıra NAME_LANGS sırası. Düğmede dil
+## kendi dilinde yazar (oyun dilinden bağımsız).
+const NAME_LANGS := ["tr", "en"]
+const NAME_LANG_TITLES := {"tr": "Türkçe", "en": "English"}
+const EN_MALE_NAMES := ["James", "John", "Robert", "Michael", "William", "David", "Richard", "Thomas",
+	"Charles", "Daniel", "Matthew", "Anthony", "Mark", "Steven", "Andrew", "Paul", "Edward", "George",
+	"Henry", "Oliver", "Jack", "Harry", "Samuel", "Benjamin", "Peter", "Arthur", "Frank", "Walter",
+	"Leonard", "Victor", "Graham", "Simon", "Nathan", "Owen", "Patrick", "Raymond", "Hugh", "Martin"]
+const EN_FEMALE_NAMES := ["Mary", "Patricia", "Jennifer", "Linda", "Elizabeth", "Susan", "Margaret",
+	"Sarah", "Karen", "Emily", "Emma", "Olivia", "Charlotte", "Amelia", "Grace", "Alice", "Helen",
+	"Catherine", "Rachel", "Laura", "Hannah", "Lucy", "Rose", "Claire", "Victoria", "Eleanor",
+	"Abigail", "Julia", "Diana", "Fiona", "Megan", "Natalie"]
+const EN_UNISEX_NAMES := ["Jordan", "Taylor", "Morgan", "Casey", "Alex", "Jamie", "Robin", "Riley"]
+const EN_SURNAMES := ["Smith", "Taylor", "Wilson", "Evans", "Thomas", "Roberts", "Walker",
+	"Wright", "Robinson", "Thompson", "White", "Hughes", "Edwards", "Green", "Hall", "Wood",
+	"Lewis", "Martin", "Jackson", "Clarke", "Turner", "Hill", "Scott", "Cooper", "Morris", "Ward",
+	"Moore", "King", "Watson", "Baker", "Harrison", "Morgan", "Patel", "Young", "Allen", "Mitchell",
+	"Anderson", "Lee", "Bell", "Parker", "Davies", "Miller", "Shaw", "Bennett", "Fletcher",
+	"Hayes", "Murray", "Palmer", "Porter", "Reed", "Russell", "Spencer", "Stone", "Webb", "Wells",
+	"Fisher", "Gray", "Holmes", "Hunter", "Lawson", "Marsh", "Nolan", "Pearce", "Quinn", "Rhodes"]
+## Gerçek (yabancı) siyasetçi soyadları: elle de yazılamaz.
+const EN_BANNED_SURNAMES := ["Trump", "Biden", "Obama", "Clinton", "Bush", "Reagan", "Nixon", "Kennedy",
+	"Carter", "Harris", "Pence", "Sanders", "Blair", "Thatcher", "Churchill", "Cameron", "Starmer",
+	"Sunak", "Truss", "Johnson", "May", "Brown", "Major", "Corbyn", "Farage", "Merkel", "Macron", "Putin",
+	"Vance", "Walz", "Pelosi", "Lincoln", "Roosevelt", "Truman", "Eisenhower"]
+
+static func next_name_lang(lang: String) -> String:
+	return String(NAME_LANGS[(NAME_LANGS.find(lang) + 1) % NAME_LANGS.size()])
+
+static func name_lang_title(lang: String) -> String:
+	return String(NAME_LANG_TITLES.get(lang, lang))
+
 const NAME_MAX_LENGTH := 40
 
 static func is_valid_background(id: String) -> bool:
@@ -211,7 +244,7 @@ static func _lower_tr(ch: String) -> String:
 
 static func is_banned_surname(surname: String) -> bool:
 	var key := surname.strip_edges().to_lower()
-	for banned in BANNED_SURNAMES:
+	for banned in BANNED_SURNAMES + EN_BANNED_SURNAMES:
 		if String(banned).to_lower() == key:
 			return true
 	return false
@@ -226,11 +259,13 @@ static func _is_doubled(surname: String) -> bool:
 	return low.length() % 2 == 0 and low.left(half) == low.substr(half)
 
 ## Rastgele soyad; avoid'deki (oyunda kullanılan) soyadları ve yasaklıları vermez.
-static func random_surname(avoid: Array = [], rng: RandomNumberGenerator = null) -> String:
+static func random_surname(avoid: Array = [], rng: RandomNumberGenerator = null, lang: String = "tr") -> String:
 	var surname := ""
 	for attempt in 200:
 		var roll := rng.randf() if rng != null else randf()
-		if roll < STANDALONE_SURNAME_CHANCE:
+		if lang == "en":
+			surname = _pick(EN_SURNAMES, rng)
+		elif roll < STANDALONE_SURNAME_CHANCE:
 			surname = _pick(STANDALONE_SURNAMES, rng)
 		else:
 			surname = _pick(SURNAME_ROOTS, rng) + _pick(SURNAME_ENDS, rng)
@@ -243,12 +278,14 @@ static func random_gender(rng: RandomNumberGenerator = null) -> String:
 	return "m" if roll < MALE_NAME_CHANCE else "f"
 
 ## Bu cinsiyetin adları (o cinsiyete özgü + unisex).
-static func names_for(gender: String) -> Array:
+static func names_for(gender: String, lang: String = "tr") -> Array:
+	if lang == "en":
+		return (EN_FEMALE_NAMES if gender == "f" else EN_MALE_NAMES) + EN_UNISEX_NAMES
 	return (FEMALE_NAMES if gender == "f" else MALE_NAMES) + UNISEX_NAMES
 
 ## Rastgele ad; avoid verilirse o ad tekrar gelmez.
-static func random_first_name(gender: String, avoid: String = "", rng: RandomNumberGenerator = null) -> String:
-	var pool := names_for(gender)
+static func random_first_name(gender: String, avoid: String = "", rng: RandomNumberGenerator = null, lang: String = "tr") -> String:
+	var pool := names_for(gender, lang)
 	var first := avoid
 	for attempt in 20:
 		first = _pick(pool, rng)

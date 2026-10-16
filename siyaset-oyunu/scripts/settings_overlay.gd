@@ -356,7 +356,7 @@ func _build_category(key: String, box: VBoxContainer) -> void:
 			_row(box, "Olay animasyonları", "Gazete ve haber manşeti gösterimleri.", _toggle(GameSettings.event_fx, GameSettings.set_event_fx))
 			_row(box, "Yayıncı modu", "Yayın sırasında gizlilik tercihi.", _toggle(GameSettings.streamer_mode, GameSettings.set_streamer_mode))
 		"language":
-			_row(box, "Oyun dili", "Arayüzde kullanılacak dil.", _segments(["Türkçe", "English"], L.LOCALES.find(GameSettings.language), func(i):
+			_row(box, "Oyun dili", "Arayüzde kullanılacak dil.", _segments([L.t("Türkçe"), L.t("İngilizce")], L.LOCALES.find(GameSettings.language), func(i):
 				if GameSettings.language != L.LOCALES[i]:
 					GameSettings.set_language(L.LOCALES[i])
 					get_tree().reload_current_scene()

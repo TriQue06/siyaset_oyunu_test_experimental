@@ -3,6 +3,15 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: en\n"
 
+msgid "Türkçe"
+msgstr "Turkish"
+
+msgid "İngilizce"
+msgstr "English"
+
+msgid "İsim dilini değiştir"
+msgstr "Change name language"
+
 msgid "%d (sabit)"
 msgstr "%d (fixed)"
 

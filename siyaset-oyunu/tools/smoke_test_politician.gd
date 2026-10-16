@@ -130,6 +130,18 @@ func _initialize() -> void:
 	cm._update_credibility({me: 20.0}, {me: 15.0})
 	check("guvenilirlik guncellendi", is_equal_approx(cm.credibility_of(me), 85.0), str(cm.credibility_of(me)))
 
+	# 0.0.222: isim dili düğmesi.
+	check("isim dili sirayla: tr -> en -> tr", PP.next_name_lang("tr") == "en" and PP.next_name_lang("en") == "tr")
+	check("dil dugmesi dilin kendi adini yazar", PP.name_lang_title("tr") == "Türkçe" and PP.name_lang_title("en") == "English")
+	var en_ok := true
+	for i in 50:
+		var first: String = PP.random_first_name("f", "", null, "en")
+		var last: String = PP.random_surname([], null, "en")
+		if not (PP.EN_FEMALE_NAMES + PP.EN_UNISEX_NAMES).has(first) or not PP.EN_SURNAMES.has(last) or PP.is_banned_surname(last):
+			en_ok = false
+	check("Ingilizce ad ve soyad uretilir, gercek siyasetci soyadi yok", en_ok)
+	check("yabanci siyasetci soyadi elle de yasak", PP.is_banned_surname("Trump"))
+
 	print("")
 	print("=== %s ===" % ("TUM TESTLER GECTI" if _failed == 0 else "%d TEST BASARISIZ" % _failed))
 	quit(1 if _failed > 0 else 0)

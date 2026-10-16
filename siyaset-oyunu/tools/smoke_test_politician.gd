@@ -117,7 +117,7 @@ func _initialize() -> void:
 	check("Yilmaz soyadi cikabilir", yilmaz)
 	check("Karabulut gecerli", not PP.is_banned_surname("Karabulut"))
 	check("Bayraktar, Soylu, Albayrak yasakli", PP.is_banned_surname("Bayraktar") and PP.is_banned_surname("Soylu") and PP.is_banned_surname("Albayrak"))
-	check("gercek soyad reddedilir", not PP.is_valid(PP.make("Ali", "Erdoğan", "sendikaci", home)))
+	check("elle yazilan gercek soyad kabul edilir (kara liste yalniz rastgelede)", PP.is_valid(PP.make("Ali", "Erdoğan", "sendikaci", home)))
 	check("rastgele soyad kullanilani vermez", not PP.random_surname(["Gökyelken"]).is_empty())
 	var bot_surnames := {}
 	for b in mm.bot_ids():
@@ -140,7 +140,9 @@ func _initialize() -> void:
 		if not (PP.EN_FEMALE_NAMES + PP.EN_UNISEX_NAMES).has(first) or not PP.EN_SURNAMES.has(last) or PP.is_banned_surname(last):
 			en_ok = false
 	check("Ingilizce ad ve soyad uretilir, gercek siyasetci soyadi yok", en_ok)
-	check("yabanci siyasetci soyadi elle de yasak", PP.is_banned_surname("Trump"))
+	check("yabanci siyasetci soyadi kara listede (rastgele uretimde)", PP.is_banned_surname("Trump"))
+	# 0.0.223: elle yazilan ad kara listeye takilmaz.
+	check("elle yazilan kara liste soyadi gecerli", PP.is_valid(PP.make("Ahmet", "Soylu", String(PP.BACKGROUND_ORDER[0]), "b01")))
 
 	print("")
 	print("=== %s ===" % ("TUM TESTLER GECTI" if _failed == 0 else "%d TEST BASARISIZ" % _failed))

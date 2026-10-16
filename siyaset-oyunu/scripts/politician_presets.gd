@@ -151,7 +151,7 @@ const EN_SURNAMES := ["Smith", "Taylor", "Wilson", "Evans", "Thomas", "Roberts",
 	"Anderson", "Lee", "Bell", "Parker", "Davies", "Miller", "Shaw", "Bennett", "Fletcher",
 	"Hayes", "Murray", "Palmer", "Porter", "Reed", "Russell", "Spencer", "Stone", "Webb", "Wells",
 	"Fisher", "Gray", "Holmes", "Hunter", "Lawson", "Marsh", "Nolan", "Pearce", "Quinn", "Rhodes"]
-## Gerçek (yabancı) siyasetçi soyadları: elle de yazılamaz.
+## Gerçek (yabancı) siyasetçi soyadları: rastgele üretici bunları vermez.
 const EN_BANNED_SURNAMES := ["Trump", "Biden", "Obama", "Clinton", "Bush", "Reagan", "Nixon", "Kennedy",
 	"Carter", "Harris", "Pence", "Sanders", "Blair", "Thatcher", "Churchill", "Cameron", "Starmer",
 	"Sunak", "Truss", "Johnson", "May", "Brown", "Major", "Corbyn", "Farage", "Merkel", "Macron", "Putin",
@@ -203,10 +203,11 @@ static func make(first_name: String, surname: String, background_id: String, hom
 		"name": ("%s %s" % [first_name, surname]).left(NAME_MAX_LENGTH),
 		"background": background_id, "hometown": hometown}
 
+## Kara liste (BANNED_SURNAMES) yalnız RASTGELE üretimde uygulanır (0.0.223):
+## oyuncu elle istediği adı yazabilir, kendisi ya da botlar için.
 static func is_valid(data: Dictionary) -> bool:
 	return is_valid_background(String(data.get("background", ""))) \
-		and String(data.get("first_name", "")) != "" and String(data.get("surname", "")) != "" \
-		and not is_banned_surname(String(data.get("surname", "")))
+		and String(data.get("first_name", "")) != "" and String(data.get("surname", "")) != ""
 
 ## ELLE YAZILAN İSİM: her kelimenin baş harfi büyük, gerisi küçük (Türkçe
 ## i/İ, ı/I kuralıyla). Harf, boşluk, kesme ve tire dışındakiler atılır.

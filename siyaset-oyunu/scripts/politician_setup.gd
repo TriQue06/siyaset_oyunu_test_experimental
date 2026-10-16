@@ -395,7 +395,7 @@ func _refresh_info() -> void:
 	_info_body.text = L.t("Senin memleketin.") if id == _hometown else L.t("Seçmek için tıkla.")
 
 func _is_complete() -> bool:
-	return _first_name != "" and _surname != "" and not PoliticianPresets.is_banned_surname(_surname) \
+	return _first_name != "" and _surname != "" \
 		and _background_id != "" and _hometown != ""
 
 func _on_continue_pressed() -> void:

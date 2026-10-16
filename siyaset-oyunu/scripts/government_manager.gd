@@ -557,7 +557,9 @@ static func law_passes(yes: int, no: int) -> bool:
 ## ERKEN SEÇİM ÖNERGESİ (erken seçim kartı oynanınca CardManager çağırır).
 ## Yasalarla aynı akış: basit çoğunluk (EVET vekilleri HAYIR'dan fazla).
 func submit_early_election(peer_id: int) -> bool:
-	if not _is_authority() or not can_submit_law():
+	# Seçime zaten bu tur gidiliyorsa erken seçim önergesi anlamsız: hangi yoldan
+	# gelirse gelsin (hamle, eski kart, bot) önerge açılmaz.
+	if not _is_authority() or not can_submit_law() or CardManager.election_this_round():
 		return false
 	_clear_proposal()
 	proposal_kind = KIND_EARLY

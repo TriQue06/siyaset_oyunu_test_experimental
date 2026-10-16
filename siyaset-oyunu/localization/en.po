@@ -3,6 +3,9 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: en\n"
 
+msgid "Seçim bu dönemin sonunda"
+msgstr "Election at the end of this term"
+
 msgid "Türkçe"
 msgstr "Turkish"
 

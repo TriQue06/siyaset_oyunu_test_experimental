@@ -841,7 +841,7 @@ func _refresh_band_date() -> void:
 	var next_election := CardManager.next_election_round()
 	_band_period.text = GameRules.period_label(mini(CardManager.round_number, GameRules.MAX_ROUNDS))
 	var parts := [L.t("Baraj %%%s") % _format_threshold(MultiplayerManager.election_threshold),
-		(L.t("Sonraki seçim %d") % GameRules.election_year(next_election)) if next_election != -1 else L.t("Başka seçim yok")]
+		_next_election_text(next_election, false)]
 	if MultiplayerManager.seat_method != MultiplayerManager.DEFAULT_SEAT_METHOD:
 		parts.append(ElectionModel.method_title(MultiplayerManager.seat_method))
 	_date_label.text = "  ·  ".join(PackedStringArray(parts))
@@ -1694,12 +1694,22 @@ func _refresh_map_seat_markers() -> void:
 		if not colors.is_empty():
 			seat_markers.set_seats(province_id, colors)
 
+## "Sonraki seçim" yazısı. Seçim BU turun sonundaysa bunu açıkça söyler:
+## erken seçim takvimi 1. yarı sonlarına kaydırınca "2010 1. yarı · Sonraki
+## seçim 2010" seçimin bitmiş bir yılda olduğu gibi okunuyordu (0.0.224).
+func _next_election_text(next_election: int, colon: bool) -> String:
+	if next_election == -1:
+		return L.t("Başka seçim yok")
+	if next_election <= CardManager.round_number:
+		return L.t("Seçim bu dönemin sonunda")
+	return (L.t("Sonraki seçim: %d") if colon else L.t("Sonraki seçim %d")) % GameRules.election_year(next_election)
+
 func _refresh_game_settings_label() -> void:
 	var next_election := CardManager.next_election_round()
 	game_settings_label.text = L.t("%s  ·  Baraj %%%s\n%s") % [
 		GameRules.period_label(mini(CardManager.round_number, GameRules.MAX_ROUNDS)),
 		_format_threshold(MultiplayerManager.election_threshold),
-		(L.t("Sonraki seçim: %d") % GameRules.election_year(next_election)) if next_election != -1 else L.t("Başka seçim yok"),
+		_next_election_text(next_election, true),
 	]
 	if MultiplayerManager.seat_method != MultiplayerManager.DEFAULT_SEAT_METHOD:
 		game_settings_label.text += L.t("\nSayım: ") + ElectionModel.method_title(MultiplayerManager.seat_method)

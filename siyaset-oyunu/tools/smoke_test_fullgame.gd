@@ -101,6 +101,12 @@ func _initialize() -> void:
 	check("sonraki secimler 19, 27 (16 degil)",
 		GameRules.is_election_round(19) and GameRules.is_election_round(27) and not GameRules.is_election_round(16))
 	check("bayrak temizlendi", not cm.early_election_pending)
+	# 0.0.224: seçim turunda erken seçim önergesi hiçbir yoldan açılmaz.
+	cm.round_number = 19
+	check("19. tur secim turu", cm.election_this_round())
+	check("secim turunda erken secim hamlesi yok", not cm.can_early_election(1))
+	check("secim turunda onerge dogrudan da acilmaz", not gm.submit_early_election(2) and not gm.is_voting())
+	cm.round_number = 12
 	# 0.0.218: oyun ortasi ayar senkronu (configure) kaymis takvimi silmemeli.
 	var max_after_early: int = GameRules.MAX_ROUNDS
 	GameRules.configure(4, 8)

@@ -25,6 +25,12 @@ extends Node2D
 ## en az bu kadar gerçek piksel boşluk kalmasını garanti eder.
 @export var min_screen_gap_px: int = 1
 
+## KALABALIK İLLER (0.0.221): HOVER_ONLY_SEATS'ten fazla vekili olan ilin
+## noktaları (ör. Türkiye haritasında İstanbul) normalde gizlidir; fare o ilin
+## üstüne gelince görünür ve o anda diğer bütün illerin noktaları gizlenir.
+const HOVER_ONLY_SEATS := 30
+var _hover_id: String = ""
+
 ## Nokta grupları bölgenin merkezine (GameMap.center_of) çizilir.
 var _seat_centers: Dictionary = {}  # province_id -> Vector2 (harita/local birimi)
 
@@ -52,6 +58,17 @@ func _ready() -> void:
 	material = shader_material
 	# Harita (ebeveyn) yakınlaşınca/kayınca yeniden çiz: ölçek o anki ekrana göre.
 	set_notify_transform(true)
+	if _province_map != null and _province_map.has_signal("province_hovered"):
+		_province_map.province_hovered.connect(_on_province_hovered)
+
+func _on_province_hovered(province_id: String) -> void:
+	var was_crowded := _is_crowded(_hover_id)
+	_hover_id = province_id
+	if was_crowded or _is_crowded(province_id):
+		_rebuild()
+
+func _is_crowded(province_id: String) -> bool:
+	return province_id != "" and (_seats.get(province_id, []) as Array).size() > HOVER_ONLY_SEATS
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_TRANSFORM_CHANGED:
@@ -126,6 +143,12 @@ func _rebuild() -> void:
 	for province_id in _seats.keys():
 		var colors: Array = _seats[province_id]
 		if colors.is_empty():
+			continue
+		# Kalabalık il yalnız hover'da; hover'dayken yalnız o il görünür.
+		if _is_crowded(_hover_id):
+			if province_id != _hover_id:
+				continue
+		elif colors.size() > HOVER_ONLY_SEATS:
 			continue
 		var layout := _get_dot_layout(colors.size())
 		var max_cols := 0

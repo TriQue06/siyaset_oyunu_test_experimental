@@ -48,14 +48,17 @@ func _initialize() -> void:
 		await _frames(5)
 		if DisplayServer.get_name() != "headless":
 			var markers: Node = scene.find_child("SeatMarkers", true, false)
-			for scale in [1.0, 0.7, 0.55, 0.45]:
-				markers.dot_radius = 4.6 * scale
-				markers.dot_spacing = 4.4 * scale
-				markers.dot_outline_width = 2.0 * scale
-				markers._rebuild()
+			var gmap = root.get_node("GameMap")
+			var istanbul := ""
+			for id in gmap.province_ids():
+				if gmap.name_of(id) == "İstanbul":
+					istanbul = id
+			for hover in ["", istanbul]:
+				markers._on_province_hovered(hover)
 				await _frames(3)
-				root.get_texture().get_image().save_png("%s/turkey_%s_%d.png" % [OS.get_user_data_dir(), mode, int(scale * 100)])
-				print("screenshot: ", mode, " ", scale)
+				var tag := "hover" if hover != "" else "normal"
+				root.get_texture().get_image().save_png("%s/turkey_%s_%s.png" % [OS.get_user_data_dir(), mode, tag])
+				print("screenshot: ", tag)
 		scene.queue_free()
 		await _frames(3)
 		mm.leave_room()

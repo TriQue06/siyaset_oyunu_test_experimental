@@ -3,6 +3,21 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: en\n"
 
+msgid "%d (sabit)"
+msgstr "%d (fixed)"
+
+msgid "Türkiye haritasında tohum yok"
+msgstr "No seed on the Türkiye map"
+
+msgid "Harita"
+msgstr "Map"
+
+msgid "Türkiye (altıgen)"
+msgstr "Türkiye (hex)"
+
+msgid "Türkiye (net)"
+msgstr "Türkiye (sharp)"
+
 msgid "AFET YARDIMI"
 msgstr "DISASTER RELIEF"
 

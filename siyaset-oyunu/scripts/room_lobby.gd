@@ -38,6 +38,7 @@ var bot_funds_buttons: Array = []
 var world_controls: Dictionary = {}
 var world_values: Dictionary = {}
 var density_buttons: Array[Button] = []
+var map_mode_buttons: Array[Button] = []
 var _lobby_columns: GridContainer
 var vote_time_buttons: Array[Button] = []
 var threshold_value_label: Label
@@ -115,7 +116,7 @@ func _refresh() -> void:
 	# Konsept A: kurallar herkese görünür; yalnız sahibi düzenler.
 
 	threshold_slider.editable = am_owner
-	map_seed_edit.editable = am_owner
+	map_seed_edit.editable = am_owner and MultiplayerManager.world_settings["map_mode"] == "random"
 	random_parties_check.disabled = not am_owner
 	if away_bot_check != null:
 		away_bot_check.disabled = not am_owner
@@ -308,11 +309,24 @@ func _refresh_settings_display() -> void:
 		control.set_value_no_signal(float(MultiplayerManager.world_settings[key]))
 		world_values[key].text = str(MultiplayerManager.world_settings[key]) + (" s" if key == "turn_seconds" else "")
 		control.editable = MultiplayerManager.is_local_owner()
+	# Türkiye haritası: 81 il ve gerçek vekil dağılımı sabit; yalnız ulusal liste ayarlanır.
+	var turkey: bool = MultiplayerManager.world_settings["map_mode"] != "random"
+	if turkey and world_controls.has("province_seats"):
+		(world_controls["province_seats"] as HSlider).editable = false
+		world_values["province_seats"].text = L.t("%d (sabit)") % GameMap.preset_seat_total(String(MultiplayerManager.world_settings["map_mode"]))
+	for button in map_mode_buttons:
+		var on: bool = String(button.get_meta("value")) == String(MultiplayerManager.world_settings["map_mode"])
+		button.set_pressed_no_signal(on)
+		button.disabled = not MultiplayerManager.is_local_owner()
+		UiSkin.skin_color_button(button, UiTheme.GOLD if on else UiTheme.PANEL_LIGHT)
+	if map_seed_edit != null:
+		map_seed_edit.editable = MultiplayerManager.is_local_owner() and not turkey
+		map_seed_edit.placeholder_text = L.t("Türkiye haritasında tohum yok") if turkey else L.t("Rastgele")
 
 	for button in density_buttons:
 		var on := is_equal_approx(float(button.get_meta("value")), float(MultiplayerManager.world_settings["province_scale"]))
 		button.set_pressed_no_signal(on)
-		button.disabled = not MultiplayerManager.is_local_owner()
+		button.disabled = not MultiplayerManager.is_local_owner() or turkey
 		UiSkin.skin_color_button(button, UiTheme.GOLD if on else UiTheme.PANEL_LIGHT)
 	for button in vote_time_buttons:
 		var selected := int(button.get_meta("seconds")) == MultiplayerManager.vote_timeout
@@ -426,6 +440,23 @@ func _build_settings_panel() -> void:
 		votes_row.add_child(button)
 		vote_time_buttons.append(button)
 	var world_box := _section(L.t("HARİTA VE MECLİS"), "")
+	world_box.add_child(UiTheme.mono_label(L.t("Harita"), 12, UiTheme.TEXT))
+	var mode_row := HBoxContainer.new()
+	mode_row.add_theme_constant_override("separation", 6)
+	world_box.add_child(mode_row)
+	var mode_names := {"random": L.t("Rastgele"), "turkiye_altigen": L.t("Türkiye (altıgen)"), "turkiye_net": L.t("Türkiye (net)")}
+	for mode in MultiplayerManager.WORLD_OPTIONS["map_mode"]:
+		var button := Button.new()
+		button.text = mode_names[mode]
+		button.toggle_mode = true
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.custom_minimum_size = Vector2(56, 34)
+		button.clip_text = false
+		button.add_theme_font_size_override("font_size", 12)
+		button.set_meta("value", mode)
+		button.pressed.connect(func(): MultiplayerManager.set_world_setting("map_mode", String(button.get_meta("value"))))
+		mode_row.add_child(button)
+		map_mode_buttons.append(button)
 	var labels := {"province_scale": L.t("İl sayısı"), "province_seats": L.t("İl milletvekilleri"), "national_seats": L.t("Ulusal milletvekilleri"), "turn_seconds": L.t("Tur süresi")}
 	world_box.add_child(UiTheme.mono_label(labels["province_scale"], 12, UiTheme.TEXT))
 	var density_row := HBoxContainer.new()

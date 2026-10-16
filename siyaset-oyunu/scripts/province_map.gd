@@ -42,6 +42,10 @@ var _sea_mesh: ArrayMesh = null
 var _border_vertices := PackedVector2Array()
 var _border_colors := PackedColorArray()
 var _edges: Dictionary = {}        # province_id -> Array[[a, b]] (bölge dış sınırı)
+## province_id -> PackedVector2Array: ilin üçgenleri (dolgu efektleri için).
+var _region_tris: Dictionary = {}
+## Net (vektör) haritada il sınırı daha ince: kıvrımlar okunsun.
+const OUTLINE_BORDER_WIDTH := 0.9
 var _colors_dirty := true
 ## Odak parıltısı: {"id", "color", "time", "duration", "icon"}; boşsa yok.
 var _pulse: Dictionary = {}
@@ -77,9 +81,18 @@ func _build_geometry() -> void:
 	var sea_colors := PackedColorArray()
 	_border_vertices = PackedVector2Array()
 	_border_colors = PackedColorArray()
+	_region_tris.clear()
 	for id in ids:
 		_edges[id] = []
-	for cell in GameMap.cells.size():
+		_region_tris[id] = PackedVector2Array()
+	if GameMap.has_outlines():
+		# Deniz: haritanın tamamını kaplayan zemin.
+		var size := GameMap.map_size()
+		sea_vertices.append_array([Vector2.ZERO, Vector2(size.x, 0), Vector2(size.x, size.y), Vector2.ZERO, Vector2(size.x, size.y), Vector2(0, size.y)])
+		for _i in 6:
+			sea_colors.append(SEA_COLOR)
+		_build_outline_geometry()
+	for cell in (0 if GameMap.has_outlines() else GameMap.cells.size()):
 		var region: int = GameMap.cells[cell]
 		var inner := GameMap.cell_corners(cell, CELL_INSET)
 		if region < 0:
@@ -92,6 +105,7 @@ func _build_geometry() -> void:
 		for k in 6:
 			_land_vertices.append_array([center, inner[k], inner[(k + 1) % 6]])
 			_land_vertex_region.append_array([region, region, region])
+			_region_tris[ids[region]].append_array([center, inner[k], inner[(k + 1) % 6]])
 		# Kenarlar: komşu başka bölgeyse bölge sınırı, denizse kıyı.
 		var outer := GameMap.cell_corners(cell, 1.0)
 		for k in 6:
@@ -122,6 +136,56 @@ func _build_geometry() -> void:
 		arrays[Mesh.ARRAY_VERTEX] = _border_vertices
 		arrays[Mesh.ARRAY_COLOR] = _border_colors
 		_border_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+
+## NET HARİTA: gerçek il sınırları. Her halka üçgenlenir (olmazsa o ilin
+## ince ızgara hücreleri kullanılır).
+## Komşu illerin ortak sınırı iki kez çizilir (aynı renk, fark edilmez).
+func _build_outline_geometry() -> void:
+	var border_color := Color.WHITE if _white_borders else (REGION_BORDER_DARK if _dark_borders else REGION_BORDER_COLOR)
+	for r in ids.size():
+		var id: String = ids[r]
+		var tris := PackedVector2Array()
+		var ok := true
+		for ring in GameMap.outlines_of(id):
+			var points: PackedVector2Array = ring
+			var indices := Geometry2D.triangulate_polygon(points)
+			if indices.is_empty():
+				ok = false
+				continue
+			for k in indices:
+				tris.append(points[k])
+		if not ok:
+			# Üçgenlenemeyen halka: ilin ızgara hücreleriyle doldur.
+			for cell in GameMap.region_cells(id):
+				var c := GameMap.cell_center(cell)
+				var corners := GameMap.cell_corners(cell, 1.0)
+				for k in 6:
+					tris.append_array([c, corners[k], corners[(k + 1) % 6]])
+		_region_tris[id] = tris
+		_land_vertices.append_array(tris)
+		for _i in tris.size():
+			_land_vertex_region.append(r)
+		for ring in GameMap.outlines_of(id):
+			var points: PackedVector2Array = ring
+			for k in points.size():
+				var a := points[k]
+				var b := points[(k + 1) % points.size()]
+				_edges[id].append([a, b])
+				_append_segment(a, b, OUTLINE_BORDER_WIDTH, border_color)
+
+## İlin tamamını tek çağrıda boyar (afet / odak parıltısı).
+func _fill_region(province_id: String, color: Color) -> void:
+	var tris: PackedVector2Array = _region_tris.get(province_id, PackedVector2Array())
+	if tris.is_empty():
+		return
+	var indices := PackedInt32Array()
+	indices.resize(tris.size())
+	for i in tris.size():
+		indices[i] = i
+	var colors := PackedColorArray()
+	colors.resize(tris.size())
+	colors.fill(color)
+	RenderingServer.canvas_item_add_triangle_array(get_canvas_item(), indices, tris, colors)
 
 ## Kenar k: köşe k ile k+1 arası; yönü 60k derece (0 = doğu, saat yönünde).
 func _neighbor_in_direction(cell: int, k: int) -> int:
@@ -236,18 +300,12 @@ func _process(delta: float) -> void:
 var _disaster_ids: Array = []
 var _disaster_kind := ""
 var _disaster_t := 0.0
-var _disaster_cells: Array = []
 
 func set_disaster(ids: Array, kind: String) -> void:
 	if ids == _disaster_ids and kind == _disaster_kind:
 		return
 	_disaster_ids = ids.duplicate()
 	_disaster_kind = kind
-	# Hücre köşeleri bir kez hesaplanır (her karede yeniden değil).
-	_disaster_cells = []
-	for id in _disaster_ids:
-		for cell in GameMap.region_cells(String(id)):
-			_disaster_cells.append(GameMap.cell_corners(cell, CELL_INSET))
 	set_process(not _disaster_ids.is_empty() or not _pulse.is_empty())
 	queue_redraw()
 
@@ -256,8 +314,8 @@ func _draw_disaster() -> void:
 	var glow: float = sin(_disaster_t * 3.2) * 0.5 + 0.5
 	var fill := Color(color, 0.18 + 0.14 * glow)
 	var center := Vector2.ZERO
-	for corners in _disaster_cells:
-		draw_colored_polygon(corners, fill)
+	for id in _disaster_ids:
+		_fill_region(String(id), fill)
 	for id in _disaster_ids:
 		center += GameMap.center_of(String(id))
 	# Koyu alt çizgi + afet renginde nabız: her il renginin üstünde okunur.
@@ -282,8 +340,7 @@ func _draw_pulse() -> void:
 	var id: String = _pulse["id"]
 	var fill := color
 	fill.a = 0.45 * glow * fade
-	for cell in GameMap.region_cells(id):
-		draw_colored_polygon(GameMap.cell_corners(cell, CELL_INSET), fill)
+	_fill_region(id, fill)
 	var outline := color.lightened(0.35)
 	outline.a = (0.55 + 0.45 * glow) * fade
 	_draw_region_outline(id, outline, 2.4 + 1.6 * glow)

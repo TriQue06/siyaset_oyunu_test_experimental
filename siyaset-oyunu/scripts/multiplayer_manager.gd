@@ -81,8 +81,10 @@ var players: Dictionary = {}
 var election_threshold: float = THRESHOLD_DEFAULT
 ## Oyun süresi: seçimler kaç turda bir ve kaç seçim olacak (bkz. GameRules.configure).
 var election_interval: int = GameRules.DEFAULT_ELECTION_INTERVAL
-const WORLD_DEFAULTS := {"province_scale": 1.0, "province_seats": 300, "national_seats": 200, "turn_seconds": 75}
-const WORLD_OPTIONS := {"province_scale": [0.75, 1.0, 1.25], "province_seats": [150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750], "national_seats": [0, 50, 100, 150, 200, 250, 300], "turn_seconds": [30, 45, 60, 75, 90, 105, 120]}
+## map_mode: "random" | "turkiye_altigen" | "turkiye_net" (bkz. GameMap). Türkiye
+## haritalarında il milletvekilleri sabittir (gerçek dağılım); ulusal liste ek.
+const WORLD_DEFAULTS := {"map_mode": "random", "province_scale": 1.0, "province_seats": 300, "national_seats": 200, "turn_seconds": 75}
+const WORLD_OPTIONS := {"map_mode": ["random", "turkiye_altigen", "turkiye_net"], "province_scale": [0.75, 1.0, 1.25], "province_seats": [150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750], "national_seats": [0, 50, 100, 150, 200, 250, 300], "turn_seconds": [30, 45, 60, 75, 90, 105, 120]}
 var world_settings: Dictionary = WORLD_DEFAULTS.duplicate()
 var vote_timeout: int = 30
 const VOTE_TIME_OPTIONS := [15, 30, 45, 60]
@@ -1066,13 +1068,20 @@ func set_world_setting(key: String, value: Variant) -> void:
 	if not is_local_owner() or not WORLD_OPTIONS.has(key) or not (WORLD_OPTIONS[key] as Array).has(value):
 		return
 	if is_host or room_code == "":
-		var updated := world_settings.duplicate()
-		updated[key] = value
-		_apply_world_settings(updated)
+		_apply_world_settings(_world_with(key, value))
 		if room_code != "":
 			_sync_world_settings.rpc(world_settings)
 	else:
 		_request_world_setting.rpc_id(1, key, value)
+
+## Ayar değişikliği uygulanmış yeni ayarlar. Türkiye haritasına geçince ulusal
+## liste kapalı başlar (isteyen ekler); rastgele haritaya dönünce varsayılana döner.
+func _world_with(key: String, value: Variant) -> Dictionary:
+	var updated := world_settings.duplicate()
+	updated[key] = value
+	if key == "map_mode" and (value != "random") != (world_settings["map_mode"] != "random"):
+		updated["national_seats"] = 0 if value != "random" else WORLD_DEFAULTS["national_seats"]
+	return updated
 
 func _apply_world_settings(values: Dictionary) -> void:
 	for key in WORLD_DEFAULTS:
@@ -1092,7 +1101,5 @@ func _sync_world_settings(values: Dictionary) -> void:
 @rpc("any_peer", "reliable")
 func _request_world_setting(key: String, value: Variant) -> void:
 	if is_host and multiplayer.get_remote_sender_id() == owner_id and WORLD_OPTIONS.has(key) and (WORLD_OPTIONS[key] as Array).has(value):
-		var updated := world_settings.duplicate()
-		updated[key] = value
-		_apply_world_settings(updated)
+		_apply_world_settings(_world_with(key, value))
 		_sync_world_settings.rpc(world_settings)

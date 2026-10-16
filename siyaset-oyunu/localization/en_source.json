@@ -1,4 +1,9 @@
 {
+"%d (sabit)": "%d (fixed)",
+"Türkiye haritasında tohum yok": "No seed on the Türkiye map",
+"Harita": "Map",
+"Türkiye (altıgen)": "Türkiye (hex)",
+"Türkiye (net)": "Türkiye (sharp)",
 "AFET YARDIMI": "DISASTER RELIEF",
 "PARTİ KASASINDAN": "FROM PARTY FUNDS",
 "DEVLET HAZİNESİNDEN": "FROM STATE TREASURY",

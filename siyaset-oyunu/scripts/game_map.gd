@@ -5,15 +5,33 @@ extends Node
 ## (menü, önizleme, testler) sabit tohumlu bir varsayılan harita durur.
 ##
 ## "province_id" oyunun her yerinde bir SEÇİM BÖLGESİ (il) kimliğidir: "b01"...
+##
+## HARİTA TÜRÜ (lobi ayarı world_settings["map_mode"], 0.0.219):
+##   random          rastgele altıgen ülke (HexGridGenerator)
+##   turkiye_altigen Türkiye'nin 81 ili, 80 sütunluk altıgen ızgara
+##   turkiye_net     Türkiye'nin gerçek il sınırları (vektör); altında ince bir
+##                   mantık ızgarası tıklama, komşuluk ve vekil noktası içindir.
+## Türkiye verisi data/*.json (tools/harita/turkiye_harita_uret.py üretir). Ağda
+## yalnız {"preset", "seed"} gider; herkes aynı dosyayı yerelden okur.
 
 signal map_changed
 
 const DEFAULT_SEED := 1950
 ## Bir altıgenin köşe yarıçapı (harita birimi). Harita sahnesi bu birimde çizilir.
+## Türkiye haritalarında daha küçüktür (harita genişliği aynı kalsın): hex_radius.
 const HEX_RADIUS := 10.0
+const MAP_MODES := ["random", "turkiye_altigen", "turkiye_net"]
+const PRESET_FILES := {"turkiye_altigen": "res://data/turkiye_altigen.json", "turkiye_net": "res://data/turkiye_net.json"}
 const SQRT3 := 1.7320508
 
+## Ağda giden veri (Türkiye haritasında yalnız preset + seed).
 var data: Dictionary = {}
+## Tam harita verisi (rastgele haritada data ile aynı).
+var _full: Dictionary = {}
+var hex_radius: float = HEX_RADIUS
+## province_id -> Array[PackedVector2Array]: gerçek il sınırları (yalnız net harita).
+var _outlines: Dictionary = {}
+static var _preset_cache: Dictionary = {}
 var cols: int = 0
 var rows: int = 0
 ## Array[int]: hücre -> bölge indeksi (-1 = deniz)
@@ -32,23 +50,58 @@ func _ready() -> void:
 
 ## Host: yeni oyun için yeni harita.
 func generate_new(seed_value: int) -> void:
+	var mode := String(MultiplayerManager.world_settings.get("map_mode", "random"))
+	if PRESET_FILES.has(mode):
+		set_data({"preset": mode, "seed": seed_value})
+		return
 	set_data(HexGridGenerator.generate(seed_value, float(MultiplayerManager.world_settings["province_scale"]), int(MultiplayerManager.world_settings["province_seats"])))
+
+## Türkiye haritası dosyası (bir kez okunur).
+static func load_preset(preset: String) -> Dictionary:
+	if not _preset_cache.has(preset):
+		var text := FileAccess.get_file_as_string(String(PRESET_FILES.get(preset, "")))
+		var parsed = JSON.parse_string(text) if text != "" else null
+		_preset_cache[preset] = parsed if parsed is Dictionary else {}
+	return _preset_cache[preset]
+
+## Türkiye haritasının toplam il milletvekili (lobide gösterilir).
+static func preset_seat_total(preset: String) -> int:
+	var total := 0
+	for region in load_preset(preset).get("regions", []):
+		total += int(region["seats"])
+	return total
+
+func is_turkey() -> bool:
+	return PRESET_FILES.has(String(data.get("preset", "")))
 
 func set_data(new_data: Dictionary) -> void:
 	if new_data.is_empty():
 		return
-	data = new_data
-	cols = int(data["cols"])
-	rows = int(data["rows"])
+	var full := new_data
+	if new_data.has("preset") and not new_data.has("cells"):
+		full = load_preset(String(new_data["preset"])).duplicate()
+		if full.is_empty():
+			push_error("Harita dosyası okunamadı: %s" % new_data["preset"])
+			return
+		full["seed"] = new_data.get("seed", 0)
+		data = {"preset": new_data["preset"], "seed": new_data.get("seed", 0)}
+	else:
+		data = new_data
+	_full = full
+	hex_radius = float(full.get("hex_radius", HEX_RADIUS))
+	cols = int(full["cols"])
+	rows = int(full["rows"])
 	cells = []
-	for v in data["cells"]:
+	for v in full["cells"]:
 		cells.append(int(v))
 	ids.clear()
 	_index_of.clear()
 	_names.clear()
 	_seats.clear()
 	_coastal.clear()
-	var regions: Array = data["regions"]
+	var regions: Array = full["regions"]
+	_outlines.clear()
+	var outlines: Array = full.get("outlines", [])
 	for i in regions.size():
 		var region: Dictionary = regions[i]
 		var id := String(region["id"])
@@ -57,6 +110,14 @@ func set_data(new_data: Dictionary) -> void:
 		_names[id] = String(region["name"])
 		_seats[id] = int(region["seats"])
 		_coastal[id] = bool(region.get("coastal", false))
+		if i < outlines.size():
+			var rings: Array = []
+			for ring in outlines[i]:
+				var points := PackedVector2Array()
+				for k in range(0, (ring as Array).size() - 1, 2):
+					points.append(Vector2(float(ring[k]), float(ring[k + 1])))
+				rings.append(points)
+			_outlines[id] = rings
 	_derive()
 	map_changed.emit()
 
@@ -169,6 +230,13 @@ func seat_counts() -> Dictionary:
 func neighbors() -> Dictionary:
 	return _neighbors
 
+## Gerçek il sınırları var mı (net Türkiye haritası)?
+func has_outlines() -> bool:
+	return not _outlines.is_empty()
+
+func outlines_of(province_id: String) -> Array:
+	return _outlines.get(province_id, [])
+
 func is_coastal(province_id: String) -> bool:
 	return bool(_coastal.get(province_id, false))
 
@@ -186,12 +254,12 @@ func region_at_cell(cell: int) -> String:
 # --- Geometri (sivri tepeli, odd-r) ----------------------------------------------
 
 func map_size() -> Vector2:
-	return Vector2(SQRT3 * HEX_RADIUS * (cols + 0.5), 1.5 * HEX_RADIUS * (rows - 1) + 2.0 * HEX_RADIUS)
+	return Vector2(SQRT3 * hex_radius * (cols + 0.5), 1.5 * hex_radius * (rows - 1) + 2.0 * hex_radius)
 
 func cell_center(cell: int) -> Vector2:
 	var col := cell % cols
 	var row := cell / cols
-	return Vector2(SQRT3 * HEX_RADIUS * (col + 0.5 * (row & 1) + 0.5), 1.5 * HEX_RADIUS * row + HEX_RADIUS)
+	return Vector2(SQRT3 * hex_radius * (col + 0.5 * (row & 1) + 0.5), 1.5 * hex_radius * row + hex_radius)
 
 ## Altıgenin 6 köşesi (scale < 1 içe çeker: hücreler arası ince boşluk).
 func cell_corners(cell: int, scale: float = 1.0) -> PackedVector2Array:
@@ -199,15 +267,15 @@ func cell_corners(cell: int, scale: float = 1.0) -> PackedVector2Array:
 	var points := PackedVector2Array()
 	for k in 6:
 		var angle := deg_to_rad(60.0 * k - 30.0)
-		points.append(c + Vector2(cos(angle), sin(angle)) * HEX_RADIUS * scale)
+		points.append(c + Vector2(cos(angle), sin(angle)) * hex_radius * scale)
 	return points
 
 ## Harita birimindeki bir noktanın hücresi (-1: harita dışı).
 func cell_at(point: Vector2) -> int:
-	var px := point.x - SQRT3 * HEX_RADIUS * 0.5
-	var py := point.y - HEX_RADIUS
-	var q := (SQRT3 / 3.0 * px - py / 3.0) / HEX_RADIUS
-	var r := (2.0 / 3.0 * py) / HEX_RADIUS
+	var px := point.x - SQRT3 * hex_radius * 0.5
+	var py := point.y - hex_radius
+	var q := (SQRT3 / 3.0 * px - py / 3.0) / hex_radius
+	var r := (2.0 / 3.0 * py) / hex_radius
 	var x := q
 	var z := r
 	var y := -x - z
@@ -234,6 +302,6 @@ func province_at(point: Vector2) -> String:
 
 func electorate_counts() -> Dictionary:
 	var result := {}
-	for region in data.get("regions", []):
+	for region in _full.get("regions", []):
 		result[String(region["id"])] = int(region.get("electorate", int(region["seats"]) * 100000))
 	return result

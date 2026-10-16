@@ -15,13 +15,10 @@ func run() -> void:
 	mm.owner_id = 1
 	mm.is_host = true
 	check(mm.world_settings["map_mode"] == "random", "varsayilan harita rastgele")
-	for mode in ["turkiye_altigen", "turkiye_net"]:
+	for mode in ["turkiye_altigen"]:
 		print("=== ", mode, " ===")
 		mm._apply_world_settings(mm._world_with("map_mode", mode))
-		if mode == "turkiye_altigen":
-			check(int(mm.world_settings["national_seats"]) == 0, "Turkiye'ye gecince ulusal liste 0 baslar")
-		else:
-			check(int(mm.world_settings["national_seats"]) == 100, "Turkiye haritalari arasinda gecis ulusal listeyi korur")
+		check(int(mm.world_settings["national_seats"]) == 0, "Turkiye'ye gecince ulusal liste 0 baslar")
 		gm.generate_new(12345)
 		var ids: Array = gm.province_ids()
 		check(ids.size() == 81, "81 il", str(ids.size()))
@@ -44,7 +41,6 @@ func run() -> void:
 		check(gm.province_at(gm.center_of(names["Ankara"])) == names["Ankara"], "Ankara'nin vekil noktasi Ankara'da")
 		check(gm.is_coastal(names["İzmir"]) and not gm.is_coastal(names["Ankara"]), "Izmir kiyi, Ankara ic")
 		check(gm.map_size().x > 700.0 and gm.map_size().x < 820.0, "harita genisligi rastgele haritayla ayni olcekte", str(gm.map_size()))
-		check(gm.has_outlines() == (mode == "turkiye_net"), "gercek sinirlar yalniz net haritada")
 		check(gm.data.size() == 2 and gm.data["preset"] == mode, "agda yalniz preset + tohum gider", str(gm.data.keys()))
 		# Ağdan gelen veri istemcide aynı haritayı kurar.
 		var sent: Dictionary = gm.data.duplicate()
@@ -55,6 +51,7 @@ func run() -> void:
 		cm.init_game()
 		check(cm.TOTAL_SEATS == 700, "toplam meclis = 600 il + 100 ulusal", str(cm.TOTAL_SEATS))
 		check(gm.province_ids().size() == 81, "yeni oyun Turkiye haritasiyla basladi")
+	check(not mm.WORLD_OPTIONS["map_mode"].has("turkiye_net"), "net harita kaldirildi")
 	mm._apply_world_settings(mm._world_with("map_mode", "random"))
 	check(int(mm.world_settings["national_seats"]) == int(mm.WORLD_DEFAULTS["national_seats"]), "rastgele haritaya donunce ulusal liste varsayilana doner")
 	gm.generate_new(12345)

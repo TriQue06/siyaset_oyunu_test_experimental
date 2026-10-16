@@ -444,7 +444,7 @@ func _build_settings_panel() -> void:
 	var mode_row := HBoxContainer.new()
 	mode_row.add_theme_constant_override("separation", 6)
 	world_box.add_child(mode_row)
-	var mode_names := {"random": L.t("Rastgele"), "turkiye_altigen": L.t("Türkiye (altıgen)"), "turkiye_net": L.t("Türkiye (net)")}
+	var mode_names := {"random": L.t("Rastgele"), "turkiye_altigen": L.t("Türkiye")}
 	for mode in MultiplayerManager.WORLD_OPTIONS["map_mode"]:
 		var button := Button.new()
 		button.text = mode_names[mode]

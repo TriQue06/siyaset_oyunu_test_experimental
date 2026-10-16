@@ -44,8 +44,7 @@ var _border_colors := PackedColorArray()
 var _edges: Dictionary = {}        # province_id -> Array[[a, b]] (bölge dış sınırı)
 ## province_id -> PackedVector2Array: ilin üçgenleri (dolgu efektleri için).
 var _region_tris: Dictionary = {}
-## Net (vektör) haritada il sınırı daha ince: kıvrımlar okunsun.
-const OUTLINE_BORDER_WIDTH := 0.9
+
 var _colors_dirty := true
 ## Odak parıltısı: {"id", "color", "time", "duration", "icon"}; boşsa yok.
 var _pulse: Dictionary = {}
@@ -85,14 +84,7 @@ func _build_geometry() -> void:
 	for id in ids:
 		_edges[id] = []
 		_region_tris[id] = PackedVector2Array()
-	if GameMap.has_outlines():
-		# Deniz: haritanın tamamını kaplayan zemin.
-		var size := GameMap.map_size()
-		sea_vertices.append_array([Vector2.ZERO, Vector2(size.x, 0), Vector2(size.x, size.y), Vector2.ZERO, Vector2(size.x, size.y), Vector2(0, size.y)])
-		for _i in 6:
-			sea_colors.append(SEA_COLOR)
-		_build_outline_geometry()
-	for cell in (0 if GameMap.has_outlines() else GameMap.cells.size()):
+	for cell in GameMap.cells.size():
 		var region: int = GameMap.cells[cell]
 		var inner := GameMap.cell_corners(cell, CELL_INSET)
 		if region < 0:
@@ -136,42 +128,6 @@ func _build_geometry() -> void:
 		arrays[Mesh.ARRAY_VERTEX] = _border_vertices
 		arrays[Mesh.ARRAY_COLOR] = _border_colors
 		_border_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-
-## NET HARİTA: gerçek il sınırları. Her halka üçgenlenir (olmazsa o ilin
-## ince ızgara hücreleri kullanılır).
-## Komşu illerin ortak sınırı iki kez çizilir (aynı renk, fark edilmez).
-func _build_outline_geometry() -> void:
-	var border_color := Color.WHITE if _white_borders else (REGION_BORDER_DARK if _dark_borders else REGION_BORDER_COLOR)
-	for r in ids.size():
-		var id: String = ids[r]
-		var tris := PackedVector2Array()
-		var ok := true
-		for ring in GameMap.outlines_of(id):
-			var points: PackedVector2Array = ring
-			var indices := Geometry2D.triangulate_polygon(points)
-			if indices.is_empty():
-				ok = false
-				continue
-			for k in indices:
-				tris.append(points[k])
-		if not ok:
-			# Üçgenlenemeyen halka: ilin ızgara hücreleriyle doldur.
-			for cell in GameMap.region_cells(id):
-				var c := GameMap.cell_center(cell)
-				var corners := GameMap.cell_corners(cell, 1.0)
-				for k in 6:
-					tris.append_array([c, corners[k], corners[(k + 1) % 6]])
-		_region_tris[id] = tris
-		_land_vertices.append_array(tris)
-		for _i in tris.size():
-			_land_vertex_region.append(r)
-		for ring in GameMap.outlines_of(id):
-			var points: PackedVector2Array = ring
-			for k in points.size():
-				var a := points[k]
-				var b := points[(k + 1) % points.size()]
-				_edges[id].append([a, b])
-				_append_segment(a, b, OUTLINE_BORDER_WIDTH, border_color)
 
 ## İlin tamamını tek çağrıda boyar (afet / odak parıltısı).
 func _fill_region(province_id: String, color: Color) -> void:

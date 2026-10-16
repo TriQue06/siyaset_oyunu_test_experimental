@@ -1,4 +1,4 @@
-"""Türkiye haritası üreticisi -> data/turkiye_altigen.json, data/turkiye_net.json
+"""Türkiye haritası üreticisi -> data/turkiye_altigen.json
 
 Kaynak (projeksiyon_hesaplayici deposu, aynı sahip):
   * TR-adm2-with-city-borders.svg, g#iller: 81 ilin gerçek dış sınırı.
@@ -9,8 +9,6 @@ Kaynak (projeksiyon_hesaplayici deposu, aynı sahip):
   {cols, rows, hex_radius, cells, regions[{id, name, seats, coastal, electorate}]}
 Altıgen (B): 80 sütunluk "odd-r" ızgara; her altıgen merkezinin düştüğü ile
 aittir, altıgen alamayan küçük il merkezine en yakın altıgeni alır.
-Net (E): aynı yöntemle ince (200 sütun) mantık ızgarası (tıklama, komşuluk,
-vekil noktası) + çizim için sadeleştirilmiş gerçek il sınırları ("outlines").
 Harita genişliği rastgele haritayla aynı tutulur (hex_radius küçülür): vekil
 noktaları ve simgeler aynı boyda kalır.
 
@@ -137,17 +135,3 @@ yaz('turkiye_altigen.json', {'preset': 'turkiye_altigen', 'cols': cols, 'rows': 
      'cells': cells, 'regions': bolgeler(cells, cols, rows)})
 print('altıgen:', cols, 'x', rows, sum(1 for c in cells if c >= 0), 'kara altıgeni')
 
-cols, rows, R, cells, donustur = izgara(200)
-outlines = []
-for p in provs:
-    halkalar = []
-    for poly in p['polys']:
-        sade = sadelestir(poly, SADELESTIRME)
-        if len(sade) >= 4 and sade[0] == sade[-1]:
-            sade = sade[:-1]
-        if len(sade) >= 3:
-            halkalar.append([round(v, 2) for x, y in sade for v in donustur(x, y)])
-    outlines.append(halkalar)
-yaz('turkiye_net.json', {'preset': 'turkiye_net', 'cols': cols, 'rows': rows, 'hex_radius': round(R, 5),
-     'cells': cells, 'regions': bolgeler(cells, cols, rows), 'outlines': outlines})
-print('net:', cols, 'x', rows, sum(len(h) // 2 for o in outlines for h in o), 'köşe')

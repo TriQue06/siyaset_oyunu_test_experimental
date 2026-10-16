@@ -9,8 +9,6 @@ extends Node
 ## HARİTA TÜRÜ (lobi ayarı world_settings["map_mode"], 0.0.219):
 ##   random          rastgele altıgen ülke (HexGridGenerator)
 ##   turkiye_altigen Türkiye'nin 81 ili, 80 sütunluk altıgen ızgara
-##   turkiye_net     Türkiye'nin gerçek il sınırları (vektör); altında ince bir
-##                   mantık ızgarası tıklama, komşuluk ve vekil noktası içindir.
 ## Türkiye verisi data/*.json (tools/harita/turkiye_harita_uret.py üretir). Ağda
 ## yalnız {"preset", "seed"} gider; herkes aynı dosyayı yerelden okur.
 
@@ -20,8 +18,8 @@ const DEFAULT_SEED := 1950
 ## Bir altıgenin köşe yarıçapı (harita birimi). Harita sahnesi bu birimde çizilir.
 ## Türkiye haritalarında daha küçüktür (harita genişliği aynı kalsın): hex_radius.
 const HEX_RADIUS := 10.0
-const MAP_MODES := ["random", "turkiye_altigen", "turkiye_net"]
-const PRESET_FILES := {"turkiye_altigen": "res://data/turkiye_altigen.json", "turkiye_net": "res://data/turkiye_net.json"}
+const MAP_MODES := ["random", "turkiye_altigen"]
+const PRESET_FILES := {"turkiye_altigen": "res://data/turkiye_altigen.json"}
 const SQRT3 := 1.7320508
 
 ## Ağda giden veri (Türkiye haritasında yalnız preset + seed).
@@ -29,8 +27,6 @@ var data: Dictionary = {}
 ## Tam harita verisi (rastgele haritada data ile aynı).
 var _full: Dictionary = {}
 var hex_radius: float = HEX_RADIUS
-## province_id -> Array[PackedVector2Array]: gerçek il sınırları (yalnız net harita).
-var _outlines: Dictionary = {}
 static var _preset_cache: Dictionary = {}
 var cols: int = 0
 var rows: int = 0
@@ -100,8 +96,6 @@ func set_data(new_data: Dictionary) -> void:
 	_seats.clear()
 	_coastal.clear()
 	var regions: Array = full["regions"]
-	_outlines.clear()
-	var outlines: Array = full.get("outlines", [])
 	for i in regions.size():
 		var region: Dictionary = regions[i]
 		var id := String(region["id"])
@@ -110,14 +104,6 @@ func set_data(new_data: Dictionary) -> void:
 		_names[id] = String(region["name"])
 		_seats[id] = int(region["seats"])
 		_coastal[id] = bool(region.get("coastal", false))
-		if i < outlines.size():
-			var rings: Array = []
-			for ring in outlines[i]:
-				var points := PackedVector2Array()
-				for k in range(0, (ring as Array).size() - 1, 2):
-					points.append(Vector2(float(ring[k]), float(ring[k + 1])))
-				rings.append(points)
-			_outlines[id] = rings
 	_derive()
 	map_changed.emit()
 
@@ -229,13 +215,6 @@ func seat_counts() -> Dictionary:
 
 func neighbors() -> Dictionary:
 	return _neighbors
-
-## Gerçek il sınırları var mı (net Türkiye haritası)?
-func has_outlines() -> bool:
-	return not _outlines.is_empty()
-
-func outlines_of(province_id: String) -> Array:
-	return _outlines.get(province_id, [])
 
 func is_coastal(province_id: String) -> bool:
 	return bool(_coastal.get(province_id, false))

@@ -107,10 +107,16 @@ const WEIGHT_REBELLION := 18.0
 ## + ulusal liste. Harita yüklenince yeniden hesaplanır.
 var TOTAL_SEATS := 500
 
-## Seçim ittifakları (oyun varsayılanı açık; anayasa ile kapatılabilir).
-## id -> {name, color, members: party ids, invitations: party ids}.
+## Seçim ittifakları (lobi ayarı, varsayılan açık; anayasa ile değişebilir).
+## id -> {name, color, leader: party id, members: party ids}. Bkz. alliance_of.
 var alliances_enabled: bool = true
 var alliances: Dictionary = {}
+## Açık başvurular: id -> {alliance, party, kind: "invite"|"request", round,
+## accepted (davet edilen kabul etti mi), voters: party ids, votes: party -> bool}.
+var alliance_requests: Dictionary = {}
+var _next_alliance_request: int = 0
+## Son seçimdeki ittifak ortakları: party -> Array[party] (botların dostluğu).
+var former_allies: Dictionary = {}
 
 # peer_id -> Array[String] (her biri CardPresets.CARD_TYPES'tan biri)
 var inventories: Dictionary = {}
@@ -369,6 +375,22 @@ func party_ids() -> Array:
 			ids.append(pid)
 	return ids
 
+## --- SEÇİM İTTİFAKLARI (0.0.225) ------------------------------------------------
+## Kurmak bedava; ittifakın LİDERİ kurucusudur. Katılmanın iki yolu var, ikisi de
+## OYBİRLİĞİ ister (bkz. alliance_requests):
+##   davet  : yalnız lider davet eder (sınırsız); davet edilen kabul etmeli ve
+##            liderin dışındaki bütün üyeler onaylamalı.
+##   istek  : ittifakı olmayan parti katılmak ister; bütün üyeler onaylamalı.
+## Yanıtlar sıra beklemeden verilir. ALLIANCE_REQUEST_ROUNDS tur içinde yanıt
+## vermeyen RET sayılır. Oylayanlar başvuru açıldığı anki üyelerdir.
+## AYRILMA serbest; yalnız SEÇİM TURUNDA ayrılan parti ulusal puan cezası alır.
+## Lider ayrılırsa liderlik en çok vekili olan üyeye geçer; tek üye kalırsa
+## ittifak biter. Seçim sonuçları çıkınca bütün ittifaklar dağılır (eski ortaklar
+## former_allies'ta bir dönem durur: botlar onlara daha dostça davranır).
+const ALLIANCE_REQUEST_ROUNDS := 2
+const ALLIANCE_LEAVE_ELECTION_PENALTY := 6.0
+const ALLIANCE_NAME_MAX := 28
+
 func alliance_of(peer_or_party_id: int) -> int:
 	var pid := party_of(peer_or_party_id)
 	for alliance_id in alliances:
@@ -376,8 +398,53 @@ func alliance_of(peer_or_party_id: int) -> int:
 			return int(alliance_id)
 	return -1
 
+func alliance_leader(alliance_id: int) -> int:
+	return int(alliances.get(alliance_id, {}).get("leader", -1))
+
+func is_alliance_leader(peer_id: int) -> bool:
+	var alliance_id := alliance_of(peer_id)
+	return alliance_id >= 0 and alliance_leader(alliance_id) == party_of(peer_id)
+
+## Bu iki parti şu an aynı ittifakta mı?
+func are_allies(a: int, b: int) -> bool:
+	var alliance_id := alliance_of(a)
+	return alliance_id >= 0 and alliance_id == alliance_of(b) and party_of(a) != party_of(b)
+
+## Son seçimde aynı ittifaktaydılar mı?
+func were_allies(a: int, b: int) -> bool:
+	return (former_allies.get(party_of(a), []) as Array).has(party_of(b))
+
+## Kendi sırasında ittifak hamlesi (kur, davet et, iste, ayrıl) yapabilir mi?
 func can_manage_alliance(peer_id: int) -> bool:
-	return alliances_enabled and can_choose_main_action(peer_id) and not is_party_member(peer_id)
+	return alliances_enabled and can_choose_main_action(peer_id) and not is_party_member(peer_id) \
+		and not PartyManager.is_independent(peer_id)
+
+## Başvuruya yanıt (onay, kabul, ret) sıra beklemeden verilir; genel başkan verir.
+func can_answer_alliance(peer_id: int) -> bool:
+	return alliances_enabled and not is_party_member(peer_id) and PartyManager.parties.has(party_of(peer_id))
+
+## Bu partinin yanıt vermesi beklenen başvurular: [request_id].
+func alliance_requests_for(peer_id: int) -> Array:
+	var pid := party_of(peer_id)
+	var result: Array = []
+	for rid in alliance_requests:
+		var req: Dictionary = alliance_requests[rid]
+		if _request_waits_for(req, pid):
+			result.append(int(rid))
+	return result
+
+func _request_waits_for(req: Dictionary, pid: int) -> bool:
+	if String(req.get("kind", "")) == "invite" and int(req.get("party", -1)) == pid:
+		return not bool(req.get("accepted", false))
+	return (req.get("voters", []) as Array).has(pid) and not (req.get("votes", {}) as Dictionary).has(pid)
+
+## Bu parti ile bu ittifak arasında açık başvuru var mı?
+func pending_alliance_request(alliance_id: int, party_id: int) -> int:
+	for rid in alliance_requests:
+		var req: Dictionary = alliance_requests[rid]
+		if int(req.get("alliance", -1)) == alliance_id and int(req.get("party", -1)) == party_of(party_id):
+			return int(rid)
+	return -1
 
 func create_alliance(peer_id: int, alliance_name: String, color: Color) -> void:
 	if _is_authority():
@@ -385,21 +452,33 @@ func create_alliance(peer_id: int, alliance_name: String, color: Color) -> void:
 	else:
 		_request_create_alliance.rpc_id(1, alliance_name, color)
 
-func join_alliance(peer_id: int, alliance_id: int) -> void:
-	if _is_authority():
-		_apply_join_alliance(peer_id, alliance_id)
-	else:
-		_request_join_alliance.rpc_id(1, alliance_id)
-
 func invite_alliance_party(peer_id: int, alliance_id: int, party_id: int) -> void:
 	if _is_authority():
 		_apply_invite_alliance_party(peer_id, alliance_id, party_id)
 	else:
 		_request_invite_alliance_party.rpc_id(1, alliance_id, party_id)
 
+func request_alliance(peer_id: int, alliance_id: int) -> void:
+	if _is_authority():
+		_apply_request_alliance(peer_id, alliance_id)
+	else:
+		_request_request_alliance.rpc_id(1, alliance_id)
+
+func answer_alliance_request(peer_id: int, request_id: int, yes: bool) -> void:
+	if _is_authority():
+		_apply_answer_alliance(peer_id, request_id, yes)
+	else:
+		_request_answer_alliance.rpc_id(1, request_id, yes)
+
+func leave_alliance(peer_id: int) -> void:
+	if _is_authority():
+		_apply_leave_alliance(peer_id)
+	else:
+		_request_leave_alliance.rpc_id(1)
+
 func _apply_create_alliance(peer_id: int, alliance_name: String, color: Color) -> void:
-	var name := alliance_name.strip_edges().substr(0, 28)
-	if not can_manage_alliance(peer_id) or not alliances_enabled or name == "" or alliance_of(peer_id) >= 0:
+	var name := alliance_name.strip_edges().substr(0, ALLIANCE_NAME_MAX)
+	if not can_manage_alliance(peer_id) or name == "" or alliance_of(peer_id) >= 0:
 		return
 	if not PartyPresets.COLORS.has(color):
 		return
@@ -409,56 +488,149 @@ func _apply_create_alliance(peer_id: int, alliance_name: String, color: Color) -
 	var next_id := 1
 	for key in alliances:
 		next_id = maxi(next_id, int(key) + 1)
-	alliances[next_id] = {"name": name, "color": color, "members": [party_of(peer_id)], "invitations": []}
-	var message := L.t("%s ittifakı kuruldu; %s ittifakın kurucu partisi oldu.") % [name, _party_name(peer_id)]
+	var pid := party_of(peer_id)
+	alliances[next_id] = {"name": name, "color": color, "leader": pid, "members": [pid]}
+	_drop_requests_of_party(pid)
+	var message := L.t("%s ittifakı kuruldu; %s ittifakın lideri oldu.") % [name, _party_name(peer_id)]
 	_push_state({"type": "alliance_created", "peer_id": peer_id, "alliance_id": next_id, "message": message})
 
-func _apply_join_alliance(peer_id: int, alliance_id: int, bot_reply: bool = false) -> void:
-	var invited_bot := bot_reply and MultiplayerManager.is_ai_controlled(peer_id) and alliances.has(alliance_id) and (alliances[alliance_id].get("invitations", []) as Array).has(party_of(peer_id))
-	if (not can_manage_alliance(peer_id) and not invited_bot) or not alliances_enabled or alliance_of(peer_id) >= 0 or not alliances.has(alliance_id):
-		return
-	var alliance: Dictionary = alliances[alliance_id]
-	var pid := party_of(peer_id)
-	var invited: Array = alliance.get("invitations", [])
-	var members: Array = alliance.get("members", []).duplicate()
-	if members.has(pid):
-		return
-	members.append(pid)
-	alliance["members"] = members
-	invited.erase(pid)
-	alliance["invitations"] = invited
-	alliances[alliance_id] = alliance
-	var message := L.t("%s, %s ittifakına katıldı.") % [_party_name(peer_id), String(alliance["name"])]
-	_push_state({"type": "alliance_joined", "peer_id": peer_id, "alliance_id": alliance_id, "message": message})
-
 func _apply_invite_alliance_party(peer_id: int, alliance_id: int, party_id: int) -> void:
-	if not can_manage_alliance(peer_id) or not alliances.has(alliance_id) or alliance_of(peer_id) != alliance_id:
+	if not can_manage_alliance(peer_id) or not alliances.has(alliance_id) or alliance_leader(alliance_id) != party_of(peer_id):
 		return
-	if not party_ids().has(party_id) or alliance_of(party_id) >= 0 or party_id == party_of(peer_id):
+	if not party_ids().has(party_id) or alliance_of(party_id) >= 0 or PartyManager.is_independent(party_id) \
+			or pending_alliance_request(alliance_id, party_id) >= 0:
 		return
-	var alliance: Dictionary = alliances[alliance_id]
-	var invitations: Array = alliance.get("invitations", []).duplicate()
-	if not invitations.has(party_id):
-		invitations.append(party_id)
-	alliance["invitations"] = invitations
-	alliances[alliance_id] = alliance
-	_push_state({"type": "alliance_invited", "peer_id": peer_id, "alliance_id": alliance_id, "target": party_id,
-		"message": L.t("%s, %s ittifakına davet edildi.") % [_party_name(party_id), String(alliance["name"])]})
+	var voters: Array = (alliances[alliance_id]["members"] as Array).duplicate()
+	voters.erase(party_of(peer_id))
+	var rid := _open_alliance_request(alliance_id, party_id, "invite", voters)
+	_push_state({"type": "alliance_invited", "peer_id": peer_id, "alliance_id": alliance_id, "target": party_id, "request": rid,
+		"message": L.t("%s, %s ittifakına davet edildi.") % [_party_name(party_id), String(alliances[alliance_id]["name"])]})
 
-## Bot yanıtı kendi sırası geldiğinde verilir; davet sahibinin sırasını kullanmaz.
-func _apply_decline_alliance_invitation(peer_id: int, alliance_id: int) -> void:
-	if not alliances_enabled or not alliances.has(alliance_id) or not MultiplayerManager.is_ai_controlled(peer_id):
+func _apply_request_alliance(peer_id: int, alliance_id: int) -> void:
+	if not can_manage_alliance(peer_id) or not alliances.has(alliance_id) or alliance_of(peer_id) >= 0 \
+			or pending_alliance_request(alliance_id, peer_id) >= 0:
+		return
+	var pid := party_of(peer_id)
+	var rid := _open_alliance_request(alliance_id, pid, "request", (alliances[alliance_id]["members"] as Array).duplicate())
+	alliance_requests[rid]["accepted"] = true
+	_push_state({"type": "alliance_requested", "peer_id": peer_id, "alliance_id": alliance_id, "request": rid,
+		"message": L.t("%s, %s ittifakına katılmak istiyor; bütün üyelerin onayı bekleniyor.") % [_party_name(peer_id), String(alliances[alliance_id]["name"])]})
+
+func _open_alliance_request(alliance_id: int, party_id: int, kind: String, voters: Array) -> int:
+	_next_alliance_request += 1
+	alliance_requests[_next_alliance_request] = {"alliance": alliance_id, "party": party_of(party_id), "kind": kind,
+		"round": round_number, "accepted": false, "voters": voters, "votes": {}}
+	return _next_alliance_request
+
+## Onay / ret. Davet edilen parti için yes = daveti kabul; üye için yes = onay.
+func _apply_answer_alliance(peer_id: int, request_id: int, yes: bool) -> void:
+	if not can_answer_alliance(peer_id) or not alliance_requests.has(request_id):
+		return
+	var pid := party_of(peer_id)
+	var req: Dictionary = alliance_requests[request_id]
+	if not _request_waits_for(req, pid):
+		return
+	if String(req["kind"]) == "invite" and int(req["party"]) == pid:
+		req["accepted"] = yes
+	else:
+		var votes: Dictionary = (req.get("votes", {}) as Dictionary).duplicate()
+		votes[pid] = yes
+		req["votes"] = votes
+	alliance_requests[request_id] = req
+	_resolve_alliance_request(request_id, pid if not yes else -1)
+
+## Başvuruyu sonuçlandırır: ret varsa düşer; herkes onaylamışsa parti katılır.
+## Sonuç yoksa (hâlâ bekleniyor) sadece durum yayınlanır.
+func _resolve_alliance_request(request_id: int, refused_by: int = -1) -> void:
+	var req: Dictionary = alliance_requests.get(request_id, {})
+	if req.is_empty():
+		return
+	var alliance_id := int(req["alliance"])
+	var pid := int(req["party"])
+	var alliance_name := String(alliances.get(alliance_id, {}).get("name", "?"))
+	if not alliances.has(alliance_id) or alliance_of(pid) >= 0 or not PartyManager.parties.has(pid):
+		alliance_requests.erase(request_id)
+		_push_state({"type": "alliance_request_closed"})
+		return
+	var members: Array = alliances[alliance_id]["members"]
+	var voters: Array = []
+	for voter in req.get("voters", []):
+		if members.has(int(voter)):
+			voters.append(int(voter))
+	var votes: Dictionary = req.get("votes", {})
+	var refused := refused_by != -1
+	for voter in voters:
+		if votes.has(voter) and not bool(votes[voter]):
+			refused = true
+	if refused:
+		alliance_requests.erase(request_id)
+		var who := refused_by if refused_by != -1 else pid
+		_push_state({"type": "alliance_refused", "peer_id": who, "alliance_id": alliance_id, "target": pid,
+			"message": L.t("%s ile %s ittifakı arasındaki başvuru reddedildi (%s).") % [_party_name(pid), alliance_name, _party_name(who)]})
+		return
+	var all_voted := true
+	for voter in voters:
+		if not votes.has(voter):
+			all_voted = false
+	if not bool(req.get("accepted", false)) or not all_voted:
+		_push_state({"type": "alliance_vote"})
+		return
+	alliance_requests.erase(request_id)
+	var updated: Array = members.duplicate()
+	updated.append(pid)
+	alliances[alliance_id]["members"] = updated
+	_drop_requests_of_party(pid)
+	_push_state({"type": "alliance_joined", "peer_id": pid, "alliance_id": alliance_id,
+		"message": L.t("%s, %s ittifakına katıldı.") % [_party_name(pid), alliance_name]})
+
+func _drop_requests_of_party(pid: int) -> void:
+	for rid in alliance_requests.keys():
+		if int(alliance_requests[rid].get("party", -1)) == pid:
+			alliance_requests.erase(rid)
+
+## Tur başında: süresi dolan başvurular (yanıt vermeyen = ret) düşer.
+func _expire_alliance_requests() -> void:
+	for rid in alliance_requests.keys():
+		var req: Dictionary = alliance_requests[rid]
+		if round_number - int(req.get("round", round_number)) >= ALLIANCE_REQUEST_ROUNDS:
+			alliance_requests.erase(rid)
+			_pending_log.append({"text": L.t("%s ile %s ittifakı arasındaki başvuru yanıtsız kaldığı için düştü.") % [
+				_party_name(int(req["party"])), String(alliances.get(int(req["alliance"]), {}).get("name", "?"))],
+				"peer_id": int(req["party"]), "province": "", "kind": "alliance"})
+
+func _apply_leave_alliance(peer_id: int) -> void:
+	var alliance_id := alliance_of(peer_id)
+	if not can_manage_alliance(peer_id) or alliance_id < 0:
 		return
 	var pid := party_of(peer_id)
 	var alliance: Dictionary = alliances[alliance_id]
-	var invitations: Array = alliance.get("invitations", []).duplicate()
-	if not invitations.has(pid) or alliance_of(pid) >= 0:
-		return
-	invitations.erase(pid)
-	alliance["invitations"] = invitations
+	var alliance_name := String(alliance["name"])
+	var members: Array = (alliance["members"] as Array).duplicate()
+	members.erase(pid)
+	alliance["members"] = members
 	alliances[alliance_id] = alliance
-	_push_state({"type": "alliance_declined", "peer_id": peer_id, "alliance_id": alliance_id,
-		"message": L.t("%s, %s ittifakına katılma davetini reddetti.") % [_party_name(peer_id), String(alliance["name"])]})
+	var message := L.t("%s, %s ittifakından ayrıldı.") % [_party_name(peer_id), alliance_name]
+	if members.size() <= 1:
+		alliances.erase(alliance_id)
+		message += " " + L.t("Tek parti kaldı; ittifak sona erdi.")
+	if election_this_round():
+		_add_national(pid, -ALLIANCE_LEAVE_ELECTION_PENALTY)
+		message = L.t("%s seçim arifesinde %s ittifakından ayrıldı; seçmen bunu affetmedi.") % [_party_name(peer_id), alliance_name]
+	_push_state({"type": "alliance_left", "peer_id": peer_id, "alliance_id": alliance_id, "message": message})
+
+## Seçim sonuçları çıkınca (ya da anayasa kapatınca) bütün ittifaklar dağılır.
+## remember=true: üyelikler former_allies'a yazılır (bir sonraki dağılmaya kadar).
+func dissolve_all_alliances(remember: bool) -> void:
+	if remember:
+		former_allies = {}
+		for alliance in alliances.values():
+			var members: Array = alliance.get("members", [])
+			for pid in members:
+				var others: Array = members.duplicate()
+				others.erase(pid)
+				former_allies[int(pid)] = others
+	alliances = {}
+	alliance_requests = {}
 
 @rpc("any_peer", "reliable")
 func _request_create_alliance(alliance_name: String, color: Color) -> void:
@@ -466,14 +638,24 @@ func _request_create_alliance(alliance_name: String, color: Color) -> void:
 		_apply_create_alliance(multiplayer.get_remote_sender_id(), alliance_name, color)
 
 @rpc("any_peer", "reliable")
-func _request_join_alliance(alliance_id: int) -> void:
-	if MultiplayerManager.is_host:
-		_apply_join_alliance(multiplayer.get_remote_sender_id(), alliance_id)
-
-@rpc("any_peer", "reliable")
 func _request_invite_alliance_party(alliance_id: int, party_id: int) -> void:
 	if MultiplayerManager.is_host:
 		_apply_invite_alliance_party(multiplayer.get_remote_sender_id(), alliance_id, party_id)
+
+@rpc("any_peer", "reliable")
+func _request_request_alliance(alliance_id: int) -> void:
+	if MultiplayerManager.is_host:
+		_apply_request_alliance(multiplayer.get_remote_sender_id(), alliance_id)
+
+@rpc("any_peer", "reliable")
+func _request_answer_alliance(request_id: int, yes: bool) -> void:
+	if MultiplayerManager.is_host:
+		_apply_answer_alliance(multiplayer.get_remote_sender_id(), request_id, yes)
+
+@rpc("any_peer", "reliable")
+func _request_leave_alliance() -> void:
+	if MultiplayerManager.is_host:
+		_apply_leave_alliance(multiplayer.get_remote_sender_id())
 
 ## Partideki oyuncu sayısı (para ve puan bölüşümü için).
 func member_count(peer_id: int) -> int:
@@ -1595,7 +1777,9 @@ func init_game() -> void:
 		return
 	inventories.clear()
 	alliances = {}
-	alliances_enabled = true
+	alliance_requests = {}
+	former_allies = {}
+	alliances_enabled = bool(MultiplayerManager.world_settings.get("alliances", true))
 	event_log.clear()
 	BotBrain.reset_skills()
 	funds = {}
@@ -3098,6 +3282,7 @@ func _finish_round() -> void:
 	# (bkz. GovernmentManager.award_formation_scores).
 	var finished_round := round_number
 	round_number += 1
+	_expire_alliance_requests()
 	# Yeni dönem: sıradaki oyuncunun toplantı bilgisi yeni döneme göre.
 	var current := current_turn_peer_id()
 	speech_done = current != -1 and int(speech_rounds.get(party_of(current), 0)) == round_number
@@ -3210,7 +3395,11 @@ func _hold_election(finished_round: int, early: bool) -> void:
 	for pid in party_ids():
 		election_groups[pid] = PartyManager.groups_of(pid).duplicate()
 	last_election_round = finished_round
-	# Geçici partiler: süresi dolan fesheder; botlar ittifak kurar/bozar; sonra
+	# İTTİFAKLAR seçimle biter (0.0.225): ortaklar bir dönem former_allies'ta kalır.
+	if not alliances.is_empty():
+		_pending_log.append({"text": L.t("Seçim bitti: bütün seçim ittifakları dağıldı."), "peer_id": -1, "province": "", "kind": "alliance"})
+	dissolve_all_alliances(true)
+	# Geçici partiler: süresi dolan fesheder; sonra
 	# belki yeni bir parti katılır. (Hükümet kurma bundan sonra başlar: ayrılan
 	# kardeş partiler ayrı ayrı makam alabilir.)
 	_retire_temporary_parties()
@@ -4265,12 +4454,29 @@ func _rekey_party(old_id: int, new_id: int, new_member: int) -> void:
 		if member_index >= 0:
 			members[member_index] = new_id
 		alliance["members"] = members
-		var invitations: Array = alliance.get("invitations", []).duplicate()
-		var invitation_index := invitations.find(old_id)
-		if invitation_index >= 0:
-			invitations[invitation_index] = new_id
-		alliance["invitations"] = invitations
+		if int(alliance.get("leader", -1)) == old_id:
+			alliance["leader"] = new_id
 		alliances[alliance_id] = alliance
+	for rid in alliance_requests.keys():
+		var req: Dictionary = alliance_requests[rid]
+		if int(req.get("party", -1)) == old_id:
+			req["party"] = new_id
+		var voters: Array = (req.get("voters", []) as Array).duplicate()
+		if voters.has(old_id):
+			voters[voters.find(old_id)] = new_id
+		req["voters"] = voters
+		var votes: Dictionary = (req.get("votes", {}) as Dictionary).duplicate()
+		if votes.has(old_id):
+			votes[new_id] = votes[old_id]
+			votes.erase(old_id)
+		req["votes"] = votes
+	if former_allies.has(old_id):
+		former_allies[new_id] = former_allies[old_id]
+		former_allies.erase(old_id)
+	for pid in former_allies.keys():
+		var others: Array = former_allies[pid]
+		if others.has(old_id):
+			others[others.find(old_id)] = new_id
 	for table in [national_support, _hidden_national_delta, _visible_national_support, populism, turmoil, law_rounds, speech_rounds, congress_rounds,
 			group_meetings, miting_fatigue, election_groups,
 			national_list, last_seats, election_seats, last_vote_shares, previous_vote_shares, party_congress]:
@@ -4322,6 +4528,9 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"world_settings": MultiplayerManager.world_settings,
 		"alliances_enabled": alliances_enabled,
 		"alliances": alliances,
+		"alliance_requests": alliance_requests,
+		"alliance_request_next": _next_alliance_request,
+		"former_allies": former_allies,
 		"law_rounds": law_rounds,
 		"tax_rounds": tax_rounds,
 		"constitution_rounds": constitution_rounds,
@@ -4372,6 +4581,8 @@ func _pack_state(include_results: bool) -> Dictionary:
 		state["province_results"] = last_province_results
 	return state
 
+## Kapanan / bağımsızlaşan partiler düşer; lider yoksa liderlik en çok vekili
+## olan üyeye geçer; tek üye kalan ittifak biter (cezasız).
 func _prune_alliances() -> void:
 	for alliance_id in alliances.keys():
 		var alliance: Dictionary = alliances[alliance_id]
@@ -4379,17 +4590,27 @@ func _prune_alliances() -> void:
 		for pid in alliance.get("members", []):
 			if PartyManager.parties.has(int(pid)) and not PartyManager.is_independent(int(pid)) and not members.has(int(pid)):
 				members.append(int(pid))
-		var invitations: Array = []
-		for pid in alliance.get("invitations", []):
-			if PartyManager.parties.has(int(pid)) and not PartyManager.is_independent(int(pid)) \
-					and not members.has(int(pid)) and not invitations.has(int(pid)):
-				invitations.append(int(pid))
+		if members.size() <= 1 and (alliance.get("members", []) as Array).size() > 1:
+			alliances.erase(alliance_id)
+			_pending_log.append({"text": L.t("%s ittifakında tek parti kaldı; ittifak sona erdi.") % String(alliance.get("name", "")),
+				"peer_id": -1, "province": "", "kind": "alliance"})
+			continue
 		if members.is_empty():
 			alliances.erase(alliance_id)
-		else:
-			alliance["members"] = members
-			alliance["invitations"] = invitations
-			alliances[alliance_id] = alliance
+			continue
+		alliance["members"] = members
+		if not members.has(int(alliance.get("leader", -1))):
+			var best: int = members[0]
+			for pid in members:
+				var score := float(last_seats.get(pid, 0)) * 1000.0 + national_of(pid)
+				if score > float(last_seats.get(best, 0)) * 1000.0 + national_of(best):
+					best = pid
+			alliance["leader"] = best
+		alliances[alliance_id] = alliance
+	for rid in alliance_requests.keys():
+		var req: Dictionary = alliance_requests[rid]
+		if not alliances.has(int(req.get("alliance", -1))) or not PartyManager.parties.has(int(req.get("party", -1))) 				or alliance_of(int(req.get("party", -1))) >= 0:
+			alliance_requests.erase(rid)
 
 func _apply_state(state: Dictionary) -> void:
 	state_version = int(state["version"])
@@ -4404,6 +4625,15 @@ func _apply_state(state: Dictionary) -> void:
 	MultiplayerManager._apply_world_settings(state.get("world_settings", MultiplayerManager.world_settings))
 	alliances_enabled = bool(state.get("alliances_enabled", true))
 	alliances = state.get("alliances", {})
+	alliance_requests = state.get("alliance_requests", {})
+	_next_alliance_request = int(state.get("alliance_request_next", 0))
+	former_allies = state.get("former_allies", {})
+	# 0.0.225 öncesi kayıt: lideri olmayan ittifakın lideri ilk üye.
+	for alliance_id in alliances:
+		var old: Dictionary = alliances[alliance_id]
+		if not old.has("leader") and not (old.get("members", []) as Array).is_empty():
+			old["leader"] = int(old["members"][0])
+		old.erase("invitations")
 	law_rounds = state.get("law_rounds", {})
 	tax_rounds = state.get("tax_rounds", {})
 	constitution_rounds = state.get("constitution_rounds", {})

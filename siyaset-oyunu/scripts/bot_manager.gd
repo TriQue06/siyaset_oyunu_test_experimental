@@ -74,13 +74,9 @@ func _handle_turn(now: float) -> void:
 		return
 	if now < _turn_due:
 		return
-	var alliance_decision := BotBrain.choose_alliance_decision(bot)
-	if not alliance_decision.is_empty():
-		var alliance_id := int(alliance_decision["alliance_id"])
-		if String(alliance_decision["type"]) == "join":
-			CardManager._apply_join_alliance(bot, alliance_id)
-		else:
-			CardManager._apply_decline_alliance_invitation(bot, alliance_id)
+	var alliance_target := BotBrain.choose_alliance_request(bot)
+	if alliance_target >= 0:
+		CardManager._apply_request_alliance(bot, alliance_target)
 		_turn_due = now + _delay(PLAY_SECONDS)
 		return
 	# Hamle sınırı yok: bot her hamleden sonra biraz düşünüp devam eder,
@@ -192,24 +188,28 @@ func _handle_formation(now: float) -> void:
 		_form_due = INF if GovernmentManager.phase == GovernmentManager.Phase.VOTING \
 			else now + _delay(FORM_SECONDS)
 
+## İTTİFAK BAŞVURULARI (0.0.225): bot olan davet edilen parti ya da oylayan
+## üye, düşünme süresinden sonra sıra beklemeden yanıt verir.
 func _handle_alliance_invitations(now: float) -> void:
 	var pending := {}
-	for alliance_id in CardManager.alliances:
-		for pid in CardManager.alliances[alliance_id].get("invitations", []):
-			if not MultiplayerManager.is_ai_controlled(int(pid)) or CardManager.alliance_of(int(pid)) >= 0:
+	for rid in CardManager.alliance_requests.keys():
+		var req: Dictionary = CardManager.alliance_requests.get(rid, {})
+		var waiting: Array = []
+		if String(req.get("kind", "")) == "invite" and not bool(req.get("accepted", false)):
+			waiting.append(int(req["party"]))
+		for voter in req.get("voters", []):
+			if not (req.get("votes", {}) as Dictionary).has(int(voter)):
+				waiting.append(int(voter))
+		for pid in waiting:
+			if not MultiplayerManager.is_ai_controlled(pid):
 				continue
-			var key := "%d:%d" % [int(alliance_id), int(pid)]
+			var key := "%d:%d" % [int(rid), pid]
 			pending[key] = true
 			if not _alliance_due.has(key):
 				_alliance_due[key] = now + _delay(VOTE_SECONDS)
 			elif now >= float(_alliance_due[key]):
-				var decision := BotBrain.choose_alliance_decision(int(pid), true)
-				if not decision.is_empty():
-					if decision["type"] == "join":
-						CardManager._apply_join_alliance(int(pid), int(decision["alliance_id"]), true)
-					else:
-						CardManager._apply_decline_alliance_invitation(int(pid), int(decision["alliance_id"]))
 				_alliance_due.erase(key)
+				CardManager._apply_answer_alliance(pid, int(rid), BotBrain.alliance_answer(pid, int(rid)))
 				return
 	for key in _alliance_due.keys():
 		if not pending.has(key):

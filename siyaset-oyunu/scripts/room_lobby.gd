@@ -33,6 +33,7 @@ var game_length_summary: Label
 var threshold_slider: HSlider
 var map_seed_edit: LineEdit
 var random_parties_check: CheckButton
+var alliances_check: CheckButton
 var away_bot_check: CheckButton
 var bot_funds_buttons: Array = []
 var world_controls: Dictionary = {}
@@ -118,6 +119,7 @@ func _refresh() -> void:
 	threshold_slider.editable = am_owner
 	map_seed_edit.editable = am_owner and MultiplayerManager.world_settings["map_mode"] == "random"
 	random_parties_check.disabled = not am_owner
+	alliances_check.disabled = not am_owner
 	if away_bot_check != null:
 		away_bot_check.disabled = not am_owner
 	for button in bot_funds_buttons:
@@ -338,6 +340,8 @@ func _refresh_settings_display() -> void:
 		map_seed_edit.text = MultiplayerManager.map_seed
 	if random_parties_check != null:
 		random_parties_check.set_pressed_no_signal(MultiplayerManager.random_parties)
+	if alliances_check != null:
+		alliances_check.set_pressed_no_signal(bool(MultiplayerManager.world_settings.get("alliances", true)))
 	if away_bot_check != null:
 		away_bot_check.set_pressed_no_signal(MultiplayerManager.away_mode == MultiplayerManager.AWAY_BOT)
 	for button in bot_funds_buttons:
@@ -492,6 +496,13 @@ func _build_settings_panel() -> void:
 	map_seed_edit.text_submitted.connect(func(text: String): MultiplayerManager.set_map_seed(text))
 	map_seed_edit.focus_exited.connect(func(): MultiplayerManager.set_map_seed(map_seed_edit.text))
 	map_box.add_child(map_seed_edit)
+
+	var alliance_box := _section(L.t("SEÇİM İTTİFAKLARI"), L.t("Açıksa partiler ittifak kurabilir; barajda ortak oy sayılır. Oyun içinde anayasayla değişebilir."))
+	alliances_check = CheckButton.new()
+	alliances_check.text = L.t("İttifaklar açık")
+	alliances_check.focus_mode = Control.FOCUS_NONE
+	alliances_check.toggled.connect(func(on: bool): MultiplayerManager.set_world_setting("alliances", on))
+	alliance_box.add_child(alliances_check)
 
 	var parties_box := _section(L.t("RASTGELE PARTİLER"), L.t("Açıksa seçimlerden sonra arada bir yeni bir parti (bot) kurulur; bir iki seçim sonra kendini fesheder."))
 	random_parties_check = CheckButton.new()

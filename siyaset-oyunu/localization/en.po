@@ -3,6 +3,105 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: en\n"
 
+msgid "%s ittifakı kuruldu; %s ittifakın lideri oldu."
+msgstr "The %s alliance was founded; %s leads it."
+
+msgid "%s, %s ittifakına katılmak istiyor; bütün üyelerin onayı bekleniyor."
+msgstr "%s wants to join the %s alliance; every member must approve."
+
+msgid "%s ile %s ittifakı arasındaki başvuru reddedildi (%s)."
+msgstr "The application between %s and the %s alliance was rejected (%s)."
+
+msgid "%s ile %s ittifakı arasındaki başvuru yanıtsız kaldığı için düştü."
+msgstr "The application between %s and the %s alliance lapsed without an answer."
+
+msgid "%s, %s ittifakından ayrıldı."
+msgstr "%s left the %s alliance."
+
+msgid "Tek parti kaldı; ittifak sona erdi."
+msgstr "Only one party remained; the alliance ended."
+
+msgid "%s seçim arifesinde %s ittifakından ayrıldı; seçmen bunu affetmedi."
+msgstr "%s left the %s alliance on the eve of the election; voters did not forgive it."
+
+msgid "Seçim bitti: bütün seçim ittifakları dağıldı."
+msgstr "The election is over: all electoral alliances dissolved."
+
+msgid "%s ittifakında tek parti kaldı; ittifak sona erdi."
+msgstr "Only one party remained in the %s alliance; it ended."
+
+msgid "%d karar bekliyor"
+msgstr "%d decisions waiting"
+
+msgid "Barajda ortak oy sayılır; her ilde ittifakın vekilleri üyelerin oyuna göre paylaşılır. Katılmak için bütün üyeler onaylamalı, davet yalnız liderden (★) gelir. İttifaklar seçimden sonra dağılır."
+msgstr "Combined votes count for the threshold; in each province the alliance's seats are shared by the members' votes. Joining needs every member's approval, only the leader (★) invites. Alliances dissolve after the election."
+
+msgid "İttifak kurmak, davet etmek, katılmak istemek ya da ayrılmak için sıranı bekle. Onay ve davet yanıtları her an verilebilir."
+msgstr "Wait for your turn to found, invite, apply or leave. Approvals and invitation answers can be given any time."
+
+msgid "İttifaktan ayrıl. Seçim turunda ayrılmak ulusal destek kaybettirir."
+msgstr "Leave the alliance. Leaving in an election round costs national support."
+
+msgid "BAŞVURU BEKLİYOR"
+msgstr "APPLICATION PENDING"
+
+msgid "KATILMAK İSTE"
+msgstr "APPLY TO JOIN"
+
+msgid "Katılmak için bütün üyelerin onayı gerekir."
+msgstr "Every member must approve to join."
+
+msgid "Davet: %s"
+msgstr "Invitation: %s"
+
+msgid "Katılma isteği: %s"
+msgstr "Application: %s"
+
+msgid "kabul etti ✓"
+msgstr "accepted ✓"
+
+msgid "yanıt bekleniyor …"
+msgstr "awaiting answer …"
+
+msgid "onaylar: %s"
+msgstr "approvals: %s"
+
+msgid "%s ittifakı seni davet ediyor. Katılman için diğer üyelerin de onayı gerekir."
+msgstr "The %s alliance invites you. The other members must also approve."
+
+msgid "Lider %s partisini %s ittifakına davet etti. Onayın gerekiyor."
+msgstr "The leader invited %s to the %s alliance. Your approval is needed."
+
+msgid "%s, %s ittifakına katılmak istiyor. Onayın gerekiyor."
+msgstr "%s wants to join the %s alliance. Your approval is needed."
+
+msgid "Yanıt vermezsen %d tur sonra ret sayılır."
+msgstr "No answer counts as a rejection after %d rounds."
+
+msgid "KABUL ET"
+msgstr "ACCEPT"
+
+msgid "ONAYLA"
+msgstr "APPROVE"
+
+msgid "REDDET"
+msgstr "REJECT"
+
+msgid "Başvurun zaten onay bekliyor."
+msgstr "Your application is already waiting for approval."
+
+msgid "Davet edilebilecek parti yok."
+msgstr "No party can be invited."
+
+msgid "İttifak kararı bekleniyor: İTTİFAK panelinden yanıtla."
+msgstr "An alliance decision is waiting: answer it in the ALLIANCE panel."
+
+msgid "Açıksa partiler ittifak kurabilir; barajda ortak oy sayılır. Oyun içinde anayasayla değişebilir."
+msgstr "If on, parties can form alliances; combined votes count for the threshold. The constitution can change it in game."
+
+msgid "İttifaklar açık"
+msgstr "Alliances on"
+
 msgid "Seçim bu dönemin sonunda"
 msgstr "Election at the end of this term"
 

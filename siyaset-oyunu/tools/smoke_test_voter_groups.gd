@@ -307,7 +307,8 @@ func _initialize() -> void:
 		"%.2f -> %.2f -> %.2f" % [l0, l1, l2])
 	check("ikinci yatirim hitapta birincisi kadar kazandirir", h2 - h1 > (h1 - h0) * 0.97, "%.3f / %.3f" % [h1 - h0, h2 - h1])
 	cm._apply_miting_move(1, inv)
-	check("miting yatirimin tavan ustu puanini kirpmaz", cm.local_of(inv, 1) >= l2 - 0.001, "%.2f" % cm.local_of(inv, 1))
+	# Miting rastgele provokasyonla puanı biraz düşürebilir; kural tavana (LIMIT) KIRPILMAMASI.
+	check("miting yatirimin tavan ustu puanini kirpmaz", cm.local_of(inv, 1) > PublicOpinion.LIMIT + 0.001, "%.2f" % cm.local_of(inv, 1))
 	gm.government = {"pm": 1}
 	gi = pm.parties[1]["groups"].duplicate()
 	check("yatirim il profilini degistirmez", str(cm.province_profiles[inv]) == prof_inv)

@@ -30,7 +30,7 @@ func run() -> void:
 	bm._handle_alliance_invitations(100.0)
 	bm._handle_alliance_invitations(110.0)
 	check(cm.alliance_of(2) == 1, "below-threshold bot accepts without waiting for its turn")
-	check(brain.choose_alliance_decision(2, true).is_empty(), "member does not rejoin another alliance")
+	check(brain.choose_alliance_request(2) == -1, "member does not request another alliance")
 	pm.parties[3] = {"name": "Other", "groups": {}}
 	cm.turn_order.append(3)
 	cm.current_turn_index = 2

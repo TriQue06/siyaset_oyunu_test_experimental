@@ -80,13 +80,32 @@
   let visible = true;
   new IntersectionObserver((es) => (visible = es[0].isIntersecting)).observe(map);
 
+  // Türkiye haritası (oyundaki altıgen veri, /data/turkiye.json); gelmezse rastgele kıta.
+  let turkey = null;
+  fetch("/data/turkiye.json").then((r) => r.json()).then((d) => { turkey = d; rebuild(); }).catch(() => {});
+
   function buildMap() {
     const w = map.clientWidth, h = map.clientHeight;
     map.width = w * dpr; map.height = h * dpr;
+    cells = [];
+    if (turkey) {
+      // Haritayı ekrana sığdır: geniş ekranda genişliğin %92'si, dar ekranda yüksekliğe göre.
+      const r = Math.min((w * 0.92) / (Math.sqrt(3) * (turkey.cols + 0.5)), (h * 0.8) / (1.5 * turkey.rows + 0.5));
+      const cw = Math.sqrt(3) * r;
+      const ox = (w - cw * (turkey.cols + 0.5)) / 2, oy = (h - 1.5 * r * turkey.rows) / 2;
+      seeds = turkey.seats.map(() => ({ c: PARTY[(Math.random() * PARTY.length) | 0] }));
+      turkey.cells.forEach((p, i) => {
+        if (p < 0) return;
+        const col = i % turkey.cols, row = (i / turkey.cols) | 0;
+        const x = ox + cw * (col + 0.5 * (row & 1) + 0.5), y = oy + 1.5 * r * row + r;
+        const nx = (x / w - 0.5) * 2, ny = (y / h - 0.5) * 2;
+        cells.push({ x, y, r, seed: seeds[p], at: Math.random() * 2500 + Math.hypot(nx, ny) * 3000 });
+      });
+      return;
+    }
     const r = Math.max(9, Math.min(16, w / 90));
     const cw = Math.sqrt(3) * r;
     seeds = Array.from({ length: 22 }, () => ({ x: Math.random() * w, y: Math.random() * h, c: PARTY[(Math.random() * PARTY.length) | 0] }));
-    cells = [];
     for (let row = 0, y = r; y < h + r; row++, y += r * 1.5) {
       for (let x = (row % 2 ? cw / 2 : 0); x < w + cw; x += cw) {
         // Kıta silueti: kenarlara doğru seyrelir.
@@ -108,8 +127,9 @@
     ctx.closePath();
   }
 
-  // Meclis yarım dairesi: 500 nokta, partilere bölünmüş, soldan sağa dolar.
-  const SEATS = [137, 106, 97, 89, 44, 25, 2];
+  // Meclis yarım dairesi: 600 nokta, partilere bölünmüş, soldan sağa dolar.
+  const SEATS = [164, 128, 116, 107, 53, 30, 2];
+  const TOTAL = SEATS.reduce((a, b) => a + b, 0);
   let slots = [];
   function buildParl() {
     const w = parl.clientWidth, h = parl.clientHeight;
@@ -117,8 +137,8 @@
     const rows = 11, inner = w * 0.16, outer = w * 0.48;
     const radii = Array.from({ length: rows }, (_, i) => inner + (outer - inner) * i / (rows - 1));
     const sum = radii.reduce((a, b) => a + b, 0);
-    const counts = radii.map((rr) => Math.round(500 * rr / sum));
-    counts[rows - 1] += 500 - counts.reduce((a, b) => a + b, 0);
+    const counts = radii.map((rr) => Math.round(TOTAL * rr / sum));
+    counts[rows - 1] += TOTAL - counts.reduce((a, b) => a + b, 0);
     slots = [];
     radii.forEach((rr, ri) => { for (let j = 0; j < counts[ri]; j++) slots.push({ a: Math.PI * (1 - (j + 0.5) / counts[ri]), rr }); });
     slots.sort((p, q) => q.a - p.a);
@@ -151,7 +171,7 @@
       pc.setTransform(dpr, 0, 0, dpr, 0, 0);
       pc.clearRect(0, 0, w, h);
       const shown = reduce ? slots.length : Math.min(slots.length, Math.floor(t / 7));
-      const dot = w / 140;
+      const dot = w / 155;
       for (let i = 0; i < slots.length; i++) {
         const s = slots[i];
         pc.beginPath();

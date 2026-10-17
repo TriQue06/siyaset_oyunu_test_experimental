@@ -209,6 +209,10 @@ static func _funds_value(bot: int) -> float:
 ## "province"} | {"type": "miting", "province"} | {"type": "speech", "group"} |
 ## {"type": "pass"}
 static func choose_action(bot: int) -> Dictionary:
+	# MECLİS AKIŞI (0.0.231): açık aşama sırayla ya yapılır ya geçilir.
+	var stage := CardManager.parliament_stage(bot)
+	if stage != "":
+		return _choose_parliament(bot, stage)
 	# GRUP TOPLANTISI isteğe bağlı: değerliyse (seçime yakın / kriz) önce yapılır.
 	if CardManager.needs_speech(bot):
 		var meeting := choose_speech(bot)
@@ -228,6 +232,91 @@ static func choose_action(bot: int) -> Dictionary:
 		# ...ya da yapacak iş varken turu boşa geçirmek.
 		if String(best.get("type", "")) != "pass" and randf() < miss * SKILL_IDLE:
 			return {"type": "pass"}
+	return best
+
+## MECLİS AŞAMASI KARARI: aşamanın hamlesi değerliyse yapılır, değilse aşama
+## geçilir ({"type": "parl_pass", "stage"}). Yasa aşamasında grup yasası,
+## vergi, anayasa ve erken seçim birbiriyle yarışır.
+static func _choose_parliament(bot: int, stage: String) -> Dictionary:
+	var skip := {"type": "parl_pass", "stage": stage}
+	var funds_value := _funds_value(bot)
+	match stage:
+		"censure":
+			if CardManager.can_censure(bot) and _censure_worth_it(bot):
+				_bloc_forming = bloc_active()
+				return {"type": "censure"}
+		"speech":
+			var meeting := choose_speech(bot)
+			if not meeting.is_empty() and float(meeting["score"]) - GameRules.SPEECH_FUNDS_COST * funds_value > PASS_ACTION_SCORE:
+				return {"type": "speech", "group": meeting["group"]}
+		"law":
+			var best := {}
+			var best_score := PASS_ACTION_SCORE
+			if CardManager.can_propose_law(bot):
+				var law := _best_law(bot)
+				var rested: bool = CardManager.round_number - int(CardManager.law_rounds.get(bot, -99)) >= LAW_EVERY_ROUNDS
+				if rested and not law.is_empty() and CardManager.can_propose_law(bot, String(law["law"])):
+					var score := float(law["score"]) - CardManager.law_funds_cost(bot, String(law["law"])) * funds_value + _jitter(bot)
+					if score > best_score:
+						best = {"type": "law", "law": law["law"]}
+						best_score = score
+			var tax := _best_tax_law(bot)
+			if not tax.is_empty():
+				var tax_score := float(tax["score"]) - GameRules.LAW_FUNDS_COST * funds_value + _jitter(bot)
+				if tax_score > best_score:
+					best = {"type": "law", "law": tax["law"]}
+					best_score = tax_score
+			var constitution := _best_constitution(bot)
+			if not constitution.is_empty() and float(constitution["score"]) > best_score:
+				best = {"type": "constitution", "payload": constitution["payload"]}
+				best_score = float(constitution["score"])
+			if CardManager.can_early_election(bot) and not CardManager.is_government_party(bot) \
+					and CardManager.national_of(bot) > EARLY_ELECTION_SUPPORT:
+				var early_score := 1.0 + CardManager.national_of(bot) * 0.8 - GameRules.EARLY_ELECTION_FUNDS_COST * funds_value + _jitter(bot)
+				if early_score > best_score:
+					best = {"type": "early_election"}
+			if not best.is_empty():
+				return best
+		"inquiry":
+			var inquiry := _eval_inquiry(bot)
+			if not inquiry.is_empty() and float(inquiry["score"]) - Economy.INQUIRY_FUNDS_COST * funds_value + _jitter(bot) > PASS_ACTION_SCORE:
+				return {"type": "inquiry", "target": inquiry["target"]}
+	return skip
+
+## AFET KARARI: değerli bir yardım varsa yapılır ({"party", "state"}), yoksa boş
+## (bu tur yardım yapma).
+static func choose_aid(bot: int) -> Dictionary:
+	var aid := eval_aid(bot)
+	if aid.is_empty() or float(aid["score"]) - float(aid["party"]) * _funds_value(bot) <= PASS_ACTION_SCORE:
+		return {}
+	return aid
+
+## MİTİNG BÜTÇESİ: kasa darsa küçük, seçim yakın ve kasa bolsa büyük, yoksa orta.
+static func miting_tier(bot: int) -> int:
+	var funds := CardManager.funds_of(bot)
+	if funds < CardManager.miting_tier_cost(1) * 2.0:
+		return 0
+	if _election_soon() and funds > CardManager.miting_tier_cost(2) * 3.0:
+		return 2
+	return CardManager.DEFAULT_TIER
+
+## Mitingte karalanacak parti (-1 = kart yok ya da değmez): en büyük rakibin
+## bu ildeki gücünü kıracak hedef (eski karalama değerlendirmesiyle aynı ölçek).
+static func miting_smear(bot: int, province_id: String) -> int:
+	var best := -1
+	var best_value := 0.6
+	var org_level := CardManager.organization_level(province_id, bot)
+	var seats := float(CardManager.province_seat_count(province_id)) * PublicOpinion.org_action_mult(org_level)
+	var gain := PublicOpinion.propaganda_gain(CardManager.party_strength(province_id, bot))
+	for target in CardManager.smear_targets(bot, province_id):
+		if is_ally(bot, int(target)):
+			continue
+		var damage := PublicOpinion.propaganda_damage(CardManager.party_strength(province_id, target))
+		var rival := 0.3 + float(GovernmentManager.seats_of(target)) / _total_seats() * 4.0
+		var value := (gain + damage * 0.6 * rival) * seats / 6.0 * 0.45 - CardPresets.card_cost(CardPresets.PROPAGANDA_CARD_TYPE) * _funds_value(bot)
+		if value > best_value:
+			best_value = value
+			best = int(target)
 	return best
 
 ## İTTİFAK BAŞVURUSUNA YANIT (0.0.225). Davet edilen bot: barajda zorlanıyorsa
@@ -428,9 +517,9 @@ static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 		var invest := _eval_investment(bot)
 		var invest_noise := _jitter(bot)
 		if not invest.is_empty():
-			candidates.append({"type": "invest", "province": invest["province"]})
+			candidates.append({"type": "invest", "province": invest["province"], "tier": CardManager.DEFAULT_TIER})
 		if not invest.is_empty() and float(invest["score"]) - GameRules.INVEST_FUNDS_COST * funds_value + invest_noise > best_score:
-			best = {"type": "invest", "province": invest["province"]}
+			best = {"type": "invest", "province": invest["province"], "tier": CardManager.DEFAULT_TIER}
 			best_score = float(invest["score"]) - GameRules.INVEST_FUNDS_COST * funds_value + invest_noise
 
 	var aid := eval_aid(bot)
@@ -468,14 +557,20 @@ static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 				best = {"type": "early_election"}
 				best_score = early_score
 
-	if CardManager.can_miting(bot):
+	var tier := miting_tier(bot)
+	if CardManager.can_miting(bot, "", -1.0, tier):
 		var miting := _eval_miting(bot)
 		var miting_noise := _jitter(bot)
+		var tier_cost := CardManager.miting_tier_cost(tier)
+		var tier_mult := CardManager.miting_tier_mult(tier)
 		if not miting.is_empty():
-			candidates.append({"type": "miting", "province": miting["province"], "focus": miting["focus"]})
-		if not miting.is_empty() and float(miting["score"]) - GameRules.MITING_FUNDS_COST * funds_value + miting_noise > best_score:
-			best = {"type": "miting", "province": miting["province"], "focus": miting["focus"]}
-			best_score = float(miting["score"]) - GameRules.MITING_FUNDS_COST * funds_value + miting_noise
+			var smear := miting_smear(bot, String(miting["province"]))
+			var action := {"type": "miting", "province": miting["province"], "focus": miting["focus"], "tier": tier, "smear": smear}
+			candidates.append(action)
+			var score := float(miting["score"]) * tier_mult - tier_cost * funds_value + miting_noise
+			if score > best_score:
+				best = action
+				best_score = score
 
 	return best
 
@@ -639,8 +734,9 @@ static func risk_appetite(bot: int) -> float:
 	return fposmod(float(absi(bot)) * 0.618034 + 0.17, 1.0)
 
 ## Miting için devlet payı (0 = tamamı kendi kasasından).
-static func miting_state_share(bot: int) -> float:
-	var r := CardManager.funding_range(bot, "miting")
+static func miting_state_share(bot: int, tier: int = CardManager.DEFAULT_TIER, smear: int = -1) -> float:
+	var extra := float(CardPresets.card_cost(CardPresets.PROPAGANDA_CARD_TYPE)) if smear != -1 else 0.0
+	var r := CardManager.funding_range(bot, "miting", CardManager.miting_tier_cost(tier), extra)
 	var lo := float(r["min"])
 	var hi := float(r["max"])
 	if not bool(r["state_allowed"]) or hi <= 0.0 or lo > hi:
@@ -657,8 +753,8 @@ static func miting_state_share(bot: int) -> float:
 
 ## Yatırım için devlet payı: mümkün olduğunca devletten (meşru), hazine
 ## yetmezse kalanı kasadan.
-static func invest_state_share(bot: int) -> float:
-	var r := CardManager.funding_range(bot, "invest")
+static func invest_state_share(bot: int, tier: int = CardManager.DEFAULT_TIER) -> float:
+	var r := CardManager.funding_range(bot, "invest", CardManager.invest_tier_cost(tier))
 	return clampf(float(r["max"]), float(r["min"]), 1.0)
 
 ## Vergi yasasına oy: hükümet (genelde) destekler; ortak seçime yakın vergi
@@ -808,7 +904,7 @@ static func _evaluate(bot: int, card_type: String) -> Dictionary:
 		CardPresets.CARD_THEFT_CARD_TYPE:
 			return _eval_card_theft(bot)
 		CardPresets.PROPAGANDA_CARD_TYPE:
-			return _eval_propaganda(bot)
+			return {}  # 0.0.231: karalama mitingin içinde kullanılır (bkz. miting_smear)
 	if CardPresets.needs_target(card_type):
 		return _eval_steal(bot, card_type)
 	if card_type == CardPresets.REPUTATION_CARD_TYPE:
@@ -1009,32 +1105,6 @@ static func eval_aid(bot: int) -> Dictionary:
 		value += minf(gain, PublicOpinion.LIMIT - CardManager.local_of(String(province_id), bot)) / PublicOpinion.MITING_LOCAL * seats / 30.0 * (0.5 + closeness)
 	value += Disaster.national_gain(0.0, party_m + state_m) * 0.5
 	return {"score": value * 1.4 * 1.6 * (1.4 if _election_soon() else 1.0), "party": party_m, "state": state_m}
-
-## En büyük rakibi, en çok vekilli ve onun zayıf, botun güçlü olduğu ilde karala.
-static func _eval_propaganda(bot: int) -> Dictionary:
-	var best := {}
-	var best_value := -INF
-	for province_id in _seats().keys():
-		# Karalama da teşkilat ister.
-		var org_level := CardManager.organization_level(String(province_id), bot)
-		if org_level < 1:
-			continue
-		var seats := float(CardManager.province_seat_count(province_id)) * PublicOpinion.org_action_mult(org_level)
-		var gain := PublicOpinion.propaganda_gain(CardManager.party_strength(province_id, bot))
-		for target in CardManager.party_ids():
-			if is_ally(bot, int(target)):
-				continue
-			var damage := PublicOpinion.propaganda_damage(CardManager.party_strength(province_id, target))
-			# Zayıfı ezmek yerine öndekini hedef al: değer ağırlıkla rakibin büyüklüğünden.
-			var rival := 0.3 + float(GovernmentManager.seats_of(target)) / _total_seats() * 4.0
-			var value := (gain + damage * 0.6 * rival) * seats / 6.0
-			if value > best_value:
-				best_value = value
-				best = {"peer": target, "province": province_id}
-	if best.is_empty():
-		return {}
-	best["score"] = best_value * 0.45
-	return best
 
 ## İktidardaysa en büyük muhalefetten, muhalefetteyse hükümetten çal.
 static func _eval_steal(bot: int, card_type: String) -> Dictionary:

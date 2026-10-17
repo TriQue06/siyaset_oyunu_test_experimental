@@ -101,34 +101,8 @@ func _initialize() -> void:
 	cm.funds[me] = 5
 	cm._push_state({"type": "timer"})
 	await _frames(5)
-	scene._on_org_button_pressed()
-	await create_timer(0.6).timeout
-	check("teskilat butonu haritayi teskilat katmanina alir", scene._map_layer == 1)
-	_shot("org_pending")
-	scene._on_org_button_pressed()
-	await create_timer(0.6).timeout
-	check("iptal: onceki katmana (guc) doner, para harcanmaz", scene._map_layer == 2 and cm.funds_of(me) == 5)
-	scene._on_org_button_pressed()
-	var target := ""
-	for id in ids:
-		if cm.organization_level(id, me) == 0:
-			target = id
-			break
-	scene._on_province_clicked(target)
-	scene._on_province_clicked(target)
-	check("teskilat kuruldu, 2 milyon, anket acildi", cm.organization_level(target, me) == 1 and cm.funds_of(me) == 3 and not cm.province_poll(me, target).is_empty())
-	await create_timer(0.3).timeout
-	check("kurunca bir an teskilat katmaninda kalir", scene._map_layer == 1)
-	await create_timer(1.6).timeout
-	check("sonra onceki katmana doner", scene._map_layer == 2)
+	# 0.0.231: teşkilat ve miting il panelinden (bkz. turn_flow_preview).
 	_shot("my_turn")
-	scene._on_miting_button_pressed()
-	scene._on_province_clicked(TestProvinces.id("konya"))
-	await _frames(3)
-	_shot("miting_pending")
-	check("miting: ilk dokunus riski gosterir", String(scene._target_hint.text).find("provokasyon") != -1)
-	scene._on_province_clicked(TestProvinces.id("konya"))
-	check("miting hamlesi yapildi (2 milyon)", cm.funds_of(me) == 3 - GameRules.MITING_FUNDS_COST)
 	cm.funds[me] = 10
 	cm.inventories[me] = ["populizm", "bagis_kampanyasi", "karalama"]
 	cm._push_state({"type": "timer"})
@@ -137,10 +111,7 @@ func _initialize() -> void:
 	await _frames(3)
 	scene._on_hand_card_clicked(0)
 	await _frames(5)
-	check("populizm karti iki dokunusla kullanildi", cm.populism_rounds_left(me) == GameRules.POPULISM_ROUNDS and cm.funds_of(me) == 9)
-	scene._on_censure_button_pressed()
-	await _frames(3)
-	check("cogunluk yokken bile hukumet yoksa gensoru acilmaz", not scene._pending_censure)
+	check("eski kayittan kalan populizm karti bedelsiz kullanildi", cm.populism_rounds_left(me) == GameRules.POPULISM_ROUNDS and cm.funds_of(me) == 10)
 	_shot("bonus_cards")
 	# Karalama hedef menüsü: her partide logo ve renk.
 	cm.inventories[me] = ["karalama"]

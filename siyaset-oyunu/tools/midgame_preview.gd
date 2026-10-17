@@ -116,7 +116,8 @@ func _initialize() -> void:
 		gm._clear_proposal()
 		gm._set_phase(gm.Phase.GOVERNING)
 		cms._push_state({"type": "timer"})
-		scene._on_speech_button_pressed()
+		scene._speech_open_key = "%d:%d" % [cms.round_number, cms.current_turn_index]
+		scene._refresh_speech_panel()
 		await create_timer(0.3).timeout
 		root.get_texture().get_image().save_png("%s/midgame_speech.png" % OS.get_user_data_dir())
 		print("screenshot: midgame_speech")

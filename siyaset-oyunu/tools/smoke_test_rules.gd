@@ -80,6 +80,8 @@ func _initialize() -> void:
 	mm = root.get_node("MultiplayerManager")
 	pm = root.get_node("PartyManager")
 	cm = root.get_node("CardManager")
+	# Eski serbest akış: bu test mekanikleri sınar (tur akışı: smoke_test_turn_flow).
+	cm.enforce_turn_flow = false
 	cm.allow_temporary_parties = false
 	cm.speech_required = false  # meclis konuşması ayrıca test edilir
 	cm.fixed_map_seed = 1950
@@ -179,7 +181,8 @@ func _initialize() -> void:
 	var gained := 0.0
 	var bonus_ok := true
 	for id in cm.turn_order:
-		var diff: float = cm.funds_of(id) - float(funds_before_election[id])
+		# Hediye kart anında bağış kampanyası olabilir (0.0.231): o para ayrı.
+		var diff: float = cm.funds_of(id) - float(funds_before_election[id]) - cm.instant_funds_of(id, cm.last_gift_draws.get(id, []))
 		gained += diff
 		if diff < float(GameRules.ELECTION_FUNDS_BONUS) - 0.01:
 			bonus_ok = false
@@ -675,7 +678,13 @@ func _initialize() -> void:
 	var gift_ok := true
 	# Seçimden sonra rastgele yeni bir parti katılabilir: sadece eskilere bak.
 	for id in hands_before.keys():
-		if cm.inventories[id].size() != mini(int(hands_before[id]) + 1, cm.MAX_HAND_SIZE):
+		# Hediye kart anında kartsa (0.0.231) ele girmez, hemen uygulanır.
+		var gift: Array = cm.last_gift_draws.get(id, [])
+		var to_hand := 0
+		for entry in gift:
+			if String(entry["result"]) == "hand":
+				to_hand += 1
+		if gift.is_empty() or cm.inventories[id].size() != mini(int(hands_before[id]) + to_hand, cm.MAX_HAND_SIZE):
 			gift_ok = false
 	check("secimden sonra herkese 1 kart hediye", gift_ok)
 	check("gundem karti destede yok", not cm._draw_pool(1).has("gundem_isci"))
@@ -775,7 +784,7 @@ func _initialize() -> void:
 	var first := int(cm.turn_order[0])
 	var others_ok := true
 	for p in cm.turn_order:
-		if int(p) != first and cm.funds_of(int(p)) - float(income_before[p]) > float(GameRules.ELECTION_FUNDS_BONUS) + 0.01:
+		if int(p) != first and cm.funds_of(int(p)) - float(income_before[p]) - cm.instant_funds_of(int(p), cm.last_gift_draws.get(p, [])) > float(GameRules.ELECTION_FUNDS_BONUS) + 0.01:
 			others_ok = false
 	check("tur geliri yeni siradaki ilk oyuncuya, digerlerine yalniz secim parasi",
 		cm.funds_of(first) - float(income_before[first]) > float(GameRules.ELECTION_FUNDS_BONUS) + 0.01 and others_ok)

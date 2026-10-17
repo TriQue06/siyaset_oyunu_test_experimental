@@ -126,7 +126,7 @@ func _initialize() -> void:
 
 	# Yatırım: önizleme, sonra yapılır (animasyon ortasında görüntü).
 	var province: String = String(cm._province_ids[6])
-	scene._on_invest_button_pressed()
+	scene._pending_invest = true  # eski hedefleme yolu: finansman paneli
 	await _frames(3)
 	scene._select_target_province(province)
 	await _frames(8)
@@ -174,7 +174,7 @@ func _initialize() -> void:
 	# Hazine azken: devlet tarafı taralı, sınır notu.
 	cm.economy["treasury"] = 40.0
 	cm.funds[me] = 120.0
-	scene._on_invest_button_pressed()
+	scene._pending_invest = true  # eski hedefleme yolu: finansman paneli
 	await _frames(3)
 	scene._select_target_province(String(cm._province_ids[9]))
 	await _frames(20)
@@ -197,7 +197,7 @@ func _initialize() -> void:
 	if mit_province == "":
 		mit_province = String(cm._province_ids[12])
 		cm.organizations[mit_province] = {me: 1}
-	scene._on_miting_button_pressed()
+	scene._pending_miting = true
 	await _frames(3)
 	scene._select_target_province(mit_province)
 	await _frames(4)

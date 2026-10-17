@@ -282,6 +282,286 @@ var _event_message: String = ""
 var _pending_log: Array = []
 var _rng := RandomNumberGenerator.new()
 
+# --- TUR AKIŞI (0.0.231) ----------------------------------------------------------
+## Sıranın başı: KART ÇEK (sırada tek sefer) → varsa AFET YARDIM kararı →
+## serbest tur (haritadaki il paneli, MECLİS akışı, ittifak, Turu Bitir).
+## Durum host'ta tutulur ve yayılır (istemci kendi kararını bundan okur):
+##   turn_flow = {"serial", "peer", "drawn", "draws": [{card, result}],
+##     "intro_left": çekim beklenirken kalan sunum süresi (tur sayacı durur),
+##     "aid_for": bu sırada karar verilen afet id'si, "parl_closed": kapanan
+##     meclis aşamaları, "mitings", "invests": bu sıradaki başarılı hamleler}.
+## MECLİS AKIŞI sırası PARL_STAGES: aşama ancak sırası gelince yapılabilir;
+## kullanılamayan aşama atlanır, karar verilen (yapılan ya da geçilen) aşama
+## bu sıra yeniden açılmaz. Yasa aşaması bir çalışma alanıdır: grup yasası,
+## vergi, anayasa ve erken seçim kendi dönemlik haklarıyla sunulur; aşama
+## ancak "bitir / geç" ile (ya da yapılacak bir şey kalmayınca) kapanır.
+## enforce_turn_flow: testler eski serbest akışa dönebilsin (çekim zorunluluğu
+## ve meclis sırası uygulanmaz); 3 miting / 3 yatırım sınırı her zaman geçerli.
+const PARL_STAGES := ["censure", "speech", "law", "inquiry"]
+## Çekim bekleyen oyuncunun sunum süresi: bu sürede tur sayacı işlemez; dolunca
+## kart kendiliğinden çekilir (AFK açığı yok).
+const INTRO_TIMEOUT := 15.0
+## Kart açılış ve afet sahnesi animasyonları karar süresinden yemesin.
+const DRAW_GRACE_SECONDS := 4.0
+const MAX_MITINGS_PER_TURN := 3
+const MAX_INVESTS_PER_TURN := 3
+## MİTİNG BÜTÇESİ: küçük / orta (eski 15 milyon miting) / büyük. Küçük para
+## başına en verimli, büyük tek hamlede en güçlü (3 hak sınırı varken değerli).
+const MITING_TIERS := [{"cost": 10.0, "mult": 0.7}, {"cost": 15.0, "mult": 1.0}, {"cost": 25.0, "mult": 1.4}]
+## YATIRIM BÜTÇESİ: 50 / 100 (eski yatırım) / 150 milyon; etki tutarla orantılı
+## (il puanı tavanı ve BOOST_MAX büyük yatırımın getirisini sınırlar).
+const INVEST_TIERS := [{"cost": 50.0}, {"cost": 100.0}, {"cost": 150.0}]
+const DEFAULT_TIER := 1
+var enforce_turn_flow := true
+## Son seçimin hediye kartları (host; testler ve günlük için): peer -> çekimler.
+var last_gift_draws: Dictionary = {}
+
+## Çekimlerdeki anında para kartlarının bu oyuncuya verdiği toplam (testler).
+func instant_funds_of(peer_id: int, draws: Array) -> float:
+	var total := 0.0
+	for entry in draws:
+		if String(entry.get("result", "")) == "instant":
+			match String(entry.get("card", "")):
+				CardPresets.FUNDS_BONUS_CARD_TYPE:
+					total += funds_bonus_amount(peer_id, false)
+				CardPresets.FUNDS_BONUS_STRONG_CARD_TYPE:
+					total += funds_bonus_amount(peer_id, true)
+	return total
+var turn_flow: Dictionary = {}
+var _turn_serial := 0
+var _skip_stage_gate := false
+
+## Çekildiği anda uygulanan kartlar (ele girmez, oynama bedeli yok).
+static func is_instant_card(card_type: String) -> bool:
+	return card_type in [CardPresets.POPULISM_CARD_TYPE, CardPresets.FUNDS_BONUS_CARD_TYPE,
+		CardPresets.FUNDS_BONUS_STRONG_CARD_TYPE, CardPresets.BONUS_CARD_TYPE]
+
+static func miting_tier_cost(tier: int) -> float:
+	return float(MITING_TIERS[clampi(tier, 0, MITING_TIERS.size() - 1)]["cost"])
+
+static func miting_tier_mult(tier: int) -> float:
+	return float(MITING_TIERS[clampi(tier, 0, MITING_TIERS.size() - 1)]["mult"])
+
+static func invest_tier_cost(tier: int) -> float:
+	return float(INVEST_TIERS[clampi(tier, 0, INVEST_TIERS.size() - 1)]["cost"])
+
+static func valid_tier(tier: int) -> bool:
+	return tier >= 0 and tier < MITING_TIERS.size()
+
+## Yeni sıra başladı (host): akış sıfırlanır. Kart almayan üye çekim yapmaz.
+func _start_turn_flow(peer_id: int) -> void:
+	_turn_serial += 1
+	turn_flow = {"serial": _turn_serial, "peer": peer_id, "drawn": peer_id == -1 or is_party_member(peer_id),
+		"draws": [], "intro_left": INTRO_TIMEOUT, "aid_for": -1, "parl_closed": [], "mitings": 0, "invests": 0}
+
+## Bu oyuncunun sırasının akışı (yoksa oluşturur). Sıra başında kurulmamış
+## akış (eski kayıt, test) çekim hakkını kullanılmış sayar: çift kart olmaz.
+func _flow_for(peer_id: int) -> Dictionary:
+	if int(turn_flow.get("peer", -1)) != peer_id:
+		_turn_serial += 1
+		turn_flow = {"serial": _turn_serial, "peer": peer_id, "drawn": true, "draws": [], "intro_left": 0.0,
+			"aid_for": -1, "parl_closed": [], "mitings": 0, "invests": 0}
+	return turn_flow
+
+func _flow_value(peer_id: int, key: String, default: Variant) -> Variant:
+	if int(turn_flow.get("peer", -1)) != peer_id:
+		return default
+	return turn_flow.get(key, default)
+
+## Sırası gelen oyuncu henüz kart çekmedi mi? (KART ÇEK düğmesi.)
+func needs_turn_draw(peer_id: int) -> bool:
+	return enforce_turn_flow and peer_id == current_turn_peer_id() and not game_finished and not is_turn_blocked() \
+		and int(turn_flow.get("peer", -1)) == peer_id and not bool(turn_flow.get("drawn", true))
+
+func turn_draws(peer_id: int) -> Array:
+	return _flow_value(peer_id, "draws", [])
+
+func miting_count(peer_id: int) -> int:
+	return int(_flow_value(peer_id, "mitings", 0))
+
+func invest_count(peer_id: int) -> int:
+	return int(_flow_value(peer_id, "invests", 0))
+
+func draw_turn_card() -> void:
+	var me := multiplayer.get_unique_id()
+	if not needs_turn_draw(me):
+		return
+	if _is_authority():
+		_apply_draw(me)
+	else:
+		_request_draw.rpc_id(1)
+
+@rpc("any_peer", "reliable")
+func _request_draw() -> void:
+	if MultiplayerManager.is_host:
+		_apply_draw(multiplayer.get_remote_sender_id())
+
+## KART ÇEKİMİ (host): sırada tek sefer. Anında kart hemen uygulanır, saklanabilir
+## kart ele girer. El doluysa (eski kural) kart çekilmez. automatic: süre doldu
+## ya da tur çekmeden bitti (sunum payı eklenmez).
+func _apply_draw(peer_id: int, automatic: bool = false) -> void:
+	if not needs_turn_draw(peer_id):
+		return
+	turn_flow["drawn"] = true
+	var draws: Array = []
+	var messages: PackedStringArray = []
+	if (inventories.get(peer_id, []) as Array).size() >= MAX_HAND_SIZE:
+		draws.append({"card": "", "result": "full"})
+	else:
+		_resolve_draw(peer_id, CardPresets.weighted_pick(_draw_weights(peer_id), _rng), draws, messages)
+	turn_flow["draws"] = draws
+	if not automatic:
+		_turn_time_left += DRAW_GRACE_SECONDS + (2.0 if aid_pending(peer_id) else 0.0)
+	var event := {"type": "draw", "peer_id": peer_id, "draws": draws}
+	if not messages.is_empty():
+		event["message"] = " ".join(messages)
+	_push_state(event)
+
+## Çekilen kartı sınıfına göre işler: anında kart uygulanır (bonus kart ek
+## çekimleri sıraya ekler), saklanabilir kart ele girer.
+func _resolve_draw(peer_id: int, card_type: String, draws: Array, messages: PackedStringArray, nested: bool = false) -> void:
+	if not is_instant_card(card_type):
+		if not inventories.has(peer_id):
+			inventories[peer_id] = []
+		if (inventories[peer_id] as Array).size() >= MAX_HAND_SIZE:
+			draws.append({"card": "", "result": "full"})
+			return
+		inventories[peer_id].insert(inventories[peer_id].size() / 2, card_type)
+		draws.append({"card": card_type, "result": "hand", "bonus": nested})
+		return
+	draws.append({"card": card_type, "result": "instant", "bonus": nested})
+	var text := _apply_instant(peer_id, card_type)
+	if text != "":
+		messages.append(text)
+	if card_type == CardPresets.BONUS_CARD_TYPE:
+		var weights := _draw_weights(peer_id)
+		weights.erase(CardPresets.BONUS_CARD_TYPE)
+		for i in GameRules.BONUS_CARD_DRAW:
+			_resolve_draw(peer_id, CardPresets.weighted_pick(weights, _rng), draws, messages, true)
+
+## Anında kartın etkisi (bir kez). Dönüş: herkese duyurulan mesaj.
+func _apply_instant(peer_id: int, card_type: String) -> String:
+	match card_type:
+		CardPresets.POPULISM_CARD_TYPE:
+			populism[party_of(peer_id)] = round_number + GameRules.POPULISM_ROUNDS
+			return L.t("%s popülizme başladı: %d dönem boyunca hamleleri daha etkili.") % [_party_name(peer_id), GameRules.POPULISM_ROUNDS]
+		CardPresets.FUNDS_BONUS_CARD_TYPE:
+			var weak_gain := funds_bonus_amount(peer_id, false)
+			funds[peer_id] = funds_of(peer_id) + weak_gain
+			return L.t("%s bağış kampanyası yaptı (+%s).") % [_party_name(peer_id), GameRules.cost_text(weak_gain)]
+		CardPresets.FUNDS_BONUS_STRONG_CARD_TYPE:
+			var strong_gain := funds_bonus_amount(peer_id, true)
+			funds[peer_id] = funds_of(peer_id) + strong_gain
+			return L.t("%s büyük bir bağış kampanyası yaptı (+%s).") % [_party_name(peer_id), GameRules.cost_text(strong_gain)]
+		CardPresets.BONUS_CARD_TYPE:
+			return L.t("%s bonus kart çekti (+%d kart).") % [_party_name(peer_id), GameRules.BONUS_CARD_DRAW]
+	return ""
+
+## AFET KARARI bekleniyor mu? (Kart çekildikten sonra açılan yardım sahnesi.)
+func aid_pending(peer_id: int) -> bool:
+	return has_disaster() and not needs_turn_draw(peer_id) and can_aid(peer_id)
+
+## Bu sırada bu afet için karar verildi mi (yardım ya da "bu tur yardım yapma")?
+func aid_decided(peer_id: int) -> bool:
+	return has_disaster() and int(_flow_value(peer_id, "aid_for", -1)) == int(active_disaster().get("id", 0))
+
+func skip_aid() -> void:
+	var me := multiplayer.get_unique_id()
+	if not has_disaster() or me != current_turn_peer_id() or aid_decided(me):
+		return
+	if _is_authority():
+		_apply_skip_aid(me)
+	else:
+		_request_skip_aid.rpc_id(1)
+
+@rpc("any_peer", "reliable")
+func _request_skip_aid() -> void:
+	if MultiplayerManager.is_host:
+		_apply_skip_aid(multiplayer.get_remote_sender_id())
+
+func _apply_skip_aid(peer_id: int) -> void:
+	if not has_disaster() or peer_id != current_turn_peer_id() or is_turn_blocked() or aid_decided(peer_id):
+		return
+	_flow_for(peer_id)["aid_for"] = int(active_disaster().get("id", 0))
+	_push_state({"type": "aid_skip", "peer_id": peer_id})
+
+## Oyuncu yardım kararı vermeden başka bir hamle yaptı: sahne geçilmiş sayılır
+## (eski istemci / doğrudan çağrı kararı delemesin).
+func _note_main_action(peer_id: int) -> void:
+	if enforce_turn_flow and has_disaster() and peer_id == current_turn_peer_id():
+		_flow_for(peer_id)["aid_for"] = int(active_disaster().get("id", 0))
+
+## MECLİS AKIŞI: şu an açık aşama ("" = yapılacak aşama yok / akış bitti).
+## Oylama ya da hükümet kurma sürerken ilk kapanmamış aşamada bekler.
+func parliament_stage(peer_id: int) -> String:
+	if not enforce_turn_flow or peer_id != current_turn_peer_id() or game_finished:
+		return ""
+	var closed: Array = _flow_value(peer_id, "parl_closed", [])
+	var blocked := is_turn_blocked()
+	var previous := _skip_stage_gate
+	_skip_stage_gate = true
+	var result := ""
+	for stage in PARL_STAGES:
+		if closed.has(stage):
+			continue
+		if blocked or _parl_stage_available(peer_id, String(stage)):
+			result = String(stage)
+			break
+	_skip_stage_gate = previous
+	return result
+
+func _parl_stage_available(peer_id: int, stage: String) -> bool:
+	match stage:
+		"censure":
+			return can_censure(peer_id)
+		"speech":
+			return needs_speech(peer_id)
+		"law":
+			return can_propose_law(peer_id) or can_propose_constitution(peer_id) or can_early_election(peer_id)
+		"inquiry":
+			return can_open_inquiry(peer_id)
+	return false
+
+## Meclis hamlesi bu aşamada mı yapılabilir? (Akış kapalıyken her zaman.)
+func _parl_stage_ok(peer_id: int, stage: String) -> bool:
+	return not enforce_turn_flow or _skip_stage_gate or parliament_stage(peer_id) == stage
+
+## Bu sırada meclis akışında hiç aşama açıldı mı / kapandı mı?
+func parliament_closed_stages(peer_id: int) -> Array:
+	return _flow_value(peer_id, "parl_closed", [])
+
+func _parl_close_through(peer_id: int, stage: String) -> void:
+	if peer_id != current_turn_peer_id():
+		return
+	var closed: Array = _flow_for(peer_id)["parl_closed"]
+	for s in PARL_STAGES:
+		if not closed.has(s):
+			closed.append(s)
+		if s == stage:
+			break
+
+## "BU TUR GEÇ" / yasa alanında "BİTİR": aşama bu sıra kapanır.
+func pass_parliament_stage(stage: String) -> void:
+	var me := multiplayer.get_unique_id()
+	if parliament_stage(me) != stage or is_turn_blocked():
+		return
+	if _is_authority():
+		_apply_parl_pass(me, stage)
+	else:
+		_request_parl_pass.rpc_id(1, stage)
+
+@rpc("any_peer", "reliable")
+func _request_parl_pass(stage: String) -> void:
+	if MultiplayerManager.is_host:
+		_apply_parl_pass(multiplayer.get_remote_sender_id(), stage)
+
+func _apply_parl_pass(peer_id: int, stage: String) -> void:
+	if not PARL_STAGES.has(stage) or is_turn_blocked() or parliament_stage(peer_id) != stage:
+		return
+	_note_main_action(peer_id)
+	_parl_close_through(peer_id, stage)
+	_push_state({"type": "parl_pass", "peer_id": peer_id, "stage": stage})
+
 func _ready() -> void:
 	call_deferred("_connect_log_sources")
 	_rng.randomize()
@@ -337,9 +617,16 @@ func tick(delta: float) -> void:
 		if _congress_time_left <= 0.0:
 			_finish_congress_show()
 	if not turn_order.is_empty() and not game_finished and not is_turn_blocked():
-		_turn_time_left -= delta
-		if _turn_time_left <= 0.0:
-			_apply_pass(current_turn_peer_id(), false)
+		var current := current_turn_peer_id()
+		if needs_turn_draw(current):
+			# Kart çekme sunumu karar süresini yemez; uzarsa kart kendiliğinden çekilir.
+			turn_flow["intro_left"] = float(turn_flow.get("intro_left", INTRO_TIMEOUT)) - delta
+			if float(turn_flow["intro_left"]) <= 0.0:
+				_apply_draw(current, true)
+		else:
+			_turn_time_left -= delta
+			if _turn_time_left <= 0.0:
+				_apply_pass(current, false)
 	if not _is_local_only():
 		_heartbeat_timer += delta
 		if _heartbeat_timer >= HEARTBEAT_INTERVAL:
@@ -741,8 +1028,8 @@ static func funds_text(value: float) -> String:
 
 ## Sıradaki oyuncunun kalan süresi (saniye).
 func turn_seconds_left() -> float:
-	if is_turn_blocked():
-		# Engel (oylama, kongre...) sırasında sayaç DURUR; baştan başlamış gibi görünmez.
+	if is_turn_blocked() or needs_turn_draw(current_turn_peer_id()):
+		# Engel (oylama, kongre...) ve kart çekme sunumu sırasında sayaç DURUR.
 		return maxf(0.0, _turn_time_left if _is_authority() else _turn_time_synced)
 	if _is_authority():
 		return maxf(0.0, _turn_time_left)
@@ -778,7 +1065,8 @@ func has_parliament_group(peer_id: int) -> bool:
 
 func needs_speech(peer_id: int) -> bool:
 	return last_election_round > 0 and has_parliament_group(peer_id) and speech_required and not turn_order.is_empty() and peer_id == current_turn_peer_id() and not is_party_member(peer_id) \
-		and int(speech_rounds.get(party_of(peer_id), 0)) != round_number and funds_of(peer_id) >= GameRules.SPEECH_FUNDS_COST
+		and int(speech_rounds.get(party_of(peer_id), 0)) != round_number and funds_of(peer_id) >= GameRules.SPEECH_FUNDS_COST \
+		and _parl_stage_ok(peer_id, "speech")
 
 ## Bu oyuncu şu an bir yasa sunabilir mi? (law_type verilirse o yasa geçerli mi.)
 ## law_type boşsa: grup yasası YA DA vergi yasası sunabiliyorsa true.
@@ -791,6 +1079,8 @@ func can_propose_law(peer_id: int, law_type: String = "") -> bool:
 		return false
 	if not has_seats(peer_id):
 		return false  # meclis dışı parti yasa teklif edemez
+	if not _parl_stage_ok(peer_id, "law"):
+		return false
 	# Gündem şartı yok (0.0.182): her grup için yasa sunulabilir; gündem ödüllendirir.
 	if has_proposed_law_this_round(peer_id, "group"):
 		return false
@@ -821,6 +1111,8 @@ func tax_law_block_reason(peer_id: int, level: int = -1) -> String:
 		return L.t("Mecliste başka bir oylama sürüyor.")
 	if not can_choose_main_action(peer_id):
 		return L.t("Sıra sende değil.")
+	if not _parl_stage_ok(peer_id, "law"):
+		return L.t("Vergi yasası meclis akışının yasa aşamasında sunulur.")
 	if funds_of(peer_id) < GameRules.LAW_FUNDS_COST:
 		return L.t("Parti kasası yetmiyor (%s gerekir).") % GameRules.cost_text(GameRules.LAW_FUNDS_COST)
 	if level >= 0 and (level == tax_level() or not Economy.TAX_LEVELS.has(level)):
@@ -841,6 +1133,8 @@ func can_propose_constitution(peer_id: int) -> bool:
 		return false
 	if has_proposed_law_this_round(peer_id, "constitution"):
 		return false
+	if not _parl_stage_ok(peer_id, "law"):
+		return false
 	return not last_seats.is_empty() and GovernmentManager.can_submit_law()
 
 ## Anayasa paketi: {"threshold": %, "interval": kaç yılda bir seçim}
@@ -858,6 +1152,7 @@ func _apply_constitution_proposal(peer_id: int, payload: Dictionary) -> void:
 	if payload.has("seat_method") and not ElectionModel.SEAT_METHODS.has(String(payload["seat_method"])):
 		return
 	_event_message = ""
+	_note_main_action(peer_id)
 	if not GovernmentManager.submit_constitution(peer_id, payload):
 		return
 	constitution_rounds[party_of(peer_id)] = round_number
@@ -910,6 +1205,8 @@ func aid_block_reason(peer_id: int, party_m: float = -1.0, state_m: float = -1.0
 		return L.t("Şu an yardım bekleyen bir afet yok.")
 	if not can_choose_main_action(peer_id):
 		return L.t("Sıra sende değil.")
+	if enforce_turn_flow and aid_decided(peer_id):
+		return L.t("Bu tur yardım kararını verdin; afet sürerse sonraki sıranda yeniden karar verebilirsin.")
 	var lim := aid_limits(peer_id)
 	if party_m < 0.0 or state_m < 0.0:
 		if float(lim["party_max"]) + float(lim["state_max"]) < Disaster.AID_MIN:
@@ -951,6 +1248,8 @@ func _apply_aid_move(peer_id: int, party_m: float, state_m: float) -> void:
 	if not can_aid(peer_id, party_m, state_m):
 		return
 	var active := active_disaster()
+	if peer_id == current_turn_peer_id():
+		_flow_for(peer_id)["aid_for"] = int(active.get("id", 0))
 	var provinces: Array = active.get("provinces", [])
 	var total := party_m + state_m
 	funds[peer_id] = funds_of(peer_id) - party_m
@@ -1040,21 +1339,25 @@ func _disaster_new_term() -> void:
 ## Yatırım hamlesi: sadece hükümet partileri; DEVLET HAZİNESİNDEN ödenir
 ## (Economy.INVEST_COST; hazine yetmezse kalanı parti kasasından).
 ## state: devletin payı (0..1); -1 = uygun bir paylaşım var mı.
-func can_invest(peer_id: int, province_id: String = "", state: float = -1.0) -> bool:
+func can_invest(peer_id: int, province_id: String = "", state: float = -1.0, tier: int = DEFAULT_TIER) -> bool:
 	if not (can_choose_main_action(peer_id) and is_government_party(peer_id) and not is_party_member(peer_id)
 			and (province_id == "" or has_province(province_id))):
 		return false
-	return _funding_ok(funding_range(peer_id, "invest"), state)
+	if not valid_tier(tier) or invest_count(peer_id) >= MAX_INVESTS_PER_TURN:
+		return false
+	return _funding_ok(funding_range(peer_id, "invest", invest_tier_cost(tier)), state)
 
 # --- Finansman paylaşımı ------------------------------------------------------
 
 ## Hamlenin finansman seçenekleri: {"kind", "total" (milyon ¤), "min", "max"
 ## (devlet payının izinli aralığı), "default", "state_allowed"}. min > max ise
 ## hiçbir paylaşım ödenemez.
-func funding_range(peer_id: int, kind: String) -> Dictionary:
-	var total := Economy.INVEST_COST if kind == "invest" else float(GameRules.MITING_FUNDS_COST)
+func funding_range(peer_id: int, kind: String, total: float = -1.0, party_extra: float = 0.0) -> Dictionary:
+	if total <= 0.0:
+		total = Economy.INVEST_COST if kind == "invest" else float(GameRules.MITING_FUNDS_COST)
 	var state_allowed := is_government_party(peer_id) and not is_party_member(peer_id) and not PartyManager.is_independent(peer_id)
-	var party_cap := maxf(0.0, funds_of(peer_id))
+	# party_extra: aynı hamlede parti kasasından ayrıca ödenen tutar (karalama kartı).
+	var party_cap := maxf(0.0, funds_of(peer_id) - party_extra)
 	var lo := clampf(1.0 - party_cap / total, 0.0, 1.0)
 	# Devlet payı partinin HAZİNE KOTASIYLA sınırlı (bkz. state_quota).
 	var hi := clampf(state_quota(peer_id) / total, 0.0, 1.0) if state_allowed else 0.0
@@ -1074,8 +1377,8 @@ static func _funding_ok(r: Dictionary, state: float) -> bool:
 	return s >= float(r["min"]) - 0.0001 and s <= float(r["max"]) + 0.0001
 
 ## Paylaşım neden ödenemiyor ("" = ödenebilir).
-func funding_block_reason(peer_id: int, kind: String, state: float) -> String:
-	var r := funding_range(peer_id, kind)
+func funding_block_reason(peer_id: int, kind: String, state: float, total: float = -1.0, party_extra: float = 0.0) -> String:
+	var r := funding_range(peer_id, kind, total, party_extra)
 	var split := Economy.split_cost(float(r["total"]), state)
 	if float(split["state"]) > state_treasury() + 0.001:
 		return L.t("Devlet hazinesi yetmiyor (%s var).") % Economy.money_full(state_treasury())
@@ -1083,8 +1386,8 @@ func funding_block_reason(peer_id: int, kind: String, state: float) -> String:
 		return L.t("Bu dönemki hazine kotan yetmiyor (%s kaldı).") % Economy.money_full(state_quota(peer_id))
 	if float(split["state"]) > 0.0 and not bool(r["state_allowed"]):
 		return L.t("Devlet hazinesini sadece hükümet partileri kullanabilir.")
-	if float(split["party"]) > funds_of(peer_id) + 0.001:
-		return L.t("Parti kasası yetmiyor (%s gerekir).") % GameRules.cost_text(float(split["party"]))
+	if float(split["party"]) + party_extra > funds_of(peer_id) + 0.001:
+		return L.t("Parti kasası yetmiyor (%s gerekir).") % GameRules.cost_text(float(split["party"]) + party_extra)
 	return ""
 
 ## Gerçek finansmanı kaydeder (soruşturmanın tek kaynağı).
@@ -1125,6 +1428,8 @@ func inquiry_block_reason(peer_id: int, target: int = -1) -> String:
 		return L.t("Partin bu dönem bir soruşturma açtı.")
 	if not can_choose_main_action(peer_id):
 		return L.t("Sıra sende değil.")
+	if not _parl_stage_ok(peer_id, "inquiry"):
+		return L.t("Soruşturma meclis akışının son aşamasında açılır.")
 	if funds_of(peer_id) < Economy.INQUIRY_FUNDS_COST:
 		return L.t("Parti kasası yetmiyor (%s gerekir).") % GameRules.cost_text(Economy.INQUIRY_FUNDS_COST)
 	if target != -1 and (not party_ids().has(party_of(target)) or PartyManager.is_independent(target)):
@@ -1159,6 +1464,8 @@ func _apply_inquiry(peer_id: int, target: int) -> void:
 	if not can_open_inquiry(peer_id, target):
 		return
 	var tpid := party_of(target)
+	_note_main_action(peer_id)
+	_parl_close_through(peer_id, "inquiry")
 	funds[peer_id] = funds_of(peer_id) - Economy.INQUIRY_FUNDS_COST
 	var inquiries: Dictionary = economy.get("inquiries", {})
 	inquiries[party_of(peer_id)] = round_number
@@ -1216,13 +1523,13 @@ func has_seats(peer_id: int) -> bool:
 func can_censure(peer_id: int) -> bool:
 	return can_choose_main_action(peer_id) and not is_party_member(peer_id) and funds_of(peer_id) >= GameRules.CENSURE_FUNDS_COST and has_seats(peer_id) \
 		and GovernmentManager.phase == GovernmentManager.Phase.GOVERNING and GovernmentManager.has_government() \
-		and not GovernmentManager.has_majority() and not is_government_party(peer_id)
+		and not GovernmentManager.has_majority() and not is_government_party(peer_id) and _parl_stage_ok(peer_id, "censure")
 
 ## ERKEN SEÇİM hamlesi: meclis gerekir, oylama açık olmamalı, zaten erken
 ## seçim kararı yoksa.
 func can_early_election(peer_id: int) -> bool:
 	return can_choose_main_action(peer_id) and not is_party_member(peer_id) and funds_of(peer_id) >= GameRules.EARLY_ELECTION_FUNDS_COST \
-		and has_seats(peer_id) and not early_election_pending and GovernmentManager.can_submit_law() 		and not early_request_used(peer_id) and not election_this_round()
+		and has_seats(peer_id) and not early_election_pending and GovernmentManager.can_submit_law() 		and not early_request_used(peer_id) and not election_this_round() and _parl_stage_ok(peer_id, "law")
 
 ## Seçim zaten BU turun sonunda mı? (Son turda erken seçim önergesi anlamsız.)
 func election_this_round() -> bool:
@@ -1244,6 +1551,7 @@ func early_election() -> void:
 func _apply_early_election_move(peer_id: int) -> void:
 	if not can_early_election(peer_id):
 		return
+	_note_main_action(peer_id)
 	funds[peer_id] = funds_of(peer_id) - GameRules.EARLY_ELECTION_FUNDS_COST
 	early_requests[party_of(peer_id)] = round_number
 	_push_state({"type": "early_election", "peer_id": peer_id,
@@ -1262,8 +1570,15 @@ func populism_rounds_left(peer_id: int) -> int:
 ## Miting hamlesi: seçilen ilde güç (provokasyon riskiyle).
 ## state: mitingin devletten ödenen payı (0..1; sadece hükümet partisi
 ## seçebilir ve PARTİZAN HARCAMA sayılır); -1 = uygun bir paylaşım var mı.
-func can_miting(peer_id: int, province_id: String = "", state: float = -1.0) -> bool:
-	if not can_choose_main_action(peer_id) or not _funding_ok(funding_range(peer_id, "miting"), state):
+func can_miting(peer_id: int, province_id: String = "", state: float = -1.0, tier: int = DEFAULT_TIER, smear_target: int = -1) -> bool:
+	if not can_choose_main_action(peer_id) or not valid_tier(tier) or miting_count(peer_id) >= MAX_MITINGS_PER_TURN:
+		return false
+	var extra := 0.0
+	if smear_target != -1:
+		if province_id == "" or not can_smear(peer_id, smear_target, province_id):
+			return false
+		extra = float(CardPresets.card_cost(CardPresets.PROPAGANDA_CARD_TYPE))
+	if not _funding_ok(funding_range(peer_id, "miting", miting_tier_cost(tier), extra), state):
 		return false
 	# BAĞIMSIZ siyasetçinin teşkilatı yoktur: her ilde miting yapabilir.
 	if PartyManager.is_independent(peer_id):
@@ -1289,12 +1604,12 @@ func national_group_counts() -> Dictionary:
 	return VoterGroups.national_counts(province_voters())
 
 ## Mitingin bu ildeki grup kazançları (ham; yorgunluk dahil, azalan getiri hariç).
-func miting_group_gains(peer_id: int, province_id: String, focus: Array = []) -> Array:
+func miting_group_gains(peer_id: int, province_id: String, focus: Array = [], tier_mult: float = 1.0) -> Array:
 	var pid := party_of(peer_id)
 	var fatigue: Dictionary = miting_fatigue.get(pid, {})
 	var result: Array = []
 	for effect in PublicOpinion.miting_gains(province_profile(province_id), national_group_counts(),
-			_miting_mult(peer_id, province_id), focus):
+			_miting_mult(peer_id, province_id) * tier_mult, focus):
 		var group := String(effect["group"])
 		result.append({"group": group, "gain": float(effect["gain"]) * PublicOpinion.miting_fatigue_mult(float(fatigue.get(group, 0.0)))})
 	return result
@@ -1362,10 +1677,8 @@ func can_play_card(peer_id: int, card_type: String, target_peer_id: int = -1, ta
 	if card_type == CardPresets.REBELLION_CARD_TYPE:
 		return other_party and has_seats(target_peer_id)
 	if card_type == CardPresets.PROPAGANDA_CARD_TYPE:
-		# Karalama teşkilat ister (ilde örgütlü olmayan parti kampanya yapamaz);
-		# BAĞIMSIZ siyasetçinin teşkilatı yoktur, her ilde yapabilir.
-		return has_province(target_province) and other_party \
-			and (organization_level(target_province, peer_id) > 0 or PartyManager.is_independent(peer_id))
+		# 0.0.231: karalama kartı tek başına oynanmaz, miting hazırlığında kullanılır.
+		return false
 	if CardPresets.needs_province_target(card_type):
 		if not has_province(target_province):
 			return false
@@ -1376,6 +1689,24 @@ func can_play_card(peer_id: int, card_type: String, target_peer_id: int = -1, ta
 	if card_type == CardPresets.INVEST_CARD_TYPE or CardPresets.is_censure_card(card_type):
 		return false  # artık hamle (bkz. invest / censure)
 	return true
+
+## KARALAMA (mitingin içinde): kart elde, hedef başka (ittifak dışı) parti,
+## ilde teşkilat (bağımsızın teşkilatı yoktur, her ilde yapabilir).
+func can_smear(peer_id: int, target_peer_id: int, province_id: String) -> bool:
+	if not (inventories.get(peer_id, []) as Array).has(CardPresets.PROPAGANDA_CARD_TYPE) or is_party_member(peer_id):
+		return false
+	if target_peer_id == -1 or not party_ids().has(party_of(target_peer_id)) or PartyManager.same_party(target_peer_id, peer_id) \
+			or are_allies(peer_id, target_peer_id):
+		return false
+	return has_province(province_id) and (organization_level(province_id, peer_id) > 0 or PartyManager.is_independent(peer_id))
+
+## Bu ilde karalama yapılabilecek partiler (kart eldeyse).
+func smear_targets(peer_id: int, province_id: String) -> Array:
+	var result: Array = []
+	for pid in party_ids():
+		if can_smear(peer_id, int(pid), province_id):
+			result.append(int(pid))
+	return result
 
 # --- Güç sorguları ------------------------------------------------------------
 
@@ -2199,13 +2530,13 @@ func build_organization(province_id: String) -> void:
 		_request_organization.rpc_id(1, province_id)
 
 ## Yatırım hamlesi: seçilen ile hükümet yatırımı (INVEST_FUNDS_COST).
-func invest(province_id: String, state: float = 1.0) -> void:
-	if not can_invest(multiplayer.get_unique_id(), province_id, state):
+func invest(province_id: String, state: float = 1.0, tier: int = DEFAULT_TIER) -> void:
+	if not can_invest(multiplayer.get_unique_id(), province_id, state, tier):
 		return
 	if _is_authority():
-		_apply_invest_move(multiplayer.get_unique_id(), province_id, state)
+		_apply_invest_move(multiplayer.get_unique_id(), province_id, state, tier)
 	else:
-		_request_invest.rpc_id(1, province_id, state)
+		_request_invest.rpc_id(1, province_id, state, tier)
 
 ## Gensoru hamlesi (CENSURE_FUNDS_COST): meclis oylaması açılır.
 func censure() -> void:
@@ -2218,13 +2549,13 @@ func censure() -> void:
 
 ## Miting hamlesi: seçilen ilde miting (MITING_FUNDS_COST). focus: odak gruplar
 ## (en çok ildeki teşkilat seviyesi kadar).
-func miting(province_id: String, state: float = 0.0, focus: Array = []) -> void:
-	if not can_miting(multiplayer.get_unique_id(), province_id, state):
+func miting(province_id: String, state: float = 0.0, focus: Array = [], tier: int = DEFAULT_TIER, smear_target: int = -1) -> void:
+	if not can_miting(multiplayer.get_unique_id(), province_id, state, tier, smear_target):
 		return
 	if _is_authority():
-		_apply_miting_move(multiplayer.get_unique_id(), province_id, state, focus)
+		_apply_miting_move(multiplayer.get_unique_id(), province_id, state, focus, tier, smear_target)
 	else:
-		_request_miting.rpc_id(1, province_id, state, focus)
+		_request_miting.rpc_id(1, province_id, state, focus, tier, smear_target)
 
 ## "Turu Bitir": sırayı bir sonraki oyuncuya devreder.
 func pass_turn() -> void:
@@ -2253,6 +2584,7 @@ func _apply_play(peer_id: int, hand_index: int, target_peer_id: int = -1, target
 	# Geçersiz hedefle / şartsız oynanan kart elde kalır, boşa harcanmaz.
 	if not can_play_card(peer_id, card_type, target_peer_id, target_province):
 		return
+	_note_main_action(peer_id)
 	var anonymous := is_anonymous_card(card_type)
 	if not anonymous:
 		card_played.emit(peer_id, card_type)
@@ -2284,6 +2616,9 @@ func _apply_play(peer_id: int, hand_index: int, target_peer_id: int = -1, target
 func _apply_pass(peer_id: int, voluntary: bool = true) -> void:
 	if is_turn_blocked() or peer_id != current_turn_peer_id():
 		return
+	# Kartını çekmeden biten sıra: kart yine verilir (eski otomatik dağıtım gibi).
+	if needs_turn_draw(peer_id):
+		_apply_draw(peer_id, true)
 	# Grup toplantısı isteğe bağlıdır: yapmamanın cezası yok (rakibe kısa
 	# vadeli fırsat bırakmış olursun).
 	var wrapped := _advance_turn()
@@ -2302,6 +2637,7 @@ func _apply_law(peer_id: int, law_type: String) -> void:
 	if not can_propose_law(peer_id, law_type):
 		return
 	_event_message = ""
+	_note_main_action(peer_id)
 	if not GovernmentManager.submit_law(peer_id, law_type):
 		return
 	funds[peer_id] = funds_of(peer_id) - law_funds_cost(peer_id, law_type)
@@ -2317,6 +2653,7 @@ func _apply_law(peer_id: int, law_type: String) -> void:
 func _apply_organization(peer_id: int, province_id: String) -> void:
 	if not can_build_organization(peer_id, province_id):
 		return
+	_note_main_action(peer_id)
 	funds[peer_id] = funds_of(peer_id) - org_cost_for(peer_id, province_id)
 	var entry: Dictionary = organizations.get(province_id, {})
 	var level := int(entry.get(party_of(peer_id), 0)) + 1
@@ -2332,10 +2669,13 @@ func _apply_organization(peer_id: int, province_id: String) -> void:
 ## state: devletin payı (varsayılan tamamı devletten, eski kural). Bedel
 ## TEK SEFER düşer: devlet payı hazineden, parti payı (+ sabit hamle bedeli)
 ## parti kasasından; gerçek paylaşım kayda geçer.
-func _apply_invest_move(peer_id: int, province_id: String, state: float = 1.0) -> void:
-	var amount := Economy.INVEST_COST
-	if not can_invest(peer_id, province_id, state):
+func _apply_invest_move(peer_id: int, province_id: String, state: float = 1.0, tier: int = DEFAULT_TIER) -> void:
+	if not can_invest(peer_id, province_id, state, tier):
 		return
+	var amount := invest_tier_cost(tier)
+	_note_main_action(peer_id)
+	var flow := _flow_for(peer_id)
+	flow["invests"] = int(flow.get("invests", 0)) + 1
 	var split := Economy.split_cost(amount, state)
 	funds[peer_id] = funds_of(peer_id) - float(split["party"])
 	_spend_quota(peer_id, float(split["state"]))
@@ -2351,15 +2691,24 @@ func _apply_invest_move(peer_id: int, province_id: String, state: float = 1.0) -
 func _apply_censure_move(peer_id: int) -> void:
 	if not can_censure(peer_id):
 		return
+	_note_main_action(peer_id)
+	_parl_close_through(peer_id, "censure")
 	funds[peer_id] = funds_of(peer_id) - GameRules.CENSURE_FUNDS_COST
 	_push_state({"type": "censure", "peer_id": peer_id,
 		"message": L.t("%s hükümete gensoru verdi: meclis oylaması başladı.") % _party_name(peer_id)})
 	GovernmentManager.submit_censure(peer_id)
 
-func _apply_miting_move(peer_id: int, province_id: String, state: float = 0.0, focus: Array = []) -> void:
-	if not can_miting(peer_id, province_id, state):
+## tier: bütçe kademesi (MITING_TIERS); smear_target: mitingte karalanacak
+## parti (-1 = yok). Karalama ayrı hak tüketmez; kart ve bedeli ancak miting
+## gerçekleşince düşer. Toplam bedel tek seferde alınır.
+func _apply_miting_move(peer_id: int, province_id: String, state: float = 0.0, focus: Array = [],
+		tier: int = DEFAULT_TIER, smear_target: int = -1) -> void:
+	if not can_miting(peer_id, province_id, state, tier, smear_target):
 		return
-	var total := float(GameRules.MITING_FUNDS_COST)
+	_note_main_action(peer_id)
+	var flow := _flow_for(peer_id)
+	flow["mitings"] = int(flow.get("mitings", 0)) + 1
+	var total := miting_tier_cost(tier)
 	var split := Economy.split_cost(total, state)
 	funds[peer_id] = funds_of(peer_id) - float(split["party"])
 	_spend_quota(peer_id, float(split["state"]))
@@ -2369,11 +2718,21 @@ func _apply_miting_move(peer_id: int, province_id: String, state: float = 0.0, f
 	if float(split["state"]) > 0.0:
 		economy_event.emit({"kind": "invest", "cost": float(split["state"]), "before": before, "after": state_treasury()})
 	_event_message = ""
-	_apply_miting(peer_id, province_id, _clean_focus(peer_id, province_id, focus))
+	_apply_miting(peer_id, province_id, _clean_focus(peer_id, province_id, focus), miting_tier_mult(tier))
+	var miting_message := _event_message
+	if smear_target != -1:
+		var hand: Array = inventories.get(peer_id, [])
+		hand.erase(CardPresets.PROPAGANDA_CARD_TYPE)
+		funds[peer_id] = funds_of(peer_id) - float(CardPresets.card_cost(CardPresets.PROPAGANDA_CARD_TYPE))
+		_event_message = ""
+		_apply_propaganda(peer_id, smear_target, province_id)
+		miting_message += " " + L.t("Kürsüden %s'a yüklendi.") % _party_name(smear_target)
+		_event_message = miting_message
 	# Bağımsızın ve üyenin mitingi kendi güvenilirliğini de artırır.
 	if PartyManager.is_independent(peer_id) or is_party_member(peer_id):
 		credibility_add(peer_id, MITING_CREDIBILITY)
-	_push_state({"type": "miting", "peer_id": peer_id, "province": province_id, "message": _event_message})
+	_push_state({"type": "miting", "peer_id": peer_id, "province": province_id, "message": _event_message,
+		"tier": tier, "smear": smear_target})
 
 ## ANONİM KARTLAR: kaset ve iç karışıklık. Oynayanın adı mesajda, log
 ## simgesinde ve kart animasyonunda gizlidir (hedef görünür).
@@ -2397,11 +2756,16 @@ func _apply_card_effect(peer_id: int, card_type: String, target_peer_id: int = -
 		CardPresets.CARD_THEFT_CARD_TYPE:
 			_apply_card_theft(peer_id, target_peer_id)
 		CardPresets.BONUS_CARD_TYPE:
-			var drawn := 0
+			# Eski kayıttan elde kalan bonus kart: ek çekimler yeni kurala göre.
+			var bonus_draws: Array = []
+			var bonus_messages: PackedStringArray = []
+			var weights := _draw_weights(peer_id)
+			weights.erase(CardPresets.BONUS_CARD_TYPE)
 			for i in GameRules.BONUS_CARD_DRAW:
-				if _deal_turn_card(peer_id, [CardPresets.BONUS_CARD_TYPE]) != "":
-					drawn += 1
-			_event_message = L.t("%s bonus kart kullandı (+%d kart).") % [_party_name(peer_id), drawn]
+				_resolve_draw(peer_id, CardPresets.weighted_pick(weights, _rng), bonus_draws, bonus_messages, true)
+			_event_message = L.t("%s bonus kart kullandı (+%d kart).") % [_party_name(peer_id), bonus_draws.size()]
+			if not bonus_messages.is_empty():
+				_event_message += " " + " ".join(bonus_messages)
 		CardPresets.FUNDS_BONUS_STRONG_CARD_TYPE:
 			var strong_gain := funds_bonus_amount(peer_id, true)
 			funds[peer_id] = funds_of(peer_id) + strong_gain
@@ -2450,7 +2814,7 @@ func _province_name(province_id: String) -> String:
 	return GameMap.name_of(province_id)
 
 ## Miting: riski ilin mevcut siyasi dengesine göre hesaplanır, zar atılır.
-func _apply_miting(peer_id: int, province_id: String, focus: Array = []) -> void:
+func _apply_miting(peer_id: int, province_id: String, focus: Array = [], tier_mult: float = 1.0) -> void:
 	var risk := miting_risk(peer_id, province_id)
 	if _event_roll("miting|%d|%s" % [party_of(peer_id), province_id]) < risk:
 		_add_local(province_id, peer_id, PublicOpinion.PROVOCATION_LOCAL, true)
@@ -2459,11 +2823,11 @@ func _apply_miting(peer_id: int, province_id: String, focus: Array = []) -> void
 		_event_message = L.t("%s'da %s mitinginde provokasyon çıktı: parti ilde ve ülke genelinde destek kaybetti.") % [
 			_province_name(province_id), _party_name(peer_id)]
 	else:
-		var org_mult := _miting_mult(peer_id, province_id)
+		var org_mult := _miting_mult(peer_id, province_id) * tier_mult
 		# YEREL: ildeki aktivite (söner).
 		_add_local(province_id, peer_id, PublicOpinion.MITING_LOCAL * org_mult, true)
 		# ULUSAL HİTAP: ildeki grupların bir kısmı kazanılır (nüfusla orantılı, kalıcı).
-		var moved := _apply_miting_positioning(peer_id, province_id, focus)
+		var moved := _apply_miting_positioning(peer_id, province_id, focus, tier_mult)
 		_log_province(province_id, L.t("%s miting yaptı") % _party_name(peer_id))
 		_ease_turmoil(peer_id, PublicOpinion.TURMOIL_EASE_MITING)
 		_event_message = L.t("%s, %s'da miting yaptı.") % [_actor_name(peer_id), _province_name(province_id)]
@@ -2475,13 +2839,13 @@ func _apply_miting(peer_id: int, province_id: String, focus: Array = []) -> void
 ## alınır. Yorgunluk (aynı gruba art arda miting), azalan getiri ve çekirdek
 ## çarpanı uygulanır. Popülizm kazancı büyütür.
 ## Dönüş: kısa özet ("odak: Emekliler") ya da "".
-func _apply_miting_positioning(peer_id: int, province_id: String, focus: Array = []) -> String:
+func _apply_miting_positioning(peer_id: int, province_id: String, focus: Array = [], tier_mult: float = 1.0) -> String:
 	var pid := party_of(peer_id)
 	if PartyManager.is_independent(pid):
-		return _apply_miting_positioning_legacy(peer_id, province_id, focus)
+		return _apply_miting_positioning_legacy(peer_id, province_id, focus, tier_mult)
 	var fatigue: Dictionary = miting_fatigue.get(pid, {})
 	# SEÇMEN TABANI (0.0.228): ildeki seçmenin bir kısmı çekilir (bkz. _vb_miting).
-	var gains := _vb_miting(pid, province_id, focus, _miting_mult(peer_id, province_id) * _own_effect(pid, 1.0))
+	var gains := _vb_miting(pid, province_id, focus, _miting_mult(peer_id, province_id) * tier_mult * _own_effect(pid, 1.0))
 	var national := national_group_counts()
 	for group in gains.keys():
 		var points := float(gains[group]) / maxf(1.0, float(national.get(group, 1.0))) * 100.0
@@ -2497,10 +2861,10 @@ func _apply_miting_positioning(peer_id: int, province_id: String, focus: Array =
 	return L.t("odak: %s") % ", ".join(names)
 
 ## Bağımsız siyasetçi seçmen tabanına girmez: eski hitap hesabı.
-func _apply_miting_positioning_legacy(peer_id: int, province_id: String, focus: Array = []) -> String:
+func _apply_miting_positioning_legacy(peer_id: int, province_id: String, focus: Array = [], tier_mult: float = 1.0) -> String:
 	var pid := party_of(peer_id)
 	var changes: Array = []
-	for effect in miting_group_gains(peer_id, province_id, focus):
+	for effect in miting_group_gains(peer_id, province_id, focus, tier_mult):
 		changes.append({"peer": pid, "group": String(effect["group"]), "amount": _own_effect(pid, float(effect["gain"]))})
 	PartyManager.apply_group_deltas(changes)
 	return ""
@@ -3371,6 +3735,8 @@ func make_speech(group: String) -> void:
 func _apply_speech(peer_id: int, group: String) -> void:
 	if not needs_speech(peer_id) or is_turn_blocked() or not VoterGroups.is_group(group):
 		return
+	_note_main_action(peer_id)
+	_parl_close_through(peer_id, "speech")
 	funds[peer_id] = funds_of(peer_id) - GameRules.SPEECH_FUNDS_COST
 	speech_done = true
 	var pid := party_of(peer_id)
@@ -3720,6 +4086,7 @@ func _advance_turn() -> bool:
 		# Tur kapandı: yeni turun ilk oyuncusu seçimden sonra (sıralama
 		# değişebilir) belli olur; geliri ve kartı _begin_round_turn verir.
 		_income_deferred = true
+		turn_flow = {}
 		return wrapped
 	_grant_turn_income()
 	_maybe_mandatory_congress()
@@ -3770,10 +4137,17 @@ func _grant_turn_income() -> void:
 	# Grup toplantısı PARTİYE aittir: partinin diğer üyesi bu dönem toplandıysa
 	# bu oyuncu toplanamaz.
 	speech_done = peer_id != -1 and int(speech_rounds.get(party_of(peer_id), 0)) == round_number
+	_start_turn_flow(peer_id)
 	if peer_id == -1:
 		return
 	funds[peer_id] = funds_of(peer_id) + turn_income(peer_id)
-	# Kart, ele girmeden ÖNCE duyurulur: animasyon eski el boyutunu kullanır.
+	if not inventories.has(peer_id):
+		inventories[peer_id] = []
+	# 0.0.231: kart artık otomatik dağıtılmaz; oyuncu sırasının başında KART
+	# ÇEK'e basar (bkz. _apply_draw). Akış kapalıysa (testler) eski dağıtım.
+	if enforce_turn_flow:
+		return
+	turn_flow["drawn"] = true
 	var card_type := _peek_turn_card(peer_id)
 	if card_type == "":
 		return
@@ -4027,7 +4401,15 @@ func _hold_election(finished_round: int, early: bool) -> void:
 	# Seçim sonrası herkese para ve 1 kart hediye.
 	for peer_id in turn_order:
 		funds[peer_id] = funds_of(peer_id) + float(GameRules.ELECTION_FUNDS_BONUS)
-		_deal_turn_card(peer_id)
+		# Hediye kart da sınıfına göre: anında kart hemen uygulanır.
+		if is_party_member(peer_id):
+			continue
+		var gift: Array = []
+		var gift_messages: PackedStringArray = []
+		_resolve_draw(peer_id, CardPresets.weighted_pick(_draw_weights(peer_id), _rng), gift, gift_messages)
+		last_gift_draws[peer_id] = gift
+		for text in gift_messages:
+			_pending_log.append({"text": text, "peer_id": peer_id, "province": "", "kind": "card"})
 	# Seçimde kullanıldıktan SONRA söner: seçimden hemen önceki hamleler tam etkili.
 	_decay_opinion()
 	_pick_music_track()  # seçim gecesinden sonra yeni dönemin müziği
@@ -4988,6 +5370,8 @@ func rekey_player(old_id: int, new_id: int) -> void:
 	var idx := turn_order.find(old_id)
 	if idx != -1:
 		turn_order[idx] = new_id
+	if int(turn_flow.get("peer", -1)) == old_id:
+		turn_flow["peer"] = new_id
 	for table in [funds, inventories, credibility]:
 		if table.has(old_id):
 			table[new_id] = table[old_id]
@@ -5150,6 +5534,7 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"alliance_request_next": _next_alliance_request,
 		"former_allies": former_allies,
 		"last_election_alliances": last_election_alliances,
+		"turn_flow": turn_flow,
 		"law_rounds": law_rounds,
 		"tax_rounds": tax_rounds,
 		"constitution_rounds": constitution_rounds,
@@ -5255,6 +5640,8 @@ func _apply_state(state: Dictionary) -> void:
 		if not old.has("leader") and not (old.get("members", []) as Array).is_empty():
 			old["leader"] = int(old["members"][0])
 		old.erase("invitations")
+	turn_flow = state.get("turn_flow", {})
+	_turn_serial = maxi(_turn_serial, int(turn_flow.get("serial", 0)))
 	law_rounds = state.get("law_rounds", {})
 	tax_rounds = state.get("tax_rounds", {})
 	constitution_rounds = state.get("constitution_rounds", {})
@@ -5462,10 +5849,10 @@ func _request_organization(province_id: String) -> void:
 	_apply_organization(multiplayer.get_remote_sender_id(), province_id)
 
 @rpc("any_peer", "reliable")
-func _request_invest(province_id: String, state: float = 1.0) -> void:
+func _request_invest(province_id: String, state: float = 1.0, tier: int = DEFAULT_TIER) -> void:
 	if not MultiplayerManager.is_host:
 		return
-	_apply_invest_move(multiplayer.get_remote_sender_id(), province_id, state)
+	_apply_invest_move(multiplayer.get_remote_sender_id(), province_id, state, tier)
 
 @rpc("any_peer", "reliable")
 func _request_censure() -> void:
@@ -5474,10 +5861,10 @@ func _request_censure() -> void:
 	_apply_censure_move(multiplayer.get_remote_sender_id())
 
 @rpc("any_peer", "reliable")
-func _request_miting(province_id: String, state: float = 0.0, focus: Array = []) -> void:
+func _request_miting(province_id: String, state: float = 0.0, focus: Array = [], tier: int = DEFAULT_TIER, smear_target: int = -1) -> void:
 	if not MultiplayerManager.is_host:
 		return
-	_apply_miting_move(multiplayer.get_remote_sender_id(), province_id, state, focus)
+	_apply_miting_move(multiplayer.get_remote_sender_id(), province_id, state, focus, tier, smear_target)
 
 @rpc("any_peer", "reliable")
 func _request_pass() -> void:

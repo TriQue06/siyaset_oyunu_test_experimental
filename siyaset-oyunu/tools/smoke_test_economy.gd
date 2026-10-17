@@ -80,6 +80,8 @@ func _initialize() -> void:
 	mm = root.get_node("MultiplayerManager")
 	pm = root.get_node("PartyManager")
 	cm = root.get_node("CardManager")
+	# Eski serbest akış: bu test ekonomi mekaniklerini sınar (tur akışı: smoke_test_turn_flow).
+	cm.enforce_turn_flow = false
 	gm = root.get_node("GovernmentManager")
 	cp = root.get_node("CardPresets")
 	cm.allow_temporary_parties = false
@@ -321,6 +323,8 @@ func _initialize() -> void:
 		"%.1f harcadı, kota %.1f (%d yatırım)" % [spent_by_pm, 400.0 * pm_share, spam])
 	check("sonra oynayan ortağın kotası duruyor", near(cm.state_quota(2), 400.0 * dep_share), "%.1f" % cm.state_quota(2))
 	check("kota bitince devlet payı 0", near(float(cm.funding_range(1, "invest")["max"]), 0.0))
+	# 0.0.231: sırada en fazla 3 yatırım; kota denemesi yeni sırada sürer.
+	cm._start_turn_flow(1)
 	check("kota bitince kendi kasasından yatırım yapabilir", cm.can_invest(1, String(cm._province_ids[0]), 0.0))
 	give_turn(2)
 	cm.funds[2] = 0.0

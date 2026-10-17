@@ -57,6 +57,8 @@ func _initialize() -> void:
 	mm = root.get_node("MultiplayerManager")
 	pm = root.get_node("PartyManager")
 	cm = root.get_node("CardManager")
+	# Eski serbest akış: bu test mekanikleri sınar (tur akışı: smoke_test_turn_flow).
+	cm.enforce_turn_flow = false
 	cm.allow_temporary_parties = false
 	cm.speech_required = false  # meclis konuşması ayrıca test edilir
 	gm = root.get_node("GovernmentManager")
@@ -526,20 +528,30 @@ func _initialize() -> void:
 	cm.funds[1] = 0.0
 	cm._apply_card_effect(1, "bagis_kampanyasi_guclu")
 	check("guclu bagis kampanyasi +60", near(cm.funds_of(1), cm.funds_bonus_amount(1, true)) and GameRules.FUNDS_BONUS_STRONG == 60)
+	# 0.0.231: bonus kart anında etki: 2 ek çekim, anında olanlar uygulanır, kalanı ele.
 	cm.inventories[1] = []
-	cm._apply_card_effect(1, "bonus_kart")
-	check("bonus kart 2 kart ceker", cm.inventories[1].size() == 2, str(cm.inventories[1]))
+	var bonus_draws: Array = []
+	cm._resolve_draw(1, "bonus_kart", bonus_draws, PackedStringArray())
+	var to_hand := 0
+	for entry in bonus_draws:
+		if String(entry["result"]) == "hand":
+			to_hand += 1
+	check("bonus kart 2 kart ceker", bonus_draws.size() == 3 and cm.inventories[1].size() == to_hand, str(bonus_draws))
 	var bonus_from_bonus := 0
 	for i in 200:
 		cm.inventories[1] = []
-		cm._apply_card_effect(1, "bonus_kart")
-		bonus_from_bonus += cm.inventories[1].count("bonus_kart")
+		var again: Array = []
+		cm._resolve_draw(1, "bonus_kart", again, PackedStringArray())
+		for entry in again.slice(1):
+			if String(entry["card"]) == "bonus_kart":
+				bonus_from_bonus += 1
 	check("bonus karttan bonus kart cikmaz", bonus_from_bonus == 0, str(bonus_from_bonus))
+	cm.inventories[1] = []
 	cm.inventories[2] = ["karalama"]
 	cm._apply_card_effect(1, "kart_calma", 2)
-	check("kart calma: rakibin kartini alir", cm.inventories[2].is_empty() and cm.inventories[1].size() == 3)
+	check("kart calma: rakibin kartini alir", cm.inventories[2].is_empty() and cm.inventories[1].size() == 1)
 	cm._apply_card_effect(1, "kart_calma", 2)
-	check("eli bossa kart bosa gider", cm.inventories[1].size() == 3)
+	check("eli bossa kart bosa gider", cm.inventories[1].size() == 1)
 	var bot_name_lengths := {}
 	var name_ok := true
 	for i in 40:

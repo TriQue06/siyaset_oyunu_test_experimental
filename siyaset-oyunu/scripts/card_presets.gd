@@ -126,7 +126,7 @@ func steal_range(card_type: String, closeness: float) -> Dictionary:
 ## Kartın elden oynanma bedeli (para).
 const CARD_FUNDS_COSTS := {
 	"karalama": 10,
-	"populizm": 10,
+	"populizm": 0,
 	"bagis_kampanyasi": 0,
 	"bagis_kampanyasi_guclu": 0,
 	"bonus_kart": 0,
@@ -438,9 +438,9 @@ func _card_effect_text(card_type: String) -> String:
 		CARD_THEFT_CARD_TYPE:
 			return L.t("Seçtiğin partinin elinden rastgele bir kart çalarsın (eli boşsa kart boşa gider).\nSeç, sonra soldaki bir partiye tıkla.")
 		BONUS_CARD_TYPE:
-			return L.t("%d kart daha çekersin (el doluysa sığdığı kadar).\nSeçmek için dokun, tekrar dokun: kullan.") % GameRules.BONUS_CARD_DRAW
+			return L.t("ANINDA ETKİ: hemen %d kart daha çekersin (el doluysa sığdığı kadar).") % GameRules.BONUS_CARD_DRAW
 		FUNDS_BONUS_STRONG_CARD_TYPE:
-			return L.t("Büyük bir bağış kampanyası: kasana %s girer.\nSeçmek için dokun, tekrar dokun: kullan.") % GameRules.cost_text(GameRules.FUNDS_BONUS_STRONG)
+			return L.t("ANINDA ETKİ: büyük bir bağış kampanyası, kasana hemen %s girer.") % GameRules.cost_text(GameRules.FUNDS_BONUS_STRONG)
 		EARLY_ELECTION_CARD_TYPE:
 			return L.t("Meclise erken seçim önerisi sunarsın; kabul edilirse dönem sonunda sandığa gidilir.\nSeçmek için dokun, tekrar dokun: kullan.")
 		CENSURE_CARD_TYPE:
@@ -452,9 +452,9 @@ func _card_effect_text(card_type: String) -> String:
 			return L.t("Hükümet: seçtiğin ile devlet hazinesinden %s yatırım. İlde %s; etkinin yarısı hemen, kalanı sonraki dönemlerde.") % [
 				Economy.money_full(Economy.INVEST_COST), EffectWords.change(PublicOpinion.INVEST_LOCAL, "local", L.t("yerel güç"))]
 		PROPAGANDA_CARD_TYPE:
-			return L.t("Bir ilde bir partiyi karala: ona eksi, sana artı.\nİlde güçlü olan partiye az işler.")
+			return L.t("SAKLANABİLİR: miting hazırlarken kullanılır. Mitingin yapıldığı ilde seçtiğin partiyi karalarsın: ona eksi, sana artı. İlde güçlü olan partiye az işler; ayrı miting hakkı harcamaz.")
 		POPULISM_CARD_TYPE:
-			return L.t("%d dönem boyunca hamlelerin çok daha etkili, kötü sonuçlar hafifler; bu sürede seçim olursa ek ulusal destek.\nSeçmek için dokun, tekrar dokun: kullan.") % GameRules.POPULISM_ROUNDS
+			return L.t("ANINDA ETKİ: çekildiği an başlar. %d dönem boyunca hamlelerin çok daha etkili, kötü sonuçlar hafifler; bu sürede seçim olursa ek ulusal destek.") % GameRules.POPULISM_ROUNDS
 		FUNDS_BONUS_CARD_TYPE:
-			return L.t("Bağış kampanyası: kasana %s girer.\nSeçmek için dokun, tekrar dokun: kullan.") % GameRules.cost_text(GameRules.FUNDS_BONUS_WEAK)
+			return L.t("ANINDA ETKİ: bağış kampanyası, kasana hemen %s girer.") % GameRules.cost_text(GameRules.FUNDS_BONUS_WEAK)
 	return ""

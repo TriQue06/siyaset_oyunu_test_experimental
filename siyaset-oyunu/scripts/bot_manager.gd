@@ -74,6 +74,21 @@ func _handle_turn(now: float) -> void:
 		return
 	if now < _turn_due:
 		return
+	# TUR BAŞI (0.0.231): önce kart çekilir, sonra varsa afet kararı verilir.
+	if CardManager.needs_turn_draw(bot):
+		CardManager._apply_draw(bot)
+		_turn_due = now + _delay(PLAY_SECONDS)
+		return
+	if CardManager.aid_pending(bot):
+		var aid := BotBrain.choose_aid(bot)
+		if aid.is_empty():
+			CardManager._apply_skip_aid(bot)
+		else:
+			CardManager._apply_aid_move(bot, float(aid["party"]), float(aid["state"]))
+			if CardManager.aid_pending(bot):
+				CardManager._apply_skip_aid(bot)  # reddedildiyse karar yine kapanır
+		_turn_due = now + _delay(PLAY_SECONDS)
+		return
 	var alliance_move := BotBrain.choose_alliance_move(bot)
 	if not alliance_move.is_empty():
 		match String(alliance_move["type"]):
@@ -108,6 +123,8 @@ static func do_action(bot: int) -> Dictionary:
 	var laws_before := [CardManager.has_proposed_law_this_round(bot, "group"), CardManager.has_proposed_law_this_round(bot, "tax"), CardManager.has_proposed_law_this_round(bot, "constitution")]
 	var blocked_before := CardManager.is_turn_blocked()
 	var speech_before := CardManager.speech_done
+	var closed_before := CardManager.parliament_closed_stages(bot).size()
+	var mitings_before := CardManager.miting_count(bot)
 	match String(action["type"]):
 		"speech":
 			CardManager._apply_speech(bot, String(action["group"]))
@@ -122,9 +139,15 @@ static func do_action(bot: int) -> Dictionary:
 		"organization":
 			CardManager._apply_organization(bot, String(action["province"]))
 		"miting":
-			CardManager._apply_miting_move(bot, String(action["province"]), BotBrain.miting_state_share(bot), action.get("focus", []))
+			var tier := int(action.get("tier", CardManager.DEFAULT_TIER))
+			var smear := int(action.get("smear", -1))
+			CardManager._apply_miting_move(bot, String(action["province"]), BotBrain.miting_state_share(bot, tier, smear),
+				action.get("focus", []), tier, smear)
 		"invest":
-			CardManager._apply_invest_move(bot, String(action["province"]), BotBrain.invest_state_share(bot))
+			var invest_tier := int(action.get("tier", CardManager.DEFAULT_TIER))
+			CardManager._apply_invest_move(bot, String(action["province"]), BotBrain.invest_state_share(bot, invest_tier), invest_tier)
+		"parl_pass":
+			CardManager._apply_parl_pass(bot, String(action["stage"]))
 		"aid":
 			CardManager._apply_aid_move(bot, float(action["party"]), float(action["state"]))
 		"censure":
@@ -150,7 +173,8 @@ static func do_action(bot: int) -> Dictionary:
 		or CardManager.state_treasury() != treasury_before or int(CardManager.economy.get("next_id", 1)) != ledger_before \
 		or CardManager.inventories.get(bot, []).size() != hand_before \
 		or [CardManager.has_proposed_law_this_round(bot, "group"), CardManager.has_proposed_law_this_round(bot, "tax"), CardManager.has_proposed_law_this_round(bot, "constitution")] != laws_before \
-		or CardManager.is_turn_blocked() != blocked_before or CardManager.speech_done != speech_before
+		or CardManager.is_turn_blocked() != blocked_before or CardManager.speech_done != speech_before \
+		or CardManager.parliament_closed_stages(bot).size() != closed_before or CardManager.miting_count(bot) != mitings_before
 	return action if applied else {}
 
 func _handle_votes(now: float) -> void:

@@ -12,6 +12,8 @@ CONST_BLOCKS = {
     'scripts/game_screen.gd': ['PLAYER_TAB_TITLES', 'PLAYER_TAB_TOOLTIPS', 'PLAYER_TAB_COLUMNS', 'MAP_LAYER_TITLES', 'SIDE_TAB_TITLES'],
     'scripts/government_presets.gd': ['POSTS'],
     'scripts/party_setup.gd': ['STEP_TITLES', 'STEP_HINTS', 'GENDER_STYLE'],
+    'scripts/parliament_flow.gd': ['STAGE_TITLES', 'STAGE_SHORT'],
+    'scripts/province_actions.gd': ['TIER_NAMES', 'TIER_NOTES', 'INVEST_NOTES'],
     'scripts/politician_presets.gd': ['BACKGROUNDS', 'TRAITS'],
     'scripts/voter_groups.gd': ['GROUPS'],
 }

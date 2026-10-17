@@ -282,18 +282,16 @@ const VOTE_COLOR_NO := Color("F2132A")          # kırmızı
 const ACTION_BUTTON_HEIGHT := 64.0
 const ACTION_BUTTON_GAP := 8
 var _action_grid: GridContainer
-## HAMLE SEKMELERİ (0.0.189): hamleler kategorilere ayrılır; ızgarada yalnız
-## seçili sekmenin hamleleri görünür. Yeni hamle = _action_button(..., kategori).
-enum ActionTab { SAHA, MECLIS, PARTI, SIYASET }
-const ACTION_TAB_TITLES := ["SAHA", "MECLİS", "PARTİ", "SİYASET"]
-var _action_tab := ActionTab.SAHA
-var _action_tab_bar: HBoxContainer
-var _action_tab_buttons: Array = []
-## Buton -> sekme (ActionTab).
+## Hamle alanındaki düğmeler (İTTİFAK, KONGRE; testler ortak görünümü sınar).
 var _action_tab_of: Dictionary = {}
-var _law_button: Button
-var _org_button: Button
-var _miting_button: Button
+## MECLİS akışının tek giriş düğmesi (0.0.231) ve tur akışı sunumları.
+var _parl_button: Button
+var _parl_pulse: Tween
+var _turn_intro: TurnIntro
+var _parliament_flow: ParliamentFlow
+var _province_actions: ProvinceActions
+var _effects_chip: PanelContainer
+var _effects_label: Label
 ## Miting hamlesi için il seçme modu.
 var _pending_miting: bool = false
 ## MİTİNG ODAĞI (0.0.213): ildeki teşkilat seviyesi kadar grup seçilir.
@@ -301,9 +299,6 @@ var _miting_focus: Array = []
 var _focus_panel: PanelContainer
 var _focus_box: VBoxContainer
 var _focus_province := ""
-var _invest_button: Button
-var _censure_button: Button
-var _early_button: Button
 var _pending_early: bool = false
 var _congress_button: Button
 var _pending_congress: bool = false
@@ -348,7 +343,6 @@ var _speech_note: Label
 var _speech_key: String = ""
 ## GRUP TOPLANTISI hamle düğmesiyle bu sırada (tur:sıra) açıldı mı?
 var _speech_open_key: String = ""
-var _speech_button: Button
 ## EKONOMİ: sağ sütundaki özet (Hükümet sekmesi) ve Vergi Politikası paneli.
 var _economy_panel: EconomyPanel
 var _tax_panel: PanelContainer
@@ -359,9 +353,7 @@ var _tax_selected: int = -1
 var _funding_panel: FundingPanel
 ## AFET YARDIMI paneli (YARDIM hamlesi).
 var _aid_panel: AidPanel
-var _aid_button: Button
 ## FİNANSMAN SORUŞTURMASI hamlesi (eskiden sadece parti kartından) ve parti seçici.
-var _inquiry_button: Button
 var _inquiry_picker: PanelContainer
 var _inquiry_panel: PanelContainer
 var _inquiry_box: VBoxContainer
@@ -458,6 +450,7 @@ func _ready() -> void:
 	_build_agenda_banner()
 	_build_propaganda_menu()
 	_build_speech_panel()
+	_build_turn_flow_ui()
 	vote_yes_button.pressed.connect(_on_vote_pressed.bind(GovernmentManager.VOTE_YES))
 	vote_no_button.pressed.connect(_on_vote_pressed.bind(GovernmentManager.VOTE_NO))
 	_abstain_button = Button.new()
@@ -508,17 +501,17 @@ func _build_tutorial() -> void:
 		L.t("Bu senin partinin parası: sıran geldikçe dolar, hamleler buradan ödenir. Sağdaki EKONOMİ'de görünen DEVLET HAZİNESİ ayrıdır; onu sadece hükümet, yatırım için kullanır."),
 		func() -> Rect2: return _r(R_FUNDS), mine)
 	_tutorial.add_step("hamleler", L.t("Hamleler"),
-		L.t("Bir hamle seç, sonra haritada il seç; aynı ile ikinci dokunuş onaylar. Soluk düğme şu an yapılamaz: üstüne gelince nedenini görürsün. Bedeller düğmelerin altında."),
+		L.t("Sıran gelince önce kartını çekersin. Teşkilat, miting ve yatırım için haritada bir ile dokun. MECLİS düğmesi gensoru, grup toplantısı, yasa ve soruşturmayı sırayla açar; istersen hiç girmeden turu bitirebilirsin."),
 		func() -> Rect2: return _r(R_ACTIONS), mine)
 	_tutorial.add_step("secmen", L.t("Seçmen grupları"),
 		L.t("Oylar 8 seçmen grubundan gelir. Seçmen katmanı her grubun hangi illerde yoğun olduğunu gösterir; partin hangi gruplara yakınsa o illerde güçlüdür. Bir ile tıkla: oradaki durumunu görürsün."),
 		func() -> Rect2: return (_layer_buttons[MapLayer.GROUPS] as Control).get_global_rect() if _layer_buttons.size() > MapLayer.GROUPS else _r(R_MAP),
 		func() -> bool: return mine.call() and _tutorial.seen_count() >= 3)
 	_tutorial.add_step("teskilat", L.t("Teşkilat"),
-		L.t("İlde teşkilat kalıcı oy, anket ve yerel bağış getirir; miting ve karalama ancak teşkilatlı ilde yapılır. Beş ilden sonra her yeni teşkilat biraz daha pahalıdır: nerede kuracağını seç."),
-		func() -> Rect2: return _org_button.get_global_rect(), func() -> bool: return mine.call() and _tutorial.seen_count() >= 4)
+		L.t("Bir ile dokun, TEŞKİLAT'ı seç: ilde kalıcı oy, anket ve yerel bağış getirir; mitingte gruplara hitap etmeni sağlar. Beş ilden sonra her yeni teşkilat biraz daha pahalıdır: nerede kuracağını seç."),
+		func() -> Rect2: return _r(R_MAP), func() -> bool: return mine.call() and _tutorial.seen_count() >= 4)
 	_tutorial.add_step("kartlar", L.t("Kartlar"),
-		L.t("Karta dokun, ne yaptığını oku; hedef isterse bir parti ya da il seç. İstemediğin kartı KART BOZDUR yuvasına sürükle: bedelinin yarısı kasana döner."),
+		L.t("Elindeki kartlar saklanabilir kartlardır: karta dokun, ne yaptığını oku; hedef isterse bir parti seç. Karalama kartı miting hazırlarken kullanılır. İstemediğin kartı KART BOZDUR yuvasına sürükle: bedelinin yarısı kasana döner."),
 		func() -> Rect2: return _r(R_HAND),
 		func() -> bool: return mine.call() and not CardManager.my_inventory().is_empty() and _tutorial.seen_count() >= 5)
 	_tutorial.add_step("secim", L.t("Seçim yapıldı"),
@@ -2076,6 +2069,7 @@ func _on_turn_changed(_peer_id: int) -> void:
 	_refresh_hand_interactivity()
 	_refresh_action_buttons()
 	_refresh_trash_button()
+	_refresh_turn_flow_ui()
 	# Oyuncu kartlarında para yazıyor: her hamlede güncellenir.
 	_rebuild_player_panel()
 
@@ -2446,6 +2440,9 @@ func _on_hand_card_clicked(hand_index: int) -> void:
 		return  # sıra değil: sadece açıklama
 	var card_type: String = hand[hand_index]
 	var me := multiplayer.get_unique_id()
+	if card_type == CardPresets.PROPAGANDA_CARD_TYPE:
+		_set_target_hint(L.t("Karalama: bir ile dokun, MİTİNG'i seç; hazırlıkta kartı kullanabilirsin."))
+		return
 	if CardPresets.needs_party_target(card_type):
 		_begin_targeting(hand_index)
 		return
@@ -2546,6 +2543,8 @@ func _maybe_autosave() -> void:
 func _unplayable_reason(card_type: String) -> String:
 	if CardManager.funds_of(multiplayer.get_unique_id()) < CardPresets.card_cost(card_type):
 		return L.t("Parti kasası yetmiyor (%s gerekir).") % GameRules.cost_text(CardPresets.card_cost(card_type))
+	if card_type == CardPresets.PROPAGANDA_CARD_TYPE:
+		return L.t("Karalama kartı miting hazırlarken kullanılır.")
 	if CardPresets.is_law_card(card_type):
 		return L.t("Yasa şu an meclise getirilemez (meclis yok ya da hükümet kuruluyor).")
 	if CardPresets.is_censure_card(card_type):
@@ -2871,6 +2870,9 @@ func _on_province_clicked(province_id: String) -> void:
 		CardManager.build_organization(province_id)
 		_show_toast(L.t("%s teşkilatı seviye %d: %s") % [ElectionNightSim.province_name(province_id), level, _org_level_text(level)])
 		_refresh_action_buttons()
+		return
+	if _pending_province_hand_index == -1 and _pending_target_hand_index == -1 and _can_open_province_actions():
+		_open_province_actions(province_id)
 		return
 	if _pending_province_hand_index != -1:
 		var hand_index := _pending_province_hand_index
@@ -4083,55 +4085,63 @@ func _build_action_buttons() -> void:
 	# konuma oturtuluyordu; uzun bir yazı (TEŞKİLATLANMA) butonun asgari
 	# genişliğini büyütünce komşusunun üstüne biniyordu. Izgara bunu yapısal
 	# olarak önler.
-	_build_action_tabs()
+	# HAMLELER (0.0.231): eski SAHA / MECLİS / PARTİ / SİYASET sekmeleri yok.
+	# MECLİS tek giriş (gensoru → toplantı → yasa → soruşturma); İTTİFAK ve
+	# KONGRE yerinde. Teşkilat, miting ve yatırım haritadaki il panelinden,
+	# afet yardımı tur başındaki sahneden yapılır.
+	_parl_button = Button.new()
+	_parl_button.focus_mode = Control.FOCUS_NONE
+	_parl_button.custom_minimum_size = Vector2(0, ACTION_BUTTON_HEIGHT)
+	_parl_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_parl_button.clip_text = true
+	_parl_button.set_meta("action_color", ACTION_COLOR_LAW)
+	_parl_button.add_theme_font_override("font", UiTheme.mono(true))
+	_parl_button.add_theme_font_size_override("font_size", 14)
+	_parl_button.tooltip_text = L.t("Meclis akışı: uygunsa gensoru, sonra grup toplantısı, yasa ve soruşturma. Her aşamayı yap ya da geç.")
+	_parl_button.pressed.connect(_on_parliament_button_pressed)
+	actions_vbox.add_child(_parl_button)
 	_action_grid = GridContainer.new()
-	_action_grid.columns = 4
+	_action_grid.columns = 2
 	_action_grid.add_theme_constant_override("h_separation", ACTION_BUTTON_GAP)
 	_action_grid.add_theme_constant_override("v_separation", ACTION_BUTTON_GAP)
-	# Izgara panelin ÜSTÜNE oturur; altındaki boşluğu esnek bir ayraç doldurur.
-	# Dikey olarak esnetilince butonlar upuzun dikdörtgenlere dönüşüyordu.
 	actions_vbox.add_child(_action_grid)
+	_alliance_button = _action_button(L.t("İTTİFAK"), L.t("görüntüle"), ACTION_COLOR_ALLIANCE)
+	_alliance_button.pressed.connect(_on_alliance_button_pressed)
+	_alliance_button.tooltip_text = L.t("İttifakları görüntüle, kur veya partileri davet et ve katıl.")
+	# KONGRE: genel başkan kendi sırasında (en az bir seçim geçtiyse) kongreye
+	# gider; partide üye kalan eski başkan kongre ister.
+	_congress_button = _action_button(L.t("KONGRE"), _congress_cost_text(), ACTION_COLOR_CONGRESS)
+	_congress_button.pressed.connect(_on_congress_button_pressed)
+	_congress_button.tooltip_text = L.t("Genel başkan: partini kongreye götür, liderliğini tazele. Üye: kongre iste, başkanlığı geri almaya çalış.")
+	var hint := PopupKit.label(L.t("Teşkilat, miting, yatırım: haritada bir ile dokun."), 11, UiTheme.TEXT_MUTED)
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	actions_vbox.add_child(hint)
 	var filler := Control.new()
 	filler.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	filler.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	actions_vbox.add_child(filler)
-	_law_button = _action_button(L.t("YASA"), GameRules.cost_text(GameRules.LAW_FUNDS_COST), ACTION_COLOR_LAW, "", ActionTab.MECLIS)
-	_law_button.pressed.connect(_on_law_button_pressed)
-	_law_button.tooltip_text = L.t("Bir seçmen grubu için yasa sun: o grupta destek kazanırsın, karşıt grup biraz soğur. Geçerse puan. Dönemde bir kez.")
-	_miting_button = _action_button(L.t("MİTİNG"), GameRules.cost_text(GameRules.MITING_FUNDS_COST), ACTION_COLOR_MITING, "miting", ActionTab.SAHA)
-	_miting_button.pressed.connect(_on_miting_button_pressed)
-	_miting_button.tooltip_text = L.t("İlde oy kazandırır ve partini ilin kalabalık seçmen gruplarına yaklaştırır. Teşkilat ister; provokasyon riski vardır.")
-	_org_button = _action_button(L.t("TEŞKİLAT"), GameRules.cost_text(GameRules.ORG_FUNDS_COST), ACTION_COLOR_ORG, "teskilat", ActionTab.SAHA)
-	_org_button.pressed.connect(_on_org_button_pressed)
-	_org_button.tooltip_text = L.t("İlde kalıcı güç ve anket; yerel bağışlarla kasana düzenli para getirir.")
-	_invest_button = _action_button(L.t("YATIRIM"), GameRules.cost_text(Economy.INVEST_COST), ACTION_COLOR_INVEST, "yatirim", ActionTab.SAHA)
-	_invest_button.pressed.connect(_on_invest_button_pressed)
-	_invest_button.tooltip_text = L.t("Güçlü yerel etki: ildeki bütün seçmen memnun olur. Devlet hazinesinden (gerekirse parti kasasından) ödenir; sadece hükümet partileri.")
-	_censure_button = _action_button(L.t("GENSORU"), GameRules.cost_text(GameRules.CENSURE_FUNDS_COST), ACTION_COLOR_CENSURE, "gensoru", ActionTab.MECLIS)
-	_censure_button.pressed.connect(_on_censure_button_pressed)
-	_censure_button.tooltip_text = L.t("Hükümeti düşürmeye çalış: meclis oylar. Reddedilirse küçük bir itibar kaybı.")
-	_early_button = _action_button(L.t("ERKEN SEÇİM"), GameRules.cost_text(GameRules.EARLY_ELECTION_FUNDS_COST), ACTION_COLOR_EARLY, "erken_secim", ActionTab.MECLIS)
-	_early_button.pressed.connect(_on_early_button_pressed)
-	_early_button.tooltip_text = L.t("Erken seçim önergesi: kabul edilirse dönem sonunda sandık kurulur.")
-	# GRUP TOPLANTISI: sıra sendeyken açık, sırada bir kez.
-	_speech_button = _action_button(L.t("TOPLANTI"), GameRules.cost_text(GameRules.SPEECH_FUNDS_COST), ACTION_COLOR_SPEECH, "grup_toplantisi", ActionTab.PARTI)
-	_speech_button.tooltip_text = L.t("Grup toplantısı: bir seçmen grubunun sorunlarını konuş. O grupta kısa süreli destek (bu dönem güçlü, sonra hızla söner). Dönemde bir kez, isteğe bağlı.")
-	_speech_button.pressed.connect(_on_speech_button_pressed)
-	# KONGRE: genel başkan kendi sırasında (en az bir seçim geçtiyse) kongreye
-	# gider; partide üye kalan eski başkan kongre ister.
-	_congress_button = _action_button(L.t("KONGRE"), _congress_cost_text(), ACTION_COLOR_CONGRESS, "kongre", ActionTab.PARTI)
-	_congress_button.pressed.connect(_on_congress_button_pressed)
-	_congress_button.tooltip_text = L.t("Genel başkan: partini kongreye götür, liderliğini tazele. Üye: kongre iste, başkanlığı geri almaya çalış.")
-	# AFET YARDIMI: sadece bir afet sürerken; tutarı oyuncu belirler.
-	_aid_button = _action_button(L.t("YARDIM"), L.t("tutar serbest"), ACTION_COLOR_AID, "yardim", ActionTab.SAHA)
-	_aid_button.pressed.connect(_on_aid_button_pressed)
-	_aid_button.tooltip_text = L.t("Afet bölgesine yardım götür: tutarı sen belirlersin. Hükümetsen devlet hazinesinden de ödeyebilirsin. Yatırımdan çok daha güçlü ve hemen etki eder; seçmen gruplarına dokunmaz.")
-	_inquiry_button = _action_button(L.t("SORUŞTURMA"), GameRules.cost_text(Economy.INQUIRY_FUNDS_COST), ACTION_COLOR_INQUIRY, "sorusturma", ActionTab.SIYASET)
-	_inquiry_button.pressed.connect(_on_inquiry_button_pressed)
-	_inquiry_button.tooltip_text = L.t("Bir partinin harcamalarına finansman soruşturması aç: devlet parasıyla miting usulsüzlüktür, kendi kasasından ödeyen itibar kazanır.")
-	_alliance_button = _action_button(L.t("İTTİFAK"), L.t("görüntüle"), ACTION_COLOR_ALLIANCE, "", ActionTab.SIYASET)
-	_alliance_button.pressed.connect(_on_alliance_button_pressed)
-	_alliance_button.tooltip_text = L.t("İttifakları görüntüle, kur veya partileri davet et ve katıl.")
+	# AKTİF ETKİLER: süreli anında kartlar (popülizm) kalan süreyle görünür.
+	_effects_chip = PanelContainer.new()
+	_effects_chip.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	_effects_chip.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_effects_chip.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_effects_chip.offset_left = FUNDS_PLATE_LEFT
+	_effects_chip.offset_right = -16.0
+	_effects_chip.offset_top = FUNDS_PLATE_TOP - 28.0
+	_effects_chip.offset_bottom = FUNDS_PLATE_TOP - 4.0
+	var chip_style := StyleBoxFlat.new()
+	chip_style.bg_color = Color(UiTheme.GOLD, 0.18)
+	chip_style.border_color = UiTheme.GOLD
+	chip_style.set_border_width_all(1)
+	chip_style.content_margin_left = 8
+	chip_style.content_margin_right = 8
+	_effects_chip.add_theme_stylebox_override("panel", chip_style)
+	_effects_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_effects_label = UiTheme.mono_label("", 11, UiTheme.GOLD, true)
+	_effects_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_effects_chip.add_child(_effects_label)
+	_effects_chip.hide()
+	add_child(_effects_chip)
 
 ## Kongre bedeli oyuncunun yerine göre: genel başkan 10, üye 20.
 func _congress_cost_text() -> String:
@@ -4141,7 +4151,7 @@ func _congress_cost_text() -> String:
 
 ## Hamle butonu: ızgaraya eklenir, sabit kutu boyutunda kalır ve yazı taşarsa
 ## kırpılır — böylece hiçbir buton komşusunu itemez.
-func _action_button(title: String, cost_text: String, color: Color, _icon_name: String = "", tab: int = ActionTab.SAHA) -> Button:
+func _action_button(title: String, cost_text: String, color: Color) -> Button:
 	var button := Button.new()
 	button.custom_minimum_size = Vector2(ACTION_BUTTON_WIDTH, ACTION_BUTTON_HEIGHT)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -4151,45 +4161,8 @@ func _action_button(title: String, cost_text: String, color: Color, _icon_name: 
 	button.set_meta("action_color", color)
 	UiSkin.skin_action_button(button, color, true)
 	_action_grid.add_child(button)
-	_action_tab_of[button] = tab
-	button.visible = tab == _action_tab
+	_action_tab_of[button] = 0
 	return button
-
-## Sekme şeridi: harita katman düğmeleriyle aynı dil (kare, seçili olan altın).
-## Düğmede, o sekmede şu an yapılabilir hamle sayısı yazar.
-func _build_action_tabs() -> void:
-	_action_tab_bar = HBoxContainer.new()
-	_action_tab_bar.add_theme_constant_override("separation", 0)
-	actions_vbox.add_child(_action_tab_bar)
-	for i in ACTION_TAB_TITLES.size():
-		var button := Button.new()
-		button.focus_mode = Control.FOCUS_NONE
-		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		button.custom_minimum_size = Vector2(0, 30)
-		button.clip_text = true
-		button.add_theme_font_size_override("font_size", 12)
-		button.pressed.connect(_select_action_tab.bind(i))
-		_action_tab_bar.add_child(button)
-		_action_tab_buttons.append(button)
-
-func _select_action_tab(tab: int) -> void:
-	_action_tab = tab
-	for button in _action_tab_of:
-		(button as Control).visible = int(_action_tab_of[button]) == tab
-	_refresh_action_tabs()
-
-func _refresh_action_tabs() -> void:
-	var ready := {}
-	for button in _action_tab_of:
-		if (button as Control).modulate.a > 0.9:
-			var t := int(_action_tab_of[button])
-			ready[t] = int(ready.get(t, 0)) + 1
-	for i in _action_tab_buttons.size():
-		var button: Button = _action_tab_buttons[i]
-		var active := i == _action_tab
-		var count := int(ready.get(i, 0))
-		button.text = "%s %d" % [L.t(ACTION_TAB_TITLES[i]), count] if count > 0 else L.t(ACTION_TAB_TITLES[i])
-		_style_tab_button(button, active, count > 0)
 
 ## Sekme düğmesi (hamle ve yasa sekmeleri): harita katman düğmeleri gibi kare,
 ## seçili olan altın; lit false ise yazı sönük.
@@ -4237,38 +4210,21 @@ func _action_block_reason(cost: float, is_law: bool = false) -> String:
 	return L.t("Şu an yapılamaz.")
 
 func _refresh_action_buttons() -> void:
-	if _law_button == null:
+	if _parl_button == null:
 		return
 	var me := multiplayer.get_unique_id()
-	var funds_now := CardManager.funds_of(me)
-	_funds_label.text = CardManager.funds_text(funds_now)
-	var law_ok := CardManager.can_propose_law(me) or CardManager.can_propose_constitution(me)
-	var org_ok := CardManager.can_choose_main_action(me) and funds_now >= CardManager.org_cost_for(me)
-	_set_action_text(_org_button, L.t("TEŞKİLAT"), GameRules.cost_text(CardManager.org_cost_for(me)))
-	var miting_ok := CardManager.can_miting(me)
-	_set_action_available(_miting_button, miting_ok or _pending_miting)
-	_set_action_available(_invest_button, CardManager.can_invest(me) or _pending_invest)
-	_set_action_available(_censure_button, CardManager.can_censure(me) or _pending_censure)
-	_set_action_available(_early_button, CardManager.can_early_election(me) or _pending_early)
+	_funds_label.text = CardManager.funds_text(CardManager.funds_of(me))
+	# disabled kullanılmıyor: pasif butona dokununca neden olmadığı uyarı olarak çıksın.
 	_set_action_available(_congress_button, CardManager.can_call_congress(me) or _pending_congress)
-	if _aid_button != null:
-		_set_action_available(_aid_button, CardManager.can_aid(me))
-	if _inquiry_button != null:
-		_set_action_available(_inquiry_button, CardManager.can_open_inquiry(me))
+	_set_action_text(_congress_button, L.t("KONGRE"), _congress_cost_text())
 	if _alliance_button != null:
 		_set_action_available(_alliance_button, CardManager.alliances_enabled)
 		var decisions := CardManager.alliance_requests_for(me).size()
 		_set_action_text(_alliance_button, L.t("İTTİFAK"), (L.t("%d karar bekliyor") % decisions) if decisions > 0 else L.t("görüntüle"))
-	# disabled kullanılmıyor: pasif butona dokununca neden olmadığı uyarı olarak çıksın.
-	_set_action_available(_law_button, law_ok)
-	_set_action_available(_org_button, org_ok or _pending_org)
-	_set_action_text(_congress_button, L.t("KONGRE"), _congress_cost_text())
-	# TOPLANTI: sıra sendeyken açık; sırada bir kez (konuşunca söner).
-	if _speech_button != null:
-		_set_action_available(_speech_button, CardManager.can_act() and CardManager.needs_speech(me))
 	if _alliance_panel != null and _alliance_panel.visible:
 		_refresh_alliance_panel()
-	_refresh_action_tabs()
+	_refresh_parliament_button()
+	_refresh_effects_chip()
 
 func _build_agenda_banner() -> void:
 	_agenda_banner = PanelContainer.new()
@@ -5238,21 +5194,6 @@ func _refresh_disaster() -> void:
 		if active.is_empty() or not CardManager.can_choose_main_action(multiplayer.get_unique_id()):
 			_aid_panel.hide()
 
-func _on_aid_button_pressed() -> void:
-	var me := multiplayer.get_unique_id()
-	if _aid_panel.visible:
-		_aid_panel.hide()
-		return
-	_deselect_hand_card()
-	_law_designer.hide()
-	_cancel_targeting()
-	var reason := CardManager.aid_block_reason(me)
-	if reason != "":
-		_show_toast(reason)
-		return
-	_aid_panel.open(me)
-	_place_aid_panel.call_deferred()
-
 func _place_aid_panel() -> void:
 	if not _aid_panel.visible:
 		return
@@ -5295,55 +5236,6 @@ func _invest_block_reason() -> String:
 			Economy.money_full(Economy.INVEST_COST)]
 	return _action_block_reason(0)
 
-## Yatırım hamlesi: haritadan il seçilir (ilk dokunuş ayrıntı, ikincisi yapar).
-func _on_invest_button_pressed() -> void:
-	if _pending_invest:
-		_cancel_targeting()
-		return
-	var me := multiplayer.get_unique_id()
-	_deselect_hand_card()
-	_law_designer.hide()
-	_cancel_targeting()
-	if not CardManager.can_invest(me):
-		_show_toast(_invest_block_reason())
-		return
-	_pending_invest = true
-	if _province_panel != null:
-		_province_panel.hide()
-	_refresh_action_buttons()
-	_set_target_hint(L.t("Yatırım (%s, parti kasası ve devlet hazinesi arasında bölünebilir): haritada bir ile dokun  ·  Butona tekrar dokun: iptal") %
-		Economy.money_full(Economy.INVEST_COST))
-
-## Gensoru hamlesi: sadece hükümet azınlıktayken muhalefete açık. İlk dokunuş
-## onay ister, ikinci dokunuş meclis oylamasını başlatır.
-func _on_censure_button_pressed() -> void:
-	var me := multiplayer.get_unique_id()
-	if _pending_censure:
-		_cancel_targeting()
-		if CardManager.can_censure(me):
-			CardManager.censure()
-		return
-	_deselect_hand_card()
-	_law_designer.hide()
-	_cancel_targeting()
-	if not CardManager.can_censure(me):
-		if not CardManager.can_act():
-			_show_toast(L.t("Sıran değil."))
-		elif not GovernmentManager.has_government():
-			_show_toast(L.t("Görevde bir hükümet yok."))
-		elif not CardManager.has_seats(me):
-			_show_toast(L.t("Mecliste vekilin yok: gensoru veremezsin."))
-		elif CardManager.is_government_party(me):
-			_show_toast(L.t("Hükümetteki parti gensoru veremez."))
-		elif GovernmentManager.has_majority():
-			_show_toast(L.t("Gensoru sadece hükümet azınlıktayken verilebilir (salt çoğunluğu yok)."))
-		else:
-			_show_toast(_action_block_reason(GameRules.CENSURE_FUNDS_COST))
-		return
-	_pending_censure = true
-	_refresh_action_buttons()
-	_set_target_hint(L.t("Gensoru: hükümeti düşürmek için meclis oylaması (%s). Reddedilirse küçük bir itibar kaybı. Onay: butona tekrar dokun") % GameRules.cost_text(GameRules.CENSURE_FUNDS_COST))
-
 ## Erken seçim hamlesi: ilk dokunuş onay ister, ikincisi önergeyi meclise getirir.
 ## Kongre hamlesi: ilk dokunuş açıklama ve onay, ikincisi kongreyi başlatır.
 func _on_congress_button_pressed() -> void:
@@ -5372,57 +5264,6 @@ func _on_congress_button_pressed() -> void:
 	else:
 		_set_target_hint(L.t("Kongreye git (%s): partideki gücün %s; ne kadar güçlüysen o kadar az rakip çıkar. Onay: butona tekrar dokun") % [
 			GameRules.cost_text(CardManager.CONGRESS_COST), EffectWords.strength(CardManager.congress_strength(pid))])
-
-func _on_early_button_pressed() -> void:
-	var me := multiplayer.get_unique_id()
-	if _pending_early:
-		_pending_early = false
-		_cancel_targeting()
-		if CardManager.can_early_election(me):
-			CardManager.early_election()
-		_refresh_action_buttons()
-		return
-	_deselect_hand_card()
-	_law_designer.hide()
-	_cancel_targeting()
-	if not CardManager.can_early_election(me):
-		if not CardManager.can_act():
-			_show_toast(L.t("Sıran değil."))
-		elif not CardManager.has_seats(me):
-			_show_toast(L.t("Mecliste vekilin yok: erken seçim önergesi veremezsin."))
-		elif CardManager.early_election_pending:
-			_show_toast(L.t("Erken seçim kararı zaten alındı."))
-		elif CardManager.election_this_round():
-			_show_toast(L.t("Seçim zaten bu turun sonunda: erken seçim önergesine gerek yok."))
-		elif CardManager.early_request_used(me):
-			_show_toast(L.t("Partin bu seçim döneminde zaten erken seçim önergesi verdi."))
-		elif not GovernmentManager.can_submit_law():
-			_show_toast(L.t("Meclis şu an meşgul (oylama ya da hükümet kurma sürüyor)."))
-		else:
-			_show_toast(_action_block_reason(GameRules.EARLY_ELECTION_FUNDS_COST))
-		return
-	_pending_early = true
-	_refresh_action_buttons()
-	_set_target_hint(L.t("Erken seçim: meclis oylaması (%s). Kabul edilirse dönem sonunda sandığa gidilir. Onay: butona tekrar dokun") % GameRules.cost_text(GameRules.EARLY_ELECTION_FUNDS_COST))
-
-## Miting hamlesi: haritadan il seçilir (ilk dokunuş riski gösterir, ikincisi yapar).
-func _on_miting_button_pressed() -> void:
-	if _pending_miting:
-		_cancel_targeting()
-		return
-	var me := multiplayer.get_unique_id()
-	_deselect_hand_card()
-	_law_designer.hide()
-	if _pending_org or _pending_invest or _pending_censure or _pending_province_hand_index != -1:
-		_cancel_targeting()
-	if not CardManager.can_miting(me):
-		_show_toast(_action_block_reason(GameRules.MITING_FUNDS_COST))
-		return
-	_pending_miting = true
-	if _province_panel != null:
-		_province_panel.hide()
-	_refresh_action_buttons()
-	_set_target_hint(L.t("Miting: haritada bir ile dokun, tekrar dokun: miting yap (%s)  ·  Butona tekrar dokun: iptal") % GameRules.cost_text(GameRules.MITING_FUNDS_COST))
 
 # --- Harita katmanları ---------------------------------------------------------
 
@@ -5772,27 +5613,6 @@ func _begin_org_view() -> void:
 		_layer_before_org = _map_layer
 	_set_map_layer(MapLayer.ORGANIZATION)
 
-## Teşkilatlanma: harita anında teşkilat katmanına geçer, il seçilir. Butona
-## tekrar basmak iptal eder (para harcanmaz). Harita teşkilat katmanında KALIR.
-func _on_org_button_pressed() -> void:
-	if _pending_org:
-		_cancel_targeting()
-		return
-	var me := multiplayer.get_unique_id()
-	_deselect_hand_card()
-	_law_designer.hide()
-	if _pending_miting or _pending_invest or _pending_censure or _pending_province_hand_index != -1:
-		_cancel_targeting()
-	if not CardManager.can_choose_main_action(me) or CardManager.funds_of(me) < CardManager.org_cost_for(me):
-		_show_toast(_action_block_reason(CardManager.org_cost_for(me)))
-		return
-	_pending_org = true
-	if _province_panel != null:
-		_province_panel.hide()
-	_begin_org_view()
-	_refresh_action_buttons()
-	_set_target_hint(L.t("Teşkilatlanma: bir ile dokun, tekrar dokun: kur ya da geliştir (%s)  ·  Butona tekrar dokun: iptal") % GameRules.cost_text(CardManager.org_cost_for(me)))
-
 ## Teşkilat seviyesinin getirdikleri (kısa).
 static func _org_level_text(level: int) -> String:
 	match level:
@@ -5849,24 +5669,6 @@ func _build_speech_panel() -> void:
 	box.add_child(_speech_rows)
 	_speech_panel.hide()
 	add_child(_speech_panel)
-
-func _on_speech_button_pressed() -> void:
-	var me := multiplayer.get_unique_id()
-	if CardManager.last_election_round <= 0:
-		_show_toast(L.t("Grup toplantısı ilk seçimden sonra yapılabilir."))
-		return
-	if not CardManager.can_act():
-		_show_toast(L.t("Sıran değil."))
-		return
-	if not CardManager.has_parliament_group(me):
-		_show_toast(L.t("Grup toplantısı için mecliste grup gerekir: en az %d vekil.") % CardManager.group_seat_requirement())
-		return
-	if not CardManager.needs_speech(me):
-		_show_toast(L.t("Partin bu dönem grup toplantısını zaten yaptı."))
-		return
-	var key := "%d:%d" % [CardManager.round_number, CardManager.current_turn_index]
-	_speech_open_key = "" if _speech_open_key == key else key
-	_refresh_speech_panel()
 
 func _refresh_speech_panel() -> void:
 	if _speech_panel == null:
@@ -6026,3 +5828,166 @@ func _map_tint(color: Color, strength: float) -> Color:
 func _set_action_available(button: Button, available: bool) -> void:
 	button.modulate = Color.WHITE
 	UiSkin.skin_action_button(button, button.get_meta("action_color", UiTheme.PANEL_LIGHT), available)
+
+# --- TUR AKIŞI ARAYÜZÜ (0.0.231) -------------------------------------------------------
+## KART ÇEK + afet sahnesi (TurnIntro), MECLİS akışı (ParliamentFlow) ve il işlem
+## paneli (ProvinceActions). Üçü de durumu CardManager'dan okur; bu ekran
+## yalnız yerleştirir ve yeniler.
+
+func _build_turn_flow_ui() -> void:
+	_province_actions = ProvinceActions.new()
+	_province_actions.closed.connect(_on_province_actions_closed)
+	_province_actions.info_requested.connect(func(id: String):
+		_pinned = false
+		_show_province_info(id)
+		_pinned = true)
+	_province_actions.toast_requested.connect(_show_toast)
+	add_child(_province_actions)
+	_parliament_flow = ParliamentFlow.new()
+	_parliament_flow.law_tab_requested.connect(_on_flow_law_tab)
+	_parliament_flow.inquiry_requested.connect(func():
+		_parliament_flow.hide()
+		_on_inquiry_button_pressed())
+	_parliament_flow.toast_requested.connect(_show_toast)
+	add_child(_parliament_flow)
+	_turn_intro = TurnIntro.new()
+	_turn_intro.hand_rect = func() -> Rect2: return _r(R_HAND)
+	_turn_intro.hold = func() -> bool: return _event_fx != null and _event_fx.is_playing()
+	_turn_intro.finished.connect(_refresh_turn_flow_ui)
+	add_child(_turn_intro)
+	CardManager.event_presented.connect(_on_flow_event)
+	_refresh_turn_flow_ui.call_deferred()
+
+## Kendi kart çekimimin olayı: kartlar ortada açılır.
+func _on_flow_event(event: Dictionary, _version: int) -> void:
+	if String(event.get("type", "")) == "draw" and int(event.get("peer_id", -1)) == multiplayer.get_unique_id():
+		_turn_intro.present(event.get("draws", []))
+
+func _refresh_turn_flow_ui() -> void:
+	if _turn_intro == null:
+		return
+	_turn_intro.refresh()
+	_parliament_flow.refresh()
+	if _province_actions.visible:
+		if not _can_open_province_actions():
+			_province_actions.close()
+		else:
+			_province_actions.refresh()
+	_refresh_parliament_button()
+
+## İl işlem paneli: sıra bende, tur başı sunumu bitti, oylama yok.
+func _can_open_province_actions() -> bool:
+	return CardManager.can_act() and not CardManager.game_finished and (_turn_intro == null or not _turn_intro.is_busy())
+
+func _open_province_actions(province_id: String) -> void:
+	_parliament_flow.close_flow()
+	_law_designer.hide()
+	var map := _r(R_MAP)
+	_province_actions.max_height = map.size.y - 16.0
+	_province_actions.open(province_id)
+	_province_actions.position = Vector2(map.end.x - ProvinceActions.WIDTH - 8.0, map.position.y + 8.0)
+	_highlight_province(province_id)
+	_focus_map_on(province_id)
+	_pinned = false
+	_show_province_info(province_id)
+	_pinned = true
+
+func _on_province_actions_closed() -> void:
+	_highlight_province("")
+	_unfocus_map()
+
+## Harita ili odaklar ve sola kayar (sağda panel için yer açılır).
+func _focus_map_on(province_id: String) -> void:
+	if _map_clip == null:
+		return
+	if _focus_tween != null and _focus_tween.is_running():
+		_focus_tween.kill()
+	var zoom := _map_fit_scale * 1.5
+	var free_width := maxf(120.0, _map_clip.size.x - ProvinceActions.WIDTH - 16.0)
+	var target := Vector2(free_width * 0.5, _map_clip.size.y * 0.5) - GameMap.center_of(province_id) * zoom
+	var min_pos := _map_clip.size - GameMap.map_size() * zoom
+	target = Vector2(clampf(target.x, min_pos.x - ProvinceActions.WIDTH, 0.0), clampf(target.y, min_pos.y, 0.0))
+	_focus_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_focus_tween.set_parallel(true)
+	_focus_tween.tween_property(map_holder, "scale", Vector2(zoom, zoom), 0.3)
+	_focus_tween.tween_property(map_holder, "position", target, 0.3)
+
+func _unfocus_map() -> void:
+	if map_holder == null:
+		return
+	if _focus_tween != null and _focus_tween.is_running():
+		_focus_tween.kill()
+	_focus_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_focus_tween.set_parallel(true)
+	_focus_tween.tween_property(map_holder, "scale", Vector2(_map_fit_scale, _map_fit_scale), 0.25)
+	_focus_tween.tween_property(map_holder, "position", Vector2.ZERO, 0.25)
+
+## MECLİS düğmesi: açık aşamayı gösterir, yapılacak iş varken nabız gibi parlar.
+func _refresh_parliament_button() -> void:
+	if _parl_button == null:
+		return
+	var me := multiplayer.get_unique_id()
+	var stage := CardManager.parliament_stage(me) if CardManager.can_act() else ""
+	var sub := ""
+	if stage != "":
+		sub = L.t("sırada: %s") % L.t(ParliamentFlow.STAGE_TITLES[stage]).to_lower()
+	elif not CardManager.can_act():
+		sub = L.t("sıra sende değil")
+	elif not CardManager.parliament_closed_stages(me).is_empty():
+		sub = L.t("bu tur tamamlandı ✓")
+	elif CardManager.last_seats.is_empty():
+		sub = L.t("ilk seçimden sonra açılır")
+	elif not CardManager.has_seats(me):
+		sub = L.t("mecliste vekilin yok")
+	elif CardManager.is_party_member(me):
+		sub = L.t("genel başkan yürütür")
+	else:
+		sub = L.t("bu tur yapılacak iş yok")
+	_parl_button.text = "%s\n%s" % [L.t("MECLİS"), sub]
+	var live := stage != ""
+	UiSkin.skin_action_button(_parl_button, ACTION_COLOR_LAW, live)
+	if live and _parl_pulse == null:
+		_parl_pulse = create_tween().set_loops()
+		_parl_pulse.tween_property(_parl_button, "modulate", Color(1.35, 1.25, 1.6), 0.6).set_trans(Tween.TRANS_SINE)
+		_parl_pulse.tween_property(_parl_button, "modulate", Color.WHITE, 0.6).set_trans(Tween.TRANS_SINE)
+	elif not live and _parl_pulse != null:
+		_parl_pulse.kill()
+		_parl_pulse = null
+		_parl_button.modulate = Color.WHITE
+
+func _on_parliament_button_pressed() -> void:
+	var me := multiplayer.get_unique_id()
+	if not CardManager.can_act():
+		_show_toast(L.t("Sıran değil."))
+		return
+	if _turn_intro != null and _turn_intro.is_busy():
+		return
+	if CardManager.parliament_stage(me) == "":
+		_show_toast(_parl_button.text.get_slice("\n", 1).capitalize())
+		return
+	if _province_actions.visible:
+		_province_actions.close()
+	_deselect_hand_card()
+	_parliament_flow.open_flow()
+
+## Yasa alanından grup / vergi / anayasa: mevcut yasa tasarlama penceresi açılır;
+## kapanınca (ya da oylama bitince) meclis akışı geri gelir.
+func _on_flow_law_tab(tab: int) -> void:
+	_parliament_flow.hide()
+	if _tax_panel != null:
+		_tax_panel.hide()
+	_law_tax_selected = -1
+	_law_tab = tab
+	_refresh_law_designer()
+	_select_law_tab(tab)
+	_law_designer.show()
+	_place_law_designer()
+
+## Popülizm gibi süreli anında etkiler kalan süreleriyle.
+func _refresh_effects_chip() -> void:
+	if _effects_chip == null:
+		return
+	var left := CardManager.populism_rounds_left(multiplayer.get_unique_id())
+	_effects_chip.visible = left > 0
+	if left > 0:
+		_effects_label.text = L.t("POPÜLİZM AKTİF · %d dönem") % left

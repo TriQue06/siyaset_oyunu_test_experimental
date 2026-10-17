@@ -85,6 +85,8 @@ func _initialize() -> void:
 	mm = root.get_node("MultiplayerManager")
 	pm = root.get_node("PartyManager")
 	cm = root.get_node("CardManager")
+	# Eski serbest akış: bu test mekanikleri sınar (tur akışı: smoke_test_turn_flow).
+	cm.enforce_turn_flow = false
 	cm.allow_temporary_parties = false
 	cm.speech_required = false  # meclis konuşması ayrıca test edilir
 	cm.fixed_map_seed = 1950
@@ -320,23 +322,24 @@ func _initialize() -> void:
 	check("teskilat: anket (sadece kurana)", not cm.province_poll(3, TestProvinces.id("ankara")).is_empty() and cm.province_poll(1, TestProvinces.id("ankara")).is_empty())
 	# Karalama artık teşkilat ister; 3 numaranın Ankara teşkilatı dursun.
 	cm.organizations = {TestProvinces.id("ankara"): {3: 1}}
-	check("teskilatsiz ilde karalama oynanamaz", not cm.can_play_card(3, "karalama", 1, TestProvinces.id("izmir")))
-	check("karalama kendine oynanamaz", not cm.can_play_card(3, "karalama", 3, TestProvinces.id("ankara")))
-	check("karalama gecersiz partiye oynanamaz", not cm.can_play_card(3, "karalama", 99, TestProvinces.id("ankara")))
+	# 0.0.231: karalama tek başına oynanmaz, mitingin içinde kullanılır.
+	check("karalama karti tek basina oynanamaz", not cm.can_play_card(3, "karalama", 1, TestProvinces.id("ankara")))
+	check("teskilatsiz ilde karalama yapilamaz", not cm.can_smear(3, 1, TestProvinces.id("izmir")))
+	check("karalama kendine yapilamaz", not cm.can_smear(3, 3, TestProvinces.id("ankara")))
+	check("karalama gecersiz partiye yapilamaz", not cm.can_smear(3, 99, TestProvinces.id("ankara")))
+	check("kart eldeyken teskilatli ilde karalama yapilabilir", cm.can_smear(3, 1, TestProvinces.id("ankara")))
 	cm.current_turn_index = 0
 	var damage: float = minf(PublicOpinion.propaganda_damage(cm.party_strength(TestProvinces.id("ankara"), 1)), -PublicOpinion.PROPAGANDA_FLOOR)
-	cm._apply_play(3, 0, 1, TestProvinces.id("ankara"))
+	cm._apply_propaganda(3, 1, TestProvinces.id("ankara"))
 	check("karalama: hedefe eksi, yapana arti", near(cm.local_of(TestProvinces.id("ankara"), 1), -damage) and cm.local_of(TestProvinces.id("ankara"), 3) > 0.0,
 		"hedef %.2f, yapan %.2f" % [cm.local_of(TestProvinces.id("ankara"), 1), cm.local_of(TestProvinces.id("ankara"), 3)])
 	cm.local_support[TestProvinces.id("ankara")][1] = -2.5
-	cm.inventories[3] = ["karalama"]
 	cm.current_turn_index = 0
-	cm._apply_play(3, 0, 1, TestProvinces.id("ankara"))
+	cm._apply_propaganda(3, 1, TestProvinces.id("ankara"))
 	check("karalama il puanini tabanin altina itemez", near(cm.local_of(TestProvinces.id("ankara"), 1), PublicOpinion.PROPAGANDA_FLOOR),
 		"%.2f" % cm.local_of(TestProvinces.id("ankara"), 1))
-	cm.inventories[3] = ["karalama"]
 	cm.current_turn_index = 0
-	cm._apply_play(3, 0, 1, TestProvinces.id("ankara"))
+	cm._apply_propaganda(3, 1, TestProvinces.id("ankara"))
 	check("tabandaki partiye karalama artik eksi yazmaz", near(cm.local_of(TestProvinces.id("ankara"), 1), PublicOpinion.PROPAGANDA_FLOOR))
 	check("ilde guclu partiye karalama daha az isler", PublicOpinion.propaganda_damage(6.0) < PublicOpinion.propaganda_damage(1.0))
 	check("ilde guclu karalayan daha cok kazanir", PublicOpinion.propaganda_gain(6.0) > PublicOpinion.propaganda_gain(1.0))
@@ -366,7 +369,8 @@ func _initialize() -> void:
 	check("populizm ve bagis kampanyasi destede", cm._draw_weights(3).has("populizm") and cm._draw_weights(3).has("bagis_kampanyasi"))
 	cm.inventories[3] = ["populizm", "bagis_kampanyasi"]
 	cm._apply_play(3, 0)
-	check("populizm 10 milyon, 3 yil", cm.funds_of(3) == 90 and cm.populism_rounds_left(3) == GameRules.POPULISM_ROUNDS)
+	# 0.0.231: popülizm anında kart, oynama bedeli yok (eski kayıttan elde kalan da bedelsiz).
+	check("populizm bedelsiz, 3 yil", cm.funds_of(3) == 100 and cm.populism_rounds_left(3) == GameRules.POPULISM_ROUNDS)
 	check("populizmde sira devretmez", cm.current_turn_peer_id() == 3)
 	cm._apply_miting(3, TestProvinces.id("konya"))
 	var pop_gain: float = cm.local_of(TestProvinces.id("konya"), 3)
@@ -378,7 +382,7 @@ func _initialize() -> void:
 	cm._add_local(TestProvinces.id("konya"), 3, -2.0)
 	check("populizm: baskasinin karalamasi etkilenmez", near(cm.local_of(TestProvinces.id("konya"), 3), -2.0 * PublicOpinion.POPULISM_BAD_MULT - 2.0))
 	cm._apply_play(3, 0)
-	check("bagis kampanyasi (zayif) +30 milyon", cm.funds_of(3) == 90 + GameRules.FUNDS_BONUS_WEAK and GameRules.FUNDS_BONUS_WEAK == 30)
+	check("bagis kampanyasi (zayif) +30 milyon", cm.funds_of(3) == 100 + GameRules.FUNDS_BONUS_WEAK and GameRules.FUNDS_BONUS_WEAK == 30)
 	check("bagis kampanyasi sirayi devretmez", cm.current_turn_peer_id() == 3)
 	cm.round_number += GameRules.POPULISM_ROUNDS
 	check("populizm 5 tur sonra biter", cm.populism_rounds_left(3) == 0)

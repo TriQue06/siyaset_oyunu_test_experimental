@@ -73,7 +73,8 @@ func _initialize() -> void:
 	await _frames(10)
 	_shot("vg_law_designer")
 	scene._law_designer.hide()
-	scene._on_speech_button_pressed()
+	scene._speech_open_key = "%d:%d" % [cm.round_number, cm.current_turn_index]
+	scene._refresh_speech_panel()
 	await _frames(10)
 	_shot("vg_meeting_panel")
 	scene._speech_panel.hide()

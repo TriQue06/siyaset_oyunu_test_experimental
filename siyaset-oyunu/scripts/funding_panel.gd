@@ -15,6 +15,11 @@ const WIDTH := 452.0
 var peer_id: int = -1
 var kind: String = "invest"
 var province_id: String = ""
+## Kademe tutarı (-1 = hamlenin eski sabit bedeli), aynı hamlede kasadan ayrıca
+## ödenen tutar (karalama kartı) ve onay düğmesinin yazısı (boş = ONAYLA).
+var total: float = -1.0
+var party_extra: float = 0.0
+var confirm_label: String = ""
 var _range: Dictionary = {}
 var _slider: FundingSlider
 var _title: Label
@@ -117,11 +122,14 @@ func _column(parent: HBoxContainer, color: Color) -> Array:
 	return [pay, left]
 
 ## Hamle ve il için paneli açar (değer: hamlenin varsayılan paylaşımı).
-func open(p_peer: int, p_kind: String, p_province: String) -> void:
+func open(p_peer: int, p_kind: String, p_province: String, p_total: float = -1.0, p_extra: float = 0.0, p_label: String = "") -> void:
 	peer_id = p_peer
 	kind = p_kind
 	province_id = p_province
-	_range = CardManager.funding_range(peer_id, kind)
+	total = p_total
+	party_extra = p_extra
+	confirm_label = p_label
+	_range = CardManager.funding_range(peer_id, kind, total, party_extra)
 	_slider.setup(float(_range["default"]), float(_range["min"]), float(_range["max"]))
 	var place := ElectionNightSim.province_name(province_id)
 	_title.text = (L.t("%s · yatırım finansmanı") if kind == "invest" else L.t("%s · miting finansmanı")) % place
@@ -144,16 +152,16 @@ func _refresh() -> void:
 	var split := _split()
 	var party_million := float(split["party"])
 	var state_million := float(split["state"])
-	_party_pay.text = L.t("%s milyon ¤") % Economy.money_text(party_million)
-	_party_left.text = L.t("kasada kalır: %s") % GameRules.money_text(CardManager.funds_of(peer_id) - party_million)
+	_party_pay.text = L.t("%s milyon ¤") % Economy.money_text(party_million + party_extra)
+	_party_left.text = L.t("kasada kalır: %s") % GameRules.money_text(CardManager.funds_of(peer_id) - party_million - party_extra)
 	_state_pay.text = L.t("%s milyon ¤") % Economy.money_text(state_million)
 	_state_left.text = L.t("kotanda kalır: %s") % Economy.money_text(CardManager.state_quota(peer_id) - state_million)
 	# Hangi kaynak daha çok ödüyor: o uç parlak, diğeri sönük.
 	var party_more := party_million > state_million
 	_party_end.modulate.a = 1.0 if party_more or is_equal_approx(party_million, state_million) else 0.55
 	_state_end.modulate.a = 1.0 if not party_more else 0.55
-	_total.text = L.t("Toplam %s milyon ¤") % Economy.money_text(float(_range["total"]))
-	var reason := CardManager.funding_block_reason(peer_id, kind, _slider.share)
+	_total.text = L.t("Toplam %s milyon ¤") % Economy.money_text(float(_range["total"]) + party_extra)
+	var reason := CardManager.funding_block_reason(peer_id, kind, _slider.share, total, party_extra)
 	var note := ""
 	if float(_range["min"]) > float(_range["max"]) + 0.001:
 		reason = L.t("Parti kasası ve devlet hazinesi birlikte yetmiyor.")
@@ -175,7 +183,7 @@ func _refresh() -> void:
 		_note.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
 	_note.visible = _note.text != ""
 	if reason == "":
-		_confirm.text = L.t("ONAYLA · %s milyon ¤") % Economy.money_text(float(_range["total"]))
+		_confirm.text = (confirm_label if confirm_label != "" else L.t("ONAYLA")) + " · " + L.t("%s milyon ¤") % Economy.money_text(float(_range["total"]) + party_extra)
 		UiSkin.skin_color_button(_confirm, UiTheme.GREEN_DARK)
 		_confirm.disabled = false
 	else:

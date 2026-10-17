@@ -4238,3 +4238,405 @@ msgstr "Brawler"
 
 msgid "Rakamlar"
 msgstr "Numbers"
+
+msgid "%s bonus kart çekti (+%d kart)."
+msgstr "%s drew a bonus card (+%d cards)."
+
+msgid "Vergi yasası meclis akışının yasa aşamasında sunulur."
+msgstr "A tax law is proposed in the law stage of the parliament flow."
+
+msgid "Bu tur yardım kararını verdin; afet sürerse sonraki sıranda yeniden karar verebilirsin."
+msgstr "You already made your aid decision this turn; if the disaster lasts you can decide again on your next turn."
+
+msgid "Soruşturma meclis akışının son aşamasında açılır."
+msgstr "An inquiry is opened in the last stage of the parliament flow."
+
+msgid "Kürsüden %s'a yüklendi."
+msgstr "From the podium they laid into %s."
+
+msgid "ANINDA ETKİ: hemen %d kart daha çekersin (el doluysa sığdığı kadar)."
+msgstr "INSTANT: you immediately draw %d more cards (as many as fit in your hand)."
+
+msgid "ANINDA ETKİ: büyük bir bağış kampanyası, kasana hemen %s girer."
+msgstr "INSTANT: a big fundraising drive, %s goes straight into your treasury."
+
+msgid "SAKLANABİLİR: miting hazırlarken kullanılır. Mitingin yapıldığı ilde seçtiğin partiyi karalarsın: ona eksi, sana artı. İlde güçlü olan partiye az işler; ayrı miting hakkı harcamaz."
+msgstr "KEEPABLE: used while preparing a rally. You smear a party of your choice in the rally's province: minus for them, plus for you. Works less on a party strong there; does not use a separate rally."
+
+msgid "ANINDA ETKİ: çekildiği an başlar. %d dönem boyunca hamlelerin çok daha etkili, kötü sonuçlar hafifler; bu sürede seçim olursa ek ulusal destek."
+msgstr "INSTANT: starts the moment it is drawn. For %d terms your moves are much stronger and bad outcomes softer; an election in that time brings extra national support."
+
+msgid "ANINDA ETKİ: bağış kampanyası, kasana hemen %s girer."
+msgstr "INSTANT: a fundraising drive, %s goes straight into your treasury."
+
+msgid "Sıran gelince önce kartını çekersin. Teşkilat, miting ve yatırım için haritada bir ile dokun. MECLİS düğmesi gensoru, grup toplantısı, yasa ve soruşturmayı sırayla açar; istersen hiç girmeden turu bitirebilirsin."
+msgstr "When your turn comes you first draw a card. Tap a province on the map for offices, rallies and investment. The PARLIAMENT button opens censure, group meeting, law and inquiry in order; you may end your turn without entering it."
+
+msgid "Bir ile dokun, TEŞKİLAT'ı seç: ilde kalıcı oy, anket ve yerel bağış getirir; mitingte gruplara hitap etmeni sağlar. Beş ilden sonra her yeni teşkilat biraz daha pahalıdır: nerede kuracağını seç."
+msgstr "Tap a province and choose OFFICE: it brings lasting votes, polling and local donations, and lets you address groups at rallies. After five provinces each new office costs a bit more: choose where to build."
+
+msgid "Elindeki kartlar saklanabilir kartlardır: karta dokun, ne yaptığını oku; hedef isterse bir parti seç. Karalama kartı miting hazırlarken kullanılır. İstemediğin kartı KART BOZDUR yuvasına sürükle: bedelinin yarısı kasana döner."
+msgstr "Cards in your hand are keepable: tap one to read what it does; pick a party if it needs a target. The smear card is used while preparing a rally. Drag an unwanted card onto CASH IN: half its cost returns to your treasury."
+
+msgid "Karalama: bir ile dokun, MİTİNG'i seç; hazırlıkta kartı kullanabilirsin."
+msgstr "Smear: tap a province and choose RALLY; you can use the card while preparing."
+
+msgid "Karalama kartı miting hazırlarken kullanılır."
+msgstr "The smear card is used while preparing a rally."
+
+msgid "Meclis akışı: uygunsa gensoru, sonra grup toplantısı, yasa ve soruşturma. Her aşamayı yap ya da geç."
+msgstr "Parliament flow: censure if possible, then group meeting, law and inquiry. Do or skip each stage."
+
+msgid "Teşkilat, miting, yatırım: haritada bir ile dokun."
+msgstr "Offices, rallies, investment: tap a province on the map."
+
+msgid "sırada: %s"
+msgstr "next: %s"
+
+msgid "sıra sende değil"
+msgstr "not your turn"
+
+msgid "bu tur tamamlandı ✓"
+msgstr "done this turn ✓"
+
+msgid "ilk seçimden sonra açılır"
+msgstr "opens after the first election"
+
+msgid "mecliste vekilin yok"
+msgstr "you have no MPs"
+
+msgid "genel başkan yürütür"
+msgstr "run by the party leader"
+
+msgid "bu tur yapılacak iş yok"
+msgstr "nothing to do this turn"
+
+msgid "POPÜLİZM AKTİF · %d dönem"
+msgstr "POPULISM ACTIVE · %d terms"
+
+msgid "Meclis işleri bu tur için tamam."
+msgstr "Parliament business is done for this turn."
+
+msgid "← Haritaya dön"
+msgstr "← Back to map"
+
+msgid "Akış yerinde kalır; MECLİS düğmesiyle kaldığın yerden devam edersin."
+msgstr "The flow stays put; continue where you left off with the PARLIAMENT button."
+
+msgid "BİTİR · SONRAKİ AŞAMA"
+msgstr "FINISH · NEXT STAGE"
+
+msgid "BU TUR GEÇ"
+msgstr "SKIP THIS TURN"
+
+msgid "Bu aşama bu tur kapanır, geri açılamaz."
+msgstr "This stage closes for this turn and cannot be reopened."
+
+msgid "Geçilen aşama bu tur yeniden açılmaz."
+msgstr "A skipped stage does not reopen this turn."
+
+msgid "Hükümet meclisteki çoğunluğunu kaybetti. Hükümeti düşürmek için oylama isteyebilirsin."
+msgstr "The government has lost its majority in parliament. You can call a vote to bring it down."
+
+msgid "Kabul edilirse hükümet düşer ve yeni hükümet kurulur; reddedilirse küçük bir itibar kaybı yaşarsın."
+msgstr "If accepted the government falls and a new one is formed; if rejected you lose a little reputation."
+
+msgid "GENSORU VER · %s"
+msgstr "FILE CENSURE · %s"
+
+msgid "Bir seçmen grubunun sorunlarını konuşarak o grubun desteğini kalıcı artırırsın. Karşıt grup biraz soğur."
+msgstr "Discussing a voter group's problems lastingly raises its support. The opposing group cools a little."
+
+msgid "Gündemdeki kriz: %s. Bu grupla toplanmak ek ulusal destek getirir."
+msgstr "Crisis on the agenda: %s. Meeting this group brings extra national support."
+
+msgid "  ★ çekirdek"
+msgstr "  ★ core"
+
+msgid "  ⚠ karşıt"
+msgstr "  ⚠ opposed"
+
+msgid "  · kriz"
+msgstr "  · crisis"
+
+msgid "%s ile toplan: %s"
+msgstr "Meet with %s: %s"
+
+msgid "Meclise teklif getir. Her teklif oylanır; sonuç gelince bu ekrana dönersin. İşin bitince BİTİR'e bas."
+msgstr "Bring a proposal to parliament. Each one is voted on; you return here when the result is in. Press FINISH when you are done."
+
+msgid "Bir seçmen grubu için yasa: o grup sana ısınır, karşıtı soğur. Geçerse puan."
+msgstr "A law for a voter group: that group warms to you, its opposite cools. Points if it passes."
+
+msgid "VERGİ YASASI"
+msgstr "TAX LAW"
+
+msgid "Hükümet olarak vergi kademesini değiştir: hazineyi ve seçmenin ruh hâlini etkiler."
+msgstr "As government, change the tax level: it affects the treasury and voters' mood."
+
+msgid "ANAYASA DEĞİŞİKLİĞİ"
+msgstr "CONSTITUTIONAL AMENDMENT"
+
+msgid "Baraj, seçim sıklığı, sayım yöntemi ve ittifak kuralı. Üçte iki çoğunluk gerekir."
+msgstr "Threshold, election frequency, counting method and the alliance rule. Needs a two-thirds majority."
+
+msgid "ERKEN SEÇİM ÖNERGESİ"
+msgstr "EARLY ELECTION MOTION"
+
+msgid "Kabul edilirse bu dönemin sonunda sandık kurulur."
+msgstr "If accepted, elections are held at the end of this term."
+
+msgid "  ✓ sunuldu"
+msgstr "  ✓ proposed"
+
+msgid "  · şu an yok"
+msgstr "  · not now"
+
+msgid "Bir partinin harcamalarını soruşturtursun. Devlet parasıyla miting yapan yakalanır; kendi kasasından harcayan itibar kazanır."
+msgstr "You have a party's spending investigated. Rallies paid with state money get caught; spending from the party's own treasury earns reputation."
+
+msgid "Bedeli %s. Açarsan meclis işleri bu tur biter."
+msgstr "It costs %s. Opening it ends parliament business for this turn."
+
+msgid "GRUP TOPLANTISI"
+msgstr "GROUP MEETING"
+
+msgid "Toplantı"
+msgstr "Meeting"
+
+msgid "Yasa"
+msgstr "Law"
+
+msgid "Soruşturma"
+msgstr "Inquiry"
+
+msgid "Bu ilde ne yapmak istiyorsun? Bir başlık seç."
+msgstr "What do you want to do in this province? Pick a heading."
+
+msgid "%d vekil · teşkilatın: %s"
+msgstr "%d MPs · your office: %s"
+
+msgid "İL BİLGİSİ"
+msgstr "PROVINCE INFO"
+
+msgid "Seçmen profili ve partinin bu ildeki durumu sağ panelde"
+msgstr "Voter profile and your party's standing here in the right panel"
+
+msgid "Kapat (haritaya dön)"
+msgstr "Close (back to map)"
+
+msgid "MİTİNG %d/%d"
+msgstr "RALLY %d/%d"
+
+msgid "YATIRIM %d/%d"
+msgstr "INVEST %d/%d"
+
+msgid "1. seviye"
+msgstr "level 1"
+
+msgid "2. seviye (en üst)"
+msgstr "level 2 (top)"
+
+msgid "az oy bonusu, yaklaşık anket, mitingte bir gruba hitap"
+msgstr "small vote bonus, rough polling, address one group at rallies"
+
+msgid "yüksek oy bonusu, isabetli anket, mitingte iki gruba hitap"
+msgstr "high vote bonus, accurate polling, address two groups at rallies"
+
+msgid "İlde kalıcı oy, anket bilgisi ve her sıra yerel bağış getirir; mitingte gruplara hitap etmeni sağlar."
+msgstr "Brings lasting votes, polling and local donations every turn; lets you address groups at rallies."
+
+msgid "Şu an"
+msgstr "Now"
+
+msgid "Sıra başı yerel bağış"
+msgstr "Local donations per turn"
+
+msgid "Bağımsız siyasetçinin teşkilatı olmaz."
+msgstr "An independent politician has no offices."
+
+msgid "Teşkilatı partinin genel başkanı kurar."
+msgstr "The party leader builds offices."
+
+msgid "Bu ildeki teşkilatın en üst seviyede."
+msgstr "Your office in this province is at the top level."
+
+msgid "Sonraki seviye"
+msgstr "Next level"
+
+msgid "Getirisi: %s; sıra başı %s yerel bağış."
+msgstr "Brings: %s; %s local donations per turn."
+
+msgid "TEŞKİLAT KUR · %s"
+msgstr "BUILD OFFICE · %s"
+
+msgid "TEŞKİLATI GELİŞTİR · %s"
+msgstr "UPGRADE OFFICE · %s"
+
+msgid "%s teşkilatı: %s"
+msgstr "%s office: %s"
+
+msgid "Bu sıra %d mitingin hepsini yaptın. Sonraki sıranda yeniden miting yapabilirsin."
+msgstr "You held all %d rallies this turn. You can rally again next turn."
+
+msgid "Miting ilde oy kazandırır ve partini ilin seçmen gruplarına yaklaştırır. Seçmen sana uzaksa provokasyon riski vardır."
+msgstr "A rally wins votes here and brings your party closer to the province's voter groups. If voters are far from you there is a risk of provocation."
+
+msgid "1 · Bütçe"
+msgstr "1 · Budget"
+
+msgid "2 · Kime hitap edeceksin?"
+msgstr "2 · Who will you address?"
+
+msgid "Bu ilde teşkilatın yok: miting genel halka hitap eder. Teşkilat kurarsan belirli gruplara seslenebilirsin."
+msgstr "You have no office here: the rally addresses the general public. Build an office to speak to specific groups."
+
+msgid "İsteğe bağlı: en çok %d grup seç. Seçmezsen genel halka hitap edersin."
+msgstr "Optional: pick up to %d groups. If you pick none you address the general public."
+
+msgid "3 · Karalama kartı"
+msgstr "3 · Smear card"
+
+msgid "Elinde karalama kartı var ama bu ilde teşkilatın olmadığı için kullanamazsın; kart elinde kalır."
+msgstr "You hold a smear card but cannot use it without an office here; the card stays in your hand."
+
+msgid "Mitingte bir rakibe yüklenebilirsin: ona eksi, sana artı. Ayrı miting hakkı harcamaz; kart ve %s bedeli miting yapılınca düşer."
+msgstr "You can lay into a rival at the rally: minus for them, plus for you. It uses no extra rally; the card and its %s cost are spent when the rally happens."
+
+msgid "Kartı sakla"
+msgstr "Keep the card"
+
+msgid "Karala: %s"
+msgstr "Smear: %s"
+
+msgid "Özet"
+msgstr "Summary"
+
+msgid "İl"
+msgstr "Province"
+
+msgid "Bütçe"
+msgstr "Budget"
+
+msgid "genel halk"
+msgstr "general public"
+
+msgid "Karalanan rakip"
+msgstr "Smeared rival"
+
+msgid "Provokasyon riski"
+msgstr "Provocation risk"
+
+msgid "Beklenen hitap: %s"
+msgstr "Expected appeal: %s"
+
+msgid "Toplam bedel"
+msgstr "Total cost"
+
+msgid "MİTİNGİ DÜZENLE"
+msgstr "HOLD THE RALLY"
+
+msgid "MİTİNGİ DÜZENLE · %s"
+msgstr "HOLD THE RALLY · %s"
+
+msgid "Hazırlığı iptal et"
+msgstr "Cancel preparation"
+
+msgid "Para ve miting hakkı harcanmaz."
+msgstr "No money or rally is spent."
+
+msgid "Yatırımı yalnız hükümetteki partiler yapabilir. Muhalefetteyken bu ilde teşkilat ve miting kullanabilirsin."
+msgstr "Only parties in government can invest. In opposition you can use offices and rallies here."
+
+msgid "Yatırımı partinin genel başkanı yapar."
+msgstr "The party leader makes investments."
+
+msgid "Bu sıra %d yatırımın hepsini yaptın."
+msgstr "You made all %d investments this turn."
+
+msgid "Devlet hazinesinden il yatırımı: ildeki bütün seçmen memnun olur, ekonomi canlanır. Hazine yetmezse kalanı parti kasasından."
+msgstr "Provincial investment from the state treasury: every voter here is pleased and the economy picks up. If the treasury falls short, the rest comes from the party treasury."
+
+msgid "Tutar"
+msgstr "Amount"
+
+msgid "Etkinin bir kısmı hemen, kalanı sonraki %d dönemde gelir; seçimde yalnız gelmiş olan sayılır."
+msgstr "Part of the effect comes now, the rest over the next %d terms; only what has arrived counts at an election."
+
+msgid "Hazine kotan"
+msgstr "Your treasury quota"
+
+msgid "YATIRIMI YAP"
+msgstr "MAKE THE INVESTMENT"
+
+msgid "KÜÇÜK"
+msgstr "SMALL"
+
+msgid "ORTA"
+msgstr "MEDIUM"
+
+msgid "BÜYÜK"
+msgstr "LARGE"
+
+msgid "daha az etki, paraya göre en verimli"
+msgstr "less effect, best value for money"
+
+msgid "olağan miting"
+msgstr "regular rally"
+
+msgid "en güçlü etki, en pahalı"
+msgstr "strongest effect, most expensive"
+
+msgid "küçük yatırım"
+msgstr "small investment"
+
+msgid "olağan yatırım"
+msgstr "regular investment"
+
+msgid "büyük yatırım; il tavanına çabuk dayanır"
+msgstr "large investment; hits the province cap quickly"
+
+msgid "Önce kartını çek. Kart ya hemen etki eder ya da eline gelir."
+msgstr "Draw your card first. It either takes effect at once or goes into your hand."
+
+msgid "🂠  KART ÇEK"
+msgstr "🂠  DRAW CARD"
+
+msgid "Çekiliyor…"
+msgstr "Drawing…"
+
+msgid "Bu ekran tur süreni harcamaz; bir süre basmazsan kart kendiliğinden çekilir."
+msgstr "This screen does not use your turn time; if you wait too long the card is drawn automatically."
+
+msgid "EL DOLU"
+msgstr "HAND FULL"
+
+msgid "ANINDA ETKİ · UYGULANDI"
+msgstr "INSTANT · APPLIED"
+
+msgid "SAKLANABİLİR · ELİNE EKLENDİ"
+msgstr "KEEPABLE · ADDED TO HAND"
+
+msgid "BONUS ÇEKİM · "
+msgstr "BONUS DRAW · "
+
+msgid "Elin dolu"
+msgstr "Your hand is full"
+
+msgid "Elinde en fazla %d kart durabilir; bu tur kart çekilmedi. Kart bozdurarak yer açabilirsin."
+msgstr "You can hold at most %d cards; no card was drawn this turn. Cash in a card to make room."
+
+msgid "AFET: %s"
+msgstr "DISASTER: %s"
+
+msgid "Etkilenen iller: %s"
+msgstr "Affected provinces: %s"
+
+msgid "Bölgeye yardım götürürsen oradaki seçmen seni hatırlar."
+msgstr "If you bring aid to the region, voters there will remember you."
+
+msgid "BU TUR YARDIM YAPMA"
+msgstr "NO AID THIS TURN"
+
+msgid "Yardım yapmazsan bu tur bu ekran yeniden açılmaz. Afet sürerse sonraki sıranda yeniden karar verirsin."
+msgstr "If you give no aid, this screen will not reopen this turn. If the disaster lasts you decide again on your next turn."

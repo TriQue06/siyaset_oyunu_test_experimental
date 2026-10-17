@@ -95,6 +95,9 @@ func _initialize() -> void:
 	# _process'in room_code == "" görünce hiç tick etmemesiydi.
 	check("cevrim disi oyun 'sahne onizlemesi' sayilmaz", not mm.is_standalone_preview())
 	var gm = root.get_node("GovernmentManager")
+	# 0.0.231: kart çekme sunumu sırasında tur sayacı durur; önce kart çekilir.
+	if cm.needs_turn_draw(cm.current_turn_peer_id()):
+		cm._apply_draw(cm.current_turn_peer_id())
 	var turn_before: float = cm.turn_seconds_left()
 	cm._process(1.0)
 	check("tur sayaci azaldi", cm.turn_seconds_left() < turn_before,

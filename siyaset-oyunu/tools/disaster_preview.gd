@@ -73,13 +73,14 @@ func _initialize() -> void:
 	await _frames(20)
 	_shot("disaster_map")
 	check("harita afet bölgesini işaretliyor", scene.map_holder._disaster_ids == region, str(region))
-	check("YARDIM butonu açık", scene._aid_button.modulate.a > 0.9)
 	var grid: GridContainer = scene._action_grid
 	print("GRID size %s min %s parent %s" % [grid.size, grid.get_combined_minimum_size(), (grid.get_parent() as Control).size])
 	for b in grid.get_children():
 		print("  %s min %s size %s" % [(b as Button).text.replace("
 ", " "), (b as Control).get_combined_minimum_size(), (b as Control).size])
-	scene._on_aid_button_pressed()
+	# 0.0.231: yardım tur başındaki afet sahnesinde; panel burada doğrudan açılır.
+	scene._aid_panel.open(me)
+	scene._place_aid_panel()
 	await _frames(10)
 	_shot("disaster_aid_panel")
 	check("yardım paneli açıldı", scene._aid_panel.visible)
@@ -99,8 +100,10 @@ func _initialize() -> void:
 	# SORUŞTURMA hamlesi: hedef parti seçici açılır, seçim soruşturma panelini açar.
 	cm.current_turn_index = cm.turn_order.find(me)
 	cm.economy["inquiries"] = {}
+	# 0.0.231: soruşturma meclis akışının son aşaması; burada yalnız panel incelenir.
+	cm.enforce_turn_flow = false
 	scene._refresh_action_buttons()
-	check("SORUŞTURMA butonu açık", scene._inquiry_button.modulate.a > 0.9)
+	check("soruşturma açılabilir", cm.can_open_inquiry(me))
 	scene._on_inquiry_button_pressed()
 	await _frames(10)
 	_shot("inquiry_picker")

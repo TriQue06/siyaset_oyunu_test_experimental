@@ -23,6 +23,7 @@ var _effect: Label
 var _given: Label
 var _note: Label
 var _confirm: Button
+var _cancel: Button
 
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -73,14 +74,19 @@ func _init() -> void:
 	_confirm.add_theme_font_size_override("font_size", 13)
 	_confirm.pressed.connect(func(): confirmed.emit(_party_slider.value, _state_slider.value))
 	buttons.add_child(_confirm)
-	var cancel := Button.new()
-	cancel.text = L.t("Vazgeç")
-	cancel.focus_mode = Control.FOCUS_NONE
-	cancel.custom_minimum_size = Vector2(90, 34)
-	UiSkin.skin_button(cancel)
-	cancel.add_theme_font_size_override("font_size", 12)
-	cancel.pressed.connect(func(): cancelled.emit())
-	buttons.add_child(cancel)
+	_cancel = Button.new()
+	_cancel.text = L.t("Vazgeç")
+	_cancel.focus_mode = Control.FOCUS_NONE
+	_cancel.custom_minimum_size = Vector2(90, 34)
+	UiSkin.skin_button(_cancel)
+	_cancel.add_theme_font_size_override("font_size", 12)
+	_cancel.pressed.connect(func(): cancelled.emit())
+	buttons.add_child(_cancel)
+
+## Tur başı afet sahnesi: vazgeç düğmesi bilinçli karardır ("bu tur yardım yapma").
+func set_cancel_text(text: String) -> void:
+	_cancel.text = text
+	_cancel.custom_minimum_size = Vector2(170, 34)
 
 ## [kaydırıcı, değer etiketi, satır]
 func _slider_row(parent: VBoxContainer, title: String, color: Color) -> Array:

@@ -148,32 +148,22 @@ const CENSURE_PASS_SCORE := 5
 const LAW_PASS_SCORE := 5
 const LAW_PASS_SCORE_GOV := 5
 const GOVERNMENT_FUNDS_BONUS := 10
-## Teşkilat: kurmak (1. seviye) ORG_FUNDS_COST, geliştirmek (2. seviye)
-## ORG_UPGRADE_FUNDS_COST. Ucuz teşkilat botların haritayı kaplamasına yol açıyordu.
+## Teşkilat (0.0.227): kurmak (1. seviye) SABİT ORG_FUNDS_COST, geliştirmek
+## (2. seviye) ORG_UPGRADE_FUNDS_COST. Kademeli artan fiyat kaldırıldı.
 const ORG_FUNDS_COST := 10
 ## TEŞKİLAT GELİRİ: her ildeki teşkilat tur başında yerel bağış getirir
-## (1. seviye +5, 2. seviye +10 milyon ¤), ama toplamı ORG_INCOME_CAP'i aşmaz:
-## teşkilat sınırsız para makinesi olmasın (eskiden üst sınır yoktu).
-const ORG_INCOME := [0, 5, 10]
-const ORG_INCOME_CAP := 25
+## (1. seviye +2,5, 2. seviye +8 milyon ¤). Üst sınır yok (0.0.227).
+const ORG_INCOME := [0.0, 2.5, 8.0]
 ## GRUP TOPLANTISI bedeli (sırada bir kez; bir seçmen grubuyla, geçici destek).
 const SPEECH_FUNDS_COST := 0
-const ORG_UPGRADE_FUNDS_COST := ORG_FUNDS_COST
-
-## KADEMELİ TEŞKİLAT BEDELİ (0.0.168): partinin ilk ORG_COST_FREE teşkilatı
-## sabit bedelle; ötesinde sahip olunan her teşkilat yeni hamleyi
-## ORG_COST_STEP pahalandırır (30 ilde teşkilatlı parti: 35). Denge
-## simülasyonunda bütün partiler 40–50 ile yayılıyor, kasa yine de birikiyordu:
-## teşkilat geniş ağın tek ve sınırsız harcaması olmasın.
-const ORG_COST_FREE := 5
-const ORG_COST_STEP := 1.0
+const ORG_UPGRADE_FUNDS_COST := 30
 
 ## Bu ildeki teşkilatı bir seviye ilerletmenin bedeli (current_level: şu anki
 ## seviye, owned: partinin teşkilatlı il sayısı). Tek doğru kaynak budur;
 ## oyuncu için CardManager.org_cost_for kullanılır.
-static func org_cost(current_level: int, owned: int = 0) -> float:
-	var base := float(ORG_FUNDS_COST if current_level <= 0 else ORG_UPGRADE_FUNDS_COST)
-	return base + ORG_COST_STEP * float(maxi(0, owned - ORG_COST_FREE))
+## (0.0.227: fiyat sabit, owned kullanılmıyor.)
+static func org_cost(current_level: int, _owned: int = 0) -> float:
+	return float(ORG_FUNDS_COST if current_level <= 0 else ORG_UPGRADE_FUNDS_COST)
 ## En fazla 2 seviye: 1 = kaba anket + az bonus, 2 = isabetli anket + yüksek bonus.
 const ORG_MAX_LEVEL := 2
 

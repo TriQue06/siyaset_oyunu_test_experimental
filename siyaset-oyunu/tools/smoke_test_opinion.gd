@@ -222,9 +222,14 @@ func _initialize() -> void:
 	gm._apply_vote(1, gm.VOTE_YES)
 	gm._apply_vote(2, gm.VOTE_ABSTAIN)
 	gm._apply_vote(3, gm.VOTE_YES)   # muhalefet iktidarın yasasına EVET: ceza yok
-	check("muhalefet iktidara EVET: hedef gruba yaklasir, ulusal ceza yok", float(pm.parties[3]["groups"]["ilerici"]) > float(g3b["ilerici"]) \
-		and near(cm.national_of(3), 0.0))
-	check("cekimser etkilenmez", str(pm.parties[2]["groups"]) == str(g2b))
+	# 0.0.228: seçmen tabanı — EVET veren de grubun seçmeninden çeker; getiren
+	# daha çok çektiği için çekimserin seçmeninden de alabilir (çalma).
+	var gain3 := float(pm.parties[3]["groups"]["ilerici"]) - float(g3b["ilerici"])
+	var gain2 := float(pm.parties[2]["groups"]["ilerici"]) - float(g2b["ilerici"])
+	# Getiren parti grubun seçmeninden çok daha fazla çektiği için EVET verenin
+	# net payı düşebilir; burada yalnız ulusal cezanın olmadığı sınanır.
+	check("muhalefet iktidara EVET: ulusal ceza yok", near(cm.national_of(3), 0.0), "EVET %.3f / cekimser %.3f" % [gain3, gain2])
+	check("cekimser hedef grupta kazanmaz", gain2 <= 0.0001, "%.3f" % gain2)
 
 	var g2c: Dictionary = pm.parties[2]["groups"].duplicate()
 	gm.submit_law(2, cp.law_type("milliyetci"))
@@ -233,8 +238,9 @@ func _initialize() -> void:
 	gm._apply_vote(3, gm.VOTE_NO)
 	check("yasa reddedildi", gm.last_resolution_reason.find("reddedildi") != -1, gm.last_resolution_reason)
 	var d2 := float(pm.parties[2]["groups"]["milliyetci"]) - float(g2c["milliyetci"])
+	# 0.0.228: kazanç seçmen olarak (grubun %'si); reddedilen yasa geçene göre küçük.
 	check("reddedilen yasanin getiricisi kucuk (vaat) kazanc",
-		d2 > 0.0 and d2 <= PublicOpinion.LAW_GROUP_GAIN_REJECTED + 0.001, "%.2f" % d2)
+		d2 > 0.0 and d2 <= PublicOpinion.LAW_GROUP_GAIN_REJECTED * cm.NATIONAL_PULL_MULT + 0.001, "%.2f" % d2)
 	check("yasa sadece meclis varken ve kurma asamasi disinda", gm.can_submit_law())
 
 	print("")

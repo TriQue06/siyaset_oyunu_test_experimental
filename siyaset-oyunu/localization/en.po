@@ -3,6 +3,39 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: en\n"
 
+msgid "%s, %s ile grup toplantısı yaptı (%s): o grupta %s."
+msgstr "%s held a group meeting with %s (%s): %s in that group."
+
+msgid "Kalıcı: grubun ülke genelindeki seçmeninden çekersin ve o gruptaki seçmenlerinin sadakati artar. Zıt grupta seçmenlerinin bir kısmı soğur."
+msgstr "Permanent: you win voters of the group nationwide and your voters in it grow more loyal. Some of your voters in the opposite group cool off."
+
+msgid "%s\nKonu: %s\nPartinin bu gruptaki desteği %s; toplantı kalıcı seçmen kazandırır.%s"
+msgstr "%s\nTopic: %s\nYour party's support in this group is %s; the meeting wins permanent voters.%s"
+
+msgid "sana bağlı seçmen"
+msgstr "voters with you"
+
+msgid "Oy: grubun ülke genelinde sana bağlı seçmen payı (▲▼ son seçimden beri)."
+msgstr "Vote: share of the group's voters nationwide who are with you (▲▼ since the last election)."
+
+msgid "Grup toplantısı için mecliste grup gerekir: en az %d vekil."
+msgstr "A group meeting needs a parliamentary group: at least %d seats."
+
+msgid "Günlük kaydedildi: %s"
+msgstr "Log saved: %s"
+
+msgid "Günlük yazılamadı."
+msgstr "The log could not be written."
+
+msgid "Oyun günlüğü"
+msgstr "Game log"
+
+msgid "Bütün olayları, seçimleri, oyuncu ve bot kararlarını bir metin dosyasına yazar."
+msgstr "Writes every event, election and player and bot decision to a text file."
+
+msgid "LOG İNDİR"
+msgstr "DOWNLOAD LOG"
+
 msgid "%s, ortağı %s tarafından verilen önergeye HAYIR dedi; %s ittifakında gerginlik var."
 msgstr "%s voted NO on a motion by its ally %s; there is tension in the %s alliance."
 

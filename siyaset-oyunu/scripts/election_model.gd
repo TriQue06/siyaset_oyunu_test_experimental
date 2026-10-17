@@ -194,9 +194,31 @@ static func cap_shares(shares: Dictionary, cap: float = PROVINCE_MAX_SHARE) -> D
 				shares[peer_id] = v + excess * v / free_total
 	return shares
 
+## SEÇMEN TABANI (0.0.228): ildeki bağlı seçmen partisine oy verir (il
+## gürültüsüyle), kararsızların UNDECIDED_TURNOUT'u sandığa gider ve kamuoyu
+## ağırlığıyla dağılır. state: {"attached": {peer -> n}, "undecided": n}.
+const UNDECIDED_TURNOUT := 0.6
+static func voter_shares(state: Dictionary, peer_ids: Array, noise: Dictionary, opinion: Dictionary) -> Dictionary:
+	var attached: Dictionary = state.get("attached", {})
+	var undecided := float(state.get("undecided", 0.0)) * UNDECIDED_TURNOUT
+	var weight_total := 0.0
+	for peer_id in peer_ids:
+		weight_total += float(opinion.get(peer_id, 1.0)) * float(noise.get(peer_id, 1.0))
+	var raw := {}
+	var total := 0.0
+	for peer_id in peer_ids:
+		var w := float(opinion.get(peer_id, 1.0)) * float(noise.get(peer_id, 1.0))
+		var v := float(attached.get(peer_id, 0.0)) * float(noise.get(peer_id, 1.0)) \
+			+ (undecided * w / weight_total if weight_total > 0.0 else 0.0)
+		raw[peer_id] = v
+		total += v
+	for peer_id in peer_ids:
+		raw[peer_id] = float(raw[peer_id]) / total if total > 0.0 else 1.0 / float(maxi(1, peer_ids.size()))
+	return raw
+
 static func compute(parties: Dictionary, province_seats: Dictionary, voters: Dictionary,
 		threshold_percent: float, rng: RandomNumberGenerator,
-		modifiers: Dictionary = {}, alliance_membership: Dictionary = {}) -> Dictionary:
+		modifiers: Dictionary = {}, alliance_membership: Dictionary = {}, voter_state: Dictionary = {}) -> Dictionary:
 	var national_mod: Dictionary = modifiers.get("national", {})
 	var local_mod: Dictionary = modifiers.get("local", {})
 	var vote_shares: Dictionary = {}
@@ -238,7 +260,16 @@ static func compute(parties: Dictionary, province_seats: Dictionary, voters: Dic
 		for peer_id in peer_ids:
 			var opinion: float = PublicOpinion.multiplier(float(national_mod.get(peer_id, 0.0)), float(local_here.get(peer_id, 0.0)))
 			weights[peer_id] = float(swing[peer_id]) * opinion * rng.randf_range(1.0 - PROVINCE_NOISE, 1.0 + PROVINCE_NOISE)
-		var shares: Dictionary = group_vote_shares(parties, profile, weights)
+		var shares: Dictionary
+		if voter_state.has(province_id):
+			var noise := {}
+			var opinion := {}
+			for peer_id in peer_ids:
+				noise[peer_id] = float(weights[peer_id]) / maxf(0.0001, PublicOpinion.multiplier(float(national_mod.get(peer_id, 0.0)), float(local_here.get(peer_id, 0.0))))
+				opinion[peer_id] = PublicOpinion.multiplier(float(national_mod.get(peer_id, 0.0)), float(local_here.get(peer_id, 0.0)))
+			shares = voter_shares(voter_state[province_id], peer_ids, noise, opinion)
+		else:
+			shares = group_vote_shares(parties, profile, weights)
 		for peer_id in peer_ids:
 			national[peer_id] = float(national[peer_id]) + float(shares[peer_id]) * seats_here
 		province_shares[province_id] = shares

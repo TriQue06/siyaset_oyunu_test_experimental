@@ -335,6 +335,9 @@ func _build_category(key: String, box: VBoxContainer) -> void:
 				DisplayServer.clipboard_set(str(GameMap.seed_value()))
 				_notice.text = L.t("Kopyalandı!"))
 			_row(box, "Harita tohumu", "Aynı ülke haritasını yeniden oluşturmak için.", _seed_copy)
+			_row(box, "Oyun günlüğü", "Bütün olayları, seçimleri, oyuncu ve bot kararlarını bir metin dosyasına yazar.", _button("LOG İNDİR", func():
+				var path: String = GameLog.export_file()
+				_notice.text = (L.t("Günlük kaydedildi: %s") % path) if path != "" else L.t("Günlük yazılamadı.")))
 			_tutorial_button = _button("REHBERİ AÇ", _restart_tutorial)
 			_row(box, "İlk oyun rehberi", "Oynanışı anlatan rehberi yeniden başlat.", _tutorial_button)
 			_leave_button = _button("OYUNDAN AYRIL", _on_leave_pressed, "danger")

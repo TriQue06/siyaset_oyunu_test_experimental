@@ -258,6 +258,9 @@ var state_version: int = 0
 ## OLAY LOGU (her cihaz kendi tutar, ağda gitmez; sahne değişse de kalır):
 ## Array[{"text", "peer_id", "province", "kind", "round"}]. En yeni sonda.
 var event_log: Array = []
+## OYUN GÜNLÜĞÜ (0.0.227): bütün olaylar (gizli türler dahil) ve seçim sonuçları;
+## ESC menüsündeki "LOG İNDİR" bunu dosyaya yazar (bkz. GameLog).
+var full_log: PackedStringArray = PackedStringArray()
 ## Testler için: 0 değilse init_game her seferinde bu tohumla aynı haritayı kurar.
 var fixed_map_seed: int = 0
 
@@ -763,8 +766,18 @@ func can_choose_main_action(peer_id: int) -> bool:
 ## yapmamanın cezası yok.) Toplantı hakkı DÖNEMLİKTİR ve partiye aittir: o
 ## dönem partisi toplandıysa toplanamaz; kasası yetmiyorsa da hakkı yok. (Önbellekteki speech_done'a güvenilmez: turun ilk oyuncusunun
 ## sırası tur numarası artmadan başlar, eski dönemin bilgisi taşınıyordu.)
+## MECLİS GRUBU (0.0.227): grup toplantısını yalnız meclis grubu olan parti
+## yapabilir. Grup için meclisin 1/30'u kadar vekil gerekir, 5'in katına
+## yukarı yuvarlanır (500 ve 600 sandalyede 20). İlk seçimden önce meclis boş.
+const GROUP_SEAT_FRACTION := 1.0 / 30.0
+func group_seat_requirement() -> int:
+	return int(ceil(float(TOTAL_SEATS) * GROUP_SEAT_FRACTION / 5.0 - 0.0001)) * 5
+
+func has_parliament_group(peer_id: int) -> bool:
+	return int(last_seats.get(party_of(peer_id), 0)) >= group_seat_requirement()
+
 func needs_speech(peer_id: int) -> bool:
-	return last_election_round > 0 and speech_required and not turn_order.is_empty() and peer_id == current_turn_peer_id() and not is_party_member(peer_id) \
+	return last_election_round > 0 and has_parliament_group(peer_id) and speech_required and not turn_order.is_empty() and peer_id == current_turn_peer_id() and not is_party_member(peer_id) \
 		and int(speech_rounds.get(party_of(peer_id), 0)) != round_number and funds_of(peer_id) >= GameRules.SPEECH_FUNDS_COST
 
 ## Bu oyuncu şu an bir yasa sunabilir mi? (law_type verilirse o yasa geçerli mi.)
@@ -1675,8 +1688,7 @@ func projected_eligible(mods: Dictionary = {}) -> Array:
 	var total := 0.0
 	for province_id in _province_ids:
 		var seats := float(province_seat_count(province_id))
-		var shares := ElectionModel.expected_shares(groups, province_profile(province_id),
-			mods["national"], local_mods.get(province_id, {}), _expected_national(mods))
+		var shares := expected_province_shares(province_id, mods)
 		for peer_id in shares.keys():
 			national[peer_id] = float(national.get(peer_id, 0.0)) + float(shares[peer_id]) * seats
 		total += seats
@@ -1687,6 +1699,20 @@ func projected_eligible(mods: Dictionary = {}) -> Array:
 	if eligible.is_empty():
 		eligible = party_ids()
 	return eligible
+
+## Gürültüsüz beklenen il payları (peer -> yüzde): seçmen tabanı + kararsızların
+## sandığa giden kısmı kamuoyu ağırlığıyla (bkz. ElectionModel.voter_shares).
+func expected_province_shares(province_id: String, mods: Dictionary) -> Dictionary:
+	var local_here: Dictionary = (mods["local"] as Dictionary).get(province_id, {})
+	var opinion := {}
+	var noise := {}
+	for pid in _vb_parties():
+		opinion[pid] = PublicOpinion.multiplier(float((mods["national"] as Dictionary).get(pid, 0.0)), float(local_here.get(pid, 0.0)))
+		noise[pid] = 1.0
+	var shares := ElectionModel.voter_shares(vb_province_state(province_id), _vb_parties(), noise, opinion)
+	for pid in shares.keys():
+		shares[pid] = float(shares[pid]) * 100.0
+	return shares
 
 ## Gürültüsüz beklenen ulusal paylar (il payları bununla karışır). Aynı
 ## modifier sözlüğü için önbellekli: bir harita çizimi 67 kez sormasın.
@@ -1700,8 +1726,18 @@ func _expected_national(mods: Dictionary) -> Dictionary:
 	for province_id in _province_ids:
 		profiles[province_id] = province_profile(province_id)
 		seats[province_id] = province_seat_count(province_id)
-	_national_cache = ElectionModel.expected_national(_group_profiles(), profiles, seats,
-		mods["national"], mods["local"])
+	var national := {}
+	var total := 0.0
+	for province_id in _province_ids:
+		var n := float(province_profile(province_id).get("_electorate", province_seat_count(province_id)))
+		var shares := expected_province_shares(province_id, mods)
+		for peer_id in shares.keys():
+			national[peer_id] = float(national.get(peer_id, 0.0)) + float(shares[peer_id]) / 100.0 * n
+		total += n
+	if total > 0.0:
+		for peer_id in national.keys():
+			national[peer_id] = float(national[peer_id]) / total
+	_national_cache = national
 	_national_cache_key = mods
 	return _national_cache
 
@@ -1710,8 +1746,7 @@ func _expected_national(mods: Dictionary) -> Dictionary:
 func province_projection(province_id: String) -> Dictionary:
 	var mods := election_modifiers(true)
 	var local_mods: Dictionary = mods["local"]
-	var shares := ElectionModel.expected_shares(_group_profiles(), province_profile(province_id),
-		mods["national"], local_mods.get(province_id, {}), _expected_national(mods))
+	var shares := expected_province_shares(province_id, mods)
 	var alloc := ElectionModel.allocate(shares, projected_eligible(mods), province_seat_count(province_id))
 	var result := {}
 	for peer_id in party_ids():
@@ -1733,8 +1768,7 @@ func projection_all(viewer: int = -1) -> Dictionary:
 		if error < 0.0:
 			continue
 		var seat_count := province_seat_count(province_id)
-		var shares := ElectionModel.expected_shares(groups, province_profile(province_id),
-			mods["national"], local_mods.get(province_id, {}), _expected_national(mods))
+		var shares := expected_province_shares(province_id, mods)
 		if viewer != -1:
 			var noisy := {}
 			for peer_id in shares.keys():
@@ -1823,8 +1857,9 @@ const PLAYER_HIDDEN_LOG_KINDS := ["bagis_kampanyasi", "bagis_kampanyasi_guclu"]
 func log_event(text: String, peer_id: int = -1, province: String = "", kind: String = "system") -> void:
 	if text.strip_edges() == "":
 		return
-	# ANA (geliştirici) LOG: her şey konsola yazılır.
+	# ANA (geliştirici) LOG: her şey konsola ve indirilebilir oyun günlüğüne yazılır.
 	print("[LOG r%d] %s" % [round_number, text])
+	full_log.append("[%s] %s" % [GameRules.period_label(maxi(1, round_number)), text])
 	# Oyuncu logunda gereksiz olanlar (bağış kampanyası) gösterilmez.
 	if kind in PLAYER_HIDDEN_LOG_KINDS:
 		return
@@ -1934,6 +1969,10 @@ func init_game() -> void:
 	province_profiles = VoterGroups.generate_profiles(_rng, _province_ids, _province_seat_counts, GameMap.electorate_counts())
 	organizations = {}
 	_apply_politician_starts()
+	# SEÇMEN TABANI: başlangıç hitabından (çekirdek gruplar, geçmiş) kurulur.
+	voter_base = {}
+	_vb_ready = false
+	_vb_ensure()
 	credibility = {}
 	for peer_id in MultiplayerManager.players.keys():
 		credibility[peer_id] = CREDIBILITY_START
@@ -2431,16 +2470,16 @@ func _apply_miting(peer_id: int, province_id: String, focus: Array = []) -> void
 ## Dönüş: kısa özet ("odak: Emekliler") ya da "".
 func _apply_miting_positioning(peer_id: int, province_id: String, focus: Array = []) -> String:
 	var pid := party_of(peer_id)
+	if PartyManager.is_independent(pid):
+		return _apply_miting_positioning_legacy(peer_id, province_id, focus)
 	var fatigue: Dictionary = miting_fatigue.get(pid, {})
-	var changes: Array = []
-	for effect in miting_group_gains(peer_id, province_id, focus):
-		changes.append({"peer": pid, "group": String(effect["group"]), "amount": _own_effect(pid, float(effect["gain"]))})
-	var actual := _shift_groups(changes)
-	for change in actual:
-		var delta := float(change["delta"])
-		if delta > 0.0:
-			var group := String(change["group"])
-			fatigue[group] = float(fatigue.get(group, 0.0)) + delta
+	# SEÇMEN TABANI (0.0.228): ildeki seçmenin bir kısmı çekilir (bkz. _vb_miting).
+	var gains := _vb_miting(pid, province_id, focus, _miting_mult(peer_id, province_id) * _own_effect(pid, 1.0))
+	var national := national_group_counts()
+	for group in gains.keys():
+		var points := float(gains[group]) / maxf(1.0, float(national.get(group, 1.0))) * 100.0
+		if points > 0.0:
+			fatigue[group] = float(fatigue.get(group, 0.0)) + points
 	if not fatigue.is_empty():
 		miting_fatigue[pid] = fatigue
 	if focus.is_empty():
@@ -2449,6 +2488,15 @@ func _apply_miting_positioning(peer_id: int, province_id: String, focus: Array =
 	for group in focus:
 		names.append(VoterGroups.title(String(group)))
 	return L.t("odak: %s") % ", ".join(names)
+
+## Bağımsız siyasetçi seçmen tabanına girmez: eski hitap hesabı.
+func _apply_miting_positioning_legacy(peer_id: int, province_id: String, focus: Array = []) -> String:
+	var pid := party_of(peer_id)
+	var changes: Array = []
+	for effect in miting_group_gains(peer_id, province_id, focus):
+		changes.append({"peer": pid, "group": String(effect["group"]), "amount": _own_effect(pid, float(effect["gain"]))})
+	PartyManager.apply_group_deltas(changes)
+	return ""
 
 ## "1,8" gibi kısa sayı.
 static func _num(value: float) -> String:
@@ -2488,11 +2536,15 @@ func _apply_investment(peer_id: int, province_id: String, amount: float = Econom
 	for pid in shares.keys():
 		_add_local(province_id, int(pid), float(shares[pid]) * scale * Economy.INVEST_IMMEDIATE, false, PublicOpinion.INVEST_LIMIT)
 		later[pid] = float(shares[pid]) * scale * (1.0 - Economy.INVEST_IMMEDIATE) / float(Economy.INVEST_DELAY_ROUNDS)
-	# SEÇMEN KARŞILIĞI: ildeki her grubun nüfusla orantılı bir kısmı getirene geçer.
-	var changes: Array = []
-	for effect in investment_group_gains(province_id, amount):
-		changes.append({"peer": investor, "group": String(effect["group"]), "amount": float(effect["gain"])})
-	_shift_groups(changes)
+	# SEÇMEN (0.0.228): yatırım ideolojiye bakmaz; ildeki seçmeni getirene ve
+	# makam sahiplerine (il puanı payıyla aynı oranda) çeker.
+	var parts := {}
+	var share_total := 0.0
+	for pid in shares.keys():
+		share_total += float(shares[pid])
+	for pid in shares.keys():
+		parts[int(pid)] = float(shares[pid]) / maxf(0.0001, share_total)
+	_vb_invest(province_id, parts, scale)
 	var pending: Array = economy.get("investments", [])
 	pending.append({"province": province_id, "party": investor, "round": round_number,
 		"rounds_left": Economy.INVEST_DELAY_ROUNDS, "amounts": later})
@@ -2522,6 +2574,14 @@ func investment_group_gains(province_id: String, amount: float = Economy.INVEST_
 ## çarpanıyla paylaşılır, iller grup seçmeni ağırlığıyla toplanır. Grupların
 ## (büyüklükleriyle ağırlıklı) ortalaması ülke geneli oy oranına yaklaşır.
 func group_vote_estimates(peer_id: int) -> Dictionary:
+	# 0.0.228: kararsızlar gösterilmez; grubun partiye bağlı yüzdesi.
+	if not PartyManager.is_independent(party_of(peer_id)):
+		var result_vb := {}
+		var levels := group_level_shares(peer_id)
+		for group in levels.keys():
+			var l: Array = levels[group]
+			result_vb[group] = float(l[0]) + float(l[1]) + float(l[2])
+		return result_vb
 	var pid := party_of(peer_id)
 	var parties := _group_profiles()
 	var result := {}
@@ -2583,6 +2643,8 @@ func _apply_propaganda(peer_id: int, target_peer_id: int, province_id: String) -
 	damage = clampf(damage, 0.0, maxf(0.0, current - PublicOpinion.PROPAGANDA_FLOOR))
 	_add_local(province_id, target_peer_id, -damage)
 	_add_local(province_id, peer_id, gain, true)
+	# 0.0.228: karalama hedefin bu ildeki seçmenini bir seviye düşürür (ilahiyatçı: yarısı).
+	_vb_scandal(target_peer_id, province_id)
 	_log_province(province_id, L.t("%s, %s karşıtı kampanya yaptı (%s, %s)") % [
 		_party_name(peer_id), _party_name(target_peer_id), EffectWords.change(-damage, "local", L.t("yerel güç")), L.t("karşılığında kazanç") if gain > 0.0 else L.t("kazanç yok")])
 	_event_message = L.t("%s, %s'da %s karşıtı karalama kampanyası yaptı.") % [
@@ -2828,12 +2890,463 @@ func _log_province(province_id: String, text: String) -> void:
 		events.pop_front()
 	province_events[province_id] = events
 
+# --- SEÇMEN TABANI (0.0.228) ----------------------------------------------------
+## Her il × seçmen grubu × parti için SADAKAT SEVİYESİNE göre seçmen sayısı:
+## 1, 2, 3. seviye partiye bağlı seçmen; partilere bağlı olmayan geri kalan
+## seçmen 0. seviye = KARARSIZ (oyuncuya gösterilmez). Seçimde bağlı seçmen
+## partisine oy verir; kararsızların UNDECIDED_TURNOUT'u sandığa gider ve
+## partilere kamuoyu (ulusal + il puanı) ağırlığıyla dağılır.
+##   MİTİNG  : ildeki seçmenin MITING_PULL'u kadarını çeker (teşkilat çarpanı);
+##             odak gruplar bileşimi değiştirir, TOPLAM DEĞİŞMEZ. Çekilen
+##             seçmenin VB_FROM_UNDECIDED'ı kararsızlardan, kalanı rakiplerden
+##             (1. seviye kolay, 2. zor, 3. çok zor çalınır; çalınamayan
+##             baskı seviye düşürür). Kendi seçmenini de bir üst seviyeye
+##             taşır (odakta daha çok).
+##   YATIRIM : ideolojiye bakmaz; daha çok çeker ve 2./3. seviyeyi daha kolay çalar.
+##   ZIT GRUP: bir gruba kazanılan her seçmenin yarısı kadar, zıt gruptaki
+##             kendi seçmenin bir seviye düşer. İki zıt grupta aynı ilde aynı
+##             anda 3. seviye tutulamaz (yeni 3. seviye diğerini 2'ye indirir).
+##   KASET   : hedef partinin bütün seçmeni bir seviye düşer (ilahiyatçı: yarısı);
+##   KARALAMA: aynısı yalnız hedef ilde.
+##   YASA / GRUP TOPLANTISI: ülke genelinde grubun seçmeninden çeker ve kendi
+##             seçmenini yükseltir.
+##   İTTİFAK : ortaklar birbirinin seçmenini çalmaz, seviyesini düşürmez.
+## Kendiliğinden seviye kaybı yok: düşüş rakiplerin baskısıyla olur; teşkilat
+## kendi seçmeninin seviye düşüşünü yavaşlatır (VB_ORG_SHIELD).
+## Saklama: party -> PackedFloat32Array, indeks ((il * 8 + grup) * 3 + seviye-1).
+## Partinin eski "hitap" değeri (groups) artık bundan TÜRETİLİR: grubun ülke
+## genelindeki bağlı payı (bkz. _vb_sync_groups).
+const VB_GROUPS := 8
+const VB_LEVELS := 3
+const UNDECIDED_TURNOUT := 0.6
+const MITING_PULL := 0.04
+const MITING_FOCUS_WEIGHT := 3.0
+const VB_FROM_UNDECIDED := 0.5
+## Mitingin rakip seviyelerine etkisi: çalma [1., 2., 3. seviye], düşürme [2., 3. seviye].
+const MITING_STEAL := [1.0, 0.12, 0.03]
+const MITING_DEMOTE := [1.5, 1.2]
+## Miting kendi seçmenini yükseltir: [1->2, 2->3]; odakta tam, diğer gruplarda üçte bir.
+const MITING_PROMOTE := [0.25, 0.1]
+const INVEST_PULL := 0.10
+const INVEST_STEAL := [1.0, 0.5, 0.15]
+const INVEST_DEMOTE := [0.3, 0.2]
+## Ülke çapı (yasa, toplantı): eski hitap puanı başına grubun bu kadar yüzdesi.
+const NATIONAL_PULL_MULT := 1.5
+const NATIONAL_STEAL := [1.0, 0.1, 0.02]
+const NATIONAL_DEMOTE := [0.4, 0.1]
+const NATIONAL_PROMOTE := [0.15, 0.05]
+## Grup toplantısı (güçlü, kalıcı): grubun ülke genelindeki seçmeninden çekilen pay (puan).
+const MEETING_PULL_POINTS := 6.0
+const MEETING_PROMOTE := [0.3, 0.12]
+const OPPOSITE_LOSS := 0.5
+## Teşkilat kendi seçmeninin seviye düşüşünü bu oranda azaltır (seviye 0, 1, 2).
+const VB_ORG_SHIELD := [0.0, 0.3, 0.55]
+## Kaset/karalama ilahiyatçıda seçmenin bu kadarını düşürür.
+const SCANDAL_THEOLOGIAN_SHARE := 0.5
+
+var voter_base: Dictionary = {}
+var _vb_index: Dictionary = {}
+var _vb_counts := PackedFloat32Array()
+var _vb_ready := false
+
+func _vb_setup() -> void:
+	_vb_index.clear()
+	_vb_counts = PackedFloat32Array()
+	_vb_counts.resize(_province_ids.size() * VB_GROUPS)
+	var voters := province_voters()
+	for i in _province_ids.size():
+		var id := String(_province_ids[i])
+		_vb_index[id] = i
+		for g in VB_GROUPS:
+			_vb_counts[i * VB_GROUPS + g] = VoterGroups.group_count(voters.get(id, {}), String(VoterGroups.GROUP_IDS[g]))
+	_vb_ready = true
+
+func _vb_check() -> void:
+	if not _vb_ready or _vb_counts.size() != _province_ids.size() * VB_GROUPS:
+		_vb_setup()
+
+## Seçmen tabanına katılan partiler (bağımsız ve blok hariç).
+func _vb_parties() -> Array:
+	var result: Array = []
+	for pid in party_ids():
+		if not PartyManager.is_independent(int(pid)) and int(pid) != PartyManager.BLOC_ID:
+			result.append(int(pid))
+	return result
+
+func _vb_arr(pid: int) -> PackedFloat32Array:
+	var arr: PackedFloat32Array = voter_base.get(pid, PackedFloat32Array())
+	if arr.size() != _province_ids.size() * VB_GROUPS * VB_LEVELS:
+		arr = PackedFloat32Array()
+		arr.resize(_province_ids.size() * VB_GROUPS * VB_LEVELS)
+	return arr
+
+static func _vb_i(pi: int, gi: int, level: int) -> int:
+	return (pi * VB_GROUPS + gi) * VB_LEVELS + level
+
+func _vb_count(pi: int, gi: int) -> float:
+	return _vb_counts[pi * VB_GROUPS + gi]
+
+func _vb_cell(arr: PackedFloat32Array, pi: int, gi: int) -> float:
+	var i := _vb_i(pi, gi, 0)
+	return arr[i] + arr[i + 1] + arr[i + 2]
+
+func _vb_undecided(pi: int, gi: int) -> float:
+	var used := 0.0
+	for pid in _vb_parties():
+		if voter_base.has(pid):
+			used += _vb_cell(voter_base[pid], pi, gi)
+	return maxf(0.0, _vb_count(pi, gi) - used)
+
+## Eksik partilerin tabanı açılır (hitabından, yalnız kararsızlardan), oyundan
+## çıkan partilerin tabanı silinir (seçmeni kararsızlaşır).
+func _vb_ensure() -> void:
+	_vb_check()
+	var parties := _vb_parties()
+	for pid in voter_base.keys():
+		if not parties.has(int(pid)):
+			voter_base.erase(pid)
+	for pid in parties:
+		if not voter_base.has(pid) or (voter_base[pid] as PackedFloat32Array).size() != _province_ids.size() * VB_GROUPS * VB_LEVELS:
+			_vb_init_party(pid)
+
+## Partinin tabanını eski hitap değerinden kurar: her ilde grubun hitap kadarı
+## (kararsızlar yetmezse yettiği kadar). ÇEKİRDEK gruplarının seçmeni 2.
+## seviyeden (partili, sadık), diğerleri 1. seviyeden başlar; memleketinde bir
+## seviye daha yüksek. (Hepsi 1. seviye olsaydı tek kaset tabanı silerdi.)
+func _vb_init_party(pid: int) -> void:
+	var arr := PackedFloat32Array()
+	arr.resize(_province_ids.size() * VB_GROUPS * VB_LEVELS)
+	voter_base[pid] = arr
+	var groups := PartyManager.groups_of(pid)
+	var core: Array = PartyManager.data_of(pid).get("core", [])
+	var home := PoliticianPresets.hometown_of(pid)
+	for pi in _province_ids.size():
+		for gi in VB_GROUPS:
+			var group := String(VoterGroups.GROUP_IDS[gi])
+			var want := _vb_count(pi, gi) * clampf(float(groups.get(group, 0.0)) / 100.0, 0.0, 1.0)
+			var take := minf(want, _vb_undecided(pi, gi))
+			var level := (1 if core.has(group) else 0) + (1 if String(_province_ids[pi]) == home else 0)
+			arr[_vb_i(pi, gi, mini(level, VB_LEVELS - 1))] += take
+			voter_base[pid] = arr
+	_vb_sync_groups(pid)
+
+## Türetilmiş hitap: grubun ülke genelinde partiye bağlı yüzdesi (0..100).
+func _vb_sync_groups(pid: int) -> void:
+	if not PartyManager.parties.has(pid) or not voter_base.has(pid):
+		return
+	var arr: PackedFloat32Array = voter_base[pid]
+	var groups: Dictionary = (PartyManager.parties[pid].get("groups", {}) as Dictionary).duplicate()
+	for gi in VB_GROUPS:
+		var mine := 0.0
+		var total := 0.0
+		for pi in _province_ids.size():
+			mine += _vb_cell(arr, pi, gi)
+			total += _vb_count(pi, gi)
+		groups[VoterGroups.GROUP_IDS[gi]] = mine / total * 100.0 if total > 0.0 else 0.0
+	PartyManager.parties[pid]["groups"] = groups
+
+func _vb_sync_all() -> void:
+	for pid in voter_base.keys():
+		_vb_sync_groups(int(pid))
+
+## Rakiplerin baskısı: çal / düşür. Dönüş: çalınan seçmen.
+func _vb_press_rivals(pid: int, pi: int, gi: int, pressure: float, steal: Array, demote: Array) -> float:
+	var rivals := {}
+	var rival_total := 0.0
+	for other in _vb_parties():
+		if other == pid or are_allies(pid, other) or not voter_base.has(other):
+			continue
+		var t := _vb_cell(voter_base[other], pi, gi)
+		if t > 0.0:
+			rivals[other] = t
+			rival_total += t
+	if rival_total <= 0.0 or pressure <= 0.0:
+		return 0.0
+	var stolen := 0.0
+	for other in rivals:
+		var p: float = pressure * float(rivals[other]) / rival_total
+		var arr: PackedFloat32Array = voter_base[other]
+		var shield: float = float(VB_ORG_SHIELD[clampi(organization_level(String(_province_ids[pi]), other), 0, 2)])
+		var i := _vb_i(pi, gi, 0)
+		var s1 := minf(arr[i], p * float(steal[0]))
+		arr[i] -= s1
+		var left := maxf(0.0, p - s1)
+		var s2 := minf(arr[i + 1], left * float(steal[1]) * (1.0 - shield))
+		arr[i + 1] -= s2
+		var d2 := minf(arr[i + 1], left * float(demote[0]) * (1.0 - shield))
+		arr[i + 1] -= d2
+		arr[i] += d2
+		var s3 := minf(arr[i + 2], left * float(steal[2]) * (1.0 - shield))
+		arr[i + 2] -= s3
+		var d3 := minf(arr[i + 2], left * float(demote[1]) * (1.0 - shield))
+		arr[i + 2] -= d3
+		arr[i + 1] += d3
+		voter_base[other] = arr
+		stolen += s1 + s2 + s3
+	return stolen
+
+## Bir il-grup hücresinden amount seçmen çeker (önce kısmen kararsızlardan,
+## sonra rakiplerden; rakipten alınamayan kısım kararsızlardan tamamlanır).
+## Gelen seçmen 1. seviyedir. Dönüş: çekilen seçmen.
+func _vb_pull(pid: int, pi: int, gi: int, amount: float, steal: Array, demote: Array) -> float:
+	if amount <= 0.0:
+		return 0.0
+	var undecided := _vb_undecided(pi, gi)
+	var gained := minf(undecided, amount * VB_FROM_UNDECIDED)
+	undecided -= gained
+	gained += _vb_press_rivals(pid, pi, gi, amount - gained, steal, demote)
+	if gained < amount:
+		gained += minf(undecided, amount - gained)
+	var arr := _vb_arr(pid)
+	arr[_vb_i(pi, gi, 0)] += gained
+	voter_base[pid] = arr
+	return gained
+
+## Kendi seçmeninden amount kadarı bir seviye düşer (seviyelere orantılı;
+## 1. seviyeden düşen kararsızlaşır). Teşkilat düşüşü yavaşlatır.
+func _vb_demote_own(pid: int, pi: int, gi: int, amount: float, shielded: bool = true) -> void:
+	if amount <= 0.0 or not voter_base.has(pid):
+		return
+	var arr: PackedFloat32Array = voter_base[pid]
+	var i := _vb_i(pi, gi, 0)
+	var total := arr[i] + arr[i + 1] + arr[i + 2]
+	if total <= 0.0:
+		return
+	if shielded:
+		amount *= 1.0 - float(VB_ORG_SHIELD[clampi(organization_level(String(_province_ids[pi]), pid), 0, 2)])
+	var frac := minf(1.0, amount / total)
+	var m1 := arr[i] * frac
+	var m2 := arr[i + 1] * frac
+	var m3 := arr[i + 2] * frac
+	arr[i] += m2 - m1
+	arr[i + 1] += m3 - m2
+	arr[i + 2] -= m3
+	voter_base[pid] = arr
+
+## Bir hücrenin seçmeninin frac kadarı bir seviye düşer (skandal).
+func _vb_demote_fraction(pid: int, pi: int, gi: int, frac: float) -> void:
+	if not voter_base.has(pid):
+		return
+	var arr: PackedFloat32Array = voter_base[pid]
+	var i := _vb_i(pi, gi, 0)
+	_vb_demote_own(pid, pi, gi, (arr[i] + arr[i + 1] + arr[i + 2]) * frac, false)
+
+## Kendi seçmenini yükseltir: r1 kadar 1->2, r2 kadar 2->3. Yeni 3. seviye,
+## zıt gruptaki 3. seviyeyi 2'ye indirir (iki zıt grupta aynı anda tutulamaz).
+func _vb_promote(pid: int, pi: int, gi: int, r1: float, r2: float) -> void:
+	if not voter_base.has(pid):
+		return
+	var arr: PackedFloat32Array = voter_base[pid]
+	var i := _vb_i(pi, gi, 0)
+	var up1 := arr[i] * clampf(r1, 0.0, 1.0)
+	var up2 := arr[i + 1] * clampf(r2, 0.0, 1.0)
+	arr[i] -= up1
+	arr[i + 1] += up1 - up2
+	arr[i + 2] += up2
+	if up2 > 0.0:
+		var oi := _vb_i(pi, _vb_opposite(gi), 0)
+		arr[oi + 1] += arr[oi + 2]
+		arr[oi + 2] = 0.0
+	voter_base[pid] = arr
+
+func _vb_opposite(gi: int) -> int:
+	return VoterGroups.GROUP_IDS.find(VoterGroups.opposite(String(VoterGroups.GROUP_IDS[gi])))
+
+## Kazanılan seçmen kadar zıt grupta kendi seçmeninin yarısı bir seviye düşer.
+func _vb_opposite_loss(pid: int, pi: int, gi: int, gained: float) -> void:
+	var oi := _vb_opposite(gi)
+	if oi >= 0:
+		_vb_demote_own(pid, pi, oi, gained * OPPOSITE_LOSS)
+
+## MİTİNG. mult: teşkilat × geçmiş × popülizm. Dönüş: grup -> çekilen seçmen.
+func _vb_miting(pid: int, province_id: String, focus: Array, mult: float) -> Dictionary:
+	_vb_ensure()
+	var pi: int = _vb_index.get(province_id, -1)
+	var result := {}
+	if pi < 0 or not voter_base.has(pid):
+		return result
+	var electorate := 0.0
+	var weights := []
+	var weight_total := 0.0
+	for gi in VB_GROUPS:
+		var n := _vb_count(pi, gi)
+		electorate += n
+		var w := n * (MITING_FOCUS_WEIGHT if focus.has(VoterGroups.GROUP_IDS[gi]) else 1.0)
+		weights.append(w)
+		weight_total += w
+	if weight_total <= 0.0:
+		return result
+	var total := electorate * MITING_PULL * mult
+	var fatigue: Dictionary = miting_fatigue.get(pid, {})
+	for gi in VB_GROUPS:
+		var group := String(VoterGroups.GROUP_IDS[gi])
+		var amount: float = total * float(weights[gi]) / weight_total * PublicOpinion.miting_fatigue_mult(float(fatigue.get(group, 0.0)))
+		var got := _vb_pull(pid, pi, gi, amount, MITING_STEAL, MITING_DEMOTE)
+		_vb_opposite_loss(pid, pi, gi, got)
+		result[group] = got
+	var org_level := organization_level(province_id, pid)
+	var promo_mult := 1.0 + 0.3 * float(org_level)
+	for gi in VB_GROUPS:
+		var share := 1.0 if focus.has(VoterGroups.GROUP_IDS[gi]) else (1.0 / 3.0 if focus.is_empty() else 0.15)
+		_vb_promote(pid, pi, gi, float(MITING_PROMOTE[0]) * share * promo_mult, float(MITING_PROMOTE[1]) * share * promo_mult)
+	_vb_sync_all()
+	return result
+
+## YATIRIM: ideolojiden bağımsız, ildeki bütün gruplardan nüfusla orantılı.
+## parts: party -> pay (0..1, toplam 1). Dönüş: çekilen toplam seçmen.
+func _vb_invest(province_id: String, parts: Dictionary, scale: float) -> float:
+	_vb_ensure()
+	var pi: int = _vb_index.get(province_id, -1)
+	if pi < 0:
+		return 0.0
+	var gained := 0.0
+	for gi in VB_GROUPS:
+		var amount := _vb_count(pi, gi) * INVEST_PULL * scale
+		for pid in parts.keys():
+			if voter_base.has(int(pid)):
+				gained += _vb_pull(int(pid), pi, gi, amount * float(parts[pid]), INVEST_STEAL, INVEST_DEMOTE)
+	_vb_sync_all()
+	return gained
+
+## ÜLKE ÇAPI GRUP ETKİSİ (yasa, toplantı, geçmiş): eski hitap puanı amount
+## grubun seçmeninin yaklaşık amount × NATIONAL_PULL_MULT yüzdesine denk gelir.
+## amount < 0: kendi seçmeninden o kadarı bir seviye düşer. promote: [r1, r2].
+## Dönüş: grubun ülke geneli payındaki değişim (puan).
+func _vb_national_group(pid: int, group: String, amount: float, promote: Array = NATIONAL_PROMOTE, opposite: bool = true) -> float:
+	_vb_ensure()
+	var gi := VoterGroups.GROUP_IDS.find(group)
+	if gi < 0 or not voter_base.has(pid):
+		return 0.0
+	var before := float(PartyManager.groups_of(pid).get(group, 0.0))
+	for pi in _province_ids.size():
+		if amount > 0.0:
+			var got := _vb_pull(pid, pi, gi, _vb_count(pi, gi) * amount / 100.0 * NATIONAL_PULL_MULT, NATIONAL_STEAL, NATIONAL_DEMOTE)
+			if opposite:
+				_vb_opposite_loss(pid, pi, gi, got)
+			_vb_promote(pid, pi, gi, float(promote[0]), float(promote[1]))
+		elif amount < 0.0:
+			_vb_demote_own(pid, pi, gi, _vb_cell(voter_base[pid], pi, gi) * -amount / 100.0 * NATIONAL_PULL_MULT)
+	_vb_sync_groups(pid)
+	for other in voter_base.keys():
+		if int(other) != pid:
+			_vb_sync_groups(int(other))
+	return float(PartyManager.groups_of(pid).get(group, 0.0)) - before
+
+## SKANDAL: partinin seçmeni bir seviye düşer (province "" = bütün iller).
+func _vb_scandal(target: int, province_id: String = "") -> void:
+	_vb_ensure()
+	var pid := party_of(target)
+	if not voter_base.has(pid):
+		return
+	var frac := SCANDAL_THEOLOGIAN_SHARE if PoliticianPresets.party_has_background(pid, "ilahiyatci") else 1.0
+	for pi in _province_ids.size():
+		if province_id != "" and String(_province_ids[pi]) != province_id:
+			continue
+		for gi in VB_GROUPS:
+			_vb_demote_fraction(pid, pi, gi, frac)
+	_vb_sync_groups(pid)
+
+## Bölünme / birleşme: from'un tabanının frac'ı to'ya geçer (aynı seviyeyle).
+func _vb_transfer(from_pid: int, to_pid: int, frac: float) -> void:
+	_vb_check()
+	if not voter_base.has(from_pid):
+		return
+	var src: PackedFloat32Array = voter_base[from_pid]
+	var dst := _vb_arr(to_pid)
+	for i in src.size():
+		var moved := src[i] * frac
+		src[i] -= moved
+		dst[i] += moved
+	voter_base[from_pid] = src
+	voter_base[to_pid] = dst
+	_vb_sync_groups(from_pid)
+	_vb_sync_groups(to_pid)
+
+## İldeki bağlı seçmen (parti -> sayı) ve kararsızlar: seçim modelinin girdisi.
+func vb_province_state(province_id: String) -> Dictionary:
+	_vb_ensure()
+	var pi: int = _vb_index.get(province_id, -1)
+	var attached := {}
+	var undecided := 0.0
+	if pi < 0:
+		return {"attached": attached, "undecided": 0.0}
+	var used := 0.0
+	var electorate := 0.0
+	for gi in VB_GROUPS:
+		electorate += _vb_count(pi, gi)
+	for pid in _vb_parties():
+		var n := 0.0
+		if voter_base.has(pid):
+			for gi in VB_GROUPS:
+				n += _vb_cell(voter_base[pid], pi, gi)
+		attached[pid] = n
+		used += n
+	undecided = maxf(0.0, electorate - used)
+	return {"attached": attached, "undecided": undecided}
+
+func vb_election_state() -> Dictionary:
+	var state := {}
+	for province_id in _province_ids:
+		state[province_id] = vb_province_state(String(province_id))
+	return state
+
+## Partinin her gruptaki ülke geneli seçmen payı seviyelere ayrılmış:
+## grup -> [1. seviye %, 2. seviye %, 3. seviye %] (grubun bütün seçmenine oranla).
+func group_level_shares(peer_id: int) -> Dictionary:
+	_vb_ensure()
+	var pid := party_of(peer_id)
+	var result := {}
+	if not voter_base.has(pid):
+		return result
+	var arr: PackedFloat32Array = voter_base[pid]
+	for gi in VB_GROUPS:
+		var levels := [0.0, 0.0, 0.0]
+		var total := 0.0
+		for pi in _province_ids.size():
+			total += _vb_count(pi, gi)
+			for level in VB_LEVELS:
+				levels[level] = float(levels[level]) + arr[_vb_i(pi, gi, level)]
+		for level in VB_LEVELS:
+			levels[level] = float(levels[level]) / total * 100.0 if total > 0.0 else 0.0
+		result[VoterGroups.GROUP_IDS[gi]] = levels
+	return result
+
+## Ağ ve kayıt: tabanı (parti -> dizi) paketle.
+func _vb_pack() -> Dictionary:
+	return voter_base.duplicate()
+
+func _vb_unpack(data) -> void:
+	voter_base = {}
+	if data is Dictionary:
+		for pid in data:
+			voter_base[int(pid)] = PackedFloat32Array(data[pid])
+	_vb_ready = false
+
 # --- Grup yakınlıkları ve toplantı -------------------------------------------------
 
 ## Partilerin grup yakınlıklarını değiştirir (bkz. PartyManager.apply_group_deltas).
 ## changes: [{"peer", "group", "amount"}]. Dönüş: gerçekleşen [{"peer", "group", "delta"}].
+## 0.0.228: partiler için seçmen tabanına yazılır (bkz. _vb_national_group):
+## pozitif değer grubun ülke genelindeki seçmeninden çeker (zıt grupta yarısı
+## kadar seviye kaybı otomatik); aynı partinin aynı listedeki zıt grup EKSİSİ
+## bu yüzden atlanır. Bağımsızlar eski hitap hesabıyla.
 func _shift_groups(changes: Array) -> Array:
-	return PartyManager.apply_group_deltas(changes)
+	var positive := {}
+	for change in changes:
+		if float(change["amount"]) > 0.0:
+			positive["%d|%s" % [party_of(int(change["peer"])), String(change["group"])]] = true
+	var result: Array = []
+	for change in changes:
+		var pid := party_of(int(change["peer"]))
+		var group := String(change["group"])
+		var amount := float(change["amount"])
+		if PartyManager.is_independent(pid) or not PartyManager.parties.has(pid):
+			result.append_array(PartyManager.apply_group_deltas([change]))
+			continue
+		if amount < 0.0 and positive.has("%d|%s" % [pid, VoterGroups.opposite(group)]):
+			continue
+		result.append({"peer": pid, "group": group, "delta": _vb_national_group(pid, group, amount)})
+	return result
 
 ## Sıra gelen oyuncunun GRUP TOPLANTISI: bir seçmen grubunun sorunlarını konuşur.
 func make_speech(group: String) -> void:
@@ -2852,12 +3365,13 @@ func _apply_speech(peer_id: int, group: String) -> void:
 	speech_done = true
 	var pid := party_of(peer_id)
 	speech_rounds[pid] = round_number
-	var entry: Dictionary = group_meetings.get(pid, {})
-	entry[group] = round_number
-	group_meetings[pid] = entry
-	var text := L.t("%s, %s ile grup toplantısı yaptı (%s): o grupta geçici, %s.") % [
+	# 0.0.228: toplantı KALICI ve güçlü: grubun ülke genelindeki seçmeninden
+	# çeker, partinin o gruptaki seçmenini yükseltir (zıt grupta yarısı kadar kayıp).
+	var points := MEETING_PULL_POINTS * (PublicOpinion.AGENDA_LAW_MULT if crisis_group() == group else 1.0)
+	var moved := _vb_national_group(pid, group, _own_effect(pid, points), MEETING_PROMOTE)
+	var text := L.t("%s, %s ile grup toplantısı yaptı (%s): o grupta %s.") % [
 		_party_name(peer_id), VoterGroups.title(group), String(VoterGroups.data(group).get("meeting", "")),
-		EffectWords.change(PublicOpinion.MEETING_BONUS[0], "group")]
+		EffectWords.change(moved, "group")]
 	if crisis_group() == group:
 		_add_national(pid, PublicOpinion.CRISIS_RESPONSE_NATIONAL)
 		text += L.t(" Gündeme yanıt verdi (ulusal destek).")
@@ -2970,6 +3484,7 @@ func _split_party(parent: int) -> void:
 	var seats_before := int(last_seats.get(parent, 0))
 	var share := _rng.randf_range(PublicOpinion.SPLIT_SEAT_SHARE_MIN, PublicOpinion.SPLIT_SEAT_SHARE_MAX)
 	var moved := _move_seats(parent, splinter, maxi(1, int(round(seats_before * share))))
+	_vb_transfer(parent, splinter, share)
 	election_seats[splinter] = mini(moved, int(election_seats.get(parent, 0)))
 	election_seats[parent] = maxi(0, int(election_seats.get(parent, 0)) - int(election_seats[splinter]))
 	var vote := float(last_vote_shares.get(parent, 0.0))
@@ -3009,6 +3524,8 @@ func _merge_splinter(splinter: int) -> void:
 	var parent := int(splinters[splinter]["parent"])
 	var splinter_name := _party_name(splinter)
 	var moved := _move_seats(splinter, parent, int(last_seats.get(splinter, 0)))
+	_vb_transfer(splinter, parent, 1.0)
+	voter_base.erase(splinter)
 	election_seats[parent] = int(election_seats.get(parent, 0)) + int(election_seats.get(splinter, 0))
 	last_vote_shares[parent] = float(last_vote_shares.get(parent, 0.0)) + float(last_vote_shares.get(splinter, 0.0))
 	for province_id in organizations.keys():
@@ -3151,6 +3668,8 @@ func _apply_reputation(peer_id: int, target_peer_id: int) -> void:
 		damage *= PoliticianPresets.CLERIC_DAMAGE_MULT
 	_add_turmoil(target_peer_id, PublicOpinion.TURMOIL_REPUTATION)
 	_add_national(target_peer_id, -damage)
+	# 0.0.228: kaset partinin BÜTÜN seçmenini bir seviye düşürür (ilahiyatçı: yarısı).
+	_vb_scandal(target_peer_id)
 	# ANONİM: kaseti kimin sızdırdığı hiçbir yerde gösterilmez.
 	_event_message = L.t("%s hakkında kaset sızdı: %s, parti içinde karışıklık.") % [
 		_party_name(target_peer_id), EffectWords.change(-damage)]
@@ -3264,7 +3783,7 @@ func _peek_turn_card(peer_id: int) -> String:
 ## Tur geliri: hükümette görevi olan partiler bir fazla para alır.
 func turn_income(peer_id: int) -> float:
 	var base := float(GameRules.FUNDS_PER_ROUND_GOVERNMENT if is_government_party(peer_id) else GameRules.FUNDS_PER_ROUND)
-	return maxf(0.0, base - bot_funds_penalty(peer_id)) + float(org_income(peer_id))
+	return maxf(0.0, base - bot_funds_penalty(peer_id)) + org_income(peer_id)
 
 ## Partinin teşkilatlı il sayısı.
 func org_count(peer_id: int) -> int:
@@ -3280,15 +3799,14 @@ func org_cost_for(peer_id: int, province_id: String = "") -> float:
 	var level := organization_level(province_id, peer_id) if province_id != "" else 0
 	return GameRules.org_cost(level, org_count(peer_id))
 
-## Partinin teşkilatlarının tur başı geliri (1. seviye +5, 2. seviye +10 / il,
-## toplamı en fazla GameRules.ORG_INCOME_CAP).
-func org_income(peer_id: int) -> int:
+## Partinin teşkilatlarının tur başı geliri (1. seviye +2,5, 2. seviye +8 / il; sınırsız).
+func org_income(peer_id: int) -> float:
 	var pid := party_of(peer_id)
-	var total := 0
+	var total := 0.0
 	for province_id in organizations.keys():
 		var level := int((organizations[province_id] as Dictionary).get(pid, 0))
-		total += int(GameRules.ORG_INCOME[clampi(level, 0, GameRules.ORG_INCOME.size() - 1)])
-	return mini(total, GameRules.ORG_INCOME_CAP)
+		total += float(GameRules.ORG_INCOME[clampi(level, 0, GameRules.ORG_INCOME.size() - 1)])
+	return total
 
 ## Lobi kuralı: botlar tur başında ve bağış kampanyalarından bu kadar az para alır.
 func bot_funds_penalty(peer_id: int) -> float:
@@ -3462,7 +3980,8 @@ func _hold_election(finished_round: int, early: bool) -> void:
 		"seats_before": last_seats.duplicate(),
 	}
 	var result := ElectionModel.compute(groups, _province_seat_counts, province_voters(),
-		MultiplayerManager.election_threshold, _election_rng(finished_round), mods, alliance_membership() if alliances_enabled else {})
+		MultiplayerManager.election_threshold, _election_rng(finished_round), mods, alliance_membership() if alliances_enabled else {},
+		vb_election_state())
 	_add_independent_seats(result, groups, mods, finished_round)
 	# Fesihten kalan Bağımsızlar bloğu seçimle dağılır (aşağıda sonuçlar yazılınca).
 	if PartyManager.parties.has(PartyManager.BLOC_ID):
@@ -4532,6 +5051,9 @@ func _rekey_party(old_id: int, new_id: int, new_member: int) -> void:
 		data["deputy"] = new_member
 	PartyManager.parties.erase(old_id)
 	PartyManager.parties[new_id] = data
+	if voter_base.has(old_id):
+		voter_base[new_id] = voter_base[old_id]
+		voter_base.erase(old_id)
 	for alliance_id in alliances.keys():
 		var alliance: Dictionary = alliances[alliance_id]
 		var members: Array = alliance.get("members", []).duplicate()
@@ -4614,6 +5136,7 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"alliances_enabled": alliances_enabled,
 		"alliances": alliances,
 		"alliance_requests": alliance_requests,
+		"voter_base": _vb_pack(),
 		"alliance_request_next": _next_alliance_request,
 		"former_allies": former_allies,
 		"last_election_alliances": last_election_alliances,
@@ -4712,6 +5235,7 @@ func _apply_state(state: Dictionary) -> void:
 	alliances_enabled = bool(state.get("alliances_enabled", true))
 	alliances = state.get("alliances", {})
 	alliance_requests = state.get("alliance_requests", {})
+	_vb_unpack(state.get("voter_base", {}))
 	_next_alliance_request = int(state.get("alliance_request_next", 0))
 	former_allies = state.get("former_allies", {})
 	last_election_alliances = state.get("last_election_alliances", {})
@@ -4825,6 +5349,7 @@ func _emit_post_event(event: Dictionary) -> void:
 	# Seçim: ekran ÖNCE donsun (bkz. GameScreen._on_election_completed), sonra
 	# paneller güncellensin — yoksa sonuç bir an önceden görünüyordu.
 	if type == "election":
+		GameLog.note_election()
 		election_completed.emit()
 	if type == "congress":
 		congress_started.emit(event.get("congress", {}))

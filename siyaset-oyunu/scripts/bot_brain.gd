@@ -483,23 +483,23 @@ static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 ## (seçim bu tur sonundaysa +10, bir tur sonraysa +3...). Grup, ülkede en
 ## kalabalık olan ve bot için en çok uyum getiren gruptur; kriz grubu ek puan.
 ## Dönüş: {"group", "score"} (boş: toplantı hiç değmez).
+## 0.0.228: toplantı KALICI seçmen kazandırır: bot çekirdek grubuyla toplanır
+## (zıt gruba asla), kriz grubu ek puan.
 static func choose_speech(bot: int) -> Dictionary:
-	var next := GameRules.next_election_round(CardManager.round_number)
-	var age := next - CardManager.round_number if next != -1 else 99
-	var bonus := PublicOpinion.meeting_bonus(age)
 	var crisis := CardManager.crisis_group()
-	var base := _national_appeal(CardManager.effective_groups(bot))
+	var core: Array = PartyManager.data_of(CardManager.party_of(bot)).get("core", [])
 	var best := {}
 	for group in VoterGroups.GROUP_IDS:
-		var score := 0.0
-		if bonus > 0.0:
-			var boosted := VoterGroups.with_bonus(CardManager.effective_groups(bot), {group: bonus})
-			score = (_national_appeal(boosted) - base) * MEETING_VALUE
+		var score := 0.4
+		if core.has(group):
+			score = 1.2
+		elif core.has(VoterGroups.opposite(group)):
+			score = -1.0
 		if group == crisis:
 			score += CRISIS_MEETING_BONUS
 		# Eşitlikte botlar hep aynı grubu seçmesin.
 		score += float((absi(bot) + CardManager.round_number + group.length()) % 7) * 0.005
-		score += _jitter(bot, 0.5)  # zayıf bot bazen yanlış grupla toplanır
+		score += _jitter(bot, 0.2)  # zayıf bot bazen yanlış grupla toplanır
 		if best.is_empty() or score > float(best["score"]):
 			best = {"group": group, "score": score}
 	return best
@@ -867,48 +867,91 @@ static func _attack_target(bot: int) -> int:
 			target = peer_id
 	return target
 
-## Beklenen il gücü kazancı × ilin vekil sayısı × partinin o ildeki uyumu +
-## mitingin siyasi hitabının (ilin baskın gruplarına kayma) ülke geneli değeri.
+## MİTİNG YERİ (0.0.228): bot KALE kurar. İlin değeri vekil sayısıyla değil,
+## partinin çekirdek gruplarının o ildeki YOĞUNLUĞUYLA ölçülür (büyük şehir
+## kendiliğinden kazanmaz): çekirdek grup payı + diğer grupların küçük katkısı −
+## çekirdeğin zıt gruplarının payı (zıt grupta seviye kaybı). Teşkilatı ya da
+## memleketi olan il, kaleyi büyütmek için daha değerli; partinin ilde zaten
+## çok seçmeni varsa getiri azalır. Vekil sayısı çok hafif (0,15 kuvvet) girer;
+## uyum, en uygun ile oranla 4. kuvvetten girer: ideolojisinin yoğun olduğu
+## iller açıkça öne çıkar.
 static func _eval_miting(bot: int) -> Dictionary:
 	var best_province := ""
 	var best_focus: Array = []
 	var best_value := -INF
+	var core: Array = PartyManager.data_of(CardManager.party_of(bot)).get("core", [])
+	var home := PoliticianPresets.hometown_of(bot)
+	var best_fit := 0.0001
 	for province_id in _seats().keys():
-		# Miting teşkilat istemez; teşkilat etkiyi ve odak sayısını artırır.
+		best_fit = maxf(best_fit, _ideology_fit(bot, String(province_id), core))
+	for province_id in _seats().keys():
 		var org_level := CardManager.organization_level(String(province_id), bot)
 		var org_mult := PublicOpinion.miting_org_mult(org_level)
 		var risk := CardManager.miting_risk(bot, province_id)
 		var seats := float(CardManager.province_seat_count(province_id))
-		var closeness := PublicOpinion.appeal_closeness(CardManager.appeal_of(province_id, bot))
-		var expected := (1.0 - risk) * PublicOpinion.MITING_LOCAL + risk * PublicOpinion.PROVOCATION_LOCAL
-		var focus := _miting_focus(bot, province_id, org_level)
-		var changes: Array = []
-		for effect in CardManager.miting_group_gains(bot, province_id, focus):
-			changes.append({"group": effect["group"], "amount": float(effect["gain"])})
-		var positioning := _appeal_gain(bot, changes) * APPEAL_TO_POINTS * PERMANENT_GAIN_VALUE
-		# İl başkanlığıyla aynı ölçek (vekil/30). Zaten güçlü olduğu ilde getirisi azalır.
-		var diminish := 1.0 / (1.0 + maxf(0.0, CardManager.activity_of(province_id, bot)) / 2.0)
-		var value := (expected / PublicOpinion.MITING_LOCAL * seats / 30.0 * (0.5 + closeness) * diminish \
-			+ risk * PublicOpinion.PROVOCATION_NATIONAL) * org_mult + (1.0 - risk) * positioning
-		value += _jitter(bot, 0.3)  # zayıf bot yanlış ilde miting yapar
+		var fit := _ideology_fit(bot, String(province_id), core)
+		var held := _province_hold(bot, String(province_id))
+		var stronghold := 1.0 + 0.35 * float(org_level) + (0.4 if String(province_id) == home else 0.0)
+		var value := pow(fit / best_fit, 4.0) * org_mult * stronghold * pow(maxf(1.0, seats), 0.15) / (1.0 + held * 4.0) * 0.6 \
+			+ risk * PublicOpinion.PROVOCATION_NATIONAL
+		value *= 1.0 - risk
+		value += _jitter(bot, 0.05)  # zayıf bot yanlış ilde miting yapar
 		if value > best_value:
 			best_value = value
 			best_province = province_id
-			best_focus = focus
+			best_focus = _miting_focus(bot, province_id, org_level)
 	if best_province == "":
 		return {}
 	var score := best_value * 1.4 * (1.4 if _election_soon() else 1.0)
 	return {"score": score, "peer": -1, "province": best_province, "focus": best_focus}
+
+## İlin partinin ideolojisine uygunluğu (0..1 civarı): çekirdek grupların ildeki
+## payı, diğerlerinin dörtte biri, çekirdeğin zıtları eksi yarısı.
+static func _ideology_fit(bot: int, province_id: String, core: Array) -> float:
+	var profile := CardManager.province_profile(province_id)
+	var electorate := 0.0
+	var counts := {}
+	for group in VoterGroups.GROUP_IDS:
+		var n := VoterGroups.group_count(profile, group)
+		counts[group] = n
+		electorate += n
+	if electorate <= 0.0:
+		return 0.0
+	var fit := 0.0
+	for group in VoterGroups.GROUP_IDS:
+		var share := float(counts[group]) / electorate
+		if core.has(group):
+			fit += share
+		elif core.has(VoterGroups.opposite(group)):
+			fit -= share * 0.5
+		else:
+			fit += share * 0.25
+	return maxf(0.05, fit)
+
+## Partinin ildeki bağlı seçmen oranı (0..1).
+static func _province_hold(bot: int, province_id: String) -> float:
+	var state := CardManager.vb_province_state(province_id)
+	var attached: Dictionary = state.get("attached", {})
+	var total := float(state.get("undecided", 0.0))
+	for pid in attached:
+		total += float(attached[pid])
+	return float(attached.get(CardManager.party_of(bot), 0.0)) / total if total > 0.0 else 0.0
 
 ## Botun mitingte odaklanacağı gruplar: ildeki teşkilat seviyesi kadar, ülke
 ## geneli uyumuna en çok katkı yapan gruplar (tek tek denenir).
 static func _miting_focus(bot: int, province_id: String, slots: int) -> Array:
 	if slots <= 0:
 		return []
+	# 0.0.228: önce çekirdek gruplar (ildeki seçmen sayısıyla), sonra diğerleri;
+	# çekirdeğin zıt grubu hiç seçilmez.
+	var core: Array = PartyManager.data_of(CardManager.party_of(bot)).get("core", [])
+	var profile := CardManager.province_profile(province_id)
 	var ranked: Array = []
-	for effect in CardManager.miting_group_gains(bot, province_id):
-		var value := _appeal_gain(bot, [{"group": effect["group"], "amount": float(effect["gain"]) * (PublicOpinion.MITING_FOCUS_MULT - 1.0)}])
-		ranked.append({"group": String(effect["group"]), "value": value})
+	for group in VoterGroups.GROUP_IDS:
+		if core.has(VoterGroups.opposite(group)):
+			continue
+		var value := VoterGroups.group_count(profile, group) * (3.0 if core.has(group) else 1.0)
+		ranked.append({"group": String(group), "value": value})
 	ranked.sort_custom(func(a, b): return float(a["value"]) > float(b["value"]))
 	var focus: Array = []
 	for item in ranked:

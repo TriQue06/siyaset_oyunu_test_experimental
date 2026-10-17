@@ -5858,6 +5858,9 @@ func _on_speech_button_pressed() -> void:
 	if not CardManager.can_act():
 		_show_toast(L.t("Sıran değil."))
 		return
+	if not CardManager.has_parliament_group(me):
+		_show_toast(L.t("Grup toplantısı için mecliste grup gerekir: en az %d vekil.") % CardManager.group_seat_requirement())
+		return
 	if not CardManager.needs_speech(me):
 		_show_toast(L.t("Partin bu dönem grup toplantısını zaten yaptı."))
 		return
@@ -5906,15 +5909,8 @@ func _place_speech_panel() -> void:
 
 ## Toplantının seçime göre zamanlaması: bonus seçimde ne kadar olur?
 func _meeting_timing_text() -> String:
-	var next := GameRules.next_election_round(CardManager.round_number)
-	var bonus_text := L.t("Geçici destek: bu dönem %s, sonra hızla söner.") % EffectWords.adjective(PublicOpinion.MEETING_BONUS[0], "group")
-	if next == -1:
-		return bonus_text
-	var age := next - CardManager.round_number
-	var at_election := PublicOpinion.meeting_bonus(age)
-	if at_election > 0.0:
-		return bonus_text + L.t(" Seçimde hâlâ %s etkisi olur.") % EffectWords.adjective(at_election, "group")
-	return bonus_text + L.t(" Seçime %d dönem var: seçime kadar söner.") % age
+	# 0.0.228: toplantı kalıcıdır (seçmen tabanı).
+	return L.t("Kalıcı: grubun ülke genelindeki seçmeninden çekersin ve o gruptaki seçmenlerinin sadakati artar. Zıt grupta seçmenlerinin bir kısmı soğur.")
 
 ## Bir seçmen grubu düğmesi: simge + tam ad + partinin şu anki desteği.
 ## Gündem bu grubu istiyorsa altın not.
@@ -5925,9 +5921,8 @@ func _speech_row(group: String, value: float) -> Control:
 	button.clip_text = false
 	UiSkin.skin_color_button(button, VoterGroups.color(group).darkened(0.4))
 	var crisis := CardManager.crisis_group() == group
-	button.tooltip_text = L.t("%s\nKonu: %s\nPartinin bu gruptaki desteği %s; toplantı bu dönem %s.%s") % [
+	button.tooltip_text = L.t("%s\nKonu: %s\nPartinin bu gruptaki desteği %s; toplantı kalıcı seçmen kazandırır.%s") % [
 		VoterGroups.title(group), String(VoterGroups.data(group).get("meeting", "")), VoterGroups.percent_text(value),
-		EffectWords.change(PublicOpinion.MEETING_BONUS[0], "group"),
 		L.t("\nGÜNDEMDE: toplantı ulusal destek de kazandırır.") if crisis else ""]
 	var row := HBoxContainer.new()
 	row.set_anchors_preset(Control.PRESET_FULL_RECT)

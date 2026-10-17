@@ -407,19 +407,19 @@ func _initialize() -> void:
 	mm.bot_funds_penalty = 5.0
 
 	print("=== TEŞKİLAT GELİRİ VE BEDELLER ===")
-	# Teşkilat geliri il başına 5 / 10 milyon ₺, toplamı en fazla ORG_INCOME_CAP.
+	# 0.0.227: teşkilat geliri il başına 2,5 / 8 milyon ₺, üst sınır yok.
 	var saved_orgs: Dictionary = cm.organizations.duplicate(true)
 	cm.organizations = {}
 	var org_test_pid: String = String(cm._province_ids[5])
-	var income_before: int = cm.org_income(me)
+	var income_before: float = cm.org_income(me)
 	cm.organizations[org_test_pid] = {cm.party_of(me): 1}
-	var lvl1: int = cm.org_income(me)
+	var lvl1: float = cm.org_income(me)
 	cm.organizations[org_test_pid][cm.party_of(me)] = 2
-	var lvl2: int = cm.org_income(me)
-	check("1. seviye teşkilat +5, 2. seviye +10 milyon ₺", income_before == 0 and lvl1 == 5 and lvl2 == 10, "%d %d %d" % [income_before, lvl1, lvl2])
+	var lvl2: float = cm.org_income(me)
+	check("1. seviye teşkilat +2,5, 2. seviye +8 milyon ₺", income_before == 0.0 and is_equal_approx(lvl1, 2.5) and is_equal_approx(lvl2, 8.0), "%.1f %.1f %.1f" % [income_before, lvl1, lvl2])
 	for i in 20:
 		cm.organizations[String(cm._province_ids[i])] = {cm.party_of(me): 2}
-	check("teşkilat geliri üst sınırı (sınırsız para yok)", cm.org_income(me) == GameRules.ORG_INCOME_CAP, str(cm.org_income(me)))
+	check("teşkilat gelirinin üst sınırı yok", is_equal_approx(cm.org_income(me), 160.0), str(cm.org_income(me)))
 	cm.organizations = saved_orgs
 	check("yasa ve toplantı bedelsiz, kongre 10 / üye 20", GameRules.LAW_FUNDS_COST == 0 and GameRules.EARLY_ELECTION_FUNDS_COST == 0 and GameRules.CENSURE_FUNDS_COST == 0 and GameRules.SPEECH_FUNDS_COST == 0
 		and cm.CONGRESS_COST == 10 and cm.CONGRESS_REQUEST_COST == 20)

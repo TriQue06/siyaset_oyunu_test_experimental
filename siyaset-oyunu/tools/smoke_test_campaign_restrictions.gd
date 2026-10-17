@@ -46,6 +46,9 @@ func run() -> void:
 	screen.queue_free()
 	await process_frame
 	cm.last_election_round = 1
-	check(cm.needs_speech(1), "meeting available after first election")
+	cm.last_seats[cm.party_of(1)] = 10
+	check(not cm.needs_speech(1), "no meeting without a parliamentary group (0.0.227)")
+	cm.last_seats[cm.party_of(1)] = cm.group_seat_requirement()
+	check(cm.needs_speech(1), "meeting available after first election with a group")
 	check(not cm.start_disaster("deprem", [province]).is_empty(), "disaster available after first election")
 	quit(1 if fails else 0)

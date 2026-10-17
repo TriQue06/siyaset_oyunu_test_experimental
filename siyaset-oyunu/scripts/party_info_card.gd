@@ -198,30 +198,30 @@ static func _add_group_section(box: VBoxContainer, peer_id: int) -> void:
 	var groups := PartyManager.groups_of(pid)
 	var before: Dictionary = CardManager.election_groups.get(pid, {})
 	var votes := CardManager.group_vote_estimates(pid)
-	box.add_child(PopupKit.section(L.t("Seçmen grupları"), L.t("tahmini oy payın")))
-	box.add_child(_group_chart(votes))
-	# Sıkı tablo: ad · oy · hitap ▲▼ (adlar kısaltılmaz, yazı küçük).
+	var levels := CardManager.group_level_shares(pid)
+	box.add_child(PopupKit.section(L.t("Seçmen grupları"), L.t("sana bağlı seçmen")))
+	box.add_child(_group_chart(votes, levels))
+	# Sıkı tablo: ad · oy ▲▼ (0.0.228: oy = grubun partiye bağlı payı; hitap ile aynı).
 	var table := GridContainer.new()
-	table.columns = 3
+	table.columns = 2
 	table.add_theme_constant_override("h_separation", 4)
 	table.add_theme_constant_override("v_separation", 1)
 	table.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(table)
-	for head in [L.t("Grup"), L.t("Oy"), L.t("Hitap")]:
+	for head in [L.t("Grup"), L.t("Oy")]:
 		var h := _label(head, 8, DIM)
 		if head != L.t("Grup"):
 			h.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		table.add_child(h)
 	for group in VoterGroups.GROUP_IDS:
-		var value := float(groups.get(group, VoterGroups.AFFINITY_NEUTRAL))
+		var value := float(votes.get(group, groups.get(group, 0.0)))
 		var delta := value - float(before[group]) if before.has(group) else 0.0
 		var name := _label(VoterGroups.title(group), 8, VoterGroups.color(group).lightened(0.25))
 		name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		table.add_child(name)
-		table.add_child(_num_cell(L.pct(float(votes.get(group, 0.0)), 0), UiTheme.TEXT))
 		var arrow := "▲" if delta >= 0.05 else ("▼" if delta <= -0.05 else "")
-		table.add_child(_num_cell(L.pct(value, 0) + arrow, UiTheme.GREEN if delta >= 0.05 else (UiTheme.RED if delta <= -0.05 else DIM)))
-	box.add_child(PopupKit.note(L.t("Oy: gruptaki tahmini oy payın · Hitap: grubun sana bağlı kısmı (▲▼ son seçimden beri)"), DIM, _text_width()))
+		table.add_child(_num_cell(L.pct(value, 1) + arrow, UiTheme.GREEN if delta >= 0.05 else (UiTheme.RED if delta <= -0.05 else UiTheme.TEXT)))
+	box.add_child(PopupKit.note(L.t("Oy: grubun ülke genelinde sana bağlı seçmen payı (▲▼ son seçimden beri)."), DIM, _text_width()))
 
 static func _num_cell(text: String, color: Color) -> Label:
 	var label := _label(text, 8, color)
@@ -231,7 +231,10 @@ static func _num_cell(text: String, color: Color) -> Label:
 
 ## 8 dikey sütun: grup renginde, yüksekliği oy payıyla orantılı (en yüksek
 ## sütun kutuyu doldurur), üstte yüzde, altta grup simgesi.
-static func _group_chart(votes: Dictionary) -> Control:
+## SEÇMEN SEVİYESİ (0.0.228): sütun seviyelere bölünür — altta koyu (3. seviye,
+## en sadık), ortada grubun kendi rengi (2.), üstte açık (1.). Yazı yok; renk
+## tonu anlatır. levels boşsa (bağımsız) düz sütun.
+static func _group_chart(votes: Dictionary, levels: Dictionary = {}) -> Control:
 	var top := 1.0
 	for group in VoterGroups.GROUP_IDS:
 		top = maxf(top, float(votes.get(group, 0.0)))
@@ -253,10 +256,21 @@ static func _group_chart(votes: Dictionary) -> Control:
 		well.custom_minimum_size = Vector2(0, 34)
 		well.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var color := VoterGroups.color(group)
+		var parts: Array = levels.get(group, [])
 		well.draw.connect(func():
 			var h := well.size.y * clampf(value / top, 0.0, 1.0)
 			well.draw_rect(Rect2(Vector2(2, 0), Vector2(well.size.x - 4, well.size.y)), UiTheme.SLOT, true)
-			well.draw_rect(Rect2(Vector2(2, well.size.y - h), Vector2(well.size.x - 4, h)), color, true))
+			if parts.size() != 3 or value <= 0.0:
+				well.draw_rect(Rect2(Vector2(2, well.size.y - h), Vector2(well.size.x - 4, h)), color, true)
+				return
+			var shades := [color.lightened(0.45), color, color.darkened(0.45)]
+			var y := well.size.y
+			for level in [2, 1, 0]:
+				var part_h := h * float(parts[level]) / value
+				if part_h <= 0.0:
+					continue
+				well.draw_rect(Rect2(Vector2(2, y - part_h), Vector2(well.size.x - 4, part_h)), shades[level], true)
+				y -= part_h)
 		col.add_child(well)
 		var icon := VoterGroupIcon.make(group, 16.0)
 		icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER

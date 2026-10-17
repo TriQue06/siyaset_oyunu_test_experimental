@@ -40,7 +40,7 @@ const LOCAL_DECAY := 0.72
 const MITING_LOCAL := 2.5
 ## TEŞKİLAT (0.0.213): miting teşkilat istemez ama teşkilatsız miting az getirir.
 ## Seviye 0 / 1 / 2 → etki 1x / 2x / 3x; seviye kadar grup ODAĞI seçilebilir.
-const MITING_ORG_MULT := [1.0, 2.0, 3.0]
+const MITING_ORG_MULT := [1.0, 2.0, 3.5]  # 0.0.227: 2. seviye 3 -> 3,5
 ## ULUSAL HİTAP: miting ildeki HER grubun bir kısmını kazanır, il nüfusuyla
 ## orantılı: gruptaki kazanç (yüzde puan) = MITING_CONVERT × teşkilat çarpanı ×
 ## ildeki grup seçmeni / ülkedeki grup seçmeni × 100. Odak gruplarda
@@ -116,13 +116,13 @@ const AGENDA_LAW_MULT := 1.3
 # --- Teşkilat ------------------------------------------------------------------
 ## Seviyeye göre KALICI aktivite (sönmez): 1 az, 2 orta, 3 yüksek oy bonusu.
 ## Seviye 0, 1, 2 (2 = tavan; eski 3. seviyenin bonusu buraya taşındı).
-const ORG_ACTIVITY_BY_LEVEL := [0.0, 2.5, 6.0]
+const ORG_ACTIVITY_BY_LEVEL := [0.0, 2.5, 8.0]  # 0.0.227: 2. seviye 6 -> 8
 ## MİTİNG ve KARALAMA artık teşkilat ister; izin kontrolü CardManager'da
 ## (can_miting / can_play_card) yapılır. Buradaki çarpan sadece ETKİ içindir:
 ## 2. seviye teşkilatın olduğu ilde miting ve karalama biraz daha vurur.
 ## (Seviye 0 zaten hamle yapamaz; çarpanı 1.0 bırakıyoruz ki kural tek yerde
 ## dursun ve yanlışlıkla "etkisiz miting" oluşmasın.)
-const ORG_ACTION_MULT := [1.0, 1.0, 1.3]
+const ORG_ACTION_MULT := [1.0, 1.0, 1.5]  # 0.0.227: 2. seviye 1,3 -> 1,5
 ## Seviye başına miting provokasyon riskinin azalma oranı.
 const ORG_RISK_REDUCTION_PER_LEVEL := 0.35
 

@@ -342,10 +342,10 @@ func _initialize() -> void:
 		and cm.poll_error(1, TestProvinces.id("ankara")) == GameRules.POLL_ERROR_LOW \
 		and not cm.province_poll(1, TestProvinces.id("ankara")).is_empty() and cm.province_poll(2, TestProvinces.id("ankara")).is_empty())
 	check("para yetmezse kurulamaz", not cm.can_build_organization(1, TestProvinces.id("izmir")))
-	cm.funds[1] = 20
+	cm.funds[1] = 50
 	for i in 5:
 		cm._apply_organization(1, TestProvinces.id("izmir"))
-	check("en fazla ORG_MAX_LEVEL", cm.organization_level(TestProvinces.id("izmir"), 1) == GameRules.ORG_MAX_LEVEL and cm.funds_of(1) == 20 - GameRules.ORG_FUNDS_COST - GameRules.ORG_UPGRADE_FUNDS_COST,
+	check("en fazla ORG_MAX_LEVEL (10 + 30 milyon)", cm.organization_level(TestProvinces.id("izmir"), 1) == GameRules.ORG_MAX_LEVEL and cm.funds_of(1) == 50 - GameRules.ORG_FUNDS_COST - GameRules.ORG_UPGRADE_FUNDS_COST,
 		"seviye %d, para %d" % [cm.organization_level(TestProvinces.id("izmir"), 1), cm.funds_of(1)])
 	check("seviye arttikca oy bonusu artar", PublicOpinion.org_activity(1) < PublicOpinion.org_activity(2))
 	var poll3: Dictionary = cm.province_poll(1, TestProvinces.id("izmir"))

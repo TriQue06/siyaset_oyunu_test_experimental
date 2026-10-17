@@ -90,8 +90,24 @@ func fmt(r: Dictionary) -> String:
 	lines += "    bölünme: %s" % r["split"]
 	return lines
 
+## 0.0.228 SEÇMEN TABANI: seçmen çalma sıraya bağlıdır (önce gelen kararsızları
+## alır), tam eşitlik artık beklenmez. Sıra sonucu KÜÇÜK oynatabilir: oy farkı
+## ORDER_VOTE_TOL puandan, vekil farkı ORDER_SEAT_TOL'dan az olmalı; ulusal ve
+## il puanı, karışıklık ve bölünme yine birebir aynı olmalı.
+const ORDER_VOTE_TOL := 0.5
+const ORDER_SEAT_TOL := 3
 func same(a: Dictionary, b: Dictionary) -> bool:
-	return str(a["votes"]) == str(b["votes"]) and str(a["seats"]) == str(b["seats"]) and str(a["pre"]) == str(b["pre"])
+	for pid in [A, B, C]:
+		if absf(float(a["votes"].get(pid, 0.0)) - float(b["votes"].get(pid, 0.0))) > ORDER_VOTE_TOL:
+			return false
+		if absi(int(a["seats"].get(pid, 0)) - int(b["seats"].get(pid, 0))) > ORDER_SEAT_TOL:
+			return false
+		var da: Dictionary = a["pre"][pid]
+		var db: Dictionary = b["pre"][pid]
+		for k in ["nat", "loc", "turmoil", "funds"]:
+			if not is_equal_approx(float(da[k]), float(db[k])):
+				return false
+	return a.get("split", false) == b.get("split", false)
 
 func diff_line(a: Dictionary, b: Dictionary) -> String:
 	var parts: PackedStringArray = []
@@ -249,9 +265,9 @@ func _initialize() -> void:
 	var fails := 0
 	for pair in [["S1 / S1'", s1, s1r], ["S2 / S2'", s2, s2r], ["teşkilat / kaset", o1, o2], ["miting+teşkilat / kaset", m1, m2],
 			["karışıklık 0", t0a, t0b], ["eşik", t1a, t1b], ["ulusal −8", c1, c2], ["il +8", d1, d2]]:
-		var ok := diff_line(pair[1], pair[2]) == "BİREBİR AYNI"
+		var ok := same(pair[1], pair[2])
 		if not ok:
 			fails += 1
-		print("  %s hamle sırası sonucu değiştirmez: %s" % ["[OK] " if ok else "[HATA]", pair[0]])
+		print("  %s hamle sırası sonucu yalnız az oynatır: %s" % ["[OK] " if ok else "[HATA]", pair[0]])
 	print("=== TUM TESTLER GECTI ===" if fails == 0 else "=== %d TEST BASARISIZ ===" % fails)
 	quit(1 if fails > 0 else 0)

@@ -222,24 +222,26 @@ func _initialize() -> void:
 	cm.organizations[game_map.ids[4]] = {1: 2}
 	var g2 := float(cm.miting_group_gains(1, game_map.ids[4])[0]["gain"])
 	cm.organizations.erase(game_map.ids[4])
-	check("teskilat 0 / 1 / 2: etki 1x / 2x / 3x", g0 > 0.0 and near(g1, 2.0 * g0) and near(g2, 3.0 * g0), "%.3f / %.3f / %.3f" % [g0, g1, g2])
+	check("teskilat 0 / 1 / 2: etki 1x / 2x / 3,5x", g0 > 0.0 and near(g1, 2.0 * g0) and near(g2, 3.5 * g0), "%.3f / %.3f / %.3f" % [g0, g1, g2])
 	check("odak sayisi = teskilat seviyesi", cm.miting_focus_slots(1, mid) == 1 and cm.miting_focus_slots(1, game_map.ids[4]) == 0)
 	check("fazla odak kirpilir", cm._clean_focus(1, mid, ["emekli", "genc", "emekli"]) == ["emekli"])
 	var plain_emekli := 0.0
 	for effect in cm.miting_group_gains(1, mid):
 		if effect["group"] == "emekli":
 			plain_emekli = float(effect["gain"])
+	var held_before: float = float(cm.vb_province_state(mid)["attached"].get(1, 0.0))
+	var und_before: float = float(cm.vb_province_state(mid)["undecided"])
 	cm._apply_miting_move(1, mid, 0.0, ["emekli"])
+	var held_after: float = float(cm.vb_province_state(mid)["attached"].get(1, 0.0))
 	var d_isci := float(pm.parties[1]["groups"]["isci"]) - float(g_before["isci"])
 	var d_isveren := float(pm.parties[1]["groups"]["isveren"]) - float(g_before["isveren"])
 	var d_emekli := float(pm.parties[1]["groups"]["emekli"]) - float(g_before["emekli"])
 	var d_genc := float(pm.parties[1]["groups"]["genc"]) - float(g_before["genc"])
 	check("yerel: il aktivitesi MITING_LOCAL x teskilat carpani artar", near(cm.local_of(mid, 1) - loc_before, PublicOpinion.MITING_LOCAL * 2.0))
-	check("ildeki her gruptan kazanir (kalabalik grupta daha cok)", d_isci > 0.0 and d_isveren > 0.0 and d_isci > d_isveren, "%.3f / %.3f" % [d_isci, d_isveren])
-	check("odak grup (emekli) odaksiz mitingin %s kati getirir" % PublicOpinion.MITING_FOCUS_MULT,
-		near(d_emekli, plain_emekli * PublicOpinion.MITING_FOCUS_MULT, 0.01) and d_genc > 0.0, "%.3f / %.3f" % [d_emekli, plain_emekli])
-	check("secmen calma: rakibin emekli hitabi azaldi", float(pm.parties[2]["groups"]["emekli"]) < float(rival_before["emekli"]),
-		"%.3f -> %.3f" % [float(rival_before["emekli"]), float(pm.parties[2]["groups"]["emekli"])])
+	# 0.0.228 SEÇMEN TABANI: miting ildeki seçmenden çeker (kararsızlar ve rakipler);
+	# odak/toplam kuralları smoke_test_voter_levels'ta.
+	check("miting ildeki bagli secmeni artirir", held_after > held_before, "%.0f -> %.0f" % [held_before, held_after])
+	check("cekilenin bir kismi kararsizlardan", float(cm.vb_province_state(mid)["undecided"]) < und_before)
 	var hitap_total := 0.0
 	for pid in [1, 2]:
 		hitap_total += float(pm.parties[pid]["groups"]["emekli"])
@@ -260,10 +262,16 @@ func _initialize() -> void:
 	check("kucuk il (%95 emekli, 3 vekil): odakli miting emeklide en cok ~%2", tiny_gain > 0.3 and tiny_gain <= 2.5, "%.2f" % tiny_gain)
 	cm.organizations.erase(tiny)
 	check("miting il profilini degistirmez", str(cm.province_profiles[mid]) == profile_before)
-	var g_mid: Dictionary = pm.parties[1]["groups"].duplicate()
-	cm._apply_miting_move(1, mid)
-	var d_isci2 := float(pm.parties[1]["groups"]["isci"]) - float(g_mid["isci"])
-	check("art arda miting neredeyse ayni getirir (yorgunluk cok kisik)", d_isci2 < d_isci and d_isci2 > d_isci * 0.95, "%.3f -> %.3f" % [d_isci, d_isci2])
+	# Yorgunluk çok kısık: aynı ile art arda iki mitingin çektiği seçmen hemen hemen aynı
+	# (provokasyon zarını dışarıda bırakmak için seçmen hesabı doğrudan çağrılır).
+	var first: Dictionary = cm._vb_miting(1, mid, [], 1.0)
+	var second: Dictionary = cm._vb_miting(1, mid, [], 1.0)
+	var sum1 := 0.0
+	var sum2 := 0.0
+	for g in first:
+		sum1 += float(first[g])
+		sum2 += float(second[g])
+	check("art arda miting yine secmen getirir (yorgunluk cok kisik)", sum2 > sum1 * 0.85, "%.0f -> %.0f" % [sum1, sum2])
 	for i in 40:
 		cm._apply_miting_move(1, mid)
 		cm.local_support = {}
@@ -396,7 +404,7 @@ func _initialize() -> void:
 	check("log siniri asilmaz", cm.event_log.size() == cm.EVENT_LOG_LIMIT)
 
 	print("")
-	print("=== 6) GRUP TOPLANTISI: GECICI VE AZALAN DESTEK ===")
+	print("=== 6) GRUP TOPLANTISI: MECLIS GRUBU, KALICI SECMEN (0.0.228) ===")
 	new_game({1: groups(["isveren", "dindar"]), 2: groups(["isci", "ilerici"]), 3: groups(["genc", "milliyetci"])})
 	cm.speech_required = true
 	cm.speech_done = false
@@ -405,21 +413,20 @@ func _initialize() -> void:
 	var org_pid: String = game_map.ids[2]
 	cm.organizations[org_pid] = {1: 1}
 	cm.last_election_round = 1  # toplantı ilk seçimden sonra
-	check("sira gelince toplanti hakki var", cm.needs_speech(1) and not cm.needs_speech(2))
+	cm.last_seats = {1: 40, 2: 40, 3: 5}
+	check("sira gelince toplanti hakki var (grup varsa)", cm.needs_speech(1) and not cm.needs_speech(2))
 	check("toplantisiz da hamle yapilabilir", cm.can_choose_main_action(1) and cm.can_miting(1, org_pid) \
 		and cm.can_play_card(1, "bagis_kampanyasi"))
 	cm._apply_speech(2, "isci")
 	check("sirasi olmayan toplanamaz", not cm.speech_done)
 	var permanent: Dictionary = pm.parties[1]["groups"].duplicate()
-	var r0: int = cm.round_number
 	cm._apply_speech(1, "emekli")
-	check("toplanti bu tur +%s gecici destek" % PublicOpinion.MEETING_BONUS[0], cm.speech_done and near(float(cm.effective_groups(1)["emekli"]), float(permanent["emekli"]) + PublicOpinion.MEETING_BONUS[0]))
-	check("kalici destek degismez", str(pm.parties[1]["groups"]) == str(permanent))
+	check("toplanti kalici secmen kazandirir", cm.speech_done and float(pm.parties[1]["groups"]["emekli"]) > float(permanent["emekli"]) + 3.0,
+		"%.2f -> %.2f" % [float(permanent["emekli"]), float(pm.parties[1]["groups"]["emekli"])])
 	check("bedel %d para" % GameRules.SPEECH_FUNDS_COST, near(cm.funds_of(1), 100.0 - GameRules.SPEECH_FUNDS_COST))
+	var after_one: Dictionary = pm.parties[1]["groups"].duplicate()
 	cm._apply_speech(1, "genc")
-	check("turda tek toplanti", cm.meeting_bonuses(1).size() == 1)
-	check("sonraki turlarda azalir, sonra 0", near(float(cm.meeting_bonuses(1, r0 + 1).get("emekli", 0.0)), PublicOpinion.MEETING_BONUS[1]) \
-		and near(float(cm.meeting_bonuses(1, r0 + 2).get("emekli", 0.0)), PublicOpinion.MEETING_BONUS[2]) and cm.meeting_bonuses(1, r0 + 3).is_empty())
+	check("turda tek toplanti", str(pm.parties[1]["groups"]) == str(after_one))
 	var nat1: float = cm.national_of(1)
 	cm._apply_pass(1, true)
 	check("toplanan partiye ceza yok", near(cm.national_of(1), nat1))
@@ -427,15 +434,11 @@ func _initialize() -> void:
 	var nat2: float = cm.national_of(2)
 	cm._apply_pass(2, true)
 	check("toplanti yapmamak ulusal ceza getirmez", near(cm.national_of(2), nat2))
-	# Ardışık turlarda aynı gruba toplantı bonusu biriktirmez.
-	cm.group_meetings[1] = {"emekli": r0 + 1}
-	check("ardisik toplanti bonusu toplamaz", near(float(cm.meeting_bonuses(1, r0 + 1).get("emekli", 0.0)), PublicOpinion.MEETING_BONUS[0]))
-	cm.group_meetings[1] = {"emekli": r0}
-	cm._decay_group_effects(r0 + 3)
-	check("suresi dolan toplanti kaydi silinir", not cm.group_meetings.has(1))
-	cm.round_number = r0
+	check("grubu olmayan parti toplanamaz", not cm.has_parliament_group(3))
+	var r0: int = cm.round_number
 	cm.agenda = {"type": "gundem_emekli", "until": r0 + 1}
 	cm.speech_rounds = {}
+	cm.last_seats[3] = 40
 	cm.current_turn_index = cm.turn_order.find(3)
 	var nat3: float = cm.national_of(3)
 	cm.funds[3] = 50.0
@@ -443,14 +446,6 @@ func _initialize() -> void:
 	check("gundemin grubuyla toplanti ulusal destek getirir", near(cm.national_of(3) - nat3, PublicOpinion.CRISIS_RESPONSE_NATIONAL))
 	cm.speech_required = false
 	cm.crisis = {}
-
-	print("")
-	print("=== 7) TOPLANTI SECIM ANINDA SAYILIR ===")
-	new_game({1: groups(["isveren", "dindar"]), 2: groups(["isveren", "dindar"])})
-	var finished: int = cm.round_number
-	cm.group_meetings[1] = {"emekli": finished}
-	var at_election: Dictionary = cm._group_profiles(finished)
-	check("secim turunda yapilan toplanti secim hesabina tam girer", near(float(at_election[1]["emekli"]) - float(at_election[2]["emekli"]), PublicOpinion.MEETING_BONUS[0]))
 
 	print("")
 	print("=== 9) KARISIKLIK, BOLUNME VE GERI DONUS ===")
@@ -478,8 +473,21 @@ func _initialize() -> void:
 	check("karisiklik esigi asildi: parti bolundu", cm.splinters.size() == 1 and cm.turn_order.size() == turn_size + 1,
 		str(cm.splinters))
 	var sid: int = int(cm.splinters.keys()[0]) if not cm.splinters.is_empty() else -1
-	check("ayrilan parti yapay zeka, ayni grup yakinliklari, benzer renk", mm.is_bot(sid) \
-		and str(pm.parties[sid]["groups"]) == str(pm.parties[1]["groups"]) \
+	# 0.0.228: ayrılan parti ana partinin seçmen tabanından pay alır: grup profili
+	# aynı oranlarda (her grupta ayrılan / ana oranı aynı).
+	var ratio := -1.0
+	var same_profile := true
+	for g in VoterGroups.GROUP_IDS:
+		var parent_v := float(pm.parties[1]["groups"][g])
+		var split_v := float(pm.parties[sid]["groups"][g])
+		if parent_v <= 0.001:
+			same_profile = same_profile and split_v <= 0.001
+			continue
+		if ratio < 0.0:
+			ratio = split_v / parent_v
+		same_profile = same_profile and absf(split_v / parent_v - ratio) < 0.01
+	check("ayrilan parti yapay zeka, ayni grup profili, benzer renk", mm.is_bot(sid) \
+		and same_profile \
 		and not Color(pm.parties[sid]["bg_color"]).is_equal_approx(Color(pm.parties[1]["bg_color"])))
 	var split_seats := int(cm.last_seats.get(sid, 0))
 	check("vekillerin ciddi bolumu gecti", split_seats >= int(200 * PublicOpinion.SPLIT_SEAT_SHARE_MIN) - 1 \

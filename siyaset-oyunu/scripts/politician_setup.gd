@@ -1,14 +1,14 @@
 extends Control
 ## SİYASETÇİ PROFİLİ ekranı — parti kurulumundan ÖNCE, her oyuncuya özel.
-## Solda siyasetçinin adı ve 6 geçmiş (her biri bir seçmen grubuyla bağlantılı),
-## sağda bu oyunun haritası: tıklanan il memleket olur. Geçmiş ve memleket
-## seçilince "Partini Kur" açılır; seçimler PartyManager.set_my_politician ile
+## Solda siyasetçinin adı, meslekler ve kişilikler; sağda bu oyunun haritası:
+## tıklanan il memleket olur. Meslek, kişilik ve memleket seçilince "Partini Kur" açılır; seçimler PartyManager.set_my_politician ile
 ## gider ve oyuncu Parti Kurulum ekranına geçer. Kurallar: PoliticianPresets.
 ## Arayüz tamamen kodla kurulur (sahne sadece kök düğüm).
 
 const MAP_SCENE := preload("res://scenes/Map.tscn")
 const LEFT_WIDTH := 540.0
-const CARD_SIZE := Vector2(258, 132)
+const CARD_SIZE := Vector2(258, 150)
+const TRAIT_CARD_SIZE := Vector2(170, 118)
 const MAP_PADDING := 12.0
 const HOME_COLOR := Color("FFC93C")
 ## Cinsiyet düğmeleri: erkek mavi, kadın pembe.
@@ -16,6 +16,7 @@ const GENDER_STYLE := {"m": {"text": "Erkek", "color": Color("3A8DE0")},
 	"f": {"text": "Kadın", "color": Color("E8559C")}}
 
 var _background_id: String = ""
+var _trait_id: String = ""
 var _hometown: String = ""
 var _hovered: String = ""
 var _gender: String = "m"
@@ -28,6 +29,7 @@ var _surname: String = ""
 var _first_edit: LineEdit
 var _surname_edit: LineEdit
 var _cards: Dictionary = {}          # background id -> Button
+var _trait_cards: Dictionary = {}    # trait id -> Button
 var _map_clip: Control
 var _map: Node2D
 var _info_title: Label
@@ -134,30 +136,42 @@ func _build_left() -> Control:
 	dice_row.add_child(_lang_button)
 	_reroll_name(true, true)
 
-	body.add_child(PopupKit.section(L.t("Geçmiş"), L.t("partini bir seçmen grubuna biraz yaklaştırır")))
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	body.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.add_theme_constant_override("separation", 8)
+	scroll.add_child(list)
+	list.add_child(PopupKit.section(L.t("Meslek"), L.t("oyun boyunca sana bir avantaj verir")))
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 8)
 	grid.add_theme_constant_override("v_separation", 8)
-	scroll.add_child(grid)
+	list.add_child(grid)
 	for id in PoliticianPresets.BACKGROUND_ORDER:
-		var card := _background_card(String(id))
+		var card := _background_card(PoliticianPresets.background(String(id)), String(id), CARD_SIZE)
+		card.pressed.connect(_on_background_pressed.bind(String(id)))
 		grid.add_child(card)
 		_cards[id] = card
+	list.add_child(PopupKit.section(L.t("Kişilik"), L.t("tarzını biraz daha belirler")))
+	var trait_row := GridContainer.new()
+	trait_row.columns = 3
+	trait_row.add_theme_constant_override("h_separation", 8)
+	list.add_child(trait_row)
+	for id in PoliticianPresets.TRAIT_ORDER:
+		var card := _background_card(PoliticianPresets.trait_info(String(id)), String(id), TRAIT_CARD_SIZE)
+		card.pressed.connect(_on_trait_pressed.bind(String(id)))
+		trait_row.add_child(card)
+		_trait_cards[id] = card
 	return built[0]
 
-## Bir geçmiş kartı: ad, seçmen grubu çipi, kısa hikâye, avantaj.
-func _background_card(id: String) -> Button:
-	var info := PoliticianPresets.background(id)
+## Meslek ya da kişilik kartı: ad, hitap ettiği gruplar (varsa), kısa hikâye, avantaj.
+func _background_card(info: Dictionary, id: String, card_size: Vector2) -> Button:
 	var button := Button.new()
-	button.custom_minimum_size = CARD_SIZE
+	button.custom_minimum_size = card_size
 	button.focus_mode = Control.FOCUS_NONE
 	button.toggle_mode = true
-	button.pressed.connect(_on_background_pressed.bind(id))
 	# Seçili kartın altın çerçevesi.
 	var frame := Panel.new()
 	frame.name = L.t("SelectedFrame")
@@ -187,13 +201,15 @@ func _background_card(id: String) -> Button:
 	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(t)
-	var group := PoliticianPresets.group_of(id)
-	var group_row := HBoxContainer.new()
-	group_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	group_row.add_theme_constant_override("separation", 4)
-	group_row.add_child(VoterGroupIcon.make(group, 16.0))
-	group_row.add_child(PopupKit.chip(VoterGroups.title(group), VoterGroups.color(group)))
-	box.add_child(group_row)
+	var appeal: Array = PoliticianPresets.BACKGROUNDS.get(id, {}).get("appeal", [])
+	if not appeal.is_empty():
+		var group_row := HBoxContainer.new()
+		group_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		group_row.add_theme_constant_override("separation", 4)
+		for group in appeal:
+			group_row.add_child(VoterGroupIcon.make(String(group), 16.0))
+			group_row.add_child(PopupKit.chip(VoterGroups.title(String(group)), VoterGroups.color(String(group))))
+		box.add_child(group_row)
 	var blurb := PopupKit.note(String(info["blurb"]), UiTheme.TEXT_MUTED)
 	box.add_child(blurb)
 	var perk := PopupKit.note("★ " + String(info["perk"]), UiTheme.GREEN)
@@ -335,6 +351,9 @@ func _restore_previous() -> void:
 	_first_name = String(data.get("first_name", _first_name))
 	_surname = String(data.get("surname", _surname))
 	_background_id = String(data.get("background", ""))
+	if not PoliticianPresets.is_valid_background(_background_id):
+		_background_id = ""
+	_trait_id = String(data.get("trait", ""))
 	_hometown = String(data.get("hometown", ""))
 	_style_gender_buttons()
 	_first_edit.text = _first_name
@@ -347,6 +366,10 @@ func _on_background_pressed(id: String) -> void:
 	_background_id = id
 	_refresh()
 
+func _on_trait_pressed(id: String) -> void:
+	_trait_id = id
+	_refresh()
+
 func _on_province_clicked(province_id: String) -> void:
 	_hometown = province_id
 	_refresh()
@@ -356,27 +379,33 @@ func _on_province_hovered(province_id: String) -> void:
 	_refresh_info()
 
 func _refresh() -> void:
-	for id in _cards.keys():
-		var card: Button = _cards[id]
-		card.button_pressed = id == _background_id
-		card.modulate = Color.WHITE if (_background_id == "" or id == _background_id) else Color(1, 1, 1, 0.62)
-		var frame := card.get_node_or_null("SelectedFrame")
-		if frame != null:
-			frame.visible = id == _background_id
+	_mark_cards(_cards, _background_id)
+	_mark_cards(_trait_cards, _trait_id)
 	_paint_map()
 	_refresh_info()
 	var ready := _is_complete()
 	_continue.disabled = not ready
 	var missing: Array = []
 	if _background_id == "":
-		missing.append(L.t("geçmiş"))
+		missing.append(L.t("meslek"))
+	if _trait_id == "":
+		missing.append(L.t("kişilik"))
 	if _hometown == "":
 		missing.append("memleket")
 	if ready:
-		_summary.text = L.t("%s · %s · memleket %s") % [_full_name(),
-			PoliticianPresets.title(_background_id), GameMap.name_of(_hometown)]
+		_summary.text = L.t("%s · %s · %s · memleket %s") % [_full_name(),
+			PoliticianPresets.title(_background_id), PoliticianPresets.trait_title(_trait_id), GameMap.name_of(_hometown)]
 	else:
 		_summary.text = L.t("Seçilmedi: ") + ", ".join(missing)
+
+func _mark_cards(cards: Dictionary, selected: String) -> void:
+	for id in cards.keys():
+		var card: Button = cards[id]
+		card.button_pressed = id == selected
+		card.modulate = Color.WHITE if (selected == "" or id == selected) else Color(1, 1, 1, 0.62)
+		var frame := card.get_node_or_null("SelectedFrame")
+		if frame != null:
+			frame.visible = id == selected
 
 func _paint_map() -> void:
 	_map.clear_overlay()
@@ -396,11 +425,11 @@ func _refresh_info() -> void:
 
 func _is_complete() -> bool:
 	return _first_name != "" and _surname != "" \
-		and _background_id != "" and _hometown != ""
+		and _background_id != "" and _trait_id != "" and _hometown != ""
 
 func _on_continue_pressed() -> void:
 	if not _is_complete():
 		return
 	_continue.disabled = true
-	PartyManager.set_my_politician(PoliticianPresets.make(_first_name, _surname, _background_id, _hometown, _gender))
+	PartyManager.set_my_politician(PoliticianPresets.make(_first_name, _surname, _background_id, _hometown, _gender, _trait_id))
 	SceneTransition.fade_to_scene("res://scenes/PartySetup.tscn")

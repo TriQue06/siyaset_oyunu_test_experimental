@@ -138,9 +138,8 @@ func run() -> void:
 	check(is_equal_approx(float(cell(b, other_pi, "emekli")[0]), count * 0.1), "karalama yalniz hedef ilde")
 	clear_all()
 	setc(b, pi, "emekli", 0.0, 0.0, count * 0.2)
-	pm.politicians[b]["background"] = "ilahiyatci"
-	cm._vb_scandal(b)
-	check(absf(float(cell(b, pi, "emekli")[2]) - count * 0.1) < 1.0, "ilahiyatcida kaset secmenin yarisini dusurur")
+	cm._vb_scandal(b, "", 0.5)
+	check(absf(float(cell(b, pi, "emekli")[2]) - count * 0.1) < 1.0, "yarim skandal secmenin yarisini dusurur")
 
 	print("=== ittifak ===")
 	clear_all()

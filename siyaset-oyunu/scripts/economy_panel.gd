@@ -354,7 +354,8 @@ static func _fill_summary(box: VBoxContainer, headline: Array) -> void:
 	box.add_child(_summary_row(L.t("Gidişat"), economy_verdict(mood)))
 	var next_state: Dictionary = econ.duplicate(true)
 	Economy.advance(next_state)
-	var next_mood := Economy.group_mood(next_state, CardManager.economy_share(pm))
+	var next_mood := Economy.group_mood(next_state, CardManager.economy_share(pm),
+		PoliticianPresets.party_effect(pm, "tax_mood"))
 	var ranked: Array = mood.keys()
 	ranked.sort_custom(func(a, b): return absf(float(mood[a])) > absf(float(mood[b])))
 	# Hükümetin ekonomiden gelen seçmen memnuniyeti: tek satır (simge + değer +

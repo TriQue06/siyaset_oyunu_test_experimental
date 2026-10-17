@@ -4923,7 +4923,7 @@ func _refresh_law_detail() -> void:
 	var groups := PartyManager.groups_of(CardManager.party_of(me))
 	var opposite := String(law["opposite"])
 	var backlash := float(VoterGroups.data(_law_group).get("law_backlash", 0.4))
-	var mult := PoliticianPresets.ACADEMIC_LAW_MULT if PoliticianPresets.has_background(me, "akademisyen") else 1.0
+	var mult := PoliticianPresets.effect(me, "law")
 	if CardManager.crisis_group() == _law_group:
 		mult *= PublicOpinion.AGENDA_LAW_MULT
 	_law_detail.add_child(VoterGroupUI.name_row(_law_group, "", UiTheme.TEXT, 13, 20.0))

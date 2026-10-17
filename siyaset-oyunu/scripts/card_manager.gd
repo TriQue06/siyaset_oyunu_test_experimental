@@ -1301,9 +1301,7 @@ func miting_group_gains(peer_id: int, province_id: String, focus: Array = []) ->
 
 func _miting_mult(peer_id: int, province_id: String) -> float:
 	var mult := PublicOpinion.miting_org_mult(organization_level(province_id, peer_id))
-	if PoliticianPresets.has_background(peer_id, "sendikaci"):
-		mult *= PoliticianPresets.UNION_MITING_MULT
-	return mult
+	return mult * PoliticianPresets.effect(peer_id, "miting")
 
 ## Partinin herhangi bir ilde teskilati var mi? (miting/karalama on sarti)
 func has_organization_anywhere(peer_id: int) -> bool:
@@ -1574,7 +1572,7 @@ func economy_share(peer_id: int) -> float:
 
 ## Hükümet partisinin ekonomiden gelen GEÇİCİ grup yakınlığı değişimi.
 func economy_mood(peer_id: int) -> Dictionary:
-	return Economy.group_mood(economy, economy_share(peer_id))
+	return Economy.group_mood(economy, economy_share(peer_id), PoliticianPresets.party_effect(peer_id, "tax_mood"))
 
 ## Partinin bekleyen (henüz gerçekleşmemiş) yatırım dilimleri: [{province,
 ## amount, rounds_left}] — sadece kendi payı.
@@ -1602,8 +1600,7 @@ func activity_of(province_id: String, peer_id: int) -> float:
 ## Teşkilatın oy bonusu (popülizm sürerken büyür).
 func org_bonus(province_id: String, peer_id: int) -> float:
 	var bonus := PublicOpinion.org_activity(organization_level(province_id, peer_id))
-	if PoliticianPresets.party_has_background(peer_id, "belediye_baskani"):
-		bonus *= PoliticianPresets.MAYOR_ORG_MULT
+	bonus *= PoliticianPresets.party_effect(peer_id, "org")
 	if populism_rounds_left(peer_id) > 0:
 		bonus *= PublicOpinion.POPULISM_GOOD_MULT
 	return bonus
@@ -1991,7 +1988,7 @@ func init_game() -> void:
 	_push_state({"type": "full"}, true)
 
 ## SİYASETÇİ PROFİLİ (bkz. PoliticianPresets): memlekette bedava teşkilat,
-## geçmişin seçmen grubunda ek yakınlık, iş insanı ek para alır.
+## iş insanı ek para, belediye başkanı rastgele illerde teşkilat alır.
 ## Memleketi bu haritada olmayan (ör. test tohumu farklı) siyasetçiye rastgele
 ## bir il verilir.
 func _apply_politician_starts() -> void:
@@ -2005,17 +2002,27 @@ func _apply_politician_starts() -> void:
 			var fixed := data.duplicate()
 			fixed["hometown"] = home
 			PartyManager.set_politician_host(peer_id, fixed)
-		# Geçmiş, partiyi kendi seçmen grubuna biraz yaklaştırır.
-		var background_group := PoliticianPresets.group_of(String(data.get("background", "")))
-		if background_group != "" and PartyManager.parties.has(peer_id):
-			PartyManager.apply_group_deltas([{"peer": peer_id, "group": background_group,
-				"amount": PoliticianPresets.BACKGROUND_GROUP_BONUS}])
+		if PoliticianPresets.has_background(peer_id, "is_insani"):
+			funds[peer_id] = funds_of(peer_id) + PoliticianPresets.BUSINESS_START_FUNDS
+		if PoliticianPresets.has_background(peer_id, "belediye_baskani"):
+			_grant_mayor_orgs(peer_id, home)
 		if home == "":
 			continue
 		organizations[home] = organizations.get(home, {})
 		organizations[home][peer_id] = PoliticianPresets.HOMETOWN_ORG_LEVEL
-		if PoliticianPresets.has_background(peer_id, "is_insani"):
-			funds[peer_id] = funds_of(peer_id) + PoliticianPresets.BUSINESS_START_FUNDS
+
+## Belediye başkanı: il sayısının MAYOR_ORG_SHARE'i kadar (en az 1) rastgele
+## ilde 1. seviye teşkilat (memleket ve teşkilatlı iller hariç).
+func _grant_mayor_orgs(peer_id: int, home: String) -> void:
+	var pool: Array = []
+	for province_id in _province_ids:
+		if String(province_id) != home and organization_level(String(province_id), peer_id) <= 0:
+			pool.append(String(province_id))
+	var count := mini(pool.size(), maxi(1, int(round(_province_ids.size() * PoliticianPresets.MAYOR_ORG_SHARE))))
+	for i in count:
+		var province_id := String(pool.pop_at(_rng.randi() % pool.size()))
+		organizations[province_id] = organizations.get(province_id, {})
+		organizations[province_id][peer_id] = PoliticianPresets.MAYOR_ORG_LEVEL
 
 func _pick_music_track() -> void:
 	var tracks: Array = AudioManager.GAME_TRACKS
@@ -2631,8 +2638,10 @@ func _advance_economy() -> String:
 ## Karalama: hedefe eksi, karalayana artı; ikisi de o ildeki güçleriyle ölçeklenir.
 func _apply_propaganda(peer_id: int, target_peer_id: int, province_id: String) -> void:
 	var damage := PublicOpinion.propaganda_damage(party_strength(province_id, target_peer_id))
-	if PoliticianPresets.party_has_background(target_peer_id, "ilahiyatci"):
-		damage *= PoliticianPresets.CLERIC_DAMAGE_MULT
+	# Meslek/kişilik: atanın karalama gücü × hedefin karalamaya direnci.
+	var profile_mult := PoliticianPresets.effect(peer_id, "propaganda_out") \
+		* PoliticianPresets.party_effect(target_peer_id, "propaganda_in")
+	damage *= profile_mult
 	if populism_rounds_left(peer_id) > 0:
 		damage *= PublicOpinion.POPULISM_GOOD_MULT
 	var org_mult := PublicOpinion.org_action_mult(organization_level(province_id, peer_id))
@@ -2643,8 +2652,9 @@ func _apply_propaganda(peer_id: int, target_peer_id: int, province_id: String) -
 	damage = clampf(damage, 0.0, maxf(0.0, current - PublicOpinion.PROPAGANDA_FLOOR))
 	_add_local(province_id, target_peer_id, -damage)
 	_add_local(province_id, peer_id, gain, true)
-	# 0.0.228: karalama hedefin bu ildeki seçmenini bir seviye düşürür (ilahiyatçı: yarısı).
-	_vb_scandal(target_peer_id, province_id)
+	# 0.0.228: karalama hedefin bu ildeki seçmenini bir seviye düşürür; profil
+	# çarpanı 1'in altındaysa (ör. emekli subay) o oranda daha azını.
+	_vb_scandal(target_peer_id, province_id, minf(1.0, profile_mult))
 	_log_province(province_id, L.t("%s, %s karşıtı kampanya yaptı (%s, %s)") % [
 		_party_name(peer_id), _party_name(target_peer_id), EffectWords.change(-damage, "local", L.t("yerel güç")), L.t("karşılığında kazanç") if gain > 0.0 else L.t("kazanç yok")])
 	_event_message = L.t("%s, %s'da %s karşıtı karalama kampanyası yaptı.") % [
@@ -2672,7 +2682,7 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 	var proposer_party := party_of(proposer)
 	var proposer_in_gov := gov_ids.has(proposer_party)
 	var party_votes := _party_vote_shares(votes)
-	var law_mult := PoliticianPresets.ACADEMIC_LAW_MULT if PoliticianPresets.has_background(proposer, "akademisyen") else 1.0
+	var law_mult := PoliticianPresets.effect(proposer, "law")
 	var gain := (PublicOpinion.LAW_GROUP_GAIN_PASSED if passed else PublicOpinion.LAW_GROUP_GAIN_REJECTED) * law_mult
 	# GÜNDEM: gündemdeki gruba yasa sunana daha güçlü yazar (karşıt kayıp da büyür).
 	if crisis_group() == group:
@@ -2941,8 +2951,6 @@ const MEETING_PROMOTE := [0.3, 0.12]
 const OPPOSITE_LOSS := 0.5
 ## Teşkilat kendi seçmeninin seviye düşüşünü bu oranda azaltır (seviye 0, 1, 2).
 const VB_ORG_SHIELD := [0.0, 0.3, 0.55]
-## Kaset/karalama ilahiyatçıda seçmenin bu kadarını düşürür.
-const SCANDAL_THEOLOGIAN_SHARE := 0.5
 
 var voter_base: Dictionary = {}
 var _vb_index: Dictionary = {}
@@ -3180,7 +3188,8 @@ func _vb_miting(pid: int, province_id: String, focus: Array, mult: float) -> Dic
 	var fatigue: Dictionary = miting_fatigue.get(pid, {})
 	for gi in VB_GROUPS:
 		var group := String(VoterGroups.GROUP_IDS[gi])
-		var amount: float = total * float(weights[gi]) / weight_total * PublicOpinion.miting_fatigue_mult(float(fatigue.get(group, 0.0)))
+		var amount: float = total * float(weights[gi]) / weight_total * PublicOpinion.miting_fatigue_mult(float(fatigue.get(group, 0.0))) \
+			* PoliticianPresets.group_appeal(pid, group)
 		var got := _vb_pull(pid, pi, gi, amount, MITING_STEAL, MITING_DEMOTE)
 		_vb_opposite_loss(pid, pi, gi, got)
 		result[group] = got
@@ -3218,6 +3227,8 @@ func _vb_national_group(pid: int, group: String, amount: float, promote: Array =
 	if gi < 0 or not voter_base.has(pid):
 		return 0.0
 	var before := float(PartyManager.groups_of(pid).get(group, 0.0))
+	if amount > 0.0:
+		amount *= PoliticianPresets.group_appeal(pid, group)
 	for pi in _province_ids.size():
 		if amount > 0.0:
 			var got := _vb_pull(pid, pi, gi, _vb_count(pi, gi) * amount / 100.0 * NATIONAL_PULL_MULT, NATIONAL_STEAL, NATIONAL_DEMOTE)
@@ -3232,13 +3243,12 @@ func _vb_national_group(pid: int, group: String, amount: float, promote: Array =
 			_vb_sync_groups(int(other))
 	return float(PartyManager.groups_of(pid).get(group, 0.0)) - before
 
-## SKANDAL: partinin seçmeni bir seviye düşer (province "" = bütün iller).
-func _vb_scandal(target: int, province_id: String = "") -> void:
+## SKANDAL: partinin seçmeninin frac'ı bir seviye düşer (province "" = bütün iller).
+func _vb_scandal(target: int, province_id: String = "", frac: float = 1.0) -> void:
 	_vb_ensure()
 	var pid := party_of(target)
 	if not voter_base.has(pid):
 		return
-	var frac := SCANDAL_THEOLOGIAN_SHARE if PoliticianPresets.party_has_background(pid, "ilahiyatci") else 1.0
 	for pi in _province_ids.size():
 		if province_id != "" and String(_province_ids[pi]) != province_id:
 			continue
@@ -3367,7 +3377,8 @@ func _apply_speech(peer_id: int, group: String) -> void:
 	speech_rounds[pid] = round_number
 	# 0.0.228: toplantı KALICI ve güçlü: grubun ülke genelindeki seçmeninden
 	# çeker, partinin o gruptaki seçmenini yükseltir (zıt grupta yarısı kadar kayıp).
-	var points := MEETING_PULL_POINTS * (PublicOpinion.AGENDA_LAW_MULT if crisis_group() == group else 1.0)
+	var points := MEETING_PULL_POINTS * (PublicOpinion.AGENDA_LAW_MULT if crisis_group() == group else 1.0) \
+		* PoliticianPresets.effect(peer_id, "speech")
 	var moved := _vb_national_group(pid, group, _own_effect(pid, points), MEETING_PROMOTE)
 	var text := L.t("%s, %s ile grup toplantısı yaptı (%s): o grupta %s.") % [
 		_party_name(peer_id), VoterGroups.title(group), String(VoterGroups.data(group).get("meeting", "")),
@@ -3417,8 +3428,8 @@ func _add_turmoil(peer_id: int, amount: float) -> void:
 	if peer_id == -1 or not _is_authority():
 		return
 	peer_id = party_of(peer_id)
-	if amount > 0.0 and PoliticianPresets.party_has_background(peer_id, "emekli_subay"):
-		amount *= PoliticianPresets.OFFICER_TURMOIL_MULT
+	if amount > 0.0:
+		amount *= PoliticianPresets.party_effect(peer_id, "turmoil_in")
 	var value := float(turmoil.get(peer_id, 0.0)) + amount
 	if is_zero_approx(value):
 		turmoil.erase(peer_id)
@@ -3638,8 +3649,9 @@ func _apply_steal(peer_id: int, target_peer_id: int, card_type: String) -> bool:
 	var wanted: int = _rng.randi_range(int(range_info["min"]), int(range_info["max"]))
 	if populism_rounds_left(peer_id) > 0:
 		wanted = int(round(wanted * PublicOpinion.POPULISM_STEAL_MULT))
-	# Meclis dışı parti yarı verimle çalar.
-	wanted = maxi(1, int(round(wanted * steal_efficiency(peer_id))))
+	# Meclis dışı parti yarı verimle çalar; hukukçunun partisinden daha az koparılır.
+	wanted = maxi(1, int(round(wanted * steal_efficiency(peer_id)
+		* PoliticianPresets.party_effect(target_peer_id, "steal_in"))))
 	var amount: int = mini(wanted, int(last_seats.get(party_of(target_peer_id), 0)))
 	if amount <= 0:
 		return false
@@ -3662,11 +3674,10 @@ func _apply_reputation(peer_id: int, target_peer_id: int) -> void:
 	var damage := PublicOpinion.REPUTATION_NATIONAL_DAMAGE
 	if populism_rounds_left(peer_id) > 0:
 		damage *= PublicOpinion.POPULISM_GOOD_MULT
-	if PoliticianPresets.party_has_background(target_peer_id, "ilahiyatci"):
-		damage *= PoliticianPresets.CLERIC_DAMAGE_MULT
+	damage *= PoliticianPresets.effect(peer_id, "reputation_out")
 	_add_turmoil(target_peer_id, PublicOpinion.TURMOIL_REPUTATION)
 	_add_national(target_peer_id, -damage)
-	# 0.0.228: kaset partinin BÜTÜN seçmenini bir seviye düşürür (ilahiyatçı: yarısı).
+	# 0.0.228: kaset partinin BÜTÜN seçmenini bir seviye düşürür.
 	_vb_scandal(target_peer_id)
 	# ANONİM: kaseti kimin sızdırdığı hiçbir yerde gösterilmez.
 	_event_message = L.t("%s hakkında kaset sızdı: %s, parti içinde karışıklık.") % [
@@ -3781,7 +3792,8 @@ func _peek_turn_card(peer_id: int) -> String:
 ## Tur geliri: hükümette görevi olan partiler bir fazla para alır.
 func turn_income(peer_id: int) -> float:
 	var base := float(GameRules.FUNDS_PER_ROUND_GOVERNMENT if is_government_party(peer_id) else GameRules.FUNDS_PER_ROUND)
-	return maxf(0.0, base - bot_funds_penalty(peer_id)) + org_income(peer_id)
+	var business := PoliticianPresets.BUSINESS_TURN_INCOME if PoliticianPresets.has_background(peer_id, "is_insani") else 0.0
+	return maxf(0.0, base - bot_funds_penalty(peer_id)) + org_income(peer_id) + business
 
 ## Partinin teşkilatlı il sayısı.
 func org_count(peer_id: int) -> int:

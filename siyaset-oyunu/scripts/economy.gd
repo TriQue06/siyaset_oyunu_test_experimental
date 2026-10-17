@@ -200,12 +200,13 @@ static func advance(state: Dictionary) -> void:
 
 ## Hükümet partisinin ekonomiden dolayı gruplardaki GEÇİCİ yakınlık değişimi
 ## (share = 1 başbakan, PARTNER_SHARE ortak). Vergi + ekonomi + enflasyon.
-static func group_mood(state: Dictionary, share: float = 1.0) -> Dictionary:
+## tax_mult: vergi tepkisi çarpanı (teknokrat kişiliği < 1).
+static func group_mood(state: Dictionary, share: float = 1.0, tax_mult: float = 1.0) -> Dictionary:
 	var result := {}
 	if share <= 0.0:
 		return result
 	var pressure := float(state["pressure"])
-	var tax_factor := -pressure if pressure > 0.0 else -pressure * LOW_TAX_GAIN
+	var tax_factor := (-pressure if pressure > 0.0 else -pressure * LOW_TAX_GAIN) * tax_mult
 	var econ := (float(state["index"]) - START_INDEX) / 50.0
 	var infl := maxf(0.0, inflation(state) - INFLATION_BASE) / 10.0
 	for group in VoterGroups.GROUP_IDS:

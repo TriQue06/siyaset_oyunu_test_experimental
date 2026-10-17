@@ -2,61 +2,97 @@ class_name PoliticianPresets
 extends RefCounted
 ## SİYASETÇİ PROFİLİ: oyun bir siyasetçinin parti kurmasıyla başlar. Parti
 ## kurulmadan önce her oyuncu siyasetçisini seçer (bkz. politician_setup.gd):
-##   - GEÇMİŞ: 6 meslek, her biri bir SEÇMEN GRUBUYLA bağlantılı (sendikacı →
-##     işçiler, iş insanı → işverenler...). Partinin çekirdek grupları parti
-##     kurulumunda serbestçe seçilir; oyun başlarken partinin geçmişin grubundaki
-##     yakınlığı BACKGROUND_GROUP_BONUS kadar artar. Geçmişin kalıcı bir oyun
-##     avantajı da vardır (perk).
+##   - MESLEK (0.0.229): 7 meslek; seçmen grubuna BAĞLI DEĞİL (çekirdek gruplar
+##     parti kurulumunda seçilir). Her meslek EFFECTS çarpanları ve bazılarında
+##     özel başlangıç (iş insanı parası, belediye başkanı teşkilatları) verir.
+##     Kayıtta alan adı geriye uyum için "background".
+##   - KİŞİLİK (0.0.229): TRAITS'ten biri; küçük çarpanlar. Yoksa rastgele.
 ##   - MEMLEKET: haritadan seçilen il. Oyuna orada 2. seviye teşkilatla
 ##     başlanır ve memlekette kalıcı "hemşehri" desteği vardır (il aktivitesi;
 ##     ilin seçmen profili değişmez). Komşu iller ETKİLENMEZ.
+## ETKİ ANAHTARLARI (çarpan, yoksa 1):
+##   HAMLEYİ YAPAN siyasetçiye bakar (effect): miting, speech (grup toplantısı),
+##     law (grup yasası), propaganda_out (attığın karalama), reputation_out (attığın kaset).
+##   PARTİYE bakar (party_effect, partinin herhangi bir üyesi): propaganda_in
+##     (sana atılan karalama), turmoil_in (iç karışıklık), steal_in (senden
+##     çalınan vekil), org (teşkilat gücü), tax_mood (vergiye seçmen tepkisi).
+##   appeal: o gruplarda kazanç (yasa, toplantı, miting) APPEAL_MULT kat.
 ## ARAYÜZ METİNLERİ SAYI İÇERMEZ (özet anlatım); sayılar sadece burada.
 ## Veri PartyManager.politicians[peer] içinde durur (partiden bağımsız) =
-##   {"gender", "first_name", "surname", "name" (ad + soyad), "background", "hometown"}
+##   {"gender", "first_name", "surname", "name" (ad + soyad), "background", "trait", "hometown"}
 ## İSİM TAMAMEN RASTGELE (elle yazılmaz): random_name(). SOYAD ileride çok
 ## yerde kullanılacak (bkz. surname_of). Soyadlar uydurma kök + ekten üretilir;
 ## gerçek siyasetçi soyadları BANNED_SURNAMES ile ayrıca engellenir.
-## (bkz. PartyManager.set_my_politician). Kişisel özellikler sonra eklenecek.
+## (bkz. PartyManager.set_my_politician).
 
-## Geçmiş -> {title, group, blurb, perk}. Sıra ekranda da bu sıra.
+## Meslek -> {title, blurb, perk, effects, appeal}. Sıra ekranda da bu sıra.
 const BACKGROUNDS := {
-	"sendikaci": {"title": "Sendikacı", "group": "isci",
+	"sendikaci": {"title": "Sendikacı",
 		"blurb": "Fabrika kapılarında büyüdün, grevleri sen örgütledin.",
-		"perk": "Mitinglerin daha güçlü yankı bulur."},
-	"is_insani": {"title": "İş İnsanı", "group": "isveren",
+		"perk": "Mitinglerin daha etkili; işçiler sana daha kolay ısınır.",
+		"effects": {"miting": 1.25}, "appeal": ["isci"]},
+	"is_insani": {"title": "İş İnsanı",
 		"blurb": "Kendi şirketini kurdun, sermaye çevreleri seni tanır.",
-		"perk": "Oyuna daha fazla kaynakla başlarsın."},
-	"akademisyen": {"title": "Akademisyen", "group": "genc",
-		"blurb": "Kürsüden siyasete indin; fikirlerin tartışma başlatır.",
-		"perk": "Sunduğun yasalar daha çok ses getirir."},
-	"ilahiyatci": {"title": "İlahiyatçı", "group": "dindar",
-		"blurb": "Cemaatin saygın bir siması; sözüne güvenilir.",
-		"perk": "Karalama ve kasetler sana daha az işler."},
-	"belediye_baskani": {"title": "Belediye Başkanı", "group": "ozerkci",
+		"perk": "Oyuna daha fazla parayla başlarsın, her tur ek gelirin olur.",
+		"effects": {}, "appeal": []},
+	"belediye_baskani": {"title": "Belediye Başkanı",
 		"blurb": "Şehrini yıllarca yönettin, yerel ağları iyi bilirsin.",
-		"perk": "Teşkilatların daha çok oy getirir."},
-	"emekli_subay": {"title": "Emekli Subay", "group": "milliyetci",
+		"perk": "Birkaç ilde hazır teşkilatla başlarsın; teşkilatların daha güçlü.",
+		"effects": {"org": 1.1}, "appeal": []},
+	"emekli_subay": {"title": "Emekli Subay",
 		"blurb": "Disiplin ve birlik senin için her şeyden önce gelir.",
-		"perk": "Partinde iç karışıklık daha zor büyür."},
+		"perk": "Partinde iç karışıklık ve sana atılan karalamalar daha az işler.",
+		"effects": {"turmoil_in": 0.75, "propaganda_in": 0.75}, "appeal": []},
+	"gazeteci": {"title": "Gazeteci",
+		"blurb": "Yıllarca manşet attın; kimin dosyası nerede bilirsin.",
+		"perk": "Rakiplere attığın kaset ve karalamalar daha sert vurur.",
+		"effects": {"reputation_out": 1.25, "propaganda_out": 1.25}, "appeal": []},
+	"hukukcu": {"title": "Hukukçu",
+		"blurb": "Davaları kazandın, sözleşmelerin her satırını okursun.",
+		"perk": "Partinden vekil koparmak daha zordur.",
+		"effects": {"steal_in": 0.75}, "appeal": []},
+	"aktivist": {"title": "Aktivist",
+		"blurb": "Sokaktan geldin; eylemleri sen başlattın.",
+		"perk": "Mitinglerin daha etkili, gençler ve ilericiler sana ısınır; yasa ve grup toplantıların daha zayıf.",
+		"effects": {"miting": 1.25, "law": 0.75, "speech": 0.75}, "appeal": ["genc", "ilerici"]},
 }
-const BACKGROUND_ORDER := ["sendikaci", "is_insani", "akademisyen", "ilahiyatci",
-	"belediye_baskani", "emekli_subay"]
+const BACKGROUND_ORDER := ["sendikaci", "is_insani", "belediye_baskani", "emekli_subay",
+	"gazeteci", "hukukcu", "aktivist"]
 
-# --- Geçmiş avantajları -------------------------------------------------------------
-const UNION_MITING_MULT := 1.25
-const BUSINESS_START_FUNDS := 20
-const ACADEMIC_LAW_MULT := 1.3
-const CLERIC_DAMAGE_MULT := 0.7
-const MAYOR_ORG_MULT := 1.25
-const OFFICER_TURMOIL_MULT := 0.6
+## Kişilik -> {title, blurb, perk, effects}. Sıra ekranda da bu sıra.
+const TRAITS := {
+	"hatip": {"title": "Hatip",
+		"blurb": "Kürsüye çıktın mı salon susar.",
+		"perk": "Mitinglerin biraz, grup toplantıların belirgin biçimde daha etkili.",
+		"effects": {"miting": 1.1, "speech": 1.2}},
+	"sert": {"title": "Sert",
+		"blurb": "Lafını esirgemezsin, kavgadan kaçmazsın.",
+		"perk": "Karalamaların daha sert, mitinglerin biraz daha etkili; ama sana atılan karalamalar da biraz daha işler.",
+		"effects": {"miting": 1.05, "propaganda_out": 1.2, "propaganda_in": 1.05}},
+	"teknokrat": {"title": "Teknokrat",
+		"blurb": "Rakamlarla konuşursun, piyasa sana güvenir.",
+		"perk": "Hükümetteyken vergilere seçmen tepkisi daha az olur.",
+		"effects": {"tax_mood": 0.8}},
+}
+const TRAIT_ORDER := ["hatip", "sert", "teknokrat"]
+
+## Mesleğin hitap ettiği gruplarda kazanç çarpanı.
+const APPEAL_MULT := 1.1
+
+# --- Meslek özel başlangıçları ------------------------------------------------
+## İş insanı: ilk tur gelirinin (FUNDS_PER_ROUND) yarısı kadar ek başlangıç
+## parası + her tur ek gelir (milyon ¤).
+const BUSINESS_START_FUNDS := 15.0
+const BUSINESS_TURN_INCOME := 2.5
+## Belediye başkanı: il sayısının bu oranı kadar rastgele ilde (en az 1) teşkilat.
+const MAYOR_ORG_SHARE := 0.1
+const MAYOR_ORG_LEVEL := 1
 
 # --- Memleket -----------------------------------------------------------------
 ## Oyun başında memlekette bedava kurulan teşkilat seviyesi.
 const HOMETOWN_ORG_LEVEL := 2
 ## Kalıcı hemşehri desteği (aktivite puanı, sönmez): sadece memleket.
 const HOMETOWN_ACTIVITY := 4.0
-## Oyun başında partinin geçmişin grubundaki yakınlığına eklenen puan.
-const BACKGROUND_GROUP_BONUS := 4.0
 
 # --- Rastgele isim ----------------------------------------------------------------
 ## CİNSİYET oyuncu tarafından seçilir ("m" erkek / "f" kadın); ad o cinsiyetin
@@ -174,39 +210,38 @@ static func background(id: String) -> Dictionary:
 static func title(id: String) -> String:
 	return L.t(String(BACKGROUNDS.get(id, {}).get("title", "")))
 
-## Geçmişin bağlı olduğu seçmen grubu ("isci") ya da "".
-static func group_of(id: String) -> String:
-	return String(BACKGROUNDS.get(id, {}).get("group", ""))
+static func is_valid_trait(id: String) -> bool:
+	return TRAITS.has(id)
 
-## Geçmişin grubunun adı ("İşçiler ve Sendikalar").
-static func side_text(id: String) -> String:
-	var group := group_of(id)
-	return VoterGroups.title(group) if group != "" else ""
+static func trait_info(id: String) -> Dictionary:
+	return L.tr_dict(TRAITS.get(id, {}))
 
-## Yakınlıklara geçmiş bonusunu uygulanmış hâliyle döndürür (önizleme/test için).
-static func boosted_affinities(id: String, affinities: Dictionary) -> Dictionary:
-	var result := affinities.duplicate()
-	var group := group_of(id)
-	if group != "":
-		VoterGroups.apply_delta(result, group, BACKGROUND_GROUP_BONUS)
-	return result
+static func trait_title(id: String) -> String:
+	return L.t(String(TRAITS.get(id, {}).get("title", "")))
+
+static func random_trait(rng: RandomNumberGenerator = null) -> String:
+	var index := (rng.randi() if rng != null else randi()) % TRAIT_ORDER.size()
+	return String(TRAIT_ORDER[index])
 
 static func random_background(rng: RandomNumberGenerator = null) -> String:
 	var index := (rng.randi() if rng != null else randi()) % BACKGROUND_ORDER.size()
 	return String(BACKGROUND_ORDER[index])
 
+## trait_id boş ya da geçersizse rastgele bir kişilik verilir (botlar, eski kayıtlar).
 static func make(first_name: String, surname: String, background_id: String, hometown: String,
-		gender: String = "m") -> Dictionary:
+		gender: String = "m", trait_id: String = "") -> Dictionary:
 	first_name = first_name.strip_edges()
 	surname = surname.strip_edges()
 	return {"gender": gender if GENDERS.has(gender) else "m", "first_name": first_name, "surname": surname,
 		"name": ("%s %s" % [first_name, surname]).left(NAME_MAX_LENGTH),
-		"background": background_id, "hometown": hometown}
+		"background": background_id, "trait": trait_id if is_valid_trait(trait_id) else random_trait(),
+		"hometown": hometown}
 
 ## Kara liste (BANNED_SURNAMES) yalnız RASTGELE üretimde uygulanır (0.0.223):
 ## oyuncu elle istediği adı yazabilir, kendisi ya da botlar için.
 static func is_valid(data: Dictionary) -> bool:
-	return is_valid_background(String(data.get("background", ""))) \
+	var trait_id := String(data.get("trait", ""))
+	return is_valid_background(String(data.get("background", ""))) and (trait_id == "" or is_valid_trait(trait_id)) \
 		and String(data.get("first_name", "")) != "" and String(data.get("surname", "")) != ""
 
 ## ELLE YAZILAN İSİM: her kelimenin baş harfi büyük, gerisi küçük (Türkçe
@@ -338,17 +373,44 @@ static func background_of(peer_id: int) -> String:
 static func hometown_of(peer_id: int) -> String:
 	return String(of(peer_id).get("hometown", ""))
 
+static func trait_of(peer_id: int) -> String:
+	return String(of(peer_id).get("trait", ""))
+
 static func has_background(peer_id: int, id: String) -> bool:
 	return background_of(peer_id) == id
 
-## PARTİ DÜZEYİ geçmiş avantajı: partinin herhangi bir üyesinde bu geçmiş var mı?
-## (Teşkilat bonusu, karalamaya dayanıklılık, iç karışıklık gibi partiye ait
-## etkiler; miting/yasa gibi hamle etkileri hamleyi yapan siyasetçiye bakar.)
+## PARTİ DÜZEYİ meslek: partinin herhangi bir üyesinde bu meslek var mı?
 static func party_has_background(party_or_peer: int, id: String) -> bool:
 	for member in PartyManager.members_of(PartyManager.party_of(party_or_peer)):
 		if has_background(int(member), id):
 			return true
 	return false
+
+## HAMLEYİ YAPAN siyasetçinin meslek × kişilik çarpanı (bkz. etki anahtarları).
+static func effect(peer_id: int, key: String) -> float:
+	return float(BACKGROUNDS.get(background_of(peer_id), {}).get("effects", {}).get(key, 1.0)) \
+		* float(TRAITS.get(trait_of(peer_id), {}).get("effects", {}).get(key, 1.0))
+
+## PARTİNİN çarpanı: üyelerdeki her farklı meslek ve kişilik bir kez sayılır.
+static func party_effect(party_or_peer: int, key: String) -> float:
+	var backgrounds := {}
+	var traits := {}
+	for member in PartyManager.members_of(PartyManager.party_of(party_or_peer)):
+		backgrounds[background_of(int(member))] = true
+		traits[trait_of(int(member))] = true
+	var mult := 1.0
+	for id in backgrounds.keys():
+		mult *= float(BACKGROUNDS.get(id, {}).get("effects", {}).get(key, 1.0))
+	for id in traits.keys():
+		mult *= float(TRAITS.get(id, {}).get("effects", {}).get(key, 1.0))
+	return mult
+
+## Partinin bu gruba hitap çarpanı (bir üyenin mesleği o gruba hitap ediyorsa).
+static func group_appeal(party_or_peer: int, group: String) -> float:
+	for member in PartyManager.members_of(PartyManager.party_of(party_or_peer)):
+		if (BACKGROUNDS.get(background_of(int(member)), {}).get("appeal", []) as Array).has(group):
+			return APPEAL_MULT
+	return 1.0
 
 ## Hemşehri desteği: sadece memleket (komşu iller etkilenmez). Partide iki
 ## siyasetçi varsa ikisinin memleketi de sayılır.

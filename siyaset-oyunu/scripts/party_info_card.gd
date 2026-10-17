@@ -42,6 +42,9 @@ static func build(peer_id: int, my_id: int, on_action: Callable = Callable(), wi
 		var hometown := String(PoliticianPresets.of(leader_id).get("hometown", ""))
 		var who := L.t("Bağımsız siyasetçi") if independent else L.t("Genel başkan %s") % PoliticianPresets.display_name(leader_id)
 		var line := L.t("%s · eski meslek: %s") % [who, job]
+		var trait_title := PoliticianPresets.trait_title(PoliticianPresets.trait_of(leader_id))
+		if trait_title != "":
+			line += L.t(" · kişilik: %s") % trait_title
 		if hometown != "":
 			line += L.t(" · memleket: %s") % ElectionNightSim.province_name(hometown)
 		box.add_child(PopupKit.note(line, color.lightened(0.45), _text_width()))

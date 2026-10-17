@@ -1,5 +1,5 @@
 extends SceneTree
-## SİYASETÇİ PROFİLİ TESTİ: harita oyun başında kurulur, memleket ve geçmiş
+## SİYASETÇİ PROFİLİ TESTİ: harita oyun başında kurulur, memleket, meslek ve kişilik
 ## kuralları oyuna doğru yansır (bkz. PP).
 ##   godot --headless --path . --script res://tools/smoke_test_politician.gd
 
@@ -24,7 +24,7 @@ func _initialize() -> void:
 	root.get_node("BotManager").set_process(false)
 
 	print("=== SIYASETCI PROFILI ===")
-	check("6 gecmis, her biri farkli bir secmen grubuyla", _covers_all_sides())
+	check("7 meslek, 3 kisilik, hepsinin metni var", _profiles_ok())
 	mm.start_offline("Barış")
 	for i in 3:
 		mm.add_bot()
@@ -32,56 +32,77 @@ func _initialize() -> void:
 	check("harita oyun baslarken kuruldu", mm.game_map_seed != 0 and not gmap.province_ids().is_empty())
 	var map_before: Array = gmap.province_ids().duplicate()
 	var home := String(gmap.province_ids()[0])
-	pm.set_my_politician(PP.make("Ayla", "Gökyelken", "is_insani", home))
+	pm.set_my_politician(PP.make("Ayla", "Gökyelken", "is_insani", home, "f", "teknokrat"))
 	var core: Array = ["isci", "ilerici"]
-	var start: Dictionary = VoterGroups.start_affinities(core)
-	var boosted: Dictionary = PP.boosted_affinities("is_insani", start)
-	check("is insani isverenlere biraz yaklastirir (isci cekirdekli partide bile)", float(boosted["isveren"]) > float(start["isveren"]) \
-		and float(boosted["isveren"]) <= float(start["isveren"]) + PP.BACKGROUND_GROUP_BONUS)
 	pm.set_party_and_ready("Yeni Yol", 3, Color.WHITE, Color("F20C1F"), core, true)
 	var me: int = mm.owner_id
 	check("oyun basladi", mm.stage == mm.Stage.IN_GAME)
 	check("oyun ayni haritada", gmap.province_ids() == map_before)
-	check("siyasetci parti verisinde korundu", PP.background_of(me) == "is_insani",
+	check("siyasetci parti verisinde korundu", PP.background_of(me) == "is_insani" and PP.trait_of(me) == "teknokrat",
 		str(pm.politicians.get(me, {})))
 	check("memlekette 2. seviye teskilat", cm.organization_level(home, me) == PP.HOMETOWN_ORG_LEVEL)
 	# Sıra oyunda ilk bendeyse ilk tur geliri memleket teşkilatı kurulmadan
 	# verilir (teşkilat geliri yok): iki durum da geçerli.
 	var first_income: float = cm.turn_income(me) - cm.org_income(me) if cm.current_turn_peer_id() == me else 0.0
 	var base: float = GameRules.FUNDS_START + PP.BUSINESS_START_FUNDS
-	check("is insani +2 milyon ile basladi", is_equal_approx(cm.funds_of(me), base + first_income)
+	check("is insani ek parayla basladi", is_equal_approx(cm.funds_of(me), base + first_income)
 		or is_equal_approx(cm.funds_of(me), base + cm.turn_income(me)),
 		str(cm.funds_of(me)))
 	var neighbor := String(gmap.neighbors().get(home, [""])[0])
 	check("hemsehri destegi memlekette", is_equal_approx(PP.hometown_activity(home, me), PP.HOMETOWN_ACTIVITY))
 	check("komsu il etkilenmez", PP.hometown_activity(neighbor, me) == 0.0)
-	# Botların geçmiş bonusları da aynı gruptan pay alabilir (seçmen çalma): biraz eksik olabilir.
-	check("oyun basinda gecmis bonusu uygulandi", float(pm.parties[me]["groups"]["isveren"]) <= float(boosted["isveren"]) + 0.001 		and float(pm.parties[me]["groups"]["isveren"]) > float(boosted["isveren"]) * 0.8,
-		str(pm.parties[me]["groups"]))
+	check("is insani her tur ek gelir alir", cm.turn_income(me) >= PP.BUSINESS_TURN_INCOME)
+	check("teknokrat vergi tepkisini azaltir", is_equal_approx(PP.party_effect(me, "tax_mood"), 0.8))
+	var econ: Dictionary = cm.economy.duplicate(true)
+	econ["pressure"] = 1.0
+	var mood_full: Dictionary = Economy.group_mood(econ, 1.0)
+	var mood_tech: Dictionary = Economy.group_mood(econ, 1.0, 0.8)
+	check("vergi tepkisi carpani group_mood'a yansir", mood_full.is_empty() or absf(float(mood_tech.values()[0])) < absf(float(mood_full.values()[0])) + 0.001)
 	check("cekirdek gruplar korundu (botlar az pay alabilir)", float(pm.parties[me]["groups"]["isci"]) <= VoterGroups.CORE_START + 0.001 and float(pm.parties[me]["groups"]["isci"]) > VoterGroups.CORE_START * 0.8, str(pm.parties[me]["groups"]["isci"]))
 	check("aktiviteye eklendi", cm.activity_of(home, me) >= PublicOpinion.org_activity(2) + PP.HOMETOWN_ACTIVITY - 0.01,
 		"%.2f" % cm.activity_of(home, me))
 	var all_bots_ok := true
 	for bot in mm.bot_ids():
 		var bh: String = PP.hometown_of(bot)
-		var bg: Dictionary = PP.background(PP.background_of(bot))
-		var bot_groups: Dictionary = pm.parties[bot]["groups"]
-		var bot_start: Dictionary = VoterGroups.start_affinities(pm.parties[bot]["core"])
 		if bh == "" or cm.organization_level(bh, bot) != PP.HOMETOWN_ORG_LEVEL \
-				or float(bot_groups[bg["group"]]) <= float(bot_start[bg["group"]]):
+				or not PP.is_valid_background(PP.background_of(bot)) or not PP.is_valid_trait(PP.trait_of(bot)):
 			all_bots_ok = false
-	check("botlarin da siyasetcisi, memleketi ve gecmis bonusu var", all_bots_ok)
+	check("botlarin da siyasetcisi, memleketi, meslegi ve kisiligi var", all_bots_ok)
 
 	# Geçmiş avantajları.
 	var bot: int = mm.bot_ids()[0]
 	cm.turmoil.erase(bot)
 	pm.politicians[bot]["background"] = "emekli_subay"
+	pm.politicians[bot]["trait"] = "teknokrat"
 	cm._add_turmoil(bot, 1.0)
-	check("emekli subay karisikligi az biriktirir", is_equal_approx(cm.turmoil_of(bot), PP.OFFICER_TURMOIL_MULT))
+	check("emekli subay karisikligi az biriktirir", is_equal_approx(cm.turmoil_of(bot), 0.75))
+	check("emekli subaya karalama az isler", is_equal_approx(PP.party_effect(bot, "propaganda_in"), 0.75))
 	pm.politicians[bot]["background"] = "belediye_baskani"
 	var bh: String = PP.hometown_of(bot)
 	check("belediye baskani teskilat bonusu", is_equal_approx(cm.org_bonus(bh, bot),
-		PublicOpinion.org_activity(2) * PP.MAYOR_ORG_MULT) or cm.populism_rounds_left(bot) > 0)
+		PublicOpinion.org_activity(2) * 1.1) or cm.populism_rounds_left(bot) > 0)
+	var orgs_before: int = cm.org_count(bot)
+	cm._grant_mayor_orgs(bot, bh)
+	var expected: int = maxi(1, int(round(gmap.province_ids().size() * PP.MAYOR_ORG_SHARE)))
+	check("belediye baskani rastgele illerde teskilat alir", cm.org_count(bot) - orgs_before == expected,
+		"%d -> %d (beklenen +%d)" % [orgs_before, cm.org_count(bot), expected])
+	pm.politicians[bot]["background"] = "sendikaci"
+	pm.politicians[bot]["trait"] = "hatip"
+	check("sendikaci + hatip miting carpani", is_equal_approx(PP.effect(bot, "miting"), 1.25 * 1.1))
+	check("hatip grup toplantisi", is_equal_approx(PP.effect(bot, "speech"), 1.2))
+	check("sendikaci iscilere hitap", is_equal_approx(PP.group_appeal(bot, "isci"), 1.1) and is_equal_approx(PP.group_appeal(bot, "isveren"), 1.0))
+	pm.politicians[bot]["background"] = "aktivist"
+	pm.politicians[bot]["trait"] = "sert"
+	check("aktivist: miting guclu, yasa ve toplanti zayif", is_equal_approx(PP.effect(bot, "miting"), 1.25 * 1.05)
+		and is_equal_approx(PP.effect(bot, "law"), 0.75) and is_equal_approx(PP.effect(bot, "speech"), 0.75))
+	check("aktivist genclere ve ilericilere hitap", is_equal_approx(PP.group_appeal(bot, "genc"), 1.1) and is_equal_approx(PP.group_appeal(bot, "ilerici"), 1.1))
+	check("sert: karalama guclu, gelen karalama biraz guclu", is_equal_approx(PP.effect(bot, "propaganda_out"), 1.2)
+		and is_equal_approx(PP.party_effect(bot, "propaganda_in"), 1.05))
+	pm.politicians[bot]["background"] = "gazeteci"
+	check("gazeteci kaset ve karalama", is_equal_approx(PP.effect(bot, "reputation_out"), 1.25) and is_equal_approx(PP.effect(bot, "propaganda_out"), 1.25 * 1.2))
+	pm.politicians[bot]["background"] = "hukukcu"
+	check("hukukcu vekil calmaya direnir", is_equal_approx(PP.party_effect(bot, "steal_in"), 0.75))
+	check("kisilik verilmezse rastgele atanir", PP.is_valid_trait(String(PP.make("A", "B", "hukukcu", home)["trait"])))
 
 	# Rastgele isim ve güvenilirlik.
 	var all_ok := true
@@ -148,10 +169,12 @@ func _initialize() -> void:
 	print("=== %s ===" % ("TUM TESTLER GECTI" if _failed == 0 else "%d TEST BASARISIZ" % _failed))
 	quit(1 if _failed > 0 else 0)
 
-func _covers_all_sides() -> bool:
-	var seen := {}
+func _profiles_ok() -> bool:
 	for id in PP.BACKGROUND_ORDER:
 		var info: Dictionary = PP.background(id)
-		if VoterGroups.is_group(String(info.get("group", ""))):
-			seen[info["group"]] = true
-	return PP.BACKGROUNDS.size() == 6 and seen.size() == 6
+		if String(info.get("title", "")) == "" or String(info.get("perk", "")) == "":
+			return false
+	for id in PP.TRAIT_ORDER:
+		if String(PP.trait_info(id).get("perk", "")) == "":
+			return false
+	return PP.BACKGROUNDS.size() == 7 and PP.TRAITS.size() == 3

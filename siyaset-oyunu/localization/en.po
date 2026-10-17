@@ -4013,3 +4013,93 @@ msgstr "Appeal"
 
 msgid "Oy: gruptaki tahmini oy payın · Hitap: grubun sana bağlı kısmı (▲▼ son seçimden beri)"
 msgstr "Vote: your estimated share of the group's vote · Appeal: the part of the group committed to you (▲▼ since the last election)"
+
+msgid " · kişilik: %s"
+msgstr " · personality: %s"
+
+msgid "Mitinglerin daha etkili; işçiler sana daha kolay ısınır."
+msgstr "Your rallies hit harder; workers warm to you more easily."
+
+msgid "Oyuna daha fazla parayla başlarsın, her tur ek gelirin olur."
+msgstr "You start with more money and earn extra every turn."
+
+msgid "Birkaç ilde hazır teşkilatla başlarsın; teşkilatların daha güçlü."
+msgstr "You start with offices in a few provinces; your offices are stronger."
+
+msgid "Partinde iç karışıklık ve sana atılan karalamalar daha az işler."
+msgstr "Party turmoil and smear campaigns against you hurt less."
+
+msgid "Gazeteci"
+msgstr "Journalist"
+
+msgid "Yıllarca manşet attın; kimin dosyası nerede bilirsin."
+msgstr "You wrote the headlines for years; you know whose file is where."
+
+msgid "Rakiplere attığın kaset ve karalamalar daha sert vurur."
+msgstr "Your tapes and smears hit rivals harder."
+
+msgid "Hukukçu"
+msgstr "Lawyer"
+
+msgid "Davaları kazandın, sözleşmelerin her satırını okursun."
+msgstr "You won the cases; you read every line of a contract."
+
+msgid "Partinden vekil koparmak daha zordur."
+msgstr "Poaching MPs from your party is harder."
+
+msgid "Aktivist"
+msgstr "Activist"
+
+msgid "Sokaktan geldin; eylemleri sen başlattın."
+msgstr "You came from the street; you started the protests."
+
+msgid "Mitinglerin daha etkili, gençler ve ilericiler sana ısınır; yasa ve grup toplantıların daha zayıf."
+msgstr "Your rallies hit harder and youth and progressives warm to you; your laws and group meetings are weaker."
+
+msgid "Hatip"
+msgstr "Orator"
+
+msgid "Kürsüye çıktın mı salon susar."
+msgstr "When you take the podium, the hall falls silent."
+
+msgid "Mitinglerin biraz, grup toplantıların belirgin biçimde daha etkili."
+msgstr "Your rallies are a bit stronger, your group meetings clearly stronger."
+
+msgid "Sert"
+msgstr "Tough"
+
+msgid "Lafını esirgemezsin, kavgadan kaçmazsın."
+msgstr "You never mince words and never dodge a fight."
+
+msgid "Karalamaların daha sert, mitinglerin biraz daha etkili; ama sana atılan karalamalar da biraz daha işler."
+msgstr "Your smears hit harder and your rallies a bit more; but smears against you also land a bit harder."
+
+msgid "Teknokrat"
+msgstr "Technocrat"
+
+msgid "Rakamlarla konuşursun, piyasa sana güvenir."
+msgstr "You speak in numbers; the markets trust you."
+
+msgid "Hükümetteyken vergilere seçmen tepkisi daha az olur."
+msgstr "In government, voters react less to taxes."
+
+msgid "Meslek"
+msgstr "Profession"
+
+msgid "oyun boyunca sana bir avantaj verir"
+msgstr "gives you an edge all game"
+
+msgid "Kişilik"
+msgstr "Personality"
+
+msgid "tarzını biraz daha belirler"
+msgstr "shapes your style a little more"
+
+msgid "meslek"
+msgstr "profession"
+
+msgid "kişilik"
+msgstr "personality"
+
+msgid "%s · %s · %s · memleket %s"
+msgstr "%s · %s · %s · hometown %s"

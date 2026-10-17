@@ -8,16 +8,25 @@
   const RAW = "https://raw.githubusercontent.com/TriQue06/siyaset_oyunu_test_experimental/main/builds/";
   const mb = (bytes) => (bytes / 1048576).toFixed(0) + " MB";
   const getJson = (url) => fetch(url, { cache: "no-cache" }).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
+  // GEÇİCİ: indirme butonları kapalı. Geri açmak için false yap.
+  const DOWNLOADS_OFF = true;
+  if (DOWNLOADS_OFF) {
+    document.querySelectorAll(".dl").forEach((a) => {
+      a.setAttribute("aria-disabled", "true");
+      a.removeAttribute("href");
+      a.addEventListener("click", (e) => e.preventDefault());
+    });
+  }
   getJson(RAW + "version.json")
     .catch(() => getJson("/version.json"))
     .then((v) => {
       const set = (sel, text) => document.querySelectorAll(sel).forEach((el) => (el.textContent = text));
       if (v.apk) {
-        document.querySelectorAll('#dl-apk, [data-mirror="apk"]').forEach((a) => (a.href = v.apk.url));
+        if (!DOWNLOADS_OFF) document.querySelectorAll('#dl-apk, [data-mirror="apk"]').forEach((a) => (a.href = v.apk.url));
         set("#meta-apk, [data-meta='apk']", `Sürüm ${v.version} · ${mb(v.apk.size)}`);
       }
       if (v.exe) {
-        document.querySelectorAll('#dl-exe, [data-mirror="exe"]').forEach((a) => (a.href = v.exe.url));
+        if (!DOWNLOADS_OFF) document.querySelectorAll('#dl-exe, [data-mirror="exe"]').forEach((a) => (a.href = v.exe.url));
         set("#meta-exe, [data-meta='exe']", `Sürüm ${v.version} · zip · ${mb(v.exe.size)}`);
       }
       set("#band-version", `Sürüm ${v.version}`);

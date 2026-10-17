@@ -199,3 +199,9 @@ a { color: var(--gold); }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
   .ticker-track { animation: none; }
 }
+
+/* Geçici olarak kapalı indirme butonları (app.js DOWNLOADS_OFF). */
+.dl[aria-disabled="true"], .dl[aria-disabled="true"]:hover, .dl[aria-disabled="true"]:active {
+  background: #6b6b6b; box-shadow: inset 2px 2px 0 #8a8a8a, inset -2px -2px 0 #4a4a4a, 6px 6px 0 var(--ink);
+  filter: grayscale(1); opacity: .6; cursor: not-allowed; pointer-events: none; transform: none;
+}

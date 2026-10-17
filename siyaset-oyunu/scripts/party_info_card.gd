@@ -47,7 +47,20 @@ static func build(peer_id: int, my_id: int, on_action: Callable = Callable(), wi
 			line += L.t(" · kişilik: %s") % trait_title
 		if hometown != "":
 			line += L.t(" · memleket: %s") % ElectionNightSim.province_name(hometown)
-		box.add_child(PopupKit.note(line, color.lightened(0.45), _text_width()))
+		var note := PopupKit.note(line, color.lightened(0.45), _text_width())
+		# Portresi olan siyasetçide (bkz. ContentPacks) resim satırın solunda.
+		var portrait := PoliticianPresets.portrait_of(leader_id)
+		if ContentPacks.has_portrait(portrait):
+			var row := HBoxContainer.new()
+			row.add_theme_constant_override("separation", 8)
+			row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			row.add_child(PoliticianPortrait.make(PoliticianPresets.of(leader_id), color, 48.0))
+			note.custom_minimum_size.x = maxf(0.0, _text_width() - 56.0)
+			note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			row.add_child(note)
+			box.add_child(row)
+		else:
+			box.add_child(note)
 	# İki kişilik parti: kadro.
 	var members: Array = PartyManager.members_of(CardManager.party_of(peer_id))
 	if members.size() >= 2:

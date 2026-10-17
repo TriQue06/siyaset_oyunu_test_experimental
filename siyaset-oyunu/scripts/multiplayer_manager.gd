@@ -706,8 +706,10 @@ func _on_connected_to_server() -> void:
 ## cihazda farklı sürüm varsa istemcinin istekleri sunucuda yanlış fonksiyona
 ## gider ya da sessizce düşer. Katılırken karşılaştırılır; her derlemede sürüm
 ## artırıldığı için farklı derlemeler asla eşleşmez.
+## Mod yüklüyse mod listesi de imzaya girer (bkz. ContentPacks): aynı modlar şart.
 func network_signature() -> String:
-	return game_version()
+	var mods := ContentPacks.signature()
+	return game_version() if mods == "" else "%s|%s" % [game_version(), mods]
 
 ## Oyun sürümü (project.godot: application/config/version). Her yeni derlemede
 ## son rakam 1 artırılır (0.0.1, 0.0.2, ...); Android version/name ile aynı tutulur.

@@ -48,6 +48,7 @@ func _ready() -> void:
 
 func _scan_icons() -> void:
 	icon_paths.clear()
+	_texture_cache.clear()
 	var dir := DirAccess.open(ICONS_DIR)
 	if dir != null:
 		dir.list_dir_begin()
@@ -79,6 +80,10 @@ func _scan_icons() -> void:
 			push_warning("İkon dizini taranamadı, %d ikon yedek listeyle bulundu." % icon_paths.size())
 		else:
 			push_warning("İkon klasörü bulunamadı: %s" % ICONS_DIR)
+	# Mod logoları yerleşiklerin ARKASINA eklenir: yerleşik indeksler değişmez
+	# (lobide herkes aynı modlara sahip; bkz. ContentPacks).
+	for path in ContentPacks.extra_icon_paths():
+		icon_paths.append(String(path))
 
 func icon_count() -> int:
 	return icon_paths.size()
@@ -105,10 +110,31 @@ func get_icon_texture(index: int, target_pixel_size: int = 128) -> Texture2D:
 	if _texture_cache.has(key):
 		return _texture_cache[key]
 	var scale := target_pixel_size / ICON_NATIVE_SIZE
-	var tex := SvgRaster.load_texture(icon_paths[index], scale)
+	var tex: Texture2D = SvgRaster.load_texture(icon_paths[index], scale) 		if icon_paths[index].get_extension().to_lower() == ICON_EXTENSION else _load_bitmap_icon(icon_paths[index])
 	if tex != null:
 		_texture_cache[key] = tex
 	return tex
+
+## Mod logosu (PNG): dosyadan okunur, boyutu kullanım yerinde sığdırılır.
+func _load_bitmap_icon(path: String) -> Texture2D:
+	var image := Image.load_from_file(path)
+	return ImageTexture.create_from_image(image) if image != null and not image.is_empty() else null
+
+## Kalıcı logo kimliği ("base:icon_05", "<mod>:<dosya>"): ayar paketleri ve
+## kayıtlar indeks yerine bunu saklayabilir (mod sırası değişse de bozulmaz).
+func icon_id(index: int) -> String:
+	if index < 0 or index >= icon_paths.size():
+		return ""
+	var path := icon_paths[index]
+	if path.begins_with(ICONS_DIR):
+		return "%s:%s" % [ContentPacks.BASE, path.get_file().get_basename()]
+	return ContentPacks.icon_id_for_path(path)
+
+func icon_index_of(id: String) -> int:
+	for i in icon_paths.size():
+		if icon_id(i) == id:
+			return i
+	return -1
 
 func random_icon_index() -> int:
 	return randi_range(0, maxi(0, icon_paths.size() - 1))

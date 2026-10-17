@@ -4103,3 +4103,138 @@ msgstr "personality"
 
 msgid "%s · %s · %s · memleket %s"
 msgstr "%s · %s · %s · hometown %s"
+
+msgid "YENİ BİR PARTİ"
+msgstr "A NEW PARTY"
+
+msgid "Siyasetçini yarat, partini kur, seçmenini seç."
+msgstr "Create your politician, found your party, pick your voters."
+
+msgid "Hazırsın. Değiştirmek için hazırlığı iptal et."
+msgstr "You're ready. Cancel ready to make changes."
+
+msgid "← Geri"
+msgstr "← Back"
+
+msgid "Cinsiyet"
+msgstr "Gender"
+
+msgid "Ad ve soyad"
+msgstr "First and last name"
+
+msgid "zarla değiştir ya da kendin yaz"
+msgstr "roll the dice or type your own"
+
+msgid "Botun adını, soyadını, mesleğini, memleketini ve çekirdek seçmen gruplarını rastgele değiştir"
+msgstr "Randomize the bot's name, surname, profession, hometown and core voter groups"
+
+msgid "Bir meslek seç."
+msgstr "Pick a profession."
+
+msgid "Bir kişilik seç."
+msgstr "Pick a personality."
+
+msgid "Aynı çiftten iki grup birlikte seçilemez (ör. işçi ve işveren)."
+msgstr "You can't pick both groups of the same pair (e.g. workers and employers)."
+
+msgid "Oda"
+msgstr "Room"
+
+msgid "Bot adayı"
+msgstr "Bot candidate"
+
+msgid "Aday kartın"
+msgstr "Your candidate card"
+
+msgid "adsız"
+msgstr "unnamed"
+
+msgid "meslek ?"
+msgstr "profession ?"
+
+msgid "kişilik ?"
+msgstr "personality ?"
+
+msgid "Memleket: %s"
+msgstr "Hometown: %s"
+
+msgid "Memleket seçilmedi"
+msgstr "No hometown yet"
+
+msgid "parti adı yok"
+msgstr "no party name"
+
+msgid "Bu botun siyasetçisini ve partisini düzenle"
+msgstr "Edit this bot's politician and party"
+
+msgid "İleri →"
+msgstr "Next →"
+
+msgid "Bot düzenleniyor: değişiklikler anında kaydedilir."
+msgstr "Editing a bot: changes are saved instantly."
+
+msgid "Herkesin hazır olması bekleniyor…"
+msgstr "Waiting for everyone to be ready…"
+
+msgid "🔒 Hazırım"
+msgstr "🔒 I'm ready"
+
+msgid "Eksik: %s"
+msgstr "Missing: %s"
+
+msgid "Her şey tamam. Hazır olduğunda bas."
+msgstr "All set. Press when you're ready."
+
+msgid "Meslek ve kişilik"
+msgstr "Profession and personality"
+
+msgid "Parti kimliği"
+msgstr "Party identity"
+
+msgid "Kim olduğunu seç: adın ve soyadın."
+msgstr "Choose who you are: your name and surname."
+
+msgid "Meslek oyun boyunca sana bir avantaj verir; kişilik tarzını biraz daha belirler."
+msgstr "Your profession gives you an edge all game; your personality shapes your style a little more."
+
+msgid "Haritadan bir il seç: memleketinde güçlü bir teşkilatla başlarsın."
+msgstr "Pick a province on the map: you start with a strong office in your hometown."
+
+msgid "Partinin adı, logosu ve rengi."
+msgstr "Your party's name, logo and color."
+
+msgid "Partinin dayanacağı iki çekirdek seçmen grubunu seç."
+msgstr "Pick the two core voter groups your party will rely on."
+
+msgid "Erkek"
+msgstr "Male"
+
+msgid "Kadın"
+msgstr "Female"
+
+msgid "Miting ve işçiler"
+msgstr "Rallies and workers"
+
+msgid "Para ve gelir"
+msgstr "Money and income"
+
+msgid "Disiplin"
+msgstr "Discipline"
+
+msgid "Kaset ve karalama"
+msgstr "Tapes and smears"
+
+msgid "Vekil koruma"
+msgstr "MP protection"
+
+msgid "Sokak ve gençler"
+msgstr "Street and youth"
+
+msgid "Kürsü"
+msgstr "Podium"
+
+msgid "Kavga"
+msgstr "Brawler"
+
+msgid "Rakamlar"
+msgstr "Numbers"

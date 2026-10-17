@@ -399,7 +399,7 @@ func open_menu() -> void:
 	_notice.text = L.t("Tercihler değiştirildiğinde anında uygulanır.")
 	var path := _scene_path()
 	var in_game := path in ["res://scenes/GameScreen.tscn", "res://scenes/GovernmentFormation.tscn", "res://scenes/ElectionResults.tscn"]
-	_leave_button.disabled = MultiplayerManager.room_code == "" and not in_game and not path in ["res://scenes/PartySetup.tscn", "res://scenes/PoliticianSetup.tscn"]
+	_leave_button.disabled = MultiplayerManager.room_code == "" and not in_game and path != "res://scenes/PartySetup.tscn"
 	_seed_copy.disabled = not in_game
 	_seed_copy.text = (str(GameMap.seed_value()) if in_game else "—") + " · " + L.t("KOPYALA")
 	_save_button.disabled = path != "res://scenes/GameScreen.tscn" or not MultiplayerManager.offline_mode or SaveGame.block_reason() != ""

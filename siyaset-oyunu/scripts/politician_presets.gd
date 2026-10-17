@@ -1,7 +1,7 @@
 class_name PoliticianPresets
 extends RefCounted
 ## SİYASETÇİ PROFİLİ: oyun bir siyasetçinin parti kurmasıyla başlar. Parti
-## kurulmadan önce her oyuncu siyasetçisini seçer (bkz. politician_setup.gd):
+## kurulurken her oyuncu siyasetçisini seçer (bkz. party_setup.gd, sihirbazın ilk adımları):
 ##   - MESLEK (0.0.229): 7 meslek; seçmen grubuna BAĞLI DEĞİL (çekirdek gruplar
 ##     parti kurulumunda seçilir). Her meslek EFFECTS çarpanları ve bazılarında
 ##     özel başlangıç (iş insanı parası, belediye başkanı teşkilatları) verir.
@@ -19,39 +19,40 @@ extends RefCounted
 ##   appeal: o gruplarda kazanç (yasa, toplantı, miting) APPEAL_MULT kat.
 ## ARAYÜZ METİNLERİ SAYI İÇERMEZ (özet anlatım); sayılar sadece burada.
 ## Veri PartyManager.politicians[peer] içinde durur (partiden bağımsız) =
-##   {"gender", "first_name", "surname", "name" (ad + soyad), "background", "trait", "hometown"}
+##   {"gender", "first_name", "surname", "name" (ad + soyad), "background", "trait", "hometown",
+##    "portrait" (portre kimliği, "" = yok; bkz. ContentPacks / PoliticianPortrait)}
 ## İSİM TAMAMEN RASTGELE (elle yazılmaz): random_name(). SOYAD ileride çok
 ## yerde kullanılacak (bkz. surname_of). Soyadlar uydurma kök + ekten üretilir;
 ## gerçek siyasetçi soyadları BANNED_SURNAMES ile ayrıca engellenir.
 ## (bkz. PartyManager.set_my_politician).
 
-## Meslek -> {title, blurb, perk, effects, appeal}. Sıra ekranda da bu sıra.
+## Meslek -> {title, tag (kartta kısa etiket), blurb, perk, effects, appeal}. Sıra ekranda da bu sıra.
 const BACKGROUNDS := {
-	"sendikaci": {"title": "Sendikacı",
+	"sendikaci": {"title": "Sendikacı", "tag": "Miting ve işçiler",
 		"blurb": "Fabrika kapılarında büyüdün, grevleri sen örgütledin.",
 		"perk": "Mitinglerin daha etkili; işçiler sana daha kolay ısınır.",
 		"effects": {"miting": 1.25}, "appeal": ["isci"]},
-	"is_insani": {"title": "İş İnsanı",
+	"is_insani": {"title": "İş İnsanı", "tag": "Para ve gelir",
 		"blurb": "Kendi şirketini kurdun, sermaye çevreleri seni tanır.",
 		"perk": "Oyuna daha fazla parayla başlarsın, her tur ek gelirin olur.",
 		"effects": {}, "appeal": []},
-	"belediye_baskani": {"title": "Belediye Başkanı",
+	"belediye_baskani": {"title": "Belediye Başkanı", "tag": "Teşkilat",
 		"blurb": "Şehrini yıllarca yönettin, yerel ağları iyi bilirsin.",
 		"perk": "Birkaç ilde hazır teşkilatla başlarsın; teşkilatların daha güçlü.",
 		"effects": {"org": 1.1}, "appeal": []},
-	"emekli_subay": {"title": "Emekli Subay",
+	"emekli_subay": {"title": "Emekli Subay", "tag": "Disiplin",
 		"blurb": "Disiplin ve birlik senin için her şeyden önce gelir.",
 		"perk": "Partinde iç karışıklık ve sana atılan karalamalar daha az işler.",
 		"effects": {"turmoil_in": 0.75, "propaganda_in": 0.75}, "appeal": []},
-	"gazeteci": {"title": "Gazeteci",
+	"gazeteci": {"title": "Gazeteci", "tag": "Kaset ve karalama",
 		"blurb": "Yıllarca manşet attın; kimin dosyası nerede bilirsin.",
 		"perk": "Rakiplere attığın kaset ve karalamalar daha sert vurur.",
 		"effects": {"reputation_out": 1.25, "propaganda_out": 1.25}, "appeal": []},
-	"hukukcu": {"title": "Hukukçu",
+	"hukukcu": {"title": "Hukukçu", "tag": "Vekil koruma",
 		"blurb": "Davaları kazandın, sözleşmelerin her satırını okursun.",
 		"perk": "Partinden vekil koparmak daha zordur.",
 		"effects": {"steal_in": 0.75}, "appeal": []},
-	"aktivist": {"title": "Aktivist",
+	"aktivist": {"title": "Aktivist", "tag": "Sokak ve gençler",
 		"blurb": "Sokaktan geldin; eylemleri sen başlattın.",
 		"perk": "Mitinglerin daha etkili, gençler ve ilericiler sana ısınır; yasa ve grup toplantıların daha zayıf.",
 		"effects": {"miting": 1.25, "law": 0.75, "speech": 0.75}, "appeal": ["genc", "ilerici"]},
@@ -59,17 +60,17 @@ const BACKGROUNDS := {
 const BACKGROUND_ORDER := ["sendikaci", "is_insani", "belediye_baskani", "emekli_subay",
 	"gazeteci", "hukukcu", "aktivist"]
 
-## Kişilik -> {title, blurb, perk, effects}. Sıra ekranda da bu sıra.
+## Kişilik -> {title, tag, blurb, perk, effects}. Sıra ekranda da bu sıra.
 const TRAITS := {
-	"hatip": {"title": "Hatip",
+	"hatip": {"title": "Hatip", "tag": "Kürsü",
 		"blurb": "Kürsüye çıktın mı salon susar.",
 		"perk": "Mitinglerin biraz, grup toplantıların belirgin biçimde daha etkili.",
 		"effects": {"miting": 1.1, "speech": 1.2}},
-	"sert": {"title": "Sert",
+	"sert": {"title": "Sert", "tag": "Kavga",
 		"blurb": "Lafını esirgemezsin, kavgadan kaçmazsın.",
 		"perk": "Karalamaların daha sert, mitinglerin biraz daha etkili; ama sana atılan karalamalar da biraz daha işler.",
 		"effects": {"miting": 1.05, "propaganda_out": 1.2, "propaganda_in": 1.05}},
-	"teknokrat": {"title": "Teknokrat",
+	"teknokrat": {"title": "Teknokrat", "tag": "Rakamlar",
 		"blurb": "Rakamlarla konuşursun, piyasa sana güvenir.",
 		"perk": "Hükümetteyken vergilere seçmen tepkisi daha az olur.",
 		"effects": {"tax_mood": 0.8}},
@@ -228,14 +229,24 @@ static func random_background(rng: RandomNumberGenerator = null) -> String:
 	return String(BACKGROUND_ORDER[index])
 
 ## trait_id boş ya da geçersizse rastgele bir kişilik verilir (botlar, eski kayıtlar).
+## portrait: portre kimliği ("<paket>:<ad>"); biçimi bozuksa boş kalır.
 static func make(first_name: String, surname: String, background_id: String, hometown: String,
-		gender: String = "m", trait_id: String = "") -> Dictionary:
+		gender: String = "m", trait_id: String = "", portrait: String = "") -> Dictionary:
 	first_name = first_name.strip_edges()
 	surname = surname.strip_edges()
 	return {"gender": gender if GENDERS.has(gender) else "m", "first_name": first_name, "surname": surname,
 		"name": ("%s %s" % [first_name, surname]).left(NAME_MAX_LENGTH),
 		"background": background_id, "trait": trait_id if is_valid_trait(trait_id) else random_trait(),
-		"hometown": hometown}
+		"hometown": hometown, "portrait": clean_portrait(portrait)}
+
+## Portre kimliği "<paket>:<ad>" biçiminde mi? Değilse "" (ağdan gelen veri de buradan geçer).
+static func clean_portrait(portrait: String) -> String:
+	var parts := portrait.split(":", false, 1)
+	if parts.size() != 2:
+		return ""
+	var pack := ContentPacks.clean_id(parts[0])
+	var key := ContentPacks.clean_id(parts[1])
+	return "%s:%s" % [pack, key] if pack != "" and key != "" else ""
 
 ## Kara liste (BANNED_SURNAMES) yalnız RASTGELE üretimde uygulanır (0.0.223):
 ## oyuncu elle istediği adı yazabilir, kendisi ya da botlar için.
@@ -375,6 +386,15 @@ static func hometown_of(peer_id: int) -> String:
 
 static func trait_of(peer_id: int) -> String:
 	return String(of(peer_id).get("trait", ""))
+
+static func portrait_of(peer_id: int) -> String:
+	return String(of(peer_id).get("portrait", ""))
+
+## Baş harfler ("Ayla Gökyelken" -> "AG"): portre yokken rozet.
+static func initials(data: Dictionary) -> String:
+	var first := String(data.get("first_name", "")).strip_edges()
+	var last := String(data.get("surname", "")).strip_edges()
+	return (first.left(1) + last.left(1)) if first != "" or last != "" else "?"
 
 static func has_background(peer_id: int, id: String) -> bool:
 	return background_of(peer_id) == id

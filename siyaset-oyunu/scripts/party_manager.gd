@@ -611,6 +611,31 @@ func _request_randomize_bot_politician(bot_id: int) -> void:
 		return
 	_randomize_bot_politician(bot_id)
 
+## Oda sahibi: botun siyasetçisini baştan yazar (ad, cinsiyet, meslek, kişilik,
+## memleket). Parti kurma sihirbazında bot düzenlenirken kullanılır.
+func set_bot_politician(bot_id: int, data: Dictionary) -> void:
+	if not MultiplayerManager.is_local_owner() or not MultiplayerManager.is_bot(bot_id) 			or not PoliticianPresets.is_valid(data):
+		return
+	if MultiplayerManager.room_code == "" or MultiplayerManager.is_host:
+		_set_bot_politician(bot_id, data)
+	else:
+		_request_set_bot_politician.rpc_id(1, bot_id, data)
+
+func _set_bot_politician(bot_id: int, data: Dictionary) -> void:
+	if not parties.has(bot_id) and not politicians.has(bot_id):
+		return
+	var home := String(data.get("hometown", ""))
+	if not GameMap.province_ids().has(home):
+		data = data.duplicate()
+		data["hometown"] = PoliticianPresets.hometown_of(bot_id)
+	_apply_politician(bot_id, data)
+
+@rpc("any_peer", "reliable")
+func _request_set_bot_politician(bot_id: int, data: Dictionary) -> void:
+	if not MultiplayerManager.is_host or multiplayer.get_remote_sender_id() != MultiplayerManager.owner_id 			or not MultiplayerManager.is_bot(bot_id) or not PoliticianPresets.is_valid(data):
+		return
+	_set_bot_politician(bot_id, data)
+
 ## Host: bir partinin siyasetçisini yazar ve yayar (botların memleketi de buradan düzeltilir).
 func set_politician_host(peer_id: int, data: Dictionary) -> void:
 	_apply_politician(peer_id, data)
@@ -618,7 +643,7 @@ func set_politician_host(peer_id: int, data: Dictionary) -> void:
 func _apply_politician(peer_id: int, data: Dictionary) -> void:
 	politicians[peer_id] = PoliticianPresets.make(String(data.get("first_name", "")),
 		String(data.get("surname", "")), String(data.get("background", "")), String(data.get("hometown", "")),
-		String(data.get("gender", "m")), String(data.get("trait", "")))
+		String(data.get("gender", "m")), String(data.get("trait", "")), String(data.get("portrait", "")))
 	if MultiplayerManager.room_code != "" and MultiplayerManager.is_host:
 		_broadcast_parties()
 	parties_updated.emit()

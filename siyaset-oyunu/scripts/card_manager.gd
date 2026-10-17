@@ -3487,10 +3487,8 @@ func _split_party(parent: int) -> void:
 	_vb_transfer(parent, splinter, share)
 	election_seats[splinter] = mini(moved, int(election_seats.get(parent, 0)))
 	election_seats[parent] = maxi(0, int(election_seats.get(parent, 0)) - int(election_seats[splinter]))
-	var vote := float(last_vote_shares.get(parent, 0.0))
-	if vote > 0.0:
-		last_vote_shares[splinter] = vote * share
-		last_vote_shares[parent] = vote * (1.0 - share)
+	# Oy oranı son seçimin statik sonucudur: bölünmede paylaştırılmaz, ayrılan
+	# parti ilk seçimine kadar oy oranı göstermez.
 	if passed_threshold.has(parent):
 		passed_threshold.append(splinter)
 	national_support[splinter] = national_of(parent)
@@ -3527,7 +3525,7 @@ func _merge_splinter(splinter: int) -> void:
 	_vb_transfer(splinter, parent, 1.0)
 	voter_base.erase(splinter)
 	election_seats[parent] = int(election_seats.get(parent, 0)) + int(election_seats.get(splinter, 0))
-	last_vote_shares[parent] = float(last_vote_shares.get(parent, 0.0)) + float(last_vote_shares.get(splinter, 0.0))
+	last_vote_shares.erase(splinter)  # birleşmede oy oranı eklenmez (son seçim sonucu statik)
 	for province_id in organizations.keys():
 		var entry: Dictionary = organizations[province_id]
 		var level := int(entry.get(splinter, 0))

@@ -61,7 +61,7 @@ static func build(peer_id: int, my_id: int, on_action: Callable = Callable(), wi
 	var pid := CardManager.party_of(peer_id)
 	var has_seats: bool = CardManager.last_seats.has(pid)
 	stats.add_child(_stat(str(int(CardManager.last_seats.get(pid, 0))) if has_seats else "—", "vekil", UiTheme.TEXT))
-	stats.add_child(_stat(L.t("%%%.1f") % float(CardManager.last_vote_shares.get(pid, 0.0)) if has_seats else "—", "oy", UiTheme.TEXT))
+	stats.add_child(_stat(L.t("%%%.1f") % float(CardManager.last_vote_shares.get(pid, 0.0)) if CardManager.last_vote_shares.has(pid) else "—", "oy", UiTheme.TEXT))
 	stats.add_child(_stat(str(GovernmentManager.score_of(peer_id)), "puan", UiTheme.GOLD))
 	var opinion := CardManager.visible_national_of(peer_id)
 	stats.add_child(_stat(EffectWords.standing(opinion), "kamuoyu", ProvincePanel._opinion_color(opinion)))

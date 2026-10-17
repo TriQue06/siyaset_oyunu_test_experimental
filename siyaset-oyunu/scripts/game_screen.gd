@@ -2009,7 +2009,7 @@ func _build_plaque(pid: int, width: float) -> Control:
 	if members.size() > 1:
 		leader_text += L.t(" · üye ") + PoliticianPresets.display_name(int(members[1]))
 	var share: float = float(CardManager.last_vote_shares.get(pid, 0.0))
-	var share_text := (L.t("%%%.1f") % share) if has_seats else ""
+	var share_text := (L.t("%%%.1f") % share) if CardManager.last_vote_shares.has(pid) else ""
 	var leader := _avatar_label(leader_text, _fit_font_size(leader_text, inner - 44.0, 11, 7), UiTheme.TEXT_MUTED)
 	leader.clip_text = true
 	leader.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS

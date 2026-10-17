@@ -528,24 +528,7 @@ func _initialize() -> void:
 	cm.funds[1] = 0.0
 	cm._apply_card_effect(1, "bagis_kampanyasi_guclu")
 	check("guclu bagis kampanyasi +60", near(cm.funds_of(1), cm.funds_bonus_amount(1, true)) and GameRules.FUNDS_BONUS_STRONG == 60)
-	# 0.0.231: bonus kart anında etki: 2 ek çekim, anında olanlar uygulanır, kalanı ele.
-	cm.inventories[1] = []
-	var bonus_draws: Array = []
-	cm._resolve_draw(1, "bonus_kart", bonus_draws, PackedStringArray())
-	var to_hand := 0
-	for entry in bonus_draws:
-		if String(entry["result"]) == "hand":
-			to_hand += 1
-	check("bonus kart 2 kart ceker", bonus_draws.size() == 3 and cm.inventories[1].size() == to_hand, str(bonus_draws))
-	var bonus_from_bonus := 0
-	for i in 200:
-		cm.inventories[1] = []
-		var again: Array = []
-		cm._resolve_draw(1, "bonus_kart", again, PackedStringArray())
-		for entry in again.slice(1):
-			if String(entry["card"]) == "bonus_kart":
-				bonus_from_bonus += 1
-	check("bonus karttan bonus kart cikmaz", bonus_from_bonus == 0, str(bonus_from_bonus))
+	check("bonus kart oyundan kalkti", not cm._draw_weights(1).has("bonus_kart"))
 	cm.inventories[1] = []
 	cm.inventories[2] = ["karalama"]
 	cm._apply_card_effect(1, "kart_calma", 2)

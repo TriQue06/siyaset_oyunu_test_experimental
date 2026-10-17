@@ -1,20 +1,23 @@
 class_name ProvinceActions
 extends PanelContainer
 ## İL İŞLEM PANELİ (0.0.231): sıram gelince haritada bir ile dokununca harita
-## ili odaklayıp sola kayar, bu panel sağda açılır. Üç başlık: TEŞKİLAT,
-## MİTİNG, YATIRIM; birine basınca yalnız onun ayrıntısı açılır.
+## paneli ikiye bölünür (0.0.232): harita solda, bu panel aynı alanın sağ
+## yarısında. Üç başlık: TEŞKİLAT, MİTİNG, YATIRIM; birine basınca yalnız
+## onun ayrıntısı açılır.
 ##   MİTİNG: bütçe (küçük / orta / büyük) → isteğe bağlı hitap grupları (teşkilat
 ##     seviyesi kadar; varsayılan genel halk) → elinde karalama kartı varsa
 ##     "kullan / sakla" → özet ve MİTİNGİ DÜZENLE. Hazırlık ya da iptal hak ve
-##     para tüketmez; kart ve bedel yalnız son onayda düşer.
+##     para tüketmez; kart yalnız son onayda elden çıkar.
 ##   YATIRIM: sadece hükümet partisi; bütçe → etki özeti → onay.
-## Kurallar ve sınırlar CardManager'da doğrulanır (sıra başına 3 miting / 3 yatırım).
+## Kurallar ve sınırlar CardManager'da doğrulanır (sıra başına miting / yatırım sınırı lobi ayarı).
 
 signal closed
 signal info_requested(province_id: String)
 signal toast_requested(text: String)
 
+## Varsayılan genişlik (yerleşimde harita alanının sağ yarısına oturur).
 const WIDTH := 380.0
+var panel_width := WIDTH
 const TIER_NAMES := ["KÜÇÜK", "ORTA", "BÜYÜK"]
 const TIER_NOTES := ["daha az etki, paraya göre en verimli", "olağan miting", "en güçlü etki, en pahalı"]
 const INVEST_NOTES := ["küçük yatırım", "olağan yatırım", "büyük yatırım; il tavanına çabuk dayanır"]
@@ -34,13 +37,13 @@ var max_height := 440.0
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	z_index = 96
+	# Harita panelinin bir parçası gibi: aynı zemin, ince çerçeve, gölgesiz.
 	var style := StyleBoxFlat.new()
-	style.bg_color = UiTheme.PANEL_DARK
-	style.border_color = UiTheme.GOLD
-	style.set_border_width_all(3)
+	style.bg_color = Color("141a36")
+	style.border_color = UiTheme.INK
+	style.set_border_width_all(2)
+	style.border_width_top = 3
 	style.set_content_margin_all(UiTheme.PAD_S + 2)
-	style.shadow_color = Color(0, 0, 0, 0.45)
-	style.shadow_offset = Vector2(4, 5)
 	add_theme_stylebox_override("panel", style)
 	custom_minimum_size = Vector2(WIDTH, 0)
 	_scroll = ScrollContainer.new()
@@ -52,6 +55,17 @@ func _init() -> void:
 	_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_scroll.add_child(_body)
 	hide()
+
+## Panel harita alanının sağ yarısına oturur (sabit boyut, içerik kayar).
+func set_panel_rect(rect: Rect2) -> void:
+	panel_width = rect.size.x
+	max_height = rect.size.y
+	position = rect.position
+	custom_minimum_size = rect.size
+	size = rect.size
+	_body.custom_minimum_size = Vector2(panel_width - 28.0, 0)
+	if visible:
+		refresh()
 
 func open(p_province: String) -> void:
 	if p_province != province_id:
@@ -94,9 +108,8 @@ func refresh() -> void:
 	_fit.call_deferred(keep)
 
 func _fit(keep: int) -> void:
-	var wanted := _body.get_combined_minimum_size().y + 24.0
-	_scroll.custom_minimum_size = Vector2(WIDTH - 20.0, minf(wanted, max_height - 24.0))
-	reset_size()
+	_scroll.custom_minimum_size = Vector2(panel_width - 20.0, max_height - 24.0)
+	size = Vector2(panel_width, max_height)
 	_scroll.scroll_vertical = keep
 
 # --- Başlık ve sekmeler ------------------------------------------------------------
@@ -124,7 +137,7 @@ func _build_header() -> void:
 	row.add_child(info)
 	var x := Button.new()
 	x.text = "✕"
-	x.tooltip_text = L.t("Kapat (haritaya dön)")
+	x.tooltip_text = L.t("Kapat (haritaya dön) · aynı ile tekrar dokunmak da kapatır")
 	x.focus_mode = Control.FOCUS_NONE
 	x.custom_minimum_size = Vector2(44, 40)
 	UiSkin.skin_button(x)
@@ -138,8 +151,8 @@ func _build_tabs() -> void:
 	_body.add_child(row)
 	var specs := [
 		["org", L.t("TEŞKİLAT"), Color("2569CF")],
-		["miting", L.t("MİTİNG %d/%d") % [CardManager.MAX_MITINGS_PER_TURN - CardManager.miting_count(me), CardManager.MAX_MITINGS_PER_TURN], Color("F2132A")],
-		["invest", L.t("YATIRIM %d/%d") % [CardManager.MAX_INVESTS_PER_TURN - CardManager.invest_count(me), CardManager.MAX_INVESTS_PER_TURN], Color("31C440")],
+		["miting", L.t("MİTİNG %d/%d") % [CardManager.action_limit(me) - CardManager.miting_count(me), CardManager.action_limit(me)], Color("F2132A")],
+		["invest", L.t("YATIRIM %d/%d") % [CardManager.action_limit(me) - CardManager.invest_count(me), CardManager.action_limit(me)], Color("31C440")],
 	]
 	for spec in specs:
 		var key := String(spec[0])
@@ -248,9 +261,9 @@ func _build_org() -> void:
 
 func _build_miting() -> void:
 	var me := multiplayer.get_unique_id()
-	var left := CardManager.MAX_MITINGS_PER_TURN - CardManager.miting_count(me)
+	var left := CardManager.action_limit(me) - CardManager.miting_count(me)
 	if left <= 0:
-		_body.add_child(PopupKit.note(L.t("Bu sıra %d mitingin hepsini yaptın. Sonraki sıranda yeniden miting yapabilirsin.") % CardManager.MAX_MITINGS_PER_TURN, UiTheme.RED))
+		_body.add_child(PopupKit.note(L.t("Bu sıra %d mitingin hepsini yaptın. Sonraki sıranda yeniden miting yapabilirsin.") % CardManager.action_limit(me), UiTheme.RED))
 		return
 	_body.add_child(PopupKit.note(L.t("Miting ilde oy kazandırır ve partini ilin seçmen gruplarına yaklaştırır. Seçmen sana uzaksa provokasyon riski vardır."), UiTheme.TEXT_MUTED))
 	# 1) BÜTÇE
@@ -297,8 +310,7 @@ func _build_miting() -> void:
 		if targets.is_empty():
 			_body.add_child(PopupKit.note(L.t("Elinde karalama kartı var ama bu ilde teşkilatın olmadığı için kullanamazsın; kart elinde kalır."), UiTheme.TEXT_MUTED))
 		else:
-			_body.add_child(PopupKit.note(L.t("Mitingte bir rakibe yüklenebilirsin: ona eksi, sana artı. Ayrı miting hakkı harcamaz; kart ve %s bedeli miting yapılınca düşer.") %
-				GameRules.cost_text(CardPresets.card_cost(CardPresets.PROPAGANDA_CARD_TYPE)), UiTheme.TEXT_MUTED))
+			_body.add_child(PopupKit.note(L.t("Mitingte bir rakibe yüklenebilirsin: ona eksi, sana artı. Ayrı miting hakkı harcamaz; kart miting yapılınca elinden çıkar."), UiTheme.TEXT_MUTED))
 			var list := GridContainer.new()
 			list.columns = 2
 			list.add_theme_constant_override("h_separation", 4)
@@ -315,7 +327,6 @@ func _build_miting() -> void:
 						refresh()))
 	# 4) ÖZET
 	_section(L.t("Özet"))
-	var smear_cost := float(CardPresets.card_cost(CardPresets.PROPAGANDA_CARD_TYPE)) if _smear != -1 else 0.0
 	var cost := CardManager.miting_tier_cost(_miting_tier)
 	_body.add_child(PopupKit.kv(L.t("İl"), ElectionNightSim.province_name(province_id)))
 	_body.add_child(PopupKit.kv(L.t("Bütçe"), "%s · %s" % [L.t(TIER_NAMES[_miting_tier]), GameRules.cost_text(cost)]))
@@ -329,14 +340,14 @@ func _build_miting() -> void:
 	var gains := _gain_preview(me)
 	if gains != "":
 		_body.add_child(PopupKit.note(L.t("Beklenen hitap: %s") % gains, UiTheme.GREEN))
-	_body.add_child(PopupKit.kv(L.t("Toplam bedel"), GameRules.cost_text(cost + smear_cost), UiTheme.GOLD))
-	var r := CardManager.funding_range(me, "miting", cost, smear_cost)
+	_body.add_child(PopupKit.kv(L.t("Toplam bedel"), GameRules.cost_text(cost), UiTheme.GOLD))
+	var r := CardManager.funding_range(me, "miting", cost)
 	if bool(r["state_allowed"]):
 		# Hükümet partisi: finansman kaynağı ayrıntısı (devlet payı partizan harcamadır).
 		var funding := FundingPanel.new()
 		funding.z_index = 0
 		_body.add_child(funding)
-		funding.open(me, "miting", province_id, cost, smear_cost, L.t("MİTİNGİ DÜZENLE"))
+		funding.open(me, "miting", province_id, cost, L.t("MİTİNGİ DÜZENLE"))
 		funding.confirmed.connect(func(share: float): _do_miting(share))
 		funding.cancelled.connect(func():
 			_reset_miting()
@@ -344,8 +355,8 @@ func _build_miting() -> void:
 	else:
 		var ok := CardManager.can_miting(me, province_id, 0.0, _miting_tier, _smear)
 		if not ok:
-			_body.add_child(PopupKit.note(L.t("Parti kasası yetmiyor (%s gerekir).") % GameRules.cost_text(cost + smear_cost), UiTheme.RED))
-		_body.add_child(_confirm_button(L.t("MİTİNGİ DÜZENLE · %s") % GameRules.cost_text(cost + smear_cost), ok, func(): _do_miting(0.0)))
+			_body.add_child(PopupKit.note(L.t("Parti kasası yetmiyor (%s gerekir).") % GameRules.cost_text(cost), UiTheme.RED))
+		_body.add_child(_confirm_button(L.t("MİTİNGİ DÜZENLE · %s") % GameRules.cost_text(cost), ok, func(): _do_miting(0.0)))
 		var cancel := Button.new()
 		cancel.text = L.t("Hazırlığı iptal et")
 		cancel.tooltip_text = L.t("Para ve miting hakkı harcanmaz.")
@@ -373,8 +384,7 @@ func _do_miting(share: float) -> void:
 		return
 	if not CardManager.can_miting(me, province_id, share, _miting_tier, _smear):
 		_sent_version = -1
-		toast_requested.emit(CardManager.funding_block_reason(me, "miting", share, CardManager.miting_tier_cost(_miting_tier),
-			float(CardPresets.card_cost(CardPresets.PROPAGANDA_CARD_TYPE)) if _smear != -1 else 0.0))
+		toast_requested.emit(CardManager.funding_block_reason(me, "miting", share, CardManager.miting_tier_cost(_miting_tier)))
 		return
 	CardManager.miting(province_id, share, _focus.duplicate(), _miting_tier, _smear)
 	_reset_miting()
@@ -389,9 +399,9 @@ func _build_invest() -> void:
 	if CardManager.is_party_member(me):
 		_body.add_child(PopupKit.note(L.t("Yatırımı partinin genel başkanı yapar."), UiTheme.TEXT_MUTED))
 		return
-	var left := CardManager.MAX_INVESTS_PER_TURN - CardManager.invest_count(me)
+	var left := CardManager.action_limit(me) - CardManager.invest_count(me)
 	if left <= 0:
-		_body.add_child(PopupKit.note(L.t("Bu sıra %d yatırımın hepsini yaptın.") % CardManager.MAX_INVESTS_PER_TURN, UiTheme.RED))
+		_body.add_child(PopupKit.note(L.t("Bu sıra %d yatırımın hepsini yaptın.") % CardManager.action_limit(me), UiTheme.RED))
 		return
 	_body.add_child(PopupKit.note(L.t("Devlet hazinesinden il yatırımı: ildeki bütün seçmen memnun olur, ekonomi canlanır. Hazine yetmezse kalanı parti kasasından."), UiTheme.TEXT_MUTED))
 	_section(L.t("1 · Bütçe"))
@@ -413,7 +423,7 @@ func _build_invest() -> void:
 	var funding := FundingPanel.new()
 	funding.z_index = 0
 	_body.add_child(funding)
-	funding.open(me, "invest", province_id, amount, 0.0, L.t("YATIRIMI YAP"))
+	funding.open(me, "invest", province_id, amount, L.t("YATIRIMI YAP"))
 	funding.confirmed.connect(func(share: float):
 		if not _first_send():
 			return

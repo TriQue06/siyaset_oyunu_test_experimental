@@ -114,11 +114,46 @@ func run() -> void:
 	var got: float = cm._vb_pull(a, pi, VoterGroups.GROUP_IDS.find("isveren"), count * 0.1, cm.MITING_STEAL, cm.MITING_DEMOTE)
 	cm._vb_opposite_loss(a, pi, VoterGroups.GROUP_IDS.find("isveren"), got)
 	var isci_after := cell(a, pi, "isci")
-	# Seviye toplamı (1×L1 + 2×L2 + 3×L3) kazancın yarısı kadar azalmalı.
+	# Seviye toplamı (1×L1 + 2×L2 + 3×L3) kazancın yarısı kadar azalmalı;
+	# 0.0.232: düşüş ilin büyüklük çarpanıyla ölçeklenir (kalabalık ilde hızlı).
 	var score_before := float(isci_before[0]) + 2.0 * float(isci_before[1]) + 3.0 * float(isci_before[2])
 	var score_after := float(isci_after[0]) + 2.0 * float(isci_after[1]) + 3.0 * float(isci_after[2])
-	check(got > 0.0 and absf((score_before - score_after) - got * cm.OPPOSITE_LOSS) < got * 0.01,
-		"isverene kazanc, iscide kazancin yarisi kadar seviye dusurur", "kazanc %.0f, dusus %.0f" % [got, score_before - score_after])
+	var expected_drop: float = got * cm.OPPOSITE_LOSS * cm.vb_size_factor(pi)
+	check(got > 0.0 and absf((score_before - score_after) - expected_drop) < got * 0.01,
+		"isverene kazanc, iscide kazancin yarisi kadar (il buyuklugune gore) seviye dusurur", "kazanc %.0f, dusus %.0f" % [got, score_before - score_after])
+
+	print("=== il buyuklugu ===")
+	var sizes: Array = []
+	for i in cm._province_ids.size():
+		sizes.append([cm.province_seat_count(String(cm._province_ids[i])), i])
+	sizes.sort_custom(func(x, y): return int(x[0]) < int(y[0]))
+	var small_pi: int = int(sizes[0][1])
+	var big_pi: int = int(sizes[-1][1])
+	check(cm.vb_size_factor(small_pi) < cm.vb_size_factor(big_pi), "kucuk ilin carpani kucuk, buyugunku buyuk",
+		"%.2f / %.2f" % [cm.vb_size_factor(small_pi), cm.vb_size_factor(big_pi)])
+	clear_all()
+	var small_n: float = cm._vb_count(small_pi, 0)
+	var big_n: float = cm._vb_count(big_pi, 0)
+	var arr: PackedFloat32Array = cm.voter_base[a]
+	arr[cm._vb_i(small_pi, 0, 0)] = small_n * 0.5
+	arr[cm._vb_i(big_pi, 0, 0)] = big_n * 0.5
+	cm.voter_base[a] = arr
+	cm._vb_promote(a, small_pi, 0, 0.2, 0.0)
+	cm._vb_promote(a, big_pi, 0, 0.2, 0.0)
+	var small_up: float = cm.voter_base[a][cm._vb_i(small_pi, 0, 1)] / (small_n * 0.5)
+	var big_up: float = cm.voter_base[a][cm._vb_i(big_pi, 0, 1)] / (big_n * 0.5)
+	check(small_up > big_up, "kucuk ilde seviye atlamak daha hizli", "%.3f / %.3f" % [small_up, big_up])
+	# Aynı oranda baskı: kalabalık ildeki 2. seviyenin daha büyük kısmı düşer.
+	cm._vb_demote_own(a, small_pi, 0, small_n * 0.5 * 0.05, false)
+	cm._vb_demote_own(a, big_pi, 0, big_n * 0.5 * 0.05, false)
+	var small_ref: float = cm.voter_base[a][cm._vb_i(small_pi, 0, 1)] / (small_n * 0.5)
+	var big_ref: float = cm.voter_base[a][cm._vb_i(big_pi, 0, 1)] / (big_n * 0.5)
+	cm._vb_demote_own(a, small_pi, 0, small_n * 0.5 * 0.05)
+	cm._vb_demote_own(a, big_pi, 0, big_n * 0.5 * 0.05)
+	var small_left: float = cm.voter_base[a][cm._vb_i(small_pi, 0, 1)] / (small_n * 0.5)
+	var big_left: float = cm.voter_base[a][cm._vb_i(big_pi, 0, 1)] / (big_n * 0.5)
+	check((small_ref - small_left) / small_ref < (big_ref - big_left) / big_ref,
+		"kalabalik ilde secmen daha kolay duser", "kucuk %.3f->%.3f, buyuk %.3f->%.3f" % [small_ref, small_left, big_ref, big_left])
 	clear_all()
 	setc(a, pi, "isci", 0.0, 0.0, count * 0.2)
 	setc(a, pi, "isveren", 0.0, count * 0.2, 0.0)

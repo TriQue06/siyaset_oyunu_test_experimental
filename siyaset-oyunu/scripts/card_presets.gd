@@ -1,11 +1,14 @@
 extends Node
 ## Autoload. Kart ve hamle katalogu. Görseller normal PNG'ler (assets/cards/).
 ##
-## KARTLAR: sırası gelen oyuncuya oyun bir kart verir; oynamanın bedeli CARD_FUNDS_COSTS.
+## KARTLAR (ŞANS KARTLARI): sırası gelen oyuncu bir kart çeker. 0.0.232: kartların
+## fiyatı yok, kart bozdurma (satma) yok.
 ## YATIRIM ve GENSORU da artık hamle (bkz. CardManager.invest / censure).
 ##   - POPÜLİZM BONUSU : POPULISM_ROUNDS tur kendi hamlelerinin iyi etkisi artar, kötüsü azalır.
+##   - OLUMSUZ (0.0.232): PARA CEZASI kasanın PENALTY_SHARE'ini siler; PARTİ İÇİ
+##     KARIŞIKLIK oyuncunun kendi partisinde iç karışıklık çıkarır; ESNEK HAREKET
+##     (olumlu) o sıra miting ve yatırım sınırını iki katına çıkarır.
 ##   - PARA BONUSU     : zayıf +FUNDS_BONUS_WEAK, güçlü +FUNDS_BONUS_STRONG para.
-##   - BONUS KART      : rastgele BONUS_CARD_DRAW kart daha çekilir.
 ##   - KART ÇALMA      : seçilen partinin elinden rastgele 1 kart çalınır (eli boşsa boşa gider).
 ## MİTİNG, YATIRIM, GENSORU kart değil, hamle; türleri hamlenin kimliği olarak durur.
 ##   - MİTİNG    : seçilen ilde güç kazandırır; provokasyon riski var.
@@ -47,7 +50,12 @@ const EARLY_ELECTION_CARD_TYPE := "erken_secim"
 const POPULISM_CARD_TYPE := "populizm"
 const FUNDS_BONUS_CARD_TYPE := "bagis_kampanyasi"
 const FUNDS_BONUS_STRONG_CARD_TYPE := "bagis_kampanyasi_guclu"
-const BONUS_CARD_TYPE := "bonus_kart"
+## Şans kartının olumsuz ve esnek türleri (çekildiği an uygulanır).
+const PENALTY_CARD_TYPE := "para_cezasi"
+const SELF_TURMOIL_CARD_TYPE := "parti_ici_karisiklik"
+const FLEX_CARD_TYPE := "esnek_hareket"
+## Para cezası kasadaki paranın bu oranını siler.
+const PENALTY_SHARE := 0.2
 
 ## GÜNDEMLER: her seçmen grubu için bir sıcak konu (bkz. GameRules gündem
 ## takvimi). Gündem bir grubun derdidir ama yasa o grubun ÇİFTİNDEKİ iki
@@ -83,7 +91,9 @@ const CARD_TYPES: Array[String] = [
 	"populizm",
 	"bagis_kampanyasi",
 	"bagis_kampanyasi_guclu",
-	"bonus_kart",
+	"para_cezasi",
+	"parti_ici_karisiklik",
+	"esnek_hareket",
 	"kart_calma",
 ]
 
@@ -123,28 +133,15 @@ func steal_range(card_type: String, closeness: float) -> Dictionary:
 	return {"min": int(round(lerpf(float(mid["min"]), float(other["min"]), t))),
 		"max": int(round(lerpf(float(mid["max"]), float(other["max"]), t)))}
 
-## Kartın elden oynanma bedeli (para).
-const CARD_FUNDS_COSTS := {
-	"karalama": 10,
-	"populizm": 0,
-	"bagis_kampanyasi": 0,
-	"bagis_kampanyasi_guclu": 0,
-	"bonus_kart": 0,
-	"kart_calma": 10,
-	"steal_weak": 10,
-	"steal_strong": 30,
-	"kaset": 20,
-	"isyan": 10,
-	"erken_secim": 30,
-}
-
 ## Kendi görseli olmayan kartlar geçici olarak başka bir kartın görselini kullanır.
 const CARD_ART_ALIAS := {
 	"kaset": "steal_medium",
 	"isyan": "gensoru",
 	"erken_secim": "gensoru",
 	"bagis_kampanyasi_guclu": "bagis_kampanyasi",
-	"bonus_kart": "anket",
+	"para_cezasi": "steal_medium",
+	"parti_ici_karisiklik": "gensoru",
+	"esnek_hareket": "anket",
 	"kart_calma": "gozcu",
 }
 
@@ -153,12 +150,14 @@ var _card_textures: Dictionary = {}
 ## (assets/cards/art/card_<tür>.png, 2:3). Olan kartta eski piksel çizim ve
 ## CardFace yerine bu görsel kartı kaplar; kenar çizgisi görselin ortalama rengi.
 const FULL_ART_PATH := "res://assets/cards/art/card_%s.png"
+## Kendi tam görseli olmayan yeni kartlar akraba kartın görselini kullanır.
+const FULL_ART_ALIAS := {"parti_ici_karisiklik": "isyan", "esnek_hareket": "bonus_kart", "para_cezasi": "kart_calma"}
 var _full_art: Dictionary = {}
 var _art_edge: Dictionary = {}
 
 func _ready() -> void:
 	for card_type in CARD_TYPES:
-		var full := FULL_ART_PATH % card_type
+		var full := FULL_ART_PATH % String(FULL_ART_ALIAS.get(card_type, card_type))
 		if ResourceLoader.exists(full):
 			var tex: Texture2D = load(full)
 			_full_art[card_type] = tex
@@ -214,7 +213,7 @@ func needs_province_target(card_type: String) -> bool:
 
 ## Hedef gerektirmeyen bonus kart mı? (popülizm, bağış kampanyası)
 func is_self_card(card_type: String) -> bool:
-	return card_type in [POPULISM_CARD_TYPE, FUNDS_BONUS_CARD_TYPE, FUNDS_BONUS_STRONG_CARD_TYPE, BONUS_CARD_TYPE,
+	return card_type in [POPULISM_CARD_TYPE, FUNDS_BONUS_CARD_TYPE, FUNDS_BONUS_STRONG_CARD_TYPE,
 		EARLY_ELECTION_CARD_TYPE]
 
 ## Meclise sunulan (oylanan) kart mı?
@@ -308,9 +307,6 @@ func law_data(card_type: String) -> Dictionary:
 	return {"group": group, "title": String(info["law_title"]), "group_title": VoterGroups.title(group),
 		"opposite": VoterGroups.opposite(group), "problem": String(info["law_problem"])}
 
-func card_cost(card_type: String) -> int:
-	return int(CARD_FUNDS_COSTS.get(card_type, 0))
-
 ## weights: card_type -> ağırlık (>0). Ağırlıkla orantılı rastgele seçim.
 func weighted_pick(weights: Dictionary, rng: RandomNumberGenerator) -> String:
 	var total := 0.0
@@ -334,8 +330,12 @@ func card_short_title(card_type: String) -> String:
 			return L.t("BAĞIŞ\nKAMPANYASI")
 		"bagis_kampanyasi_guclu":
 			return L.t("BÜYÜK BAĞIŞ\nKAMPANYASI")
-		"bonus_kart":
-			return L.t("BONUS\nKART")
+		"para_cezasi":
+			return L.t("PARA\nCEZASI")
+		"parti_ici_karisiklik":
+			return L.t("PARTİ İÇİ\nKARIŞIKLIK")
+		"esnek_hareket":
+			return L.t("ESNEK\nHAREKET")
 		"kart_calma":
 			return L.t("KART\nÇALMA")
 		"isyan":
@@ -368,8 +368,12 @@ func card_title(card_type: String) -> String:
 			return L.t("İç Karışıklık")
 		"kart_calma":
 			return L.t("Kart Çalma")
-		"bonus_kart":
-			return L.t("Bonus Kart")
+		"para_cezasi":
+			return L.t("Para Cezası")
+		"parti_ici_karisiklik":
+			return L.t("Parti İçi Karışıklık")
+		"esnek_hareket":
+			return L.t("Esnek Hareket")
 		"bagis_kampanyasi_guclu":
 			return L.t("Büyük Bağış Kampanyası")
 		"gensoru":
@@ -409,13 +413,9 @@ func law_description(card_type: String) -> String:
 		law["problem"], law["group_title"], EffectWords.change(PublicOpinion.LAW_GROUP_GAIN_PASSED, "group"),
 		VoterGroups.title(String(law["opposite"])), EffectWords.change(-PublicOpinion.LAW_GROUP_GAIN_PASSED * backlash, "group")]
 
-## Karta dokununca gösterilen açıklama (kısa ve somut) + para bedeli.
+## Karta dokununca gösterilen açıklama (kısa ve somut). Kartların fiyatı yok.
 func card_description(card_type: String) -> String:
-	var text := _card_effect_text(card_type)
-	var cost := card_cost(card_type)
-	if cost > 0 and not is_law_card(card_type):
-		text += L.t("\nBedel: %s") % GameRules.cost_text(cost)
-	return text
+	return _card_effect_text(card_type)
 
 ## Kartın ETKİSİ: ne olur, ne kadar güçlü (nitel), kritik kısıt. Kesin
 ## formüller kartta yazmaz; büyüklükler EffectWords ile sözcüğe çevrilir.
@@ -437,8 +437,12 @@ func _card_effect_text(card_type: String) -> String:
 				EffectWords.change(-PublicOpinion.REBELLION_NATIONAL_DAMAGE)
 		CARD_THEFT_CARD_TYPE:
 			return L.t("Seçtiğin partinin elinden rastgele bir kart çalarsın (eli boşsa kart boşa gider).\nSeç, sonra soldaki bir partiye tıkla.")
-		BONUS_CARD_TYPE:
-			return L.t("ANINDA ETKİ: hemen %d kart daha çekersin (el doluysa sığdığı kadar).") % GameRules.BONUS_CARD_DRAW
+		PENALTY_CARD_TYPE:
+			return L.t("OLUMSUZ, ANINDA ETKİ: para cezası. Parti kasandaki paranın beşte biri hemen silinir.")
+		SELF_TURMOIL_CARD_TYPE:
+			return L.t("OLUMSUZ, ANINDA ETKİ: kendi partinde iç karışıklık çıkar; ulusal desteğin düşer, karışıklık birikirse parti bölünebilir.")
+		FLEX_CARD_TYPE:
+			return L.t("ANINDA ETKİ: esnek hareket. Bu sıra miting ve yatırım sınırın iki katına çıkar.")
 		FUNDS_BONUS_STRONG_CARD_TYPE:
 			return L.t("ANINDA ETKİ: büyük bir bağış kampanyası, kasana hemen %s girer.") % GameRules.cost_text(GameRules.FUNDS_BONUS_STRONG)
 		EARLY_ELECTION_CARD_TYPE:
@@ -452,9 +456,9 @@ func _card_effect_text(card_type: String) -> String:
 			return L.t("Hükümet: seçtiğin ile devlet hazinesinden %s yatırım. İlde %s; etkinin yarısı hemen, kalanı sonraki dönemlerde.") % [
 				Economy.money_full(Economy.INVEST_COST), EffectWords.change(PublicOpinion.INVEST_LOCAL, "local", L.t("yerel güç"))]
 		PROPAGANDA_CARD_TYPE:
-			return L.t("SAKLANABİLİR: miting hazırlarken kullanılır. Mitingin yapıldığı ilde seçtiğin partiyi karalarsın: ona eksi, sana artı. İlde güçlü olan partiye az işler; ayrı miting hakkı harcamaz.")
+			return L.t("SAKLANABİLİR: miting hazırlarken kullanılır. Mitingin yapıldığı ilde seçtiğin partiyi karalarsın: ona eksi, sana artı. İlde güçlü olan partiye az işler; ayrı miting hakkı harcamaz, bedeli yok.")
 		POPULISM_CARD_TYPE:
-			return L.t("ANINDA ETKİ: çekildiği an başlar. %d dönem boyunca hamlelerin çok daha etkili, kötü sonuçlar hafifler; bu sürede seçim olursa ek ulusal destek.") % GameRules.POPULISM_ROUNDS
+			return L.t("ANINDA ETKİ: çekildiği an başlar. Bu dönem boyunca hamlelerin çok daha etkili, kötü sonuçlar hafifler; dönem sonunda seçim olursa ek ulusal destek.")
 		FUNDS_BONUS_CARD_TYPE:
 			return L.t("ANINDA ETKİ: bağış kampanyası, kasana hemen %s girer.") % GameRules.cost_text(GameRules.FUNDS_BONUS_WEAK)
 	return ""

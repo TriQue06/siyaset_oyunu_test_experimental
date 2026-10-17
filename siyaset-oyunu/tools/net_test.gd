@@ -106,7 +106,6 @@ func run_host() -> void:
 	cm.funds[client_id] = 10  # teşkilat (2) + her kart (en çok 3)
 	cm.inventories[client_id] = []
 	cm.inventories[1] = []
-	cm._deal_turn_card(client_id)  # sıra gelen oyuncuya otomatik kart
 	cm._push_state({"type": "full"}, true)
 	log_line("oyun başladı, sıra client'ta (id %d)" % client_id)
 
@@ -150,35 +149,14 @@ func run_client() -> void:
 	if not await wait_until(func(): return cm.turn_order.size() == 2 and pm.parties.has(me) and cm.is_my_turn(),
 			"tam durum + parti verisi alındı, sıra bende"):
 		return
-	# Kart çekme yok: sıra gelince oyun bir kart verir.
-	if not await wait_until(func(): return cm.my_inventory().size() == 1, "sıra gelince otomatik kart verildi"):
+	# Sıra başında KART ÇEK (0.0.231): çekim RPC'si, sonra teşkilat ve tur bitir.
+	cm.draw_turn_card()
+	if not await wait_until(func(): return not cm.turn_draws(me).is_empty(), "kart çekme RPC'si"):
 		return
-	var card: String = cm.my_inventory()[0]
-	# Hamle sınırı yok: önce teşkilat (2 para), sonra kasası yeterse çekilen kart.
 	cm.build_organization(TestProvinces.id("izmir"))
 	if not await wait_until(func(): return cm.organization_level(TestProvinces.id("izmir"), me) == 1 and not cm.province_poll(me, TestProvinces.id("izmir")).is_empty(), "teşkilat hamlesi RPC'si"):
 		return
-	if cm.funds_of(me) < root.get_node("CardPresets").card_cost(card):
-		log_line("kart için para yetmiyor (%s), tur bitiriliyor" % card)
-		cm.pass_turn()
-		card = "atlandi"
-	else:
-		# Deste ilk seçimden önce karalama, popülizm ya da bağış kampanyası verir.
-		cm.play_card(0, 1, TestProvinces.id("ankara"))
-	# Bağış kampanyası sırayı devreder; sıra geri dönünce yeni kart gelebilir.
-	var round_before: int = cm.round_number
-	if card != "atlandi" and not await wait_until(func(): return cm.my_inventory().is_empty() or not cm.is_my_turn() 			or cm.round_number != round_before or cm.last_election_round > 0,
-			"kart oynama RPC'si (%s)" % card):
-		return
-	if card == "karalama":
-		if not await wait_until(func(): return cm.province_events.has(TestProvinces.id("ankara")), "karalama sonucu (il olayı) senkronlandı"):
-			return
-	elif card == "populizm":
-		if not await wait_until(func(): return cm.populism_rounds_left(me) > 0, "popülizm senkronlandı"):
-			return
-	# Bağış kampanyası sırayı kendisi devreder; diğerlerinde turu bitir.
-	if card != "atlandi":
-		cm.pass_turn()
+	cm.pass_turn()
 	if not await wait_until(func(): return cm.province_profiles.size() == 67, "illerin seçmen profilleri senkronlandı"):
 		return
 	if not await wait_until(func(): return cm.last_election_round == 1 and cm.last_province_results.size() == 67,

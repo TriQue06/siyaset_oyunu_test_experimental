@@ -27,7 +27,7 @@ extends RefCounted
 ##     KART ÇEKME HAMLESİ YOK: sıra gelince otomatik olarak 1 kart dağıtılır
 ##     (el doluysa verilmez); kart oynamak sınırsız (kartların kendi bedeli
 ##     var). Her seçimden sonra da herkese 1 kart hediye.
-##     Kartları oynamanın bedeli CardPresets.CARD_FUNDS_COSTS.
+##     Kartların oynama bedeli yok (0.0.232).
 ##   - Hükümet kurulamazsa (tüm görev hakları biterse) o turun sonunda ERKEN
 ##     SEÇİM yapılır.
 ##   - MAX_ROUNDS'uncu turun sonunda SON SEÇİM yapılır; kurulan hükümet makam
@@ -94,8 +94,8 @@ const FUNDS_PER_ROUND := 30
 ## Hükümette görevi olan partiler dönemde 10 milyon ¤ fazla alır (iktidar avantajı).
 const FUNDS_PER_ROUND_GOVERNMENT := 40
 ## BEDEL YAZISI: ücretsiz hamleler her yerde "bedelsiz" diye geçer ("bedava"
-## ya da "0 milyon ¤" değil). Kart bozdurma yarım iade ettiği için ondalık da
-## gerekirse basılır.
+## ya da "0 milyon ¤" değil). Para cezası ve finansman paylaşımı yüzünden
+## ondalık da gerekirse basılır.
 static func cost_text(cost: float) -> String:
 	if cost <= 0.0:
 		return L.t("bedelsiz")
@@ -124,12 +124,11 @@ const CENSURE_FUNDS_COST := 0
 ## ERKEN SEÇİM hamlesi (eskiden kart): meclise önerge getirir.
 const EARLY_ELECTION_FUNDS_COST := 0
 ## Popülizm bonusu kartı bu kadar tur sürer. BAĞIŞ KAMPANYASI kartının iki
-## çeşidi var: zayıf +FUNDS_BONUS_WEAK, güçlü +FUNDS_BONUS_STRONG milyon ¤. Bonus kart BONUS_CARD_DRAW kart çeker.
-const POPULISM_ROUNDS := 3
+## çeşidi var: zayıf +FUNDS_BONUS_WEAK, güçlü +FUNDS_BONUS_STRONG milyon ¤. Popülizm 0.0.232'den beri bir dönem sürer.
+const POPULISM_ROUNDS := 1
 const FUNDS_BONUS_WEAK := 30
 const FUNDS_BONUS_STRONG := 60
 const FUNDS_BONUS_AMOUNT := FUNDS_BONUS_WEAK
-const BONUS_CARD_DRAW := 2
 const ELECTION_FUNDS_BONUS := 10
 ## GÜNDEM (0.0.182'de kriz ile birleşti): ilk seçimden sonraki her tur bir
 ## SEÇMEN GRUBUNUN sıcak konusudur; art arda gelen gündemler farklı çiftlerden

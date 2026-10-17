@@ -83,8 +83,9 @@ var election_threshold: float = THRESHOLD_DEFAULT
 var election_interval: int = GameRules.DEFAULT_ELECTION_INTERVAL
 ## map_mode: "random" | "turkiye_altigen" (bkz. GameMap). Türkiye
 ## haritalarında il milletvekilleri sabittir (gerçek dağılım); ulusal liste ek.
-const WORLD_DEFAULTS := {"alliances": true, "map_mode": "random", "province_scale": 1.0, "province_seats": 300, "national_seats": 200, "turn_seconds": 75}
-const WORLD_OPTIONS := {"alliances": [true, false], "map_mode": ["random", "turkiye_altigen"], "province_scale": [0.75, 1.0, 1.25], "province_seats": [150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750], "national_seats": [0, 50, 100, 150, 200, 250, 300], "turn_seconds": [30, 45, 60, 75, 90, 105, 120]}
+## action_limit (0.0.232): bir oyuncunun sırasında en fazla kaç miting ve (ayrıca) kaç yatırım.
+const WORLD_DEFAULTS := {"alliances": true, "map_mode": "random", "province_scale": 1.0, "province_seats": 300, "national_seats": 200, "turn_seconds": 75, "action_limit": 5}
+const WORLD_OPTIONS := {"alliances": [true, false], "map_mode": ["random", "turkiye_altigen"], "province_scale": [0.75, 1.0, 1.25], "province_seats": [150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750], "national_seats": [0, 50, 100, 150, 200, 250, 300], "turn_seconds": [30, 45, 60, 75, 90, 105, 120], "action_limit": [3, 4, 5, 6, 7]}
 var world_settings: Dictionary = WORLD_DEFAULTS.duplicate()
 var vote_timeout: int = 30
 const VOTE_TIME_OPTIONS := [15, 30, 45, 60]

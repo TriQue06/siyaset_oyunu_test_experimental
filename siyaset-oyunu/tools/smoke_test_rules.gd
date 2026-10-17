@@ -304,7 +304,7 @@ func _initialize() -> void:
 
 	check("gozcu destede yok", not cm._draw_pool(1).has("gozcu"))
 	check("miting hamle, destede yok, 15 milyon", not cm._draw_pool(1).has("miting") and GameRules.MITING_FUNDS_COST == 15)
-	check("kart bedelleri: karalama 10, calma 10/30, kaset 20, isyan 10", cp.card_cost("karalama") == 10 		and cp.card_cost("steal_weak") == 10 and cp.card_cost("steal_strong") == 30 and cp.card_cost("kaset") == 20 and cp.card_cost("isyan") == 10)
+	check("kartlarin fiyati yok (0.0.232)", not cp.has_method("card_cost"))
 
 	var law_type: String = cp.law_type("isveren")
 	check("yasa hamlesi turu okunur", cp.is_law_card(law_type) and cp.law_data(law_type)["group"] == "isveren" \
@@ -698,6 +698,8 @@ func _initialize() -> void:
 	cm.last_seats[kaset_target] = maxi(20, int(cm.last_seats.get(kaset_target, 0)))
 	cm.last_seats[kaset_player] = maxi(20, int(cm.last_seats.get(kaset_player, 0)))
 	cm.turmoil = {}
+	# Seçim hediyesi anında popülizm olabilir (0.0.231): kaset hasarını büyütmesin.
+	cm.populism.erase(cm.party_of(kaset_player))
 	var nat_before: float = cm.national_of(kaset_target)
 	cm._apply_card_effect(kaset_player, "kaset", kaset_target)
 	check("kaset: hedefin ulusal destegi dustu", near(cm.national_of(kaset_target), nat_before - PublicOpinion.REPUTATION_NATIONAL_DAMAGE),

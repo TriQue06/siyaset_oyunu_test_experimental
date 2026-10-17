@@ -34,10 +34,9 @@ const R_MAP := Rect2(304, 72, 672, 448)
 const R_SIDE := Rect2(992, 72, 272, 448)
 const R_DESK := Rect2(0, 528, 1280, 192)
 const R_HAND := Rect2(16, 560, 504, 128)
-const R_ACTIONS := Rect2(536, 560, 392, 136)
-const R_FUNDS := Rect2(952, 560, 148, 64)
-const R_TRASH := Rect2(1108, 560, 156, 64)
-const R_PASS := Rect2(952, 632, 312, 72)
+## 0.0.232: kart bozdurma yok; Turu Bitir hamleler alanında, para sağda.
+const R_ACTIONS := Rect2(536, 560, 560, 136)
+const R_FUNDS := Rect2(1112, 560, 152, 136)
 ## Stüdyo masasındaki meclis yuvasının yüksekliği (oylamada büyür).
 const PARL_SLOT_HEIGHT := 150.0
 const PARL_SLOT_VOTE_HEIGHT := 286.0
@@ -135,7 +134,6 @@ const PLAY_POP_DURATION := 0.18   # ortada küçülüp "puf" kaybolma
 
 @onready var map_holder: Node2D = %MapHolder
 ## Kartı sürükleyip bırakınca atmaya yarayan çöp kutusu.
-var _trash_panel: PanelContainer
 ## Anayasa paketi: oyuncunun seçtiği baraj ve seçim aralığı.
 var _constitution_threshold: float = 0.0
 var _constitution_interval: int = 4
@@ -233,24 +231,11 @@ var _target_hint: Label
 var _card_info: PanelContainer
 var _abstain_button: Button
 ## Sürüklenen kart (el içindeki sırası; -1 = sürükleme yok) ve imleci izleyen kopyası.
-var _drag_hand_index: int = -1
-var _drag_card_type: String = ""
-var _drag_ghost: TextureRect
 ## Sürükleme sırasında el yeniden kurulmak istendi mi (bırakınca kurulur).
-var _hand_dirty: bool = false
-## Hamle butonları ve para göstergesi (sağ sütun, destenin yanında).
-## Para levhası: sağ sütunun altında, hamle butonlarının hemen üstünde.
-## Sağ sütun aşağıdan yukarı: sıra göstergesi, Turu Bitir, kart bozdurma,
-## para levhası. Hamle butonları buradan parlamentonun yanına taşındı.
+## Para levhasının ilk konumu (yerleşimde R_FUNDS'a oturtulur).
 const FUNDS_PLATE_LEFT := -(RIGHT_COLUMN_WIDTH - 16.0)
 const FUNDS_PLATE_HEIGHT := 44.0
-## Kart bozdurma ve Turu Bitir AYNI ÖLÇÜDE, alt alta.
-const BOTTOM_BUTTON_HEIGHT := 46.0
-## Sağ sütun aşağıdan yukarı dizilir ve KART BARININ ÜSTÜNDE biter.
-const RIGHT_STACK_BOTTOM := -(CARD_BAR_HEIGHT + 12.0)
-const PASS_TOP := RIGHT_STACK_BOTTOM - BOTTOM_BUTTON_HEIGHT
-const TRASH_TOP := PASS_TOP - BOTTOM_BUTTON_HEIGHT - 6.0
-const FUNDS_PLATE_TOP := TRASH_TOP - FUNDS_PLATE_HEIGHT - 6.0
+const FUNDS_PLATE_TOP := -(CARD_BAR_HEIGHT + 12.0) - FUNDS_PLATE_HEIGHT
 const FUNDS_ICON_SIZE := 34.0
 ## Parlamento diyagramının köşesinde duran "teklifi veren parti" rozeti.
 var _proposer_chip: PanelContainer
@@ -276,6 +261,7 @@ const ACTION_COLOR_SPEECH := Color("3FB586")    # su yeşili
 const ACTION_COLOR_CONGRESS := Color("AB39DB")  # mor
 const ACTION_COLOR_INQUIRY := Color("244FB3")   # lacivert
 const ACTION_COLOR_ALLIANCE := Color("F27E1F")  # turuncu
+const ACTION_COLOR_PASS := Color("244FB3")      # lacivert
 const VOTE_COLOR_YES := Color("31C440")         # yeşil
 const VOTE_COLOR_ABSTAIN := Color("FAD028")     # sarı
 const VOTE_COLOR_NO := Color("F2132A")          # kırmızı
@@ -290,8 +276,9 @@ var _parl_pulse: Tween
 var _turn_intro: TurnIntro
 var _parliament_flow: ParliamentFlow
 var _province_actions: ProvinceActions
-var _effects_chip: PanelContainer
-var _effects_label: Label
+## İl hamleleri açıkken harita paneli ikiye bölünür (bkz. _open_province_actions).
+var _map_split := false
+var _map_split_tween: Tween
 ## Miting hamlesi için il seçme modu.
 var _pending_miting: bool = false
 ## MİTİNG ODAĞI (0.0.213): ildeki teşkilat seviyesi kadar grup seçilir.
@@ -439,7 +426,6 @@ func _ready() -> void:
 	_build_target_hint()
 	_build_card_info()
 	_build_action_buttons()
-	_build_trash_button()
 	_build_player_tabs()
 	# Çöp kutusu destenin yanına otursun (yerleşim butonlar kurulduktan sonra).
 	_place_right_column_controls()
@@ -511,7 +497,7 @@ func _build_tutorial() -> void:
 		L.t("Bir ile dokun, TEŞKİLAT'ı seç: ilde kalıcı oy, anket ve yerel bağış getirir; mitingte gruplara hitap etmeni sağlar. Beş ilden sonra her yeni teşkilat biraz daha pahalıdır: nerede kuracağını seç."),
 		func() -> Rect2: return _r(R_MAP), func() -> bool: return mine.call() and _tutorial.seen_count() >= 4)
 	_tutorial.add_step("kartlar", L.t("Kartlar"),
-		L.t("Elindeki kartlar saklanabilir kartlardır: karta dokun, ne yaptığını oku; hedef isterse bir parti seç. Karalama kartı miting hazırlarken kullanılır. İstemediğin kartı KART BOZDUR yuvasına sürükle: bedelinin yarısı kasana döner."),
+		L.t("Elindeki kartlar saklanabilir kartlardır: karta dokun, ne yaptığını oku; hedef isterse bir parti seç. Karalama kartı miting hazırlarken kullanılır. Kartların fiyatı yok."),
 		func() -> Rect2: return _r(R_HAND),
 		func() -> bool: return mine.call() and not CardManager.my_inventory().is_empty() and _tutorial.seen_count() >= 5)
 	_tutorial.add_step("secim", L.t("Seçim yapıldı"),
@@ -613,7 +599,7 @@ func _place_desk_labels() -> void:
 	var k := get_viewport_rect().size / DESIGN
 	(_desk_labels["hand"] as Label).position = Vector2(16, 538) * k
 	(_desk_labels["actions"] as Label).position = Vector2(536, 538) * k
-	(_desk_labels["turn"] as Label).position = Vector2(952, 538) * k
+	(_desk_labels["turn"] as Label).position = Vector2(1112, 538) * k
 	(_desk_labels["actions"] as Label).text = L.t("HAMLELER")
 	_refresh_desk_labels()
 
@@ -642,7 +628,13 @@ func _apply_layout() -> void:
 	# oyuncu şeridi hariç kalan genişliğe sığacak şekilde ölçekleniyor —
 	# geniş, dikdörtgen bir alanı doldurması hedefleniyor.
 	var map_rect := _r(R_MAP)
-	_place_map(_swap_map_rect if _swap_engaged else map_rect)
+	if _swap_engaged:
+		_place_map(_swap_map_rect)
+	elif _map_split:
+		_place_map(_map_split_rects()[0])
+		_province_actions.set_panel_rect(_map_split_rects()[1])
+	else:
+		_place_map(map_rect)
 	_place_layer_bar()
 
 	# CANLI YAYIN BANDI: CANLI · başlık + tarih · sıra kimde (Menü sağda).
@@ -673,7 +665,7 @@ func _apply_layout() -> void:
 	_setup_side_column()
 	_place_parliament_badge()
 
-	# BENİM MASAM: kartlar, hamleler, para, bozdurma, Turu Bitir.
+	# BENİM MASAM: kartlar, hamleler (Turu Bitir dahil), para.
 	_place_card_bar()
 
 	# Harita ölçeği değişti => vekil kareleri yeni ölçeğe göre yeniden piksel
@@ -1528,11 +1520,15 @@ func _focus_log_entry(entry: Dictionary) -> void:
 	_focus_tween.chain().tween_property(map_holder, "scale", Vector2(base_scale, base_scale), FOCUS_MOVE)
 	_focus_tween.parallel().tween_property(map_holder, "position", Vector2.ZERO, FOCUS_MOVE)
 
+## Açık kongre gecesi (tur başı sunumu onun bitmesini bekler).
+var _congress_view: Control
+
 ## KONGRE GECESİ: herkesin ekranında, seçim gecesi tarzında.
 func _on_congress_started(data: Dictionary) -> void:
 	var congress_view: Control = preload("res://scripts/congress_show.gd").new()
 	congress_view.data = data
 	add_child(congress_view)  # sonuç gazetesini kendisi oynatır
+	_congress_view = congress_view
 
 ## Haritada bir hamle olunca (ili olan her log kaydı) ilin üstünde, log
 ## kaydına dokununca oynayan animasyonun YAKINLAŞTIRMASIZ hâli oynar.
@@ -1572,6 +1568,8 @@ func _refresh_countdowns() -> void:
 ## Seçim sonuçları artık sağdaki EVRENSEL PARTİ TABLOSUNDA (sekmeler) —
 ## ayrı bir "son seçim" paneli yok.
 func _refresh_results_panels() -> void:
+	if _leaving_for_results:
+		return
 	_rebuild_player_panel()
 	_refresh_parliament_diagram()
 	_refresh_map_seat_markers()
@@ -1951,7 +1949,7 @@ func _build_plaque(pid: int, width: float) -> Control:
 		tags.append([L.t("SEN"), UiTheme.GOLD, UiTheme.INK])
 	var populism_left := CardManager.populism_rounds_left(pid)
 	if populism_left > 0:
-		tags.append([L.t("POP %d") % populism_left, UiTheme.PURPLE, UiTheme.TEXT])
+		tags.append([L.t("POP"), UiTheme.PURPLE, UiTheme.TEXT])
 	for member in members:
 		if MultiplayerManager.is_away(int(member)):
 			tags.append([L.t("BOT") if MultiplayerManager.away_mode == MultiplayerManager.AWAY_BOT else L.t("PASİF"), UiTheme.RED, UiTheme.TEXT])
@@ -2068,7 +2066,6 @@ func _on_turn_changed(_peer_id: int) -> void:
 	_refresh_pass_button()
 	_refresh_hand_interactivity()
 	_refresh_action_buttons()
-	_refresh_trash_button()
 	_refresh_turn_flow_ui()
 	# Oyuncu kartlarında para yazıyor: her hamlede güncellenir.
 	_rebuild_player_panel()
@@ -2098,34 +2095,21 @@ func _update_turn_indicator_text() -> void:
 	turn_indicator_label.text = L.t("Sıra: %s%s%s") % [pname, suffix, timer]
 	_refresh_desk_labels()
 
-## Kart bozdurma yuvası sadece sıra sendeyken ve elinde kart varken belirgin.
-func _refresh_trash_button() -> void:
-	if _trash_panel == null:
-		return
-	var usable: bool = CardManager.can_act() and not CardManager.my_inventory().is_empty()
-	_trash_panel.modulate.a = 1.0 if usable else 0.35
-
 func _refresh_pass_button() -> void:
-	if pass_button.icon == null:
-		UiSkin.set_side_icon(pass_button, "turu_gec", 16)
-	pass_button.disabled = not CardManager.can_act()
-	pass_button.text = L.t("Turu Bitir")
-	# Para bittiyse tur kendiliğinden geçmez; buton nabız gibi atarak hatırlatır.
-	var should_pulse: bool = not pass_button.disabled and CardManager.funds_of(multiplayer.get_unique_id()) <= 0
+	var active := CardManager.can_act()
+	pass_button.disabled = not active
+	_set_action_text(pass_button, L.t("TURU BİTİR"), L.t("sırayı devret") if active else L.t("sıra sende değil"))
+	UiSkin.skin_action_button(pass_button, ACTION_COLOR_PASS, active)
+	# Para bittiyse tur kendiliğinden geçmez; düğme nabız gibi atarak hatırlatır.
+	var should_pulse: bool = active and CardManager.funds_of(multiplayer.get_unique_id()) <= 0
 	if should_pulse and _pass_pulse == null:
-		pass_button.pivot_offset = pass_button.size * 0.5
 		_pass_pulse = create_tween().set_loops()
-		_pass_pulse.tween_property(pass_button, "scale", Vector2(1.08, 1.08), 0.45).set_trans(Tween.TRANS_SINE)
-		_pass_pulse.parallel().tween_property(pass_button, "modulate", Color(1.35, 1.2, 0.6), 0.45).set_trans(Tween.TRANS_SINE)
-		_pass_pulse.tween_property(pass_button, "scale", Vector2.ONE, 0.45).set_trans(Tween.TRANS_SINE)
-		_pass_pulse.parallel().tween_property(pass_button, "modulate", Color.WHITE, 0.45).set_trans(Tween.TRANS_SINE)
+		_pass_pulse.tween_property(pass_button, "modulate", Color(1.35, 1.2, 0.6), 0.45).set_trans(Tween.TRANS_SINE)
+		_pass_pulse.tween_property(pass_button, "modulate", Color.WHITE, 0.45).set_trans(Tween.TRANS_SINE)
 	elif not should_pulse and _pass_pulse != null:
 		_pass_pulse.kill()
 		_pass_pulse = null
-		pass_button.scale = Vector2.ONE
 		pass_button.modulate = Color.WHITE
-	if _pass_pulse == null:
-		pass_button.modulate.a = 1.0 if not pass_button.disabled else 0.5
 
 var _pass_pulse: Tween
 
@@ -2144,11 +2128,6 @@ func _refresh_hand_interactivity() -> void:
 # --- El (envanter) ----------------------------------------------------------
 
 func _rebuild_hand() -> void:
-	# Kart sürüklenirken el yeniden kurulursa sürüklenen düğüm silinir ve
-	# bırakma olayı hiç gelmez; bırakılınca kurulsun.
-	if _drag_hand_index != -1:
-		_hand_dirty = true
-		return
 	# El değişti: bekleyen hedef seçimi artık yanlış karta işaret edebilir.
 	_cancel_targeting()
 	_selected_hand_index = -1
@@ -2181,6 +2160,10 @@ var _deferred_ui: Dictionary = {}
 
 func _run_deferred_ui(name: String) -> void:
 	_deferred_ui.erase(name)
+	# Seçim sonucu ekranına geçilirken paneller DONAR: soldaki liste yeni oy
+	# oranına göre sıralanıp sonucu animasyondan önce ele vermesin.
+	if _leaving_for_results:
+		return
 	if is_inside_tree():
 		call(name + "_now")
 var _live_wait := 0.0
@@ -2190,17 +2173,14 @@ func _process(delta: float) -> void:
 	_update_vote_swap(delta)
 	_sync_parliament_to_slot()
 	_refresh_timer_bar()
-	if _drag_ghost != null:
-		_update_drag()
-	else:
-		# Fare kımıldamadıysa il / parti tespiti her karede yapılmaz (performans);
-		# yine de arada bir tazelenir (altındaki içerik değişmiş olabilir).
-		var mouse := get_viewport().get_mouse_position()
-		_live_wait -= delta
-		if mouse != _live_mouse or _live_wait <= 0.0:
-			_live_mouse = mouse
-			_live_wait = 0.25
-			_update_live_province()
+	# Fare kımıldamadıysa il / parti tespiti her karede yapılmaz (performans);
+	# yine de arada bir tazelenir (altındaki içerik değişmiş olabilir).
+	var mouse := get_viewport().get_mouse_position()
+	_live_wait -= delta
+	if mouse != _live_mouse or _live_wait <= 0.0:
+		_live_mouse = mouse
+		_live_wait = 0.25
+		_update_live_province()
 
 	var i := _hand_holders.size() - 1
 	while i >= 0:
@@ -2263,9 +2243,6 @@ func _build_hand_card(card_type: String, hand_index: int) -> Control:
 			art.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 		holder.add_child(_card_art_title(card_type, CardManager.my_inventory().size() * CARD_DISPLAY_SIZE.x > _r(R_HAND).size.x))
 		holder.add_child(_card_art_edge(CardPresets.art_edge_color(card_type)))
-		var art_badge := _card_cost_badge(CardPresets.card_cost(card_type))
-		art_badge.position = Vector2(4.0, 4.0)
-		holder.add_child(art_badge)
 		_wire_hand_card(wrapper, holder, card, card_type, hand_index)
 		return wrapper
 
@@ -2280,7 +2257,6 @@ func _build_hand_card(card_type: String, hand_index: int) -> Control:
 	# Kartın ne olduğu her kartta görselin üstündeki bantta yazar.
 	# Kartlar üst üste biniyorsa başlık sola yaslanır (görünen şeritte okunur).
 	holder.add_child(_card_title_banner(card_type, CardManager.my_inventory().size() * CARD_DISPLAY_SIZE.x > _r(R_HAND).size.x))
-	holder.add_child(_card_cost_badge(CardPresets.card_cost(card_type)))
 	_wire_hand_card(wrapper, holder, card, card_type, hand_index)
 	return wrapper
 
@@ -2300,15 +2276,7 @@ func _wire_hand_card(wrapper: Control, holder: Control, card: Control, card_type
 				card.set_meta("press_pos", event.position)
 			elif card.get_meta("pressed", false):
 				card.set_meta("pressed", false)
-				if _drag_hand_index == hand_index:
-					_finish_drag()
-				elif _drag_hand_index == -1:
-					_on_hand_card_clicked(hand_index)
-		# SÜRÜKLEYEREK BOZDURMA: kart oynamak tıkla-seç ile; sürükleme sadece
-		# KART BOZDUR yuvasına bırakmak içindir (başka yere bırakmak iptal).
-		elif event is InputEventMouseMotion and card.get_meta("pressed", false) and _drag_hand_index == -1:
-			if event.position.distance_to(card.get_meta("press_pos", Vector2.ZERO)) > TAP_MAX_MOVE_PX:
-				_start_drag(hand_index, card_type, holder)
+				_on_hand_card_clicked(hand_index)
 	)
 
 	# FARE ÜSTÜNE GELİNCE kart tamamen görünür (dokunmatikte aynısını tek
@@ -2496,36 +2464,6 @@ func _card_title_banner(card_type: String, crowded: bool = false) -> Control:
 	banner.add_child(title)
 	return banner
 
-## Kartın sağ alt köşesindeki para bedeli rozeti.
-## Kartın üst kısmında para bedeli: para simgesi + sayı (bedelsiz kartta 0).
-func _card_cost_badge(cost: int) -> Control:
-	var badge := PanelContainer.new()
-	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := UiSkin.stylebox(UiSkin.SLOT, 3)
-	style.content_margin_left = 6
-	style.content_margin_right = 8
-	style.content_margin_top = 2
-	style.content_margin_bottom = 2
-	UiSkin.apply_style(badge, "panel", style)
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 2)
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	badge.add_child(row)
-	row.add_child(CoinIcon.make(22.0 * CARD_ART_RATIO, FUNDS_COLOR))
-	var label := Label.new()
-	label.text = str(cost)
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", int(roundf(18.0 * CARD_ART_RATIO)))
-	label.add_theme_color_override("font_color", FUNDS_COLOR)
-	label.add_theme_color_override("font_outline_color", Color.BLACK)
-	label.add_theme_constant_override("outline_size", 4)
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_child(label)
-	badge.reset_size()
-	# Sol altta: kartlar üst üste binince de görünen şeritte kalır.
-	badge.position = Vector2(6.0, CARD_DISPLAY_SIZE.y - badge.get_combined_minimum_size().y - 6.0)
-	return badge
-
 ## OTOMATİK KAYIT: çevrim dışı oyunda her yeni dönemin başında (tur akışı
 ## engellenmemişken) bir kez. Elle kayıttan ayrı yuvaya yazılır.
 var _autosaved_round := -1
@@ -2541,8 +2479,6 @@ func _maybe_autosave() -> void:
 
 ## Oynanamayan bir karta tıklanınca neden oynanamadığı.
 func _unplayable_reason(card_type: String) -> String:
-	if CardManager.funds_of(multiplayer.get_unique_id()) < CardPresets.card_cost(card_type):
-		return L.t("Parti kasası yetmiyor (%s gerekir).") % GameRules.cost_text(CardPresets.card_cost(card_type))
 	if card_type == CardPresets.PROPAGANDA_CARD_TYPE:
 		return L.t("Karalama kartı miting hazırlarken kullanılır.")
 	if CardPresets.is_law_card(card_type):
@@ -2552,205 +2488,6 @@ func _unplayable_reason(card_type: String) -> String:
 	return L.t("Bu kart şu an oynanamaz.")
 
 # --- Sürükle-bırak -----------------------------------------------------------
-
-func _start_drag(hand_index: int, card_type: String, holder: Control) -> void:
-	if _player_tab != 0:
-		_on_player_tab_pressed(0)  # parti hedefleri VEKİL sekmesinde
-	if not CardManager.can_act():
-		return
-	_deselect_hand_card()
-	_drag_hand_index = hand_index
-	_drag_card_type = card_type
-	_card_info.hide()
-	if holder != null:
-		holder.modulate.a = 0.35
-	_drag_ghost = TextureRect.new()
-	# Yasa dairesi sürüklenirken kart yerine renkli bir daire imleci izler.
-	var law := CardPresets.law_data(card_type)
-	_drag_ghost.texture = _circle_texture(VoterGroups.color(String(law["group"]))) if not law.is_empty() \
-		else CardPresets.get_card_texture(card_type)
-	_drag_ghost.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_drag_ghost.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_drag_ghost.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS if CardPresets.has_full_art(card_type) \
-		else CanvasItem.TEXTURE_FILTER_NEAREST
-	_drag_ghost.size = Vector2(52, 52) if not law.is_empty() else CARD_DISPLAY_SIZE * 0.6
-	_drag_ghost.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_drag_ghost.z_index = 150
-	add_child(_drag_ghost)
-	_update_drag()
-
-## Her kare: kopya imleci izler, imlecin altındaki hedef vurgulanır ve üstte
-## "bırakırsan ne olur" yazar.
-func _update_drag() -> void:
-	var mouse := get_viewport().get_mouse_position()
-	_drag_ghost.position = mouse - _drag_ghost.size * 0.5
-	var target := _drop_target(_drag_card_type)
-	_set_target_hint(String(target["label"]) + L.t("  ·  Geçersiz yere bırak: iptal"))
-	var valid: bool = target["valid"]
-	_drag_ghost.modulate = Color(1, 1, 1, 0.95) if valid else Color(1, 0.6, 0.6, 0.85)
-	parliament_diagram.modulate = Color(1.3, 1.3, 1.05) if bool(target["parliament"]) else Color.WHITE
-	if CardPresets.needs_province_target(_drag_card_type):
-		var province_id: String = target["province"]
-		if province_id != _hovered_province_id:
-			_highlight_province(province_id)
-
-func _finish_drag() -> void:
-	var hand_index := _drag_hand_index
-	var card_type := _drag_card_type
-	var target := _drop_target(card_type)
-	_end_drag()
-	if not bool(target["valid"]):
-		if String(target["error"]) != "":
-			_show_toast(target["error"])
-		return
-	if bool(target.get("discard", false)):
-		CardManager.discard_card(hand_index)
-	elif hand_index == LAW_DRAG_INDEX:
-		_law_designer.hide()
-		CardManager.propose_law(card_type)
-	elif card_type == CardPresets.PROPAGANDA_CARD_TYPE:
-		_ask_propaganda_target(hand_index, String(target["province"]))
-	else:
-		CardManager.play_card(hand_index, int(target["peer"]), String(target["province"]))
-
-func _end_drag() -> void:
-	if _drag_ghost != null:
-		_drag_ghost.queue_free()
-		_drag_ghost = null
-	_drag_hand_index = -1
-	_drag_card_type = ""
-	parliament_diagram.modulate = Color.WHITE
-	if _hovered_province_id != "":
-		_highlight_province("")
-	_cancel_targeting()
-	if _hand_dirty:
-		_hand_dirty = false
-		_rebuild_hand()
-	else:
-		_refresh_hand_interactivity()
-
-## İmlecin altındaki bırakma hedefi. Dönüş:
-##   valid: bırakılırsa kart oynanır mı · peer / province: oynanacak hedef
-##   label: üstte gösterilen yönerge · error: geçersiz bırakmada gösterilecek neden
-##   parliament: imleç parlamento diyagramının üstünde mi (meclis kartları)
-func _drop_target(card_type: String) -> Dictionary:
-	var me := multiplayer.get_unique_id()
-	var result := {"valid": false, "peer": -1, "province": "", "label": "", "error": "",
-		"parliament": false, "discard": false}
-	# ÇÖP her kartı kabul eder (yasa tasarımı hariç): bedelin yarısı geri gelir.
-	if _trash_panel != null and card_type != "" and not CardPresets.is_law_card(card_type) 			and _trash_panel.get_global_rect().has_point(get_viewport().get_mouse_position()):
-		result["valid"] = true
-		result["discard"] = true
-		result["label"] = L.t("Bırak: kartı bozdur (+%s)") % GameRules.cost_text(CardManager.discard_refund(card_type))
-		return result
-	if _drag_hand_index >= 0:
-		# Eldeki kart sürükleniyor: tek geçerli hedef KART BOZDUR yuvası.
-		result["label"] = L.t("Bozdurmak için KART BOZDUR yuvasına bırak")
-		return result
-	if CardPresets.needs_party_target(card_type) and not CardPresets.needs_target(card_type):
-		# Kaset / parti içi isyan: hedef, kendisi dışında herhangi bir parti.
-		var other := _party_under_mouse()
-		result["peer"] = other
-		var title := CardPresets.card_title(card_type)
-		if other == -1:
-			result["label"] = L.t("%s için sağdaki bir partinin logosuna bırak") % title
-		elif other == me:
-			result["label"] = L.t("Bu kartı kendi partine oynayamazsın")
-			result["error"] = result["label"]
-		elif card_type == CardPresets.REBELLION_CARD_TYPE and not CardManager.has_seats(other):
-			result["label"] = L.t("Meclis dışı partide iç karışıklık çıkarılamaz")
-			result["error"] = result["label"]
-		else:
-			result["valid"] = true
-			if card_type == CardPresets.REPUTATION_CARD_TYPE:
-				result["label"] = L.t("Bırak: %s hakkında kaset sızdır (%s)") % [_party_name_of(other),
-					EffectWords.change(-PublicOpinion.REPUTATION_NATIONAL_DAMAGE)]
-			elif card_type == CardPresets.CARD_THEFT_CARD_TYPE:
-				result["label"] = L.t("Bırak: %s'ın elinden rastgele 1 kart çal") % _party_name_of(other)
-			else:
-				result["label"] = L.t("Bırak: %s'da iç karışıklık çıkar (%s)") % [_party_name_of(other),
-					EffectWords.change(-PublicOpinion.REBELLION_NATIONAL_DAMAGE)]
-	elif CardPresets.needs_target(card_type):
-		var peer := _party_under_mouse()
-		result["peer"] = peer
-		if peer == -1:
-			result["label"] = L.t("Vekil çalmak için sağdaki bir partinin logosuna bırak")
-		elif CardManager.is_valid_steal_target(me, peer):
-			result["valid"] = true
-			var r := CardManager.steal_range(me, peer, card_type)
-			var closeness := CardManager.group_closeness(me, peer)
-			result["label"] = L.t("Bırak: %s partisinden %d-%d vekil çal (seçmenleriniz %s)") % [_party_name_of(peer),
-				int(r["min"]), int(r["max"]), L.t("yakın") if closeness >= 0.6 else (L.t("kısmen yakın") if closeness >= 0.3 else L.t("uzak"))]
-		else:
-			result["label"] = L.t("Bu partiden vekil çalınamaz")
-			result["error"] = result["label"]
-	elif CardPresets.needs_province_target(card_type):
-		var province_id := _province_under_mouse()
-		result["province"] = province_id
-		var pname := ElectionNightSim.province_name(province_id)
-		if province_id == "":
-			result["label"] = L.t("Haritada bir ilin üstüne bırak")
-		elif card_type == CardPresets.INVEST_CARD_TYPE and not CardManager.is_government_party(me):
-			result["label"] = L.t("Yatırımı sadece hükümet partileri yapabilir")
-			result["error"] = result["label"]
-		elif card_type != CardPresets.INVEST_CARD_TYPE and CardManager.organization_level(province_id, me) < 1 \
-				and not PartyManager.is_independent(me):
-			result["label"] = L.t("%s'da teşkilatın yok — önce teşkilatlan") % pname
-			result["error"] = result["label"]
-		else:
-			result["valid"] = true
-			if card_type == CardPresets.MITING_CARD_TYPE:
-				result["label"] = L.t("Bırak: %s'da miting · provokasyon: %s") % [pname, EffectWords.risk(CardManager.miting_risk(me, province_id))]
-			elif card_type == CardPresets.INVEST_CARD_TYPE:
-				result["label"] = L.t("Bırak: %s'a yatırım") % pname
-			else:
-				result["label"] = L.t("Bırak: %s'da karalama — sonra hedef partiyi seç") % pname
-	elif CardPresets.is_law_card(card_type):
-		var over_law := parliament_diagram.get_global_rect().has_point(get_viewport().get_mouse_position())
-		result["parliament"] = over_law
-		var law := CardPresets.law_data(card_type)
-		if not over_law:
-			result["label"] = L.t("%s: parlamento diyagramının üstüne bırak") % law["title"]
-		elif CardManager.can_propose_law(me, card_type):
-			result["valid"] = true
-			result["label"] = L.t("Bırak: %s %s (bedelsiz, dönemde 1)") % [law["title"],
-				L.t("seçim vaadi olarak açıklanır") if CardManager.last_seats.is_empty() else L.t("meclise sunulur")]
-		else:
-			result["label"] = _action_block_reason(GameRules.LAW_FUNDS_COST, true)
-			result["error"] = result["label"]
-	elif card_type == CardPresets.EARLY_ELECTION_CARD_TYPE:
-		var over_parliament := parliament_diagram.get_global_rect().has_point(get_viewport().get_mouse_position())
-		result["parliament"] = over_parliament
-		if not over_parliament:
-			result["label"] = L.t("Erken seçim önergesi: parlamento diyagramının üstüne bırak")
-		elif CardManager.can_play_card(me, card_type):
-			result["valid"] = true
-			result["label"] = L.t("Bırak: erken seçim önergesi sun (meclis oylar)")
-		else:
-			result["label"] = _unplayable_reason(card_type)
-			result["error"] = result["label"]
-	elif CardPresets.is_self_card(card_type):
-		var above_hand := get_viewport().get_mouse_position().y < hand_area.get_global_rect().position.y
-		if not above_hand:
-			result["label"] = L.t("%s: kullanmak için yukarı sürükle") % CardPresets.card_title(card_type)
-		elif CardManager.can_play_card(me, card_type):
-			result["valid"] = true
-			result["label"] = L.t("Bırak: %s kullan") % CardPresets.card_title(card_type)
-		else:
-			result["label"] = _unplayable_reason(card_type)
-			result["error"] = result["label"]
-	elif CardPresets.is_censure_card(card_type):
-		var over := parliament_diagram.get_global_rect().has_point(get_viewport().get_mouse_position())
-		result["parliament"] = over
-		if not over:
-			result["label"] = L.t("Gensoru için parlamento diyagramının üstüne bırak")
-		elif CardManager.can_play_card(me, card_type):
-			result["valid"] = true
-			result["label"] = L.t("Bırak: gensoru ver")
-		else:
-			result["label"] = _unplayable_reason(card_type)
-			result["error"] = result["label"]
-	return result
 
 ## İmleç haritada hangi ilin üstünde? (Paneller ve alt hazne hariç.)
 func _province_under_mouse() -> String:
@@ -2822,8 +2559,7 @@ func _cancel_targeting() -> void:
 		_refresh_action_buttons()
 	if _selected_province != "":
 		_selected_province = ""
-		if _drag_hand_index == -1:
-			_highlight_province("")
+		_highlight_province("")
 	_set_target_hint("")
 	if _pending_target_hand_index == -1:
 		return
@@ -3233,7 +2969,6 @@ func _show_card_info(card_type: String, holder: Control) -> void:
 			usage.append(line.strip_edges())
 		else:
 			effect.append(line.strip_edges())
-	var cost := CardPresets.card_cost(card_type)
 	var accent := UiTheme.RED if CardPresets.needs_target(card_type) else UiTheme.BLUE
 	var parts := PopupKit.frame(300.0, accent, _card_info)
 	var box: VBoxContainer = parts[1]
@@ -3242,8 +2977,6 @@ func _show_card_info(card_type: String, holder: Control) -> void:
 	var title := UiTheme.mono_label(CardPresets.card_title(card_type), PopupKit.FS_TITLE - 2, UiTheme.TEXT, true)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(title)
-	if not CardPresets.is_law_card(card_type):
-		head.add_child(PopupKit.chip(GameRules.cost_text(cost), UiTheme.BLUE.lightened(0.2)))
 	box.add_child(head)
 	if not effect.is_empty():
 		box.add_child(PopupKit.note(" ".join(effect), UiTheme.TEXT, 276.0))
@@ -3308,8 +3041,8 @@ func _play_draw_animation(card_type: String, old_hand_size: int) -> void:
 	flying.modulate.a = 0.0
 	add_child(flying)
 
-	# Deste yok: kart sağ alttaki bozdurma kutusunun üstünden gelir.
-	var deck_rect := _trash_panel.get_global_rect() if _trash_panel != null else Rect2(get_viewport_rect().size - Vector2(180, 180), CARD_DISPLAY_SIZE)
+	# Deste yok: kart sağ alttaki para levhasının üstünden gelir.
+	var deck_rect := _funds_plate.get_global_rect() if _funds_plate != null else Rect2(get_viewport_rect().size - Vector2(180, 180), CARD_DISPLAY_SIZE)
 	flying.size = deck_rect.size
 	flying.global_position = deck_rect.position
 
@@ -3519,7 +3252,7 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 	if is_self:
 		tags.append([L.t("SEN"), UiTheme.GOLD, UiTheme.INK])
 	if populism_left > 0:
-		tags.append([L.t("POP %d") % populism_left, UiTheme.PURPLE, UiTheme.TEXT])
+		tags.append([L.t("POP"), UiTheme.PURPLE, UiTheme.TEXT])
 	if PartyManager.is_deputy(peer_id):
 		tags.append([L.t("YRD"), color, UiTheme.TEXT])
 	elif PartyManager.deputy_of(peer_id) != -1:
@@ -3949,8 +3682,6 @@ func _refresh_score_panel() -> void:
 
 # --- Hamleler: yasa tasarla, teşkilat, karalama hedefi -------------------
 
-## Yasa dairesi sürüklenirken _drag_hand_index bu değeri alır (elde kart yok).
-const LAW_DRAG_INDEX := -2
 const FUNDS_COLOR := UiTheme.BLUE
 const EMPTY_SEAT_COLOR := UiTheme.TEXT
 
@@ -3958,70 +3689,9 @@ const EMPTY_SEAT_COLOR := UiTheme.TEXT
 ## yanında YASA TASARLA / İL BAŞKANLIĞI butonları, para. Parti kartları üstte
 ## kalan alana sığar.
 func _place_right_column_controls() -> void:
-	# MASANIN SAĞI: para ve kart bozdurma yan yana, altında Turu Bitir.
+	# MASANIN SAĞI: parti kasası (Turu Bitir hamleler alanında).
 	if _funds_plate != null:
 		_set_rect(_funds_plate, _r(R_FUNDS))
-	if _trash_panel != null:
-		_set_rect(_trash_panel, _r(R_TRASH))
-	pass_button.add_theme_font_size_override("font_size", 20)
-	_set_rect(pass_button, _r(R_PASS))
-
-## Seçili kart bozdurulur (sıra sendeyse).
-func _on_trash_input(event: InputEvent) -> void:
-	if not (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
-		return
-	var hand := CardManager.my_inventory()
-	if _selected_hand_index < 0 or _selected_hand_index >= hand.size():
-		_show_toast(L.t("Önce bozdurmak istediğin kartı seç."))
-		return
-	if not CardManager.can_act():
-		_show_toast(L.t("Sıra sende değil."))
-		return
-	var index := _selected_hand_index
-	_deselect_hand_card()
-	_cancel_targeting()
-	CardManager.discard_card(index)
-
-## KART BOZDURMA: istemediğin kartı buraya sürükle, bedelinin yarısı para
-## olarak geri gelir. Tıklanabilir bir buton değil, BIRAKMA HEDEFİ — bu yüzden
-## buton değil, kendi başlığı ve para simgesi olan bir yuva paneli.
-func _build_trash_button() -> void:
-	_trash_panel = PanelContainer.new()
-	_trash_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	_trash_panel.gui_input.connect(_on_trash_input)
-	_trash_panel.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	_trash_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	_trash_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	_trash_panel.tooltip_text = L.t("Bir kart seç, sonra buraya tıkla: kart bozulur, bedelinin yarısı kasaya döner.")
-	var style := UiSkin.stylebox(UiSkin.SLOT)
-	style.set_content_margin_all(UiTheme.PAD_S)
-	UiSkin.apply_style(_trash_panel, "panel", style)
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_trash_panel.add_child(row)
-	var icon := CoinIcon.make(26.0, FUNDS_COLOR)
-	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(icon)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 0)
-	box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_child(box)
-	box.add_child(_trash_label(L.t("KART BOZDUR"), 11, UiTheme.TEXT_MUTED))
-	box.add_child(_trash_label(L.t("kartı seç, tıkla"), 10, UiTheme.TEXT_DIM))
-	add_child(_trash_panel)
-
-func _trash_label(text: String, size: int, color: Color) -> Label:
-	var label := Label.new()
-	label.text = text
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_font_override("font", UiTheme.mono())
-	label.add_theme_font_size_override("font_size", size)
-	label.add_theme_color_override("font_color", color)
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	return label
 
 func _build_action_buttons() -> void:
 	# PARA LEVHASI: eskiden destenin yanında küçük bir simge+sayı ikilisiydi
@@ -4101,7 +3771,7 @@ func _build_action_buttons() -> void:
 	_parl_button.pressed.connect(_on_parliament_button_pressed)
 	actions_vbox.add_child(_parl_button)
 	_action_grid = GridContainer.new()
-	_action_grid.columns = 2
+	_action_grid.columns = 3
 	_action_grid.add_theme_constant_override("h_separation", ACTION_BUTTON_GAP)
 	_action_grid.add_theme_constant_override("v_separation", ACTION_BUTTON_GAP)
 	actions_vbox.add_child(_action_grid)
@@ -4113,6 +3783,15 @@ func _build_action_buttons() -> void:
 	_congress_button = _action_button(L.t("KONGRE"), _congress_cost_text(), ACTION_COLOR_CONGRESS)
 	_congress_button.pressed.connect(_on_congress_button_pressed)
 	_congress_button.tooltip_text = L.t("Genel başkan: partini kongreye götür, liderliğini tazele. Üye: kongre iste, başkanlığı geri almaya çalış.")
+	# TURU BİTİR: sahnedeki düğme hamle ızgarasına taşınır, hamle düğmesi görünümünde.
+	pass_button.get_parent().remove_child(pass_button)
+	pass_button.custom_minimum_size = Vector2(ACTION_BUTTON_WIDTH, ACTION_BUTTON_HEIGHT)
+	pass_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pass_button.clip_text = true
+	pass_button.icon = null
+	pass_button.set_meta("action_color", ACTION_COLOR_PASS)
+	_action_grid.add_child(pass_button)
+	_action_tab_of[pass_button] = 0
 	var hint := PopupKit.label(L.t("Teşkilat, miting, yatırım: haritada bir ile dokun."), 11, UiTheme.TEXT_MUTED)
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	actions_vbox.add_child(hint)
@@ -4120,28 +3799,6 @@ func _build_action_buttons() -> void:
 	filler.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	filler.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	actions_vbox.add_child(filler)
-	# AKTİF ETKİLER: süreli anında kartlar (popülizm) kalan süreyle görünür.
-	_effects_chip = PanelContainer.new()
-	_effects_chip.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	_effects_chip.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	_effects_chip.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	_effects_chip.offset_left = FUNDS_PLATE_LEFT
-	_effects_chip.offset_right = -16.0
-	_effects_chip.offset_top = FUNDS_PLATE_TOP - 28.0
-	_effects_chip.offset_bottom = FUNDS_PLATE_TOP - 4.0
-	var chip_style := StyleBoxFlat.new()
-	chip_style.bg_color = Color(UiTheme.GOLD, 0.18)
-	chip_style.border_color = UiTheme.GOLD
-	chip_style.set_border_width_all(1)
-	chip_style.content_margin_left = 8
-	chip_style.content_margin_right = 8
-	_effects_chip.add_theme_stylebox_override("panel", chip_style)
-	_effects_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_effects_label = UiTheme.mono_label("", 11, UiTheme.GOLD, true)
-	_effects_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_effects_chip.add_child(_effects_label)
-	_effects_chip.hide()
-	add_child(_effects_chip)
 
 ## Kongre bedeli oyuncunun yerine göre: genel başkan 10, üye 20.
 func _congress_cost_text() -> String:
@@ -4224,7 +3881,6 @@ func _refresh_action_buttons() -> void:
 	if _alliance_panel != null and _alliance_panel.visible:
 		_refresh_alliance_panel()
 	_refresh_parliament_button()
-	_refresh_effects_chip()
 
 func _build_agenda_banner() -> void:
 	_agenda_banner = PanelContainer.new()
@@ -5852,11 +5508,15 @@ func _build_turn_flow_ui() -> void:
 	add_child(_parliament_flow)
 	_turn_intro = TurnIntro.new()
 	_turn_intro.hand_rect = func() -> Rect2: return _r(R_HAND)
-	_turn_intro.hold = func() -> bool: return _event_fx != null and _event_fx.is_playing()
+	# Gazeteler (seçim sonucu, hükümet kuruldu...) ve kongre gecesi önce; şans kartı sonra.
+	_turn_intro.hold = func() -> bool: return (_event_fx != null and _event_fx.is_playing()) 		or (_congress_view != null and is_instance_valid(_congress_view))
 	_turn_intro.finished.connect(_refresh_turn_flow_ui)
 	add_child(_turn_intro)
 	CardManager.event_presented.connect(_on_flow_event)
-	_refresh_turn_flow_ui.call_deferred()
+	# Ekran açılırken sıradaki gazeteler (seçim sonucu, hükümet) kuyruğa girsin, sonra bakılır.
+	get_tree().create_timer(1.0).timeout.connect(func():
+		if is_inside_tree():
+			_refresh_turn_flow_ui())
 
 ## Kendi kart çekimimin olayı: kartlar ortada açılır.
 func _on_flow_event(event: Dictionary, _version: int) -> void:
@@ -5879,48 +5539,47 @@ func _refresh_turn_flow_ui() -> void:
 func _can_open_province_actions() -> bool:
 	return CardManager.can_act() and not CardManager.game_finished and (_turn_intro == null or not _turn_intro.is_busy())
 
+## İL TIKLAMASI (0.0.232): harita paneli ikiye bölünür; harita sol yarıya
+## küçülür, il hamleleri aynı alanın sağ yarısında açılır. Aynı ile tekrar
+## dokunmak ya da paneldeki ✕ eski görünüme döndürür.
 func _open_province_actions(province_id: String) -> void:
+	if _province_actions.visible and _province_actions.province_id == province_id:
+		_province_actions.close()
+		return
 	_parliament_flow.close_flow()
 	_law_designer.hide()
-	var map := _r(R_MAP)
-	_province_actions.max_height = map.size.y - 16.0
+	var halves := _map_split_rects()
+	var right: Rect2 = halves[1]
+	_province_actions.set_panel_rect(right)
 	_province_actions.open(province_id)
-	_province_actions.position = Vector2(map.end.x - ProvinceActions.WIDTH - 8.0, map.position.y + 8.0)
 	_highlight_province(province_id)
-	_focus_map_on(province_id)
 	_pinned = false
 	_show_province_info(province_id)
 	_pinned = true
+	if not _map_split:
+		_map_split = true
+		_animate_map_rect(_r(R_MAP), halves[0])
 
 func _on_province_actions_closed() -> void:
 	_highlight_province("")
-	_unfocus_map()
+	if _map_split:
+		_map_split = false
+		_animate_map_rect(_map_split_rects()[0], _r(R_MAP))
 
-## Harita ili odaklar ve sola kayar (sağda panel için yer açılır).
-func _focus_map_on(province_id: String) -> void:
-	if _map_clip == null:
-		return
-	if _focus_tween != null and _focus_tween.is_running():
-		_focus_tween.kill()
-	var zoom := _map_fit_scale * 1.5
-	var free_width := maxf(120.0, _map_clip.size.x - ProvinceActions.WIDTH - 16.0)
-	var target := Vector2(free_width * 0.5, _map_clip.size.y * 0.5) - GameMap.center_of(province_id) * zoom
-	var min_pos := _map_clip.size - GameMap.map_size() * zoom
-	target = Vector2(clampf(target.x, min_pos.x - ProvinceActions.WIDTH, 0.0), clampf(target.y, min_pos.y, 0.0))
-	_focus_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	_focus_tween.set_parallel(true)
-	_focus_tween.tween_property(map_holder, "scale", Vector2(zoom, zoom), 0.3)
-	_focus_tween.tween_property(map_holder, "position", target, 0.3)
+## [harita yarısı, hamle yarısı]: harita alanının sol ve sağ yarısı.
+func _map_split_rects() -> Array:
+	var map := _r(R_MAP)
+	var half := (map.size.x - 8.0) * 0.5
+	return [Rect2(map.position, Vector2(half, map.size.y)),
+		Rect2(map.position + Vector2(half + 8.0, 0.0), Vector2(half, map.size.y))]
 
-func _unfocus_map() -> void:
-	if map_holder == null:
-		return
-	if _focus_tween != null and _focus_tween.is_running():
-		_focus_tween.kill()
-	_focus_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	_focus_tween.set_parallel(true)
-	_focus_tween.tween_property(map_holder, "scale", Vector2(_map_fit_scale, _map_fit_scale), 0.25)
-	_focus_tween.tween_property(map_holder, "position", Vector2.ZERO, 0.25)
+## Haritayı bir dikdörtgenden ötekine kısa bir animasyonla taşır (bölme / birleşme).
+func _animate_map_rect(from: Rect2, to: Rect2) -> void:
+	if _map_split_tween != null and _map_split_tween.is_valid():
+		_map_split_tween.kill()
+	_map_split_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_map_split_tween.tween_method(func(t: float):
+		_place_map(Rect2(from.position.lerp(to.position, t), from.size.lerp(to.size, t))), 0.0, 1.0, 0.25)
 
 ## MECLİS düğmesi: açık aşamayı gösterir, yapılacak iş varken nabız gibi parlar.
 func _refresh_parliament_button() -> void:
@@ -5983,11 +5642,3 @@ func _on_flow_law_tab(tab: int) -> void:
 	_law_designer.show()
 	_place_law_designer()
 
-## Popülizm gibi süreli anında etkiler kalan süreleriyle.
-func _refresh_effects_chip() -> void:
-	if _effects_chip == null:
-		return
-	var left := CardManager.populism_rounds_left(multiplayer.get_unique_id())
-	_effects_chip.visible = left > 0
-	if left > 0:
-		_effects_label.text = L.t("POPÜLİZM AKTİF · %d dönem") % left

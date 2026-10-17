@@ -19,13 +19,13 @@ const KIND_COLORS := {
 
 static func kind_of(card_type: String) -> String:
 	match card_type:
-		"karalama", "kaset", "isyan":
+		"karalama", "kaset", "isyan", "parti_ici_karisiklik":
 			return "attack"
 		"populizm":
 			return "boost"
-		"bagis_kampanyasi", "bagis_kampanyasi_guclu":
+		"bagis_kampanyasi", "bagis_kampanyasi_guclu", "para_cezasi":
 			return "money"
-		"bonus_kart", "kart_calma":
+		"esnek_hareket", "kart_calma":
 			return "cards"
 	if card_type.begins_with("steal_"):
 		return "seats"
@@ -90,8 +90,8 @@ static func draw_emblem(canvas: CanvasItem, card_type: String, c: Vector2, s: fl
 				canvas.draw_line(c + Vector2(-s * 0.75, y + s * 0.18), c + Vector2(s * 0.75, y + s * 0.18), dark, w * 0.8, true)
 			canvas.draw_circle(c + Vector2(0, -s * 0.55), s * 0.38, ink)
 			canvas.draw_circle(c + Vector2(0, -s * 0.55), s * 0.2, dark)
-		"bonus_kart":
-			# İki kart + artı.
+		"esnek_hareket":
+			# İki kart + artı (iki kat hamle).
 			canvas.draw_rect(Rect2(c + Vector2(-s * 0.85, -s * 0.7), Vector2(s * 0.95, s * 1.3)), Color(ink, 0.55), true)
 			canvas.draw_rect(Rect2(c + Vector2(-s * 0.45, -s * 0.5), Vector2(s * 0.95, s * 1.3)), ink, true)
 			canvas.draw_line(c + Vector2(s * 0.03, s * 0.15), c + Vector2(s * 0.03, -s * 0.15) + Vector2(0, -s * 0.0), dark, w, true)

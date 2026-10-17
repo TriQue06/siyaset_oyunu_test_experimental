@@ -141,7 +141,7 @@ static func do_action(bot: int) -> Dictionary:
 		"miting":
 			var tier := int(action.get("tier", CardManager.DEFAULT_TIER))
 			var smear := int(action.get("smear", -1))
-			CardManager._apply_miting_move(bot, String(action["province"]), BotBrain.miting_state_share(bot, tier, smear),
+			CardManager._apply_miting_move(bot, String(action["province"]), BotBrain.miting_state_share(bot, tier),
 				action.get("focus", []), tier, smear)
 		"invest":
 			var invest_tier := int(action.get("tier", CardManager.DEFAULT_TIER))

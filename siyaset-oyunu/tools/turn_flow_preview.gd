@@ -75,13 +75,19 @@ func _initialize() -> void:
 	Input.warp_mouse(Vector2(2, 2))
 	await _wait(0.6)
 	check("gazete oynarken KART CEK ust uste acilmaz", not scene._event_fx.is_playing() or scene._turn_intro.mode == scene._turn_intro.Mode.NONE)
+	await _wait(0.6)
 	scene._event_fx.skip_all()
 	await _wait(0.8)
 	check("sira basinda KART CEK ekrani", scene._turn_intro.mode == scene._turn_intro.Mode.PROMPT)
 	_shot("tf_1_draw")
 	cm.draw_turn_card()
-	await _wait(0.45)
+	await _wait(0.8)
 	_shot("tf_2_reveal")
+	await _wait(1.5)
+	check("sans karti sureyle kapanmaz, ATLA bekler", scene._turn_intro.mode == scene._turn_intro.Mode.REVEAL)
+	for child in scene._turn_intro._layer.get_children():
+		if child is Button:
+			(child as Button).pressed.emit()
 	for i in 40:
 		if scene._turn_intro.mode == scene._turn_intro.Mode.AID:
 			break

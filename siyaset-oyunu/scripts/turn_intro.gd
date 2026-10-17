@@ -1,19 +1,21 @@
 class_name TurnIntro
 extends Control
 ## TUR BAŞI SUNUMU (0.0.231, yalnız kendi sıramda): ortada animasyonlu KART ÇEK
-## → çekilen kart(lar) ortada açılır (ANINDA ETKİ: "uygulandı" parıltısı;
-## SAKLANABİLİR: sol alttaki ele uçar; bonus kartın ek çekimleri sırayla) →
-## afet sürüyorsa YARDIM sahnesi. Ekrana dokunmak animasyonu HIZLANDIRIR, karar
-## değildir; yardımdan vazgeçmek ayrı düğmedir (BU TUR YARDIM YAPMA).
+## → ŞANS KARTI ortada açılır ve oyuncu ATLA'ya basana kadar kalır (süreyle
+## kapanmaz; ANINDA / OLUMSUZ: "uygulandı", SAKLANABİLİR: ele uçar) → afet
+## sürüyorsa YARDIM sahnesi. Ekrana dokunmak açılış animasyonunu HIZLANDIRIR,
+## karar değildir; yardımdan vazgeçmek ayrı düğmedir (BU TUR YARDIM YAPMA).
+## Gazete oynarken sunum bekler (bkz. hold).
 ## Karar ve hak durumu CardManager.turn_flow'dan okunur: sahne kapanıp açılsa,
 ## oyuncu yeniden bağlansa da hak yenilenmez, bonus tekrar verilmez.
 
 signal finished
 
-const CARD_SIZE := Vector2(210, 280)
+const CARD_SIZE := Vector2(250, 380)
 const REVEAL_IN := 0.35
-const REVEAL_HOLD := 1.4
 const REVEAL_OUT := 0.35
+## Tam ekran sunumların arka planı hafif kararır.
+const DIM_ALPHA := 0.45
 
 ## WAIT: KART ÇEK'e basıldı, çekimin olayı bekleniyor (afet sahnesi karttan önce açılmasın).
 enum Mode { NONE, PROMPT, REVEAL, AID, WAIT }
@@ -39,7 +41,7 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	z_index = 125
 	_dim = ColorRect.new()
-	_dim.color = Color(0.03, 0.02, 0.08, 0.62)
+	_dim.color = Color(0.03, 0.02, 0.08, DIM_ALPHA)
 	_dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_dim.mouse_filter = Control.MOUSE_FILTER_STOP
 	_dim.gui_input.connect(_on_dim_input)
@@ -55,6 +57,10 @@ func is_busy() -> bool:
 	return mode != Mode.NONE
 
 func _process(_delta: float) -> void:
+	# Gazete (seçim sonucu, hükümet) oynarken bekleyen sunum gizlenir; gazeteler
+	# bitince açılır (üst üste binmez).
+	if mode in [Mode.PROMPT, Mode.AID, Mode.WAIT]:
+		visible = not hold.call()
 	if _waiting and not hold.call():
 		_waiting = false
 		if not _held_draws.is_empty():
@@ -96,8 +102,8 @@ func refresh() -> void:
 
 ## Kendi çekimimin olayı geldi: kartlar sırayla açılır.
 func present(draws: Array) -> void:
-	# Kendi KART ÇEK basışımın cevabı gazeteyi beklemez.
-	if mode != Mode.PROMPT and mode != Mode.WAIT and hold.call():
+	# Gazete oynuyorsa önce o biter, şans kartı sonra açılır.
+	if hold.call():
 		_held_draws = draws.duplicate()
 		_waiting = true
 		return
@@ -222,9 +228,22 @@ func _reveal_next() -> void:
 	var entry: Dictionary = _queue.pop_front()
 	var card := String(entry.get("card", ""))
 	var result := String(entry.get("result", ""))
-	var face := _card_face(card, result, bool(entry.get("bonus", false)))
+	var face := _card_face(entry)
 	_layer.add_child(face)
-	var center := get_viewport_rect().size * 0.5 - CARD_SIZE * 0.5
+	# ATLA: kart süreyle değil, oyuncu isteyince kapanır.
+	var skip := Button.new()
+	skip.text = L.t("ATLA  ▸")
+	skip.tooltip_text = L.t("Kartı kapat, devam et")
+	skip.focus_mode = Control.FOCUS_NONE
+	skip.custom_minimum_size = Vector2(150, 56)
+	skip.add_theme_font_override("font", UiTheme.mono(true))
+	skip.add_theme_font_size_override("font_size", 18)
+	UiSkin.skin_color_button(skip, UiTheme.GOLD_DIM)
+	_layer.add_child(skip)
+	var view := get_viewport_rect().size
+	var center := Vector2((view.x - CARD_SIZE.x) * 0.5 - 60.0, (view.y - CARD_SIZE.y) * 0.5)
+	skip.position = center + Vector2(CARD_SIZE.x + 24.0, CARD_SIZE.y * 0.5 - 28.0)
+	skip.modulate.a = 0.0
 	face.position = center + Vector2(0, 60)
 	face.pivot_offset = CARD_SIZE * 0.5
 	face.scale = Vector2(0.35, 0.35)
@@ -237,76 +256,152 @@ func _reveal_next() -> void:
 	tw.tween_property(face, "scale", Vector2.ONE, REVEAL_IN).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.tween_property(face, "rotation", 0.0, REVEAL_IN)
 	tw.tween_property(face, "modulate:a", 1.0, REVEAL_IN * 0.6)
-	tw.chain().tween_interval(REVEAL_HOLD)
+	tw.tween_property(skip, "modulate:a", 1.0, REVEAL_IN)
+	var token := _reveal_token
+	skip.pressed.connect(func():
+		if token != _reveal_token:
+			return
+		skip.disabled = true
+		_dismiss_card(face, skip, result, token))
+
+## Kartı kapatır: saklanabilir kart ele uçar, anında kart parlayıp kaybolur.
+func _dismiss_card(face: Control, skip: Control, result: String, token: int) -> void:
+	var tw := create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(skip, "modulate:a", 0.0, REVEAL_OUT * 0.5)
 	if result == "hand":
 		var target := hand_rect.call() as Rect2
 		var dest := target.position + target.size * 0.5 - CARD_SIZE * 0.5
-		tw.chain().tween_property(face, "position", dest, REVEAL_OUT).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
-		tw.parallel().tween_property(face, "scale", Vector2(0.4, 0.4), REVEAL_OUT)
-		tw.parallel().tween_property(face, "modulate:a", 0.0, REVEAL_OUT)
+		tw.tween_property(face, "position", dest, REVEAL_OUT).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+		tw.tween_property(face, "scale", Vector2(0.35, 0.35), REVEAL_OUT)
+		tw.tween_property(face, "modulate:a", 0.0, REVEAL_OUT)
 	else:
-		tw.chain().tween_property(face, "scale", Vector2(1.3, 1.3), REVEAL_OUT).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-		tw.parallel().tween_property(face, "modulate:a", 0.0, REVEAL_OUT)
-	var token := _reveal_token
+		tw.tween_property(face, "scale", Vector2(1.25, 1.25), REVEAL_OUT).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tw.tween_property(face, "modulate:a", 0.0, REVEAL_OUT)
 	tw.chain().tween_callback(func():
 		# Sahne bu arada temizlendiyse (yeni çekim, kapanış) eski zincir devam etmez.
 		if token != _reveal_token:
 			return
 		if is_instance_valid(face):
 			face.queue_free()
+		if is_instance_valid(skip):
+			skip.queue_free()
 		_reveal_next())
 
-## Ortada açılan kart: görsel, ad, ne olduğu (anında / saklanabilir) ve açıklama.
-func _card_face(card: String, result: String, bonus: bool) -> Control:
+## Kart türünün sunum rengi ve üst şerit yazısı.
+func _card_style(card: String, result: String) -> Array:
+	if card == "":
+		return [UiTheme.TEXT_MUTED, L.t("EL DOLU")]
+	if result == "hand":
+		return [UiTheme.GREEN, L.t("SAKLANABİLİR · ELİNE EKLENDİ")]
+	if CardManager.is_negative_card(card):
+		return [UiTheme.RED, L.t("OLUMSUZ · HEMEN UYGULANDI")]
+	return [UiTheme.GOLD, L.t("ANINDA ETKİ · UYGULANDI")]
+
+## Ortada açılan şans kartı: renkli üst şerit (türü), görsel, ad, etkisi bir
+## çerçevede, varsa sonucu (ör. ceza tutarı).
+func _card_face(entry: Dictionary) -> Control:
+	var card := String(entry.get("card", ""))
+	var result := String(entry.get("result", ""))
+	var style_info := _card_style(card, result)
+	var accent: Color = style_info[0]
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = CARD_SIZE
 	panel.size = CARD_SIZE
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var style := StyleBoxFlat.new()
 	style.bg_color = UiTheme.PANEL_DARK
-	style.border_color = UiTheme.GOLD if result == "instant" else UiTheme.PANEL_LIGHT
+	style.border_color = accent
 	style.set_border_width_all(4)
-	style.set_content_margin_all(8)
-	style.shadow_color = Color(0, 0, 0, 0.5)
-	style.shadow_offset = Vector2(6, 8)
+	style.set_corner_radius_all(14)
+	style.content_margin_left = 0
+	style.content_margin_right = 0
+	style.content_margin_top = 0
+	style.content_margin_bottom = 12
+	style.shadow_color = Color(0, 0, 0, 0.55)
+	style.shadow_size = 10
+	style.shadow_offset = Vector2(4, 8)
 	panel.add_theme_stylebox_override("panel", style)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 4)
+	box.add_theme_constant_override("separation", 8)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(box)
-	var tag_text := L.t("EL DOLU")
-	var tag_color := UiTheme.TEXT_MUTED
-	match result:
-		"instant":
-			tag_text = L.t("ANINDA ETKİ · UYGULANDI")
-			tag_color = UiTheme.GOLD
-		"hand":
-			tag_text = L.t("SAKLANABİLİR · ELİNE EKLENDİ")
-			tag_color = UiTheme.GREEN
-	if bonus:
-		tag_text = L.t("BONUS ÇEKİM · ") + tag_text
-	box.add_child(PopupKit.chip(tag_text, tag_color))
+	# Üst şerit: "ŞANS KARTI" ve türü.
+	var ribbon := PanelContainer.new()
+	var ribbon_style := StyleBoxFlat.new()
+	ribbon_style.bg_color = accent.darkened(0.25)
+	ribbon_style.corner_radius_top_left = 10
+	ribbon_style.corner_radius_top_right = 10
+	ribbon_style.set_content_margin_all(6)
+	ribbon.add_theme_stylebox_override("panel", ribbon_style)
+	ribbon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(ribbon)
+	var ribbon_box := VBoxContainer.new()
+	ribbon_box.add_theme_constant_override("separation", 0)
+	ribbon_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ribbon.add_child(ribbon_box)
+	ribbon_box.add_child(_centered_label(L.t("ŞANS KARTI"), 11, UiTheme.INK if accent == UiTheme.GOLD else UiTheme.TEXT))
+	ribbon_box.add_child(_centered_label(String(style_info[1]), 10, UiTheme.INK if accent == UiTheme.GOLD else UiTheme.TEXT))
 	if card == "":
-		box.add_child(UiTheme.mono_label(L.t("Elin dolu"), 18, UiTheme.TEXT, true))
-		box.add_child(PopupKit.note(L.t("Elinde en fazla %d kart durabilir; bu tur kart çekilmedi. Kart bozdurarak yer açabilirsin.") % CardManager.MAX_HAND_SIZE,
-			UiTheme.TEXT_MUTED, CARD_SIZE.x - 20.0))
+		box.add_child(_centered_label(L.t("Elin dolu"), 22, UiTheme.TEXT))
+		box.add_child(_framed_text(L.t("Elinde en fazla %d kart durabilir; bu tur kart çekilmedi. Elindeki kartları oynayarak yer açabilirsin.") % CardManager.MAX_HAND_SIZE, accent))
 		return panel
+	# Görsel: kenarlardan içeride, çerçeveli.
+	var art_frame := PanelContainer.new()
+	var art_style := StyleBoxFlat.new()
+	art_style.bg_color = UiTheme.INK
+	art_style.border_color = accent.darkened(0.3)
+	art_style.set_border_width_all(2)
+	art_style.set_corner_radius_all(8)
+	art_frame.add_theme_stylebox_override("panel", art_style)
+	art_frame.custom_minimum_size = Vector2(CARD_SIZE.x - 32.0, 132)
+	art_frame.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	art_frame.clip_contents = true
+	art_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(art_frame)
 	var art := TextureRect.new()
 	art.texture = CardPresets.get_card_texture(card)
-	art.custom_minimum_size = Vector2(0, 108)
 	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED if CardPresets.has_full_art(card) else TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	art.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-	art.clip_contents = true
 	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(art)
-	var title := UiTheme.mono_label(CardPresets.card_title(card), 15, UiTheme.TEXT, true)
+	art_frame.add_child(art)
+	var title := _centered_label(CardPresets.card_title(card).to_upper(), 19, UiTheme.TEXT)
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.custom_minimum_size.x = CARD_SIZE.x - 24.0
 	box.add_child(title)
-	var text := PopupKit.note(CardPresets.card_description(card), UiTheme.TEXT_MUTED, CARD_SIZE.x - 20.0)
-	text.add_theme_font_size_override("font_size", 10)
-	box.add_child(text)
+	box.add_child(_framed_text(CardPresets.card_description(card), accent))
+	if entry.has("amount"):
+		box.add_child(_centered_label(L.t("Silinen: %s") % GameRules.cost_text(float(entry["amount"])), 14, UiTheme.RED.lightened(0.2)))
 	return panel
+
+func _centered_label(text: String, size: int, color: Color) -> Label:
+	var label := UiTheme.mono_label(text, size, color, true)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return label
+
+## Kartın etki metni: hafif açık zeminli, kenarlıklı bir çerçevede.
+func _framed_text(text: String, accent: Color) -> Control:
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 12)
+	margin.add_theme_constant_override("margin_right", 12)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var frame := PanelContainer.new()
+	var frame_style := StyleBoxFlat.new()
+	frame_style.bg_color = Color(accent, 0.1)
+	frame_style.border_color = Color(accent, 0.45)
+	frame_style.set_border_width_all(1)
+	frame_style.set_corner_radius_all(6)
+	frame_style.set_content_margin_all(8)
+	frame.add_theme_stylebox_override("panel", frame_style)
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	margin.add_child(frame)
+	var label := PopupKit.note(text, UiTheme.TEXT, CARD_SIZE.x - 48.0)
+	label.add_theme_font_size_override("font_size", 12)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	frame.add_child(label)
+	return margin
 
 # --- AFET YARDIM SAHNESİ ----------------------------------------------------------
 

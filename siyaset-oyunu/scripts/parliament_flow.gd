@@ -32,7 +32,7 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	z_index = 115
 	_dim = ColorRect.new()
-	_dim.color = Color(0.03, 0.02, 0.08, 0.45)
+	_dim.color = Color(0.03, 0.02, 0.08, 0.4)
 	_dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_dim.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_dim)

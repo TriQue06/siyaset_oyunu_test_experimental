@@ -313,7 +313,7 @@ static func miting_smear(bot: int, province_id: String) -> int:
 			continue
 		var damage := PublicOpinion.propaganda_damage(CardManager.party_strength(province_id, target))
 		var rival := 0.3 + float(GovernmentManager.seats_of(target)) / _total_seats() * 4.0
-		var value := (gain + damage * 0.6 * rival) * seats / 6.0 * 0.45 - CardPresets.card_cost(CardPresets.PROPAGANDA_CARD_TYPE) * _funds_value(bot)
+		var value := (gain + damage * 0.6 * rival) * seats / 6.0 * 0.45
 		if value > best_value:
 			best_value = value
 			best = int(target)
@@ -468,8 +468,7 @@ static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 	var hand: Array = CardManager.inventories.get(bot, [])
 	var play := choose_play(bot)
 	if not play.is_empty():
-		var card: String = hand[int(play["index"])]
-		var card_score := float(play["score"]) - CardPresets.card_cost(card) * funds_value + _jitter(bot)
+		var card_score := float(play["score"]) + _jitter(bot)
 		candidates.append({"type": "card"})
 		if card_score > best_score:
 			best = {"type": "card"}
@@ -734,9 +733,8 @@ static func risk_appetite(bot: int) -> float:
 	return fposmod(float(absi(bot)) * 0.618034 + 0.17, 1.0)
 
 ## Miting için devlet payı (0 = tamamı kendi kasasından).
-static func miting_state_share(bot: int, tier: int = CardManager.DEFAULT_TIER, smear: int = -1) -> float:
-	var extra := float(CardPresets.card_cost(CardPresets.PROPAGANDA_CARD_TYPE)) if smear != -1 else 0.0
-	var r := CardManager.funding_range(bot, "miting", CardManager.miting_tier_cost(tier), extra)
+static func miting_state_share(bot: int, tier: int = CardManager.DEFAULT_TIER) -> float:
+	var r := CardManager.funding_range(bot, "miting", CardManager.miting_tier_cost(tier))
 	var lo := float(r["min"])
 	var hi := float(r["max"])
 	if not bool(r["state_allowed"]) or hi <= 0.0 or lo > hi:
@@ -887,8 +885,6 @@ static func choose_play(bot: int) -> Dictionary:
 	return best
 
 static func _evaluate(bot: int, card_type: String) -> Dictionary:
-	if CardManager.funds_of(bot) < CardPresets.card_cost(card_type):
-		return {}
 	match card_type:
 		CardPresets.POPULISM_CARD_TYPE:
 			# Seçime az kala ya da hiç popülizm yokken değerli.
@@ -898,9 +894,6 @@ static func _evaluate(bot: int, card_type: String) -> Dictionary:
 		CardPresets.FUNDS_BONUS_CARD_TYPE, CardPresets.FUNDS_BONUS_STRONG_CARD_TYPE:
 			# Kasası azken, yapacak başka şey yokken kullanılır.
 			return {"score": 0.9 if CardManager.funds_of(bot) < GameRules.MITING_FUNDS_COST else 0.3, "peer": -1, "province": ""}
-		CardPresets.BONUS_CARD_TYPE:
-			var room := CardManager.MAX_HAND_SIZE - hand_size(bot) + 1
-			return {} if room < 2 else {"score": 1.1, "peer": -1, "province": ""}
 		CardPresets.CARD_THEFT_CARD_TYPE:
 			return _eval_card_theft(bot)
 		CardPresets.PROPAGANDA_CARD_TYPE:

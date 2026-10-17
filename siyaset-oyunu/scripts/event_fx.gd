@@ -46,11 +46,34 @@ var _reveal_tween: Tween
 var _tween: Tween
 var _current: Dictionary = {}
 
+## Gazete oynarken ekranın geri kalanı hafifçe kararır (0.0.232).
+const DIM_ALPHA := 0.38
+var _dim: ColorRect
+var _dim_tween: Tween
+
 func _ready() -> void:
 	top_level = true
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	z_index = 90
+	_dim = ColorRect.new()
+	_dim.color = Color(0.03, 0.02, 0.08, 0.0)
+	_dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_dim.hide()
+	add_child(_dim)
+
+func _set_dim(on: bool) -> void:
+	if _dim == null:
+		return
+	if _dim_tween != null and _dim_tween.is_valid():
+		_dim_tween.kill()
+	if on:
+		_dim.show()
+	_dim_tween = create_tween()
+	_dim_tween.tween_property(_dim, "color:a", DIM_ALPHA if on else 0.0, 0.2)
+	if not on:
+		_dim_tween.tween_callback(_dim.hide)
 
 ## Olayı kuyruğa koyar. Gösterilecekse true (anahtar daha önce görüldüyse,
 ## animasyonlar kapalıysa false).
@@ -68,8 +91,9 @@ func present(key: String, data: Dictionary) -> bool:
 		_next()
 	return true
 
+## Oynayan ya da sırada bekleyen gazete var mı?
 func is_playing() -> bool:
-	return _active
+	return _active or not _queue.is_empty()
 
 ## Oynayan gazeteyi hemen kaldırır (sonraki varsa o başlar).
 func skip() -> void:
@@ -84,6 +108,7 @@ func skip_all() -> void:
 	_queue.clear()
 	_clear_current()
 	_active = false
+	_set_dim(false)
 
 func _input(event: InputEvent) -> void:
 	if not _active:
@@ -113,8 +138,11 @@ func _next() -> void:
 	if _active or not is_inside_tree():
 		return
 	if _queue.is_empty():
+		_set_dim(false)
 		drained.emit()
 		return
+	if not _dim.visible:
+		_set_dim(true)
 	_active = true
 	_current = _queue.pop_front()
 	var rate := speed * (CATCH_UP_SPEED if not _queue.is_empty() else 1.0)

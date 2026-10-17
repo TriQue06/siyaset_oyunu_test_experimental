@@ -461,7 +461,7 @@ func _build_settings_panel() -> void:
 		button.pressed.connect(func(): MultiplayerManager.set_world_setting("map_mode", String(button.get_meta("value"))))
 		mode_row.add_child(button)
 		map_mode_buttons.append(button)
-	var labels := {"province_scale": L.t("İl sayısı"), "province_seats": L.t("İl milletvekilleri"), "national_seats": L.t("Ulusal milletvekilleri"), "turn_seconds": L.t("Tur süresi")}
+	var labels := {"province_scale": L.t("İl sayısı"), "province_seats": L.t("İl milletvekilleri"), "national_seats": L.t("Ulusal milletvekilleri"), "turn_seconds": L.t("Tur süresi"), "action_limit": L.t("Sırada miting / yatırım sınırı")}
 	world_box.add_child(UiTheme.mono_label(labels["province_scale"], 12, UiTheme.TEXT))
 	var density_row := HBoxContainer.new()
 	density_row.add_theme_constant_override("separation", 6)
@@ -476,8 +476,8 @@ func _build_settings_panel() -> void:
 		button.pressed.connect(func(): MultiplayerManager.set_world_setting("province_scale", button.get_meta("value")))
 		density_row.add_child(button)
 		density_buttons.append(button)
-	for key in ["province_seats", "national_seats", "turn_seconds"]:
-		var target_box: VBoxContainer = _setting_sections["timing"] if key == "turn_seconds" else world_box
+	for key in ["province_seats", "national_seats", "turn_seconds", "action_limit"]:
+		var target_box: VBoxContainer = _setting_sections["timing"] if key in ["turn_seconds", "action_limit"] else world_box
 		world_values[key] = _value_row(target_box, labels[key])
 		var control := HSlider.new()
 		var values: Array = MultiplayerManager.WORLD_OPTIONS[key]

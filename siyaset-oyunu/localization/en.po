@@ -4640,3 +4640,81 @@ msgstr "NO AID THIS TURN"
 
 msgid "Yardım yapmazsan bu tur bu ekran yeniden açılmaz. Afet sürerse sonraki sıranda yeniden karar verirsin."
 msgstr "If you give no aid, this screen will not reopen this turn. If the disaster lasts you decide again on your next turn."
+
+msgid "%s popülizme başladı: bu dönem hamleleri daha etkili."
+msgstr "%s turned populist: their moves are stronger this term."
+
+msgid "%s para cezasına çarptırıldı (−%s)."
+msgstr "%s was fined (−%s)."
+
+msgid "%s esnek hareket kartı çekti: bu sıra miting ve yatırım sınırı iki katı."
+msgstr "%s drew a flexible move card: double rally and investment limit this turn."
+
+msgid "PARA\nCEZASI"
+msgstr "FINE"
+
+msgid "PARTİ İÇİ\nKARIŞIKLIK"
+msgstr "INTERNAL\nTURMOIL"
+
+msgid "ESNEK\nHAREKET"
+msgstr "FLEXIBLE\nMOVE"
+
+msgid "Para Cezası"
+msgstr "Fine"
+
+msgid "Parti İçi Karışıklık"
+msgstr "Internal Turmoil"
+
+msgid "Esnek Hareket"
+msgstr "Flexible Move"
+
+msgid "OLUMSUZ, ANINDA ETKİ: para cezası. Parti kasandaki paranın beşte biri hemen silinir."
+msgstr "NEGATIVE, INSTANT: a fine. One fifth of the money in your party treasury is wiped out at once."
+
+msgid "OLUMSUZ, ANINDA ETKİ: kendi partinde iç karışıklık çıkar; ulusal desteğin düşer, karışıklık birikirse parti bölünebilir."
+msgstr "NEGATIVE, INSTANT: turmoil breaks out in your own party; your national support drops and if turmoil builds up the party may split."
+
+msgid "ANINDA ETKİ: esnek hareket. Bu sıra miting ve yatırım sınırın iki katına çıkar."
+msgstr "INSTANT: flexible move. Your rally and investment limits double this turn."
+
+msgid "SAKLANABİLİR: miting hazırlarken kullanılır. Mitingin yapıldığı ilde seçtiğin partiyi karalarsın: ona eksi, sana artı. İlde güçlü olan partiye az işler; ayrı miting hakkı harcamaz, bedeli yok."
+msgstr "KEEPABLE: used while preparing a rally. You smear a party of your choice in the rally's province: minus for them, plus for you. Works less on a party strong there; uses no separate rally and costs nothing."
+
+msgid "ANINDA ETKİ: çekildiği an başlar. Bu dönem boyunca hamlelerin çok daha etkili, kötü sonuçlar hafifler; dönem sonunda seçim olursa ek ulusal destek."
+msgstr "INSTANT: starts the moment it is drawn. This term your moves are much stronger and bad outcomes softer; an election at the end of the term brings extra national support."
+
+msgid "Elindeki kartlar saklanabilir kartlardır: karta dokun, ne yaptığını oku; hedef isterse bir parti seç. Karalama kartı miting hazırlarken kullanılır. Kartların fiyatı yok."
+msgstr "Cards in your hand are keepable: tap one to read what it does; pick a party if it needs a target. The smear card is used while preparing a rally. Cards cost nothing."
+
+msgid "TURU BİTİR"
+msgstr "END TURN"
+
+msgid "sırayı devret"
+msgstr "pass the turn"
+
+msgid "Kapat (haritaya dön) · aynı ile tekrar dokunmak da kapatır"
+msgstr "Close (back to map) · tapping the same province again also closes"
+
+msgid "Mitingte bir rakibe yüklenebilirsin: ona eksi, sana artı. Ayrı miting hakkı harcamaz; kart miting yapılınca elinden çıkar."
+msgstr "You can lay into a rival at the rally: minus for them, plus for you. It uses no extra rally; the card leaves your hand when the rally happens."
+
+msgid "Sırada miting / yatırım sınırı"
+msgstr "Rally / investment limit per turn"
+
+msgid "ATLA  ▸"
+msgstr "SKIP  ▸"
+
+msgid "Kartı kapat, devam et"
+msgstr "Close the card and continue"
+
+msgid "OLUMSUZ · HEMEN UYGULANDI"
+msgstr "NEGATIVE · APPLIED AT ONCE"
+
+msgid "ŞANS KARTI"
+msgstr "CHANCE CARD"
+
+msgid "Elinde en fazla %d kart durabilir; bu tur kart çekilmedi. Elindeki kartları oynayarak yer açabilirsin."
+msgstr "You can hold at most %d cards; no card was drawn this turn. Play cards from your hand to make room."
+
+msgid "Silinen: %s"
+msgstr "Wiped out: %s"

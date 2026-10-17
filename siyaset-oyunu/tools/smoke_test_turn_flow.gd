@@ -87,6 +87,9 @@ func _initialize() -> void:
 
 	print("=== 1) ILK SECIM ONCESI: KART CEK, MECLIS YOK, IL HAMLELERI ===")
 	new_game()
+	check("miting / yatirim siniri varsayilan 5 (lobi ayari)", cm.action_limit(1) == 5 and mm.WORLD_OPTIONS["action_limit"] == [3, 4, 5, 6, 7])
+	# Aşağıdaki sınır denemeleri lobide 3 seçilmiş gibi.
+	mm.world_settings["action_limit"] = 3
 	check("sira basinda kart cekilmedi, KART CEK bekleniyor", cm.needs_turn_draw(1) and cm.inventories[1].is_empty())
 	var time_before: float = cm._turn_time_left
 	cm.tick(5.0)
@@ -157,10 +160,33 @@ func _initialize() -> void:
 			instant_ok = false
 	check("anindaki kart ele girmez, etkisi bir kez uygulanir", saw_instant and instant_ok)
 	check("saklanabilir kart ele girer", saw_hand and hand_ok)
-	cm.inventories[3] = []
-	var bonus: Array = []
-	cm._resolve_draw(3, cp.BONUS_CARD_TYPE, bonus, PackedStringArray())
-	check("bonus kart: 2 ek cekim kuyrukta, ana cekimden ayri", bonus.size() == 3 and bool(bonus[1]["bonus"]) and bool(bonus[2]["bonus"]))
+	check("bonus kart destede yok", not cm._draw_weights(3).has("bonus_kart"))
+	cm.populism[cm.party_of(3)] = cm.round_number + 1
+	check("popülizm surerken desteden popülizm cikmaz", not cm._draw_weights(3).has(cp.POPULISM_CARD_TYPE))
+	check("popülizm bir donem surer", GameRules.POPULISM_ROUNDS == 1 and cm.populism_rounds_left(3) == 1)
+	cm.populism.erase(cm.party_of(3))
+	# OLUMSUZ / ESNEK ŞANS KARTLARI
+	cm.funds[3] = 50.0
+	var fine_entry: Array = []
+	cm._resolve_draw(3, cp.PENALTY_CARD_TYPE, fine_entry, PackedStringArray())
+	check("para cezasi kasanin %20'sini siler", is_equal_approx(cm.funds_of(3), 40.0) and is_equal_approx(float(fine_entry[0]["amount"]), 10.0))
+	var national_before: float = cm.national_of(3)
+	var turmoil_before: float = cm.turmoil.get(cm.party_of(3), 0.0)
+	cm._resolve_draw(3, cp.SELF_TURMOIL_CARD_TYPE, [], PackedStringArray())
+	check("parti ici karisiklik oyuncunun kendisini vurur", cm.national_of(3) < national_before
+		and float(cm.turmoil.get(cm.party_of(3), 0.0)) > turmoil_before)
+	give_turn(3)
+	var limit_before: int = cm.action_limit(3)
+	cm._resolve_draw(3, cp.FLEX_CARD_TYPE, [], PackedStringArray())
+	check("esnek hareket o sira siniri iki katina cikarir", cm.action_limit(3) == limit_before * 2)
+	give_turn(3)
+	check("esnek hareket sonraki sirada biter", cm.action_limit(3) == limit_before)
+	check("olumsuz kartlar anindadir, ele girmez", cm.is_instant_card(cp.PENALTY_CARD_TYPE) and cm.is_negative_card(cp.SELF_TURMOIL_CARD_TYPE))
+	cm.inventories[3] = [cp.REPUTATION_CARD_TYPE]
+	var free_funds: float = cm.funds_of(3)
+	cm._apply_play(3, 0, 1)
+	check("kartlarin fiyati yok", cm.inventories[3].is_empty() and is_equal_approx(cm.funds_of(3), free_funds))
+	check("kart bozdurma yok", not cm.has_method("discard_card"))
 	give_turn(3)
 	cm.inventories[3] = []
 	for k in cm.MAX_HAND_SIZE:
@@ -312,15 +338,16 @@ func _initialize() -> void:
 	check("kart varken hedef secilebilir", cm.smear_targets(1, home).has(2))
 	var smear_funds: float = cm.funds_of(1)
 	cm._apply_miting_move(1, home, 0.0, [], 1, 2)
-	check("karalamali miting: kart ve bedel tek seferde dustu", cm.inventories[1].is_empty()
-		and is_equal_approx(smear_funds - cm.funds_of(1), 15.0 + cp.card_cost(cp.PROPAGANDA_CARD_TYPE)))
+	check("karalamali miting: kart dustu, karalamanin bedeli yok", cm.inventories[1].is_empty()
+		and is_equal_approx(smear_funds - cm.funds_of(1), 15.0))
 	check("karalama ayri miting hakki harcamaz", cm.miting_count(1) == 1)
 	cm.inventories[1] = [cp.PROPAGANDA_CARD_TYPE]
 	check("karalama karti tek basina oynanamaz", not cm.can_play_card(1, cp.PROPAGANDA_CARD_TYPE, 2, home))
 	check("iptal edilen hazirlik kart ve hak tuketmez", cm.inventories[1].size() == 1 and cm.miting_count(1) == 1)
 
-	print("=== 10) YATIRIM KADEMELERI VE 3 SINIR ===")
+	print("=== 10) YATIRIM KADEMELERI VE SINIR ===")
 	new_game()
+	mm.world_settings["action_limit"] = 3
 	form_government({1: 300, 2: 120, 3: 80}, all_posts_to(1))
 	cm.funds = {1: 500.0, 2: 200.0, 3: 200.0}
 	cm.economy["treasury"] = 2000.0
@@ -348,6 +375,7 @@ func _initialize() -> void:
 
 	print("=== 11) BOTLAR YENI AKISLA OYNAR ===")
 	new_game()
+	mm.world_settings["action_limit"] = 5
 	for id in [1, 2, 3]:
 		mm.players[id]["bot"] = true
 	var bm = root.get_node("BotManager")
@@ -360,11 +388,11 @@ func _initialize() -> void:
 		cm.tick(0.5)
 		gm.tick(0.5)
 		var cur: int = cm.current_turn_peer_id()
-		max_mitings = maxi(max_mitings, cm.miting_count(cur))
+		max_mitings = maxi(max_mitings, cm.miting_count(cur) - cm.action_limit(cur) + 5)
 		if cm.round_number >= 14 or cm.game_finished:
 			break
 	check("botlar turlari oynadi (secim dahil)", cm.round_number >= 12 or cm.game_finished, "tur %d" % cm.round_number)
-	check("botlar sirada en fazla 3 miting yapti", max_mitings <= 3, str(max_mitings))
+	check("botlar sirada siniri asmadi", max_mitings <= 5, str(max_mitings))
 	check("botlar kart cekti", draws_ok and int(cm.turn_flow.get("serial", 0)) > 20)
 
 	print("=== TUR AKISI: %s ===" % ("PASS" if fails == 0 else "%d HATA" % fails))

@@ -117,6 +117,8 @@ var alliance_requests: Dictionary = {}
 var _next_alliance_request: int = 0
 ## Son seçimdeki ittifak ortakları: party -> Array[party] (botların dostluğu).
 var former_allies: Dictionary = {}
+## Son seçime giren ittifaklar (seçim gecesi ve sonuçlar için; seçimle dağılırlar).
+var last_election_alliances: Dictionary = {}
 
 # peer_id -> Array[String] (her biri CardPresets.CARD_TYPES'tan biri)
 var inventories: Dictionary = {}
@@ -410,6 +412,14 @@ func are_allies(a: int, b: int) -> bool:
 	var alliance_id := alliance_of(a)
 	return alliance_id >= 0 and alliance_id == alliance_of(b) and party_of(a) != party_of(b)
 
+## Son seçimdeki ittifak üyeliği: party -> ittifak kimliği.
+func election_alliance_membership() -> Dictionary:
+	var membership := {}
+	for alliance_id in last_election_alliances:
+		for pid in last_election_alliances[alliance_id].get("members", []):
+			membership[int(pid)] = int(alliance_id)
+	return membership
+
 ## Son seçimde aynı ittifaktaydılar mı?
 func were_allies(a: int, b: int) -> bool:
 	return (former_allies.get(party_of(a), []) as Array).has(party_of(b))
@@ -564,6 +574,10 @@ func _resolve_alliance_request(request_id: int, refused_by: int = -1) -> void:
 			refused = true
 	if refused:
 		alliance_requests.erase(request_id)
+		# Ret hatırlanır: botlar aynı partiye hemen yeniden başvurmaz (bkz. recently_refused).
+		var refusals: Dictionary = (alliances[alliance_id].get("refused", {}) as Dictionary).duplicate()
+		refusals[pid] = round_number
+		alliances[alliance_id]["refused"] = refusals
 		var who := refused_by if refused_by != -1 else pid
 		_push_state({"type": "alliance_refused", "peer_id": who, "alliance_id": alliance_id, "target": pid,
 			"message": L.t("%s ile %s ittifakı arasındaki başvuru reddedildi (%s).") % [_party_name(pid), alliance_name, _party_name(who)]})
@@ -618,10 +632,40 @@ func _apply_leave_alliance(peer_id: int) -> void:
 		message = L.t("%s seçim arifesinde %s ittifakından ayrıldı; seçmen bunu affetmedi.") % [_party_name(peer_id), alliance_name]
 	_push_state({"type": "alliance_left", "peer_id": peer_id, "alliance_id": alliance_id, "message": message})
 
+## GERGİNLİK (0.0.227): ortağının meclis önergesine HAYIR diyen parti ittifakta
+## küskünlük yaratır: önergenin sahibinin "grievance" sayacı artar. Botlar
+## küskünlük birikince ittifaktan ayrılmayı düşünür (bkz. BotBrain).
+const ALLIANCE_GRIEVANCE_LEAVE := 2
+
+func note_alliance_vote(voter: int, proposer: int, vote_no: bool) -> void:
+	if not vote_no or not are_allies(voter, proposer):
+		return
+	var alliance_id := alliance_of(voter)
+	var alliance: Dictionary = alliances[alliance_id]
+	var grievance: Dictionary = (alliance.get("grievance", {}) as Dictionary).duplicate()
+	var victim := party_of(proposer)
+	grievance[victim] = int(grievance.get(victim, 0)) + 1
+	alliance["grievance"] = grievance
+	alliances[alliance_id] = alliance
+	_pending_log.append({"text": L.t("%s, ortağı %s tarafından verilen önergeye HAYIR dedi; %s ittifakında gerginlik var.") % [
+		_party_name(voter), _party_name(proposer), String(alliance.get("name", ""))], "peer_id": voter, "province": "", "kind": "alliance"})
+
+## Bu parti ile bu ittifak arasındaki başvuru son 2 turda reddedildi mi?
+func recently_refused(alliance_id: int, party_id: int) -> bool:
+	var refusals: Dictionary = alliances.get(alliance_id, {}).get("refused", {})
+	return refusals.has(party_of(party_id)) and round_number - int(refusals[party_of(party_id)]) < ALLIANCE_REQUEST_ROUNDS
+
+func alliance_grievance(party_id: int) -> int:
+	var alliance_id := alliance_of(party_id)
+	if alliance_id < 0:
+		return 0
+	return int((alliances[alliance_id].get("grievance", {}) as Dictionary).get(party_of(party_id), 0))
+
 ## Seçim sonuçları çıkınca (ya da anayasa kapatınca) bütün ittifaklar dağılır.
 ## remember=true: üyelikler former_allies'a yazılır (bir sonraki dağılmaya kadar).
 func dissolve_all_alliances(remember: bool) -> void:
 	if remember:
+		last_election_alliances = alliances.duplicate(true) if alliances_enabled else {}
 		former_allies = {}
 		for alliance in alliances.values():
 			var members: Array = alliance.get("members", [])
@@ -1292,6 +1336,9 @@ func can_play_card(peer_id: int, card_type: String, target_peer_id: int = -1, ta
 		return false
 	if card_type == CardPresets.EARLY_ELECTION_CARD_TYPE:
 		return false  # artık hamle (bkz. can_early_election)
+	# İTTİFAK (0.0.227): ortağa saldırı kartı oynanamaz.
+	if target_peer_id != -1 and are_allies(peer_id, target_peer_id):
+		return false
 	if CardPresets.needs_target(card_type):
 		return is_valid_steal_target(peer_id, target_peer_id)
 	# Hedef PARTİ (ya da kart çalmada o partinin oyuncusu): kendi partin olamaz.
@@ -1380,7 +1427,45 @@ func effective_groups(peer_id: int, at_round: int = -1) -> Dictionary:
 	var mood := economy_mood(pid)
 	for group in mood.keys():
 		bonus[group] = float(bonus.get(group, 0.0)) + float(mood[group])
-	return VoterGroups.with_bonus(PartyManager.groups_of(pid), bonus)
+	var groups := VoterGroups.with_bonus(PartyManager.groups_of(pid), bonus)
+	var alliance_id := alliance_of(pid)
+	if alliances_enabled and alliance_id >= 0:
+		groups = VoterGroups.alliance_blend(groups, _alliance_blend_members(alliances[alliance_id].get("members", [])))
+	return groups
+
+## İdeoloji karışımının üyeleri: taban hitap + ağırlık (son oy payı; seçim
+## olmadıysa eşit). Hesap döngüye girmesin diye beklenen oy kullanılmaz.
+func _alliance_blend_members(members: Array) -> Array:
+	var result: Array = []
+	for pid in members:
+		result.append({"groups": PartyManager.groups_of(int(pid)), "weight": float(last_vote_shares.get(int(pid), 10.0))})
+	return result
+
+## Katılım önizlemesi: party_id bu ittifaka girerse etkin hitabı nasıl değişir?
+## [[grup, önce, sonra], ...] en büyük değişimden küçüğe.
+func alliance_preview(party_id: int, alliance_id: int) -> Array:
+	var pid := party_of(party_id)
+	if not alliances.has(alliance_id):
+		return []
+	var members: Array = (alliances[alliance_id].get("members", []) as Array).duplicate()
+	if not members.has(pid):
+		members.append(pid)
+	var before := PartyManager.groups_of(pid)
+	var after := VoterGroups.alliance_blend(before, _alliance_blend_members(members))
+	var rows: Array = []
+	for group in VoterGroups.GROUP_IDS:
+		rows.append([group, float(before.get(group, 0.0)), float(after.get(group, 0.0))])
+	rows.sort_custom(func(a, b): return absf(a[2] - a[1]) > absf(b[2] - b[1]))
+	return rows
+
+## Partinin bu ittifaktan etkilenen bütün değerleri tek satırda ("Emekliler 90 → 80").
+func alliance_preview_text(party_id: int, alliance_id: int, count: int = 3) -> String:
+	var parts: Array[String] = []
+	for row in alliance_preview(party_id, alliance_id):
+		if parts.size() >= count or absf(float(row[2]) - float(row[1])) < 0.5:
+			break
+		parts.append("%s %d → %d" % [VoterGroups.title(String(row[0])), roundi(float(row[1])), roundi(float(row[2]))])
+	return ", ".join(PackedStringArray(parts))
 
 ## Partinin şu an geçerli toplantı bonusları: grup -> bonus.
 func meeting_bonuses(peer_id: int, at_round: int = -1) -> Dictionary:
@@ -4531,6 +4616,7 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"alliance_requests": alliance_requests,
 		"alliance_request_next": _next_alliance_request,
 		"former_allies": former_allies,
+		"last_election_alliances": last_election_alliances,
 		"law_rounds": law_rounds,
 		"tax_rounds": tax_rounds,
 		"constitution_rounds": constitution_rounds,
@@ -4628,6 +4714,7 @@ func _apply_state(state: Dictionary) -> void:
 	alliance_requests = state.get("alliance_requests", {})
 	_next_alliance_request = int(state.get("alliance_request_next", 0))
 	former_allies = state.get("former_allies", {})
+	last_election_alliances = state.get("last_election_alliances", {})
 	# 0.0.225 öncesi kayıt: lideri olmayan ittifakın lideri ilk üye.
 	for alliance_id in alliances:
 		var old: Dictionary = alliances[alliance_id]

@@ -50,8 +50,12 @@ static func province_name(province_id: String) -> String:
 	var map = Engine.get_main_loop().root.get_node_or_null("GameMap") if Engine.get_main_loop() is SceneTree else null
 	return map.name_of(province_id) if map != null else province_id
 
+## alliances: party -> ittifak kimliği. İttifak üyeleri barajı ORTAK oyla geçer.
+var alliances: Dictionary = {}
+
 func setup(province_results: Dictionary, vote_shares: Dictionary, seats: Dictionary, passed: Array,
-		threshold_percent: float, seed_value: int, duration_seconds: float) -> void:
+		threshold_percent: float, seed_value: int, duration_seconds: float, alliance_membership: Dictionary = {}) -> void:
+	alliances = alliance_membership
 	duration = maxf(1.0, duration_seconds)
 	threshold = threshold_percent
 	_results = province_results
@@ -177,9 +181,16 @@ func sample(t: float) -> Dictionary:
 		provinces[province_id] = {"c": c, "shares": shares, "seats": {}}
 	var eligible: Array = []
 	if weight > 0.0:
+		var totals := {}
 		for peer_id in peer_ids:
 			national[peer_id] = float(national[peer_id]) / weight
-			if float(national[peer_id]) >= threshold:
+			var aid := int(alliances.get(peer_id, 0))
+			if aid != 0:
+				totals[aid] = float(totals.get(aid, 0.0)) + float(national[peer_id])
+		for peer_id in peer_ids:
+			var aid := int(alliances.get(peer_id, 0))
+			var share: float = float(totals[aid]) if aid != 0 else float(national[peer_id])
+			if share >= threshold:
 				eligible.append(peer_id)
 		if eligible.is_empty():
 			eligible = peer_ids.duplicate()

@@ -74,9 +74,17 @@ func _handle_turn(now: float) -> void:
 		return
 	if now < _turn_due:
 		return
-	var alliance_target := BotBrain.choose_alliance_request(bot)
-	if alliance_target >= 0:
-		CardManager._apply_request_alliance(bot, alliance_target)
+	var alliance_move := BotBrain.choose_alliance_move(bot)
+	if not alliance_move.is_empty():
+		match String(alliance_move["type"]):
+			"request":
+				CardManager._apply_request_alliance(bot, int(alliance_move["alliance_id"]))
+			"create":
+				CardManager._apply_create_alliance(bot, String(alliance_move["name"]), alliance_move["color"])
+			"invite":
+				CardManager._apply_invite_alliance_party(bot, int(alliance_move["alliance_id"]), int(alliance_move["party"]))
+			"leave":
+				CardManager._apply_leave_alliance(bot)
 		_turn_due = now + _delay(PLAY_SECONDS)
 		return
 	# Hamle sınırı yok: bot her hamleden sonra biraz düşünüp devam eder,

@@ -4456,6 +4456,10 @@ func _refresh_alliance_panel() -> void:
 		for pid in members:
 			names.append(("★ " if int(pid) == leader else "") + String(PartyManager.data_of(int(pid)).get("name", "?")))
 		row.add_child(PopupKit.note(L.t("Üyeler: %s") % ", ".join(PackedStringArray(names)), UiTheme.TEXT_DIM, 350))
+		if my_alliance == int(alliance_id) and members.size() > 1:
+			var shift := _my_alliance_shift()
+			if shift != "":
+				row.add_child(PopupKit.note(L.t("İttifak hitabını şekillendiriyor: %s") % shift, UiTheme.TEXT, 350))
 		# Açık başvurular ve üye üye onay durumu.
 		for rid in CardManager.alliance_requests:
 			var req: Dictionary = CardManager.alliance_requests[rid]
@@ -4479,6 +4483,9 @@ func _refresh_alliance_panel() -> void:
 			var pending := CardManager.pending_alliance_request(int(alliance_id), my_party) >= 0
 			var ask := _alliance_action(L.t("BAŞVURU BEKLİYOR") if pending else L.t("KATILMAK İSTE"), Color(alliance.get("color", UiTheme.GOLD)).darkened(0.25))
 			ask.tooltip_text = L.t("Katılmak için bütün üyelerin onayı gerekir.")
+			var my_preview := CardManager.alliance_preview_text(my_party, int(alliance_id))
+			if my_preview != "":
+				row.add_child(PopupKit.note(L.t("Katılırsan: %s") % my_preview, UiTheme.TEXT, 350))
 			ask.pressed.connect(_on_alliance_request_pressed.bind(int(alliance_id)))
 			ask.modulate.a = 1.0 if action_reason == "" and not pending else 0.45
 			buttons.add_child(ask)
@@ -4492,6 +4499,22 @@ func _refresh_alliance_panel() -> void:
 func _invited_to(alliance_id: int, party_id: int) -> bool:
 	var rid := CardManager.pending_alliance_request(alliance_id, party_id)
 	return rid >= 0 and String(CardManager.alliance_requests[rid].get("kind", "")) == "invite"
+
+## Ben ittifaktayken taban → etkin hitap farkı (en büyük üç).
+func _my_alliance_shift() -> String:
+	var me := multiplayer.get_unique_id()
+	var base := PartyManager.groups_of(CardManager.party_of(me))
+	var blended := VoterGroups.alliance_blend(base, CardManager._alliance_blend_members(CardManager.alliances[CardManager.alliance_of(me)]["members"]))
+	var rows: Array = []
+	for group in VoterGroups.GROUP_IDS:
+		rows.append([group, float(base.get(group, 0.0)), float(blended.get(group, 0.0))])
+	rows.sort_custom(func(a, b): return absf(a[2] - a[1]) > absf(b[2] - b[1]))
+	var parts: Array[String] = []
+	for row in rows:
+		if parts.size() >= 3 or absf(float(row[2]) - float(row[1])) < 0.5:
+			break
+		parts.append("%s %d → %d" % [VoterGroups.title(String(row[0])), roundi(float(row[1])), roundi(float(row[2]))])
+	return ", ".join(PackedStringArray(parts))
 
 func _alliance_action(text: String, color: Color) -> Button:
 	var button := Button.new()
@@ -4533,6 +4556,10 @@ func _alliance_decision_row(rid: int) -> Control:
 	else:
 		text = L.t("%s, %s ittifakına katılmak istiyor. Onayın gerekiyor.") % [_fx_party_name(int(req["party"])), String(alliance.get("name", "?"))]
 	box.add_child(PopupKit.note(text, UiTheme.GOLD, 350))
+	# İdeoloji önizlemesi: katılan partinin hitabı nasıl değişir (bana davetse benim).
+	var preview := CardManager.alliance_preview_text(int(req.get("party", -1)), int(req.get("alliance", -1)))
+	if preview != "":
+		box.add_child(PopupKit.note(L.t("%s ittifakta: %s") % [_fx_party_name(int(req.get("party", -1))), preview], UiTheme.TEXT, 350))
 	box.add_child(PopupKit.note(L.t("Yanıt vermezsen %d tur sonra ret sayılır.") % CardManager.ALLIANCE_REQUEST_ROUNDS, UiTheme.TEXT_DIM, 350))
 	var buttons := HBoxContainer.new()
 	buttons.add_theme_constant_override("separation", 6)

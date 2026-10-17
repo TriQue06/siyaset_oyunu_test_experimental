@@ -1,4 +1,10 @@
 {
+"%s, ortağı %s tarafından verilen önergeye HAYIR dedi; %s ittifakında gerginlik var.": "%s voted NO on a motion by its ally %s; there is tension in the %s alliance.",
+"%s ittifakı %%%.1f": "%s alliance %%%.1f",
+"%s ittifakı %s · %d vekil": "%s alliance %s · %d seats",
+"İttifak hitabını şekillendiriyor: %s": "The alliance shapes your appeal: %s",
+"Katılırsan: %s": "If you join: %s",
+"%s ittifakta: %s": "%s in the alliance: %s",
 "%s ittifakı kuruldu; %s ittifakın lideri oldu.": "The %s alliance was founded; %s leads it.",
 "%s, %s ittifakına katılmak istiyor; bütün üyelerin onayı bekleniyor.": "%s wants to join the %s alliance; every member must approve.",
 "%s ile %s ittifakı arasındaki başvuru reddedildi (%s).": "The application between %s and the %s alliance was rejected (%s).",

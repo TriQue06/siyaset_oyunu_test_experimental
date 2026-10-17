@@ -649,6 +649,7 @@ func _apply_vote(peer_id: int, choice) -> void:
 	if is_coalition_stage() and normalize_vote(choice) == VOTE_ABSTAIN:
 		return
 	votes[peer_id] = normalize_vote(choice)
+	CardManager.note_alliance_vote(peer_id, proposal_peer_id, votes[peer_id] == VOTE_NO)
 	if not _all_voted():
 		_push_state()
 	else:

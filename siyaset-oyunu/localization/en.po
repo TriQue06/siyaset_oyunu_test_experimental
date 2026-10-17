@@ -3,6 +3,24 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: en\n"
 
+msgid "%s, ortağı %s tarafından verilen önergeye HAYIR dedi; %s ittifakında gerginlik var."
+msgstr "%s voted NO on a motion by its ally %s; there is tension in the %s alliance."
+
+msgid "%s ittifakı %%%.1f"
+msgstr "%s alliance %%%.1f"
+
+msgid "%s ittifakı %s · %d vekil"
+msgstr "%s alliance %s · %d seats"
+
+msgid "İttifak hitabını şekillendiriyor: %s"
+msgstr "The alliance shapes your appeal: %s"
+
+msgid "Katılırsan: %s"
+msgstr "If you join: %s"
+
+msgid "%s ittifakta: %s"
+msgstr "%s in the alliance: %s"
+
 msgid "%s ittifakı kuruldu; %s ittifakın lideri oldu."
 msgstr "The %s alliance was founded; %s leads it."
 

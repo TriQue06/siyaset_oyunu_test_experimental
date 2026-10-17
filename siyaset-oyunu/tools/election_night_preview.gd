@@ -43,6 +43,9 @@ func _initialize() -> void:
 		}
 	cm.init_game()
 	cm.turn_order = [1, 2, 3, 4, 5, 6]
+	# PREVIEW_ALLIANCE=1: küçük üç parti seçime ittifakla girer (0.0.226).
+	if OS.get_environment("PREVIEW_ALLIANCE") != "":
+		cm.alliances = {1: {"name": "Halk Cephesi", "color": Color("F2C230"), "leader": 4, "members": [4, 5, 6]}}
 	cm._hold_election(1, false)
 
 	var scene: Node = (load("res://scenes/ElectionResults.tscn") as PackedScene).instantiate()

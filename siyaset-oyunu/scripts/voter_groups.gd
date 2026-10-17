@@ -410,6 +410,42 @@ static func apply_delta(affinities: Dictionary, group: String, amount: float, co
 	return delta
 
 ## Geçici bonuslar eklenmiş, 0..100'e sıkıştırılmış yakınlıklar.
+## İTTİFAK İDEOLOJİSİ (0.0.226): ittifaktaki parti seçimde ve panellerde
+## "etkin hitap" kullanır; tabanı (kalıcı hitap) DEĞİŞMEZ, ittifak dağılınca
+## etkin hitap tabana döner.
+##   1. Yaklaşma: her grupta ittifak ortalaması (üyelerin oy payıyla ağırlıklı)
+##      bulunur; üye ortalamaya ALLIANCE_BLEND oranında kayar.
+##   2. Ortak güç: üyelerin bu grupta BİRLİKTE ulaştığı değer (en yüksek ikinci
+##      hitap) kadar, kalan boşluğun ALLIANCE_SYNERGY payı eklenir.
+## Örnek (iki eşit parti): emekli 90 / 10 -> ~71 / ~32; ikisi de 90 -> ~92,7.
+## 0,5: senin örneğin (emekli 90 ile 10 olan iki eşit parti -> ~71 ile ~32).
+const ALLIANCE_BLEND := 0.5
+const ALLIANCE_SYNERGY := 0.3
+
+## own: bu partinin hitabı. members: ittifakın bütün üyeleri (kendisi dahil)
+## [{"groups": Dictionary, "weight": float}]. Tek üyede değişiklik yok.
+static func alliance_blend(own: Dictionary, members: Array) -> Dictionary:
+	if members.size() < 2:
+		return own
+	var result := own.duplicate()
+	var total_weight := 0.0
+	for m in members:
+		total_weight += maxf(0.0001, float(m["weight"]))
+	for group in GROUP_IDS:
+		var mean := 0.0
+		var values: Array = []
+		for m in members:
+			var v := float((m["groups"] as Dictionary).get(group, AFFINITY_NEUTRAL))
+			mean += v * maxf(0.0001, float(m["weight"])) / total_weight
+			values.append(v)
+		values.sort()
+		var together: float = values[values.size() - 2]
+		var value := float(own.get(group, AFFINITY_NEUTRAL))
+		var near := value + ALLIANCE_BLEND * (mean - value)
+		near += ALLIANCE_SYNERGY * together / 100.0 * (AFFINITY_MAX - near)
+		result[group] = clampf(near, AFFINITY_MIN, AFFINITY_MAX)
+	return result
+
 static func with_bonus(affinities: Dictionary, bonus: Dictionary) -> Dictionary:
 	if bonus.is_empty():
 		return affinities

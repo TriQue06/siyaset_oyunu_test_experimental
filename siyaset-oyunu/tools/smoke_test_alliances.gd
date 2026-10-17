@@ -116,6 +116,88 @@ func run() -> void:
 	check(cm.alliances.is_empty() and cm.alliance_requests.is_empty(), "secim sonrasi ittifaklar ve basvurular silinir")
 	check(cm.were_allies(1, 3) and cm.were_allies(3, 1) and not cm.were_allies(1, 2), "eski ortaklar hatirlanir")
 
+	print("=== ideoloji (etkin hitap) ===")
+	var VG = load("res://scripts/voter_groups.gd")
+	var a_g := {"emekli": 90.0, "genc": 10.0}
+	var b_g := {"emekli": 10.0, "genc": 90.0}
+	var mixed: Dictionary = VG.alliance_blend(a_g, [{"groups": a_g, "weight": 1.0}, {"groups": b_g, "weight": 1.0}])
+	check(absf(float(mixed["emekli"]) - 70.9) < 0.2 and absf(float(mixed["genc"]) - 32.1) < 0.2, "zit iki parti: emekli 90 -> ~71, genc 10 -> ~32", "%.1f / %.1f" % [mixed["emekli"], mixed["genc"]])
+	var same: Dictionary = VG.alliance_blend(a_g, [{"groups": a_g, "weight": 1.0}, {"groups": a_g, "weight": 1.0}])
+	check(absf(float(same["emekli"]) - 92.7) < 0.1, "ayni ideoloji: 90 -> 92,7", "%.2f" % same["emekli"])
+	var big: Dictionary = VG.alliance_blend(b_g, [{"groups": a_g, "weight": 40.0}, {"groups": b_g, "weight": 10.0}])
+	check(float(big["emekli"]) > float(mixed["genc"]), "buyuk ortak daha cok ceker")
+	_turn(1)
+	cm.alliances_enabled = true
+	pm.parties[1]["groups"] = a_g.duplicate()
+	pm.parties[3]["groups"] = b_g.duplicate()
+	cm.last_vote_shares = {1: 20.0, 3: 20.0}
+	var base_emekli: float = float(cm.effective_groups(1)["emekli"])
+	cm._apply_create_alliance(1, "Ideoloji", presets.COLORS[4])
+	check(cm.alliance_preview_text(3, cm.alliance_of(1)) != "", "katilim onizlemesi var", cm.alliance_preview_text(3, cm.alliance_of(1)))
+	cm._apply_invite_alliance_party(1, cm.alliance_of(1), 3)
+	cm._apply_answer_alliance(3, cm.pending_alliance_request(cm.alliance_of(1), 3), true)
+	check(float(cm.effective_groups(1)["emekli"]) < base_emekli - 10.0, "ittifakta etkin hitap kayar", "%.1f -> %.1f" % [base_emekli, cm.effective_groups(1)["emekli"]])
+	check(is_equal_approx(float(pm.parties[1]["groups"]["emekli"]), 90.0), "taban hitap degismez")
+	cm.dissolve_all_alliances(true)
+	check(is_equal_approx(float(cm.effective_groups(1)["emekli"]), base_emekli), "ittifak dagilinca etkin hitap tabana doner")
+
+	print("=== secim gecesi ===")
+	var sim = load("res://scripts/election_night_sim.gd").new()
+	var results := {"x": {1: {"percent": 60.0, "seats": 6}, 2: {"percent": 36.0, "seats": 4}, 3: {"percent": 4.0, "seats": 0}}}
+	sim.setup(results, {1: 60.0, 2: 36.0, 3: 4.0}, {1: 6, 2: 4, 3: 0}, [1, 2, 3], 7.0, 1, 10.0, {2: 1, 3: 1})
+	var mid: Dictionary = sim.sample(9.0)
+	check((mid["eligible"] as Array).has(3), "sayim sirasinda: ittifak barajı gecince %4'luk uye baraj alti degil")
+	var solo = load("res://scripts/election_night_sim.gd").new()
+	solo.setup(results, {1: 60.0, 2: 36.0, 3: 4.0}, {1: 6, 2: 4, 3: 0}, [1, 2], 7.0, 1, 10.0, {})
+	check(not (solo.sample(9.0)["eligible"] as Array).has(3), "ittifaksiz %4'luk parti baraj alti")
+	_turn(1)
+	cm.alliances_enabled = true
+	cm._apply_create_alliance(1, "Gece", presets.COLORS[5])
+	cm.dissolve_all_alliances(true)
+	check(cm.last_election_alliances.size() == 1 and cm.election_alliance_membership().get(1, 0) != 0, "secime giren ittifaklar seçim gecesi icin saklanir")
+
+	print("=== etkilesim ve botlar ===")
+	var brain = load("res://scripts/bot_brain.gd")
+	cm.alliances_enabled = true
+	cm.round_number = 5
+	_turn(1)
+	cm._apply_create_alliance(1, "Dost", presets.COLORS[6])
+	var dost: int = cm.alliance_of(1)
+	cm._apply_invite_alliance_party(1, dost, 2)
+	cm._apply_answer_alliance(2, cm.pending_alliance_request(dost, 2), true)
+	cm.funds[1] = 500.0
+	check(not cm.can_play_card(1, root.get_node("CardPresets").REPUTATION_CARD_TYPE, 2), "ortaga kaset oynanamaz")
+	check(cm.can_play_card(1, root.get_node("CardPresets").REPUTATION_CARD_TYPE, 3), "ortak olmayana oynanir")
+	cm.note_alliance_vote(2, 1, true)
+	cm.note_alliance_vote(2, 1, true)
+	check(cm.alliance_grievance(1) == 2, "ortagin onergesine HAYIR kuskunluk yazar")
+	mm.players[1]["bot"] = true
+	check(String(brain.choose_alliance_move(1).get("type", "")) == "leave", "kuskun bot ittifaktan ayrilmak ister")
+	cm.round_number = GameRules.next_election_round(cm.round_number)
+	check(String(brain.choose_alliance_move(1).get("type", "")) != "leave", "secim turunda (cezali) kuskun bot ayrilmaz")
+	cm.round_number = 5
+	mm.players[1].erase("bot")
+	cm.dissolve_all_alliances(true)
+	pm.parties[1]["groups"] = {"emekli": 80.0, "isci": 70.0}
+	pm.parties[2]["groups"] = {"genc": 80.0, "isveren": 70.0}
+	var plain: float = brain._distance(1, 2)
+	check(brain._friend_distance(1, 2) < plain, "eski ortak botlara daha yakin gorunur", "%.2f < %.2f" % [brain._friend_distance(1, 2), plain])
+	# Bot barajda zorlanınca ittifak kurar, lider olunca yakın partiyi davet eder.
+	mm.election_threshold = 7.0
+	mm.players[3]["bot"] = true
+	pm.parties[3]["groups"] = {"emekli": 80.0, "isci": 70.0}
+	pm.parties[4]["groups"] = {"emekli": 75.0, "isci": 65.0}
+	pm.parties[1]["groups"] = {"genc": 80.0, "isveren": 70.0}
+	cm.last_vote_shares = {1: 40.0, 2: 40.0, 3: 3.0, 4: 3.0}
+	_turn(3)
+	var move: Dictionary = brain.choose_alliance_move(3)
+	check(String(move.get("type", "")) == "create", "barajdaki bot ittifak kurar", str(move))
+	cm._apply_create_alliance(3, String(move["name"]), move["color"])
+	move = brain.choose_alliance_move(3)
+	check(String(move.get("type", "")) == "invite" and int(move.get("party", -1)) == 4, "lider bot yakin partiyi davet eder", str(move))
+	mm.players[3].erase("bot")
+	cm.dissolve_all_alliances(false)
+
 	print("=== anayasa ===")
 	_turn(1)
 	cm._apply_create_alliance(1, "Son", presets.COLORS[2])

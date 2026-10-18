@@ -186,9 +186,35 @@ func _update_land_colors() -> void:
 	_land_mesh.clear_surfaces()
 	_land_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 
+## İl paneli açıkken haritada yalnız bu il çizilir (bkz. game_screen _open_province_actions).
+var isolated_id := ""
+
+func set_isolated(province_id: String) -> void:
+	isolated_id = province_id
+	for child in get_children():
+		if child is CanvasItem:
+			child.visible = province_id == ""
+	queue_redraw()
+
+## İlin harita koordinatlarındaki sınır kutusu.
+func region_bounds(province_id: String) -> Rect2:
+	var tris: PackedVector2Array = _region_tris.get(province_id, PackedVector2Array())
+	if tris.is_empty():
+		return Rect2(GameMap.center_of(province_id), Vector2.ZERO)
+	var box := Rect2(tris[0], Vector2.ZERO)
+	for point in tris:
+		box = box.expand(point)
+	return box
+
 func _draw() -> void:
 	if _colors_dirty:
 		_update_land_colors()
+	if isolated_id != "":
+		_fill_region(isolated_id, _colors.get(isolated_id, LAND_COLOR))
+		_draw_region_outline(isolated_id, REGION_BORDER_COLOR, REGION_BORDER_WIDTH)
+		if isolated_id in _disaster_ids or not _pulse.is_empty():
+			_draw_region_outline(isolated_id, Color(UiTheme.GOLD, 0.8), 2.4)
+		return
 	if _sea_mesh != null and _sea_mesh.get_surface_count() > 0:
 		draw_mesh(_sea_mesh, null)
 	if _land_mesh != null and _land_mesh.get_surface_count() > 0:
@@ -358,13 +384,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseMotion:
 		var id := get_province_id_at(to_local(event.global_position))
+		if isolated_id != "" and id != isolated_id:
+			id = ""
 		if id != _hovered_id:
 			_hovered_id = id
 			province_hovered.emit(id)
 			queue_redraw()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		var id := get_province_id_at(to_local(event.global_position))
-		if id != "":
+		if id != "" and (isolated_id == "" or id == isolated_id):
 			province_clicked.emit(id)
 
 func set_province_color(province_id: String, color: Color) -> void:

@@ -1,8 +1,8 @@
 class_name TurnIntro
 extends Control
 ## TUR BAŞI SUNUMU (0.0.231, yalnız kendi sıramda): ortada animasyonlu KART ÇEK
-## (ya da ATLA: bu sıra kart yok) → ŞANS KARTI ortada açılır, TAMAM'a basana kadar kalır (süreyle
-## kapanmaz; ANINDA / OLUMSUZ: "uygulandı", SAKLANABİLİR: ele uçar) → afet
+## (ya da ATLA: bu sıra kart yok) → ŞANS KARTI ortada açılır, ~1,5 sn görünüp kendiliğinden kapanır
+## (düğme yok; ANINDA / OLUMSUZ: "uygulandı", SAKLANABİLİR: ele uçar) → afet
 ## sürüyorsa YARDIM sahnesi. Ekrana dokunmak açılış animasyonunu HIZLANDIRIR,
 ## karar değildir; yardımdan vazgeçmek ayrı düğmedir (BU TUR YARDIM YAPMA).
 ## Gazete oynarken sunum bekler (bkz. hold).
@@ -14,6 +14,8 @@ signal finished
 const CARD_SIZE := Vector2(250, 380)
 const REVEAL_IN := 0.35
 const REVEAL_OUT := 0.35
+## Kart açıldıktan sonra ekranda kalma süresi (giriş animasyonu dahil ~1,5 sn).
+const CARD_HOLD := 1.15
 ## Tam ekran sunumların arka planı hafif kararır.
 const DIM_ALPHA := 0.45
 
@@ -248,15 +250,9 @@ func _reveal_next() -> void:
 	var result := String(entry.get("result", ""))
 	var face := _card_face(entry)
 	_layer.add_child(face)
-	# TAMAM: kart süreyle değil, oyuncu isteyince kapanır.
-	var skip := Button.new()
-	skip.text = L.t("TAMAM  ▸")
-	skip.tooltip_text = L.t("Kartı kapat, devam et")
-	skip.focus_mode = Control.FOCUS_NONE
-	skip.custom_minimum_size = Vector2(150, 56)
-	skip.add_theme_font_override("font", UiTheme.mono(true))
-	skip.add_theme_font_size_override("font_size", 18)
-	UiSkin.skin_color_button(skip, UiTheme.GOLD_DIM)
+	# Kart 1,5 sn görünür, sonra kendiliğinden kapanır (düğme yok).
+	var skip := Control.new()
+	skip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_layer.add_child(skip)
 	var view := get_viewport_rect().size
 	var center := Vector2((view.x - CARD_SIZE.x) * 0.5 - 60.0, (view.y - CARD_SIZE.y) * 0.5)
@@ -276,10 +272,10 @@ func _reveal_next() -> void:
 	tw.tween_property(face, "modulate:a", 1.0, REVEAL_IN * 0.6)
 	tw.tween_property(skip, "modulate:a", 1.0, REVEAL_IN)
 	var token := _reveal_token
-	skip.pressed.connect(func():
+	tw.chain().tween_interval(CARD_HOLD)
+	tw.chain().tween_callback(func():
 		if token != _reveal_token:
 			return
-		skip.disabled = true
 		_dismiss_card(face, skip, result, token))
 
 ## Kartı kapatır: saklanabilir kart ele uçar, anında kart parlayıp kaybolur.

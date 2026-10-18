@@ -693,6 +693,17 @@ func _place_map(map_rect: Rect2) -> void:
 	var seat_markers := map_holder.get_node_or_null("SeatMarkers")
 	if seat_markers != null:
 		seat_markers.queue_redraw()
+	if map_holder.isolated_id != "":
+		_fit_isolated_province(map_rect)
+
+## Bölünmüş görünüm: sol yarıyı yalnız tıklanan il doldurur (il tamamen görünür).
+func _fit_isolated_province(map_rect: Rect2) -> void:
+	_map_clip.position = map_rect.position
+	_map_clip.size = map_rect.size
+	var box: Rect2 = map_holder.region_bounds(map_holder.isolated_id)
+	var fit := minf(map_rect.size.x / maxf(box.size.x, 1.0), map_rect.size.y / maxf(box.size.y, 1.0)) * 0.8
+	map_holder.scale = Vector2(fit, fit)
+	map_holder.position = map_rect.size * 0.5 - box.get_center() * fit
 
 ## Hamle paneli alt banda, kartların sağına taşınır (sahnede meclisin yanındaydı).
 func _detach_actions_panel() -> void:
@@ -5556,12 +5567,18 @@ func _open_province_actions(province_id: String) -> void:
 	_pinned = false
 	_show_province_info(province_id)
 	_pinned = true
+	if _focus_tween != null and _focus_tween.is_running():
+		_focus_tween.kill()
+	map_holder.set_isolated(province_id)
 	if not _map_split:
 		_map_split = true
 		_animate_map_rect(_r(R_MAP), halves[0])
+	else:
+		_place_map(halves[0])
 
 func _on_province_actions_closed() -> void:
 	_highlight_province("")
+	map_holder.set_isolated("")
 	if _map_split:
 		_map_split = false
 		_animate_map_rect(_map_split_rects()[0], _r(R_MAP))

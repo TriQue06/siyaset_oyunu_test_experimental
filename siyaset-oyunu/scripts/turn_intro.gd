@@ -327,7 +327,7 @@ func _card_face(entry: Dictionary) -> Control:
 	style.bg_color = UiTheme.PANEL_DARK
 	style.border_color = accent
 	style.set_border_width_all(4)
-	style.set_corner_radius_all(14)
+	style.set_corner_radius_all(0)
 	style.content_margin_left = 0
 	style.content_margin_right = 0
 	style.content_margin_top = 0
@@ -344,8 +344,8 @@ func _card_face(entry: Dictionary) -> Control:
 	var ribbon := PanelContainer.new()
 	var ribbon_style := StyleBoxFlat.new()
 	ribbon_style.bg_color = accent.darkened(0.25)
-	ribbon_style.corner_radius_top_left = 10
-	ribbon_style.corner_radius_top_right = 10
+	ribbon_style.corner_radius_top_left = 0
+	ribbon_style.corner_radius_top_right = 0
 	ribbon_style.set_content_margin_all(6)
 	ribbon.add_theme_stylebox_override("panel", ribbon_style)
 	ribbon.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -366,7 +366,7 @@ func _card_face(entry: Dictionary) -> Control:
 	art_style.bg_color = UiTheme.INK
 	art_style.border_color = accent.darkened(0.3)
 	art_style.set_border_width_all(2)
-	art_style.set_corner_radius_all(8)
+	art_style.set_corner_radius_all(0)
 	art_frame.add_theme_stylebox_override("panel", art_style)
 	art_frame.custom_minimum_size = Vector2(CARD_SIZE.x - 32.0, 132)
 	art_frame.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -406,7 +406,7 @@ func _framed_text(text: String, accent: Color) -> Control:
 	frame_style.bg_color = Color(accent, 0.1)
 	frame_style.border_color = Color(accent, 0.45)
 	frame_style.set_border_width_all(1)
-	frame_style.set_corner_radius_all(6)
+	frame_style.set_corner_radius_all(0)
 	frame_style.set_content_margin_all(8)
 	frame.add_theme_stylebox_override("panel", frame_style)
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE

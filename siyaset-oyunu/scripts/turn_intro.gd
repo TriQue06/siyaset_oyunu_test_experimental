@@ -1,7 +1,7 @@
 class_name TurnIntro
 extends Control
 ## TUR BAŞI SUNUMU (0.0.231, yalnız kendi sıramda): ortada animasyonlu KART ÇEK
-## → ŞANS KARTI ortada açılır ve oyuncu ATLA'ya basana kadar kalır (süreyle
+## (ya da ATLA: bu sıra kart yok) → ŞANS KARTI ortada açılır, TAMAM'a basana kadar kalır (süreyle
 ## kapanmaz; ANINDA / OLUMSUZ: "uygulandı", SAKLANABİLİR: ele uçar) → afet
 ## sürüyorsa YARDIM sahnesi. Ekrana dokunmak açılış animasyonunu HIZLANDIRIR,
 ## karar değildir; yardımdan vazgeçmek ayrı düğmedir (BU TUR YARDIM YAPMA).
@@ -109,7 +109,11 @@ func present(draws: Array) -> void:
 		return
 	_queue = draws.duplicate()
 	if _queue.is_empty():
-		refresh()
+		# ATLA ile çekim yapılmadı: KART ÇEK ekranı kapanır, sıradaki sahneye geçilir.
+		if mode in [Mode.PROMPT, Mode.WAIT]:
+			_reveal_next()
+		else:
+			refresh()
 		return
 	_clear_layer()
 	mode = Mode.REVEAL
@@ -173,7 +177,7 @@ func _show_prompt() -> void:
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	frame.add_child(box)
 	box.add_child(_centered(UiTheme.mono_label(L.t("SIRA SENDE"), 30, UiTheme.GOLD, true)))
-	var note := PopupKit.note(L.t("Önce kartını çek. Kart ya hemen etki eder ya da eline gelir."), UiTheme.TEXT, 420)
+	var note := PopupKit.note(L.t("Rastgele bir kart çek ya da bu sıra atla. Kart ya hemen etki eder ya da eline gelir."), UiTheme.TEXT, 420)
 	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(_centered(note))
 	var button := Button.new()
@@ -185,11 +189,25 @@ func _show_prompt() -> void:
 	UiSkin.skin_color_button(button, UiTheme.GOLD_DIM)
 	for key in ["font_color", "font_hover_color", "font_pressed_color"]:
 		button.add_theme_color_override(key, UiTheme.TEXT)
+	var skip := Button.new()
+	skip.text = L.t("ATLA  ▸")
+	skip.tooltip_text = L.t("Bu sıra kart çekme")
+	skip.focus_mode = Control.FOCUS_NONE
+	skip.custom_minimum_size = Vector2(150, 56)
+	skip.add_theme_font_override("font", UiTheme.mono(true))
+	skip.add_theme_font_size_override("font_size", 18)
+	UiSkin.skin_color_button(skip, UiTheme.GOLD_DIM)
 	button.pressed.connect(func():
 		button.disabled = true
+		skip.disabled = true
 		button.text = L.t("Çekiliyor…")
 		CardManager.draw_turn_card())
+	skip.pressed.connect(func():
+		button.disabled = true
+		skip.disabled = true
+		CardManager.skip_turn_draw())
 	box.add_child(_centered(button))
+	box.add_child(_centered(skip))
 	var timer_note := PopupKit.note(L.t("Bu ekran tur süreni harcamaz; bir süre basmazsan kart kendiliğinden çekilir."), UiTheme.TEXT_MUTED, 420)
 	timer_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(_centered(timer_note))
@@ -230,9 +248,9 @@ func _reveal_next() -> void:
 	var result := String(entry.get("result", ""))
 	var face := _card_face(entry)
 	_layer.add_child(face)
-	# ATLA: kart süreyle değil, oyuncu isteyince kapanır.
+	# TAMAM: kart süreyle değil, oyuncu isteyince kapanır.
 	var skip := Button.new()
-	skip.text = L.t("ATLA  ▸")
+	skip.text = L.t("TAMAM  ▸")
 	skip.tooltip_text = L.t("Kartı kapat, devam et")
 	skip.focus_mode = Control.FOCUS_NONE
 	skip.custom_minimum_size = Vector2(150, 56)

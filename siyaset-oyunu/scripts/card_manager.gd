@@ -410,6 +410,28 @@ func _request_draw() -> void:
 	if MultiplayerManager.is_host:
 		_apply_draw(multiplayer.get_remote_sender_id())
 
+## ATLA: oyuncu bu sıra kart çekmekten vazgeçer (çekim hakkı kullanılmış sayılır).
+func skip_turn_draw() -> void:
+	var me := multiplayer.get_unique_id()
+	if not needs_turn_draw(me):
+		return
+	if _is_authority():
+		_apply_skip_draw(me)
+	else:
+		_request_skip_draw.rpc_id(1)
+
+@rpc("any_peer", "reliable")
+func _request_skip_draw() -> void:
+	if MultiplayerManager.is_host:
+		_apply_skip_draw(multiplayer.get_remote_sender_id())
+
+func _apply_skip_draw(peer_id: int) -> void:
+	if not needs_turn_draw(peer_id):
+		return
+	turn_flow["drawn"] = true
+	turn_flow["draws"] = []
+	_push_state({"type": "draw", "peer_id": peer_id, "draws": []})
+
 ## KART ÇEKİMİ (host): sırada tek sefer. Anında kart hemen uygulanır, saklanabilir
 ## kart ele girer. El doluysa (eski kural) kart çekilmez. automatic: süre doldu
 ## ya da tur çekmeden bitti (sunum payı eklenmez).

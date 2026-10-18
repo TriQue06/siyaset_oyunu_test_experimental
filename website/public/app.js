@@ -9,7 +9,7 @@
   const mb = (bytes) => (bytes / 1048576).toFixed(0) + " MB";
   const getJson = (url) => fetch(url, { cache: "no-cache" }).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
   // GEÇİCİ: indirme butonları kapalı. Geri açmak için false yap.
-  const DOWNLOADS_OFF = true;
+  const DOWNLOADS_OFF = false;
   if (DOWNLOADS_OFF) {
     document.querySelectorAll(".dl").forEach((a) => {
       a.setAttribute("aria-disabled", "true");

@@ -191,8 +191,12 @@ var isolated_id := ""
 
 func set_isolated(province_id: String) -> void:
 	isolated_id = province_id
+	# Vekil noktaları yalnız bu ilinkileri çizer (görünürlüğü katman belirler);
+	# diğer üst katmanlar (etiketler vb.) inceleme sırasında gizlenir.
 	for child in get_children():
-		if child is CanvasItem:
+		if child.has_method("set_only_province"):
+			child.set_only_province(province_id)
+		elif child is CanvasItem:
 			child.visible = province_id == ""
 	queue_redraw()
 
@@ -210,10 +214,17 @@ func _draw() -> void:
 	if _colors_dirty:
 		_update_land_colors()
 	if isolated_id != "":
+		_fill_region(isolated_id, LAND_COLOR)
 		_fill_region(isolated_id, _colors.get(isolated_id, LAND_COLOR))
-		_draw_region_outline(isolated_id, REGION_BORDER_COLOR, REGION_BORDER_WIDTH)
-		if isolated_id in _disaster_ids or not _pulse.is_empty():
-			_draw_region_outline(isolated_id, Color(UiTheme.GOLD, 0.8), 2.4)
+		# Büyütülmüş çizimde yumuşatılmış çizgi bulanıklaşır: kalınlık ekran
+		# pikseline göre, yumuşatmasız çizilir.
+		var px := 1.0 / maxf(0.0001, (get_viewport().get_final_transform() * get_global_transform_with_canvas()).get_scale().x)
+		var border := REGION_BORDER_DARK if _dark_borders else REGION_BORDER_COLOR
+		for edge in _edges.get(isolated_id, []):
+			draw_line(edge[0], edge[1], border, 2.0 * px, false)
+		if isolated_id in _disaster_ids:
+			for edge in _edges.get(isolated_id, []):
+				draw_line(edge[0], edge[1], Color(UiTheme.RED, 0.9), 4.0 * px, false)
 		return
 	if _sea_mesh != null and _sea_mesh.get_surface_count() > 0:
 		draw_mesh(_sea_mesh, null)

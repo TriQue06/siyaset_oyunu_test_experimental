@@ -93,6 +93,13 @@ func set_all(seats_by_province: Dictionary) -> void:
 	_seats = seats_by_province.duplicate()
 	_rebuild()
 
+## İl incelemesi: yalnız bu ilin noktaları, kalabalık olsa da hep çizilir.
+var _only_id := ""
+
+func set_only_province(province_id: String) -> void:
+	_only_id = province_id
+	_rebuild()
+
 func clear_all() -> void:
 	_seats.clear()
 	_rebuild()
@@ -144,8 +151,11 @@ func _rebuild() -> void:
 		var colors: Array = _seats[province_id]
 		if colors.is_empty():
 			continue
+		if _only_id != "":
+			if province_id != _only_id:
+				continue
 		# Kalabalık il yalnız hover'da; hover'dayken yalnız o il görünür.
-		if _is_crowded(_hover_id):
+		elif _is_crowded(_hover_id):
 			if province_id != _hover_id:
 				continue
 		elif colors.size() > HOVER_ONLY_SEATS:

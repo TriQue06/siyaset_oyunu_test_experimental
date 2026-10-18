@@ -5096,7 +5096,7 @@ func _rebuild_layer_legend() -> void:
 			var span := _group_layer_span()
 			swatches.append([null, L.t("%%%d") % int(span.x)])
 			for i in 4:
-				swatches.append([_map_tint(_group_layer_color(), float(i) / 3.0), ""])
+				swatches.append([_group_layer_tint(float(i) / 3.0), ""])
 			swatches.append([null, L.t("%%%d") % int(span.y)])
 	_layer_legend.visible = not swatches.is_empty()
 	for entry in swatches:
@@ -5161,7 +5161,7 @@ func _apply_map_layer_colors() -> void:
 				MapLayer.GROUPS:
 					var pct := float(VoterGroups.percent(CardManager.province_profile(province_id), _map_group))
 					var t := clampf((pct - span.x) / maxf(1.0, span.y - span.x), 0.0, 1.0)
-					colors[province_id] = _map_tint(_group_layer_color(), t)
+					colors[province_id] = _group_layer_tint(t)
 				MapLayer.ORGANIZATION:
 					colors[province_id] = _map_tint(mine, float(CardManager.organization_level(province_id, me)) / GameRules.ORG_MAX_LEVEL)
 				MapLayer.STRENGTH:
@@ -5180,9 +5180,14 @@ func _apply_map_layer_colors() -> void:
 		_hovered_province_id = ""
 		_highlight_province(selected)
 
-## Seçmen katmanının en yoğun ucu: grubun rengi, biraz koyu (soluk illerden belirgin ayrılsın).
-func _group_layer_color() -> Color:
-	return VoterGroups.color(_map_group).darkened(0.25)
+## Seçmen katmanı: şeffaflık yok. En az yoğun il grubun kendi rengi; yoğunluk
+## arttıkça renk koyulaşır, en yoğun uç grubun koyu, lacivertle karışmış hali.
+const GROUP_LAYER_DEEP := Color(0.12, 0.14, 0.26)
+
+func _group_layer_tint(t: float) -> Color:
+	var base := VoterGroups.color(_map_group)
+	base.a = 1.0
+	return base.lerp(GROUP_LAYER_DEEP, 0.6 * clampf(t, 0.0, 1.0))
 
 ## Seçmen katmanında seçili grubun illerdeki en düşük ve en yüksek yüzdesi
 ## (renk ölçeği bu aralığa yayılır, gösterge de bu sayıları yazar).
@@ -5233,6 +5238,8 @@ func _set_map_layer(layer: int, animate: bool = true) -> void:
 		if _map_snapshot.visible:
 			map_holder.position = Vector2.ZERO
 			_map_snapshot.hide()
+			if map_holder.isolated_id != "" and _map_split:
+				_place_map(_map_split_rects()[0])
 		# İki kare bekle: gizli butonlarla en az bir kare çizilmiş olsun.
 		await get_tree().process_frame
 		await get_tree().process_frame
@@ -5261,14 +5268,16 @@ func _set_map_layer(layer: int, animate: bool = true) -> void:
 	_map_snapshot.size = _map_clip.size
 	_map_snapshot.show()
 	_map_clip.move_child(_map_snapshot, _map_clip.get_child_count() - 1)
-	map_holder.position = Vector2(width * direction, 0.0)
+	# İl incelenirken harita yakınlaştırılmış konumuna kayar.
+	var home := map_holder.position if map_holder.isolated_id != "" else Vector2.ZERO
+	map_holder.position = home + Vector2(width * direction, 0.0)
 	_map_slide_tween = create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 	_map_slide_tween.tween_property(_map_snapshot, "position:x", -width * direction, MAP_SLIDE_DURATION)
-	_map_slide_tween.tween_property(map_holder, "position:x", 0.0, MAP_SLIDE_DURATION)
+	_map_slide_tween.tween_property(map_holder, "position:x", home.x, MAP_SLIDE_DURATION)
 	_map_slide_tween.chain().tween_callback(func():
 		_map_snapshot.hide()
 		_map_snapshot.texture = null
-		map_holder.position = Vector2.ZERO)
+		map_holder.position = home)
 	if _queued_layer != -1:
 		var queued := _queued_layer
 		_queued_layer = -1

@@ -43,7 +43,7 @@ const PAIR_IDS := ["emek", "kusak", "inanc", "yonetim"]
 ## miting_backlash: mitingle bu gruba yaklaşınca karşıt gruptaki kayıp oranı.
 const GROUPS := {
 	"isci": {
-		"title": "İşçiler ve Sendikalar", "color": Color("#E85D75"), "icon": "hardhat",
+		"title": "İşçi", "color": Color("#E85D75"), "icon": "isci",
 		"opposite": "isveren", "pair": "emek",
 		"blurb": "Ücretli çalışanlar, fabrika ve sendika tabanı.",
 		"issues": ["ücretler", "iş güvencesi", "sendikal haklar"],
@@ -53,7 +53,7 @@ const GROUPS := {
 		"law_backlash": 0.54, "miting_backlash": 0.42,
 	},
 	"isveren": {
-		"title": "İşverenler ve İşletmeler", "color": Color("#3D8BDB"), "icon": "briefcase",
+		"title": "İşveren", "color": Color("#3D8BDB"), "icon": "isveren",
 		"opposite": "isci", "pair": "emek",
 		"blurb": "Esnaf, sanayici ve şirket sahipleri.",
 		"issues": ["yatırım ortamı", "vergi yükü", "bürokrasi"],
@@ -63,7 +63,7 @@ const GROUPS := {
 		"law_backlash": 0.54, "miting_backlash": 0.42,
 	},
 	"genc": {
-		"title": "Gençler ve Öğrenciler", "color": Color("#F2B632"), "icon": "gradcap",
+		"title": "Öğrenci", "color": Color("#F2B632"), "icon": "genc",
 		"opposite": "emekli", "pair": "kusak",
 		"blurb": "Öğrenciler ve iş hayatına yeni atılanlar.",
 		"issues": ["eğitim", "barınma", "istihdam"],
@@ -73,7 +73,7 @@ const GROUPS := {
 		"law_backlash": 0.36, "miting_backlash": 0.3,
 	},
 	"emekli": {
-		"title": "Emekliler", "color": Color("#8B70D6"), "icon": "heart",
+		"title": "Emekli", "color": Color("#8B70D6"), "icon": "emekli",
 		"opposite": "genc", "pair": "kusak",
 		"blurb": "Çalışma hayatını tamamlamış yaşlı seçmenler.",
 		"issues": ["emekli aylıkları", "sağlık", "yaşam maliyeti"],
@@ -83,7 +83,7 @@ const GROUPS := {
 		"law_backlash": 0.36, "miting_backlash": 0.3,
 	},
 	"dindar": {
-		"title": "Dindar Topluluklar", "color": Color("#2EAA79"), "icon": "dome",
+		"title": "Muhafazakâr", "color": Color("#2EAA79"), "icon": "dindar",
 		"opposite": "ilerici", "pair": "inanc",
 		"blurb": "İnancını gündelik hayatının merkezine koyan topluluklar.",
 		"issues": ["inanç özgürlüğü", "din eğitimi", "aile değerleri"],
@@ -93,7 +93,7 @@ const GROUPS := {
 		"law_backlash": 0.6, "miting_backlash": 0.48,
 	},
 	"ilerici": {
-		"title": "LGBT ve Ateist İlericiler", "color": Color("#E65AB7"), "icon": "rainbow",
+		"title": "İlerici", "color": Color("#E65AB7"), "icon": "ilerici",
 		"opposite": "dindar", "pair": "inanc",
 		"blurb": "Laik, ilerici ve LGBT topluluklar.",
 		"issues": ["ayrımcılık", "eşit yurttaşlık", "bireysel özgürlükler"],
@@ -103,7 +103,7 @@ const GROUPS := {
 		"law_backlash": 0.6, "miting_backlash": 0.48,
 	},
 	"ozerkci": {
-		"title": "Özerkçiler", "color": Color("#16A6A1"), "icon": "pin",
+		"title": "Bölgeselci", "color": Color("#16A6A1"), "icon": "ozerkci",
 		"opposite": "milliyetci", "pair": "yonetim",
 		"blurb": "Kararların yerelde alınmasını isteyen bölgesel seçmen.",
 		"issues": ["yerel yetkiler", "bölgesel temsil", "yerinden yönetim"],
@@ -113,7 +113,7 @@ const GROUPS := {
 		"law_backlash": 0.48, "miting_backlash": 0.36,
 	},
 	"milliyetci": {
-		"title": "Milliyetçiler", "color": Color("#E87532"), "icon": "flag",
+		"title": "Milliyetçi", "color": Color("#E87532"), "icon": "milliyetci",
 		"opposite": "ozerkci", "pair": "yonetim",
 		"blurb": "Ulusal birliği ve güçlü devleti önceleyen seçmen.",
 		"issues": ["ulusal egemenlik", "güvenlik", "ulusal birlik"],

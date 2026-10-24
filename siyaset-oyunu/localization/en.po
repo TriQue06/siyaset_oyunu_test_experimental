@@ -3,6 +3,30 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: en\n"
 
+msgid "İşçi"
+msgstr "Worker"
+
+msgid "İşveren"
+msgstr "Employer"
+
+msgid "Öğrenci"
+msgstr "Student"
+
+msgid "Emekli"
+msgstr "Retiree"
+
+msgid "Muhafazakâr"
+msgstr "Conservative"
+
+msgid "İlerici"
+msgstr "Progressive"
+
+msgid "Bölgeselci"
+msgstr "Regionalist"
+
+msgid "Milliyetçi"
+msgstr "Nationalist"
+
 msgid "YARDIM GÖTÜR · %s"
 msgstr "SEND RELIEF · %s"
 

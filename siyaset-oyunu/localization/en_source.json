@@ -1,4 +1,12 @@
 {
+"İşçi": "Worker",
+"İşveren": "Employer",
+"Öğrenci": "Student",
+"Emekli": "Retiree",
+"Muhafazakâr": "Conservative",
+"İlerici": "Progressive",
+"Bölgeselci": "Regionalist",
+"Milliyetçi": "Nationalist",
 "YARDIM GÖTÜR · %s": "SEND RELIEF · %s",
 "¤ %s": "¤ %s",
 "dönem başına": "per term",

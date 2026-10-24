@@ -131,7 +131,7 @@ func _initialize() -> void:
 	check("8 farkli renk", group_colors.size() == 8)
 	var icon_ok := true
 	for group in VoterGroups.GROUP_IDS:
-		if not ["hardhat", "briefcase", "gradcap", "heart", "dome", "rainbow", "pin", "flag"].has(VoterGroups.icon(group)):
+		if GroupIconSvg.texture(VoterGroups.icon(group)) == null:
 			icon_ok = false
 	check("her grubun cizilebilen bir simgesi var", icon_ok)
 	var prof := {"emek": 65, "kusak": 23, "inanc": 44, "yonetim": 44}

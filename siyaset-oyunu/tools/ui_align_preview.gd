@@ -153,6 +153,12 @@ func _initialize() -> void:
 	await _frames(10)
 	_shot("room")
 	audit(room, "oda lobisi")
+	var timing: Control = room._setting_sections["timing"]
+	var rules_scroll: ScrollContainer = room.settings_side_panel.find_children("*", "ScrollContainer", true, false)[0]
+	rules_scroll.scroll_vertical = int(timing.get_global_rect().position.y - rules_scroll.get_global_rect().position.y)
+	await _frames(4)
+	_shot("room_timing")
+	audit(room, "oda lobisi: sureler")
 	room.queue_free()
 	await _frames(2)
 

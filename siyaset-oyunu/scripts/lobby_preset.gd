@@ -61,7 +61,7 @@ static func apply(pack: Dictionary) -> bool:
 	if lobby.has("threshold"):
 		mm.set_election_threshold(float(lobby["threshold"]))
 	if lobby.has("interval") or lobby.has("count"):
-		mm.set_game_length(int(lobby.get("interval", mm.election_interval)), int(lobby.get("count", mm.election_count)))
+		mm.set_game_length(float(lobby.get("interval", mm.election_interval)), int(lobby.get("count", mm.election_count)))
 	if lobby.has("vote_seconds"):
 		mm.set_vote_timeout(int(lobby["vote_seconds"]))
 	if lobby.has("map_seed"):

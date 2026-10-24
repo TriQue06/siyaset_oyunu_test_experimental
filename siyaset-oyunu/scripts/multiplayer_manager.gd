@@ -80,12 +80,12 @@ var players: Dictionary = {}
 # --- Lobi ayarları (lobi sahibi yetkili, tüm oyunculara senkronize) ---
 var election_threshold: float = THRESHOLD_DEFAULT
 ## Oyun süresi: seçimler kaç turda bir ve kaç seçim olacak (bkz. GameRules.configure).
-var election_interval: int = GameRules.DEFAULT_ELECTION_INTERVAL
+var election_interval: float = GameRules.DEFAULT_ELECTION_INTERVAL
 ## map_mode: "random" | "turkiye_altigen" (bkz. GameMap). Türkiye
 ## haritalarında il milletvekilleri sabittir (gerçek dağılım); ulusal liste ek.
 ## action_limit (0.0.232): bir oyuncunun sırasında en fazla kaç miting ve (ayrıca) kaç yatırım.
 const WORLD_DEFAULTS := {"alliances": true, "map_mode": "random", "province_scale": 1.0, "province_seats": 300, "national_seats": 200, "turn_seconds": 75, "action_limit": 5}
-const WORLD_OPTIONS := {"alliances": [true, false], "map_mode": ["random", "turkiye_altigen"], "province_scale": [0.75, 1.0, 1.25], "province_seats": [150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750], "national_seats": [0, 50, 100, 150, 200, 250, 300], "turn_seconds": [30, 45, 60, 75, 90, 105, 120], "action_limit": [3, 4, 5, 6, 7]}
+const WORLD_OPTIONS := {"alliances": [true, false], "map_mode": ["random", "turkiye_altigen"], "province_scale": [0.75, 1.0, 1.25], "province_seats": [150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750], "national_seats": [0, 50, 100, 150, 200, 250, 300], "turn_seconds": [45, 60, 75, 90, 105], "action_limit": [4, 5, 6]}
 var world_settings: Dictionary = WORLD_DEFAULTS.duplicate()
 var vote_timeout: int = 30
 const VOTE_TIME_OPTIONS := [15, 30, 45, 60]
@@ -627,7 +627,7 @@ func apply_constitution(payload: Dictionary) -> void:
 	if not is_host and not local_only:
 		return
 	election_threshold = snap_threshold(float(payload.get("threshold", election_threshold)))
-	election_interval = clampi(int(payload.get("interval", election_interval)), GameRules.ELECTION_INTERVAL_MIN, GameRules.ELECTION_INTERVAL_MAX)
+	election_interval = GameRules.snap_interval(float(payload.get("interval", election_interval)))
 	GameRules.configure(election_interval, election_count)
 	_set_seat_method(String(payload.get("seat_method", seat_method)))
 	CardManager.alliances_enabled = bool(payload.get("alliances_enabled", CardManager.alliances_enabled))
@@ -653,10 +653,10 @@ func set_election_threshold(value: float) -> void:
 
 ## Oyun süresini ayarlar: seçimler kaç turda bir ve kaç seçim olacak. Sadece
 ## mevcut lobi sahibi çağırabilir.
-func set_game_length(interval: int, count: int) -> void:
+func set_game_length(interval: float, count: int) -> void:
 	if not is_local_owner():
 		return
-	interval = clampi(interval, GameRules.ELECTION_INTERVAL_MIN, GameRules.ELECTION_INTERVAL_MAX)
+	interval = GameRules.snap_interval(interval)
 	count = clampi(count, GameRules.ELECTION_COUNT_MIN, GameRules.ELECTION_COUNT_MAX)
 	if is_host:
 		election_interval = interval
@@ -915,7 +915,7 @@ func _join_rejected(reason: String) -> void:
 	join_failed.emit(reason)
 
 @rpc("authority", "reliable")
-func _sync_player_list(new_players: Dictionary, new_owner: int, threshold: float, interval: int, count: int, vote_seconds: int = 30) -> void:
+func _sync_player_list(new_players: Dictionary, new_owner: int, threshold: float, interval: float, count: int, vote_seconds: int = 30) -> void:
 	vote_timeout = vote_seconds
 	players = new_players
 	owner_id = new_owner
@@ -958,19 +958,19 @@ func _request_set_threshold(value: float) -> void:
 
 ## Host-olmayan mevcut sahip, oyun süresini değiştirmek istediğinde host'a istek yollar.
 @rpc("any_peer", "reliable")
-func _request_set_game_length(interval: int, count: int) -> void:
+func _request_set_game_length(interval: float, count: int) -> void:
 	if not is_host:
 		return
 	if multiplayer.get_remote_sender_id() != owner_id:
 		return
-	election_interval = clampi(interval, GameRules.ELECTION_INTERVAL_MIN, GameRules.ELECTION_INTERVAL_MAX)
+	election_interval = GameRules.snap_interval(interval)
 	election_count = clampi(count, GameRules.ELECTION_COUNT_MIN, GameRules.ELECTION_COUNT_MAX)
 	GameRules.configure(election_interval, election_count)
 	_sync_settings.rpc(election_threshold, election_interval, election_count, vote_timeout)
 	settings_updated.emit()
 
 @rpc("authority", "reliable")
-func _sync_settings(threshold: float, interval: int, count: int, vote_seconds: int = 30) -> void:
+func _sync_settings(threshold: float, interval: float, count: int, vote_seconds: int = 30) -> void:
 	vote_timeout = vote_seconds
 	election_threshold = threshold
 	election_interval = interval

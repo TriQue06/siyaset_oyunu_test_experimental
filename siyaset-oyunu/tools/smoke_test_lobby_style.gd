@@ -20,7 +20,13 @@ func run() -> void:
 	check(lobby._setting_sections.size() == 3, "A three setting groups")
 	check(lobby.settings_side_panel.visible, "A rules panel always visible")
 	check(lobby._lobby_columns.columns == 2, "A desktop columns")
-	check(lobby.world_controls["turn_seconds"] is HSlider, "turn duration uses slider")
+	check(not lobby.world_controls.has("turn_seconds") and lobby.world_choice_buttons["turn_seconds"].size() == 5, "turn duration uses buttons (45-105)")
+	check(lobby.world_choice_buttons["action_limit"].size() == 3, "action limit uses buttons (4, 5, 6)")
+	var turn_buttons: Array = lobby.world_choice_buttons["turn_seconds"]
+	var limit_buttons: Array = lobby.world_choice_buttons["action_limit"]
+	check(is_equal_approx(turn_buttons[0].size.y, limit_buttons[0].size.y), "choice buttons share height")
+	check(turn_buttons[0].size.x < limit_buttons[0].size.x, "more options -> narrower buttons")
+	check(turn_buttons[0].text == "45" and lobby.vote_time_buttons[0].text == "15", "no seconds suffix")
 	check(lobby.world_controls["province_seats"] is HSlider, "district seats use slider")
 	check(lobby.world_controls["national_seats"] is HSlider, "national seats use slider")
 	check(lobby.density_buttons.size() == 3, "density segmented choices")
@@ -46,8 +52,8 @@ func run() -> void:
 			var card: Control = slot.get_meta("card")
 			check(is_equal_approx(card.size.y, 71.0), "empty and occupied cards fixed height")
 	slots = lobby.player_list_box.get_children()
-	lobby.world_controls["turn_seconds"].value = 90
-	check(int(mm.world_settings["turn_seconds"]) == 90, "slider changes server setting")
+	(lobby.world_choice_buttons["turn_seconds"][3] as Button).pressed.emit()
+	check(int(mm.world_settings["turn_seconds"]) == 90, "button changes server setting")
 	var skin = load("res://scripts/ui_skin.gd")
 	var panel := Panel.new()
 	var flat := StyleBoxFlat.new()
@@ -68,7 +74,7 @@ func run() -> void:
 	panel.free()
 	mm.owner_id = 99
 	lobby._refresh()
-	check(not lobby.world_controls["turn_seconds"].editable, "guest sees read-only sliders")
+	check(not lobby.world_controls["national_seats"].editable and (lobby.world_choice_buttons["turn_seconds"][0] as Button).disabled, "guest sees read-only settings")
 	check(lobby.settings_side_panel.visible, "guest sees rules panel")
 	lobby.queue_free()
 	await process_frame

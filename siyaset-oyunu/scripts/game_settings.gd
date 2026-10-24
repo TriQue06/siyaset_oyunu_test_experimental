@@ -43,6 +43,8 @@ var province_view: int = DEFAULT_PROVINCE_VIEW
 var language: String = "tr" if not OS.get_locale_language().begins_with("en") else "en"
 
 func _ready() -> void:
+	# Para simgesi bütün yazı tiplerine yedek olarak eklenir (yazı içi simge).
+	MoneyIcon.install()
 	_load()
 	# Test/önizleme betikleri (-s) oyuncunun dil seçimine bakmaz: Türkçe başlar
 	# (İngilizce isteyen betik dili kendisi ayarlar).

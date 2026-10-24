@@ -716,8 +716,8 @@ func _resolve_proposal() -> void:
 			MultiplayerManager.apply_constitution(payload)
 			# Takvim son seçimden itibaren yeni aralıkla işlesin; kalan seçim sayısı korunur.
 			CardManager.rebase_election_calendar(remaining)
-			last_resolution_reason += L.t(" Yeni baraj %%%s, seçimler %d yılda bir, sayım: %s.") % [
-				String.num(MultiplayerManager.election_threshold, 1), MultiplayerManager.election_interval,
+			last_resolution_reason += L.t(" Yeni baraj %%%s, seçimler %s yılda bir, sayım: %s.") % [
+				String.num(MultiplayerManager.election_threshold, 1), GameRules.years_text(MultiplayerManager.election_interval),
 				ElectionModel.method_title(MultiplayerManager.seat_method)]
 			var alliance_status := L.t("açık") if CardManager.alliances_enabled else L.t("kapalı")
 			last_resolution_reason += L.t(" Seçim ittifakları: %s.") % alliance_status

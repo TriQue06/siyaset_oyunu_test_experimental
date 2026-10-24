@@ -40,23 +40,26 @@ extends RefCounted
 ## sürer. Değerler configure() ile (her cihazda, ayar senkronlanınca) güncellenir.
 const ROUNDS_PER_YEAR := 2
 ## VARSAYILAN: seçimler 2 YILDA BİR, yani 4 dönemde bir (tur = 6 ay).
-const DEFAULT_ELECTION_INTERVAL := 2
+## Aralık YIL cinsinden ve BUÇUKLU olabilir (0.0.239): bir tur yarım yıl
+## olduğu için 2,5 yıl = 5 tur. Adım ELECTION_INTERVAL_STEP.
+const DEFAULT_ELECTION_INTERVAL := 2.0
 const DEFAULT_ELECTION_COUNT := 5
-const ELECTION_INTERVAL_MIN := 1
-const ELECTION_INTERVAL_MAX := 8
+const ELECTION_INTERVAL_MIN := 1.0
+const ELECTION_INTERVAL_MAX := 8.0
+const ELECTION_INTERVAL_STEP := 0.5
 const ELECTION_COUNT_MIN := 2
 const ELECTION_COUNT_MAX := 12
 ## Seçim aralığı YIL cinsinden (lobi ayarı).
-static var ELECTION_INTERVAL_YEARS: int = DEFAULT_ELECTION_INTERVAL
+static var ELECTION_INTERVAL_YEARS: float = DEFAULT_ELECTION_INTERVAL
 ## Aynı aralığın TUR cinsinden karşılığı (oyun içi hesaplar bunu kullanır).
-static var ELECTION_INTERVAL: int = DEFAULT_ELECTION_INTERVAL * ROUNDS_PER_YEAR
-static var FIRST_ELECTION_ROUND: int = DEFAULT_ELECTION_INTERVAL * ROUNDS_PER_YEAR
-static var MAX_ROUNDS: int = DEFAULT_ELECTION_INTERVAL * ROUNDS_PER_YEAR * DEFAULT_ELECTION_COUNT
+static var ELECTION_INTERVAL: int = int(DEFAULT_ELECTION_INTERVAL * ROUNDS_PER_YEAR)
+static var FIRST_ELECTION_ROUND: int = int(DEFAULT_ELECTION_INTERVAL * ROUNDS_PER_YEAR)
+static var MAX_ROUNDS: int = int(DEFAULT_ELECTION_INTERVAL * ROUNDS_PER_YEAR) * DEFAULT_ELECTION_COUNT
 
 ## Seçim takviminin ÇIPASI: seçimler bu turdan itibaren ELECTION_INTERVAL'de
 ## bir yapılır. Normalde ilk seçim turudur; ERKEN SEÇİM kabul edilince o tura
 ## kayar ve takvim oradan devam eder.
-static var ELECTION_ANCHOR: int = DEFAULT_ELECTION_INTERVAL * ROUNDS_PER_YEAR
+static var ELECTION_ANCHOR: int = int(DEFAULT_ELECTION_INTERVAL * ROUNDS_PER_YEAR)
 
 ## Oyun içinde kaymış takvim (erken seçim / anayasa). configure() bunları
 ## SİLMEZ (0.0.218): oyun ortasındaki ayar senkronu takvimi bozuyordu.
@@ -64,9 +67,17 @@ static var _anchor_override: int = 0
 static var _max_rounds_override: int = 0
 static var _election_count: int = DEFAULT_ELECTION_COUNT
 
-static func configure(interval_years: int, count: int) -> void:
-	ELECTION_INTERVAL_YEARS = clampi(interval_years, ELECTION_INTERVAL_MIN, ELECTION_INTERVAL_MAX)
-	ELECTION_INTERVAL = ELECTION_INTERVAL_YEARS * ROUNDS_PER_YEAR
+## Seçim aralığını yarım yıl adımına oturtur ve sınırlar.
+static func snap_interval(interval_years: float) -> float:
+	return clampf(snappedf(interval_years, ELECTION_INTERVAL_STEP), ELECTION_INTERVAL_MIN, ELECTION_INTERVAL_MAX)
+
+## "2" ya da "2,5" (yıl).
+static func years_text(years: float) -> String:
+	return L.dec(years, 1)
+
+static func configure(interval_years: float, count: int) -> void:
+	ELECTION_INTERVAL_YEARS = snap_interval(interval_years)
+	ELECTION_INTERVAL = int(round(ELECTION_INTERVAL_YEARS * ROUNDS_PER_YEAR))
 	FIRST_ELECTION_ROUND = ELECTION_INTERVAL
 	_election_count = clampi(count, ELECTION_COUNT_MIN, ELECTION_COUNT_MAX)
 	ELECTION_ANCHOR = _anchor_override if _anchor_override > 0 else FIRST_ELECTION_ROUND

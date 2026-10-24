@@ -369,7 +369,9 @@ func _initialize() -> void:
 	print("")
 	print("=== 10) GÖSTERİM YARDIMCILARI ===")
 	check("para biçimi", Economy.money_text(1240.0) == "1.240" and Economy.money_text(-5.0) == "−5"
-		and Economy.money_full(100.0) == "100 milyon ¤")
+		and Economy.money_full(100.0) == "100 milyon " + MoneyIcon.GLYPH)
+	check("para karakteri gösterilmez (yer tutucu simgeye döner)", not Economy.money_full(100.0).contains("¤")
+		and not GameRules.cost_text(15.0).contains("¤"))
 	check("yüzde biçimi", Economy.percent_text(8.44) == "%8,4")
 	new_game()
 	check("göstergeler aralıkta", cm.inflation() > 0.0 and cm.unemployment() > 0.0 and cm.economy_index() <= 100.0)

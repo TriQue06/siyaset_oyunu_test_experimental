@@ -1256,7 +1256,7 @@ static func _constitution_vote(bot: int, payload: Dictionary = {}) -> int:
 	if payload.is_empty():
 		payload = GovernmentManager.proposal_assignments
 	var new_threshold := float(payload.get("threshold", MultiplayerManager.election_threshold))
-	var new_interval := int(payload.get("interval", MultiplayerManager.election_interval))
+	var new_interval := float(payload.get("interval", MultiplayerManager.election_interval))
 	var score := 0.0
 	# Oy oranı barajın altına yakınsa baraj düşmesi hayat kurtarır.
 	var share := float(CardManager.last_vote_shares.get(bot, 0.0))
@@ -1277,7 +1277,7 @@ static func _constitution_vote(bot: int, payload: Dictionary = {}) -> int:
 		elif share < 20.0:
 			var method_rank := {"hare": 0.0, "dhondt": 1.0}
 			score -= (float(method_rank.get(new_method, 1.0)) - float(method_rank.get(MultiplayerManager.seat_method, 1.0))) * 1.2
-	var interval_delta := float(new_interval - MultiplayerManager.election_interval)
+	var interval_delta := new_interval - MultiplayerManager.election_interval
 	score += interval_delta * (1.0 if CardManager.is_government_party(bot) else -1.0)
 	if score > 0.4:
 		return GovernmentManager.VOTE_YES

@@ -87,9 +87,9 @@ func _initialize() -> void:
 
 	print("=== 1) ILK SECIM ONCESI: KART CEK, MECLIS YOK, IL HAMLELERI ===")
 	new_game()
-	check("miting / yatirim siniri varsayilan 5 (lobi ayari)", cm.action_limit(1) == 5 and mm.WORLD_OPTIONS["action_limit"] == [3, 4, 5, 6, 7])
-	# Aşağıdaki sınır denemeleri lobide 3 seçilmiş gibi.
-	mm.world_settings["action_limit"] = 3
+	check("miting / yatirim siniri varsayilan 5 (lobi ayari)", cm.action_limit(1) == 5 and mm.WORLD_OPTIONS["action_limit"] == [4, 5, 6])
+	# Aşağıdaki sınır denemeleri lobide 4 (en küçük seçenek) seçilmiş gibi.
+	mm.world_settings["action_limit"] = 4
 	check("sira basinda kart cekilmedi, KART CEK bekleniyor", cm.needs_turn_draw(1) and cm.inventories[1].is_empty())
 	var time_before: float = cm._turn_time_left
 	cm.tick(5.0)
@@ -115,10 +115,12 @@ func _initialize() -> void:
 	check("buyuk miting 25 milyon", is_equal_approx(before_miting - cm.funds_of(1), 35.0) and cm.miting_count(1) == 2)
 	cm._apply_miting_move(1, province, 0.0, [], 1)
 	check("orta miting 15 milyon, 3. hak", is_equal_approx(before_miting - cm.funds_of(1), 50.0) and cm.miting_count(1) == 3)
-	check("4. miting reddedilir", not cm.can_miting(1, province))
-	var after_three: float = cm.funds_of(1)
+	cm._apply_miting_move(1, province, 0.0, [], 0)
+	check("4. miting (sinir 4)", cm.miting_count(1) == 4)
+	check("5. miting reddedilir", not cm.can_miting(1, province))
+	var after_four: float = cm.funds_of(1)
 	cm._apply_miting_move(1, province, 0.0, [], 1)
-	check("4. miting otorite tarafinda da reddedilir", cm.miting_count(1) == 3 and is_equal_approx(cm.funds_of(1), after_three))
+	check("5. miting otorite tarafinda da reddedilir", cm.miting_count(1) == 4 and is_equal_approx(cm.funds_of(1), after_four))
 	cm.funds[2] = 5.0
 	give_turn(2)
 	cm._apply_draw(2)

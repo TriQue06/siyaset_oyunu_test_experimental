@@ -38,6 +38,10 @@ var away_bot_check: CheckButton
 var bot_funds_buttons: Array = []
 var world_controls: Dictionary = {}
 var world_values: Dictionary = {}
+## Düğmeli dünya ayarları (tur süresi, miting / yatırım sınırı): ayar -> düğmeler.
+var world_choice_buttons: Dictionary = {}
+## Ayar seçenek düğmelerinin ortak yüksekliği.
+const CHOICE_HEIGHT := 34.0
 var density_buttons: Array[Button] = []
 var map_mode_buttons: Array[Button] = []
 var _lobby_columns: GridContainer
@@ -65,8 +69,8 @@ func _ready() -> void:
 	threshold_slider.step = MultiplayerManager.THRESHOLD_STEP
 	threshold_slider.value_changed.connect(_on_threshold_slider_changed)
 
-	interval_minus.pressed.connect(func(): _change_game_length(-1, 0))
-	interval_plus.pressed.connect(func(): _change_game_length(1, 0))
+	interval_minus.pressed.connect(func(): _change_game_length(-GameRules.ELECTION_INTERVAL_STEP, 0))
+	interval_plus.pressed.connect(func(): _change_game_length(GameRules.ELECTION_INTERVAL_STEP, 0))
 	count_minus.pressed.connect(func(): _change_game_length(0, -1))
 	count_plus.pressed.connect(func(): _change_game_length(0, 1))
 
@@ -309,7 +313,7 @@ func _refresh_settings_display() -> void:
 	for key in world_controls:
 		var control: HSlider = world_controls[key]
 		control.set_value_no_signal(float(MultiplayerManager.world_settings[key]))
-		world_values[key].text = str(MultiplayerManager.world_settings[key]) + (" s" if key == "turn_seconds" else "")
+		world_values[key].text = str(MultiplayerManager.world_settings[key])
 		control.editable = MultiplayerManager.is_local_owner()
 	# Türkiye haritası: 81 il ve gerçek vekil dağılımı sabit; yalnız ulusal liste ayarlanır.
 	var turkey: bool = MultiplayerManager.world_settings["map_mode"] != "random"
@@ -330,6 +334,12 @@ func _refresh_settings_display() -> void:
 		button.set_pressed_no_signal(on)
 		button.disabled = not MultiplayerManager.is_local_owner() or turkey
 		UiSkin.skin_color_button(button, UiTheme.GOLD if on else UiTheme.PANEL_LIGHT)
+	for key in world_choice_buttons:
+		for button in world_choice_buttons[key]:
+			var on: bool = button.get_meta("value") == MultiplayerManager.world_settings[key]
+			button.set_pressed_no_signal(on)
+			button.disabled = not MultiplayerManager.is_local_owner()
+			UiSkin.skin_color_button(button, UiTheme.GOLD if on else UiTheme.PANEL_LIGHT)
 	for button in vote_time_buttons:
 		var selected := int(button.get_meta("seconds")) == MultiplayerManager.vote_timeout
 		UiSkin.skin_color_button(button, UiTheme.GOLD if selected else UiTheme.PANEL_LIGHT)
@@ -352,16 +362,17 @@ func _refresh_settings_display() -> void:
 	var t := MultiplayerManager.election_threshold
 	var interval := MultiplayerManager.election_interval
 	var count := MultiplayerManager.election_count
-	threshold_label.text = L.t("Baraj %%%s  ·  %d seçim, %d yılda bir (%d'den %d yıl)") % [_format_threshold(t), count, interval, GameRules.START_YEAR, interval * count]
-	interval_value_label.text = str(interval)
+	threshold_label.text = L.t("Baraj %%%s  ·  %d seçim, %s yılda bir (%d'den %s yıl)") % [_format_threshold(t), count,
+		GameRules.years_text(interval), GameRules.START_YEAR, GameRules.years_text(interval * count)]
+	interval_value_label.text = GameRules.years_text(interval)
 	count_value_label.text = str(count)
 	var years: Array = []
 	for i in range(1, count + 1):
-		years.append(str(GameRules.START_YEAR + interval * i))
+		years.append(_election_date(interval * i))
 	if years.size() > 5:
 		years = years.slice(0, 3) + ["…"] + years.slice(years.size() - 1)
-	game_length_summary.text = L.t("%d'de başlar, %d yıl sürer (bir tur 6 ay). Seçimler: %s.") % [GameRules.START_YEAR,
-		interval * count, ", ".join(PackedStringArray(years))]
+	game_length_summary.text = L.t("%d'de başlar, %s yıl sürer (bir tur 6 ay). Seçimler: %s.") % [GameRules.START_YEAR,
+		GameRules.years_text(interval * count), ", ".join(PackedStringArray(years))]
 	if MultiplayerManager.is_local_owner():
 		interval_minus.disabled = interval <= GameRules.ELECTION_INTERVAL_MIN
 		interval_plus.disabled = interval >= GameRules.ELECTION_INTERVAL_MAX
@@ -379,7 +390,13 @@ func _format_threshold(value: float) -> String:
 func _on_threshold_slider_changed(value: float) -> void:
 	MultiplayerManager.set_election_threshold(value)
 
-func _change_game_length(interval_delta: int, count_delta: int) -> void:
+## Başlangıçtan "years" yıl sonraki seçim: buçuklu ise yılın ortası ("2002 ortası").
+static func _election_date(years: float) -> String:
+	var whole := int(floor(years + 0.001))
+	var year := GameRules.START_YEAR + whole
+	return str(year) if is_equal_approx(years, float(whole)) else L.t("%d ortası") % year
+
+func _change_game_length(interval_delta: float, count_delta: int) -> void:
 	MultiplayerManager.set_game_length(MultiplayerManager.election_interval + interval_delta,
 		MultiplayerManager.election_count + count_delta)
 
@@ -434,9 +451,10 @@ func _build_settings_panel() -> void:
 	votes_box.add_child(votes_row)
 	for seconds in MultiplayerManager.VOTE_TIME_OPTIONS:
 		var button := Button.new()
-		button.text = "%d s" % seconds
+		button.text = str(seconds)
 		button.toggle_mode = true
-		button.custom_minimum_size = Vector2(56, 34)
+		button.focus_mode = Control.FOCUS_NONE
+		button.custom_minimum_size = Vector2(0, CHOICE_HEIGHT)
 		button.set_meta("seconds", seconds)
 		UiSkin.skin_button(button)
 		button.pressed.connect(func(): MultiplayerManager.set_vote_timeout(int(button.get_meta("seconds"))))
@@ -476,8 +494,31 @@ func _build_settings_panel() -> void:
 		button.pressed.connect(func(): MultiplayerManager.set_world_setting("province_scale", button.get_meta("value")))
 		density_row.add_child(button)
 		density_buttons.append(button)
-	for key in ["province_seats", "national_seats", "turn_seconds", "action_limit"]:
-		var target_box: VBoxContainer = _setting_sections["timing"] if key in ["turn_seconds", "action_limit"] else world_box
+	# TUR SÜRESİ ve MİTİNG / YATIRIM SINIRI: kaydırıcı değil, oylama süresi gibi
+	# düğmeler (0.0.239). Seçenek arttıkça düğmeler daralır, yükseklik aynı kalır.
+	for key in ["turn_seconds", "action_limit"]:
+		var timing: VBoxContainer = _setting_sections["timing"]
+		timing.add_child(HSeparator.new())
+		var heading_text := L.t("TUR SÜRESİ") if key == "turn_seconds" else L.t("SIRADA MİTİNG / YATIRIM SINIRI")
+		timing.add_child(UiTheme.mono_label(heading_text, 12, SECTION_COLOR, true))
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 6)
+		timing.add_child(row)
+		var buttons: Array = []
+		for value in MultiplayerManager.WORLD_OPTIONS[key]:
+			var button := Button.new()
+			button.text = str(value)
+			button.toggle_mode = true
+			button.focus_mode = Control.FOCUS_NONE
+			button.custom_minimum_size = Vector2(0, CHOICE_HEIGHT)
+			button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			button.set_meta("value", value)
+			button.pressed.connect(func(): MultiplayerManager.set_world_setting(key, button.get_meta("value")))
+			row.add_child(button)
+			buttons.append(button)
+		world_choice_buttons[key] = buttons
+	for key in ["province_seats", "national_seats"]:
+		var target_box: VBoxContainer = world_box
 		world_values[key] = _value_row(target_box, labels[key])
 		var control := HSlider.new()
 		var values: Array = MultiplayerManager.WORLD_OPTIONS[key]

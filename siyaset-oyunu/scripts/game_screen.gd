@@ -137,7 +137,7 @@ const PLAY_POP_DURATION := 0.18   # ortada küçülüp "puf" kaybolma
 ## Kartı sürükleyip bırakınca atmaya yarayan çöp kutusu.
 ## Anayasa paketi: oyuncunun seçtiği baraj ve seçim aralığı.
 var _constitution_threshold: float = 0.0
-var _constitution_interval: int = 4
+var _constitution_interval: float = GameRules.DEFAULT_ELECTION_INTERVAL
 var _constitution_threshold_label: Label
 var _constitution_interval_label: Label
 var _constitution_button: Button
@@ -3800,7 +3800,7 @@ func _build_action_buttons() -> void:
 	_funds_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	amount_box.add_child(_funds_label)
 	var unit := Label.new()
-	unit.text = L.t("milyon ¤")
+	unit.text = L.t("milyon")  # simge levhanın solunda (CoinIcon), yazıda tekrar etmez
 	unit.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	unit.add_theme_font_override("font", UiTheme.mono(true))
 	unit.add_theme_font_size_override("font_size", 10)
@@ -4417,9 +4417,9 @@ func _build_constitution_section(box: VBoxContainer) -> void:
 	_constitution_interval_label = UiTheme.mono_label("", UiTheme.FS_SMALL)
 	_constitution_interval_label.custom_minimum_size.x = 48
 	_constitution_interval_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	interval_row.add_child(_stepper_button("−", func(): _change_constitution(0.0, -1)))
+	interval_row.add_child(_stepper_button("−", func(): _change_constitution(0.0, -GameRules.ELECTION_INTERVAL_STEP)))
 	interval_row.add_child(_constitution_interval_label)
-	interval_row.add_child(_stepper_button("+", func(): _change_constitution(0.0, 1)))
+	interval_row.add_child(_stepper_button("+", func(): _change_constitution(0.0, GameRules.ELECTION_INTERVAL_STEP)))
 	grid.add_child(interval_row)
 
 	# Sayım yöntemi: D'Hondt / Hare / Kazanan hepsini alır.
@@ -4472,23 +4472,22 @@ func _stepper_button(text: String, action: Callable) -> Button:
 	button.pressed.connect(action)
 	return button
 
-func _change_constitution(threshold_delta: float, interval_delta: int) -> void:
+func _change_constitution(threshold_delta: float, interval_delta: float) -> void:
 	_constitution_threshold = clampf(_constitution_threshold + threshold_delta, 0.0, 10.0)
-	_constitution_interval = clampi(_constitution_interval + interval_delta,
-		GameRules.ELECTION_INTERVAL_MIN, GameRules.ELECTION_INTERVAL_MAX)
+	_constitution_interval = GameRules.snap_interval(_constitution_interval + interval_delta)
 	_refresh_constitution_section()
 
 func _refresh_constitution_section() -> void:
 	if _constitution_threshold_label == null:
 		return
 	_constitution_threshold_label.text = L.t("%%%s") % String.num(_constitution_threshold, 1)
-	_constitution_interval_label.text = L.t("%d yıl") % _constitution_interval
+	_constitution_interval_label.text = L.t("%s yıl") % GameRules.years_text(_constitution_interval)
 	_constitution_method_label.text = ElectionModel.method_title(_constitution_method)
 	var me := multiplayer.get_unique_id()
 	var can := CardManager.can_propose_constitution(me)
 	_constitution_button.disabled = not can
 	var needed := GovernmentManager.constitution_threshold_seats()
-	var changed: bool = not is_equal_approx(_constitution_threshold, MultiplayerManager.election_threshold) 		or _constitution_interval != MultiplayerManager.election_interval \
+	var changed: bool = not is_equal_approx(_constitution_threshold, MultiplayerManager.election_threshold) 		or not is_equal_approx(_constitution_interval, MultiplayerManager.election_interval) \
 		or _constitution_method != MultiplayerManager.seat_method \
 		or _constitution_alliances.button_pressed != CardManager.alliances_enabled
 	if not changed:

@@ -37,7 +37,7 @@ func run() -> void:
 	affinity["emekli"] = 90.0
 	var votes: Dictionary = model.shares_in_group(party_groups, "emekli")
 	check(float(votes[1]) > 0.9, "targeted party captures retired electorate")
-	mm._apply_world_settings({"province_scale": 0.75, "province_seats": 150, "national_seats": 0, "turn_seconds": 30})
+	mm._apply_world_settings({"province_scale": 0.75, "province_seats": 150, "national_seats": 0, "turn_seconds": 45})
 	var outcome: Dictionary = model.compute(party_groups, {"small": 50, "metro": 100}, profiles, 0.0, rng)
 	var seat_sum := 0
 	for value in outcome["seats"].values():
@@ -45,8 +45,14 @@ func run() -> void:
 	check(seat_sum == 150, "zero national list and total seats")
 	check(model.NATIONAL_LIST_SEATS == 0, "national list setting")
 	var rules = load("res://scripts/game_rules.gd")
-	check(rules.TURN_TIMEOUT == 30.0, "turn timeout setting")
+	check(rules.TURN_TIMEOUT == 45.0, "turn timeout setting")
+	mm._apply_world_settings({"turn_seconds": 30, "action_limit": 7})
+	check(int(mm.world_settings["turn_seconds"]) == 75 and int(mm.world_settings["action_limit"]) == 5, "old out-of-range values fall back to defaults")
 	rules.configure(1, 5)
 	check(rules.ELECTION_INTERVAL == 2, "one year election interval")
+	rules.configure(2.5, 5)
+	check(rules.ELECTION_INTERVAL == 5 and rules.MAX_ROUNDS == 25, "half-year election interval (2.5 years = 5 rounds)")
+	check(is_equal_approx(rules.snap_interval(2.3), 2.5) and is_equal_approx(rules.snap_interval(0.2), 1.0), "interval snaps to half years")
+	rules.configure(1, 5)
 	mm._apply_world_settings(mm.WORLD_DEFAULTS)
 	quit(1 if fails else 0)

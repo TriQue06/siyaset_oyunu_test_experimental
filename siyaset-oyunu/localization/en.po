@@ -3,6 +3,27 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: en\n"
 
+msgid "%s yıl"
+msgstr "%s yr"
+
+msgid " Yeni baraj %%%s, seçimler %s yılda bir, sayım: %s."
+msgstr " New threshold %s%%, elections every %s years, counting: %s."
+
+msgid "Baraj %%%s  ·  %d seçim, %s yılda bir (%d'den %s yıl)"
+msgstr "Threshold %s%%  ·  %d elections every %s years (from %d, %s years)"
+
+msgid "%d'de başlar, %s yıl sürer (bir tur 6 ay). Seçimler: %s."
+msgstr "Starts in %d, lasts %s years (one turn is 6 months). Elections: %s."
+
+msgid "%d ortası"
+msgstr "mid-%d"
+
+msgid "TUR SÜRESİ"
+msgstr "TURN TIME"
+
+msgid "SIRADA MİTİNG / YATIRIM SINIRI"
+msgstr "RALLY / INVESTMENT LIMIT PER TURN"
+
 msgid "Afet yardımı parti kasasından yapılır; devlet hazinesi yalnız yatırım içindir."
 msgstr "Disaster aid is paid from the party treasury; the state treasury is only for investment."
 

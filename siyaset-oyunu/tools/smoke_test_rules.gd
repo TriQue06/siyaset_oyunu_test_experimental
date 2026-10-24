@@ -751,6 +751,33 @@ func _initialize() -> void:
 	cm._apply_state(packed_cal)
 	check("kayit / istemci: uzayan oyun durumla tasinir", GameRules.MAX_ROUNDS == 18)
 
+	# 0.0.239: ERKEN SEÇİMLER SEÇİM SAYISINA DAHİL. Yalnız son seçim kalmışken
+	# yapılan erken seçim oyunun son seçimidir (eskiden bir seçim daha eklenirdi).
+	GameRules.configure(2, 5)
+	new_game({1: groups(), 2: groups(), 3: groups()})
+	cm.last_seats = {1: 150, 2: 200, 3: 150}
+	cm.last_election_round = 16
+	cm.round_number = 18
+	cm.schedule_early_election()
+	cm._finish_round()
+	check("son secim kalmisken erken secim oyunun son secimi", GameRules.MAX_ROUNDS == 18 and cm.final_election_pending,
+		"son tur %d, final %s" % [GameRules.MAX_ROUNDS, str(cm.final_election_pending)])
+	# Hükümet kurulamadığı için yapılan seçim de erken seçim sayılır: takvim kayar, sayı korunur.
+	GameRules.configure(2, 5)
+	new_game({1: groups(), 2: groups(), 3: groups()})
+	cm.last_seats = {1: 150, 2: 200, 3: 150}
+	cm.last_election_round = 4
+	cm.round_number = 6
+	gm.government = {}
+	gm._set_phase(gm.Phase.IDLE)
+	cm._finish_round()
+	var cal2: Array = []
+	for rr in range(7, GameRules.MAX_ROUNDS + 1):
+		if GameRules.is_election_round(rr):
+			cal2.append(rr)
+	check("hukumetsizlik secimi de sayiya dahil: 10, 14, 18", cm.last_election_round == 6 and cal2 == [10, 14, 18],
+		"%s, son tur %d" % [str(cal2), GameRules.MAX_ROUNDS])
+
 	print("")
 	print("=== 17) SECIM SONRASI SIRA, AFET, SON TURDA ERKEN SECIM ===")
 	GameRules.configure(2, 5)  # 4, 8, 12, 16, 20

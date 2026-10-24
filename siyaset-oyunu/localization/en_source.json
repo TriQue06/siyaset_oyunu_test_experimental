@@ -1,4 +1,11 @@
 {
+"%s yıl": "%s yr",
+" Yeni baraj %%%s, seçimler %s yılda bir, sayım: %s.": " New threshold %s%%, elections every %s years, counting: %s.",
+"Baraj %%%s  ·  %d seçim, %s yılda bir (%d'den %s yıl)": "Threshold %s%%  ·  %d elections every %s years (from %d, %s years)",
+"%d'de başlar, %s yıl sürer (bir tur 6 ay). Seçimler: %s.": "Starts in %d, lasts %s years (one turn is 6 months). Elections: %s.",
+"%d ortası": "mid-%d",
+"TUR SÜRESİ": "TURN TIME",
+"SIRADA MİTİNG / YATIRIM SINIRI": "RALLY / INVESTMENT LIMIT PER TURN",
 "Afet yardımı parti kasasından yapılır; devlet hazinesi yalnız yatırım içindir.": "Disaster aid is paid from the party treasury; the state treasury is only for investment.",
 "Sıran gelince önce kartını çekersin. Teşkilat, miting ve yatırım için haritada bir ile dokun. MECLİS düğmesi gensoru, grup toplantısı ve yasayı sırayla açar; istersen hiç girmeden turu bitirebilirsin.": "When your turn comes, you draw your card first. Tap a province on the map for organization, rallies and investment. The PARLIAMENT button opens the censure motion, group meeting and law in order; you can also end your turn without entering.",
 "Hükümettesin: vergi kademesini meclise sunabilir, devlet hazinesinden il yatırımı yapabilirsin. Vergi indirimi seçmene yavaş yansır, seçimden birkaç dönem önce yap. Hazineden payın bakanlıklarına göredir; miting ve yardım parti kasasından ödenir.": "You are in government: you can bring the tax level to parliament and invest in provinces from the state treasury. Tax cuts reach voters slowly, so do them a few terms before the election. Your share of the treasury follows your ministries; rallies and aid are paid from the party treasury.",

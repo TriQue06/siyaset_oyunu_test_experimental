@@ -4173,36 +4173,45 @@ func _finish_round() -> void:
 	if finished_round < GameRules.MAX_ROUNDS and not will_elect:
 		_roll_disaster()
 
-	if finished_round >= GameRules.MAX_ROUNDS:
-		# SON SEÇİM: kurulan hükümet puanlarını alınca oyun biter (bkz. on_block_state_changed).
-		final_election_pending = true
-		_hold_election(finished_round, false)
-		return
-
-	# ERKEN SEÇİM: meclis karar verdiyse bu dönemin sonunda sandık kurulur ve
-	# takvim bu tura sabitlenir — sonraki seçimler buradan itibaren sayılır.
-	if early_election_pending:
-		early_election_pending = false
-		# Erken seçim sıradaki olağan seçimin YERİNE geçer: ondan sonraki
-		# olağan seçimler kadar seçim kalır, hepsi buradan itibaren aralıkla.
-		var remaining := 0
-		for r in range(finished_round + 1, GameRules.MAX_ROUNDS + 1):
-			if GameRules.is_election_round(r):
-				remaining += 1
-		election_anchor = finished_round
-		GameRules.set_election_anchor(election_anchor)
-		max_rounds_override = finished_round + maxi(1, remaining - 1) * GameRules.ELECTION_INTERVAL
-		GameRules.set_max_rounds_override(max_rounds_override)
-		_hold_election(finished_round, false)
-		_schedule_agenda()
-		return
-
 	var scheduled := GameRules.is_election_round(finished_round)
 	var no_government := not last_seats.is_empty() \
 		and not GovernmentManager.has_government() \
 		and GovernmentManager.phase == GovernmentManager.Phase.IDLE
-	if scheduled or no_government:
-		_hold_election(finished_round, no_government and not scheduled)
+	# ERKEN SEÇİM (meclis kararı ya da kurulamayan hükümet) lobideki seçim
+	# SAYISINA DAHİLDİR (0.0.239): sıradaki olağan seçimin yerine geçer. Ondan
+	# sonra kalan seçim yoksa bu erken seçim oyunun SON seçimidir.
+	var early := finished_round < GameRules.MAX_ROUNDS and not scheduled and (early_election_pending or no_government)
+	var left_after := 0
+	if early:
+		for r in range(finished_round + 1, GameRules.MAX_ROUNDS + 1):
+			if GameRules.is_election_round(r):
+				left_after += 1
+		left_after -= 1
+		if left_after <= 0:
+			max_rounds_override = finished_round
+			GameRules.set_max_rounds_override(max_rounds_override)
+
+	if finished_round >= GameRules.MAX_ROUNDS:
+		# SON SEÇİM: kurulan hükümet puanlarını alınca oyun biter (bkz. on_block_state_changed).
+		early_election_pending = false
+		final_election_pending = true
+		_hold_election(finished_round, early and no_government and not early_election_pending)
+		return
+
+	# Erken seçim: takvim bu tura sabitlenir — kalan seçimler buradan itibaren aralıkla.
+	if early:
+		var by_parliament := early_election_pending
+		early_election_pending = false
+		election_anchor = finished_round
+		GameRules.set_election_anchor(election_anchor)
+		max_rounds_override = finished_round + left_after * GameRules.ELECTION_INTERVAL
+		GameRules.set_max_rounds_override(max_rounds_override)
+		_hold_election(finished_round, not by_parliament)
+		_schedule_agenda()
+		return
+
+	if scheduled:
+		_hold_election(finished_round, false)
 	else:
 		_decay_opinion()
 		_begin_round_turn()

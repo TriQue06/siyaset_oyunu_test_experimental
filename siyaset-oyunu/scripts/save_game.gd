@@ -150,7 +150,7 @@ static func apply(data: Dictionary) -> void:
 	mm.players = saved_mm["players"]
 	mm.owner_id = int(saved_mm.get("owner_id", mm.owner_id))
 	mm.election_threshold = float(saved_mm.get("election_threshold", mm.election_threshold))
-	mm.election_interval = int(saved_mm.get("election_interval", mm.election_interval))
+	mm.election_interval = GameRules.snap_interval(float(saved_mm.get("election_interval", mm.election_interval)))
 	mm._apply_world_settings(saved_mm.get("world_settings", mm.WORLD_DEFAULTS))
 	mm.vote_timeout = int(saved_mm.get("vote_timeout", 30))
 	mm.election_count = int(saved_mm.get("election_count", mm.election_count))

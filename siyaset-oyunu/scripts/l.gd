@@ -15,7 +15,8 @@ const LOCALES := ["tr", "en"]
 const LOCALE_NAMES := {"tr": "Türkçe", "en": "English"}
 
 static func t(text: String) -> String:
-	return String(TranslationServer.translate(text))
+	# Para birimi karakteri gösterilmez: "¤" yer tutucusu simgeye döner (MoneyIcon).
+	return MoneyIcon.apply(String(TranslationServer.translate(text)))
 
 static func is_en() -> bool:
 	return TranslationServer.get_locale().begins_with("en")

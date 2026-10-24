@@ -2166,6 +2166,7 @@ func _fit_hand_width(count: int) -> void:
 			separation = int(floor((available - count * CARD_DISPLAY_SIZE.x) / float(count - 1)))
 	hand_container.add_theme_constant_override("separation", separation)
 
+var _live_mouse := Vector2(-1, -1)
 var _deferred_ui: Dictionary = {}
 
 func _run_deferred_ui(name: String) -> void:
@@ -2176,6 +2177,8 @@ func _run_deferred_ui(name: String) -> void:
 		return
 	if is_inside_tree():
 		call(name + "_now")
+var _live_wait := 0.0
+
 func _process(delta: float) -> void:
 	_refresh_countdowns()
 	_update_vote_swap(delta)
@@ -2183,6 +2186,14 @@ func _process(delta: float) -> void:
 	_refresh_timer_bar()
 	if _smear_ghost != null:
 		_update_smear_drag()
+	# Fare kımıldamadıysa il / parti tespiti her karede yapılmaz (performans);
+	# yine de arada bir tazelenir (altındaki içerik değişmiş olabilir).
+	var mouse := get_viewport().get_mouse_position()
+	_live_wait -= delta
+	if mouse != _live_mouse or _live_wait <= 0.0:
+		_live_mouse = mouse
+		_live_wait = 0.25
+		_update_live_province()
 
 	var i := _hand_holders.size() - 1
 	while i >= 0:
@@ -2683,12 +2694,44 @@ func _on_province_clicked(province_id: String) -> void:
 	_show_province_info(province_id)
 	_pinned = true
 
-## İL BİLGİSİ sağ sütunda ("Seçili"): ile tıklayınca açılır.
+## İL BİLGİSİ sağ sütunda ("Seçili"). Fare haritada dolaşırken canlı olarak
+## değişir (bkz. _update_live_province); tıklamak da aynı bilgiyi gösterir.
 var _live_province := ""
 
-## 0.0.246: fareyle (hover) inceleme kaldırıldı; il ve parti bilgisi yalnız
-## TIKLAYINCA sağ panelde açılır (_pinned: ✕, sekme ya da tekrar tıklama kapatır).
+## Fare haritada bir ilin üstündeyse (hedef seçme yokken) o ilin bilgisi
+## tıklamadan sağda gösterilir. Haritadan çıkınca son il ekranda kalır.
+## FAREYLE İNCELEME (panel modu): ilin ya da parti plaketinin üstüne gelince
+## bilgisi sağ panelde GEÇİCİ açılır, fare çekilince kapanır ve en son
+## açık sekmeye dönülür. TIKLAMA kalıcı açar (_pinned): fare gezinse de değişmez.
 var _pinned := false
+
+func _update_live_province() -> void:
+	if _window_mode() or _pinned:
+		return
+	if _pending_org or _pending_miting or _pending_invest or _pending_province_hand_index != -1 			or _pending_target_hand_index != -1 or _layer_switching or not is_visible_in_tree():
+		return
+	var mouse := get_viewport().get_mouse_position()
+	# Fare sağ paneldeyse açık olan bilgi kalır (kaydırılabilsin).
+	if left_panel.get_global_rect().has_point(mouse):
+		return
+	var party := _party_under_mouse()
+	if party != -1:
+		if _profile_peer_id != party:
+			_profile_peer_id = party
+			_show_tooltip_for(party)
+		return
+	var province_id := _province_under_mouse()
+	if province_id != "":
+		if not (province_id == _live_province and _province_panel != null and _province_panel.visible):
+			_show_province_info(province_id)
+		return
+	# Hiçbir şeyin üstünde değil: geçici bilgi kapanır, en son açık olan
+	# sekmeye (Hükümet ya da Log) dönülür.
+	if _left_dock != null and _left_dock.visible:
+		if _profile_peer_id != -1:
+			_hide_profile()
+		if _province_panel != null and _province_panel.embedded_mode and _province_panel.visible:
+			_province_panel.hide()
 
 func _show_province_info(province_id: String) -> void:
 	# Ayar değiştiyse eski türdeki il paneli atılır.

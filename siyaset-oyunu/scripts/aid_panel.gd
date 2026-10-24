@@ -146,8 +146,8 @@ func _refresh() -> void:
 		return
 	var party_m := _party_slider.value
 	var state_m := _state_slider.value
-	_party_value.text = L.t("%s milyon ¤") % Economy.money_text(party_m)
-	_state_value.text = L.t("%s milyon ¤") % Economy.money_text(state_m)
+	_party_value.text = Economy.money_full(party_m)
+	_state_value.text = Economy.money_full(state_m)
 	var provinces: Array = active.get("provinces", [])
 	var prev := CardManager.disaster_aid_of(peer_id)
 	var total := party_m + state_m
@@ -159,7 +159,7 @@ func _refresh() -> void:
 	_note.remove_theme_color_override("font_color")
 	_note.add_theme_color_override("font_color", UiTheme.RED if reason != "" else UiTheme.TEXT_MUTED)
 	if reason == "":
-		_confirm.text = L.t("YARDIM GÖTÜR · %s milyon ¤") % Economy.money_text(total)
+		_confirm.text = L.t("YARDIM GÖTÜR · %s") % Economy.money_full(total)
 		UiSkin.skin_color_button(_confirm, UiTheme.GREEN_DARK)
 		_confirm.disabled = false
 	else:

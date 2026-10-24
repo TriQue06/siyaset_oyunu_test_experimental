@@ -369,7 +369,9 @@ func _initialize() -> void:
 	print("")
 	print("=== 10) GÖSTERİM YARDIMCILARI ===")
 	check("para biçimi", Economy.money_text(1240.0) == "1.240" and Economy.money_text(-5.0) == "−5"
-		and Economy.money_full(100.0) == "100 milyon " + MoneyIcon.GLYPH)
+		and Economy.money_full(100.0) == MoneyIcon.GLYPH + " 100 M")
+	check("milyonun altı bin (B), simge başta", GameRules.money(0.59) == MoneyIcon.GLYPH + " 590 B" and GameRules.amount(2.5) == "2,5 M"
+		and GameRules.amount(1240.0) == "1.240 M" and GameRules.amount(-5.0) == "−5 M", GameRules.money(0.59))
 	check("para karakteri gösterilmez (yer tutucu simgeye döner)", not Economy.money_full(100.0).contains("¤")
 		and not GameRules.cost_text(15.0).contains("¤"))
 	check("yüzde biçimi", Economy.percent_text(8.44) == "%8,4")

@@ -1855,7 +1855,7 @@ func _player_row_values(peer_id: int, is_self: bool) -> Array:
 		_:
 			# PARA GİZLİ: kimse rakibinin kasasını göremez.
 			if is_self:
-				return [_table_value(CardManager.funds_text(CardManager.funds_of(peer_id)), 58.0, FUNDS_COLOR)]
+				return [_table_value(GameRules.money(CardManager.funds_of(peer_id)), 58.0, FUNDS_COLOR)]
 			return [_table_value("·", 58.0, UiTheme.TEXT_DIM)]
 
 ## Bir durum güncellemesinde birkaç sinyal aynı paneli yeniden kuruyordu
@@ -3800,13 +3800,6 @@ func _build_action_buttons() -> void:
 	_funds_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	amount_box.add_child(_funds_label)
 	var unit := Label.new()
-	unit.text = L.t("milyon")  # simge levhanın solunda (CoinIcon), yazıda tekrar etmez
-	unit.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	unit.add_theme_font_override("font", UiTheme.mono(true))
-	unit.add_theme_font_size_override("font_size", 10)
-	unit.add_theme_color_override("font_color", FUNDS_COLOR.lightened(0.25))
-	unit.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	amount_box.add_child(unit)
 	_funds_plate.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_show_toast(_funds_rules))
@@ -3931,7 +3924,8 @@ func _refresh_action_buttons() -> void:
 	if _parl_button == null:
 		return
 	var me := multiplayer.get_unique_id()
-	_funds_label.text = CardManager.funds_text(CardManager.funds_of(me))
+	# "190 M": simge levhanın solunda (CoinIcon), yazıda tekrar etmez.
+	_funds_label.text = GameRules.amount(CardManager.funds_of(me))
 	# disabled kullanılmıyor: pasif butona dokununca neden olmadığı uyarı olarak çıksın.
 	_set_action_available(_congress_button, CardManager.can_call_congress(me) or _pending_congress)
 	_set_action_text(_congress_button, L.t("KONGRE"), _congress_cost_text())
@@ -4650,8 +4644,8 @@ func _on_economy_event(data: Dictionary) -> void:
 ## bakiyesi, etkinin zamanlaması.
 func _invest_preview(pname: String) -> String:
 	var before := CardManager.state_treasury()
-	return L.t("%s yatırımı · devlet hazinesi %s → %s milyon ¤\nGüçlü yerel etki: yarısı hemen, kalanı %d dönemde · ekonomi canlanır") % [
-		pname, Economy.money_text(before), Economy.money_text(before - Economy.INVEST_COST), Economy.INVEST_DELAY_ROUNDS]
+	return L.t("%s yatırımı · devlet hazinesi %s → %s\nGüçlü yerel etki: yarısı hemen, kalanı %d dönemde · ekonomi canlanır") % [
+		pname, Economy.money_full(before), Economy.money_full(before - Economy.INVEST_COST), Economy.INVEST_DELAY_ROUNDS]
 
 static func _one_decimal(value: float) -> String:
 	if is_equal_approx(value, roundf(value)):

@@ -249,9 +249,9 @@ static func snap_share(state: float) -> float:
 static func money_text(value: float) -> String:
 	return L.thousands(value)
 
-## "1.240 milyon ¤"
+## "¤ 1.240 M" (simge başta; bkz. GameRules.money)
 static func money_full(value: float) -> String:
-	return L.t("%s milyon ¤") % money_text(value)
+	return GameRules.money(value)
 
 ## "%8,4"
 static func percent_text(value: float) -> String:

@@ -150,10 +150,14 @@ func _make_treasury_row() -> Control:
 	cap.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	cap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	line.add_child(cap)
+	# Para simgesi tutarın solunda ("¤ 200 M").
+	var icon := UiTheme.mono_label(L.t("¤"), VALUE_SIZE + 1, UiTheme.GOLD, true)
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	line.add_child(icon)
 	var value := UiTheme.mono_label("—", VALUE_SIZE + 1, UiTheme.GOLD, true)
 	value.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	line.add_child(value)
-	var unit := UiTheme.mono_label(L.t("milyon ¤"), DELTA_SIZE, UiTheme.TEXT_MUTED)
+	var unit := UiTheme.mono_label(L.t("M"), DELTA_SIZE, UiTheme.TEXT_MUTED)
 	unit.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	unit.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	line.add_child(unit)
@@ -228,7 +232,7 @@ func refresh() -> void:
 		(_tiles["treasury"]["panel"] as Control).tooltip_text += "
 " + L.t("Bu dönemki kotan: %s (bakanlık puanına göre hazinenin %%%d'i).") % [
 			Economy.money_full(CardManager.state_quota(me)), int(round(CardManager.quota_share(CardManager.party_of(me)) * 100.0))]
-	_income_label.text = L.t("+%s / dönem") % Economy.money_text(CardManager.expected_revenue())
+	_income_label.text = L.t("+%s / dönem") % GameRules.amount(CardManager.expected_revenue())
 	var election := not election_headline().is_empty()
 	# Sandık öncesi: özet göstergelerin yerini alır (hazine ve vergi özette).
 	_indicators.visible = not election
@@ -333,7 +337,7 @@ static func _fill_summary(box: VBoxContainer, headline: Array) -> void:
 		tax_text += L.t(" · yerleşik")
 	box.add_child(_summary_row(L.t("Vergi"), tax_text))
 	box.add_child(_summary_row(L.t("Hazine"), L.t("%s · +%s / dönem") % [Economy.money_full(float(econ["treasury"])),
-		Economy.money_text(CardManager.expected_revenue())]))
+		GameRules.amount(CardManager.expected_revenue())]))
 	var pending: Array = econ.get("investments", [])
 	if pending.is_empty():
 		box.add_child(_summary_row(L.t("Yatırım"), L.t("süren yatırım yok")))
@@ -423,12 +427,12 @@ func play_event(data: Dictionary) -> void:
 				refresh()
 				return  # tamamı parti kasasından: hazine değişmedi
 			_count_treasury(float(data.get("before", CardManager.state_treasury())), float(data.get("after", CardManager.state_treasury())))
-			_float_text("treasury", "−%s" % Economy.money_text(float(data.get("cost", 0.0))), UiTheme.RED)
+			_float_text("treasury", "−%s" % GameRules.amount(float(data.get("cost", 0.0))), UiTheme.RED)
 			_flash("treasury", UiTheme.RED)
 		"round":
 			var revenue := float(data.get("revenue", 0.0))
 			_count_treasury(CardManager.state_treasury() - revenue, CardManager.state_treasury())
-			_float_text("treasury", "+%s" % Economy.money_text(revenue), UiTheme.GREEN)
+			_float_text("treasury", "+%s" % GameRules.amount(revenue), UiTheme.GREEN)
 			_flash("treasury", UiTheme.GREEN)
 			for key in ["index", "inflation", "unemployment"]:
 				_flash(key, UiTheme.GOLD)
@@ -562,11 +566,11 @@ static func _policy_card(me: int, level: int, current: int, selected: int, on_se
 	name.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(name)
 	var revenue := CardManager.expected_revenue(level)
-	var money := UiTheme.mono_label("+%s" % Economy.money_text(revenue), 16, UiTheme.TEXT, true)
+	var money := UiTheme.mono_label(L.t("¤ %s") % ("+" + GameRules.amount(revenue)), 16, UiTheme.TEXT, true)
 	money.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(money)
 	var diff := revenue - CardManager.expected_revenue(current)
-	var sub := L.t("milyon ¤ / dönem") if is_current else L.t("%s%s / dönem") % ["+" if diff > 0.0 else "−", Economy.money_text(absf(diff))]
+	var sub := L.t("dönem başına") if is_current else L.t("%s%s / dönem") % ["+" if diff > 0.0 else "−", GameRules.amount(absf(diff))]
 	box.add_child(PopupKit.label(sub, 9, UiTheme.TEXT_DIM if is_current else (UiTheme.GREEN if diff > 0.0 else UiTheme.RED)))
 	# Seçmen etkisi (tam yerleşince başbakanın partisinde, şimdiki kademeye göre).
 	var effects := _tax_mood_change(level, current)
@@ -616,7 +620,7 @@ static func _fill_policy_detail(detail: VBoxContainer, me: int, level: int, curr
 	detail.add_child(UiTheme.mono_label(CardPresets.card_title(law_type), 13, TAX_COLORS[level], true))
 	var revenue_now := CardManager.expected_revenue(current)
 	var revenue_new := CardManager.expected_revenue(level)
-	detail.add_child(PopupKit.kv(L.t("Hazine geliri"), L.t("%s → %s milyon ¤ / dönem") % [Economy.money_text(revenue_now), Economy.money_text(revenue_new)],
+	detail.add_child(PopupKit.kv(L.t("Hazine geliri"), L.t("%s → %s / dönem") % [Economy.money_full(revenue_now), Economy.money_full(revenue_new)],
 		UiTheme.GREEN if revenue_new > revenue_now else UiTheme.RED))
 	var after := Economy.pressure_after_change(float(CardManager.economy["pressure"]), level)
 	var probe := {"tax": level, "pressure": after}

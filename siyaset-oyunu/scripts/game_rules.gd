@@ -105,12 +105,26 @@ const FUNDS_PER_ROUND := 30
 ## Hükümette görevi olan partiler dönemde 10 milyon ¤ fazla alır (iktidar avantajı).
 const FUNDS_PER_ROUND_GOVERNMENT := 40
 ## BEDEL YAZISI: ücretsiz hamleler her yerde "bedelsiz" diye geçer ("bedava"
-## ya da "0 milyon ¤" değil). Para cezası ve finansman paylaşımı yüzünden
-## ondalık da gerekirse basılır.
+## ya da "¤ 0 M" değil).
 static func cost_text(cost: float) -> String:
 	if cost <= 0.0:
 		return L.t("bedelsiz")
-	return L.t("%s milyon ¤") % money_text(cost)
+	return money(cost)
+
+## PARA YAZISI (0.0.240): simge EN BAŞTA, sonra tutar ve birim: "¤ 10 M".
+## Tutarlar milyon cinsindendir; 1 milyonun altı bin olarak yazılır ("¤ 590 B";
+## İngilizcede "K"). "¤" yer tutucusu L.t() içinde simgeye döner (MoneyIcon).
+static func money(value_million: float) -> String:
+	return L.t("¤ %s") % amount(value_million)
+
+## Simgesiz tutar ve birim: "10 M", "2,5 M", "1.240 M", "590 B".
+static func amount(value_million: float) -> String:
+	var v := absf(value_million)
+	var sign := "−" if value_million < 0.0 else ""
+	if v > 0.0 and v < 1.0:
+		return sign + L.t("%s B") % str(int(roundf(v * 1000.0)))
+	var text := L.thousands(v) if is_equal_approx(v, roundf(v)) else L.dec(v, 1)
+	return sign + L.t("%s M") % text
 
 ## Tutar yazısı (milyon ¤, birimsiz): tam sayıysa "15", değilse "2,5".
 static func money_text(value: float) -> String:

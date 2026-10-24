@@ -1,4 +1,12 @@
 {
+"YARDIM GÖTÜR · %s": "SEND RELIEF · %s",
+"¤ %s": "¤ %s",
+"dönem başına": "per term",
+"%s → %s / dönem": "%s → %s / term",
+"%s B": "%s K",
+"%s M": "%s M",
+"%s yatırımı · devlet hazinesi %s → %s\nGüçlü yerel etki: yarısı hemen, kalanı %d dönemde · ekonomi canlanır": "%s investment · state treasury %s → %s\nStrong local effect: half now, the rest within %d terms · the economy picks up",
+"Botların dönemlik geliri ve bağış kampanyaları seçilen tutar kadar (¤ M) azalır. 0 = zayıflatma yok.": "Bots' income per term and fundraising campaigns are reduced by the chosen amount (¤ M). 0 = no handicap.",
 "%s yıl": "%s yr",
 " Yeni baraj %%%s, seçimler %s yılda bir, sayım: %s.": " New threshold %s%%, elections every %s years, counting: %s.",
 "Baraj %%%s  ·  %d seçim, %s yılda bir (%d'den %s yıl)": "Threshold %s%%  ·  %d elections every %s years (from %d, %s years)",

@@ -3,6 +3,24 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: en\n"
 
+msgid "YARDIM GÖTÜR · %s"
+msgstr "SEND RELIEF · %s"
+
+msgid "dönem başına"
+msgstr "per term"
+
+msgid "%s → %s / dönem"
+msgstr "%s → %s / term"
+
+msgid "%s B"
+msgstr "%s K"
+
+msgid "%s yatırımı · devlet hazinesi %s → %s\nGüçlü yerel etki: yarısı hemen, kalanı %d dönemde · ekonomi canlanır"
+msgstr "%s investment · state treasury %s → %s\nStrong local effect: half now, the rest within %d terms · the economy picks up"
+
+msgid "Botların dönemlik geliri ve bağış kampanyaları seçilen tutar kadar (¤ M) azalır. 0 = zayıflatma yok."
+msgstr "Bots' income per term and fundraising campaigns are reduced by the chosen amount (¤ M). 0 = no handicap."
+
 msgid "%s yıl"
 msgstr "%s yr"
 

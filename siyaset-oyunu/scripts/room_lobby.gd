@@ -560,7 +560,7 @@ func _build_settings_panel() -> void:
 		MultiplayerManager.AWAY_BOT if on else MultiplayerManager.AWAY_PASSIVE))
 	away_box.add_child(away_bot_check)
 
-	var bot_box := _section(L.t("BOT GELİR ZAYIFLATMASI"), L.t("Botların dönemlik geliri ve bağış kampanyaları seçilen tutar kadar (milyon ¤) azalır. 0 = zayıflatma yok."))
+	var bot_box := _section(L.t("BOT GELİR ZAYIFLATMASI"), L.t("Botların dönemlik geliri ve bağış kampanyaları seçilen tutar kadar (¤ M) azalır. 0 = zayıflatma yok."))
 	var bot_row := HBoxContainer.new()
 	bot_row.add_theme_constant_override("separation", 6)
 	bot_box.add_child(bot_row)

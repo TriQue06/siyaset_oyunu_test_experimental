@@ -135,7 +135,6 @@ func _build_header() -> void:
 	texts.add_child(sub)
 	var info := Button.new()
 	info.text = L.t("İL BİLGİSİ")
-	info.tooltip_text = L.t("Seçmen profili ve partinin bu ildeki durumu sağ panelde")
 	info.focus_mode = Control.FOCUS_NONE
 	info.custom_minimum_size = Vector2(90, 40)
 	info.add_theme_font_size_override("font_size", 11)
@@ -144,7 +143,6 @@ func _build_header() -> void:
 	row.add_child(info)
 	var x := Button.new()
 	x.text = "✕"
-	x.tooltip_text = L.t("Kapat (haritaya dön) · aynı ile tekrar dokunmak da kapatır")
 	x.focus_mode = Control.FOCUS_NONE
 	x.custom_minimum_size = Vector2(44, 40)
 	UiSkin.skin_button(x)
@@ -329,7 +327,6 @@ func _build_miting() -> void:
 	_body.add_child(_confirm_button(L.t("MİTİNGİ DÜZENLE · %s") % GameRules.cost_text(cost), ok, func(): _do_miting()))
 	var cancel := Button.new()
 	cancel.text = L.t("Hazırlığı iptal et")
-	cancel.tooltip_text = L.t("Para ve miting hakkı harcanmaz.")
 	cancel.focus_mode = Control.FOCUS_NONE
 	cancel.custom_minimum_size = Vector2(0, 40)
 	UiSkin.skin_button(cancel)

@@ -246,7 +246,6 @@ static func _group_chart(votes: Dictionary, levels: Dictionary = {}) -> Control:
 		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		col.add_theme_constant_override("separation", 2)
 		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		col.tooltip_text = "%s: %s" % [VoterGroups.title(group), L.pct(value, 1)]
 		row.add_child(col)
 		var pct := _label(L.pct(value, 0), 9, UiTheme.TEXT)
 		pct.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

@@ -1275,7 +1275,6 @@ func _refresh_score_table_now() -> void:
 		line.add_child(_table_value(str(GovernmentManager.score_of(peer_id)), 40.0, UiTheme.GOLD, 13))
 		var national := CardManager.visible_national_of(pid)
 		var trend_value := _table_value(EffectWords.arrows(national), 46.0, ProvincePanel._opinion_color(national), 12)
-		trend_value.tooltip_text = L.t("Ulusal kamuoyu: %s") % EffectWords.standing(national)
 		trend_value.mouse_filter = Control.MOUSE_FILTER_PASS
 		line.add_child(trend_value)
 		_score_box.add_child(row)
@@ -1730,7 +1729,7 @@ func _on_constitution_pressed() -> void:
 	CardManager.propose_constitution({"threshold": _constitution_threshold, "interval": _constitution_interval,
 		"seat_method": _constitution_method,
 		"alliances_enabled": _constitution_alliances.button_pressed if _constitution_alliances != null else CardManager.alliances_enabled})
-	_law_designer.hide()
+	_close_law_page()
 
 func _on_pass_pressed() -> void:
 	CardManager.pass_turn()
@@ -1772,7 +1771,6 @@ func _build_player_tabs() -> void:
 	for i in PLAYER_TAB_TITLES.size():
 		var button := Button.new()
 		button.text = PLAYER_TAB_TITLES[i]
-		button.tooltip_text = PLAYER_TAB_TOOLTIPS[i]
 		button.focus_mode = Control.FOCUS_NONE
 		button.clip_text = true
 		button.custom_minimum_size = Vector2(0, PLAYER_TAB_HEIGHT)
@@ -1988,7 +1986,6 @@ func _build_plaque(pid: int, width: float) -> Control:
 		UiTheme.GOLD if mine else UiTheme.TEXT)
 	name_label.clip_text = true
 	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	name_label.tooltip_text = name_text
 	name_label.add_theme_font_override("font", UiTheme.mono(true))
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(name_label)
@@ -2000,7 +1997,6 @@ func _build_plaque(pid: int, width: float) -> Control:
 		(tag_control as Label).clip_text = true
 		(tag_control as Label).text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		tag_control.custom_minimum_size.x = minf(tag_limit, String(tag[0]).length() * 6.0 + 6.0)
-		tag_control.tooltip_text = String(tag[0])
 		tag_control.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		head.add_child(tag_control)
 	var seats_label := _avatar_label(seats_text, 15, UiTheme.TEXT)
@@ -2048,7 +2044,6 @@ func _build_plaque(pid: int, width: float) -> Control:
 	stack.add_child(bar)
 
 	card.set_meta("peer_id", pid)
-	card.tooltip_text = L.t("%s · dokun: profil") % name_text
 	var halo := Panel.new()
 	halo.name = L.t("TargetHalo")
 	halo.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -2171,7 +2166,6 @@ func _fit_hand_width(count: int) -> void:
 			separation = int(floor((available - count * CARD_DISPLAY_SIZE.x) / float(count - 1)))
 	hand_container.add_theme_constant_override("separation", separation)
 
-var _live_mouse := Vector2(-1, -1)
 var _deferred_ui: Dictionary = {}
 
 func _run_deferred_ui(name: String) -> void:
@@ -2182,8 +2176,6 @@ func _run_deferred_ui(name: String) -> void:
 		return
 	if is_inside_tree():
 		call(name + "_now")
-var _live_wait := 0.0
-
 func _process(delta: float) -> void:
 	_refresh_countdowns()
 	_update_vote_swap(delta)
@@ -2191,14 +2183,6 @@ func _process(delta: float) -> void:
 	_refresh_timer_bar()
 	if _smear_ghost != null:
 		_update_smear_drag()
-	# Fare kımıldamadıysa il / parti tespiti her karede yapılmaz (performans);
-	# yine de arada bir tazelenir (altındaki içerik değişmiş olabilir).
-	var mouse := get_viewport().get_mouse_position()
-	_live_wait -= delta
-	if mouse != _live_mouse or _live_wait <= 0.0:
-		_live_mouse = mouse
-		_live_wait = 0.25
-		_update_live_province()
 
 	var i := _hand_holders.size() - 1
 	while i >= 0:
@@ -2699,44 +2683,12 @@ func _on_province_clicked(province_id: String) -> void:
 	_show_province_info(province_id)
 	_pinned = true
 
-## İL BİLGİSİ sağ sütunda ("Seçili"). Fare haritada dolaşırken canlı olarak
-## değişir (bkz. _update_live_province); tıklamak da aynı bilgiyi gösterir.
+## İL BİLGİSİ sağ sütunda ("Seçili"): ile tıklayınca açılır.
 var _live_province := ""
 
-## Fare haritada bir ilin üstündeyse (hedef seçme yokken) o ilin bilgisi
-## tıklamadan sağda gösterilir. Haritadan çıkınca son il ekranda kalır.
-## FAREYLE İNCELEME (panel modu): ilin ya da parti plaketinin üstüne gelince
-## bilgisi sağ panelde GEÇİCİ açılır, fare çekilince kapanır ve en son
-## açık sekmeye dönülür. TIKLAMA kalıcı açar (_pinned): fare gezinse de değişmez.
+## 0.0.246: fareyle (hover) inceleme kaldırıldı; il ve parti bilgisi yalnız
+## TIKLAYINCA sağ panelde açılır (_pinned: ✕, sekme ya da tekrar tıklama kapatır).
 var _pinned := false
-
-func _update_live_province() -> void:
-	if _window_mode() or _pinned:
-		return
-	if _pending_org or _pending_miting or _pending_invest or _pending_province_hand_index != -1 			or _pending_target_hand_index != -1 or _layer_switching or not is_visible_in_tree():
-		return
-	var mouse := get_viewport().get_mouse_position()
-	# Fare sağ paneldeyse açık olan bilgi kalır (kaydırılabilsin).
-	if left_panel.get_global_rect().has_point(mouse):
-		return
-	var party := _party_under_mouse()
-	if party != -1:
-		if _profile_peer_id != party:
-			_profile_peer_id = party
-			_show_tooltip_for(party)
-		return
-	var province_id := _province_under_mouse()
-	if province_id != "":
-		if not (province_id == _live_province and _province_panel != null and _province_panel.visible):
-			_show_province_info(province_id)
-		return
-	# Hiçbir şeyin üstünde değil: geçici bilgi kapanır, en son açık olan
-	# sekmeye (Hükümet ya da Log) dönülür.
-	if _left_dock != null and _left_dock.visible:
-		if _profile_peer_id != -1:
-			_hide_profile()
-		if _province_panel != null and _province_panel.embedded_mode and _province_panel.visible:
-			_province_panel.hide()
 
 func _show_province_info(province_id: String) -> void:
 	# Ayar değiştiyse eski türdeki il paneli atılır.
@@ -3714,7 +3666,6 @@ func _refresh_proposer_chip() -> void:
 	who.custom_minimum_size = Vector2(72, 22)
 	who.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_proposer_row.add_child(who)
-	_proposer_chip.tooltip_text = "%s: %s" % [_proposal_kind_title(), _party_name_of(peer_id)]
 	_proposer_chip.reset_size()
 
 ## Oylanan teklifin kısa türü (rozetin üst satırı).
@@ -3770,7 +3721,6 @@ func _build_action_buttons() -> void:
 	_funds_plate.offset_top = FUNDS_PLATE_TOP
 	_funds_plate.offset_bottom = FUNDS_PLATE_TOP + FUNDS_PLATE_HEIGHT
 	_funds_plate.mouse_filter = Control.MOUSE_FILTER_STOP
-	_funds_plate.tooltip_text = L.t("Parti kasası")
 	var funds_style := UiSkin.color_box(FUNDS_COLOR.darkened(0.62), UiSkin.SLOT)
 	funds_style.content_margin_left = UiTheme.PAD_S
 	funds_style.content_margin_right = UiTheme.PAD_S
@@ -3822,7 +3772,6 @@ func _build_action_buttons() -> void:
 	_parl_button.set_meta("action_color", ACTION_COLOR_LAW)
 	_parl_button.add_theme_font_override("font", UiTheme.mono(true))
 	_parl_button.add_theme_font_size_override("font_size", ACTION_FONT_SIZE)
-	_parl_button.tooltip_text = L.t("Meclis akışı: uygunsa gensoru, sonra grup toplantısı ve yasa. Her aşamayı yap ya da geç.")
 	_parl_button.pressed.connect(_on_parliament_button_pressed)
 	actions_vbox.add_child(_parl_button)
 	_action_grid = GridContainer.new()
@@ -3832,12 +3781,10 @@ func _build_action_buttons() -> void:
 	actions_vbox.add_child(_action_grid)
 	_alliance_button = _action_button(L.t("İTTİFAK"), "", ACTION_COLOR_ALLIANCE)
 	_alliance_button.pressed.connect(_on_alliance_button_pressed)
-	_alliance_button.tooltip_text = L.t("İttifakları görüntüle, kur veya partileri davet et ve katıl.")
 	# KONGRE: genel başkan kendi sırasında (en az bir seçim geçtiyse) kongreye
 	# gider; partide üye kalan eski başkan kongre ister.
 	_congress_button = _action_button(L.t("KONGRE"), _congress_cost_text(), ACTION_COLOR_CONGRESS)
 	_congress_button.pressed.connect(_on_congress_button_pressed)
-	_congress_button.tooltip_text = L.t("Genel başkan: partini kongreye götür, liderliğini tazele. Üye: kongre iste, başkanlığı geri almaya çalış.")
 	# TURU BİTİR: sahnedeki düğme hamle ızgarasına taşınır, hamle düğmesi görünümünde.
 	pass_button.get_parent().remove_child(pass_button)
 	pass_button.custom_minimum_size = Vector2(ACTION_BUTTON_WIDTH, ACTION_BUTTON_HEIGHT)
@@ -4045,7 +3992,7 @@ func _on_alliance_button_pressed() -> void:
 		_alliance_panel.hide()
 		return
 	if _law_designer != null:
-		_law_designer.hide()
+		_close_law_page()
 	_refresh_alliance_panel()
 	_alliance_panel.show()
 	_place_alliance_panel.call_deferred()
@@ -4146,14 +4093,12 @@ func _refresh_alliance_panel() -> void:
 				invite.modulate.a = 1.0 if action_reason == "" and not _alliance_invite_targets(int(alliance_id)).is_empty() else 0.45
 				buttons.add_child(invite)
 			var leave := _alliance_action(L.t("AYRIL"), UiTheme.RED.darkened(0.35))
-			leave.tooltip_text = L.t("İttifaktan ayrıl. Seçim turunda ayrılmak ulusal destek kaybettirir.")
 			leave.pressed.connect(_on_alliance_leave_pressed)
 			leave.modulate.a = 1.0 if action_reason == "" else 0.45
 			buttons.add_child(leave)
 		elif my_alliance < 0 and not _invited_to(int(alliance_id), my_party):
 			var pending := CardManager.pending_alliance_request(int(alliance_id), my_party) >= 0
 			var ask := _alliance_action(L.t("BAŞVURU BEKLİYOR") if pending else L.t("KATILMAK İSTE"), Color(alliance.get("color", UiTheme.GOLD)).darkened(0.25))
-			ask.tooltip_text = L.t("Katılmak için bütün üyelerin onayı gerekir.")
 			var my_preview := CardManager.alliance_preview_text(my_party, int(alliance_id))
 			if my_preview != "":
 				row.add_child(PopupKit.note(L.t("Katılırsan: %s") % my_preview, UiTheme.TEXT, 350))
@@ -4331,7 +4276,7 @@ func _build_law_designer() -> void:
 	close.text = L.t("Kapat")
 	UiSkin.skin_button(close)
 	close.add_theme_font_size_override("font_size", 11)
-	close.pressed.connect(func(): _law_designer.hide())
+	close.pressed.connect(_close_law_page)
 	header.add_child(close)
 	# Kazanç satırı: kabul edilirse puan, bedel.
 	_law_points_label = Label.new()
@@ -4379,7 +4324,6 @@ func _build_law_designer() -> void:
 	_law_detail.custom_minimum_size = Vector2(300, 0)
 	group_page.add_child(_law_detail)
 	_build_constitution_section(_law_pages[LawTab.CONSTITUTION])
-	_law_designer.hide()
 	add_child(_law_designer)
 
 ## ANAYASA DEĞİŞİKLİĞİ paneli (yasa panelinin altında). Gündeme bağlı değil,
@@ -4505,7 +4449,7 @@ func _refresh_law_designer() -> void:
 	_refresh_constitution_section()
 	if _law_tab == LawTab.TAX:
 		EconomyPanel.fill_policy(_law_tax_box, multiplayer.get_unique_id(), _law_tax_selected,
-			_on_law_tax_selected, _propose_tax, _law_designer.hide, false)
+			_on_law_tax_selected, _propose_tax, _close_law_page, false)
 	var me := multiplayer.get_unique_id()
 	var in_gov := CardManager.is_government_party(me)
 	_law_points_label.text = L.t("Kabul: +%d puan · %s") % [CardManager.law_pass_score(in_gov), GameRules.cost_text(GameRules.LAW_FUNDS_COST)]
@@ -4546,26 +4490,27 @@ func _refresh_law_tabs() -> void:
 func _law_group_button(group: String, on_agenda: bool) -> Control:
 	var button := Button.new()
 	button.focus_mode = Control.FOCUS_NONE
-	button.custom_minimum_size = Vector2(150, 30)
+	# Meclis penceresinde iki sütunu doldurur (0.0.246).
+	button.custom_minimum_size = Vector2(0, 38)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.clip_text = false
 	var tint := VoterGroups.color(group)
 	UiSkin.skin_color_button(button, tint.darkened(0.45) if group != _law_group else tint.darkened(0.15))
-	button.tooltip_text = L.t("%s\nTalepler: %s%s") % [VoterGroups.title(group), VoterGroups.issues_text(group),
-		L.t("\nGÜNDEMDE: yasa daha güçlü ve ulusal destek getirir.") if on_agenda else ""]
 	var row := HBoxContainer.new()
 	row.set_anchors_preset(Control.PRESET_FULL_RECT)
 	row.offset_left = 4
 	row.add_theme_constant_override("separation", 4)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	button.add_child(row)
-	var icon := VoterGroupIcon.make(group, 18.0)
+	var icon := VoterGroupIcon.make(group, 24.0)
 	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(icon)
 	var label := Label.new()
 	label.text = ("★ " if on_agenda else "") + VoterGroups.title(group)
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	label.add_theme_font_size_override("font_size", 9)
+	label.add_theme_font_override("font", UiTheme.mono(true))
+	label.add_theme_font_size_override("font_size", 13)
 	label.add_theme_color_override("font_color", UiTheme.GOLD if group == _law_group or on_agenda else UiTheme.TEXT)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(label)
@@ -4626,7 +4571,7 @@ func _propose_law_clicked(law_type: String) -> void:
 	if not CardManager.can_propose_law(multiplayer.get_unique_id(), law_type):
 		_show_toast(_action_block_reason(CardManager.law_funds_cost(multiplayer.get_unique_id(), law_type), true))
 		return
-	_law_designer.hide()
+	_close_law_page()
 	CardManager.propose_law(law_type)
 
 # --- Ekonomi ve vergi ---------------------------------------------------------
@@ -4679,7 +4624,7 @@ func _open_tax_panel() -> void:
 		_tax_panel.hide()
 		return
 	_deselect_hand_card()
-	_law_designer.hide()
+	_close_law_page()
 	_cancel_targeting()
 	_tax_selected = -1
 	_fill_tax_panel()
@@ -4709,7 +4654,7 @@ func _propose_tax(law_type: String) -> void:
 		_show_toast(CardManager.tax_law_block_reason(me, CardPresets.tax_law_level(law_type)))
 		return
 	_tax_panel.hide()
-	_law_designer.hide()
+	_close_law_page()
 	CardManager.propose_law(law_type)
 
 # --- Afet yardım paneli --------------------------------------------------------
@@ -4766,29 +4711,37 @@ func _circle_texture(color: Color) -> Texture2D:
 	_circle_textures[key] = texture
 	return texture
 
+## Yasa alanını doğrudan açar (önizleme betikleri): meclis penceresinin yasa sayfası.
 func _on_law_button_pressed() -> void:
 	_deselect_hand_card()
-	var law_me := multiplayer.get_unique_id()
-	if not _law_designer.visible and not CardManager.can_propose_law(law_me) and not CardManager.can_propose_constitution(law_me):
-		_show_toast(_action_block_reason(GameRules.LAW_FUNDS_COST, true) + L.t(" (Panel yine de açılır: yasaları incele.)"))
-	if _law_designer.visible:
-		_law_designer.hide()
-		return
 	if _tax_panel != null:
 		_tax_panel.hide()
 	_law_tax_selected = -1
-	_refresh_law_designer()
-	_law_designer.show()
-	_place_law_designer()
+	_parliament_flow.open_law_page(_law_tab)
 
+## 0.0.246: yasa alanı meclis penceresinin içinde; pencere yeniden ortalanır.
 func _place_law_designer() -> void:
-	_law_designer.reset_size()
-	await get_tree().process_frame
-	_law_designer.reset_size()
-	var viewport_size := get_viewport_rect().size
-	_law_designer.position = Vector2(
-		viewport_size.x - RIGHT_COLUMN_WIDTH - _law_designer.size.x - 12.0,
-		maxf(12.0, _top_area_height() - _law_designer.size.y))
+	if _parliament_flow != null:
+		_parliament_flow.relayout()
+
+## YASA ALANI MECLİS PENCERESİNE GÖMÜLÜR (0.0.246): kendi başlığı (Kapat) ve
+## Grup / Vergi / Anayasa sekmeleri gizlenir; hangi sayfanın açık olduğunu
+## meclis penceresinin YASA seçenekleri belirler, "← Geri" sekmelere döner.
+func _embed_law_designer() -> void:
+	_law_designer.get_parent().remove_child(_law_designer)
+	_parliament_flow.law_host.add_child(_law_designer)
+	_law_designer.z_index = 0
+	UiSkin.apply_style(_law_designer, "panel", StyleBoxEmpty.new())
+	var box := _law_designer.get_child(0) as VBoxContainer
+	(box.get_child(0) as Control).hide()  # başlık + Kapat
+	if not _law_tab_buttons.is_empty():
+		(_law_tab_buttons[0] as Control).get_parent().hide()  # iç sekmeler
+	_law_designer.show()
+
+## Yasa sayfası kapanır (teklif sunuldu ya da vazgeçildi): meclis sekmelerine dönülür.
+func _close_law_page() -> void:
+	if _parliament_flow != null:
+		_parliament_flow.leave_law_page()
 
 # --- AFET (0.0.181) --------------------------------------------------------------
 
@@ -4855,7 +4808,7 @@ func _on_congress_button_pressed() -> void:
 		_refresh_action_buttons()
 		return
 	_deselect_hand_card()
-	_law_designer.hide()
+	_close_law_page()
 	_cancel_targeting()
 	if PartyManager.is_independent(me):
 		_show_toast(L.t("Bağımsızsın: kongre yok. Önce parti kur."))
@@ -4921,7 +4874,6 @@ func _build_layer_bar() -> void:
 		var pick := Button.new()
 		pick.focus_mode = Control.FOCUS_NONE
 		pick.custom_minimum_size = Vector2(34, 34)
-		pick.tooltip_text = VoterGroups.title(group)
 		var icon := VoterGroupIcon.make(group, 28.0)
 		icon.position = Vector2(3, 3)
 		icon.size = Vector2(28, 28)
@@ -5266,7 +5218,6 @@ func _build_speech_panel() -> void:
 	# Kapat: şerit gizlenir; hamle düğmesiyle yeniden açılır.
 	var skip := Button.new()
 	skip.text = L.t("Kapat")
-	skip.tooltip_text = L.t("Toplantıyı kapat (TOPLANTI düğmesiyle yeniden açılır).")
 	skip.add_theme_font_size_override("font_size", 11)
 	UiSkin.skin_button(skip)
 	skip.pressed.connect(func():
@@ -5311,7 +5262,7 @@ func _refresh_speech_panel() -> void:
 		_speech_panel.show()
 		if _province_panel != null:
 			_province_panel.hide()
-		_law_designer.hide()
+		_close_law_page()
 	_place_speech_panel.call_deferred()
 
 func _place_speech_panel() -> void:
@@ -5338,9 +5289,6 @@ func _speech_row(group: String, value: float) -> Control:
 	button.clip_text = false
 	UiSkin.skin_color_button(button, VoterGroups.color(group).darkened(0.4))
 	var crisis := CardManager.crisis_group() == group
-	button.tooltip_text = L.t("%s\nKonu: %s\nPartinin bu gruptaki desteği %s; toplantı kalıcı seçmen kazandırır.%s") % [
-		VoterGroups.title(group), String(VoterGroups.data(group).get("meeting", "")), VoterGroups.percent_text(value),
-		L.t("\nGÜNDEMDE: toplantı ulusal destek de kazandırır.") if crisis else ""]
 	var row := HBoxContainer.new()
 	row.set_anchors_preset(Control.PRESET_FULL_RECT)
 	row.offset_left = 4
@@ -5491,6 +5439,7 @@ func _build_turn_flow_ui() -> void:
 	_parliament_flow.law_tab_requested.connect(_on_flow_law_tab)
 	_parliament_flow.toast_requested.connect(_show_toast)
 	add_child(_parliament_flow)
+	_embed_law_designer()
 	_turn_intro = TurnIntro.new()
 	_turn_intro.hand_rect = func() -> Rect2: return _r(R_HAND)
 	# Gazeteler (seçim sonucu, hükümet kuruldu...) ve kongre gecesi önce; şans kartı sonra.
@@ -5532,7 +5481,7 @@ func _open_province_actions(province_id: String) -> void:
 		_province_actions.close()
 		return
 	_parliament_flow.close_flow()
-	_law_designer.hide()
+	_close_law_page()
 	var halves := _map_split_rects()
 	var right: Rect2 = halves[1]
 	_province_actions.set_panel_rect(right)
@@ -5580,7 +5529,12 @@ func _refresh_parliament_button() -> void:
 	var stage := CardManager.parliament_stage(me) if CardManager.can_act() else ""
 	var sub := ""
 	if stage != "":
-		sub = L.t("sırada: %s") % L.t(ParliamentFlow.STAGE_TITLES[stage]).to_lower()
+		# Sekmeler sırasız: açık olanların hepsi yazar.
+		var open: PackedStringArray = []
+		for id in CardManager.PARL_STAGES:
+			if CardManager.parliament_stage_available(me, String(id)):
+				open.append({"censure": L.t("gensoru"), "speech": L.t("toplantı"), "law": L.t("yasa")}[id])
+		sub = L.t("açık: %s") % ", ".join(open)
 	elif not CardManager.can_act():
 		sub = L.t("sıra sende değil")
 	elif not CardManager.parliament_closed_stages(me).is_empty():
@@ -5620,16 +5574,11 @@ func _on_parliament_button_pressed() -> void:
 	_deselect_hand_card()
 	_parliament_flow.open_flow()
 
-## Yasa alanından grup / vergi / anayasa: mevcut yasa tasarlama penceresi açılır;
-## kapanınca (ya da oylama bitince) meclis akışı geri gelir.
+## YASA sekmesinden grup / vergi / anayasa: gömülü yasa alanında o sayfa açılır.
 func _on_flow_law_tab(tab: int) -> void:
-	_parliament_flow.hide()
 	if _tax_panel != null:
 		_tax_panel.hide()
 	_law_tax_selected = -1
 	_law_tab = tab
-	_refresh_law_designer()
 	_select_law_tab(tab)
-	_law_designer.show()
-	_place_law_designer()
 

@@ -13,12 +13,10 @@ static func make(group_id: String, size_px: float = 22.0, bare_icon: bool = fals
 	icon.bare = bare_icon
 	icon.custom_minimum_size = Vector2(size_px, size_px)
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	icon.tooltip_text = VoterGroups.title(group_id)
 	return icon
 
 func set_group(group_id: String) -> void:
 	group = group_id
-	tooltip_text = VoterGroups.title(group_id)
 	queue_redraw()
 
 func _draw() -> void:

@@ -91,10 +91,9 @@ func _build_header() -> void:
 		strip.add_child(button)
 		_tax_buttons.append(button)
 
-func _make_tile(key: String, caption: String, tip: String) -> Control:
+func _make_tile(key: String, caption: String, _tip: String) -> Control:
 	var panel := PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	panel.tooltip_text = tip
 	panel.mouse_filter = Control.MOUSE_FILTER_PASS
 	var style := StyleBoxFlat.new()
 	style.bg_color = TILE_BG
@@ -215,8 +214,6 @@ func refresh() -> void:
 		UiSkin.skin_color_button(button, TAX_COLORS[i] if active else UiTheme.PANEL_DARK)
 		button.add_theme_color_override("font_color", UiTheme.INK if active else UiTheme.TEXT_DIM)
 		button.add_theme_color_override("font_hover_color", UiTheme.INK if active else UiTheme.TEXT)
-		button.tooltip_text = (L.t("Yürürlükteki vergi: %s.\n") % Economy.tax_title(level) if active else "") \
-			+ L.t("Vergi değişikliği meclis oylaması ister: dokun, Vergi Politikası açılsın.")
 	var prev: Dictionary = econ.get("prev", {})
 	_set_tile("index", str(int(round(CardManager.economy_index()))), prev, "index", CardManager.economy_index(), true, false)
 	_set_tile("inflation", Economy.percent_text(CardManager.inflation()), prev, "inflation", CardManager.inflation(), false, true)
@@ -225,13 +222,6 @@ func refresh() -> void:
 		_shown_treasury = CardManager.state_treasury()
 		_show_treasury(_shown_treasury)
 	_set_delta("treasury", prev, "treasury", CardManager.state_treasury(), true, false)
-	(_tiles["treasury"]["panel"] as Control).tooltip_text = L.t("Devlet hazinesi: %s. Dönem sonunda %s vergi geliri girer. Bir yatırım %s.") % [
-		Economy.money_full(CardManager.state_treasury()), Economy.money_full(CardManager.expected_revenue()), Economy.money_full(Economy.INVEST_COST)]
-	var me := multiplayer.get_unique_id()
-	if CardManager.is_government_party(me):
-		(_tiles["treasury"]["panel"] as Control).tooltip_text += "
-" + L.t("Bu dönemki kotan: %s (bakanlık puanına göre hazinenin %%%d'i).") % [
-			Economy.money_full(CardManager.state_quota(me)), int(round(CardManager.quota_share(CardManager.party_of(me)) * 100.0))]
 	_income_label.text = L.t("+%s / dönem") % GameRules.amount(CardManager.expected_revenue())
 	var election := not election_headline().is_empty()
 	# Sandık öncesi: özet göstergelerin yerini alır (hazine ve vergi özette).
@@ -275,8 +265,6 @@ func _refresh_transition(econ: Dictionary) -> void:
 	_transition_title.text = L.t("İNDİRİM ETKİSİ") if cutting else L.t("ARTIRIM ETKİSİ")
 	_transition_ratio = Economy.settle_ratio(econ)
 	_transition_text.text = L.t("~%d dönem") % Economy.rounds_to_settle(econ)
-	_transition.tooltip_text = L.t("Vergi %s → %s. Seçmen değişimi kademeli hissediyor; tamamen yerleşmesi yaklaşık %d dönem sürer. Seçim olursa sadece yerleşen kısım sayılır.") % [
-		Economy.tax_title(int(econ.get("tax_from", econ["tax"]))), Economy.tax_title(int(econ["tax"])), Economy.rounds_to_settle(econ)]
 	_transition_bar.queue_redraw()
 
 # --- Sandık öncesi özet ---------------------------------------------------------------
@@ -370,22 +358,16 @@ static func _fill_summary(box: VBoxContainer, headline: Array) -> void:
 	var k := PopupKit.label(L.t("Seçmen"), 10, UiTheme.TEXT_MUTED)
 	k.custom_minimum_size = Vector2(52, 0)
 	row.add_child(k)
-	var tip := PackedStringArray()
 	if ranked.is_empty():
 		row.add_child(PopupKit.label(L.t("ekonominin belirgin etkisi yok"), 10, UiTheme.TEXT_DIM))
 	for i in mini(3, ranked.size()):
 		var group := String(ranked[i])
 		var now := float(mood[group])
-		var trend := float(next_mood.get(group, 0.0)) - now
 		var icon := VoterGroupIcon.make(group, 13.0)
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(icon)
 		row.add_child(UiTheme.mono_label(EffectWords.arrows(now, "group"), 9, UiTheme.GREEN if now > 0.0 else UiTheme.RED, true))
-		tip.append("%s: %s%s" % [VoterGroups.title(group), EffectWords.change(now, "group"),
-			(" (%s)" % (L.t("toparlanıyor") if trend > 0.0 else L.t("kötüleşiyor"))) if absf(trend) >= 0.05 else ""])
-	row.tooltip_text = L.t("%s hükümetinin ekonomi politikasına seçmen tepkisi:\n%s") % [
-		PartyManager.data_of(pm).get("name", "?"), "\n".join(tip)]
 	box.add_child(row)
 
 ## Hükümetin ekonomiden gelen seçmen tepkisinin TEK CÜMLELİK yorumu (gerçek
@@ -602,7 +584,6 @@ static func _policy_card(me: int, level: int, current: int, selected: int, on_se
 	box.add_child(PopupKit.chip(tag_text, tag_color))
 	if not available and not is_current:
 		button.modulate = Color(1, 1, 1, 0.7)
-		button.tooltip_text = CardManager.tax_law_block_reason(me, level)
 	return button
 
 static func _tax_mood_change(level: int, current: int) -> Dictionary:

@@ -62,10 +62,6 @@ static func affinity_row(group: String, value: float, bonus: float = 0.0, delta:
 		text += " " + ("▲" if delta > 0.0 else "▼")
 	box.add_child(name_row(group, text, UiTheme.TEXT))
 	box.add_child(bar(value / 100.0, VoterGroups.color(group), BAR_HEIGHT, bonus / 100.0, VoterGroups.color(group).lightened(0.55)))
-	box.tooltip_text = L.t("%s: partinin bu gruptaki desteği %s%s%s.\nBu, grubun ülkedeki nüfus payı değildir.") % [
-		VoterGroups.title(group), VoterGroups.percent_text(value),
-		L.t(" (toplantıdan geçici destek dahil)") if bonus > 0.0 else "",
-		(L.t("; son dönemde ") + EffectWords.change(delta, "group")) if absf(delta) >= 0.5 else ""]
 	return box
 
 ## İl profilinde bir ÇİFT: üstte ilk grup ve yüzdesi, ortada iki renkli
@@ -91,8 +87,6 @@ static func pair_rows(pair: String, profile: Dictionary) -> Control:
 		split.draw_line(Vector2(cut, -1), Vector2(cut, split.size.y + 1), UiTheme.INK, 2.0))
 	box.add_child(split)
 	box.add_child(name_row(b, L.t("%%%d") % (100 - pa), UiTheme.TEXT))
-	box.tooltip_text = L.t("Bu ilde %s %%%d, %s %%%d (iki taraf toplam %%100).") % [
-		VoterGroups.title(a), pa, VoterGroups.title(b), 100 - pa]
 	return box
 
 ## Etki satırı (önizlemeler için): [simge] Grup adı   hafif artış / orta kayıp

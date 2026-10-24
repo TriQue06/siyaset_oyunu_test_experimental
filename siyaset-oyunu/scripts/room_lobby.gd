@@ -183,7 +183,6 @@ func _build_player_card(peer_id: int, index: int, am_owner: bool, local_id: int)
 	name_label.add_theme_font_size_override("font_size", 14)
 	name_label.clip_text = true
 	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	name_label.tooltip_text = player_name
 	info.add_child(name_label)
 	var tags: Array[String] = []
 	if peer_id == MultiplayerManager.owner_id:
@@ -213,7 +212,6 @@ func _build_player_card(peer_id: int, index: int, am_owner: bool, local_id: int)
 			action.pressed.connect(func(): MultiplayerManager.remove_bot(peer_id))
 		else:
 			action.text = L.t("Devret")
-			action.tooltip_text = L.t("Sahipliği Devret")
 			action.pressed.connect(func(): MultiplayerManager.transfer_ownership(peer_id))
 		actions.add_child(action)
 		if not is_bot:
@@ -222,7 +220,6 @@ func _build_player_card(peer_id: int, index: int, am_owner: bool, local_id: int)
 			UiSkin.skin_color_button(kick, UiTheme.RED)
 			_compact_player_action(kick)
 			kick.text = L.t("At")
-			kick.tooltip_text = L.t("Lobiden At")
 			kick.pressed.connect(func(): MultiplayerManager.kick_player(peer_id))
 			actions.add_child(kick)
 		row.add_child(actions)

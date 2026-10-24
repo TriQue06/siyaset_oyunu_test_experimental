@@ -1,4 +1,8 @@
 {
+"toplantı": "meeting",
+"açık: %s": "open: %s",
+"Meclise bir teklif getir; teklif oylanır. Sunduğunda yasa sekmesi bu tur kapanır.": "Bring a proposal to parliament; it goes to a vote. Once you submit, the law tab closes for this turn.",
+"KART ÇEK": "DRAW CARD",
 "Vekil": "Seats",
 "İşçi": "Worker",
 "İşveren": "Employer",

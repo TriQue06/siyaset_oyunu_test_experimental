@@ -183,7 +183,11 @@ func _show_prompt() -> void:
 	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(_centered(note))
 	var button := Button.new()
-	button.text = L.t("🂠  KART ÇEK")
+	# 0.0.246: kart simgesi Material "playing_cards" (yazının solunda, yazı renginde).
+	button.text = L.t("KART ÇEK")
+	button.icon = cards_icon()
+	button.add_theme_constant_override("h_separation", 14)
+	button.add_theme_constant_override("icon_max_width", 48)
 	button.focus_mode = Control.FOCUS_NONE
 	button.custom_minimum_size = Vector2(300, 92)
 	button.add_theme_font_override("font", UiTheme.mono(true))
@@ -191,9 +195,10 @@ func _show_prompt() -> void:
 	UiSkin.skin_color_button(button, UiTheme.GOLD_DIM)
 	for key in ["font_color", "font_hover_color", "font_pressed_color"]:
 		button.add_theme_color_override(key, UiTheme.TEXT)
+	for key in ["icon_normal_color", "icon_hover_color", "icon_pressed_color", "icon_focus_color"]:
+		button.add_theme_color_override(key, UiTheme.TEXT)
 	var skip := Button.new()
 	skip.text = L.t("ATLA  ▸")
-	skip.tooltip_text = L.t("Bu sıra kart çekme")
 	skip.focus_mode = Control.FOCUS_NONE
 	skip.custom_minimum_size = Vector2(150, 56)
 	skip.add_theme_font_override("font", UiTheme.mono(true))
@@ -488,3 +493,14 @@ func _show_aid(disaster_id: int) -> void:
 	tw.tween_property(box, "position", final_pos, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.tween_property(box, "modulate:a", 1.0, 0.25)
 	AudioManager.play("paper_slap")
+
+## KART ÇEK simgesi (Material "playing_cards", beyaz; düğmede yazı rengine boyanır).
+const CARDS_SVG := '<svg xmlns="http://www.w3.org/2000/svg" height="96" viewBox="0 -960 960 960" width="96" fill="#ffffff"><path d="m608-368 46-166-142-98-46 166 142 98ZM160-207l-33-16q-31-13-42-44.5t3-62.5l72-156v279Zm160 87q-33 0-56.5-24T240-201v-239l107 294q3 7 5 13.5t7 12.5h-39Zm206-5q-31 11-62-3t-42-45L245-662q-11-31 3-61.5t45-41.5l301-110q31-11 61.5 3t41.5 45l178 489q11 31-3 61.5T827-235L526-125Zm-28-75 302-110-179-490-301 110 178 490Zm62-300Z"/></svg>'
+static var _cards_icon: Texture2D
+
+static func cards_icon() -> Texture2D:
+	if _cards_icon == null:
+		var image := Image.new()
+		image.load_svg_from_string(CARDS_SVG, 0.5)
+		_cards_icon = ImageTexture.create_from_image(image)
+	return _cards_icon

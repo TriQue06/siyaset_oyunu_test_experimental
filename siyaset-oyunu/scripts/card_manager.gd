@@ -288,11 +288,10 @@ var _rng := RandomNumberGenerator.new()
 ##     "intro_left": çekim beklenirken kalan sunum süresi (tur sayacı durur),
 ##     "aid_for": bu sırada karar verilen afet id'si, "parl_closed": kapanan
 ##     meclis aşamaları, "mitings", "invests": bu sıradaki başarılı hamleler}.
-## MECLİS AKIŞI sırası PARL_STAGES: aşama ancak sırası gelince yapılabilir;
-## kullanılamayan aşama atlanır, karar verilen (yapılan ya da geçilen) aşama
-## bu sıra yeniden açılmaz. Yasa aşaması bir çalışma alanıdır: grup yasası,
-## vergi, anayasa ve erken seçim kendi dönemlik haklarıyla sunulur; aşama
-## ancak "bitir / geç" ile (ya da yapılacak bir şey kalmayınca) kapanır.
+## MECLİS SEKMELERİ (0.0.246) PARL_STAGES: sıra yok, oyuncu istediği sekmeden
+## başlar. Bir sekmenin hamlesi yapılınca (gensoru verildi, toplantı yapıldı,
+## yasa / anayasa / erken seçim sunuldu) o sekme bu sıra kapanır, yeniden
+## açılmaz. Botlar bir sekmeyi "geç" ile de kapatabilir (_apply_parl_pass).
 ## enforce_turn_flow: testler eski serbest akışa dönebilsin (çekim zorunluluğu
 ## ve meclis sırası uygulanmaz); miting / yatırım sınırı her zaman geçerli.
 const PARL_STAGES := ["censure", "speech", "law"]
@@ -562,26 +561,38 @@ func _parl_stage_available(peer_id: int, stage: String) -> bool:
 
 ## Meclis hamlesi bu aşamada mı yapılabilir? (Akış kapalıyken her zaman.)
 func _parl_stage_ok(peer_id: int, stage: String) -> bool:
-	return not enforce_turn_flow or _skip_stage_gate or parliament_stage(peer_id) == stage
+	if not enforce_turn_flow or _skip_stage_gate:
+		return true
+	if not PARL_STAGES.has(stage) or peer_id != current_turn_peer_id() or game_finished:
+		return false
+	return not (_flow_value(peer_id, "parl_closed", []) as Array).has(stage)
+
+## Bu sekme şu an kullanılabilir mi (kapanmamış ve hamlesi mümkün)?
+func parliament_stage_available(peer_id: int, stage: String) -> bool:
+	if not _parl_stage_ok(peer_id, stage):
+		return false
+	var previous := _skip_stage_gate
+	_skip_stage_gate = true
+	var ok := _parl_stage_available(peer_id, stage)
+	_skip_stage_gate = previous
+	return ok
 
 ## Bu sırada meclis akışında hiç aşama açıldı mı / kapandı mı?
 func parliament_closed_stages(peer_id: int) -> Array:
 	return _flow_value(peer_id, "parl_closed", [])
 
-func _parl_close_through(peer_id: int, stage: String) -> void:
+## Yalnız bu sekme bu sıra kapanır (diğerleri açık kalır).
+func _parl_close(peer_id: int, stage: String) -> void:
 	if peer_id != current_turn_peer_id():
 		return
 	var closed: Array = _flow_for(peer_id)["parl_closed"]
-	for s in PARL_STAGES:
-		if not closed.has(s):
-			closed.append(s)
-		if s == stage:
-			break
+	if not closed.has(stage):
+		closed.append(stage)
 
 ## "BU TUR GEÇ" / yasa alanında "BİTİR": aşama bu sıra kapanır.
 func pass_parliament_stage(stage: String) -> void:
 	var me := multiplayer.get_unique_id()
-	if parliament_stage(me) != stage or is_turn_blocked():
+	if not _parl_stage_ok(me, stage) or is_turn_blocked():
 		return
 	if _is_authority():
 		_apply_parl_pass(me, stage)
@@ -594,10 +605,10 @@ func _request_parl_pass(stage: String) -> void:
 		_apply_parl_pass(multiplayer.get_remote_sender_id(), stage)
 
 func _apply_parl_pass(peer_id: int, stage: String) -> void:
-	if not PARL_STAGES.has(stage) or is_turn_blocked() or parliament_stage(peer_id) != stage:
+	if not PARL_STAGES.has(stage) or is_turn_blocked() or not _parl_stage_ok(peer_id, stage):
 		return
 	_note_main_action(peer_id)
-	_parl_close_through(peer_id, stage)
+	_parl_close(peer_id, stage)
 	_push_state({"type": "parl_pass", "peer_id": peer_id, "stage": stage})
 
 func _ready() -> void:
@@ -1190,6 +1201,7 @@ func _apply_constitution_proposal(peer_id: int, payload: Dictionary) -> void:
 		return
 	_event_message = ""
 	_note_main_action(peer_id)
+	_parl_close(peer_id, "law")
 	if not GovernmentManager.submit_constitution(peer_id, payload):
 		return
 	constitution_rounds[party_of(peer_id)] = round_number
@@ -1458,6 +1470,7 @@ func _apply_early_election_move(peer_id: int) -> void:
 	if not can_early_election(peer_id):
 		return
 	_note_main_action(peer_id)
+	_parl_close(peer_id, "law")
 	funds[peer_id] = funds_of(peer_id) - GameRules.EARLY_ELECTION_FUNDS_COST
 	early_requests[party_of(peer_id)] = round_number
 	_push_state({"type": "early_election", "peer_id": peer_id,
@@ -2509,6 +2522,7 @@ func _apply_law(peer_id: int, law_type: String) -> void:
 	_note_main_action(peer_id)
 	if not GovernmentManager.submit_law(peer_id, law_type):
 		return
+	_parl_close(peer_id, "law")  # yasa sekmesi bu sıra kapanır
 	funds[peer_id] = funds_of(peer_id) - law_funds_cost(peer_id, law_type)
 	if CardPresets.is_tax_law(law_type):
 		tax_rounds[party_of(peer_id)] = round_number
@@ -2560,7 +2574,7 @@ func _apply_censure_move(peer_id: int) -> void:
 	if not can_censure(peer_id):
 		return
 	_note_main_action(peer_id)
-	_parl_close_through(peer_id, "censure")
+	_parl_close(peer_id, "censure")
 	funds[peer_id] = funds_of(peer_id) - GameRules.CENSURE_FUNDS_COST
 	_push_state({"type": "censure", "peer_id": peer_id,
 		"message": L.t("%s hükümete gensoru verdi: meclis oylaması başladı.") % _party_name(peer_id)})
@@ -3616,7 +3630,7 @@ func _apply_speech(peer_id: int, group: String) -> void:
 	if not needs_speech(peer_id) or is_turn_blocked() or not VoterGroups.is_group(group):
 		return
 	_note_main_action(peer_id)
-	_parl_close_through(peer_id, "speech")
+	_parl_close(peer_id, "speech")
 	funds[peer_id] = funds_of(peer_id) - GameRules.SPEECH_FUNDS_COST
 	speech_done = true
 	var pid := party_of(peer_id)

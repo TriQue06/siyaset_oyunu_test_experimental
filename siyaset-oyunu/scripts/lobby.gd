@@ -187,7 +187,6 @@ Sadece sen ve eklediğin botlar.")
 	if slot != "":
 		var info := SaveGame.summary(slot)
 		var resume := _button(L.t("Kayıtlı Oyuna Devam Et"), UiTheme.BLUE.darkened(0.2), 42.0)
-		resume.tooltip_text = "%s · %s · %s" % [String(info.get("party", "")), String(info.get("period", "")), String(info.get("saved_at", ""))]
 		resume.pressed.connect(func():
 			resume.disabled = true
 			var err := SaveGame.load_game(get_tree(), slot)

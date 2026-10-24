@@ -403,7 +403,6 @@ func open_menu() -> void:
 	_seed_copy.disabled = not in_game
 	_seed_copy.text = (str(GameMap.seed_value()) if in_game else "—") + " · " + L.t("KOPYALA")
 	_save_button.disabled = path != "res://scenes/GameScreen.tscn" or not MultiplayerManager.offline_mode or SaveGame.block_reason() != ""
-	_save_button.tooltip_text = SaveGame.block_reason()
 	_tutorial_button.disabled = path != "res://scenes/GameScreen.tscn"
 	_status.text = L.t("● Çevrim dışı · Oyun duraklatıldı") if MultiplayerManager.offline_mode and in_game else L.t("● Çevrim içi · Oyun devam ediyor") if in_game else L.t("● SİYASET OYUNU")
 	_select_category("game")

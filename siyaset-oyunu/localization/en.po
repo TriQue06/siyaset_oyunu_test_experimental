@@ -3,6 +3,18 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: en\n"
 
+msgid "toplantı"
+msgstr "meeting"
+
+msgid "açık: %s"
+msgstr "open: %s"
+
+msgid "Meclise bir teklif getir; teklif oylanır. Sunduğunda yasa sekmesi bu tur kapanır."
+msgstr "Bring a proposal to parliament; it goes to a vote. Once you submit, the law tab closes for this turn."
+
+msgid "KART ÇEK"
+msgstr "DRAW CARD"
+
 msgid "Vekil"
 msgstr "Seats"
 

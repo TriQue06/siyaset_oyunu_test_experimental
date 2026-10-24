@@ -140,7 +140,6 @@ func _build_partner_bar() -> void:
 		UiSkin.skin_button(btn)
 		btn.text = "%s (%d)" % [PartyManager.data_of(peer_id).get("name", "?"), GovernmentManager.seats_of(peer_id)]
 		btn.modulate = Color.WHITE if in_gov else Color(0.78, 0.78, 0.78, 1.0)
-		btn.tooltip_text = L.t("Görevli parti (sabit)") if peer_id == me else (L.t("Hükümetten çıkar") if in_gov else L.t("Hükümete ekle"))
 		btn.disabled = peer_id == me
 		if peer_id != me:
 			btn.pressed.connect(_on_partner_toggled.bind(peer_id))
@@ -281,10 +280,6 @@ func _build_party_chip(peer_id: int) -> Control:
 	var chip := Control.new()
 	chip.custom_minimum_size = CHIP_SIZE
 	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	chip.tooltip_text = "%s — %s" % [
-		party.get("name", "?"),
-		PoliticianPresets.display_name(int(peer_id)),
-	]
 
 	# Parti rengi olduğu gibi görünsün: koyu 9-slice zemin yerine rozet
 	# (renkli daire + beyaz logo) — oyunun geri kalanıyla da aynı görünüm.

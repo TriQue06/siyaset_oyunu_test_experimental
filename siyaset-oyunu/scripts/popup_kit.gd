@@ -89,7 +89,6 @@ static func header(title: String, subtitle: String, badge: Control = null, on_cl
 	if on_close.is_valid():
 		var close := Button.new()
 		close.text = "✕"
-		close.tooltip_text = L.t("Kapat")
 		close.custom_minimum_size = Vector2(30, 30)
 		close.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		close.focus_mode = Control.FOCUS_NONE

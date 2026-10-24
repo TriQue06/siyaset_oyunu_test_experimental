@@ -42,7 +42,6 @@ static func _badge(peer_id: int) -> Control:
 	var badge := PartyBadge.build(PartyManager.data_of(peer_id), BADGE_SIZE, BADGE_ICON_PIXEL_SIZE)
 	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	badge.tooltip_text = party_name_of(peer_id)
 	return badge
 
 ## "Başbakan [logo] Parti  ·  Yrd. [logo]" — TEK SATIR.
@@ -78,7 +77,6 @@ static func _party_chip(peer_id: int, show_name: bool) -> Control:
 		return _label("—", 13)
 	var chip := HBoxContainer.new()
 	chip.add_theme_constant_override("separation", 4)
-	chip.tooltip_text = party_name_of(peer_id)
 	# Kalan genişliği ADI GÖSTEREN öbek alır; sadece logo olan öbek büzülür.
 	if show_name:
 		chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -139,7 +137,6 @@ static func fill_government_panel(box: VBoxContainer) -> void:
 		withdraw.text = L.t("Koalisyondan Çekil")
 		withdraw.add_theme_font_size_override("font_size", 12)
 		UiSkin.set_side_icon(withdraw, "koalisyondan_cekil", 16)
-		withdraw.tooltip_text = L.t("Görevlerin ana iktidar partisine geçer. Puan tablon etkilenmez ama kamuoyunda bir miktar destek kaybedersin. Ortağın yalnız kalıp gensoruyla düşerse o %d puan kaybeder.") % GovernmentPresets.ABANDONED_FALL_PENALTY
 		withdraw.pressed.connect(func():
 			if bool(withdraw.get_meta("armed", false)):
 				GovernmentManager.withdraw_from_coalition()

@@ -146,6 +146,7 @@ func _initialize() -> void:
 	check("2/3 yoksa reddedilir", is_equal_approx(mm.election_threshold, 7.0), gm.last_resolution_reason)
 	cm.law_rounds = {}
 	cm.constitution_rounds = {}
+	cm._start_turn_flow(1)  # 0.0.246: yasa sekmesi sırada bir teklifle kapanır; yeni sıra
 	cm._apply_constitution_proposal(1, {"threshold": 3.0, "interval": 6})
 	gm._apply_vote(1, gm.VOTE_YES)
 	gm._apply_vote(2, gm.VOTE_YES)
@@ -156,8 +157,11 @@ func _initialize() -> void:
 	check("anayasa sonrasi kalan secim sayisi korunur, son secim yeni araliga oturur (7 secim: 20..92)",
 		GameRules.MAX_ROUNDS == 92 and cm.remaining_elections() == 7, "son %d kalan %d" % [GameRules.MAX_ROUNDS, cm.remaining_elections()])
 	check("ayni donemde ikinci yasa hakki yok", not cm.can_propose_constitution(1))
-	# 0.0.185: grup yasasi, vergi yasasi ve anayasa AYRI haklar.
-	check("anayasa sunan parti ayni turda grup yasasini da sunabilir", cm.can_propose_law(1, cp.law_type("isci")),
+	# 0.0.246: yasa sekmesi sırada tek teklif; grup yasası ayrı dönemlik hak
+	# olarak kalır (sonraki sırasında sunabilir).
+	check("anayasa sunulunca yasa sekmesi bu sira kapandi", not cm.can_propose_law(1, cp.law_type("isci")))
+	cm._start_turn_flow(1)
+	check("ayni donemde sonraki sirasinda grup yasasini sunabilir", cm.can_propose_law(1, cp.law_type("isci")),
 		"grup %s vergi %s anayasa %s" % [cm.has_proposed_law_this_round(1, "group"), cm.has_proposed_law_this_round(1, "tax"), cm.has_proposed_law_this_round(1, "constitution")])
 	cm._apply_law(1, cp.law_type("isci"))
 	check("grup yasasi sunuldu, anayasa hakki ayrica kullanilmis", cm.has_proposed_law_this_round(1, "group") and cm.has_proposed_law_this_round(1, "constitution"))

@@ -328,7 +328,6 @@ func _build_politician_page() -> Control:
 			[L.t("🎲 İkisi de"), L.t("Ad ve soyadı birlikte değiştir"), true, true]]:
 		var dice := Button.new()
 		dice.text = spec[0]
-		dice.tooltip_text = spec[1]
 		dice.focus_mode = Control.FOCUS_NONE
 		dice.custom_minimum_size = Vector2(0, 40)
 		dice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -337,7 +336,6 @@ func _build_politician_page() -> Control:
 	# Dil düğmesi kendi dilinde yazar ("Türkçe", "English"); basınca sıradaki dil.
 	_lang_button = Button.new()
 	_lang_button.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
-	_lang_button.tooltip_text = L.t("İsim dilini değiştir")
 	_lang_button.focus_mode = Control.FOCUS_NONE
 	_lang_button.custom_minimum_size = Vector2(0, 40)
 	_lang_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -345,7 +343,6 @@ func _build_politician_page() -> Control:
 	dice_row.add_child(_lang_button)
 	_bot_random_button = Button.new()
 	_bot_random_button.text = L.t("🎲 Bot Profilini Rastgele Yap")
-	_bot_random_button.tooltip_text = L.t("Botun adını, soyadını, mesleğini, memleketini ve çekirdek seçmen gruplarını rastgele değiştir")
 	_bot_random_button.focus_mode = Control.FOCUS_NONE
 	_bot_random_button.custom_minimum_size = Vector2(0, 42)
 	_bot_random_button.pressed.connect(_on_bot_random_pressed)
@@ -609,7 +606,6 @@ func _build_color_row() -> void:
 		if taken:
 			btn.text = "✕"
 			btn.add_theme_font_size_override("font_size", 12)
-			btn.tooltip_text = L.t("Bu renk başka bir oyuncuda")
 		btn.disabled = taken
 		btn.modulate = Color.WHITE if not taken else Color(0.55, 0.55, 0.55, 1.0)
 		var selected := color.is_equal_approx(_bg_color)
@@ -657,8 +653,6 @@ func _core_button(group: String) -> Button:
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.custom_minimum_size = Vector2(0, 58)
 	button.button_pressed = selected
-	button.tooltip_text = L.t("%s\n%s\nTalepler: %s") % [VoterGroups.title(group), String(VoterGroups.data(group).get("blurb", "")),
-		VoterGroups.issues_text(group)]
 	UiSkin.skin_color_button(button, VoterGroups.color(group).darkened(0.25) if selected else UiTheme.PANEL)
 	var row := HBoxContainer.new()
 	row.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -846,7 +840,6 @@ func _refresh_players() -> void:
 			var editing: bool = int(peer_id) == live_target
 			var edit_button := Button.new()
 			edit_button.text = "✎" if int(peer_id) != my_id else L.t("Ben")
-			edit_button.tooltip_text = L.t("Bu botun siyasetçisini ve partisini düzenle") if int(peer_id) != my_id else L.t("Kendi partine dön")
 			UiSkin.skin_button(edit_button)
 			edit_button.focus_mode = Control.FOCUS_NONE
 			edit_button.add_theme_font_size_override("font_size", 14)

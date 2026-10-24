@@ -231,6 +231,27 @@ func _initialize() -> void:
 	await _wait(0.5)
 	_shot("game_1")
 	audit(root, "oyun ekrani")
+	# Vekil haritası: fare bir ilin üstüne gelince ayrı noktalar (geçişli).
+	var busiest := ""
+	var most := 0
+	var markers = scene.map_holder.get_node("SeatMarkers")
+	for pid in markers._seats.keys():
+		var n: int = (markers._seats[pid] as Array).size()
+		if n > most and n <= 30:
+			most = n
+			busiest = String(pid)
+	scene.map_holder.province_hovered.emit(busiest)
+	await _wait(0.05)
+	_shot("game_hover_mid")
+	await _wait(0.3)
+	_shot("game_hover")
+	scene.map_holder.province_hovered.emit("")
+	await _wait(0.2)
+	scene._on_layer_button_pressed(3)
+	await _wait(0.3)
+	_shot("game_voter_layer")
+	scene._on_layer_button_pressed(0)
+	await _wait(0.2)
 	var province: String = String(cm._province_ids[2])
 	cm.organizations[province] = {me: 2}
 	scene._on_province_clicked(province)

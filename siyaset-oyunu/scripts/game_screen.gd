@@ -113,7 +113,7 @@ const VOTE_COLORS := {1: UiTheme.GREEN, 0: UiTheme.GOLD, -1: UiTheme.RED}
 ##   GROUPS       : seçilen SEÇMEN GRUBUNUN illerdeki yoğunluğu (soluk = az,
 ##                  grubun renginde koyu = çok); 8 grup simgesiyle seçilir.
 enum MapLayer { SEATS, ORGANIZATION, STRENGTH, GROUPS }
-const MAP_LAYER_TITLES := ["Vekiller", "Teşkilat", "Güç", "Seçmen"]
+const MAP_LAYER_TITLES := ["Vekil", "Teşkilat", "Güç", "Seçmen"]
 const MAP_UNKNOWN_COLOR := Color(0.62, 0.62, 0.64)
 const MAP_SLIDE_DURATION := 0.38
 ## Olay logundan odaklanma: yakınlaşma, bekleme (parıltı) ve dönüş süreleri.
@@ -4917,7 +4917,7 @@ func _build_layer_bar() -> void:
 	_group_picker.z_index = 6
 	add_child(_group_picker)
 	for group in VoterGroups.GROUP_IDS:
-		# Hap düğme: madalyon + (seçiliyse) grubun tam adı.
+		# Kare düğme: yalnız grup simgesi (seçili olan grubun renginde).
 		var pick := Button.new()
 		pick.focus_mode = Control.FOCUS_NONE
 		pick.custom_minimum_size = Vector2(34, 34)
@@ -4995,11 +4995,10 @@ func _refresh_layer_bar() -> void:
 			var group := String(pick.get_meta("group"))
 			var selected := group == _map_group
 			var color := VoterGroups.color(group)
+			# 0.0.244: seçili olsa da yalnız simge (ad genişlemesi yok; ad ipucunda).
 			var title: Label = pick.get_node("Title")
-			title.visible = selected
+			title.visible = false
 			var width := 34.0
-			if selected:
-				width = 36.0 + title.get_theme_font("font").get_string_size(title.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x + 14.0
 			(pick as Button).custom_minimum_size = Vector2(width, 34)
 			(pick as Button).size = Vector2(width, 34)
 			for state in ["normal", "hover", "pressed", "focus"]:

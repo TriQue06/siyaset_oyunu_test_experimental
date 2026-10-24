@@ -342,7 +342,7 @@ func _initialize() -> void:
 		and is_equal_approx(smear_funds - cm.funds_of(1), 15.0))
 	check("karalama ayri miting hakki harcamaz", cm.miting_count(1) == 1)
 	cm.inventories[1] = [cp.PROPAGANDA_CARD_TYPE]
-	check("karalama karti tek basina oynanamaz", not cm.can_play_card(1, cp.PROPAGANDA_CARD_TYPE, 2, home))
+	check("karalama karti tek basina da oynanabilir", cm.can_play_card(1, cp.PROPAGANDA_CARD_TYPE, 2, home))
 	check("iptal edilen hazirlik kart ve hak tuketmez", cm.inventories[1].size() == 1 and cm.miting_count(1) == 1)
 
 	print("=== 10) YATIRIM KADEMELERI VE SINIR ===")

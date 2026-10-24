@@ -142,10 +142,9 @@ func _initialize() -> void:
 	_shot("tf_11_miting_summary")
 	var before: float = cm.funds_of(me)
 	var smears_before: int = cm.my_inventory().count("karalama")
-	scene._province_actions._smear = int(cm.smear_targets(me, province)[0])
 	scene._province_actions._do_miting(0.0)
 	await _wait(0.5)
-	check("arayuzden miting + karalama yapildi", cm.miting_count(me) == 1 and cm.my_inventory().count("karalama") == smears_before - 1,
+	check("arayuzden miting yapildi, karalama karti elde kaldi", cm.miting_count(me) == 1 and cm.my_inventory().count("karalama") == smears_before,
 		"%.0f -> %.0f" % [before, cm.funds_of(me)])
 	scene._province_actions.tab = "invest"
 	scene._province_actions.refresh()
@@ -154,5 +153,41 @@ func _initialize() -> void:
 	scene._province_actions.close()
 	await _wait(0.4)
 	check("panel kapaninca harita eski olcege doner", is_equal_approx(scene.map_holder.scale.x, scene._map_fit_scale))
+	# 0.0.237 KARALAMA: karta dokun → ile dokun → evrensel parti listesi → parti.
+	var card_index: int = cm.my_inventory().find("karalama")
+	scene._on_hand_card_clicked(card_index)
+	await _wait(0.2)
+	check("karalama kartina dokununca il secimi bekler", scene._pending_province_hand_index == card_index)
+	scene._on_province_clicked(province)
+	await _wait(0.4)
+	_shot("tf_13_smear_picker")
+	var picker = scene._inquiry_picker
+	check("ile dokununca parti listesi acildi", picker != null and is_instance_valid(picker) and picker.visible)
+	check("il paneli acilmadi (karalama hedefi)", not scene._province_actions.visible)
+	var target_button: Button = null
+	for node in picker.find_children("*", "Button", true, false):
+		if (node as Button).text != "İptal" and target_button == null:
+			target_button = node
+	var target_local_before: float = cm.local_of(province, int(cm.smear_targets(me, province)[0]))
+	target_button.pressed.emit()
+	await _wait(0.4)
+	check("parti secilince karalama oynandi, kart dustu", cm.my_inventory().count("karalama") == smears_before - 1,
+		"hedef il puani %.2f -> %.2f" % [target_local_before, cm.local_of(province, int(cm.smear_targets(me, province)[0]) if not cm.smear_targets(me, province).is_empty() else -1)])
+	# Teşkilatsız ile karalama: liste açılmaz.
+	cm.inventories[me] = cm.inventories[me] + ["karalama"]
+	cm._push_state({"type": "timer"})
+	await _wait(0.3)
+	var other: String = String(cm._province_ids[30])
+	scene._on_hand_card_clicked(cm.my_inventory().find("karalama"))
+	scene._on_province_clicked(other)
+	await _wait(0.3)
+	check("teskilatsiz ilde parti listesi acilmaz", scene._inquiry_picker == null or not is_instance_valid(scene._inquiry_picker))
+	# Sürükleme: harita dışına bırakmak iptal, kart elde kalır.
+	scene._start_smear_drag(cm.my_inventory().find("karalama"), "karalama", null)
+	await _wait(0.1)
+	Input.warp_mouse(Vector2(2, 2))
+	scene._finish_smear_drag()
+	await _wait(0.2)
+	check("harita disina birakilan karalama iptal", cm.my_inventory().has("karalama") and scene._smear_ghost == null)
 	print("=== TURN FLOW PREVIEW: %s ===" % ("PASS" if fails == 0 else "%d HATA" % fails))
 	quit()

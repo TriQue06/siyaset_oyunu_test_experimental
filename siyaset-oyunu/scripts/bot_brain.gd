@@ -319,6 +319,29 @@ static func miting_smear(bot: int, province_id: String) -> int:
 			best = int(target)
 	return best
 
+## KARALAMA KARTI (0.0.237, yine ayrı kart): teşkilatlı illerde en değerli
+## il + rakip; ölçek miting_smear ile aynı.
+static func _eval_propaganda(bot: int) -> Dictionary:
+	var best := {}
+	var best_value := -INF
+	for province_id in _seats().keys():
+		var target := miting_smear(bot, String(province_id))
+		if target == -1:
+			continue
+		var org_level := CardManager.organization_level(String(province_id), bot)
+		var seats := float(CardManager.province_seat_count(province_id)) * PublicOpinion.org_action_mult(org_level)
+		var gain := PublicOpinion.propaganda_gain(CardManager.party_strength(province_id, bot))
+		var damage := PublicOpinion.propaganda_damage(CardManager.party_strength(province_id, target))
+		var rival := 0.3 + float(GovernmentManager.seats_of(target)) / _total_seats() * 4.0
+		var value := (gain + damage * 0.6 * rival) * seats / 6.0
+		if value > best_value:
+			best_value = value
+			best = {"peer": target, "province": province_id}
+	if best.is_empty():
+		return {}
+	best["score"] = best_value * 0.45
+	return best
+
 ## İTTİFAK BAŞVURUSUNA YANIT (0.0.225). Davet edilen bot: barajda zorlanıyorsa
 ## neredeyse her zaman, ortak oy barajı aşıyorsa çoğunlukla kabul eder.
 ## Oylayan üye bot: ittifakı barajdan kurtaracak ya da güçlendirecek partiyi
@@ -563,8 +586,7 @@ static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 		var tier_cost := CardManager.miting_tier_cost(tier)
 		var tier_mult := CardManager.miting_tier_mult(tier)
 		if not miting.is_empty():
-			var smear := miting_smear(bot, String(miting["province"]))
-			var action := {"type": "miting", "province": miting["province"], "focus": miting["focus"], "tier": tier, "smear": smear}
+			var action := {"type": "miting", "province": miting["province"], "focus": miting["focus"], "tier": tier, "smear": -1}
 			candidates.append(action)
 			var score := float(miting["score"]) * tier_mult - tier_cost * funds_value + miting_noise
 			if score > best_score:
@@ -897,7 +919,7 @@ static func _evaluate(bot: int, card_type: String) -> Dictionary:
 		CardPresets.CARD_THEFT_CARD_TYPE:
 			return _eval_card_theft(bot)
 		CardPresets.PROPAGANDA_CARD_TYPE:
-			return {}  # 0.0.231: karalama mitingin içinde kullanılır (bkz. miting_smear)
+			return _eval_propaganda(bot)
 	if CardPresets.needs_target(card_type):
 		return _eval_steal(bot, card_type)
 	if card_type == CardPresets.REPUTATION_CARD_TYPE:

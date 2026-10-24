@@ -5,8 +5,8 @@ extends PanelContainer
 ## yarısında. Üç başlık: TEŞKİLAT, MİTİNG, YATIRIM; birine basınca yalnız
 ## onun ayrıntısı açılır.
 ##   MİTİNG: bütçe (küçük / orta / büyük) → isteğe bağlı hitap grupları (teşkilat
-##     seviyesi kadar; varsayılan genel halk) → elinde karalama kartı varsa
-##     "kullan / sakla" → özet ve MİTİNGİ DÜZENLE. Hazırlık ya da iptal hak ve
+##     seviyesi kadar; varsayılan genel halk) → özet ve MİTİNGİ DÜZENLE
+##     (karalama 0.0.237'den beri yine ayrı kart). Hazırlık ya da iptal hak ve
 ##     para tüketmez; kart yalnız son onayda elden çıkar.
 ##   YATIRIM: sadece hükümet partisi; bütçe → etki özeti → onay.
 ## Kurallar ve sınırlar CardManager'da doğrulanır (sıra başına miting / yatırım sınırı lobi ayarı).
@@ -300,32 +300,8 @@ func _build_miting() -> void:
 					elif _focus.size() < slots:
 						_focus.append(group)
 					refresh(), not full))
-	# 3) KARALAMA (yalnız kart eldeyse)
-	var has_card := (CardManager.my_inventory() as Array).has(CardPresets.PROPAGANDA_CARD_TYPE)
-	var targets := CardManager.smear_targets(me, province_id) if has_card else []
-	if not targets.has(_smear):
-		_smear = -1
-	if has_card:
-		_section(L.t("3 · Karalama kartı"))
-		if targets.is_empty():
-			_body.add_child(PopupKit.note(L.t("Elinde karalama kartı var ama bu ilde teşkilatın olmadığı için kullanamazsın; kart elinde kalır."), UiTheme.TEXT_MUTED))
-		else:
-			_body.add_child(PopupKit.note(L.t("Mitingte bir rakibe yüklenebilirsin: ona eksi, sana artı. Ayrı miting hakkı harcamaz; kart miting yapılınca elinden çıkar."), UiTheme.TEXT_MUTED))
-			var list := GridContainer.new()
-			list.columns = 2
-			list.add_theme_constant_override("h_separation", 4)
-			list.add_theme_constant_override("v_separation", 4)
-			_body.add_child(list)
-			list.add_child(_choice_button(L.t("Kartı sakla"), _smear == -1, UiTheme.PANEL_LIGHT, func():
-				_smear = -1
-				refresh()))
-			for pid in targets:
-				var party: Dictionary = PartyManager.data_of(int(pid))
-				list.add_child(_choice_button(L.t("Karala: %s") % String(party.get("name", "?")), _smear == int(pid),
-					Color(party.get("bg_color", UiTheme.PANEL)), func():
-						_smear = int(pid)
-						refresh()))
-	# 4) ÖZET
+	_smear = -1  # 0.0.237: karalama yine ayrı kart (elden ile sürükle)
+	# 3) ÖZET
 	_section(L.t("Özet"))
 	var cost := CardManager.miting_tier_cost(_miting_tier)
 	_body.add_child(PopupKit.kv(L.t("İl"), ElectionNightSim.province_name(province_id)))
@@ -334,8 +310,6 @@ func _build_miting() -> void:
 	for group in _focus:
 		names.append(VoterGroups.title(String(group)))
 	_body.add_child(PopupKit.kv(L.t("Hitap"), ", ".join(names) if not names.is_empty() else L.t("genel halk")))
-	if _smear != -1:
-		_body.add_child(PopupKit.kv(L.t("Karalanan rakip"), String(PartyManager.data_of(_smear).get("name", "?")), UiTheme.RED.lightened(0.3)))
 	_body.add_child(PopupKit.kv(L.t("Provokasyon riski"), EffectWords.risk(CardManager.miting_risk(me, province_id))))
 	var gains := _gain_preview(me)
 	if gains != "":

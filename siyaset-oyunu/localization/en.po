@@ -3,6 +3,24 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: en\n"
 
+msgid "Karalama: teşkilatın olan bir ile dokun, sonra rakip partiyi seç  ·  Karta tekrar dokun: iptal"
+msgstr "Smear: tap a province where you have an organization, then pick the rival party  ·  Tap the card again: cancel"
+
+msgid "Karalama kartını bir ile sürükle ya da karta dokunup ili seç."
+msgstr "Drag the smear card onto a province, or tap the card and pick the province."
+
+msgid "%s'da teşkilatın yok: karalama teşkilat ister."
+msgstr "You have no organization in %s: a smear needs one."
+
+msgid "Karalama: haritada bir ilin üstüne bırak  ·  Başka yere bırak: iptal"
+msgstr "Smear: drop it on a province on the map  ·  Drop anywhere else: cancel"
+
+msgid "Bırak: %s'da karalama (sonra rakip partiyi seç)"
+msgstr "Drop: smear in %s (then pick the rival party)"
+
+msgid "%s'da teşkilatın yok: karalama teşkilat ister"
+msgstr "You have no organization in %s: a smear needs one"
+
 msgid "%s, %s ile grup toplantısı yaptı (%s): o grupta %s."
 msgstr "%s held a group meeting with %s (%s): %s in that group."
 

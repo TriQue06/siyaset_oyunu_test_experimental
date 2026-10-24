@@ -1,4 +1,10 @@
 {
+"Karalama: teşkilatın olan bir ile dokun, sonra rakip partiyi seç  ·  Karta tekrar dokun: iptal": "Smear: tap a province where you have an organization, then pick the rival party  ·  Tap the card again: cancel",
+"Karalama kartını bir ile sürükle ya da karta dokunup ili seç.": "Drag the smear card onto a province, or tap the card and pick the province.",
+"%s'da teşkilatın yok: karalama teşkilat ister.": "You have no organization in %s: a smear needs one.",
+"Karalama: haritada bir ilin üstüne bırak  ·  Başka yere bırak: iptal": "Smear: drop it on a province on the map  ·  Drop anywhere else: cancel",
+"Bırak: %s'da karalama (sonra rakip partiyi seç)": "Drop: smear in %s (then pick the rival party)",
+"%s'da teşkilatın yok: karalama teşkilat ister": "You have no organization in %s: a smear needs one",
 "%s, %s ile grup toplantısı yaptı (%s): o grupta %s.": "%s held a group meeting with %s (%s): %s in that group.",
 "Kalıcı: grubun ülke genelindeki seçmeninden çekersin ve o gruptaki seçmenlerinin sadakati artar. Zıt grupta seçmenlerinin bir kısmı soğur.": "Permanent: you win voters of the group nationwide and your voters in it grow more loyal. Some of your voters in the opposite group cool off.",
 "%s\nKonu: %s\nPartinin bu gruptaki desteği %s; toplantı kalıcı seçmen kazandırır.%s": "%s\nTopic: %s\nYour party's support in this group is %s; the meeting wins permanent voters.%s",

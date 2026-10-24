@@ -2184,6 +2184,8 @@ func _process(delta: float) -> void:
 	_update_vote_swap(delta)
 	_sync_parliament_to_slot()
 	_refresh_timer_bar()
+	if _smear_ghost != null:
+		_update_smear_drag()
 	# Fare kımıldamadıysa il / parti tespiti her karede yapılmaz (performans);
 	# yine de arada bir tazelenir (altındaki içerik değişmiş olabilir).
 	var mouse := get_viewport().get_mouse_position()
@@ -2287,7 +2289,14 @@ func _wire_hand_card(wrapper: Control, holder: Control, card: Control, card_type
 				card.set_meta("press_pos", event.position)
 			elif card.get_meta("pressed", false):
 				card.set_meta("pressed", false)
-				_on_hand_card_clicked(hand_index)
+				if _smear_drag_index == hand_index:
+					_finish_smear_drag()
+				else:
+					_on_hand_card_clicked(hand_index)
+		elif event is InputEventMouseMotion and card.get_meta("pressed", false) and _smear_drag_index == -1 \
+				and card_type == CardPresets.PROPAGANDA_CARD_TYPE and CardManager.can_act():
+			if event.position.distance_to(card.get_meta("press_pos", Vector2.ZERO)) > TAP_MAX_MOVE_PX:
+				_start_smear_drag(hand_index, card_type, holder)
 	)
 
 	# FARE ÜSTÜNE GELİNCE kart tamamen görünür (dokunmatikte aynısını tek
@@ -2420,7 +2429,8 @@ func _on_hand_card_clicked(hand_index: int) -> void:
 	var card_type: String = hand[hand_index]
 	var me := multiplayer.get_unique_id()
 	if card_type == CardPresets.PROPAGANDA_CARD_TYPE:
-		_set_target_hint(L.t("Karalama: bir ile dokun, MİTİNG'i seç; hazırlıkta kartı kullanabilirsin."))
+		_begin_province_targeting(hand_index)
+		_set_target_hint(L.t("Karalama: teşkilatın olan bir ile dokun, sonra rakip partiyi seç  ·  Karta tekrar dokun: iptal"))
 		return
 	if CardPresets.needs_party_target(card_type):
 		_begin_targeting(hand_index)
@@ -2491,7 +2501,7 @@ func _maybe_autosave() -> void:
 ## Oynanamayan bir karta tıklanınca neden oynanamadığı.
 func _unplayable_reason(card_type: String) -> String:
 	if card_type == CardPresets.PROPAGANDA_CARD_TYPE:
-		return L.t("Karalama kartı miting hazırlarken kullanılır.")
+		return L.t("Karalama kartını bir ile sürükle ya da karta dokunup ili seç.")
 	if CardPresets.is_law_card(card_type):
 		return L.t("Yasa şu an meclise getirilemez (meclis yok ya da hükümet kuruluyor).")
 	if CardPresets.is_censure_card(card_type):
@@ -2541,6 +2551,55 @@ func _valid_party_target(peer_id: int) -> bool:
 	return CardManager.can_play_card(multiplayer.get_unique_id(), String(hand[_pending_target_hand_index]), peer_id)
 
 ## Miting / yatırım: haritadan il seçilmesi beklenir (bkz. _on_province_clicked).
+# --- KARALAMA SÜRÜKLEME (0.0.237): kart bir ile bırakılır, parti listesi açılır ---
+var _smear_drag_index := -1
+var _smear_ghost: TextureRect
+
+func _start_smear_drag(hand_index: int, card_type: String, holder: Control) -> void:
+	_deselect_hand_card()
+	_cancel_targeting()
+	_smear_drag_index = hand_index
+	if holder != null:
+		holder.modulate.a = 0.35
+	_smear_ghost = TextureRect.new()
+	_smear_ghost.texture = CardPresets.get_card_texture(card_type)
+	_smear_ghost.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_smear_ghost.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_smear_ghost.size = CARD_DISPLAY_SIZE * 0.6
+	_smear_ghost.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_smear_ghost.z_index = 150
+	add_child(_smear_ghost)
+	_update_smear_drag()
+
+func _update_smear_drag() -> void:
+	var mouse := get_viewport().get_mouse_position()
+	_smear_ghost.position = mouse - _smear_ghost.size * 0.5
+	var province_id := _province_under_mouse()
+	var me := multiplayer.get_unique_id()
+	var ok := province_id != "" and (CardManager.organization_level(province_id, me) > 0 or PartyManager.is_independent(me))
+	_smear_ghost.modulate = Color(1, 1, 1, 0.95) if ok else Color(1, 0.6, 0.6, 0.85)
+	if province_id != _hovered_province_id:
+		_highlight_province(province_id)
+	if province_id == "":
+		_set_target_hint(L.t("Karalama: haritada bir ilin üstüne bırak  ·  Başka yere bırak: iptal"))
+	elif ok:
+		_set_target_hint(L.t("Bırak: %s'da karalama (sonra rakip partiyi seç)") % ElectionNightSim.province_name(province_id))
+	else:
+		_set_target_hint(L.t("%s'da teşkilatın yok: karalama teşkilat ister") % ElectionNightSim.province_name(province_id))
+
+func _finish_smear_drag() -> void:
+	var hand_index := _smear_drag_index
+	var province_id := _province_under_mouse()
+	_smear_drag_index = -1
+	if _smear_ghost != null:
+		_smear_ghost.queue_free()
+		_smear_ghost = null
+	_set_target_hint("")
+	_highlight_province("")
+	_rebuild_hand()
+	if province_id != "":
+		_ask_propaganda_target(hand_index, province_id)
+
 func _begin_province_targeting(hand_index: int) -> void:
 	_pending_province_hand_index = hand_index
 	# Harita tıklanabilir kalsın: açık il paneli haritanın üstünü kapatmasın.
@@ -5445,11 +5504,11 @@ func _build_propaganda_menu() -> void:
 
 ## Karalama kartı bir ile bırakıldı: hedef parti seçtirilir, sonra oynanır.
 func _ask_propaganda_target(hand_index: int, province_id: String) -> void:
-	var targets: Array = []
-	var mine := CardManager.party_of(multiplayer.get_unique_id())
-	for pid in CardManager.party_ids():
-		if int(pid) != mine:
-			targets.append(int(pid))
+	var me := multiplayer.get_unique_id()
+	if CardManager.organization_level(province_id, me) < 1 and not PartyManager.is_independent(me):
+		_show_toast(L.t("%s'da teşkilatın yok: karalama teşkilat ister.") % ElectionNightSim.province_name(province_id))
+		return
+	var targets: Array = CardManager.smear_targets(me, province_id)
 	_show_party_picker(L.t("%s: kimi karalayacaksın?") % ElectionNightSim.province_name(province_id), targets,
 		func(pid: int): CardManager.play_card(hand_index, pid, province_id))
 

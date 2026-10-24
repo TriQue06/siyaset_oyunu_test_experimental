@@ -322,8 +322,9 @@ func _initialize() -> void:
 	check("teskilat: anket (sadece kurana)", not cm.province_poll(3, TestProvinces.id("ankara")).is_empty() and cm.province_poll(1, TestProvinces.id("ankara")).is_empty())
 	# Karalama artık teşkilat ister; 3 numaranın Ankara teşkilatı dursun.
 	cm.organizations = {TestProvinces.id("ankara"): {3: 1}}
-	# 0.0.231: karalama tek başına oynanmaz, mitingin içinde kullanılır.
-	check("karalama karti tek basina oynanamaz", not cm.can_play_card(3, "karalama", 1, TestProvinces.id("ankara")))
+	# 0.0.237: karalama yine tek başına oynanır (il + parti).
+	check("karalama karti teskilatli ilde rakibe oynanir", cm.can_play_card(3, "karalama", 1, TestProvinces.id("ankara")))
+	check("karalama karti teskilatsiz ilde oynanamaz", not cm.can_play_card(3, "karalama", 1, TestProvinces.id("izmir")))
 	check("teskilatsiz ilde karalama yapilamaz", not cm.can_smear(3, 1, TestProvinces.id("izmir")))
 	check("karalama kendine yapilamaz", not cm.can_smear(3, 3, TestProvinces.id("ankara")))
 	check("karalama gecersiz partiye yapilamaz", not cm.can_smear(3, 99, TestProvinces.id("ankara")))

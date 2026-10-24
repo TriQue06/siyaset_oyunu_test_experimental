@@ -1716,8 +1716,8 @@ func can_play_card(peer_id: int, card_type: String, target_peer_id: int = -1, ta
 	if card_type == CardPresets.REBELLION_CARD_TYPE:
 		return other_party and has_seats(target_peer_id)
 	if card_type == CardPresets.PROPAGANDA_CARD_TYPE:
-		# 0.0.231: karalama kartı tek başına oynanmaz, miting hazırlığında kullanılır.
-		return false
+		# 0.0.237: karalama yine tek başına oynanır (karta dokun / sürükle → il → parti).
+		return can_smear(peer_id, target_peer_id, target_province)
 	if CardPresets.needs_province_target(card_type):
 		if not has_province(target_province):
 			return false

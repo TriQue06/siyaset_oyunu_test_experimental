@@ -13,6 +13,8 @@ const PLACEHOLDER := "¤"
 const SVG := '<svg xmlns="http://www.w3.org/2000/svg" height="96" width="96" viewBox="0 -960 960 960" fill="#ffffff"><path d="M444-200h70v-50q50-9 86-39t36-89q0-42-24-77t-96-61q-60-20-83-35t-23-41q0-26 18.5-41t53.5-15q32 0 50 15.5t26 38.5l64-26q-11-35-40.5-61T516-710v-50h-70v50q-50 11-78 44t-28 74q0 47 27.5 76t86.5 50q63 23 87.5 41t24.5 47q0 33-23.5 48.5T486-314q-33 0-58.5-20.5T390-396l-66 26q14 48 43.5 77.5T444-252v52Zm36 120q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></svg>'
 ## Simge yazı tipinin çizim boyu (piksel; her puntoya ölçeklenir).
 const FONT_SIZE := 96
+## Simgenin yazı puntosuna oranı (0.0.241: eskisinin iki katı).
+const ICON_SCALE := 1.84
 const FONTS := ["res://assets/fonts/IBMPlexMono-Regular.ttf", "res://assets/fonts/IBMPlexMono-Medium.ttf",
 	"res://assets/fonts/IBMPlexMono-SemiBold.ttf", "res://assets/fonts/IBMPlexMono-Bold.ttf"]
 
@@ -46,13 +48,14 @@ static func font() -> FontFile:
 	f.set_cache_descent(0, FONT_SIZE, s * 0.2)
 	f.set_texture_image(0, cache, 0, image)
 	var glyph := GLYPH.unicode_at(0)
-	var side := s * 0.92
+	# 0.0.241: simge yazının iki katı boyda (küçük kalıyordu); büyük harflerin
+	# ortasına hizalı, iki yanında biraz boşluk.
+	var side := s * ICON_SCALE
 	f.set_glyph_texture_idx(0, cache, glyph, 0)
 	f.set_glyph_uv_rect(0, cache, glyph, Rect2(0, 0, image.get_width(), image.get_height()))
 	f.set_glyph_size(0, cache, glyph, Vector2(side, side))
-	# Rakamların boyunda, satırın ortasında dursun.
-	f.set_glyph_offset(0, cache, glyph, Vector2(s * 0.04, -s * 0.78))
-	f.set_glyph_advance(0, FONT_SIZE, glyph, Vector2(s, 0))
+	f.set_glyph_offset(0, cache, glyph, Vector2(s * 0.06, -s * 0.36 - side * 0.5))
+	f.set_glyph_advance(0, FONT_SIZE, glyph, Vector2(side + s * 0.12, 0))
 	_font = f
 	return f
 

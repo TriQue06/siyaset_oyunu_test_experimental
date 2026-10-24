@@ -77,16 +77,6 @@ func _add_row(entry: Dictionary) -> void:
 		var dot := Control.new()
 		dot.custom_minimum_size = Vector2(BADGE_SIZE, 6)
 		row.add_child(dot)
-	# SORUŞTURMA SONUCU: renkten bağımsız, metinli etiket.
-	var kind := String(entry.get("kind", ""))
-	if kind == "inquiry":
-		var result := "scandal" if String(entry.get("text", "")).begins_with("USULSÜZLÜK") \
-			else ("clean" if String(entry.get("text", "")).begins_with("ŞEFFAF") else "none")
-		var tag: Array = EconomyPanel.inquiry_tag(result)
-		var chip := PopupKit.chip(String(tag[0]).substr(0, 1), tag[1])
-		chip.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-		chip.tooltip_text = String(tag[0])
-		row.add_child(chip)
 	var label := Label.new()
 	label.text = String(entry.get("text", ""))
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

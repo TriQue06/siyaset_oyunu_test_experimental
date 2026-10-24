@@ -110,7 +110,7 @@ func _refresh() -> void:
 			count, MultiplayerManager.MAX_PLAYERS, MultiplayerManager.MIN_PLAYERS_TO_START
 		]
 
-	settings_button.visible = am_owner
+	# Eski "LOBİ AYARLARI" düğmesi gizli kalır: kurallar sağ sütunda hep açık.
 	start_button.visible = am_owner
 	start_button.disabled = count < MultiplayerManager.MIN_PLAYERS_TO_START
 
@@ -682,12 +682,15 @@ func _build_concept_a() -> void:
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	for side in ["left", "top", "right", "bottom"]:
 		margin.add_theme_constant_override("margin_" + side, 24)
+	# Başlık satırı sağ üstteki Menü düğmesiyle aynı hizada (üst 16, yükseklik 44).
+	margin.add_theme_constant_override("margin_top", 16)
 	add_child(margin)
 	var root_box := VBoxContainer.new()
 	root_box.add_theme_constant_override("separation", 16)
 	margin.add_child(root_box)
 	var header := HBoxContainer.new()
 	header.add_theme_constant_override("separation", 16)
+	header.custom_minimum_size.y = 44
 	root_box.add_child(header)
 	var title := UiTheme.mono_label(L.t("SİYASET OYUNU"), 24, UiTheme.TEXT, true)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -695,6 +698,8 @@ func _build_concept_a() -> void:
 	var code_row := center_box.get_node("CodeRow")
 	code_row.reparent(header)
 	UiSkin.skin_button(copy_code_button)
+	copy_code_button.custom_minimum_size.y = 44
+	copy_code_button.size_flags_vertical = Control.SIZE_FILL
 	var menu_space := Control.new()
 	menu_space.custom_minimum_size.x = 124
 	header.add_child(menu_space)
@@ -746,6 +751,9 @@ func _build_concept_a() -> void:
 	leave_button.reparent(footer)
 	leave_button.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	UiSkin.skin_button(leave_button)
+	# Yan yana: AYRIL ile OYUNU BAŞLAT aynı yükseklikte.
+	leave_button.custom_minimum_size = Vector2(120, start_button.custom_minimum_size.y)
+	leave_button.size_flags_vertical = Control.SIZE_FILL
 	start_button.reparent(footer)
 	UiSkin.skin_color_button(start_button, UiTheme.GREEN_DARK)
 	resized.connect(_fit_concept_a)

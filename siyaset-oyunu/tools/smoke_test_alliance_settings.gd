@@ -40,7 +40,6 @@ func run() -> void:
 		mm._apply_vote_timeout(seconds)
 		gm._set_phase(gm.Phase.VOTING)
 		check(is_equal_approx(gm.phase_seconds_left(), float(seconds)), "vote deadline %d" % seconds)
-	check(economy.INQUIRY_FUNDS_COST == 20, "inquiry cost 20 million")
 	var screen = load("res://scripts/game_screen.gd")
 	check(screen.can_instantiate(), "game screen compiles")
 	var lobby = load("res://scripts/room_lobby.gd")

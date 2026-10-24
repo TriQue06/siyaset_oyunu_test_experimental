@@ -3,6 +3,33 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: en\n"
 
+msgid "Afet yardımı parti kasasından yapılır; devlet hazinesi yalnız yatırım içindir."
+msgstr "Disaster aid is paid from the party treasury; the state treasury is only for investment."
+
+msgid "Sıran gelince önce kartını çekersin. Teşkilat, miting ve yatırım için haritada bir ile dokun. MECLİS düğmesi gensoru, grup toplantısı ve yasayı sırayla açar; istersen hiç girmeden turu bitirebilirsin."
+msgstr "When your turn comes, you draw your card first. Tap a province on the map for organization, rallies and investment. The PARLIAMENT button opens the censure motion, group meeting and law in order; you can also end your turn without entering."
+
+msgid "Hükümettesin: vergi kademesini meclise sunabilir, devlet hazinesinden il yatırımı yapabilirsin. Vergi indirimi seçmene yavaş yansır, seçimden birkaç dönem önce yap. Hazineden payın bakanlıklarına göredir; miting ve yardım parti kasasından ödenir."
+msgstr "You are in government: you can bring the tax level to parliament and invest in provinces from the state treasury. Tax cuts reach voters slowly, so do them a few terms before the election. Your share of the treasury follows your ministries; rallies and aid are paid from the party treasury."
+
+msgid "Meclis akışı: uygunsa gensoru, sonra grup toplantısı ve yasa. Her aşamayı yap ya da geç."
+msgstr "Parliament flow: a censure motion if possible, then the group meeting and a law. Do each stage or skip it."
+
+msgid "Devlet hazinesinden il yatırımı: ildeki bütün seçmen memnun olur, ekonomi canlanır. Partinin hazine kotası bakanlık payına göredir."
+msgstr "Provincial investment from the state treasury: every voter in the province is pleased and the economy picks up. Your party's treasury quota follows its share of ministries."
+
+msgid "Hazine kotan yetmiyor (%s kaldı). Daha küçük bir yatırım seç."
+msgstr "Your treasury quota is not enough (%s left). Choose a smaller investment."
+
+msgid "YATIRIMI YAP · %s"
+msgstr "INVEST · %s"
+
+msgid "Rastgele bir kart çek ya da bu sıra atla. Kart ya hemen etki eder ya da eline gelir."
+msgstr "Draw a random card or skip this turn. The card either takes effect at once or goes to your hand."
+
+msgid "Bu sıra kart çekme"
+msgstr "Don't draw a card this turn"
+
 msgid "Karalama: teşkilatın olan bir ile dokun, sonra rakip partiyi seç  ·  Karta tekrar dokun: iptal"
 msgstr "Smear: tap a province where you have an organization, then pick the rival party  ·  Tap the card again: cancel"
 

@@ -124,89 +124,9 @@ func _initialize() -> void:
 	_shot("econ_law_designer")
 	scene._law_designer.hide()
 
-	# Yatırım: önizleme, sonra yapılır (animasyon ortasında görüntü).
+	# Yatırım (0.0.238: tamamı hazineden, finansman paneli yok).
 	var province: String = String(cm._province_ids[6])
-	scene._pending_invest = true  # eski hedefleme yolu: finansman paneli
-	await _frames(3)
-	scene._select_target_province(province)
-	await _frames(8)
-	_shot("econ_invest_preview")
-	var fp = scene._funding_panel
-	check("finansman paneli açıldı", fp.visible)
-	check("finansman paneli haritanın içinde", scene._r(scene.R_MAP).grow(1.0).encloses(fp.get_global_rect()), str(fp.get_global_rect()))
-	check("varsayılan: tamamı devletten, hazine önce/sonra", fp._state_left.text.contains(Economy.money_text(cm.state_treasury() - Economy.INVEST_COST)),
-		fp._state_left.text)
-	# Noktayı sürükle: %30 devlet (fareyle, gerçek giriş olayıyla).
-	var slider = fp._slider
-	var press := InputEventMouseButton.new()
-	press.button_index = MOUSE_BUTTON_LEFT
-	press.pressed = true
-	press.position = Vector2(slider._x_of(0.9), slider.size.y * 0.5)
-	slider._gui_input(press)
-	var motion := InputEventMouseMotion.new()
-	motion.position = Vector2(slider._x_of(0.3), slider.size.y * 0.5)
-	slider._gui_input(motion)
-	var release := InputEventMouseButton.new()
-	release.button_index = MOUSE_BUTTON_LEFT
-	release.pressed = false
-	slider._gui_input(release)
-	await _frames(20)
-	_shot("econ_funding_split")
-	check("sürükleme paylaşımı değiştirdi (%30 devlet)", absf(slider.share - 0.3) < 0.001, str(slider.share))
-	check("iki katkı anında güncellendi (ikisi de milyon ₺)", fp._state_pay.text == Economy.money_full(30.0) and fp._party_pay.text == Economy.money_full(70.0),
-		"%s / %s" % [fp._state_pay.text, fp._party_pay.text])
-	check("kalan bakiyeler güncellendi", fp._party_left.text.contains(GameRules.money_text(cm.funds_of(me) - 70.0))
-		and fp._state_left.text.contains(Economy.money_text(cm.state_treasury() - 30.0)), fp._party_left.text)
-	var key := InputEventKey.new()
-	key.pressed = true
-	key.keycode = KEY_HOME
-	slider._gui_input(key)
-	await _frames(20)
-	_shot("econ_funding_party")
-	check("klavyeyle tam 100/0 (tamamı parti)", is_zero_approx(slider.share) and not fp._confirm.disabled)
 	var before: float = cm.state_treasury()
-	var funds_pre: float = cm.funds_of(me)
-	fp._confirm.pressed.emit()
-	await _frames(4)
-	check("onay: kasa tam bir kez −100 milyon ₺, hazine değişmedi", absf(cm.funds_of(me) - (funds_pre - 100.0)) < 0.01 and absf(cm.state_treasury() - before) < 0.01,
-		"%.1f -> %.1f" % [funds_pre, cm.funds_of(me)])
-	check("onaydan sonra panel kapandı", not fp.visible)
-	# Hazine azken: devlet tarafı taralı, sınır notu.
-	cm.economy["treasury"] = 40.0
-	cm.funds[me] = 120.0
-	scene._pending_invest = true  # eski hedefleme yolu: finansman paneli
-	await _frames(3)
-	scene._select_target_province(String(cm._province_ids[9]))
-	await _frames(20)
-	_shot("econ_funding_limited")
-	check("hazine 40: nokta en fazla %40'a gider", absf(slider.max_share - 0.4) < 0.001 and slider.share <= 0.4 + 0.001)
-	cm.funds[me] = 5.0
-	fp.open(me, "invest", String(cm._province_ids[9]))
-	await _frames(6)
-	_shot("econ_funding_blocked")
-	check("ödenemiyorsa onay kapalı ve nedeni yazar", fp._confirm.disabled and fp._note.text != "", fp._note.text)
-	scene._cancel_targeting()
-	cm.funds[me] = 120.0
-	cm.economy["treasury"] = 600.0
-	# Hükümet mitingi devlet parasıyla: usulsüzlük uyarısı.
-	var mit_province := ""
-	for pid in cm._province_ids:
-		if cm.organization_level(String(pid), me) > 0:
-			mit_province = String(pid)
-			break
-	if mit_province == "":
-		mit_province = String(cm._province_ids[12])
-		cm.organizations[mit_province] = {me: 1}
-	scene._pending_miting = true
-	await _frames(3)
-	scene._select_target_province(mit_province)
-	await _frames(4)
-	slider.set_share(1.0)
-	await _frames(20)
-	_shot("econ_funding_miting")
-	check("devlet paylı mitingte usulsüzlük uyarısı", (fp._note.text.contains("PARTİZAN") or fp._note.text.contains("PARTISAN")), fp._note.text)
-	scene._cancel_targeting()
-	before = cm.state_treasury()
 	cm._apply_invest_move(me, province)
 	await _frames(12)
 	_shot("econ_invest_anim")
@@ -230,43 +150,6 @@ func _initialize() -> void:
 		"%.1f + %.1f -> %.1f" % [before_round, expected_income, cm.state_treasury()])
 	await _frames(10)
 	_shot("econ_round_revenue")
-
-	# Finansman soruşturması paneli ve sonuç kartları.
-	var rival: int = -1
-	for pid in cm.party_ids():
-		if int(pid) != cm.party_of(me) and not pm.is_independent(int(pid)):
-			rival = int(pid)
-			break
-	cm.current_turn_index = cm.turn_order.find(me)
-	cm.funds[me] = 120.0
-	scene._open_inquiry_panel(rival)
-	await _frames(8)
-	_shot("econ_inquiry_panel")
-	check("soruşturma paneli ekrana sığıyor", _inside(scene._inquiry_panel), str(scene._inquiry_panel.get_global_rect()))
-	scene._inquiry_panel.hide()
-	scene._on_party_action("inquiry", me)
-	await _frames(6)
-	scene._inquiry_panel.hide()
-	var results := [
-		{"peer_id": me, "target": rival, "result": "clean", "examined": 3, "party_million": 160.0, "public_million": 100.0,
-			"improper_million": 0.0, "gain": Economy.transparency_gain(160.0), "damage": 0.0},
-		{"peer_id": me, "target": rival, "result": "scandal", "examined": 2, "party_million": 0.0, "public_million": 0.0,
-			"improper_million": 60.0, "gain": 0.0, "damage": Economy.scandal_damage(60.0)},
-		{"peer_id": me, "target": rival, "result": "none", "examined": 0, "party_million": 0.0, "public_million": 0.0,
-			"improper_million": 0.0, "gain": 0.0, "damage": 0.0}]
-	for data in results:
-		scene._show_inquiry_result(data)
-		await create_timer(0.5).timeout
-		_shot("econ_inquiry_%s" % String(data["result"]))
-		check("sonuç kartı (%s) ekrana sığıyor" % String(data["result"]), _inside(scene._inquiry_card), str(scene._inquiry_card.get_global_rect()))
-	# Gerçek soruşturma: log satırında etiket.
-	cm.economy["inquiries"] = {}
-	cm._apply_inquiry(me, rival)
-	await _frames(6)
-	scene._on_side_tab(1)
-	await _frames(6)
-	_shot("econ_inquiry_log")
-	scene._on_side_tab(0)
 
 	# Profil kartı: hükümette ekonomi etkisi.
 	scene._toggle_profile(me)

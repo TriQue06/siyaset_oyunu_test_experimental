@@ -1,7 +1,7 @@
 class_name ParliamentFlow
 extends Control
 ## MECLİS AKIŞI SUNUMU (0.0.231): MECLİS düğmesiyle açılır, sıra
-## GENSORU (uygunsa) → GRUP TOPLANTISI → YASA → SORUŞTURMA. Her aşama ortada
+## GENSORU (uygunsa) → GRUP TOPLANTISI → YASA. Her aşama ortada
 ## büyük bir kartla gelir; oyuncu aşamanın hamlesini yapar ya da BU TUR GEÇ der.
 ## Hangi aşamada olunduğu ve neyin kapandığı CardManager'dan okunur (otorite
 ## orada): pencereyi kapatmak ("Haritaya dön") hakkı yenilemez, MECLİS düğmesi
@@ -11,13 +11,12 @@ extends Control
 ## tasarlama penceresinde açılır (law_tab_requested), erken seçim buradan sunulur.
 
 signal law_tab_requested(tab: int)
-signal inquiry_requested
 signal toast_requested(text: String)
 
 const WIDTH := 600.0
-const STAGE_TITLES := {"censure": "GENSORU", "speech": "GRUP TOPLANTISI", "law": "YASA", "inquiry": "SORUŞTURMA"}
-const STAGE_SHORT := {"censure": "Gensoru", "speech": "Toplantı", "law": "Yasa", "inquiry": "Soruşturma"}
-const STAGE_COLORS := {"censure": Color("A6325A"), "speech": Color("3FB586"), "law": Color("7647CC"), "inquiry": Color("244FB3")}
+const STAGE_TITLES := {"censure": "GENSORU", "speech": "GRUP TOPLANTISI", "law": "YASA"}
+const STAGE_SHORT := {"censure": "Gensoru", "speech": "Toplantı", "law": "Yasa"}
+const STAGE_COLORS := {"censure": Color("A6325A"), "speech": Color("3FB586"), "law": Color("7647CC")}
 
 ## Oyuncu akışı açtı mı (oylama sonrası kendiliğinden geri gelsin diye).
 var engaged := false
@@ -110,8 +109,6 @@ func _build(stage: String) -> void:
 			_build_speech()
 		"law":
 			_build_law()
-		"inquiry":
-			_build_inquiry()
 	_body.add_child(UiTheme.rule())
 	var footer := HBoxContainer.new()
 	footer.add_theme_constant_override("separation", 10)
@@ -266,12 +263,6 @@ func _option(title: String, text: String, done: bool, available: bool, action: C
 	UiSkin.skin_color_button(button, STAGE_COLORS["law"].darkened(0.2) if available and not done else UiTheme.PANEL)
 	button.pressed.connect(action)
 	return button
-
-func _build_inquiry() -> void:
-	_explain(L.t("Bir partinin harcamalarını soruşturtursun. Devlet parasıyla miting yapan yakalanır; kendi kasasından harcayan itibar kazanır."))
-	_explain(L.t("Bedeli %s. Açarsan meclis işleri bu tur biter.") % GameRules.cost_text(Economy.INQUIRY_FUNDS_COST), UiTheme.TEXT_MUTED)
-	_body.add_child(_big_button(L.t("SORUŞTURMA AÇ · %s") % GameRules.cost_text(Economy.INQUIRY_FUNDS_COST), STAGE_COLORS["inquiry"], func():
-		inquiry_requested.emit()))
 
 # --- Yerleşim ve animasyon --------------------------------------------------------
 

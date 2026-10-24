@@ -142,7 +142,7 @@ func _initialize() -> void:
 	_shot("tf_11_miting_summary")
 	var before: float = cm.funds_of(me)
 	var smears_before: int = cm.my_inventory().count("karalama")
-	scene._province_actions._do_miting(0.0)
+	scene._province_actions._do_miting()
 	await _wait(0.5)
 	check("arayuzden miting yapildi, karalama karti elde kaldi", cm.miting_count(me) == 1 and cm.my_inventory().count("karalama") == smears_before,
 		"%.0f -> %.0f" % [before, cm.funds_of(me)])
@@ -161,7 +161,7 @@ func _initialize() -> void:
 	scene._on_province_clicked(province)
 	await _wait(0.4)
 	_shot("tf_13_smear_picker")
-	var picker = scene._inquiry_picker
+	var picker = scene._party_picker
 	check("ile dokununca parti listesi acildi", picker != null and is_instance_valid(picker) and picker.visible)
 	check("il paneli acilmadi (karalama hedefi)", not scene._province_actions.visible)
 	var target_button: Button = null
@@ -181,7 +181,7 @@ func _initialize() -> void:
 	scene._on_hand_card_clicked(cm.my_inventory().find("karalama"))
 	scene._on_province_clicked(other)
 	await _wait(0.3)
-	check("teskilatsiz ilde parti listesi acilmaz", scene._inquiry_picker == null or not is_instance_valid(scene._inquiry_picker))
+	check("teskilatsiz ilde parti listesi acilmaz", scene._party_picker == null or not is_instance_valid(scene._party_picker))
 	# Sürükleme: harita dışına bırakmak iptal, kart elde kalır.
 	scene._start_smear_drag(cm.my_inventory().find("karalama"), "karalama", null)
 	await _wait(0.1)

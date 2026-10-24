@@ -115,10 +115,8 @@ func _handle_turn(now: float) -> void:
 static func do_action(bot: int) -> Dictionary:
 	var action := BotBrain.choose_action(bot)
 	var funds_before := CardManager.funds_of(bot)
-	# Devletten ödenen hamle (yatırım, partizan miting) kasayı değiştirmez:
-	# hazine ve işlem defteri de izlenir.
+	# Devletten ödenen hamle (yatırım) kasayı değiştirmez: hazine de izlenir.
 	var treasury_before := CardManager.state_treasury()
-	var ledger_before := int(CardManager.economy.get("next_id", 1))
 	var hand_before: int = CardManager.inventories.get(bot, []).size()
 	var laws_before := [CardManager.has_proposed_law_this_round(bot, "group"), CardManager.has_proposed_law_this_round(bot, "tax"), CardManager.has_proposed_law_this_round(bot, "constitution")]
 	var blocked_before := CardManager.is_turn_blocked()
@@ -141,19 +139,17 @@ static func do_action(bot: int) -> Dictionary:
 		"miting":
 			var tier := int(action.get("tier", CardManager.DEFAULT_TIER))
 			var smear := int(action.get("smear", -1))
-			CardManager._apply_miting_move(bot, String(action["province"]), BotBrain.miting_state_share(bot, tier),
+			CardManager._apply_miting_move(bot, String(action["province"]), 0.0,
 				action.get("focus", []), tier, smear)
 		"invest":
 			var invest_tier := int(action.get("tier", CardManager.DEFAULT_TIER))
-			CardManager._apply_invest_move(bot, String(action["province"]), BotBrain.invest_state_share(bot, invest_tier), invest_tier)
+			CardManager._apply_invest_move(bot, String(action["province"]), 1.0, invest_tier)
 		"parl_pass":
 			CardManager._apply_parl_pass(bot, String(action["stage"]))
 		"aid":
 			CardManager._apply_aid_move(bot, float(action["party"]), float(action["state"]))
 		"censure":
 			CardManager._apply_censure_move(bot)
-		"inquiry":
-			CardManager._apply_inquiry(bot, int(action["target"]))
 		"congress":
 			CardManager._apply_congress(bot)
 		"early_election":
@@ -170,7 +166,7 @@ static func do_action(bot: int) -> Dictionary:
 			return {}
 	# Hamle gerçekten uygulandı mı? (Reddedilen hamlede döngüye girmesin.)
 	var applied: bool = CardManager.funds_of(bot) != funds_before or CardManager.current_turn_peer_id() != bot \
-		or CardManager.state_treasury() != treasury_before or int(CardManager.economy.get("next_id", 1)) != ledger_before \
+		or CardManager.state_treasury() != treasury_before \
 		or CardManager.inventories.get(bot, []).size() != hand_before \
 		or [CardManager.has_proposed_law_this_round(bot, "group"), CardManager.has_proposed_law_this_round(bot, "tax"), CardManager.has_proposed_law_this_round(bot, "constitution")] != laws_before \
 		or CardManager.is_turn_blocked() != blocked_before or CardManager.speech_done != speech_before \

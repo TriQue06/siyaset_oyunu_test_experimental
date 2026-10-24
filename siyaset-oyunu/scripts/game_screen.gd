@@ -36,7 +36,8 @@ const R_DESK := Rect2(0, 528, 1280, 192)
 const R_HAND := Rect2(16, 560, 504, 128)
 ## 0.0.232: kart bozdurma yok; Turu Bitir hamleler alanında, para sağda.
 const R_ACTIONS := Rect2(536, 560, 560, 136)
-const R_FUNDS := Rect2(1112, 560, 152, 136)
+## Alt kenar hamle düğmelerinin alt kenarıyla aynı (560 + 64 + 6 + 64).
+const R_FUNDS := Rect2(1112, 560, 152, 134)
 ## Stüdyo masasındaki meclis yuvasının yüksekliği (oylamada büyür).
 const PARL_SLOT_HEIGHT := 150.0
 const PARL_SLOT_VOTE_HEIGHT := 286.0
@@ -259,7 +260,6 @@ const ACTION_COLOR_CENSURE := Color("A6325A")   # bordo
 const ACTION_COLOR_EARLY := Color("F0A824")     # sarı-turuncu
 const ACTION_COLOR_SPEECH := Color("3FB586")    # su yeşili
 const ACTION_COLOR_CONGRESS := Color("AB39DB")  # mor
-const ACTION_COLOR_INQUIRY := Color("244FB3")   # lacivert
 const ACTION_COLOR_ALLIANCE := Color("F27E1F")  # turuncu
 const ACTION_COLOR_PASS := Color("244FB3")      # lacivert
 const VOTE_COLOR_YES := Color("31C440")         # yeşil
@@ -335,17 +335,10 @@ var _economy_panel: EconomyPanel
 var _tax_panel: PanelContainer
 var _tax_box: VBoxContainer
 var _tax_selected: int = -1
-## FİNANSMAN: yatırım / miting için il seçilince açılan kaydırıcılı panel;
-## finansman soruşturması paneli ve sonuç kartı.
-var _funding_panel: FundingPanel
 ## AFET YARDIMI paneli (YARDIM hamlesi).
 var _aid_panel: AidPanel
-## FİNANSMAN SORUŞTURMASI hamlesi (eskiden sadece parti kartından) ve parti seçici.
-var _inquiry_picker: PanelContainer
-var _inquiry_panel: PanelContainer
-var _inquiry_box: VBoxContainer
-var _inquiry_target: int = -1
-var _inquiry_card: Control
+## EVRENSEL PARTİ LİSTESİ (karalama hedefi, ittifak daveti...).
+var _party_picker: PanelContainer
 var _alliance_button: Button
 var _alliance_panel: PanelContainer
 var _alliance_list: VBoxContainer
@@ -392,7 +385,6 @@ func _ready() -> void:
 	GovernmentManager.proposal_resolved.connect(_on_proposal_resolved)
 	CardManager.opinion_changed.connect(_on_opinion_changed)
 	CardManager.economy_event.connect(_on_economy_event)
-	CardManager.inquiry_resolved.connect(_show_inquiry_result)
 	GameSettings.province_view_changed.connect(_on_province_view_changed)
 
 	UiSkin.skin_panel(left_panel, UiSkin.PANEL_DARK)
@@ -487,7 +479,7 @@ func _build_tutorial() -> void:
 		L.t("Bu senin partinin parası: sıran geldikçe dolar, hamleler buradan ödenir. Sağdaki EKONOMİ'de görünen DEVLET HAZİNESİ ayrıdır; onu sadece hükümet, yatırım için kullanır."),
 		func() -> Rect2: return _r(R_FUNDS), mine)
 	_tutorial.add_step("hamleler", L.t("Hamleler"),
-		L.t("Sıran gelince önce kartını çekersin. Teşkilat, miting ve yatırım için haritada bir ile dokun. MECLİS düğmesi gensoru, grup toplantısı, yasa ve soruşturmayı sırayla açar; istersen hiç girmeden turu bitirebilirsin."),
+		L.t("Sıran gelince önce kartını çekersin. Teşkilat, miting ve yatırım için haritada bir ile dokun. MECLİS düğmesi gensoru, grup toplantısı ve yasayı sırayla açar; istersen hiç girmeden turu bitirebilirsin."),
 		func() -> Rect2: return _r(R_ACTIONS), mine)
 	_tutorial.add_step("secmen", L.t("Seçmen grupları"),
 		L.t("Oylar 8 seçmen grubundan gelir. Seçmen katmanı her grubun hangi illerde yoğun olduğunu gösterir; partin hangi gruplara yakınsa o illerde güçlüdür. Bir ile tıkla: oradaki durumunu görürsün."),
@@ -507,7 +499,7 @@ func _build_tutorial() -> void:
 		L.t("Hükümet kuruldu. Makamlar (başbakanlık, bakanlıklar) puan yazar; küçük ortak olmak da değerlidir. Muhalefet gensoruyla hükümeti düşürmeye, ortaklar koalisyondan çekilmeye karar verebilir."),
 		func() -> Rect2: return _r(R_SIDE), func() -> bool: return GovernmentManager.has_government() and not CardManager.is_turn_blocked())
 	_tutorial.add_step("ekonomi", L.t("Vergi ve yatırım"),
-		L.t("Hükümettesin: vergi kademesini meclise sunabilir, devlet hazinesinden il yatırımı yapabilirsin. Vergi indirimi seçmene yavaş yansır, seçimden birkaç dönem önce yap. Devlet parasını partinin mitinginde kullanmak usulsüzlüktür ve soruşturmada ortaya çıkar."),
+		L.t("Hükümettesin: vergi kademesini meclise sunabilir, devlet hazinesinden il yatırımı yapabilirsin. Vergi indirimi seçmene yavaş yansır, seçimden birkaç dönem önce yap. Hazineden payın bakanlıklarına göredir; miting ve yardım parti kasasından ödenir."),
 		func() -> Rect2: return _economy_panel.get_global_rect() if _economy_panel != null and _economy_panel.is_visible_in_tree() else _r(R_SIDE),
 		func() -> bool: return mine.call() and CardManager.is_government_party(me))
 	_tutorial.add_step("puan", L.t("Nasıl kazanılır?"),
@@ -820,8 +812,13 @@ func _place_date_chip(_map_rect: Rect2) -> void:
 		add_child(_timer_bar)
 	_band_period.position = _r(Rect2(16, 12, 0, 0)).position
 	_date_label.position = _r(Rect2(16, 38, 0, 0)).position
-	_set_rect(_band_crisis, _r(Rect2(300, 11, 444, 46)))
-	_set_rect(_band_turn, _r(Rect2(760, 16, 380, 38)))
+	# Üst banttaki kutular (gündem, sıra) sağdaki Menü düğmesiyle AYNI üst ve
+	# alt kenarda durur (Menü SettingsOverlay'de, ölçeklenmeyen piksellerle).
+	var menu := _menu_button_rect()
+	var crisis := _r(Rect2(300, 0, 444, 0))
+	var turn := _r(Rect2(760, 0, 380, 0))
+	_set_rect(_band_crisis, Rect2(crisis.position.x, menu.position.y, crisis.size.x, menu.size.y))
+	_set_rect(_band_turn, Rect2(turn.position.x, menu.position.y, turn.size.x, menu.size.y))
 	_set_rect(_timer_bar_bg, _r(Rect2(0, 0, 1280, TIMER_BAR_HEIGHT)))
 	_refresh_band_date()
 	_refresh_band_crisis()
@@ -830,6 +827,14 @@ func _place_date_chip(_map_rect: Rect2) -> void:
 	_refresh_timer_bar()
 
 const TIMER_BAR_HEIGHT := 7.0
+
+## Sağ üstteki Menü düğmesinin ekrandaki dikdörtgeni (yoksa tasarım değeri).
+func _menu_button_rect() -> Rect2:
+	var overlay := get_node_or_null("/root/SettingsOverlay")
+	var button: Control = overlay.get_node_or_null("%OpenSettingsButton") if overlay != null else null
+	if button != null and button.size.y > 0.0:
+		return button.get_global_rect()
+	return Rect2(get_viewport_rect().size.x - 124.0, 16.0, 108.0, 44.0)
 
 func _refresh_band_date() -> void:
 	if _band_period == null:
@@ -2610,8 +2615,6 @@ func _begin_province_targeting(hand_index: int) -> void:
 
 func _cancel_targeting() -> void:
 	_pending_province_hand_index = -1
-	if _funding_panel != null:
-		_funding_panel.hide()
 	if _focus_panel != null:
 		_focus_panel.hide()
 	_miting_focus = []
@@ -2647,8 +2650,8 @@ func _on_province_clicked(province_id: String) -> void:
 	if _pending_miting and _focus_panel != null and _focus_panel.visible:
 		_on_focus_confirmed()
 		return
-	if _pending_invest or (_pending_miting and _funding_panel.visible):
-		_on_funding_confirmed(_funding_panel.current_share())
+	if _pending_invest:
+		_on_funding_confirmed()
 		return
 	if _pending_miting:
 		var focus := _miting_focus.duplicate()
@@ -2932,10 +2935,6 @@ func _on_focus_confirmed() -> void:
 	if province_id == "":
 		_cancel_targeting()
 		return
-	if _miting_has_choice():
-		_open_funding(province_id)
-		_set_target_hint(L.t("%s: finansmanı aşağıdan ayarla, ONAYLA'ya bas (ya da ile tekrar dokun)  ·  Butona tekrar dokun: iptal") % ElectionNightSim.province_name(province_id))
-		return
 	var focus := _miting_focus.duplicate()
 	_cancel_targeting()
 	if CardManager.can_miting(me, province_id):
@@ -2952,18 +2951,12 @@ func _select_target_province(province_id: String) -> void:
 	var detail := ""
 	if _pending_miting:
 		_miting_focus = []
-		if _funding_panel != null:
-			_funding_panel.hide()
 		if CardManager.miting_focus_slots(me, province_id) > 0:
 			_open_focus_panel(province_id)
 			_set_target_hint(L.t("%s: odak gruplarını seç, ONAYLA'ya bas (ya da ile tekrar dokun)  ·  Butona tekrar dokun: iptal") % pname)
 			return
 		if _focus_panel != null:
 			_focus_panel.hide()
-	if _pending_invest or (_pending_miting and _miting_has_choice()):
-		_open_funding(province_id)
-		_set_target_hint(L.t("%s: finansmanı aşağıdan ayarla, ONAYLA'ya bas (ya da ile tekrar dokun)  ·  Butona tekrar dokun: iptal") % pname)
-		return
 	if _pending_invest:
 		detail = _invest_preview(pname)
 	elif _pending_miting:
@@ -3425,8 +3418,6 @@ func _on_party_action(kind: String, peer_id: int) -> void:
 			CardManager.resign_from_party()
 		"found":
 			add_child(FoundPartyDialog.new())
-		"inquiry":
-			_open_inquiry_panel(peer_id)
 
 func _hide_profile() -> void:
 	_profile_peer_id = -1
@@ -3826,7 +3817,7 @@ func _build_action_buttons() -> void:
 	# genişliğini büyütünce komşusunun üstüne biniyordu. Izgara bunu yapısal
 	# olarak önler.
 	# HAMLELER (0.0.231): eski SAHA / MECLİS / PARTİ / SİYASET sekmeleri yok.
-	# MECLİS tek giriş (gensoru → toplantı → yasa → soruşturma); İTTİFAK ve
+	# MECLİS tek giriş (gensoru → toplantı → yasa); İTTİFAK ve
 	# KONGRE yerinde. Teşkilat, miting ve yatırım haritadaki il panelinden,
 	# afet yardımı tur başındaki sahneden yapılır.
 	_parl_button = Button.new()
@@ -3837,7 +3828,7 @@ func _build_action_buttons() -> void:
 	_parl_button.set_meta("action_color", ACTION_COLOR_LAW)
 	_parl_button.add_theme_font_override("font", UiTheme.mono(true))
 	_parl_button.add_theme_font_size_override("font_size", 14)
-	_parl_button.tooltip_text = L.t("Meclis akışı: uygunsa gensoru, sonra grup toplantısı, yasa ve soruşturma. Her aşamayı yap ya da geç.")
+	_parl_button.tooltip_text = L.t("Meclis akışı: uygunsa gensoru, sonra grup toplantısı ve yasa. Her aşamayı yap ya da geç.")
 	_parl_button.pressed.connect(_on_parliament_button_pressed)
 	actions_vbox.add_child(_parl_button)
 	_action_grid = GridContainer.new()
@@ -4055,8 +4046,6 @@ func _on_alliance_button_pressed() -> void:
 		return
 	if _law_designer != null:
 		_law_designer.hide()
-	if _inquiry_panel != null:
-		_inquiry_panel.hide()
 	_refresh_alliance_panel()
 	_alliance_panel.show()
 	_place_alliance_panel.call_deferred()
@@ -4724,51 +4713,17 @@ func _propose_tax(law_type: String) -> void:
 	_law_designer.hide()
 	CardManager.propose_law(law_type)
 
-# --- Finansman paylaşımı ve soruşturma ----------------------------------------
+# --- Afet yardım paneli --------------------------------------------------------
 
 func _build_funding_ui() -> void:
-	_funding_panel = FundingPanel.new()
-	_funding_panel.hide()
-	_funding_panel.confirmed.connect(_on_funding_confirmed)
-	_funding_panel.cancelled.connect(_cancel_targeting)
-	add_child(_funding_panel)
 	_aid_panel = AidPanel.new()
 	_aid_panel.hide()
 	_aid_panel.confirmed.connect(_on_aid_confirmed)
 	_aid_panel.cancelled.connect(func(): _aid_panel.hide())
 	add_child(_aid_panel)
-	_inquiry_panel = PanelContainer.new()
-	var style := UiSkin.stylebox(UiSkin.PANEL)
-	style.set_content_margin_all(UiTheme.PAD_M)
-	UiSkin.apply_style(_inquiry_panel, "panel", style)
-	_inquiry_panel.z_index = 108
-	_inquiry_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	_inquiry_box = VBoxContainer.new()
-	_inquiry_box.add_theme_constant_override("separation", 5)
-	_inquiry_box.custom_minimum_size = Vector2(404, 0)
-	_inquiry_panel.add_child(_inquiry_box)
-	_inquiry_panel.hide()
-	add_child(_inquiry_panel)
 
-## Hükümetteki parti mitingini devlet parasıyla da yapabilir: seçim varsa panel açılır.
-func _miting_has_choice() -> bool:
-	return bool(CardManager.funding_range(multiplayer.get_unique_id(), "miting")["state_allowed"])
-
-func _open_funding(province_id: String) -> void:
-	_funding_panel.open(multiplayer.get_unique_id(), "invest" if _pending_invest else "miting", province_id)
-	_place_funding_panel.call_deferred()
-
-## Haritanın alt kenarına ortalı; haritanın dışına taşmaz.
-func _place_funding_panel() -> void:
-	if not _funding_panel.visible:
-		return
-	_funding_panel.reset_size()
-	var map := _r(R_MAP)
-	var panel_size := _funding_panel.size
-	_funding_panel.position = Vector2(map.position.x + (map.size.x - panel_size.x) * 0.5,
-		maxf(map.position.y + 40.0, map.end.y - panel_size.y - 8.0))
-
-func _on_funding_confirmed(share: float) -> void:
+## 0.0.238: miting parti kasasından, yatırım devlet hazinesinden (paylaşım yok).
+func _on_funding_confirmed() -> void:
 	var me := multiplayer.get_unique_id()
 	var province_id := _selected_province
 	var investing := _pending_invest
@@ -4777,96 +4732,23 @@ func _on_funding_confirmed(share: float) -> void:
 	if province_id == "":
 		return
 	if investing:
-		if CardManager.can_invest(me, province_id, share):
-			CardManager.invest(province_id, share)
+		if CardManager.can_invest(me, province_id, 1.0):
+			CardManager.invest(province_id, 1.0)
 		else:
-			_show_toast(CardManager.funding_block_reason(me, "invest", share) if CardManager.can_invest(me, province_id) else _invest_block_reason())
+			_show_toast(CardManager.funding_block_reason(me, "invest", 1.0) if CardManager.is_government_party(me) else _invest_block_reason())
 	else:
-		if CardManager.can_miting(me, province_id, share):
-			CardManager.miting(province_id, share, focus)
+		if CardManager.can_miting(me, province_id, 0.0):
+			CardManager.miting(province_id, 0.0, focus)
 		else:
-			_show_toast(CardManager.funding_block_reason(me, "miting", share))
+			_show_toast(CardManager.funding_block_reason(me, "miting", 0.0))
 
-## SORUŞTURMA hamlesi: önce hedef parti seçilir, sonra soruşturma paneli açılır.
-func _on_inquiry_button_pressed() -> void:
-	var me := multiplayer.get_unique_id()
-	if _inquiry_picker != null and is_instance_valid(_inquiry_picker):
-		_inquiry_picker.queue_free()
-		_inquiry_picker = null
+func _place_party_picker() -> void:
+	if _party_picker == null or not is_instance_valid(_party_picker):
 		return
-	var reason := CardManager.inquiry_block_reason(me)
-	if reason != "":
-		_show_toast(reason)
-		return
-	_law_designer.hide()
-	_cancel_targeting()
-	_inquiry_panel.hide()
-	var targets: Array = []
-	for pid in CardManager.party_ids():
-		if not PartyManager.is_independent(int(pid)):
-			targets.append(int(pid))
-	_show_party_picker(L.t("SORUŞTURMA: HEDEF PARTİ"), targets, _open_inquiry_panel)
-
-func _place_inquiry_picker() -> void:
-	if _inquiry_picker == null or not is_instance_valid(_inquiry_picker):
-		return
-	_inquiry_picker.reset_size()
+	_party_picker.reset_size()
 	var map := _r(R_MAP)
-	_inquiry_picker.position = Vector2(map.position.x + (map.size.x - _inquiry_picker.size.x) * 0.5,
-		maxf(map.position.y + 40.0, map.end.y - _inquiry_picker.size.y - 8.0))
-
-func _open_inquiry_panel(target: int) -> void:
-	_inquiry_target = CardManager.party_of(target)
-	_law_designer.hide()
-	_tax_panel.hide()
-	_cancel_targeting()
-	_fill_inquiry_panel()
-	_inquiry_panel.show()
-	_place_inquiry_panel.call_deferred()
-
-func _fill_inquiry_panel() -> void:
-	EconomyPanel.fill_inquiry(_inquiry_box, multiplayer.get_unique_id(), _inquiry_target, _on_inquiry_open, _inquiry_panel.hide)
-
-func _place_inquiry_panel() -> void:
-	_inquiry_panel.reset_size()
-	var viewport_size := get_viewport_rect().size
-	_inquiry_panel.position = Vector2(viewport_size.x - RIGHT_COLUMN_WIDTH - _inquiry_panel.size.x - 12.0,
-		clampf(_top_area_height() - _inquiry_panel.size.y, 12.0, maxf(12.0, viewport_size.y - _inquiry_panel.size.y - 12.0)))
-
-func _on_inquiry_open(target: int) -> void:
-	var me := multiplayer.get_unique_id()
-	if not CardManager.can_open_inquiry(me, target):
-		_show_toast(CardManager.inquiry_block_reason(me, target))
-		return
-	_inquiry_panel.hide()
-	CardManager.open_inquiry(target)
-
-## SONUÇ KARTI: haritanın üstünde ortada belirir, birkaç saniye kalır (dokununca
-## kapanır). Ton etiketle (✓ ŞEFFAF / ! USULSÜZLÜK / — KANIT YOK) ve renkle.
-func _show_inquiry_result(data: Dictionary) -> void:
-	if _inquiry_card != null and is_instance_valid(_inquiry_card):
-		_inquiry_card.queue_free()
-	if _inquiry_panel != null and _inquiry_panel.visible:
-		_fill_inquiry_panel()
-	var card := EconomyPanel.inquiry_result_card(data)
-	card.z_index = 109
-	add_child(card)
-	_inquiry_card = card
-	card.gui_input.connect(func(event: InputEvent):
-		if event is InputEventMouseButton and event.pressed and is_instance_valid(card):
-			card.queue_free())
-	card.reset_size()
-	var map := _r(R_MAP)
-	var target := Vector2(map.position.x + (map.size.x - card.size.x) * 0.5, map.position.y + 46.0)
-	card.position = target + Vector2(0, -16)
-	card.modulate.a = 0.0
-	var tween := card.create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(card, "position", target, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tween.tween_property(card, "modulate:a", 1.0, 0.2)
-	tween.chain().tween_interval(6.0)
-	tween.chain().tween_property(card, "modulate:a", 0.0, 0.5)
-	tween.chain().tween_callback(card.queue_free)
+	_party_picker.position = Vector2(map.position.x + (map.size.x - _party_picker.size.x) * 0.5,
+		maxf(map.position.y + 40.0, map.end.y - _party_picker.size.y - 8.0))
 
 func _circle_texture(color: Color) -> Texture2D:
 	var key := color.to_html()
@@ -5512,50 +5394,79 @@ func _ask_propaganda_target(hand_index: int, province_id: String) -> void:
 	_show_party_picker(L.t("%s: kimi karalayacaksın?") % ElectionNightSim.province_name(province_id), targets,
 		func(pid: int): CardManager.play_card(hand_index, pid, province_id))
 
+## Evrensel parti listesinde satır (logo = düğme) yüksekliği ve ad düğmesi genişliği.
+const PICKER_ROW := 40.0
+const PICKER_FONT := 15
+const PICKER_NAME_MIN := 120.0
+const PICKER_NAME_MAX := 280.0
+
 func _show_party_picker(title: String, targets: Array, selected: Callable) -> void:
-	if _inquiry_picker != null and is_instance_valid(_inquiry_picker):
-		_inquiry_picker.queue_free()
+	if _party_picker != null and is_instance_valid(_party_picker):
+		_party_picker.queue_free()
 	if targets.is_empty():
 		_show_toast(L.t("Seçilebilecek parti yok."))
 		return
-	_inquiry_picker = PanelContainer.new()
-	UiSkin.skin_panel(_inquiry_picker, UiSkin.PANEL)
-	_inquiry_picker.z_index = 120
+	_party_picker = PanelContainer.new()
+	UiSkin.skin_panel(_party_picker, UiSkin.PANEL)
+	_party_picker.z_index = 120
+	# EVRENSEL PARTİ LİSTESİ: logo ve düğme AYNI yükseklikte (PICKER_ROW);
+	# düğme genişliği en uzun parti adına göre (gereğinden geniş değil).
+	var font: Font = ThemeDB.fallback_font
+	var name_width := PICKER_NAME_MIN
+	for pid in targets:
+		var text := String(PartyManager.data_of(int(pid)).get("name", "?"))
+		name_width = maxf(name_width, font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, PICKER_FONT).x + 28.0)
+	name_width = minf(name_width, PICKER_NAME_MAX)
+	var row_width := PICKER_ROW + 6.0 + name_width
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
-	_inquiry_picker.add_child(box)
-	box.add_child(UiTheme.mono_label(title, 14, UiTheme.TEXT, true))
+	_party_picker.add_child(box)
+	var heading := UiTheme.mono_label(title, 14, UiTheme.TEXT, true)
+	heading.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	heading.custom_minimum_size.x = row_width
+	box.add_child(heading)
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(340, 220)
+	var rows_height := targets.size() * PICKER_ROW + maxf(0.0, targets.size() - 1) * 6.0
+	scroll.custom_minimum_size = Vector2(row_width, minf(rows_height, PICKER_ROW * 6.0 + 30.0))
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	box.add_child(scroll)
 	var list := VBoxContainer.new()
+	list.add_theme_constant_override("separation", 6)
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(list)
 	for pid in targets:
 		var party: Dictionary = PartyManager.data_of(int(pid))
 		var row := HBoxContainer.new()
-		row.add_child(PartyBadge.build(party, Vector2(34, 34), BADGE_ICON_PIXEL_SIZE))
+		row.add_theme_constant_override("separation", 6)
+		var badge := PartyBadge.build(party, Vector2(PICKER_ROW, PICKER_ROW), BADGE_ICON_PIXEL_SIZE)
+		badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(badge)
 		var button := Button.new()
 		button.text = String(party.get("name", "?"))
 		button.clip_text = true
-		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.focus_mode = Control.FOCUS_NONE
+		button.custom_minimum_size = Vector2(name_width, PICKER_ROW)
+		button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		button.add_theme_font_size_override("font_size", PICKER_FONT)
 		UiSkin.skin_color_button(button, Color(party.get("bg_color", UiTheme.PANEL_DARK)).darkened(0.35))
 		button.pressed.connect(func():
-			_inquiry_picker.queue_free()
-			_inquiry_picker = null
+			_party_picker.queue_free()
+			_party_picker = null
 			selected.call(int(pid)))
 		row.add_child(button)
 		list.add_child(row)
 	var close := Button.new()
 	close.text = L.t("İptal")
+	close.focus_mode = Control.FOCUS_NONE
+	close.custom_minimum_size = Vector2(row_width, PICKER_ROW)
+	close.add_theme_font_size_override("font_size", PICKER_FONT)
 	UiSkin.skin_button(close)
 	close.pressed.connect(func():
-		_inquiry_picker.queue_free()
-		_inquiry_picker = null)
+		_party_picker.queue_free()
+		_party_picker = null)
 	box.add_child(close)
-	add_child(_inquiry_picker)
-	_place_inquiry_picker.call_deferred()
+	add_child(_party_picker)
+	_place_party_picker.call_deferred()
 
 func _map_tint(color: Color, strength: float) -> Color:
 	return Color(color, clampf(strength, 0.0, 1.0))
@@ -5580,9 +5491,6 @@ func _build_turn_flow_ui() -> void:
 	add_child(_province_actions)
 	_parliament_flow = ParliamentFlow.new()
 	_parliament_flow.law_tab_requested.connect(_on_flow_law_tab)
-	_parliament_flow.inquiry_requested.connect(func():
-		_parliament_flow.hide()
-		_on_inquiry_button_pressed())
 	_parliament_flow.toast_requested.connect(_show_toast)
 	add_child(_parliament_flow)
 	_turn_intro = TurnIntro.new()

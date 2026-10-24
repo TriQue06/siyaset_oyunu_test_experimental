@@ -107,10 +107,9 @@ const PARTNER_SHARE := 0.6
 static func start_state() -> Dictionary:
 	return {"tax": START_TAX, "pressure": float(TAX_PRESSURE[START_TAX]), "index": START_INDEX, "boost": 0.0,
 		"treasury": START_TREASURY, "revenue": 0.0, "prev": {}, "tax_round": 0, "tax_from": START_TAX,
-		"pressure_from": float(TAX_PRESSURE[START_TAX]), "investments": [], "ledger": [], "next_id": 1,
+		"pressure_from": float(TAX_PRESSURE[START_TAX]), "investments": [],
 		# HAZİNE KOTASI (CardManager.state_quota): dönem, dönem başı hazine, parti -> harcanan.
-		"quota_round": -1, "quota_base": 0.0, "quota_spent": {},
-		"inquiries": {}}
+		"quota_round": -1, "quota_base": 0.0, "quota_spent": {}}
 
 ## Eski sürüm durumunda eksik alanlar güvenli varsayılanla doldurulur.
 static func normalized(state) -> Dictionary:
@@ -243,75 +242,8 @@ static func split_cost(total: float, state: float) -> Dictionary:
 	var party_million := total - state_million
 	return {"share": s, "state": state_million, "party": party_million}
 
-## Süresi dolan ve incelenmiş kayıtları atar; kapsamdaki kanıtı korur.
-static func prune_ledger(ledger: Array, round_number: int) -> Array:
-	var kept: Array = []
-	for entry in ledger:
-		if round_number - int(entry.get("round", 0)) > INQUIRY_SCOPE_ROUNDS:
-			continue
-		kept.append(entry)
-	# Hâlâ çok fazlaysa önce incelenmiş (artık kanıt olmayan) kayıtlar gider.
-	var i := 0
-	while kept.size() > LEDGER_LIMIT and i < kept.size():
-		if bool(kept[i].get("investigated", false)):
-			kept.remove_at(i)
-		else:
-			i += 1
-	return kept
-
 static func snap_share(state: float) -> float:
 	return clampf(snappedf(state, FUND_STEP), 0.0, 1.0)
-
-# --- İşlem kaydı ve Finansman Soruşturması -------------------------------------------
-## Her yatırım ve miting GERÇEK finansmanıyla kaydedilir (economy["ledger"]):
-## {"id", "round", "party", "kind", "province", "total", "party_million",
-##  "state_million", "investigated"}. KAYIT SAKLAMA zaman penceresiyledir:
-## soruşturma kapsamından (INQUIRY_SCOPE_ROUNDS) çıkan ya da incelenmiş kayıt
-## silinir; kapsamdaki incelenmemiş kayıt (geçerli kanıt) SAYI SINIRIYLA
-## SİLİNMEZ. LEDGER_LIMIT sadece bunlardan sonra uygulanan güvenlik sınırıdır.
-const LEDGER_LIMIT := 400
-## Soruşturma bedeli (soruşturan partinin kasasından), kapsamı (son kaç tur).
-const INQUIRY_FUNDS_COST := 20
-const INQUIRY_SCOPE_ROUNDS := 8
-## ŞEFFAFLIK ÖDÜLÜ (hedefe, ulusal destek): kendi kasasından ödenmiş toplam
-## T milyon ¤ için min(MAX, PER_SQRT × √T); T < MIN ise ödül yok (küçük
-## harcamalarla oy toplanamaz). Her işlem bir kez incelenir.
-const TRANSPARENCY_MIN := 20.0
-const TRANSPARENCY_PER_SQRT := 0.12
-const TRANSPARENCY_MAX := 1.5
-## Kendi kasasından MİTİNG olağan parti faaliyetidir: ödüle çeyrek ağırlıkla
-## girer (kendi parasıyla YATIRIM olağanüstüdür, tam ağırlık). Partinin kendini
-## denetletmesi daha az inandırıcıdır: ödülün yarısı. (Sürekli öz denetimle
-## oy toplanamasın.)
-const MITING_TRANSPARENCY_WEIGHT := 0.25
-const SELF_AUDIT_FACTOR := 0.5
-
-## İşlemin şeffaflık ödülüne giren tutarı (milyon ¤).
-static func transparency_amount(entry: Dictionary) -> float:
-	var weight := MITING_TRANSPARENCY_WEIGHT if is_partisan(String(entry.get("kind", ""))) else 1.0
-	return float(entry.get("party_million", 0.0)) * weight
-## USULSÜZLÜK (partizan bir faaliyete devlet parası): ulusal kayıp
-## min(MAX, PER_MILLION × tutar) + kaset kadar karışıklık; soruşturana
-## güvenilirlik.
-const SCANDAL_PER_MILLION := 0.06
-const SCANDAL_MAX := 4.0
-const INQUIRY_CREDIBILITY := 5.0
-
-## Bir işlemin hangi sınıfa girdiği: devletten ödenen MİTİNG partizan
-## harcamadır (usulsüzlük); devletten ödenen YATIRIM meşru kamu harcamasıdır;
-## parti kasasından ödenen her şey parti finansmanıdır.
-static func is_partisan(kind: String) -> bool:
-	return kind == "miting"
-
-static func transparency_gain(party_million: float) -> float:
-	if party_million < TRANSPARENCY_MIN:
-		return 0.0
-	return minf(TRANSPARENCY_MAX, TRANSPARENCY_PER_SQRT * sqrt(party_million))
-
-static func scandal_damage(improper_million: float) -> float:
-	if improper_million <= 0.0:
-		return 0.0
-	return minf(SCANDAL_MAX, SCANDAL_PER_MILLION * improper_million)
 
 ## "1.240" gibi binlik ayraçlı tam sayı.
 static func money_text(value: float) -> String:

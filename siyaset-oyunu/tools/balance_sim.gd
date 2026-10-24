@@ -9,8 +9,7 @@ extends SceneTree
 ##   - iktidar partilerinin bir sonraki seçimde vekil değişimi,
 ##   - karalanan partinin o ilde yine de vekil çıkarabilme oranı,
 ##   - EKONOMİ (tur başına): devlet hazinesi, vergi kademesi, ekonomi endeksi,
-##     parti kasaları (ortalama / en yüksek), teşkilat sayısı ve geliri,
-##     partizan harcama ve soruşturma sonuçları.
+##     parti kasaları (ortalama / en yüksek), teşkilat sayısı ve geliri.
 ##   godot --headless --script res://tools/balance_sim.gd -- --games=40 --first=0 --out=C:/yol/sonuc.json
 
 const LUCK_RESEEDS := 10
@@ -86,13 +85,6 @@ func _play_game(g: int, report: Dictionary) -> void:
 	var prev_election_seats := {}
 	var marks := {}  # province_id -> {hedef: true} (son seçimden beri karalananlar)
 	var econ_rounds := []
-	var inquiries := {"clean": 0, "scandal": 0, "none": 0}
-	var on_inquiry := func(data: Dictionary):
-		_bump(inquiries, String(data.get("result", "none")))
-	cm.inquiry_resolved.connect(on_inquiry)
-	var partisan := 0
-	var invest_state := 0.0
-	var invest_party := 0.0
 	var steps := 0
 	var turn_actions := 0
 	var last_bot := -1
@@ -152,15 +144,8 @@ func _play_game(g: int, report: Dictionary) -> void:
 				_bump(actions, "teskilat")
 			"miting":
 				_bump(actions, "miting")
-				var led: Array = cm.economy.get("ledger", [])
-				if not led.is_empty() and float(led[-1].get("state_million", 0.0)) > 0.0 and String(led[-1]["kind"]) == "miting":
-					partisan += 1
 			"invest":
 				_bump(actions, "yatirim")
-				var led2: Array = cm.economy.get("ledger", [])
-				if not led2.is_empty():
-					invest_state += float(led2[-1].get("state_million", 0.0))
-					invest_party += float(led2[-1].get("party_million", 0.0))
 			"censure":
 				_bump(actions, "gensoru")
 			"draw":
@@ -190,10 +175,8 @@ func _play_game(g: int, report: Dictionary) -> void:
 			"propaganda_received": stats.get(peer_id, {}).get("propaganda_received", 0),
 			"orgs": _org_count(peer_id), "funds_end": cm.funds_of(peer_id),
 		})
-	cm.inquiry_resolved.disconnect(on_inquiry)
 	report["games"].append({"game": g, "steps": steps, "parties": parties, "law_types": law_types,
-		"econ_rounds": econ_rounds, "inquiries": inquiries, "partisan_mitings": partisan,
-		"invest_state_million": invest_state, "invest_party_million": invest_party})
+		"econ_rounds": econ_rounds})
 
 func _org_count(peer_id: int) -> int:
 	var pid: int = cm.party_of(peer_id)

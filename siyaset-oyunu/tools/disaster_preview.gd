@@ -89,35 +89,13 @@ func _initialize() -> void:
 	check("panel ekrana sığıyor", view.encloses(panel.get_global_rect()), str(panel.get_global_rect()))
 	var before: float = cm.local_of(String(region[0]), me)
 	panel._party_slider.value = 20.0
-	panel._state_slider.value = 40.0
 	await _frames(3)
 	_shot("disaster_aid_amount")
 	panel._confirm.pressed.emit()
 	await _frames(20)
-	check("yardım uygulandı", cm.disaster_aid_of(me) == 60.0 and cm.local_of(String(region[0]), me) > before,
+	check("yardım uygulandı", cm.disaster_aid_of(me) == 20.0 and cm.local_of(String(region[0]), me) > before,
 		"%.1f milyon, il %.2f -> %.2f" % [cm.disaster_aid_of(me), before, cm.local_of(String(region[0]), me)])
 	_shot("disaster_after")
-	# SORUŞTURMA hamlesi: hedef parti seçici açılır, seçim soruşturma panelini açar.
-	cm.current_turn_index = cm.turn_order.find(me)
-	cm.economy["inquiries"] = {}
-	# 0.0.231: soruşturma meclis akışının son aşaması; burada yalnız panel incelenir.
-	cm.enforce_turn_flow = false
-	scene._refresh_action_buttons()
-	check("soruşturma açılabilir", cm.can_open_inquiry(me))
-	scene._on_inquiry_button_pressed()
-	await _frames(10)
-	_shot("inquiry_picker")
-	var picker: Control = scene._inquiry_picker
-	check("soruşturma seçicisi açıldı", picker != null and picker.visible)
-	if picker != null:
-		check("seçici ekrana sığıyor", view.encloses(picker.get_global_rect()), str(picker.get_global_rect()))
-	scene._open_inquiry_panel(partner)
-	if picker != null and is_instance_valid(picker):
-		picker.queue_free()
-	await _frames(10)
-	check("soruşturma paneli açıldı", scene._inquiry_panel.visible)
-	_shot("inquiry_panel")
-	scene._inquiry_panel.hide()
 	# Sağ sütun: sekmeler panelin üstünde kalır, içerik kaydırılabilir.
 	var tabs: Control = scene._side_tabs
 	var left: Control = scene.left_panel

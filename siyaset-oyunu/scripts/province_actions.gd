@@ -122,10 +122,17 @@ func _build_header() -> void:
 	texts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	texts.add_theme_constant_override("separation", 0)
 	row.add_child(texts)
-	texts.add_child(UiTheme.mono_label(ElectionNightSim.province_name(province_id), 20, UiTheme.TEXT, true))
+	# Başlık yazıları paneli genişletmesin (dar ekranda harita alanından taşmasın).
+	var title := UiTheme.mono_label(ElectionNightSim.province_name(province_id), 20, UiTheme.TEXT, true)
+	title.clip_text = true
+	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	texts.add_child(title)
 	var me := multiplayer.get_unique_id()
-	texts.add_child(PopupKit.label(L.t("%d vekil · teşkilatın: %s") % [CardManager.province_seat_count(province_id),
-		_level_name(CardManager.organization_level(province_id, me))], 11, UiTheme.TEXT_MUTED))
+	var sub := PopupKit.label(L.t("%d vekil · teşkilatın: %s") % [CardManager.province_seat_count(province_id),
+		_level_name(CardManager.organization_level(province_id, me))], 11, UiTheme.TEXT_MUTED)
+	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sub.custom_minimum_size.x = 0
+	texts.add_child(sub)
 	var info := Button.new()
 	info.text = L.t("İL BİLGİSİ")
 	info.tooltip_text = L.t("Seçmen profili ve partinin bu ildeki durumu sağ panelde")
@@ -179,8 +186,9 @@ func _choice_button(text: String, selected: bool, color: Color, action: Callable
 	button.text = text
 	button.focus_mode = Control.FOCUS_NONE
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.custom_minimum_size = Vector2(0, 44)
-	button.clip_text = true
+	# Uzun grup adları kırpılmaz, iki satıra iner; satırdaki düğmeler aynı boyda.
+	button.custom_minimum_size = Vector2(0, 48)
+	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	button.disabled = not enabled
 	button.add_theme_font_size_override("font_size", 11)
 	UiSkin.skin_color_button(button, color if selected else color.darkened(0.5))
@@ -315,33 +323,21 @@ func _build_miting() -> void:
 	if gains != "":
 		_body.add_child(PopupKit.note(L.t("Beklenen hitap: %s") % gains, UiTheme.GREEN))
 	_body.add_child(PopupKit.kv(L.t("Toplam bedel"), GameRules.cost_text(cost), UiTheme.GOLD))
-	var r := CardManager.funding_range(me, "miting", cost)
-	if bool(r["state_allowed"]):
-		# Hükümet partisi: finansman kaynağı ayrıntısı (devlet payı partizan harcamadır).
-		var funding := FundingPanel.new()
-		funding.z_index = 0
-		_body.add_child(funding)
-		funding.open(me, "miting", province_id, cost, L.t("MİTİNGİ DÜZENLE"))
-		funding.confirmed.connect(func(share: float): _do_miting(share))
-		funding.cancelled.connect(func():
-			_reset_miting()
-			refresh())
-	else:
-		var ok := CardManager.can_miting(me, province_id, 0.0, _miting_tier, _smear)
-		if not ok:
-			_body.add_child(PopupKit.note(L.t("Parti kasası yetmiyor (%s gerekir).") % GameRules.cost_text(cost), UiTheme.RED))
-		_body.add_child(_confirm_button(L.t("MİTİNGİ DÜZENLE · %s") % GameRules.cost_text(cost), ok, func(): _do_miting(0.0)))
-		var cancel := Button.new()
-		cancel.text = L.t("Hazırlığı iptal et")
-		cancel.tooltip_text = L.t("Para ve miting hakkı harcanmaz.")
-		cancel.focus_mode = Control.FOCUS_NONE
-		cancel.custom_minimum_size = Vector2(0, 40)
-		UiSkin.skin_button(cancel)
-		cancel.pressed.connect(func():
-			_reset_miting()
-			tab = ""
-			refresh())
-		_body.add_child(cancel)
+	var ok := CardManager.can_miting(me, province_id, 0.0, _miting_tier, _smear)
+	if not ok:
+		_body.add_child(PopupKit.note(L.t("Parti kasası yetmiyor (%s gerekir).") % GameRules.cost_text(cost), UiTheme.RED))
+	_body.add_child(_confirm_button(L.t("MİTİNGİ DÜZENLE · %s") % GameRules.cost_text(cost), ok, func(): _do_miting()))
+	var cancel := Button.new()
+	cancel.text = L.t("Hazırlığı iptal et")
+	cancel.tooltip_text = L.t("Para ve miting hakkı harcanmaz.")
+	cancel.focus_mode = Control.FOCUS_NONE
+	cancel.custom_minimum_size = Vector2(0, 40)
+	UiSkin.skin_button(cancel)
+	cancel.pressed.connect(func():
+		_reset_miting()
+		tab = ""
+		refresh())
+	_body.add_child(cancel)
 
 func _gain_preview(me: int) -> String:
 	var parts: PackedStringArray = []
@@ -352,15 +348,16 @@ func _gain_preview(me: int) -> String:
 			parts.append(VoterGroups.title(String(item["group"])))
 	return ", ".join(parts)
 
-func _do_miting(share: float) -> void:
+## Miting her zaman parti kasasından (0.0.238).
+func _do_miting() -> void:
 	var me := multiplayer.get_unique_id()
 	if not _first_send():
 		return
-	if not CardManager.can_miting(me, province_id, share, _miting_tier, _smear):
+	if not CardManager.can_miting(me, province_id, 0.0, _miting_tier, _smear):
 		_sent_version = -1
-		toast_requested.emit(CardManager.funding_block_reason(me, "miting", share, CardManager.miting_tier_cost(_miting_tier)))
+		toast_requested.emit(CardManager.funding_block_reason(me, "miting", 0.0, CardManager.miting_tier_cost(_miting_tier)))
 		return
-	CardManager.miting(province_id, share, _focus.duplicate(), _miting_tier, _smear)
+	CardManager.miting(province_id, 0.0, _focus.duplicate(), _miting_tier, _smear)
 	_reset_miting()
 
 # --- YATIRIM -----------------------------------------------------------------------
@@ -377,7 +374,7 @@ func _build_invest() -> void:
 	if left <= 0:
 		_body.add_child(PopupKit.note(L.t("Bu sıra %d yatırımın hepsini yaptın.") % CardManager.action_limit(me), UiTheme.RED))
 		return
-	_body.add_child(PopupKit.note(L.t("Devlet hazinesinden il yatırımı: ildeki bütün seçmen memnun olur, ekonomi canlanır. Hazine yetmezse kalanı parti kasasından."), UiTheme.TEXT_MUTED))
+	_body.add_child(PopupKit.note(L.t("Devlet hazinesinden il yatırımı: ildeki bütün seçmen memnun olur, ekonomi canlanır. Partinin hazine kotası bakanlık payına göredir."), UiTheme.TEXT_MUTED))
 	_section(L.t("1 · Bütçe"))
 	var tiers := HBoxContainer.new()
 	tiers.add_theme_constant_override("separation", 4)
@@ -394,18 +391,15 @@ func _build_invest() -> void:
 	_body.add_child(PopupKit.kv(L.t("Tutar"), Economy.money_full(amount)))
 	_body.add_child(PopupKit.note(L.t("Etkinin bir kısmı hemen, kalanı sonraki %d dönemde gelir; seçimde yalnız gelmiş olan sayılır.") % Economy.INVEST_DELAY_ROUNDS, UiTheme.GREEN))
 	_body.add_child(PopupKit.kv(L.t("Hazine kotan"), Economy.money_full(CardManager.state_quota(me))))
-	var funding := FundingPanel.new()
-	funding.z_index = 0
-	_body.add_child(funding)
-	funding.open(me, "invest", province_id, amount, L.t("YATIRIMI YAP"))
-	funding.confirmed.connect(func(share: float):
+	var quota := CardManager.state_quota(me)
+	if quota < amount - 0.001:
+		_body.add_child(PopupKit.note(L.t("Hazine kotan yetmiyor (%s kaldı). Daha küçük bir yatırım seç.") % Economy.money_full(quota), UiTheme.RED))
+	var ok := CardManager.can_invest(me, province_id, 1.0, _invest_tier)
+	_body.add_child(_confirm_button(L.t("YATIRIMI YAP · %s") % Economy.money_full(amount), ok, func():
 		if not _first_send():
 			return
-		if CardManager.can_invest(me, province_id, share, _invest_tier):
-			CardManager.invest(province_id, share, _invest_tier)
+		if CardManager.can_invest(me, province_id, 1.0, _invest_tier):
+			CardManager.invest(province_id, 1.0, _invest_tier)
 		else:
 			_sent_version = -1
-			toast_requested.emit(CardManager.funding_block_reason(me, "invest", share, amount)))
-	funding.cancelled.connect(func():
-		tab = ""
-		refresh())
+			toast_requested.emit(CardManager.funding_block_reason(me, "invest", 1.0, amount))))

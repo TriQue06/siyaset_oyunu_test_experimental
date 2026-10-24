@@ -277,10 +277,6 @@ static func _choose_parliament(bot: int, stage: String) -> Dictionary:
 					best = {"type": "early_election"}
 			if not best.is_empty():
 				return best
-		"inquiry":
-			var inquiry := _eval_inquiry(bot)
-			if not inquiry.is_empty() and float(inquiry["score"]) - Economy.INQUIRY_FUNDS_COST * funds_value + _jitter(bot) > PASS_ACTION_SCORE:
-				return {"type": "inquiry", "target": inquiry["target"]}
 	return skip
 
 ## AFET KARARI: değerli bir yardım varsa yapılır ({"party", "state"}), yoksa boş
@@ -552,14 +548,6 @@ static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 			best = {"type": "aid", "party": aid["party"], "state": aid["state"]}
 			best_score = aid_score
 
-	var inquiry := _eval_inquiry(bot)
-	if not inquiry.is_empty():
-		var inquiry_score := float(inquiry["score"]) - Economy.INQUIRY_FUNDS_COST * funds_value + _jitter(bot)
-		candidates.append({"type": "inquiry", "target": inquiry["target"]})
-		if inquiry_score > best_score:
-			best = {"type": "inquiry", "target": inquiry["target"]}
-			best_score = inquiry_score
-
 	if CardManager.can_censure(bot) and _censure_worth_it(bot):
 		# Geçeceği hesaplanan gensoru: hükümet düşer, yeni kurma turu başlar.
 		# Blokta gensoru planın son adımı: çok daha değerli.
@@ -703,79 +691,6 @@ static func _best_tax_law(bot: int) -> Dictionary:
 	if _law_pass_chance(bot, law_type) < 0.5:
 		return {}
 	return {"law": law_type, "score": TAX_LAW_SCORE}
-
-## FİNANSMAN SORUŞTURMASI (oyuncuyla aynı kurallar; gizli tutarlara bakmaz):
-##   - KENDİ kayıtları (botun kendi bildiği harcamaları): kendi kasasından
-##     ödenmiş yeterli harcama birikmişse kendini denetletir (şeffaflık).
-##   - RAKİP: muhalefetteyken, kapsamda en çok mitingi olan hükümet partisi
-##     (miting sayısı herkese açıktır; kimin parasıyla yapıldığı değil).
-const INQUIRY_SELF_MIN := 60.0
-const INQUIRY_RIVAL_MITINGS := 2
-const INQUIRY_RIVAL_SCORE := 0.9
-
-static func _eval_inquiry(bot: int) -> Dictionary:
-	if not CardManager.can_open_inquiry(bot) or CardManager.funds_of(bot) < 60.0:
-		return {}
-	var best := {}
-	var own := 0.0
-	for entry in CardManager.inquiry_records(bot):
-		own += Economy.transparency_amount(entry)
-	if own >= INQUIRY_SELF_MIN:
-		best = {"target": CardManager.party_of(bot), "score": 0.6 + Economy.transparency_gain(own) * Economy.SELF_AUDIT_FACTOR * 2.0}
-	if not CardManager.is_government_party(bot):
-		var rival := -1
-		var most := INQUIRY_RIVAL_MITINGS - 1
-		for pid in GovernmentManager.government_party_ids():
-			if is_ally(bot, int(pid)):
-				continue
-			var mitings := 0
-			for entry in CardManager.inquiry_records(int(pid)):
-				if String(entry["kind"]) == "miting":
-					mitings += 1
-			if mitings > most:
-				most = mitings
-				rival = int(pid)
-		if rival != -1 and (best.is_empty() or INQUIRY_RIVAL_SCORE > float(best["score"])):
-			best = {"target": rival, "score": INQUIRY_RIVAL_SCORE}
-	return best
-
-# --- FİNANSMAN TERCİHİ (insanla aynı kurallar) ------------------------------
-## Hükümetteki bot mitingini devlet parasıyla ödeyebilir (PARTİZAN HARCAMA,
-## soruşturmada usulsüzlük çıkar). Karar: kasası daraldıysa cazip
-## (PARTISAN_TEMPT_LOW), bol parası varken nadiren (PARTISAN_TEMPT); botun
-## sabit RİSK İŞTAHI (kişilik, 0..1) çarpan olur. Bot sadece KENDİ kaydını bilir:
-## henüz incelenmemiş usulsüz mitingi PARTISAN_MAX_OPEN'e ulaştıysa bir daha
-## denemez (yakalanma riski birikir). Kanıtın bulunup bulunmayacağını bilmez.
-const PARTISAN_TEMPT_LOW := 0.3
-const PARTISAN_TEMPT := 0.06
-const PARTISAN_MAX_OPEN := 2
-
-## Botun değişmeyen risk iştahı (0..1; aynı bot hep aynı).
-static func risk_appetite(bot: int) -> float:
-	return fposmod(float(absi(bot)) * 0.618034 + 0.17, 1.0)
-
-## Miting için devlet payı (0 = tamamı kendi kasasından).
-static func miting_state_share(bot: int, tier: int = CardManager.DEFAULT_TIER) -> float:
-	var r := CardManager.funding_range(bot, "miting", CardManager.miting_tier_cost(tier))
-	var lo := float(r["min"])
-	var hi := float(r["max"])
-	if not bool(r["state_allowed"]) or hi <= 0.0 or lo > hi:
-		return lo
-	var open := 0
-	for entry in CardManager.inquiry_records(bot):
-		if Economy.is_partisan(String(entry["kind"])) and float(entry.get("state_million", 0.0)) > 0.0:
-			open += 1
-	if open >= PARTISAN_MAX_OPEN:
-		return lo
-	var low_funds := CardManager.funds_of(bot) < GameRules.MITING_FUNDS_COST * 3.0
-	var chance := (PARTISAN_TEMPT_LOW if low_funds else PARTISAN_TEMPT) * (0.4 + risk_appetite(bot))
-	return hi if randf() < chance else lo
-
-## Yatırım için devlet payı: mümkün olduğunca devletten (meşru), hazine
-## yetmezse kalanı kasadan.
-static func invest_state_share(bot: int, tier: int = CardManager.DEFAULT_TIER) -> float:
-	var r := CardManager.funding_range(bot, "invest", CardManager.invest_tier_cost(tier))
-	return clampf(float(r["max"]), float(r["min"]), 1.0)
 
 ## Vergi yasasına oy: hükümet (genelde) destekler; ortak seçime yakın vergi
 ## artırımına destek vermez (sonucunu o da taşır). Muhalefet artırıma HAYIR,
@@ -1076,9 +991,8 @@ static func _miting_focus(bot: int, province_id: String, slots: int) -> Array:
 ## HAZİNE: seçim uzaksa bir yatırımlık yedek bırakır (hepsini harcamaz);
 ## yatırımın kalan dilimleri seçimden sonraya kalacaksa değeri düşer.
 static func _eval_investment(bot: int) -> Dictionary:
-	# Kotası yatırımın en az yarısını karşılamalı (kalanı kasadan).
-	if not CardManager.is_government_party(bot) or not CardManager.can_invest(bot) \
-			or CardManager.state_quota(bot) < Economy.INVEST_COST * 0.5:
+	# Yatırım tamamen hazine kotasından (can_invest kotayı denetler).
+	if not CardManager.is_government_party(bot) or not CardManager.can_invest(bot):
 		return {}
 	var left := _rounds_to_election()
 	var reserve := Economy.INVEST_COST if left > TAX_CUT_LEAD else 0.0

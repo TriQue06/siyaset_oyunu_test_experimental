@@ -2114,7 +2114,7 @@ func _update_turn_indicator_text() -> void:
 func _refresh_pass_button() -> void:
 	var active := CardManager.can_act()
 	pass_button.disabled = not active
-	_set_action_text(pass_button, L.t("TURU BİTİR"), L.t("sırayı devret") if active else L.t("sıra sende değil"))
+	_set_action_text(pass_button, L.t("TURU BİTİR"), "")
 	UiSkin.skin_action_button(pass_button, ACTION_COLOR_PASS, active)
 	# Para bittiyse tur kendiliğinden geçmez; düğme nabız gibi atarak hatırlatır.
 	var should_pulse: bool = active and CardManager.funds_of(multiplayer.get_unique_id()) <= 0
@@ -3743,7 +3743,10 @@ func _refresh_score_panel() -> void:
 
 # --- Hamleler: yasa tasarla, teşkilat, karalama hedefi -------------------
 
-const FUNDS_COLOR := UiTheme.BLUE
+## Hamle düğmelerinin ortak puntosu (MECLİS, İTTİFAK, KONGRE, TURU BİTİR).
+const ACTION_FONT_SIZE := 14
+## Kasa rengi: dolar banknotunun koyu yeşili (0.0.242).
+const FUNDS_COLOR := Color("3E8E4E")
 const EMPTY_SEAT_COLOR := UiTheme.TEXT
 
 ## Sağ sütunun alt kısmı (aşağıdan yukarı): sıra göstergesi, pas, deste ve
@@ -3788,8 +3791,6 @@ func _build_action_buttons() -> void:
 	_funds_label.add_theme_font_override("font", UiTheme.mono(true))
 	_funds_label.add_theme_font_size_override("font_size", 26)
 	_funds_label.add_theme_color_override("font_color", FUNDS_COLOR)
-	_funds_label.add_theme_color_override("font_outline_color", UiTheme.INK)
-	_funds_label.add_theme_constant_override("outline_size", 6)
 	_funds_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	# Tutar ve altında küçük birim: plaka eski genişliğinde kalır.
 	var amount_box := VBoxContainer.new()
@@ -3820,7 +3821,7 @@ func _build_action_buttons() -> void:
 	_parl_button.clip_text = true
 	_parl_button.set_meta("action_color", ACTION_COLOR_LAW)
 	_parl_button.add_theme_font_override("font", UiTheme.mono(true))
-	_parl_button.add_theme_font_size_override("font_size", 14)
+	_parl_button.add_theme_font_size_override("font_size", ACTION_FONT_SIZE)
 	_parl_button.tooltip_text = L.t("Meclis akışı: uygunsa gensoru, sonra grup toplantısı ve yasa. Her aşamayı yap ya da geç.")
 	_parl_button.pressed.connect(_on_parliament_button_pressed)
 	actions_vbox.add_child(_parl_button)
@@ -3829,7 +3830,7 @@ func _build_action_buttons() -> void:
 	_action_grid.add_theme_constant_override("h_separation", ACTION_BUTTON_GAP)
 	_action_grid.add_theme_constant_override("v_separation", ACTION_BUTTON_GAP)
 	actions_vbox.add_child(_action_grid)
-	_alliance_button = _action_button(L.t("İTTİFAK"), L.t("görüntüle"), ACTION_COLOR_ALLIANCE)
+	_alliance_button = _action_button(L.t("İTTİFAK"), "", ACTION_COLOR_ALLIANCE)
 	_alliance_button.pressed.connect(_on_alliance_button_pressed)
 	_alliance_button.tooltip_text = L.t("İttifakları görüntüle, kur veya partileri davet et ve katıl.")
 	# KONGRE: genel başkan kendi sırasında (en az bir seçim geçtiyse) kongreye
@@ -3893,11 +3894,16 @@ func _style_tab_button(button: Button, active: bool, lit: bool) -> void:
 ## düğmeye sığana kadar yazı küçülür (İngilizce "EARLY ELECTION" gibi; ad
 ## kısaltılmaz).
 func _set_action_text(button: Button, title: String, cost_text: String) -> void:
-	button.text = "%s\n%s" % [title, cost_text]
-	# İki satır ayrı ölçülür, düğmenin yazı tipiyle (5 sütunda kutu dar).
-	var width := ACTION_BUTTON_WIDTH - 10.0
-	var font := UiTheme.mono()
-	var size := UiTheme.FS_TINY - 2
+	# 0.0.242: bütün hamle düğmeleri MECLİS ile aynı yazı tipi ve puntoda;
+	# ikinci satır yalnız gerekiyorsa (bedel, bekleyen karar).
+	button.text = title if cost_text == "" else "%s\n%s" % [title, cost_text]
+	# Sığdırma düğmenin GERÇEK genişliğine göre (ızgarada genişler); daha
+	# yerleşmemişse hamle ızgarasının bir sütunu.
+	var cell := (_r(R_ACTIONS).size.x - ACTION_BUTTON_GAP * 2.0) / 3.0
+	var width := maxf(button.size.x, maxf(ACTION_BUTTON_WIDTH, cell)) - 10.0
+	var font := UiTheme.mono(true)
+	button.add_theme_font_override("font", font)
+	var size := ACTION_FONT_SIZE
 	while size > 6 and (font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width
 			or font.get_string_size(cost_text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width):
 		size -= 1
@@ -3932,7 +3938,7 @@ func _refresh_action_buttons() -> void:
 	if _alliance_button != null:
 		_set_action_available(_alliance_button, CardManager.alliances_enabled)
 		var decisions := CardManager.alliance_requests_for(me).size()
-		_set_action_text(_alliance_button, L.t("İTTİFAK"), (L.t("%d karar bekliyor") % decisions) if decisions > 0 else L.t("görüntüle"))
+		_set_action_text(_alliance_button, L.t("İTTİFAK"), (L.t("%d karar bekliyor") % decisions) if decisions > 0 else "")
 	if _alliance_panel != null and _alliance_panel.visible:
 		_refresh_alliance_panel()
 	_refresh_parliament_button()

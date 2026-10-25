@@ -3,6 +3,24 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: en\n"
 
+msgid "2/3 sağlandı · kabul"
+msgstr "2/3 reached · passes"
+
+msgid "kabul için %d oy daha (2/3 = %d)"
+msgstr "%d more votes to pass (2/3 = %d)"
+
+msgid "EVET önde · +%d"
+msgstr "YES leads · +%d"
+
+msgid "HAYIR önde · +%d"
+msgstr "NO leads · +%d"
+
+msgid "berabere · %d – %d"
+msgstr "tied · %d – %d"
+
+msgid "EVET %d · HAYIR %d"
+msgstr "YES %d · NO %d"
+
 msgid "teşkilat, miting, yatırım: haritada bir ile dokun"
 msgstr "organization, rally, investment: tap a province on the map"
 

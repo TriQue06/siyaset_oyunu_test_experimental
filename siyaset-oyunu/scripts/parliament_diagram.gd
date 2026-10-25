@@ -178,6 +178,10 @@ func _place_count_plate() -> void:
 	_count_plate.position = Vector2(origin.x - plate_size.x * 0.5,
 		origin.y - plate_size.y - BASELINE_GAP)
 
+## Yayın (koltukların) ekrandaki genişliği: altındaki öğeler bu genişliğe hizalanır.
+func arc_width() -> float:
+	return 2.0 * minf(size.x * 0.5, size.y * 0.96)
+
 ## Yayın taban çizgisinin orta noktası. _draw ve levha yerleşimi aynı yeri
 ## kullanmalı, yoksa sayı yayın ortasından kayar.
 func _arc_origin() -> Vector2:

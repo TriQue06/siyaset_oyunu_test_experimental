@@ -1,4 +1,10 @@
 {
+"2/3 sağlandı · kabul": "2/3 reached · passes",
+"kabul için %d oy daha (2/3 = %d)": "%d more votes to pass (2/3 = %d)",
+"EVET önde · +%d": "YES leads · +%d",
+"HAYIR önde · +%d": "NO leads · +%d",
+"berabere · %d – %d": "tied · %d – %d",
+"EVET %d · HAYIR %d": "YES %d · NO %d",
 "teşkilat, miting, yatırım: haritada bir ile dokun": "organization, rally, investment: tap a province on the map",
 "İTTİFAKLAR": "ALLIANCES",
 "YENİ İTTİFAK": "NEW ALLIANCE",

@@ -569,6 +569,8 @@ var _map_bg: Panel
 var _parl_bg: Panel
 var _parl_title: Label
 var _parl_summary: Label
+## Oylama sürerken diyagramın altında EVET / HAYIR halat çubuğu (özet satırının yerine).
+var _vote_bar: VoteTugBar
 var _side_tabs: HBoxContainer
 var _side_tab := 0
 var _strip_bg: Panel
@@ -1022,6 +1024,11 @@ func _place_parliament_badge() -> void:
 			_parl_summary.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			vbox.add_child(_parl_summary)
 			vbox.move_child(_parl_summary, 2)
+			_vote_bar = VoteTugBar.new()
+			_vote_bar.diagram = parliament_diagram
+			_vote_bar.hide()
+			vbox.add_child(_vote_bar)
+			vbox.move_child(_vote_bar, 3)
 			vbox.add_theme_constant_override("separation", 4)
 		var chamber := bottom_area.get_node_or_null("ChamberSplit/ParliamentChamber") as MarginContainer
 		if chamber != null:
@@ -3725,6 +3732,14 @@ func _refresh_vote_ui() -> void:
 
 	proposal_label.text = GovernmentHud.proposal_status_text(multiplayer.get_unique_id())
 	_refresh_proposer_chip()
+	# Oylama sürerken özet satırının yerinde EVET / HAYIR çubuğu.
+	if _vote_bar != null:
+		var voting := GovernmentManager.is_voting()
+		_vote_bar.visible = voting
+		if _parl_summary != null:
+			_parl_summary.visible = not voting
+		if voting:
+			_vote_bar.refresh()
 
 ## TEKLİFİ VEREN PARTİ: yasa/gensoru/hükümet oylamasında meclis diyagramının
 ## köşesinde logosu ve adıyla durur. Eskiden bu bilgi diyagramın altındaki

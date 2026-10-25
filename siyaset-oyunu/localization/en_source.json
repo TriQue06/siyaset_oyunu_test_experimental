@@ -1,4 +1,10 @@
 {
+"İTTİFAKLAR": "ALLIANCES",
+"YENİ İTTİFAK": "NEW ALLIANCE",
+"İttifakı sen kurarsan lideri olursun: diğer partileri sen davet edersin.": "If you found the alliance you lead it: you invite the other parties.",
+"İTTİFAK ADI": "ALLIANCE NAME",
+"RENK": "COLOR",
+"İTTİFAKI KUR": "FOUND ALLIANCE",
 "toplantı": "meeting",
 "açık: %s": "open: %s",
 "Meclise bir teklif getir; teklif oylanır. Sunduğunda yasa sekmesi bu tur kapanır.": "Bring a proposal to parliament; it goes to a vote. Once you submit, the law tab closes for this turn.",

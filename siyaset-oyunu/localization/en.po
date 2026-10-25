@@ -3,6 +3,24 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: en\n"
 
+msgid "İTTİFAKLAR"
+msgstr "ALLIANCES"
+
+msgid "YENİ İTTİFAK"
+msgstr "NEW ALLIANCE"
+
+msgid "İttifakı sen kurarsan lideri olursun: diğer partileri sen davet edersin."
+msgstr "If you found the alliance you lead it: you invite the other parties."
+
+msgid "İTTİFAK ADI"
+msgstr "ALLIANCE NAME"
+
+msgid "RENK"
+msgstr "COLOR"
+
+msgid "İTTİFAKI KUR"
+msgstr "FOUND ALLIANCE"
+
 msgid "toplantı"
 msgstr "meeting"
 

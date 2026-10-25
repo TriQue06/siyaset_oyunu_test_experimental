@@ -356,9 +356,16 @@ static func alliance_answer(bot: int, request_id: int) -> bool:
 		return struggling or (helps and randf() < 0.65) or (CardManager.were_allies(pid, int(req["party"])) and randf() < 0.5)
 	var candidate := int(req["party"])
 	var pooled := _alliance_share(alliance_id)
-	var chance := 0.7
+	# 0.0.254: seçmeni uzak partiyi onaylamaz; ittifak 3 partiyi geçmez (ortak
+	# oy hâlâ barajın altındaysa hariç).
+	if _friend_distance(bot, candidate) >= ALLIANCE_PARTNER_DISTANCE and not CardManager.were_allies(pid, candidate):
+		return false
+	var size: int = (CardManager.alliances.get(alliance_id, {}).get("members", []) as Array).size()
+	if size >= ALLIANCE_MAX_BOT_SIZE and (threshold <= 0.0 or pooled >= threshold):
+		return false
+	var chance := 0.6
 	if threshold > 0.0 and pooled < threshold:
-		chance = 0.95
+		chance = 0.9
 	if CardManager.were_allies(pid, candidate):
 		chance += 0.15
 	return randf() < chance
@@ -394,13 +401,21 @@ static func choose_alliance_request(bot: int) -> int:
 ##            grupları yakın (ideoloji karışımı çekirdeğini sulandırmayan)
 ##            partileri davet eder.
 ##   kur    : barajda zorlanıyor, katılacak ittifak yok, yakın bir parti var.
-const ALLIANCE_PARTNER_DISTANCE := 3.0
+## 0.0.254: 3.0 → 1.5. Parti çiftlerinin uzaklığı pratikte 0–1,8 arası: 3.0 hiç
+## kimseyi elemiyordu (bütün botlar tek ittifakta toplanıyordu).
+const ALLIANCE_PARTNER_DISTANCE := 1.5
+## Botların kendi isteğiyle büyüttüğü ittifakın en fazla parti sayısı.
+const ALLIANCE_MAX_BOT_SIZE := 3
 const ALLIANCE_NAMES := [["Halk Cephesi", "People's Front"], ["Ulusal Birlik", "National Union"],
 	["Demokrasi Bloku", "Democracy Bloc"], ["Emek Birliği", "Labour Union"], ["Ortak Gelecek", "Common Future"],
 	["Anadolu Birliği", "Anatolian Union"], ["Özgürlük Cephesi", "Freedom Front"], ["Yeni Başlangıç", "New Beginning"]]
 
 static func choose_alliance_move(bot: int) -> Dictionary:
 	if not CardManager.can_manage_alliance(bot):
+		return {}
+	# 0.0.254: ilk seçimden önce kimse kimsenin gücünü bilmez: bot ittifak
+	# kurmaz, davet etmez, başvurmaz (gelen daveti yine yanıtlar).
+	if CardManager.last_seats.is_empty():
 		return {}
 	var pid := CardManager.party_of(bot)
 	var alliance_id := CardManager.alliance_of(bot)
@@ -435,7 +450,7 @@ static func _alliance_candidate(bot: int, other: int) -> bool:
 static func _alliance_invite_target(bot: int, alliance_id: int) -> int:
 	var members: Array = CardManager.alliances[alliance_id].get("members", [])
 	var threshold := MultiplayerManager.election_threshold
-	if members.size() >= 3 and _alliance_share(alliance_id) >= threshold + 3.0:
+	if members.size() >= ALLIANCE_MAX_BOT_SIZE or (members.size() >= 2 and _alliance_share(alliance_id) >= threshold + 3.0):
 		return -1
 	var best := -1
 	var best_d := INF
@@ -468,14 +483,20 @@ static func _free_alliance_color() -> Color:
 			return color
 	return Color.TRANSPARENT
 
+## Partinin oy oranı (%): son seçim; seçim yoksa (ilk seçimden önce ya da
+## yeni parti) "şimdi seçim olsa" beklenen ulusal oy. Eskiden kamuoyu puanına
+## düşüyordu (~0): her bot kendini barajın altında sanıp ittifaka koşuyordu.
 static func _vote_share(pid: int) -> float:
-	return float(CardManager.last_vote_shares.get(pid, CardManager.national_of(pid)))
+	if CardManager.last_vote_shares.has(pid):
+		return float(CardManager.last_vote_shares[pid])
+	var expected: Dictionary = CardManager._expected_national(CardManager.election_modifiers(true))
+	return float(expected.get(pid, 0.0)) * 100.0
 
 static func _alliance_share(alliance_id: int) -> float:
 	var alliance: Dictionary = CardManager.alliances.get(alliance_id, {})
 	var total := 0.0
 	for member in alliance.get("members", []):
-		total += float(CardManager.last_vote_shares.get(int(member), CardManager.national_of(int(member))))
+		total += _vote_share(int(member))
 	return total
 
 ## En iyi hamle (gürültülü puanlarla). Geçerli seçenekler candidates'e eklenir.

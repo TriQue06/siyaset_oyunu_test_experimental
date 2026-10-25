@@ -690,7 +690,8 @@ func _apply_layout() -> void:
 		_strip_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(_strip_bg)
 		move_child(_strip_bg, 1)
-	_set_rect(_strip_bg, _r(R_BAND))
+	# 0.0.255: bant sayaç şeridinin ALTINDAN başlar (ikisi üst üste binmez).
+	_set_rect(_strip_bg, _r(Rect2(0, TIMER_BAR_HEIGHT, 1280, R_BAND.size.y - TIMER_BAR_HEIGHT)))
 	_place_date_chip(map_rect)
 
 	# SKOR TABLOSU (sol): VEKİL ve PUAN sekmeleri.
@@ -860,8 +861,8 @@ func _place_date_chip(_map_rect: Rect2) -> void:
 		_timer_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_timer_bar.z_index = 8
 		add_child(_timer_bar)
-	_band_period.position = _r(Rect2(16, 12, 0, 0)).position
-	_date_label.position = _r(Rect2(16, 38, 0, 0)).position
+	_band_period.position = _r(Rect2(16, 16, 0, 0)).position
+	_date_label.position = _r(Rect2(16, 42, 0, 0)).position
 	# Üst banttaki kutular (gündem, sıra) sağdaki Menü düğmesiyle AYNI üst ve
 	# alt kenarda durur (Menü SettingsOverlay'de, ölçeklenmeyen piksellerle).
 	var menu := _menu_button_rect()
@@ -876,7 +877,8 @@ func _place_date_chip(_map_rect: Rect2) -> void:
 	_refresh_band_turn()
 	_refresh_timer_bar()
 
-const TIMER_BAR_HEIGHT := 7.0
+## Sayaç şeridi ekranın en üstünde kendi satırında (bant 8–64 arası).
+const TIMER_BAR_HEIGHT := 8.0
 
 ## Sağ üstteki Menü düğmesinin ekrandaki dikdörtgeni (yoksa tasarım değeri).
 func _menu_button_rect() -> Rect2:
@@ -884,7 +886,7 @@ func _menu_button_rect() -> Rect2:
 	var button: Control = overlay.get_node_or_null("%OpenSettingsButton") if overlay != null else null
 	if button != null and button.size.y > 0.0:
 		return button.get_global_rect()
-	return Rect2(get_viewport_rect().size.x - 124.0, 10.0, 108.0, 44.0)
+	return Rect2(get_viewport_rect().size.x - 124.0, 14.0, 108.0, 44.0)
 
 func _refresh_band_date() -> void:
 	if _band_period == null:

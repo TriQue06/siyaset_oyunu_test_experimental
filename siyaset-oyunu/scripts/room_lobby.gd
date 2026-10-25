@@ -720,8 +720,8 @@ func _build_concept_a() -> void:
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	for side in ["left", "top", "right", "bottom"]:
 		margin.add_theme_constant_override("margin_" + side, 24)
-	# Başlık satırı sağ üstteki Menü düğmesiyle aynı hizada (üst 10, yükseklik 44).
-	margin.add_theme_constant_override("margin_top", 10)
+	# Başlık satırı sağ üstteki Menü düğmesiyle aynı hizada (üst 14, yükseklik 44).
+	margin.add_theme_constant_override("margin_top", 14)
 	add_child(margin)
 	var root_box := VBoxContainer.new()
 	root_box.add_theme_constant_override("separation", 16)

@@ -22,7 +22,9 @@ static func texture(icon_name: String) -> Texture2D:
 	if not SVGS.has(icon_name):
 		return null
 	var image := Image.new()
-	image.load_svg_from_string(String(SVGS[icon_name]), 1.0)
+	# 0.0.253: 256 px + mipmap (her çözünürlükte keskin).
+	image.load_svg_from_string(String(SVGS[icon_name]), 2.0)
+	image.generate_mipmaps()
 	var tex := ImageTexture.create_from_image(image)
 	_cache[icon_name] = tex
 	return tex

@@ -10,6 +10,7 @@ var bare: bool = false
 static func make(group_id: String, size_px: float = 22.0, bare_icon: bool = false) -> VoterGroupIcon:
 	var icon := VoterGroupIcon.new()
 	icon.group = group_id
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	icon.bare = bare_icon
 	icon.custom_minimum_size = Vector2(size_px, size_px)
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE

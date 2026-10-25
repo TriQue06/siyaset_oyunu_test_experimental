@@ -24,7 +24,9 @@ static var _installed := false
 
 static func _image() -> Image:
 	var image := Image.new()
-	image.load_svg_from_string(SVG, 1.0)
+	# 0.0.253: 256 px + mipmap (her çözünürlükte keskin).
+	image.load_svg_from_string(SVG, 256.0 / 96.0)
+	image.generate_mipmaps()
 	return image
 
 ## Tek başına kullanılan simge dokusu (beyaz; modulate ile renklendirilir).
@@ -41,6 +43,7 @@ static func font() -> FontFile:
 	image.convert(Image.FORMAT_LA8)  # gri tonlu: yazının rengiyle boyanır
 	var f := FontFile.new()
 	f.fixed_size = FONT_SIZE
+	f.generate_mipmaps = true
 	f.fixed_size_scale_mode = TextServer.FIXED_SIZE_SCALE_ENABLED
 	var cache := Vector2i(FONT_SIZE, 0)
 	var s := float(FONT_SIZE)

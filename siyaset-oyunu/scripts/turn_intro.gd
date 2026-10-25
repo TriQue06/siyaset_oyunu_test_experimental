@@ -183,12 +183,33 @@ func _show_prompt() -> void:
 	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(_centered(note))
 	var button := Button.new()
-	# 0.0.246: kart simgesi Material "playing_cards" (yazının solunda, yazı renginde).
-	button.text = L.t("KART ÇEK")
-	button.icon = cards_icon()
-	button.add_theme_constant_override("h_separation", 14)
-	button.add_theme_constant_override("icon_max_width", 48)
+	# Kart simgesi ve yazı birlikte düğmenin ORTASINDA (0.0.253: simge eskiden
+	# düğmenin sol kenarına yapışıyordu).
 	button.focus_mode = Control.FOCUS_NONE
+	var content := HBoxContainer.new()
+	content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	content.alignment = BoxContainer.ALIGNMENT_CENTER
+	content.add_theme_constant_override("separation", 16)
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(content)
+	var icon := TextureRect.new()
+	icon.texture = cards_icon()
+	icon.custom_minimum_size = Vector2(52, 52)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	icon.modulate = UiTheme.TEXT
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(icon)
+	var caption := Label.new()
+	caption.text = L.t("KART ÇEK")
+	caption.add_theme_font_override("font", UiTheme.mono(true))
+	caption.add_theme_font_size_override("font_size", 28)
+	caption.add_theme_color_override("font_color", UiTheme.TEXT)
+	caption.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(caption)
 	button.custom_minimum_size = Vector2(300, 92)
 	button.add_theme_font_override("font", UiTheme.mono(true))
 	button.add_theme_font_size_override("font_size", 28)
@@ -501,6 +522,8 @@ static var _cards_icon: Texture2D
 static func cards_icon() -> Texture2D:
 	if _cards_icon == null:
 		var image := Image.new()
-		image.load_svg_from_string(CARDS_SVG, 0.5)
+		# 0.0.253: 256 px + mipmap (her çözünürlükte keskin).
+		image.load_svg_from_string(CARDS_SVG, 256.0 / 96.0)
+		image.generate_mipmaps()
 		_cards_icon = ImageTexture.create_from_image(image)
 	return _cards_icon

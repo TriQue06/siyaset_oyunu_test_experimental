@@ -9,6 +9,7 @@ var color: Color = UiTheme.BLUE
 static func make(size_px: float, coin_color: Color = UiTheme.BLUE) -> CoinIcon:
 	var icon := CoinIcon.new()
 	icon.color = coin_color
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	icon.custom_minimum_size = Vector2(size_px, size_px)
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return icon

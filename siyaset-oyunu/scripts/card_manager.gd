@@ -497,11 +497,12 @@ func _apply_instant(peer_id: int, card_type: String, entry: Dictionary = {}) -> 
 			return L.t("%s büyük bir bağış kampanyası yaptı (+%s).") % [_party_name(peer_id), GameRules.cost_text(strong_gain)]
 	return ""
 
-## AFET KARARI bekleniyor mu? (Kart çekildikten sonra açılan yardım sahnesi.)
+## AFET SAHNESİ bekleniyor mu? (Kart çekildikten sonra bir kez açılır; yardım
+## ya da "şimdilik atla" ile kapanır. Sonra YARDIM hamlesi tur boyunca açık.)
 func aid_pending(peer_id: int) -> bool:
-	return has_disaster() and not needs_turn_draw(peer_id) and can_aid(peer_id)
+	return has_disaster() and not needs_turn_draw(peer_id) and not aid_decided(peer_id) and can_aid(peer_id)
 
-## Bu sırada bu afet için karar verildi mi (yardım ya da "bu tur yardım yapma")?
+## Bu sırada afet sahnesi geçildi mi (yardım yapıldı ya da "şimdilik atla")?
 func aid_decided(peer_id: int) -> bool:
 	return has_disaster() and int(_flow_value(peer_id, "aid_for", -1)) == int(active_disaster().get("id", 0))
 
@@ -1253,8 +1254,6 @@ func aid_block_reason(peer_id: int, party_m: float = -1.0, state_m: float = -1.0
 		return L.t("Şu an yardım bekleyen bir afet yok.")
 	if not can_choose_main_action(peer_id):
 		return L.t("Sıra sende değil.")
-	if enforce_turn_flow and aid_decided(peer_id):
-		return L.t("Bu tur yardım kararını verdin; afet sürerse sonraki sıranda yeniden karar verebilirsin.")
 	var lim := aid_limits(peer_id)
 	if party_m < 0.0 or state_m < 0.0:
 		if float(lim["party_max"]) + float(lim["state_max"]) < Disaster.AID_MIN:
@@ -1353,7 +1352,7 @@ func start_disaster(kind: String, provinces: Array = []) -> Array:
 	for province_id in provinces:
 		names.append(_province_name(String(province_id)))
 		_log_province(String(province_id), L.t("%s afeti") % Disaster.title(kind))
-	_pending_log.append({"text": L.t("AFET: %s — %s. Bu tur boyunca YARDIM GÖTÜR hamlesiyle bölgeye yardım edilebilir.") % [
+	_pending_log.append({"text": L.t("AFET: %s — %s. Bu tur boyunca YARDIM hamlesiyle bölgeye istendiği kadar yardım edilebilir.") % [
 		Disaster.title(kind), ", ".join(PackedStringArray(names))], "peer_id": -1, "province": String(provinces[0]), "kind": "disaster"})
 	_pending_disaster_fx = {"id": id, "kind": kind, "provinces": provinces}
 	return provinces
@@ -5001,6 +5000,9 @@ var _congress_time_left: float = 0.0
 ## Herkes: kongre gösterisi sürüyor mu (tur akışı durur).
 var congress_active: bool = false
 
+## KONGRE ŞİMDİLİK KAPALI (0.0.260): kodu duruyor, ileride geri açılmak üzere.
+## Kapalıyken ne hamle, ne istek, ne zorunlu kongre olur (testler açabilir).
+var congress_enabled := false
 const CONGRESS_MAX_ELECTIONS := 3
 const CONGRESS_COST := 10
 const CONGRESS_REQUEST_COST := 20
@@ -5025,13 +5027,13 @@ func elections_since_congress(pid: int) -> int:
 ## Genel başkan isteğe bağlı kongreye gidebilir mi? (Son kongreden beri en az
 ## bir seçim geçmiş olmalı.)
 func can_hold_congress(peer_id: int) -> bool:
-	return can_choose_main_action(peer_id) and PartyManager.is_leader(peer_id) and not PartyManager.is_independent(peer_id) \
+	return congress_enabled and can_choose_main_action(peer_id) and PartyManager.is_leader(peer_id) and not PartyManager.is_independent(peer_id) \
 		and not is_splinter(peer_id) and elections_since_congress(peer_id) >= 1 and funds_of(peer_id) >= CONGRESS_COST
 
 ## Üye (eski başkan) kongre isteyebilir mi? Son kongreden beri bir seçim
 ## geçmiş olmalı VE bot başkanın döneminde partinin oyu DÜŞMÜŞ olmalı.
 func can_request_congress(peer_id: int) -> bool:
-	if not can_choose_main_action(peer_id) or not is_party_member(peer_id):
+	if not congress_enabled or not can_choose_main_action(peer_id) or not is_party_member(peer_id):
 		return false
 	var pid := party_of(peer_id)
 	return elections_since_congress(pid) >= 1 and funds_of(peer_id) >= CONGRESS_REQUEST_COST and member_vote_drop(pid) > 0.0
@@ -5178,7 +5180,7 @@ func _apply_congress(peer_id: int) -> void:
 ## gitmediyse kongre kendiliğinden başlar.
 func _maybe_mandatory_congress() -> void:
 	var peer_id := current_turn_peer_id()
-	if peer_id == -1 or game_finished or congress_active or not PartyManager.is_leader(peer_id):
+	if not congress_enabled or peer_id == -1 or game_finished or congress_active or not PartyManager.is_leader(peer_id):
 		return
 	if PartyManager.is_independent(peer_id) or is_splinter(peer_id) or bool(PartyManager.data_of(peer_id).get("temporary", false)):
 		return

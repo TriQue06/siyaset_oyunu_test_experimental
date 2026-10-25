@@ -91,7 +91,7 @@ func _initialize() -> void:
 		var treasury_text: String = (panel._tiles["treasury"]["value"] as Label).text
 		check("hazine kutusu gerçek bakiyeyi gösterir", treasury_text == Economy.money_text(cm.state_treasury()),
 			"%s / %s" % [treasury_text, Economy.money_text(cm.state_treasury())])
-		check("vergi etkisi satırı görünür", panel._tax_effect.visible and panel._tax_effect.text.begins_with("Vergi"), panel._tax_effect.text)
+		check("vergi etkisi satırı görünür", panel._tax_effect.visible and panel._tax_effect.text.contains("vergi"), panel._tax_effect.text)
 		check("ekonomi kutusu ekrana sığıyor", _inside(panel), str(panel.get_global_rect()))
 		check("yürürlükteki vergi vurgulu", (panel._tax_buttons[Economy.TAX_NORMAL] as Button).get_theme_color("font_color") == UiTheme.INK)
 

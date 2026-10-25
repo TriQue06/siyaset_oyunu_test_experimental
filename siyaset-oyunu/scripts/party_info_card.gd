@@ -117,18 +117,22 @@ static func _actions(peer_id: int, my_id: int, on_action: Callable) -> Control:
 			notes.append(L.t("Eski partin %s'nin %d teşkilatından %d tanesi yeni partine geçer; beklersen bu sayı azalır.") % [
 				String(former.get("name", "")), CardManager.former_org_source(my_id).size(), moving])
 	elif CardManager.is_party_member(my_id):
-		list.append([L.t("Kongre İste · %s") % GameRules.cost_text(CardManager.CONGRESS_REQUEST_COST), "congress", CardManager.can_request_congress(my_id), false])
+		# 0.0.260: kongre şimdilik kapalı (CardManager.congress_enabled).
+		if CardManager.congress_enabled:
+			list.append([L.t("Kongre İste · %s") % GameRules.cost_text(CardManager.CONGRESS_REQUEST_COST), "congress", CardManager.can_request_congress(my_id), false])
 		list.append([L.t("Partiden İstifa Et"), "resign", CardManager.can_resign(my_id), true])
 		notes.append(L.t("Partinin üyesisin: sadece miting yapabilirsin (partine ve güvenilirliğine yazar). Parti hükümetteyse başkanla aynı puanı alırsın."))
 		var reason := CardManager.congress_block_reason(my_id)
-		if reason != "":
+		if CardManager.congress_enabled and reason != "":
 			notes.append(L.t("Kongre: ") + reason)
 	else:
-		list.append([L.t("Kongreye Git · %s") % GameRules.cost_text(CardManager.CONGRESS_COST), "congress", CardManager.can_hold_congress(my_id), false])
+		if CardManager.congress_enabled:
+			list.append([L.t("Kongreye Git · %s") % GameRules.cost_text(CardManager.CONGRESS_COST), "congress", CardManager.can_hold_congress(my_id), false])
 		list.append([L.t("Partiyi Feshet"), "dissolve", CardManager.can_dissolve(my_id), true])
-		var left := CardManager.CONGRESS_MAX_ELECTIONS - CardManager.elections_since_congress(pid)
-		notes.append(L.t("Zorunlu kongreye %s. Partideki gücün %s: güçlüysen rakip az çıkar.") % [
-			L.t("bu seçimden sonra sıran gelince gidilecek") if left <= 0 else L.t("%d seçim kaldı") % left, EffectWords.strength(CardManager.congress_strength(pid))])
+		if CardManager.congress_enabled:
+			var left := CardManager.CONGRESS_MAX_ELECTIONS - CardManager.elections_since_congress(pid)
+			notes.append(L.t("Zorunlu kongreye %s. Partideki gücün %s: güçlüysen rakip az çıkar.") % [
+				L.t("bu seçimden sonra sıran gelince gidilecek") if left <= 0 else L.t("%d seçim kaldı") % left, EffectWords.strength(CardManager.congress_strength(pid))])
 	if list.is_empty():
 		return null
 	var box := VBoxContainer.new()

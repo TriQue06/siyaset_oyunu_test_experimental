@@ -494,7 +494,7 @@ func _show_aid(disaster_id: int) -> void:
 	_aid_panel.z_index = 0
 	box.add_child(_aid_panel)
 	_aid_panel.open(me)
-	_aid_panel.set_cancel_text(L.t("BU TUR YARDIM YAPMA"))
+	_aid_panel.set_cancel_text(L.t("ŞİMDİLİK ATLA"))
 	_aid_panel.confirmed.connect(func(party_m: float, state_m: float):
 		if CardManager.can_aid(me, party_m, state_m):
 			CardManager.aid(party_m, state_m)
@@ -502,7 +502,7 @@ func _show_aid(disaster_id: int) -> void:
 	_aid_panel.cancelled.connect(func():
 		CardManager.skip_aid()
 		_close())
-	texts.add_child(PopupKit.note(L.t("Yardım yapmazsan bu tur bu ekran yeniden açılmaz. Afet sürerse sonraki sıranda yeniden karar verirsin."),
+	texts.add_child(PopupKit.note(L.t("Şimdilik atlarsan bu tur içinde YARDIM hamlesiyle istediğin kadar yardım edebilirsin."),
 		UiTheme.GOLD, 300))
 	box.reset_size()
 	var size := box.get_combined_minimum_size()

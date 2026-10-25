@@ -42,14 +42,11 @@ func _ready() -> void:
 	add_child(_dim)
 	_panel = PanelContainer.new()
 	_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	# 0.0.260: düğmeler ve diğer paneller gibi konturlu panel.
 	var style := StyleBoxFlat.new()
 	style.bg_color = UiTheme.PANEL_DARK
-	style.border_color = UiTheme.INK
-	style.set_border_width_all(3)
 	style.set_content_margin_all(UiTheme.PAD_L)
-	style.shadow_color = Color(0, 0, 0, 0.5)
-	style.shadow_offset = Vector2(6, 8)
-	_panel.add_theme_stylebox_override("panel", style)
+	UiSkin.apply_style(_panel, "panel", style)
 	add_child(_panel)
 	_body = VBoxContainer.new()
 	_body.add_theme_constant_override("separation", 10)
@@ -60,6 +57,7 @@ func _ready() -> void:
 	_body.add_child(_tabs_row)
 	_content = VBoxContainer.new()
 	_content.add_theme_constant_override("separation", 10)
+	_content.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_body.add_child(_content)
 	law_host = VBoxContainer.new()
 	law_host.add_theme_constant_override("separation", 6)
@@ -183,6 +181,8 @@ func _build() -> void:
 			refresh())
 		_tabs_row.add_child(button)
 	law_host.visible = _law_page
+	# Yasa sayfasında içerik üstte kalır, artan boşluk pencerenin dibinde.
+	_content.size_flags_vertical = Control.SIZE_FILL if _law_page else Control.SIZE_EXPAND_FILL
 	if _law_page:
 		var back := Button.new()
 		back.text = L.t("← Geri")
@@ -200,6 +200,11 @@ func _build() -> void:
 				_build_speech()
 			"law":
 				_build_law()
+		# Alt düğme pencerenin dibinde: sekmeler arasında pencere boyu sabit.
+		var filler := Control.new()
+		filler.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		filler.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_content.add_child(filler)
 		_content.add_child(UiTheme.rule())
 		var away := Button.new()
 		away.text = L.t("← Haritaya dön")
@@ -303,13 +308,20 @@ func _option(title: String, text: String, available: bool, action: Callable) -> 
 
 # --- Yerleşim ve animasyon --------------------------------------------------------
 
+## SABİT BOY (0.0.260): sekmeler ve yasa sayfaları arasında pencere boyu
+## değişmez. Boy, en büyük sayfaya göre bir kez ölçülür (FIXED_SIZE) ve
+## ekrandan büyükse ekrana sığdırılır; içerik ondan büyükse pencere büyür.
+const FIXED_SIZE := Vector2(676, 525)
+var fixed_size := FIXED_SIZE
+
 func _place() -> void:
 	_panel.size = Vector2.ZERO
 	_panel.reset_size()
+	var view := get_viewport_rect().size
 	var size := _panel.get_combined_minimum_size()
+	size = Vector2(maxf(size.x, minf(fixed_size.x, view.x - 16.0)), maxf(size.y, minf(fixed_size.y, view.y - 16.0)))
 	_panel.size = size
 	_panel.pivot_offset = size * 0.5
-	var view := get_viewport_rect().size
 	_panel.position = Vector2((view.x - size.x) * 0.5, clampf((view.y - size.y) * 0.5 - 40.0, 8.0, maxf(8.0, view.y - size.y - 8.0)))
 
 func _animate_in(stage: String) -> void:

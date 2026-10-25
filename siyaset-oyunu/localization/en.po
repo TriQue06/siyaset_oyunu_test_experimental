@@ -3,6 +3,57 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: en\n"
 
+msgid "AFET: %s — %s. Bu tur boyunca YARDIM hamlesiyle bölgeye istendiği kadar yardım edilebilir."
+msgstr "DISASTER: %s — %s. All round, the AID move can send help to the region as often as you like."
+
+msgid "Hükümet yok: vergi kimseyi etkilemez"
+msgstr "No government: taxes affect nobody"
+
+msgid "Normal vergi: seçmene etkisi yok"
+msgstr "Normal tax: no effect on voters"
+
+msgid "Düşük vergi: hükümete her sıra artı"
+msgstr "Low tax: government gains every turn"
+
+msgid "Yüksek vergi: hükümete her sıra eksi"
+msgstr "High tax: government loses every turn"
+
+msgid "seçmen: artı"
+msgstr "voters: plus"
+
+msgid "seçmen: eksi"
+msgstr "voters: minus"
+
+msgid "etkisi yok"
+msgstr "no effect"
+
+msgid "hükümete her sıra artı"
+msgstr "government gains every turn"
+
+msgid "hükümete her sıra eksi"
+msgstr "government loses every turn"
+
+msgid "Etki seçime yaklaştıkça artar."
+msgstr "The effect grows as the election nears."
+
+msgid "SIRA SENDE · %s"
+msgstr "YOUR TURN · %s"
+
+msgid "SIRA · %s"
+msgstr "TURN · %s"
+
+msgid "afet var"
+msgstr "disaster"
+
+msgid "Şu an yardım bekleyen bir afet yok. Afet çıkınca buradan yardım götürebilirsin."
+msgstr "No disaster needs aid right now. When one strikes, you can send aid from here."
+
+msgid "ŞİMDİLİK ATLA"
+msgstr "SKIP FOR NOW"
+
+msgid "Şimdilik atlarsan bu tur içinde YARDIM hamlesiyle istediğin kadar yardım edebilirsin."
+msgstr "If you skip for now, you can still send aid as often as you like this round with the AID move."
+
 msgid "%s KABUL EDİLDİ — vergiler %s → %s. Dönem geliri %s → %s. %s +%d puan."
 msgstr "%s PASSED — taxes %s → %s. Term revenue %s → %s. %s +%d points."
 

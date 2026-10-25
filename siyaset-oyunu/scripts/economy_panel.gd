@@ -189,20 +189,17 @@ func refresh() -> void:
 	_tax_effect.add_theme_color_override("font_color", effect[1])
 	_refresh_summary()
 
-## VERGİ ETKİSİ satırı: [metin, renk]. Örn. "Vergi: hükümete +0,18 / sıra ·
-## tur ×3". Hükümet yoksa kimsenin hanesine yazılmaz.
+## VERGİ ETKİSİ satırı: [metin, renk], sayısız (0.0.260). Hükümet yoksa
+## kimsenin hanesine yazılmaz.
 static func tax_effect_text() -> Array:
 	if not GovernmentManager.has_government():
-		return [L.t("Vergi: hükümet yok, etki yazılmaz"), UiTheme.TEXT_MUTED]
+		return [L.t("Hükümet yok: vergi kimseyi etkilemez"), UiTheme.TEXT_MUTED]
 	var total := CardManager.tax_turn_effect()
-	var mult := CardManager.tax_cycle_mult()
 	if is_zero_approx(total):
-		return [L.t("Vergi seçmene etkisiz · tur ×%d") % mult, UiTheme.TEXT_MUTED]
-	return [L.t("Vergi: hükümete %s / sıra · tur ×%d") % [_signed2(total), mult], UiTheme.GREEN if total > 0.0 else UiTheme.RED]
-
-## "+0,18" / "−0,06" gibi iki basamaklı işaretli sayı.
-static func _signed2(value: float) -> String:
-	return ("+" if value > 0.0 else "−") + String.num(snappedf(absf(value), 0.01), 2).replace(".", ",")
+		return [L.t("Normal vergi: seçmene etkisi yok"), UiTheme.TEXT_MUTED]
+	if total > 0.0:
+		return [L.t("Düşük vergi: hükümete her sıra artı"), UiTheme.GREEN]
+	return [L.t("Yüksek vergi: hükümete her sıra eksi"), UiTheme.RED]
 
 func _set_tile(key: String, text: String, prev: Dictionary, prev_key: String, now: float, up_good: bool, decimal: bool) -> void:
 	(_tiles[key]["value"] as Label).text = text
@@ -459,7 +456,7 @@ static func _policy_card(me: int, level: int, current: int, selected: int, on_se
 	box.add_child(PopupKit.label(sub, 9, UiTheme.TEXT_DIM if is_current else (UiTheme.GREEN if diff > 0.0 else UiTheme.RED)))
 	# Seçmen etkisi: hükümete her sırada (bu turun çarpanıyla).
 	var effect := CardManager.tax_turn_effect(level)
-	var effect_text := L.t("seçmen: etkisiz") if is_zero_approx(effect) else L.t("seçmen: %s / sıra") % _signed2(effect)
+	var effect_text := L.t("seçmen: etkisiz") if is_zero_approx(effect) else (L.t("seçmen: artı") if effect > 0.0 else L.t("seçmen: eksi"))
 	box.add_child(PopupKit.label(effect_text, 10, UiTheme.TEXT_MUTED if is_zero_approx(effect) else (UiTheme.GREEN if effect > 0.0 else UiTheme.RED)))
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -480,10 +477,11 @@ static func _fill_policy_detail(detail: VBoxContainer, me: int, level: int, curr
 	detail.add_child(PopupKit.kv(L.t("Hazine geliri"), L.t("%s → %s / dönem") % [Economy.money_full(revenue_now), Economy.money_full(revenue_new)],
 		UiTheme.GREEN if revenue_new > revenue_now else UiTheme.RED))
 	var effect := CardManager.tax_turn_effect(level)
-	detail.add_child(PopupKit.kv(L.t("Seçmene yansıma"), L.t("hükümete her sırada %s (tur ×%d)") % [_signed2(effect), CardManager.tax_cycle_mult()],
+	var effect_word := L.t("etkisi yok") if is_zero_approx(effect) else (L.t("hükümete her sıra artı") if effect > 0.0 else L.t("hükümete her sıra eksi"))
+	detail.add_child(PopupKit.kv(L.t("Seçmene yansıma"), effect_word,
 		UiTheme.GREEN if effect > 0.0 else (UiTheme.RED if effect < 0.0 else UiTheme.TEXT_MUTED)))
 	detail.add_child(PopupKit.kv(L.t("Kimi etkiler"), L.t("hükümet partileri, bakanlık payına göre")))
-	detail.add_child(PopupKit.note(L.t("Etki seçime yaklaştıkça artar: döngünün 1. turunda ×1, son turunda en yüksek. Sırada erken değiştirmek o turdaki daha çok sırayı etkiler."), UiTheme.TEXT_DIM, 380))
+	detail.add_child(PopupKit.note(L.t("Etki seçime yaklaştıkça artar."), UiTheme.TEXT_DIM, 380))
 	var reason := CardManager.tax_law_block_reason(me, level)
 	var button := Button.new()
 	button.focus_mode = Control.FOCUS_NONE

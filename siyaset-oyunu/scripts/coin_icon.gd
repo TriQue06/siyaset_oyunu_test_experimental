@@ -18,5 +18,9 @@ func _draw() -> void:
 	var side := minf(size.x, size.y)
 	if side <= 0.0:
 		return
-	var rect := Rect2((size - Vector2(side, side)) * 0.5, Vector2(side, side))
-	draw_texture_rect(MoneyIcon.texture(), rect, false, color)
+	# 0.0.260: simge yerine düz "$" karakteri, aynı yerde ve renkte.
+	var font := UiTheme.mono(true)
+	var font_size := int(side * 0.95)
+	var text_size := font.get_string_size(MoneyIcon.GLYPH, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
+	var baseline := (size.y - font.get_height(font_size)) * 0.5 + font.get_ascent(font_size)
+	draw_string(font, Vector2((size.x - text_size.x) * 0.5, baseline), MoneyIcon.GLYPH, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)

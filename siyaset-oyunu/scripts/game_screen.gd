@@ -274,7 +274,7 @@ const VOTE_COLOR_NO := Color("F2132A")          # kırmızı
 const ACTION_BUTTON_HEIGHT := 64.0
 const ACTION_BUTTON_GAP := 8
 var _action_grid: GridContainer
-## Hamle alanındaki düğmeler (İTTİFAK, KONGRE; testler ortak görünümü sınar).
+## Hamle alanındaki düğmeler (İTTİFAK, YARDIM; testler ortak görünümü sınar).
 var _action_tab_of: Dictionary = {}
 ## MECLİS akışının tek giriş düğmesi (0.0.231) ve tur akışı sunumları.
 var _parl_button: Button
@@ -295,6 +295,8 @@ var _focus_province := ""
 var _pending_early: bool = false
 var _congress_button: Button
 var _pending_congress: bool = false
+## YARDIM (0.0.260, kongrenin yerinde): afet sürerken tur içinde istendiği kadar.
+var _aid_button: Button
 ## Yatırım hamlesi için il seçme modu.
 var _pending_invest: bool = false
 ## Gensoru: ilk dokunuş onay ister, ikincisi verir.
@@ -528,12 +530,9 @@ func _place_card_bar() -> void:
 	if _card_bar_panel == null:
 		_card_bar_panel = Panel.new()
 		_card_bar_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var style := StyleBoxFlat.new()
-		style.bg_color = DESK_COLOR
-		style.border_color = UiTheme.INK
-		style.border_width_top = 2
-		# Ekranı boydan boya kaplayan masa: kenar çerçevesi yok, yalnız üst çizgi.
-		_card_bar_panel.add_theme_stylebox_override("panel", style)
+		# Ekranı boydan boya kaplayan masa: diğer paneller gibi konturlu, ama
+		# kontur yalnız üst ve alt kenarda (0.0.260).
+		_card_bar_panel.add_theme_stylebox_override("panel", _edge_band_style(DESK_COLOR))
 		add_child(_card_bar_panel)
 		move_child(_card_bar_panel, 1)
 	_set_rect(_card_bar_panel, _r(R_DESK))
@@ -616,6 +615,14 @@ static func _remap(v: float, stops: Array, total: float, gap: float) -> float:
 		out += seg
 	return out
 
+## Boydan boya şerit zemini: diğer panellerin konturlu dokusu; yan konturlar
+## ekranın dışına taşırılır, böylece yalnız üst ve alt kenarda görünür.
+static func _edge_band_style(color: Color) -> StyleBox:
+	var box := UiSkin.color_box(color, UiSkin.BUTTON_TINT_NORMAL)
+	box.expand_margin_left = 16.0
+	box.expand_margin_right = 16.0
+	return box
+
 func _set_rect(control: Control, rect: Rect2) -> void:
 	control.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	control.position = rect.position
@@ -641,6 +648,8 @@ func _place_desk_labels() -> void:
 	(_desk_labels["hand"] as Label).position = _r(Rect2(16, 546, 0, 0)).position
 	(_desk_labels["actions"] as Label).position = _r(Rect2(536, 546, 0, 0)).position
 	(_desk_labels["turn"] as Label).position = _r(Rect2(1112, 546, 0, 0)).position
+	# 0.0.260: sıra göstergesi yalnız üst bantta (para levhasının üstünde yok).
+	(_desk_labels["turn"] as Label).visible = false
 	# İpucu başlığın yanında (masanın alt kenarına taşmasın).
 	(_desk_labels["actions"] as Label).text = L.t("HAMLELER") + "  ·  " + L.t("teşkilat, miting, yatırım: haritada bir ile dokun")
 	_refresh_desk_labels()
@@ -682,12 +691,8 @@ func _apply_layout() -> void:
 	# CANLI YAYIN BANDI: CANLI · başlık + tarih · sıra kimde (Menü sağda).
 	if _strip_bg == null:
 		_strip_bg = Panel.new()
-		var strip_style := StyleBoxFlat.new()
-		strip_style.bg_color = Color("1d1838")
-		strip_style.border_color = UiTheme.INK
-		strip_style.border_width_bottom = 2
-		# Boydan boya bant: kenar çerçevesi yok, yalnız alt çizgi.
-		_strip_bg.add_theme_stylebox_override("panel", strip_style)
+		# Boydan boya bant: kontur üst ve alt kenarda, yanlarda yok (0.0.260).
+		_strip_bg.add_theme_stylebox_override("panel", _edge_band_style(Color("1d1838")))
 		_strip_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(_strip_bg)
 		move_child(_strip_bg, 1)
@@ -841,17 +846,10 @@ func _place_date_chip(_map_rect: Rect2) -> void:
 		_band_crisis_text.position = Vector2(42, 23)
 		add_child(_band_crisis)
 		_band_turn = PanelContainer.new()
-		var turn_style := StyleBoxFlat.new()
-		turn_style.bg_color = Color("2a2350")
-		turn_style.border_color = UiTheme.GOLD
-		turn_style.set_border_width_all(2)
-		turn_style.content_margin_left = 8
-		turn_style.content_margin_right = 8
-		UiSkin.apply_style(_band_turn, "panel", turn_style)
 		_band_turn.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_band_turn.clip_contents = true
 		_band_turn_row = HBoxContainer.new()
-		_band_turn_row.add_theme_constant_override("separation", 8)
+		_band_turn_row.add_theme_constant_override("separation", 10)
 		_band_turn_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_band_turn.add_child(_band_turn_row)
 		add_child(_band_turn)
@@ -868,13 +866,19 @@ func _place_date_chip(_map_rect: Rect2) -> void:
 		add_child(_timer_bar)
 	_band_period.position = _r(Rect2(16, 16, 0, 0)).position
 	_date_label.position = _r(Rect2(16, 42, 0, 0)).position
-	# Üst banttaki kutular (gündem, sıra) sağdaki Menü düğmesiyle AYNI üst ve
+	# Üst banttaki kutular (kriz, sıra) sağdaki Menü düğmesiyle AYNI üst ve
 	# alt kenarda durur (Menü SettingsOverlay'de, ölçeklenmeyen piksellerle).
+	# 0.0.260: aralarındaki boşluk Menü'nün bantla üst/alt boşluğu kadar;
+	# kutular Menü'den sola doğru dizilir.
 	var menu := _menu_button_rect()
-	var crisis := _r(Rect2(300, 0, 444, 0))
-	var turn := _r(Rect2(760, 0, 380, 0))
-	_set_rect(_band_crisis, Rect2(crisis.position.x, menu.position.y, crisis.size.x, menu.size.y))
-	_set_rect(_band_turn, Rect2(turn.position.x, menu.position.y, turn.size.x, menu.size.y))
+	var band := _r(Rect2(0, TIMER_BAR_HEIGHT, 1280, R_BAND.size.y - TIMER_BAR_HEIGHT))
+	var gap := maxf(2.0, ((menu.position.y - band.position.y) + (band.end.y - menu.end.y)) * 0.5)
+	var turn_w := _r(Rect2(760, 0, 380, 0)).size.x
+	var crisis_w := _r(Rect2(300, 0, 444, 0)).size.x
+	var turn_x := menu.position.x - gap - turn_w
+	var crisis_x := turn_x - gap - crisis_w
+	_set_rect(_band_crisis, Rect2(crisis_x, menu.position.y, crisis_w, menu.size.y))
+	_set_rect(_band_turn, Rect2(turn_x, menu.position.y, turn_w, menu.size.y))
 	_set_rect(_timer_bar_bg, _r(Rect2(0, 0, 1280, TIMER_BAR_HEIGHT)))
 	_refresh_band_date()
 	_refresh_band_crisis()
@@ -947,13 +951,15 @@ func _refresh_timer_bar() -> void:
 	_timer_bar.size = Vector2(full.size.x * elapsed, full.size.y)
 	_timer_bar.color = PartyManager.data_of(CardManager.party_of(peer_id)).get("bg_color", UiTheme.GOLD)
 
-## Banttaki sıra kutusu: logo · SIRA: PARTİ (siyasetçi) · süre.
+## SIRA KUTUSU (0.0.260, kriz kutusuyla aynı tarz): sırası gelen partinin
+## renginde zemin, solda logosu, başlık "SIRA · PARTİ" ve altında siyasetçi ·
+## kalan süre.
 func _refresh_band_turn() -> void:
 	if _band_turn_row == null:
 		return
 	var peer_id := CardManager.current_turn_peer_id()
 	var timer := "" if peer_id == -1 or CardManager.is_turn_blocked() else GameRules.format_seconds(CardManager.turn_seconds_left())
-	var key := "%d|%s|%s" % [peer_id, timer, PartyManager.data_of(peer_id).get("name", "")]
+	var key := "%d|%s|%s|%.0f" % [peer_id, timer, PartyManager.data_of(peer_id).get("name", ""), _band_turn.size.y]
 	if key == _band_turn_key:
 		return
 	_band_turn_key = key
@@ -963,22 +969,35 @@ func _refresh_band_turn() -> void:
 	_band_turn.visible = peer_id != -1
 	if peer_id == -1:
 		return
-	var badge := PartyBadge.build(PartyManager.data_of(peer_id), Vector2(22, 22), BADGE_ICON_PIXEL_SIZE)
+	var data := PartyManager.data_of(CardManager.party_of(peer_id))
+	var color: Color = data.get("bg_color", UiTheme.GOLD)
+	var style := StyleBoxFlat.new()
+	style.bg_color = color.darkened(0.72)
+	style.content_margin_left = 6
+	style.content_margin_right = 10
+	style.content_margin_top = 0
+	style.content_margin_bottom = 0
+	UiSkin.apply_style(_band_turn, "panel", style)
+	var side := clampf(_band_turn.size.y - 10.0, 20.0, 40.0)
+	var badge := PartyBadge.build(PartyManager.data_of(peer_id), Vector2(side, side), BADGE_ICON_PIXEL_SIZE)
 	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_band_turn_row.add_child(badge)
+	var texts := VBoxContainer.new()
+	texts.add_theme_constant_override("separation", 0)
+	texts.alignment = BoxContainer.ALIGNMENT_CENTER
+	texts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	texts.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_band_turn_row.add_child(texts)
 	var party_text := L.t("Bağımsız") if PartyManager.is_independent(peer_id) else String(PartyManager.data_of(peer_id).get("name", "?"))
-	var text := L.t("SIRA SENDE") if peer_id == multiplayer.get_unique_id() else L.t("SIRA: %s · %s") % [party_text, PoliticianPresets.display_name(peer_id)]
-	var label := _avatar_label(text, _fit_font_size(text, _r(Rect2(0, 0, 300, 0)).size.x, 14, 8), UiTheme.TEXT)
-	label.add_theme_font_override("font", UiTheme.mono(true))
-	label.clip_text = false
-	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_band_turn_row.add_child(label)
-	var time_label := _avatar_label(timer, 14, UiTheme.GOLD)
-	time_label.add_theme_font_override("font", UiTheme.mono(true))
-	time_label.clip_text = false
-	time_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_band_turn_row.add_child(time_label)
+	var title_text := (L.t("SIRA SENDE · %s") if peer_id == multiplayer.get_unique_id() else L.t("SIRA · %s")) % party_text
+	var title := _avatar_label(title_text, 13, color.lightened(0.45))
+	title.add_theme_font_override("font", UiTheme.mono(true))
+	title.clip_text = true
+	texts.add_child(title)
+	var sub_text := PoliticianPresets.display_name(peer_id) + (("  ·  " + timer) if timer != "" else "")
+	var sub := _avatar_label(sub_text, 10, UiTheme.TEXT)
+	sub.clip_text = true
+	texts.add_child(sub)
 
 ## MECLİS: stüdyo masasının HÜKÜMET sekmesinde, sekmelerin hemen altındaki
 ## yuvada; oylama sürerken büyür, teklif metni ve EVET/ÇEKİMSER/HAYIR görünür (bkz. _parl_slot). Oylama başlayınca Hükümet sekmesi kendiliğinden açılır.
@@ -3895,10 +3914,15 @@ func _build_action_buttons() -> void:
 	actions_vbox.add_child(_action_grid)
 	_alliance_button = _action_button(L.t("İTTİFAK"), "", ACTION_COLOR_ALLIANCE)
 	_alliance_button.pressed.connect(_on_alliance_button_pressed)
-	# KONGRE: genel başkan kendi sırasında (en az bir seçim geçtiyse) kongreye
-	# gider; partide üye kalan eski başkan kongre ister.
-	_congress_button = _action_button(L.t("KONGRE"), _congress_cost_text(), ACTION_COLOR_CONGRESS)
-	_congress_button.pressed.connect(_on_congress_button_pressed)
+	# YARDIM (0.0.260): kongre şimdilik kapalı, yerinde afet yardımı. Afet
+	# sürerken sıranda istediğin kadar (üst üste de) yardım götürebilirsin.
+	# KONGRE düğmesi CardManager.congress_enabled açıkken geri gelir.
+	if CardManager.congress_enabled:
+		_congress_button = _action_button(L.t("KONGRE"), _congress_cost_text(), ACTION_COLOR_CONGRESS)
+		_congress_button.pressed.connect(_on_congress_button_pressed)
+	else:
+		_aid_button = _action_button(L.t("YARDIM"), "", ACTION_COLOR_AID)
+		_aid_button.pressed.connect(_on_aid_button_pressed)
 	# TURU BİTİR: sahnedeki düğme hamle ızgarasına taşınır, hamle düğmesi görünümünde.
 	pass_button.get_parent().remove_child(pass_button)
 	pass_button.custom_minimum_size = Vector2(ACTION_BUTTON_WIDTH, ACTION_BUTTON_HEIGHT)
@@ -3991,8 +4015,12 @@ func _refresh_action_buttons() -> void:
 	# "190 M": simge levhanın solunda (CoinIcon), yazıda tekrar etmez.
 	_funds_label.text = GameRules.amount(CardManager.funds_of(me))
 	# disabled kullanılmıyor: pasif butona dokununca neden olmadığı uyarı olarak çıksın.
-	_set_action_available(_congress_button, CardManager.can_call_congress(me) or _pending_congress)
-	_set_action_text(_congress_button, L.t("KONGRE"), _congress_cost_text())
+	if _congress_button != null:
+		_set_action_available(_congress_button, CardManager.can_call_congress(me) or _pending_congress)
+		_set_action_text(_congress_button, L.t("KONGRE"), _congress_cost_text())
+	if _aid_button != null:
+		_set_action_available(_aid_button, CardManager.can_aid(me))
+		_set_action_text(_aid_button, L.t("YARDIM"), L.t("afet var") if CardManager.has_disaster() else "")
 	if _alliance_button != null:
 		_set_action_available(_alliance_button, CardManager.alliances_enabled)
 		var decisions := CardManager.alliance_requests_for(me).size()
@@ -4976,6 +5004,24 @@ func _place_aid_panel() -> void:
 	var panel_size := _aid_panel.size
 	_aid_panel.position = Vector2(map.position.x + (map.size.x - panel_size.x) * 0.5,
 		maxf(map.position.y + 40.0, map.end.y - panel_size.y - 8.0))
+
+## YARDIM hamlesi: afet sürerken yardım paneli haritanın üstünde açılır.
+func _on_aid_button_pressed() -> void:
+	var me := multiplayer.get_unique_id()
+	if _aid_panel.visible:
+		_aid_panel.hide()
+		return
+	if not CardManager.has_disaster():
+		_show_toast(L.t("Şu an yardım bekleyen bir afet yok. Afet çıkınca buradan yardım götürebilirsin."))
+		return
+	var reason := CardManager.aid_block_reason(me)
+	if reason != "":
+		_show_toast(reason)
+		return
+	_aid_panel.open(me)
+	_aid_panel.show()
+	_place_aid_panel()
+	_place_aid_panel.call_deferred()
 
 func _on_aid_confirmed(party_m: float, state_m: float) -> void:
 	var me := multiplayer.get_unique_id()

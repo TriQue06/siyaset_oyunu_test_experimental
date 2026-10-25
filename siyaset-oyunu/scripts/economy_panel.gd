@@ -3,10 +3,9 @@ extends VBoxContainer
 ## SAĞ SÜTUN · EKONOMİ ÖZETİ (Hükümet sekmesinde, meclisin altında).
 ##   - başlık + VERGİ şeridi (Düşük / Normal / Yüksek; yürürlükteki vurgulu,
 ##     dokununca Vergi Politikası paneli açılır),
-##   - tek satırda üç gösterge: Ekonomi 0–100, Enflasyon %, İşsizlik %
-##     (yanlarında bir önceki tur sonuna göre eğilim),
 ##   - DEVLET HAZİNESİ şeridi: gerçek bakiye, eğilim, dönem sonu vergi geliri,
-##   - (varsa) vergi değişikliğinin yerleşme çubuğu,
+##   - VERGİ ETKİSİ: hükümete her sırada yazılan ulusal puan (seçime yaklaştıkça
+##     artar; 0.0.259: ekonomi göstergeleri ve kademeli yerleşme kalktı),
 ##   - seçim bu dönemin sonundaysa (erken ya da takvim) göstergelerin yerine
 ##     SANDIK ÖNCESİ özeti (sağ sütun yüksekliği sabit: ikisi birden sığmaz).
 ## Durum tutmaz: her şeyi CardManager.economy'den okur (tek kaynak). Para
@@ -28,13 +27,8 @@ const SEGMENTS := 10
 
 var _tax_buttons: Array = []
 var _tiles: Dictionary = {}       # key -> {"panel", "style", "value", "delta"}
-var _indicators: HBoxContainer
 var _income_label: Label
-var _transition: HBoxContainer
-var _transition_title: Label
-var _transition_bar: Control
-var _transition_ratio: float = 0.0
-var _transition_text: Label
+var _tax_effect: Label
 var _summary: PanelContainer
 var _summary_box: VBoxContainer
 var _summary_key: String = ""
@@ -46,15 +40,11 @@ func _init() -> void:
 	add_theme_constant_override("separation", 4)
 	mouse_filter = Control.MOUSE_FILTER_PASS
 	_build_header()
-	_indicators = HBoxContainer.new()
-	_indicators.add_theme_constant_override("separation", 4)
-	add_child(_indicators)
-	for entry in [["index", L.t("EKONOMİ"), L.t("0–100 arası ekonomi göstergesi (50 olağan). Vergi ve yatırımlarla her dönem yavaşça değişir; hükümet partilerinin seçmen memnuniyetine yansır.")],
-			["inflation", L.t("ENFLASYON"), L.t("Yıllık enflasyon. Düşük vergi ve yoğun yatırım artırır; emeklilerin ve işçilerin hükümete desteğini azaltır.")],
-			["unemployment", L.t("İŞSİZLİK"), L.t("İşsizlik oranı. Ekonomi büyüdükçe düşer.")]]:
-		_indicators.add_child(_make_tile(String(entry[0]), String(entry[1]), String(entry[2])))
 	add_child(_make_treasury_row())
-	_build_transition()
+	_tax_effect = UiTheme.mono_label("", DELTA_SIZE, UiTheme.TEXT_MUTED, true)
+	_tax_effect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tax_effect.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	add_child(_tax_effect)
 	_summary = PanelContainer.new()
 	_summary.mouse_filter = Control.MOUSE_FILTER_PASS
 	add_child(_summary)
@@ -69,7 +59,7 @@ func _build_header() -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
 	add_child(row)
-	var title := UiTheme.section_label(L.t("EKONOMİ"))
+	var title := UiTheme.section_label(L.t("BÜTÇE"))
 	title.add_theme_font_size_override("font_size", 12)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(title)
@@ -173,36 +163,6 @@ func _make_treasury_row() -> Control:
 	_tiles["treasury"] = {"panel": panel, "style": style, "value": value, "delta": delta}
 	return panel
 
-func _build_transition() -> void:
-	_transition = HBoxContainer.new()
-	_transition.add_theme_constant_override("separation", 6)
-	_transition.mouse_filter = Control.MOUSE_FILTER_PASS
-	add_child(_transition)
-	_transition_title = UiTheme.mono_label("", 10, UiTheme.GOLD, true)
-	_transition_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_transition.add_child(_transition_title)
-	_transition_bar = Control.new()
-	_transition_bar.custom_minimum_size = Vector2(0, 8)
-	_transition_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_transition_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_transition_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_transition_bar.draw.connect(_draw_transition_bar)
-	_transition.add_child(_transition_bar)
-	_transition_text = UiTheme.mono_label("", 10, UiTheme.TEXT, true)
-	_transition_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_transition.add_child(_transition_text)
-
-## Parçalı ilerleme çubuğu: dolu parçalar yerleşen etki.
-func _draw_transition_bar() -> void:
-	var w := _transition_bar.size.x
-	var h := _transition_bar.size.y
-	var gap := 2.0
-	var cell := (w - gap * (SEGMENTS - 1)) / SEGMENTS
-	var filled := int(round(_transition_ratio * SEGMENTS))
-	for i in SEGMENTS:
-		var color := UiTheme.GOLD if i < filled else UiTheme.SLOT
-		_transition_bar.draw_rect(Rect2(i * (cell + gap), 0, cell, h), color, true)
-
 # --- Yenileme ------------------------------------------------------------------------
 
 func refresh() -> void:
@@ -215,22 +175,34 @@ func refresh() -> void:
 		button.add_theme_color_override("font_color", UiTheme.INK if active else UiTheme.TEXT_DIM)
 		button.add_theme_color_override("font_hover_color", UiTheme.INK if active else UiTheme.TEXT)
 	var prev: Dictionary = econ.get("prev", {})
-	_set_tile("index", str(int(round(CardManager.economy_index()))), prev, "index", CardManager.economy_index(), true, false)
-	_set_tile("inflation", Economy.percent_text(CardManager.inflation()), prev, "inflation", CardManager.inflation(), false, true)
-	_set_tile("unemployment", Economy.percent_text(CardManager.unemployment()), prev, "unemployment", CardManager.unemployment(), false, true)
 	if _treasury_tween == null or not _treasury_tween.is_running():
 		_shown_treasury = CardManager.state_treasury()
 		_show_treasury(_shown_treasury)
 	_set_delta("treasury", prev, "treasury", CardManager.state_treasury(), true, false)
 	_income_label.text = L.t("+%s / dönem") % GameRules.amount(CardManager.expected_revenue())
 	var election := not election_headline().is_empty()
-	# Sandık öncesi: özet göstergelerin yerini alır (hazine ve vergi özette).
-	_indicators.visible = not election
+	# Sandık öncesi: özet hazine ve vergi satırlarının yerini alır.
 	(_tiles["treasury"]["panel"] as Control).visible = not election
-	_refresh_transition(econ)
-	if election:
-		_transition.visible = false
+	_tax_effect.visible = not election
+	var effect := tax_effect_text()
+	_tax_effect.text = effect[0]
+	_tax_effect.add_theme_color_override("font_color", effect[1])
 	_refresh_summary()
+
+## VERGİ ETKİSİ satırı: [metin, renk]. Örn. "Vergi: hükümete +0,18 / sıra ·
+## tur ×3". Hükümet yoksa kimsenin hanesine yazılmaz.
+static func tax_effect_text() -> Array:
+	if not GovernmentManager.has_government():
+		return [L.t("Vergi: hükümet yok, etki yazılmaz"), UiTheme.TEXT_MUTED]
+	var total := CardManager.tax_turn_effect()
+	var mult := CardManager.tax_cycle_mult()
+	if is_zero_approx(total):
+		return [L.t("Vergi seçmene etkisiz · tur ×%d") % mult, UiTheme.TEXT_MUTED]
+	return [L.t("Vergi: hükümete %s / sıra · tur ×%d") % [_signed2(total), mult], UiTheme.GREEN if total > 0.0 else UiTheme.RED]
+
+## "+0,18" / "−0,06" gibi iki basamaklı işaretli sayı.
+static func _signed2(value: float) -> String:
+	return ("+" if value > 0.0 else "−") + String.num(snappedf(absf(value), 0.01), 2).replace(".", ",")
 
 func _set_tile(key: String, text: String, prev: Dictionary, prev_key: String, now: float, up_good: bool, decimal: bool) -> void:
 	(_tiles[key]["value"] as Label).text = text
@@ -255,17 +227,6 @@ func _set_delta(key: String, prev: Dictionary, prev_key: String, now: float, up_
 
 func _show_treasury(value: float) -> void:
 	(_tiles["treasury"]["value"] as Label).text = Economy.money_text(value)
-
-func _refresh_transition(econ: Dictionary) -> void:
-	var settled := Economy.is_settled(econ)
-	_transition.visible = not settled
-	if settled:
-		return
-	var cutting := Economy.target_pressure(int(econ["tax"])) < float(econ.get("pressure_from", 0.0))
-	_transition_title.text = L.t("İNDİRİM ETKİSİ") if cutting else L.t("ARTIRIM ETKİSİ")
-	_transition_ratio = Economy.settle_ratio(econ)
-	_transition_text.text = L.t("~%d dönem") % Economy.rounds_to_settle(econ)
-	_transition_bar.queue_redraw()
 
 # --- Sandık öncesi özet ---------------------------------------------------------------
 
@@ -317,13 +278,7 @@ static func _fill_summary(box: VBoxContainer, headline: Array) -> void:
 	var econ: Dictionary = CardManager.economy
 	var title := UiTheme.mono_label(String(headline[0]), 10, headline[1], true)
 	box.add_child(title)
-	var tax_text := Economy.tax_title(int(econ["tax"]))
-	if not Economy.is_settled(econ):
-		tax_text += L.t(" (%s'den) · %s") % [Economy.tax_title(int(econ.get("tax_from", econ["tax"]))),
-			L.t("büyük ölçüde yerleşti") if Economy.settle_ratio(econ) >= 0.7 else L.t("etkisi yerleşiyor")]
-	else:
-		tax_text += L.t(" · yerleşik")
-	box.add_child(_summary_row(L.t("Vergi"), tax_text))
+	box.add_child(_summary_row(L.t("Vergi"), "%s · %s" % [Economy.tax_title(int(econ["tax"])), String(tax_effect_text()[0])]))
 	box.add_child(_summary_row(L.t("Hazine"), L.t("%s · +%s / dönem") % [Economy.money_full(float(econ["treasury"])),
 		GameRules.amount(CardManager.expected_revenue())]))
 	var pending: Array = econ.get("investments", [])
@@ -335,54 +290,6 @@ static func _fill_summary(box: VBoxContainer, headline: Array) -> void:
 			after += maxi(0, int(entry["rounds_left"]) - 1)
 		box.add_child(_summary_row(L.t("Yatırım"), L.t("%d il sürüyor · %s") % [pending.size(),
 			L.t("%d dilim seçimden sonra") % after if after > 0 else L.t("hepsi seçimden önce biter")]))
-	var pm := GovernmentManager.main_gov_peer_id
-	if pm == -1 or not GovernmentManager.has_government():
-		var none := PopupKit.label(L.t("Hükümet yok: ekonomi kimsenin hanesine yazılmıyor."), 10, UiTheme.TEXT_MUTED)
-		none.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		none.custom_minimum_size = Vector2(120, 0)
-		box.add_child(none)
-		return
-	var mood := CardManager.economy_mood(pm)
-	box.add_child(_summary_row(L.t("Gidişat"), economy_verdict(mood)))
-	var next_state: Dictionary = econ.duplicate(true)
-	Economy.advance(next_state)
-	var next_mood := Economy.group_mood(next_state, CardManager.economy_share(pm),
-		PoliticianPresets.party_effect(pm, "tax_mood"))
-	var ranked: Array = mood.keys()
-	ranked.sort_custom(func(a, b): return absf(float(mood[a])) > absf(float(mood[b])))
-	# Hükümetin ekonomiden gelen seçmen memnuniyeti: tek satır (simge + değer +
-	# yön). Grupların tam adı ipucunda.
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 4)
-	row.mouse_filter = Control.MOUSE_FILTER_PASS
-	var k := PopupKit.label(L.t("Seçmen"), 10, UiTheme.TEXT_MUTED)
-	k.custom_minimum_size = Vector2(52, 0)
-	row.add_child(k)
-	if ranked.is_empty():
-		row.add_child(PopupKit.label(L.t("ekonominin belirgin etkisi yok"), 10, UiTheme.TEXT_DIM))
-	for i in mini(3, ranked.size()):
-		var group := String(ranked[i])
-		var now := float(mood[group])
-		var icon := VoterGroupIcon.make(group, 13.0)
-		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		row.add_child(icon)
-		row.add_child(UiTheme.mono_label(EffectWords.arrows(now, "group"), 9, UiTheme.GREEN if now > 0.0 else UiTheme.RED, true))
-	box.add_child(row)
-
-## Hükümetin ekonomiden gelen seçmen tepkisinin TEK CÜMLELİK yorumu (gerçek
-## Economy.group_mood değerlerinin toplamından; büyüklük EffectWords ile).
-static func economy_verdict(mood: Dictionary) -> String:
-	var total := 0.0
-	for group in mood.keys():
-		total += float(mood[group])
-	var level := EffectWords.level(total, "group")
-	if level <= 1:
-		return L.t("Ekonomi seçmen üzerinde belirleyici değil.")
-	if total > 0.0:
-		return L.t("Ekonomi hükümete destek kazandırıyor.") if level <= 2 else L.t("Ekonomi hükümetin en güçlü kozu.")
-	return L.t("Ekonomi hükümet için yük olmaya başladı.") if level <= 2 else L.t("Ekonomi politikası hükümete ağır siyasi bedel ödetiyor.")
-
 static func _summary_row(key: String, value: String) -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
@@ -416,14 +323,11 @@ func play_event(data: Dictionary) -> void:
 			_count_treasury(CardManager.state_treasury() - revenue, CardManager.state_treasury())
 			_float_text("treasury", "+%s" % GameRules.amount(revenue), UiTheme.GREEN)
 			_flash("treasury", UiTheme.GREEN)
-			for key in ["index", "inflation", "unemployment"]:
-				_flash(key, UiTheme.GOLD)
 		"tax":
 			var level := int(data.get("to", CardManager.tax_level()))
 			if level >= 0 and level < _tax_buttons.size():
 				_pop(_tax_buttons[level])
-			for key in ["inflation", "treasury"]:
-				_flash(key, TAX_COLORS[clampi(level, 0, 2)])
+			_flash("treasury", TAX_COLORS[clampi(level, 0, 2)])
 	refresh()
 
 func _count_treasury(from: float, to: float) -> void:
@@ -508,15 +412,14 @@ static func fill_policy(box: VBoxContainer, me: int, selected: int, on_select: C
 	detail.add_theme_constant_override("separation", 3)
 	box.add_child(detail)
 	if selected < 0 or selected == current:
-		detail.add_child(PopupKit.note(L.t("Bir kademe seç: geliri, seçmene etkisini ve ne zaman yerleşeceğini gör."), UiTheme.TEXT_MUTED, 380))
+		detail.add_child(PopupKit.note(L.t("Bir kademe seç: geliri ve seçmene etkisini gör."), UiTheme.TEXT_MUTED, 380))
 		var reason := CardManager.tax_law_block_reason(me)
 		if reason != "":
 			detail.add_child(PopupKit.note(L.t("Şu an sunamazsın: ") + reason, UiTheme.RED, 380))
 		return
 	_fill_policy_detail(detail, me, selected, current, on_propose)
 
-## Kademe kartı: ad, dönem geliri ve farkı, seçmen etkisi (simgeler), ekonomi
-## yönü; durum: yürürlükte (altın çerçeve), seçili (beyaz), sunulamaz (sönük).
+## Kademe kartı: ad, dönem geliri ve farkı, sıra başı seçmen etkisi; durum: yürürlükte (altın çerçeve), seçili (beyaz), sunulamaz (sönük).
 static func _policy_card(me: int, level: int, current: int, selected: int, on_select: Callable) -> Control:
 	var is_current := level == current
 	var is_selected := level == selected and not is_current
@@ -554,27 +457,10 @@ static func _policy_card(me: int, level: int, current: int, selected: int, on_se
 	var diff := revenue - CardManager.expected_revenue(current)
 	var sub := L.t("dönem başına") if is_current else L.t("%s%s / dönem") % ["+" if diff > 0.0 else "−", GameRules.amount(absf(diff))]
 	box.add_child(PopupKit.label(sub, 9, UiTheme.TEXT_DIM if is_current else (UiTheme.GREEN if diff > 0.0 else UiTheme.RED)))
-	# Seçmen etkisi (tam yerleşince başbakanın partisinde, şimdiki kademeye göre).
-	var effects := _tax_mood_change(level, current)
-	var icons := HBoxContainer.new()
-	icons.add_theme_constant_override("separation", 3)
-	icons.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(icons)
-	var ranked: Array = effects.keys()
-	ranked.sort_custom(func(a, b): return absf(float(effects[a])) > absf(float(effects[b])))
-	for i in mini(2, ranked.size()):
-		var group := String(ranked[i])
-		var icon := VoterGroupIcon.make(group, 14.0)
-		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		icons.add_child(icon)
-		var amount := float(effects[group])
-		icons.add_child(PopupKit.label(EffectWords.arrows(amount, "group"), 10, UiTheme.GREEN if amount > 0.0 else UiTheme.RED))
-	if ranked.is_empty():
-		icons.add_child(PopupKit.label(L.t("seçmen: dengeli"), 10, UiTheme.TEXT_MUTED))
-	var growth := float(Economy.TAX_GROWTH[level]) - float(Economy.TAX_GROWTH[current])
-	var econ_text := L.t("ekonomi %s · enflasyon %s") % ["▲" if growth > 0.0 else ("▼" if growth < 0.0 else "="),
-		"▲" if level < current else ("▼" if level > current else "=")]
-	box.add_child(PopupKit.label(econ_text, 9, UiTheme.TEXT_MUTED))
+	# Seçmen etkisi: hükümete her sırada (bu turun çarpanıyla).
+	var effect := CardManager.tax_turn_effect(level)
+	var effect_text := L.t("seçmen: etkisiz") if is_zero_approx(effect) else L.t("seçmen: %s / sıra") % _signed2(effect)
+	box.add_child(PopupKit.label(effect_text, 10, UiTheme.TEXT_MUTED if is_zero_approx(effect) else (UiTheme.GREEN if effect > 0.0 else UiTheme.RED)))
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -586,16 +472,6 @@ static func _policy_card(me: int, level: int, current: int, selected: int, on_se
 		button.modulate = Color(1, 1, 1, 0.7)
 	return button
 
-static func _tax_mood_change(level: int, current: int) -> Dictionary:
-	var target := Economy.tax_mood_at(level)
-	var base := Economy.tax_mood_at(current)
-	var result := {}
-	for group in VoterGroups.GROUP_IDS:
-		var diff := float(target.get(group, 0.0)) - float(base.get(group, 0.0))
-		if absf(diff) >= 0.05:
-			result[group] = diff
-	return result
-
 static func _fill_policy_detail(detail: VBoxContainer, me: int, level: int, current: int, on_propose: Callable) -> void:
 	var law_type := CardPresets.tax_law_type(level)
 	detail.add_child(UiTheme.mono_label(CardPresets.card_title(law_type), 13, TAX_COLORS[level], true))
@@ -603,22 +479,11 @@ static func _fill_policy_detail(detail: VBoxContainer, me: int, level: int, curr
 	var revenue_new := CardManager.expected_revenue(level)
 	detail.add_child(PopupKit.kv(L.t("Hazine geliri"), L.t("%s → %s / dönem") % [Economy.money_full(revenue_now), Economy.money_full(revenue_new)],
 		UiTheme.GREEN if revenue_new > revenue_now else UiTheme.RED))
-	var after := Economy.pressure_after_change(float(CardManager.economy["pressure"]), level)
-	var probe := {"tax": level, "pressure": after}
-	detail.add_child(PopupKit.kv(L.t("Seçmene yansıma"), L.t("kademeli · ~%d dönemde") % Economy.rounds_to_settle(probe), UiTheme.GOLD))
-	detail.add_child(PopupKit.kv(L.t("Kimi etkiler"), L.t("en çok başbakanın partisi")))
-	var effects := _tax_mood_change(level, current)
-	var ranked: Array = effects.keys()
-	ranked.sort_custom(func(a, b): return absf(float(effects[a])) > absf(float(effects[b])))
-	var grid := GridContainer.new()
-	grid.columns = 2
-	grid.add_theme_constant_override("h_separation", 14)
-	grid.add_theme_constant_override("v_separation", 1)
-	detail.add_child(grid)
-	for i in mini(4, ranked.size()):
-		var row := VoterGroupUI.effect_row(String(ranked[i]), float(effects[ranked[i]]), 10)
-		row.custom_minimum_size = Vector2(180, 0)
-		grid.add_child(row)
+	var effect := CardManager.tax_turn_effect(level)
+	detail.add_child(PopupKit.kv(L.t("Seçmene yansıma"), L.t("hükümete her sırada %s (tur ×%d)") % [_signed2(effect), CardManager.tax_cycle_mult()],
+		UiTheme.GREEN if effect > 0.0 else (UiTheme.RED if effect < 0.0 else UiTheme.TEXT_MUTED)))
+	detail.add_child(PopupKit.kv(L.t("Kimi etkiler"), L.t("hükümet partileri, bakanlık payına göre")))
+	detail.add_child(PopupKit.note(L.t("Etki seçime yaklaştıkça artar: döngünün 1. turunda ×1, son turunda en yüksek. Sırada erken değiştirmek o turdaki daha çok sırayı etkiler."), UiTheme.TEXT_DIM, 380))
 	var reason := CardManager.tax_law_block_reason(me, level)
 	var button := Button.new()
 	button.focus_mode = Control.FOCUS_NONE

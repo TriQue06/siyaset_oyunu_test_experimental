@@ -247,7 +247,10 @@ func crisis_data(crisis_type: String) -> Dictionary:
 		return {}
 	return L.tr_dict(_with_group_info(CRISES[crisis_type]))
 
+## Süren siyasi krizin verisi (eski kayıtların "gundem_<grup>" türü de olur).
 func agenda_data(agenda_type: String) -> Dictionary:
+	if CRISES.has(agenda_type):
+		return L.tr_dict(_with_group_info(CRISES[agenda_type]))
 	if not AGENDAS.has(agenda_type):
 		return {}
 	return L.tr_dict(_with_group_info(AGENDAS[agenda_type]))
@@ -272,7 +275,7 @@ func agenda_effect_text(agenda_type: String) -> String:
 	var data := agenda_data(agenda_type)
 	if data.is_empty():
 		return ""
-	return L.t("%s için yasa daha güçlü; yasa, EVET oyu ve toplantı ulusal destek getirir") % data["group_title"]
+	return L.t("%s ile toplantı ve yasa çok daha etkili, karşıt gruptan kayıp yarıya iner") % data["group_title"]
 
 func is_censure_card(card_type: String) -> bool:
 	return card_type == CENSURE_CARD_TYPE

@@ -239,7 +239,7 @@ func _build_speech() -> void:
 	_explain(L.t("Bir seçmen grubunun sorunlarını konuşarak o grubun desteğini kalıcı artırırsın. Karşıt grup biraz soğur."))
 	var crisis := CardManager.crisis_group()
 	if crisis != "":
-		_explain(L.t("Gündemdeki kriz: %s. Bu grupla toplanmak ek ulusal destek getirir.") % VoterGroups.title(crisis), UiTheme.GOLD)
+		_explain(L.t("Siyasi kriz: %s. Bu grupla toplanmak çok daha etkili, karşıt gruptan kayıp yarıya iner.") % VoterGroups.title(crisis), UiTheme.GOLD)
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 6)

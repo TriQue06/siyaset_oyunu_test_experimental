@@ -168,7 +168,8 @@ var miting_fatigue: Dictionary = {}
 ## Son seçim anındaki grup yakınlıkları: parti -> {grup -> değer} (arayüzde
 ## "son seçimden beri" değişimi göstermek için).
 var election_groups: Dictionary = {}
-## GÜNDEM: {"type": gündem türü, "until": bittiği tur} (boş = gündem yok).
+## SİYASİ KRİZ (0.0.259; eskiden "gündem"): {"type": "kriz_<grup>", "until":
+## bittiği tur} (boş = kriz yok). Eski kayıtlardaki "gundem_<grup>" de okunur.
 var agenda: Dictionary = {}
 ## KRİZ: {"type": "kriz_<grup>", "until": tur}. Gündemle birlikte açılır.
 var crisis: Dictionary = {}
@@ -306,7 +307,7 @@ const DRAW_GRACE_SECONDS := 4.0
 ## başına en verimli, büyük tek hamlede en güçlü (3 hak sınırı varken değerli).
 const MITING_TIERS := [{"cost": 10.0, "mult": 0.7}, {"cost": 15.0, "mult": 1.0}, {"cost": 25.0, "mult": 1.4}]
 ## YATIRIM BÜTÇESİ: 50 / 100 (eski yatırım) / 150 milyon; etki tutarla orantılı
-## (il puanı tavanı ve BOOST_MAX büyük yatırımın getirisini sınırlar).
+## (il puanı tavanı büyük yatırımın getirisini sınırlar).
 const INVEST_TIERS := [{"cost": 50.0}, {"cost": 100.0}, {"cost": 150.0}]
 const DEFAULT_TIER := 1
 var enforce_turn_flow := true
@@ -1677,14 +1678,9 @@ func province_profile(province_id: String) -> Dictionary:
 
 ## Partinin seçimde kullanılan grup yakınlıkları: kalıcı ulusal yakınlık +
 ## geçici toplantı bonusu. at_round: bonusun hesaplandığı tur (-1: şimdiki).
-## EKONOMİ: hükümet partilerine vergi/ekonomi memnuniyeti de eklenir (tek
-## kanal; kalıcı yakınlığa yazılmaz, ulusal puana ayrıca eklenmez).
 func effective_groups(peer_id: int, at_round: int = -1) -> Dictionary:
 	var pid := party_of(peer_id)
 	var bonus := meeting_bonuses(pid, at_round)
-	var mood := economy_mood(pid)
-	for group in mood.keys():
-		bonus[group] = float(bonus.get(group, 0.0)) + float(mood[group])
 	var groups := VoterGroups.with_bonus(PartyManager.groups_of(pid), bonus)
 	var alliance_id := alliance_of(pid)
 	if alliances_enabled and alliance_id >= 0:
@@ -1796,30 +1792,37 @@ func _spend_quota(peer_id: int, amount: float) -> void:
 	var pid := party_of(peer_id)
 	spent[pid] = float(spent.get(pid, 0.0)) + amount
 
-func economy_index() -> float:
-	return float(economy.get("index", Economy.START_INDEX))
-
-func inflation() -> float:
-	return Economy.inflation(economy)
-
-func unemployment() -> float:
-	return Economy.unemployment(economy)
-
-## Bu tur sonunda hazineye girecek vergi geliri (şu anki kademe ve ekonomiyle).
+## Bu tur sonunda hazineye girecek vergi geliri.
 func expected_revenue(level: int = -1) -> float:
-	return Economy.revenue(tax_level() if level < 0 else level, economy_index())
+	return Economy.revenue(tax_level() if level < 0 else level)
 
-## Partinin ekonomik memnuniyet payı: başbakanın partisi 1, ortak
-## PARTNER_SHARE, hükümette değilse 0.
-func economy_share(peer_id: int) -> float:
+## VERGİ ÇARPANI (0.0.259): seçim döngüsünde bu tur kaçıncı tur (1..aralık).
+## Seçime yaklaştıkça vergi seçmene daha çok yansır.
+func tax_cycle_mult() -> int:
+	var interval := maxi(1, GameRules.ELECTION_INTERVAL)
+	var left := maxi(0, next_election_round() - round_number)
+	return clampi(interval - left, 1, interval)
+
+## Bu turda bir sırada hükümete yazılan toplam vergi etkisi (ulusal puan).
+func tax_turn_effect(level: int = -1) -> float:
+	return Economy.tax_turn_effect(tax_level() if level < 0 else level, tax_cycle_mult())
+
+## Bu partinin bir sıradaki vergi payı (hükümette değilse 0): bakanlık puanı
+## payı × teknokrat gibi kişilik çarpanı.
+func tax_turn_effect_of(peer_id: int, level: int = -1) -> float:
 	var pid := party_of(peer_id)
 	if not GovernmentManager.has_government() or not GovernmentManager.government_party_ids().has(pid):
 		return 0.0
-	return 1.0 if pid == GovernmentManager.main_gov_peer_id else Economy.PARTNER_SHARE
+	return tax_turn_effect(level) * quota_share(pid) * PoliticianPresets.party_effect(pid, "tax_mood")
 
-## Hükümet partisinin ekonomiden gelen GEÇİCİ grup yakınlığı değişimi.
-func economy_mood(peer_id: int) -> Dictionary:
-	return Economy.group_mood(economy, economy_share(peer_id), PoliticianPresets.party_effect(peer_id, "tax_mood"))
+## Her sıranın başında (host): vergi hükümet partilerine yazılır.
+func _apply_tax_tick() -> void:
+	if not GovernmentManager.has_government():
+		return
+	for pid in GovernmentManager.government_party_ids():
+		var amount := tax_turn_effect_of(int(pid))
+		if amount != 0.0:
+			_add_national(int(pid), amount)
 
 ## Partinin bekleyen (henüz gerçekleşmemiş) yatırım dilimleri: [{province,
 ## amount, rounds_left}] — sadece kendi payı.
@@ -2789,7 +2792,6 @@ func _apply_investment(peer_id: int, province_id: String, amount: float = Econom
 	pending.append({"province": province_id, "party": investor, "round": round_number,
 		"rounds_left": Economy.INVEST_DELAY_ROUNDS, "amounts": later})
 	economy["investments"] = pending
-	economy["boost"] = minf(Economy.BOOST_MAX, float(economy.get("boost", 0.0)) + Economy.INVEST_ECONOMY * scale)
 	_ease_turmoil(peer_id, PublicOpinion.TURMOIL_EASE_INVEST * minf(1.0, scale))
 	_log_province(province_id, L.t("Hükümet yatırımı — %s getirdi (%s; etkisi %d dönemde tamamlanır)") % [
 		_party_name(peer_id), Economy.money_full(amount), Economy.INVEST_DELAY_ROUNDS])
@@ -2847,9 +2849,8 @@ func group_vote_estimates(peer_id: int) -> Dictionary:
 		result[group] = votes / total * 100.0 if total > 0.0 else 0.0
 	return result
 
-## TUR SONU EKONOMİSİ (host, tur başına TEK SEFER, seçimden önce): vergi
-## geliri hazineye, vergi baskısı ve ekonomi bir adım yerleşir, bekleyen
-## yatırım dilimleri ile illere gelir. Dönüş: log satırı.
+## TUR SONU (host, tur başına TEK SEFER, seçimden önce): vergi geliri
+## hazineye, bekleyen yatırım dilimleri illere gelir. Dönüş: log satırı.
 func _advance_economy() -> String:
 	Economy.advance(economy)
 	var still: Array = []
@@ -2968,7 +2969,7 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 		for pid in crisis_parties:
 			_add_national(int(pid), PublicOpinion.CRISIS_RESPONSE_NATIONAL)
 			names.append(_party_name(int(pid)))
-		notes += L.t(" Gündeme yanıt verdi (ulusal destek): %s.") % ", ".join(names)
+		notes += L.t(" Krize yanıt verdi (ulusal destek): %s.") % ", ".join(names)
 	if passed:
 		notes += L.t(" %s +%d puan.") % [_actor_name(proposer), law_pass_score(proposer_in_gov)]
 		_ease_turmoil(proposer_party, PublicOpinion.TURMOIL_EASE_LAW)
@@ -2976,10 +2977,9 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 		law["title"], L.t("KABUL EDİLDİ") if passed else L.t("reddedildi"), _party_name(proposer), law["group_title"],
 		"" if passed else L.t(" (vaat olarak, az)"), VoterGroups.title(opposite), notes]})
 
-## VERGİ YASASI sonucu. Kabul: kademe değişir, gelir bir sonraki tur sonundan
-## itibaren yeni kademeyle; seçmenin hissettiği baskı TAX_IMMEDIATE kadar
-## hemen, kalanı turlar içinde yerleşir. Grup yakınlığına ayrıca YAZILMAZ
-## (etki Economy.group_mood'dan gelir: çift sayım yok).
+## VERGİ YASASI sonucu. Kabul: kademe değişir; gelir bir sonraki tur sonundan
+## itibaren yeni kademeyle, seçmen etkisi bir sonraki sıradan itibaren
+## (_apply_tax_tick: her sırada hükümete, seçime yaklaştıkça artarak).
 func _apply_tax_result(proposer: int, level: int, passed: bool) -> void:
 	var old := tax_level()
 	var title := CardPresets.card_title(CardPresets.tax_law_type(level))
@@ -2988,16 +2988,13 @@ func _apply_tax_result(proposer: int, level: int, passed: bool) -> void:
 			title, Economy.tax_title(old)]})
 		return
 	economy["tax_from"] = old
-	economy["pressure_from"] = float(economy["pressure"])
 	economy["tax"] = level
 	economy["tax_round"] = round_number
-	economy["pressure"] = Economy.pressure_after_change(float(economy["pressure"]), level)
 	_ease_turmoil(party_of(proposer), PublicOpinion.TURMOIL_EASE_LAW)
-	var rounds := Economy.rounds_to_settle(economy)
 	_push_state({"type": "opinion", "peer_id": proposer, "econ": {"kind": "tax", "from": old, "to": level},
-		"message": L.t("%s KABUL EDİLDİ — vergiler %s → %s. Dönem geliri %s → %s. Seçmen bunu kademeli hissedecek (yaklaşık %d dönem). %s +%d puan.") % [
+		"message": L.t("%s KABUL EDİLDİ — vergiler %s → %s. Dönem geliri %s → %s. %s +%d puan.") % [
 		title, Economy.tax_title(old), Economy.tax_title(level), Economy.money_full(expected_revenue(old)),
-		Economy.money_full(expected_revenue(level)), rounds, _actor_name(proposer), law_pass_score(true)]})
+		Economy.money_full(expected_revenue(level)), _actor_name(proposer), law_pass_score(true)]})
 
 ## Oylar (oyuncu -> oy) partiye göre: parti -> [{"choice", "weight"}]; weight,
 ## oyuncunun partinin vekillerinden yönettiği pay (tek kişilik partide 1).
@@ -3022,11 +3019,11 @@ static func law_pass_score(proposer_in_gov: bool) -> int:
 func crisis_type() -> String:
 	return ""
 
-## Gündemin ödüllendirdiği seçmen grubu ya da "" (eskiden krizin grubu).
+## Süren siyasi krizin seçmen grubu ya da "".
 func crisis_group() -> String:
 	return String(CardPresets.agenda_data(agenda_type()).get("group", ""))
 
-## Şu an gündemdeki konu ("gundem_<grup>") ya da "".
+## Süren siyasi kriz ("kriz_<grup>") ya da "".
 func agenda_type() -> String:
 	if agenda.is_empty() or round_number >= int(agenda.get("until", 0)):
 		return ""
@@ -3057,7 +3054,7 @@ func _schedule_agenda() -> void:
 		var was_active := not agenda.is_empty()
 		agenda = {}
 		if was_active and pos == GameRules.AGENDA_ROUNDS:
-			_push_state({"type": "agenda", "message": L.t("Gündem arası: %d dönem yasa yok, sonra yeni gündemler.") % GameRules.AGENDA_GAP})
+			_push_state({"type": "agenda", "message": L.t("Kriz yatıştı: %d dönem sakin, sonra yeni krizler.") % GameRules.AGENDA_GAP})
 		return
 	# Çiftler karıştırılmış bir sıradan tüketilir: arka arkaya gelen iki gündem
 	# hep farklı çiftten olur.
@@ -3073,11 +3070,11 @@ func _schedule_agenda() -> void:
 	var pair: String = String(_agenda_pairs.pop_front())
 	_last_agenda_pair = pair
 	var groups: Array = VoterGroups.PAIRS[pair]
-	var type := "gundem_%s" % groups[_rng.randi() % 2]
+	var type := "kriz_%s" % groups[_rng.randi() % 2]
 	agenda = {"type": type, "until": round_number + 1, "index": pos + 1}
 	var data := CardPresets.agenda_data(type)
 	crisis = {}
-	var message := L.t("GÜNDEM: %s — %s.") % [data["title"], CardPresets.agenda_effect_text(type)]
+	var message := L.t("SİYASİ KRİZ: %s — %s.") % [data["title"], CardPresets.agenda_effect_text(type)]
 	_push_state({"type": "agenda", "message": message})
 
 ## GovernmentManager, reddedilen gensorudan sonra (host) çağırır: getiren parti
@@ -3181,7 +3178,11 @@ const NATIONAL_PROMOTE := [0.15, 0.05]
 ## Grup toplantısı (güçlü, kalıcı): grubun ülke genelindeki seçmeninden çekilen pay (puan).
 const MEETING_PULL_POINTS := 6.0
 const MEETING_PROMOTE := [0.3, 0.12]
-const OPPOSITE_LOSS := 0.5
+## ZIT GRUP KAYBI (0.0.259): bir gruba kazanılan her seçmen için zıt gruptaki
+## kendi seçmeninden bu kadarı bir seviye düşer (5 işveren → 4 işçi). Siyasi
+## krizin grubunda kayıp yarıya iner (5 → 2).
+const OPPOSITE_LOSS := 0.8
+const OPPOSITE_LOSS_CRISIS := 0.4
 ## Teşkilat kendi seçmeninin seviye düşüşünü bu oranda azaltır (seviye 0, 1, 2).
 const VB_ORG_SHIELD := [0.0, 0.3, 0.55]
 ## İL BÜYÜKLÜĞÜ (0.0.232): seviye ATLAMA hızı ilin vekil sayısıyla TERS, seviye
@@ -3418,11 +3419,13 @@ func _vb_promote(pid: int, pi: int, gi: int, r1: float, r2: float) -> void:
 func _vb_opposite(gi: int) -> int:
 	return VoterGroups.GROUP_IDS.find(VoterGroups.opposite(String(VoterGroups.GROUP_IDS[gi])))
 
-## Kazanılan seçmen kadar zıt grupta kendi seçmeninin yarısı bir seviye düşer.
+## Kazanılan seçmenin OPPOSITE_LOSS'u kadar zıt gruptaki kendi seçmeni bir
+## seviye düşer; grup siyasi krizin grubuysa OPPOSITE_LOSS_CRISIS kadar.
 func _vb_opposite_loss(pid: int, pi: int, gi: int, gained: float) -> void:
 	var oi := _vb_opposite(gi)
 	if oi >= 0:
-		_vb_demote_own(pid, pi, oi, gained * OPPOSITE_LOSS)
+		var ratio := OPPOSITE_LOSS_CRISIS if String(VoterGroups.GROUP_IDS[gi]) == crisis_group() else OPPOSITE_LOSS
+		_vb_demote_own(pid, pi, oi, gained * ratio)
 
 ## MİTİNG. mult: teşkilat × geçmiş × popülizm. Dönüş: grup -> çekilen seçmen.
 func _vb_miting(pid: int, province_id: String, focus: Array, mult: float) -> Dictionary:
@@ -3645,7 +3648,7 @@ func _apply_speech(peer_id: int, group: String) -> void:
 		EffectWords.change(moved, "group")]
 	if crisis_group() == group:
 		_add_national(pid, PublicOpinion.CRISIS_RESPONSE_NATIONAL)
-		text += L.t(" Gündeme yanıt verdi (ulusal destek).")
+		text += L.t(" Krize yanıt verdi (ulusal destek).")
 	_push_state({"type": "speech", "peer_id": peer_id, "message": text})
 
 @rpc("any_peer", "reliable")
@@ -4041,6 +4044,7 @@ func _grant_turn_income() -> void:
 	_start_turn_flow(peer_id)
 	if peer_id == -1:
 		return
+	_apply_tax_tick()
 	funds[peer_id] = funds_of(peer_id) + turn_income(peer_id)
 	if not inventories.has(peer_id):
 		inventories[peer_id] = []

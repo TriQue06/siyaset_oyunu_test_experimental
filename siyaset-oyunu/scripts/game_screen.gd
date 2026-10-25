@@ -800,6 +800,8 @@ var _band_period: Label
 var _band_crisis: PanelContainer
 var _band_crisis_title: Label
 var _band_crisis_text: Label
+## Krizin seçmen grubu simgesi (kutunun solunda).
+var _band_crisis_icon: VoterGroupIcon
 var _timer_bar_bg: ColorRect
 var _timer_bar: ColorRect
 
@@ -833,8 +835,10 @@ func _place_date_chip(_map_rect: Rect2) -> void:
 		_band_crisis_text.add_theme_color_override("font_color", UiTheme.TEXT)
 		_band_crisis_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		crisis_box.add_child(_band_crisis_text)
-		_band_crisis_title.position = Vector2(0, 2)
-		_band_crisis_text.position = Vector2(0, 24)
+		_band_crisis_icon = VoterGroupIcon.make("isci", 32.0)
+		crisis_box.add_child(_band_crisis_icon)
+		_band_crisis_title.position = Vector2(42, 3)
+		_band_crisis_text.position = Vector2(42, 23)
 		add_child(_band_crisis)
 		_band_turn = PanelContainer.new()
 		var turn_style := StyleBoxFlat.new()
@@ -901,35 +905,34 @@ func _refresh_band_date() -> void:
 	_date_label.text = "  ·  ".join(PackedStringArray(parts))
 
 ## KRİZ (kırmızı) ya da sadece GÜNDEM (altın) bantta; ikisi de yoksa gizli.
+## SİYASİ KRİZ KUTUSU (0.0.259): kırmızı çerçeve, solda krizin seçmen grubu
+## simgesi, başlık "KRİZ · ..." ve tek satır etki. Kriz yoksa gizli.
 func _refresh_band_crisis() -> void:
 	if _band_crisis == null:
 		return
-	var crisis := CardManager.crisis_type()
 	var agenda := CardManager.agenda_type()
-	_band_crisis.visible = crisis != "" or agenda != ""
+	_band_crisis.visible = agenda != ""
 	if not _band_crisis.visible:
 		return
+	var data := CardPresets.agenda_data(agenda)
 	var style := StyleBoxFlat.new()
-	style.content_margin_left = 10
+	style.bg_color = Color("3a1620")
+	style.border_color = Color("c4303c")
+	style.set_border_width_all(2)
+	style.content_margin_left = 6
 	style.content_margin_right = 10
-	style.border_width_left = 6
 	style.content_margin_top = 0
 	style.content_margin_bottom = 0
-	if crisis != "":
-		var data := CardPresets.crisis_data(crisis)
-		style.bg_color = Color("4a1020")
-		style.border_color = Color("ff3b4e")
-		_band_crisis_title.text = L.t("⚠ KRİZ · %s") % data["title"]
-		_band_crisis_title.add_theme_color_override("font_color", Color("ff8a94"))
-		_band_crisis_text.text = L.t("%s için yasa / toplantı ulusal destek getirir") % data["group_title"]
-	else:
-		var data := CardPresets.agenda_data(agenda)
-		style.bg_color = Color("2a2350")
-		style.border_color = UiTheme.GOLD
-		_band_crisis_title.text = L.t("GÜNDEM · %s") % data["title"]
-		_band_crisis_title.add_theme_color_override("font_color", UiTheme.GOLD)
-		_band_crisis_text.text = L.t("%s için yasa / toplantı ulusal destek getirir") % data["group_title"]
 	UiSkin.apply_style(_band_crisis, "panel", style)
+	var side := clampf(_band_crisis.size.y - 10.0, 20.0, 40.0)
+	_band_crisis_icon.set_group(String(data.get("group", "")))
+	_band_crisis_icon.size = Vector2(side, side)
+	_band_crisis_icon.position = Vector2(0, (_band_crisis.size.y - side) * 0.5 - 2.0)
+	_band_crisis_title.position = Vector2(side + 10.0, 3)
+	_band_crisis_text.position = Vector2(side + 10.0, 23)
+	_band_crisis_title.text = L.t("KRİZ · %s") % data["title"]
+	_band_crisis_title.add_theme_color_override("font_color", Color("ff6b74"))
+	_band_crisis_text.text = L.t("%s ile toplantı ve yasa çok daha etkili") % data["group_title"]
 
 func _refresh_timer_bar() -> void:
 	if _timer_bar == null:
@@ -4030,7 +4033,7 @@ func _refresh_agenda_banner() -> void:
 		return
 	var data := CardPresets.agenda_data(current)
 	# Kısa tut: sol panelde olay loguna yer kalsın.
-	_agenda_label.text = L.t("GÜNDEM: %s\n%s") % [data["title"], CardPresets.agenda_effect_text(current)]
+	_agenda_label.text = L.t("KRİZ: %s\n%s") % [data["title"], CardPresets.agenda_effect_text(current)]
 
 ## İTTİFAK PENCERESİ (0.0.249): MECLİS penceresiyle aynı dil — ortada,
 ## karartılmış zemin üstünde, aynı çerçeve ve gölge; üstte sekmeler
@@ -4666,10 +4669,10 @@ func _refresh_law_designer() -> void:
 	_law_points_label.text = L.t("Kabul: +%d puan · %s") % [CardManager.law_pass_score(in_gov), GameRules.cost_text(GameRules.LAW_FUNDS_COST)]
 	var current := CardManager.agenda_type()
 	if current == "":
-		_law_agenda_label.text = L.t("Gündem yok: her grup için yasa sunulabilir.")
+		_law_agenda_label.text = L.t("Siyasi kriz yok: her grup için yasa sunulabilir.")
 	else:
 		var data := CardPresets.agenda_data(current)
-		_law_agenda_label.text = L.t("Gündem: %s — %s.") % [data["title"], CardPresets.agenda_effect_text(current)]
+		_law_agenda_label.text = L.t("Kriz: %s — %s.") % [data["title"], CardPresets.agenda_effect_text(current)]
 	for child in _law_rows.get_children():
 		child.queue_free()
 	var groups_on_agenda := CardManager.agenda_groups()
@@ -4766,7 +4769,7 @@ func _refresh_law_detail() -> void:
 		EffectWords.adjective(VoterGroups.effective_delta(groups, _law_group, rejected), "group")], UiTheme.GREEN, VoterGroupUI.FS_NAME, 16.0, true))
 	_law_detail.add_child(VoterGroupUI.name_row(opposite, L.t("%s / %s kayıp") % [EffectWords.adjective(VoterGroups.effective_delta(groups, opposite, -passed * backlash), "group"),
 		EffectWords.adjective(VoterGroups.effective_delta(groups, opposite, -rejected * backlash), "group")], UiTheme.RED, VoterGroupUI.FS_NAME, 16.0, true))
-	var crisis_note := L.t(" Gündemde: etki daha güçlü, ulusal destek de kazandırır.") if CardManager.crisis_group() == _law_group else ""
+	var crisis_note := L.t(" Krizin grubu: etki daha güçlü, karşıt gruptan kayıp yarıya iner.") if CardManager.crisis_group() == _law_group else ""
 	_law_detail.add_child(PopupKit.note(L.t("Meclis çoğunluğu gerekir.%s") % crisis_note, UiTheme.TEXT_DIM, 300))
 	var submit := Button.new()
 	submit.focus_mode = Control.FOCUS_NONE
@@ -5523,7 +5526,7 @@ func _speech_row(group: String, value: float) -> Control:
 	name.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	texts.add_child(name)
 	var sub := Label.new()
-	sub.text = L.t("destek %s%s") % [VoterGroups.percent_text(value), L.t(" · GÜNDEM") if crisis else ""]
+	sub.text = L.t("destek %s%s") % [VoterGroups.percent_text(value), L.t(" · KRİZ") if crisis else ""]
 	sub.add_theme_font_size_override("font_size", 9)
 	sub.add_theme_color_override("font_color", UiTheme.GOLD if crisis else UiTheme.TEXT_MUTED)
 	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE

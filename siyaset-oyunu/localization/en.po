@@ -3,6 +3,69 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: en\n"
 
+msgid "%s KABUL EDİLDİ — vergiler %s → %s. Dönem geliri %s → %s. %s +%d puan."
+msgstr "%s PASSED — taxes %s → %s. Term revenue %s → %s. %s +%d points."
+
+msgid "Kriz yatıştı: %d dönem sakin, sonra yeni krizler."
+msgstr "Crisis has calmed: %d quiet term(s), then new crises."
+
+msgid "SİYASİ KRİZ: %s — %s."
+msgstr "POLITICAL CRISIS: %s — %s."
+
+msgid "%s ile toplantı ve yasa çok daha etkili, karşıt gruptan kayıp yarıya iner"
+msgstr "meetings and laws for %s are far more effective, losses from the opposing group are halved"
+
+msgid "BÜTÇE"
+msgstr "BUDGET"
+
+msgid "Vergi: hükümet yok, etki yazılmaz"
+msgstr "Tax: no government, no effect"
+
+msgid "Vergi seçmene etkisiz · tur ×%d"
+msgstr "Tax has no voter effect · round ×%d"
+
+msgid "Vergi: hükümete %s / sıra · tur ×%d"
+msgstr "Tax: %s / turn to government · round ×%d"
+
+msgid "Bir kademe seç: geliri ve seçmene etkisini gör."
+msgstr "Pick a level: see its revenue and its effect on voters."
+
+msgid "seçmen: etkisiz"
+msgstr "voters: no effect"
+
+msgid "seçmen: %s / sıra"
+msgstr "voters: %s / turn"
+
+msgid "hükümete her sırada %s (tur ×%d)"
+msgstr "%s to the government every turn (round ×%d)"
+
+msgid "hükümet partileri, bakanlık payına göre"
+msgstr "government parties, by their share of ministries"
+
+msgid "Etki seçime yaklaştıkça artar: döngünün 1. turunda ×1, son turunda en yüksek. Sırada erken değiştirmek o turdaki daha çok sırayı etkiler."
+msgstr "The effect grows as the election nears: ×1 in the first round of the cycle, highest in the last. Changing it early affects more turns in that round."
+
+msgid "KRİZ · %s"
+msgstr "CRISIS · %s"
+
+msgid "%s ile toplantı ve yasa çok daha etkili"
+msgstr "meetings and laws for %s are far more effective"
+
+msgid "KRİZ: %s\n%s"
+msgstr "CRISIS: %s\n%s"
+
+msgid "Siyasi kriz yok: her grup için yasa sunulabilir."
+msgstr "No political crisis: laws can be proposed for any group."
+
+msgid "Kriz: %s — %s."
+msgstr "Crisis: %s — %s."
+
+msgid " Krizin grubu: etki daha güçlü, karşıt gruptan kayıp yarıya iner."
+msgstr " Crisis group: stronger effect, losses from the opposing group are halved."
+
+msgid "Siyasi kriz: %s. Bu grupla toplanmak çok daha etkili, karşıt gruptan kayıp yarıya iner."
+msgstr "Political crisis: %s. Meeting this group is far more effective, losses from the opposing group are halved."
+
 msgid "2/3 sağlandı · kabul"
 msgstr "2/3 reached · passes"
 

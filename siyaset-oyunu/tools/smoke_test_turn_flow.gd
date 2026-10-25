@@ -369,7 +369,6 @@ func _initialize() -> void:
 	var treasury_three: float = cm.state_treasury()
 	cm._apply_invest_move(1, province, 1.0, 0)
 	check("4. yatirim otorite tarafinda da reddedilir", cm.invest_count(1) == 3 and is_equal_approx(cm.state_treasury(), treasury_three))
-	check("ekonomi ivmesi sinirda kalir", float(cm.economy.get("boost", 0.0)) <= Economy.BOOST_MAX + 0.0001)
 	give_turn(2)
 	cm._apply_draw(2)
 	check("muhalefet yatirim yapamaz", not cm.can_invest(2, province))

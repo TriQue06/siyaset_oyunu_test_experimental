@@ -67,19 +67,14 @@ func _initialize() -> void:
 	cm.funds[me] = 120.0
 	cm.agenda = {}
 	cm.crisis = {}
-	# Yüksek vergiyle birkaç dönem, sonra indirim: geçiş sürüyor.
+	# Yüksek vergiyle birkaç dönem, sonra normal vergi.
 	cm.economy = Economy.start_state()
 	cm.economy["tax"] = Economy.TAX_HIGH
-	cm.economy["pressure"] = 0.0
 	for i in 3:
 		Economy.advance(cm.economy)
-	cm.economy["tax_from"] = Economy.TAX_HIGH
-	cm.economy["pressure_from"] = float(cm.economy["pressure"])
 	cm.economy["tax"] = Economy.TAX_NORMAL
-	cm.economy["pressure"] = Economy.pressure_after_change(float(cm.economy["pressure"]), Economy.TAX_NORMAL)
 	cm.economy["prev"] = Economy.snapshot(cm.economy)
 	cm.economy["prev"]["treasury"] = float(cm.economy["treasury"]) - 140.0
-	cm.economy["prev"]["index"] = float(cm.economy["index"]) + 2.0
 	cm._push_state({"type": "timer"})
 
 	var scene: Node = (load("res://scenes/GameScreen.tscn") as PackedScene).instantiate()
@@ -96,8 +91,7 @@ func _initialize() -> void:
 		var treasury_text: String = (panel._tiles["treasury"]["value"] as Label).text
 		check("hazine kutusu gerçek bakiyeyi gösterir", treasury_text == Economy.money_text(cm.state_treasury()),
 			"%s / %s" % [treasury_text, Economy.money_text(cm.state_treasury())])
-		check("enflasyon kutusu", (panel._tiles["inflation"]["value"] as Label).text == Economy.percent_text(cm.inflation()))
-		check("vergi geçişi gösteriliyor", panel._transition.visible)
+		check("vergi etkisi satırı görünür", panel._tax_effect.visible and panel._tax_effect.text.begins_with("Vergi"), panel._tax_effect.text)
 		check("ekonomi kutusu ekrana sığıyor", _inside(panel), str(panel.get_global_rect()))
 		check("yürürlükteki vergi vurgulu", (panel._tax_buttons[Economy.TAX_NORMAL] as Button).get_theme_color("font_color") == UiTheme.INK)
 

@@ -1,10 +1,9 @@
 extends SceneTree
 ## EKONOMİ ve VERGİ testleri (yerel mod, RPC yok): yüksek vergiyle hazine
-## birikmesi, indirimin hemen + kademeli etkisi, gelir düşüşü, hazineden
-## yatırım (tek sefer harcama, dilimler), yüksek vergide erken seçim, indirimden
-## sonra sadece gerçekleşen etkinin sayılması, koalisyon ortaklarının payı, çift
-## sayım olmaması, durum kaydı/yükleme (eski sürüm dahil), botların aynı
-## kurallarla vergi ve yatırım kararları.
+## birikmesi, her sırada hükümete yazılan vergi etkisi (döngü çarpanı, bakanlık
+## payı), hazineden yatırım (tek sefer harcama, dilimler), çift sayım olmaması,
+## durum kaydı/yükleme (eski sürüm dahil), botların aynı kurallarla vergi ve
+## yatırım kararları. 0.0.259: ekonomi göstergeleri ve kademeli baskı yok.
 ##   godot --headless --path . --script res://tools/smoke_test_economy.gd
 
 var mm
@@ -111,22 +110,20 @@ func _initialize() -> void:
 	check("hükümet yokken kimse vergi değiştiremez", not cm.can_propose_tax_law(1, Economy.TAX_HIGH))
 	new_game()
 	var rejected := pass_tax(Economy.TAX_HIGH, -1, -1)
-	check("reddedilen vergi yasası kademeyi değiştirmez", not rejected and cm.tax_level() == Economy.TAX_NORMAL
-		and near(float(cm.economy["pressure"]), 0.0))
+	check("reddedilen vergi yasası kademeyi değiştirmez", not rejected and cm.tax_level() == Economy.TAX_NORMAL)
 	check("reddedilen yasa yine de dönemin yasa hakkını kullanır", cm.has_proposed_law_this_round(1)
 		and not cm.can_propose_tax_law(1, Economy.TAX_HIGH))
 
 	print("")
-	print("=== 1) YÜKSEK VERGİ: HAZİNE BİRİKİR, HÜKÜMET DESTEK KAYBEDER ===")
+	print("=== 1) YÜKSEK VERGİ: HAZİNE BİRİKİR ===")
 	new_game()
-	var share_normal := election_share(1)
 	var groups_before := str(pm.parties[1]["groups"])
 	var national_before := str(cm.national_support)
 	check("vergi artırımı kabul edildi", pass_tax(Economy.TAX_HIGH))
-	check("baskının bir kısmı hemen hissedilir", near(float(cm.economy["pressure"]), Economy.TAX_IMMEDIATE),
-		"%.3f" % float(cm.economy["pressure"]))
 	check("vergi yasası kalıcı grup yakınlığına yazmaz", str(pm.parties[1]["groups"]) == groups_before)
-	check("vergi yasası ulusal puana yazmaz", str(cm.national_support) == national_before)
+	check("vergi yasası kabul anında ulusal puana yazmaz", str(cm.national_support) == national_before)
+	check("grup değerine ekonomi katmanı eklenmez", str(cm.effective_groups(1)) == str(cm.effective_groups(1))
+		and not cm.has_method("economy_mood") and not cm.has_method("economy_index"))
 	var treasury0: float = cm.state_treasury()
 	var revenues: Array = []
 	for i in 4:
@@ -136,33 +133,72 @@ func _initialize() -> void:
 		check("tur %d: gelir hazineye bir kez girdi" % (i + 1), near(float(cm.economy["revenue"]), expected, 0.01))
 	var gained: float = cm.state_treasury() - treasury0
 	check("4 tur yüksek vergi: hazine birikti", gained > 4.0 * Economy.TAX_REVENUE[Economy.TAX_NORMAL] * 0.9, "+%.0f" % gained)
-	check("yüksek vergi geliri normalden fazla", float(revenues[0]) > Economy.revenue(Economy.TAX_NORMAL, 50.0))
-	var pressure_high: float = float(cm.economy["pressure"])
-	check("baskı turlar içinde arttı (kademeli)", pressure_high > Economy.TAX_IMMEDIATE + 0.4, "%.3f" % pressure_high)
-	var share_high := election_share(1)
-	check("yüksek vergide başbakanın oyu düştü", share_high < share_normal - 0.1, "%.2f -> %.2f" % [share_normal, share_high])
-	check("ekonomi yüksek vergide yavaşladı", cm.economy_index() < Economy.START_INDEX)
+	check("yüksek vergi geliri normalden fazla", float(revenues[0]) > Economy.revenue(Economy.TAX_NORMAL))
+	check("gelir sabit (ekonomi göstergesi yok)", near(float(revenues[0]), float(revenues[3])))
 
 	print("")
-	print("=== 2-3) VERGİ İNDİRİMİ: HEMEN + KADEMELİ, GELİR DÜŞER ===")
-	var mood_high: Dictionary = cm.economy_mood(1)
-	check("indirim (yüksek → normal) kabul edildi", pass_tax(Economy.TAX_NORMAL))
-	var pressure_cut: float = float(cm.economy["pressure"])
-	check("indirim anında baskı kısmen azaldı", near(pressure_cut, pressure_high * (1.0 - Economy.TAX_IMMEDIATE)),
-		"%.3f -> %.3f" % [pressure_high, pressure_cut])
-	check("indirim tüm memnuniyetsizliği bir anda silmez", pressure_cut > 0.3 and not Economy.is_settled(cm.economy))
-	check("indirimin önizlemesi: yerleşmeye birkaç tur var", Economy.rounds_to_settle(cm.economy) >= 3, str(Economy.rounds_to_settle(cm.economy)))
-	var share_cut_now := election_share(1)
-	end_round()
-	var share_cut_1 := election_share(1)
-	end_round()
-	var share_cut_2 := election_share(1)
-	check("oy indirim anında biraz toparlandı", share_cut_now > share_high, "%.2f -> %.2f" % [share_high, share_cut_now])
-	check("oy sonraki turlarda toparlanmaya devam etti", share_cut_1 > share_cut_now and share_cut_2 > share_cut_1,
-		"%.2f -> %.2f -> %.2f" % [share_cut_now, share_cut_1, share_cut_2])
-	check("indirimden sonra gelir düştü", float(cm.economy["revenue"]) < float(revenues[3]),
-		"%.0f -> %.0f" % [float(revenues[3]), float(cm.economy["revenue"])])
-	check("işverenlerin memnuniyetsizliği azaldı", float(cm.economy_mood(1).get("isveren", 0.0)) > float(mood_high.get("isveren", 0.0)))
+	print("=== 2) VERGİ ETKİSİ: HER SIRADA, SEÇİME YAKLAŞTIKÇA ARTAR ===")
+	GameRules.configure(2, 12)
+	new_game()
+	var interval: int = GameRules.ELECTION_INTERVAL
+	check("seçim döngüsü 4 tur", interval == 4, str(interval))
+	var mults: Array = []
+	for r in range(1, interval + 1):
+		cm.round_number = r
+		mults.append(cm.tax_cycle_mult())
+	check("1. tur ×1 … son tur ×%d" % interval, str(mults) == str(range(1, interval + 1)), str(mults))
+	cm.round_number = interval + 1
+	check("seçimden sonraki tur yine ×1", cm.tax_cycle_mult() == 1, str(cm.tax_cycle_mult()))
+	cm.round_number = 2
+	check("normal vergi seçmeni etkilemez", near(cm.tax_turn_effect(Economy.TAX_NORMAL), 0.0))
+	check("düşük vergi artı, yüksek vergi eksi", cm.tax_turn_effect(Economy.TAX_LOW) > 0.0 and cm.tax_turn_effect(Economy.TAX_HIGH) < 0.0)
+	check("2. turda etki 2 kat", near(cm.tax_turn_effect(Economy.TAX_HIGH), 2.0 * Economy.TAX_TURN_NATIONAL[Economy.TAX_HIGH]))
+	cm.economy["tax"] = Economy.TAX_HIGH
+	cm.national_support = {}
+	cm._apply_tax_tick()
+	var n1: float = cm.national_of(1)
+	var n2: float = cm.national_of(2)
+	var total_tick: float = cm.tax_turn_effect()
+	check("yüksek vergi: hükümet partileri eksi yazar", n1 < 0.0 and n2 < 0.0, "%.3f / %.3f" % [n1, n2])
+	check("muhalefet etkilenmez", near(cm.national_of(3), 0.0))
+	check("toplam etki bakanlık payına göre bölünür", near(n1, total_tick * cm.quota_share(1)) and near(n2, total_tick * cm.quota_share(2))
+		and near(n1 + n2, total_tick), "%.3f + %.3f = %.3f" % [n1, n2, total_tick])
+	cm._apply_tax_tick()
+	check("her sırada tekrar yazılır (birikir)", near(cm.national_of(1), 2.0 * n1))
+	cm.national_support = {}
+	cm.economy["tax"] = Economy.TAX_LOW
+	cm.round_number = interval
+	cm._apply_tax_tick()
+	check("düşük vergi son turda en yüksek artı", near(cm.national_of(1) + cm.national_of(2), Economy.TAX_TURN_NATIONAL[Economy.TAX_LOW] * interval),
+		"%.3f" % (cm.national_of(1) + cm.national_of(2)))
+	cm.national_support = {}
+	cm.economy["tax"] = Economy.TAX_NORMAL
+	cm._apply_tax_tick()
+	check("normal vergi hiçbir şey yazmaz", near(cm.national_of(1), 0.0) and near(cm.national_of(2), 0.0))
+	cm.round_number = 1
+	cm.early_election_pending = true
+	check("erken seçim kabul edilince çarpan en yüksek", cm.tax_cycle_mult() == interval)
+	cm.early_election_pending = false
+	gm.government = {}
+	gm.main_gov_peer_id = -1
+	cm.economy["tax"] = Economy.TAX_HIGH
+	cm.national_support = {}
+	cm._apply_tax_tick()
+	check("hükümet yokken kimseye yazılmaz", cm.national_support.is_empty() or (near(cm.national_of(1), 0.0) and near(cm.national_of(2), 0.0)))
+	# Sıra başı: _grant_turn_income vergiyi bir kez yazar.
+	new_game()
+	cm.round_number = 1
+	cm.economy["tax"] = Economy.TAX_LOW
+	cm.national_support = {}
+	give_turn(1)
+	cm._grant_turn_income()
+	var after_grant: float = cm.national_of(1) + cm.national_of(2)
+	check("sıra başında vergi bir kez yazıldı", near(after_grant, cm.tax_turn_effect()), "%.3f" % after_grant)
+	var share_before := election_share(1)
+	for i in 6:
+		cm._apply_tax_tick()
+	check("düşük vergi biriktikçe başbakanın oyu artar", election_share(1) > share_before, "%.2f -> %.2f" % [share_before, election_share(1)])
+	GameRules.configure(8, 12)
 
 	print("")
 	print("=== 4) HAZİNEDEN YATIRIM: TEK SEFER HARCAMA, DİLİMLER ===")
@@ -200,49 +236,20 @@ func _initialize() -> void:
 	var after_done: float = cm.local_of(province, 1)
 	end_round()
 	check("tamamlanan yatırım tekrar dilim yazmaz", cm.local_of(province, 1) < after_done)
-	check("yatırım ekonomiyi canlandırdı", cm.economy_index() > Economy.START_INDEX, "%.1f" % cm.economy_index())
 	check("yatırım ayrıca ulusal puan yazmaz", near(cm.national_of(1), 0.0))
 
 	print("")
 	print("=== 5) YÜKSEK VERGİDE ERKEN SEÇİM ===")
 	new_game()
-	var base_share := election_share(1)
-	var base_partner := election_share(2)
-	var base_opposition := election_share(3)
 	pass_tax(Economy.TAX_HIGH)
-	end_round()
-	end_round()
-	var early_share := election_share(1)
-	var early_partner := election_share(2)
-	var early_opposition := election_share(3)
-	check("başbakanın partisi yüksek vergide erken seçimde kaybeder", early_share < base_share, "%.2f -> %.2f" % [base_share, early_share])
-	check("muhalefet bundan kazanır", early_opposition > base_opposition)
-	var mods: Dictionary = cm.election_modifiers()
-	check("erken seçime ayrı bir ekonomi cezası eklenmez (ulusal çarpan aynı)",
-		near(float(mods["national"].get(1, 0.0)), float(cm.national_support.get(1, 0.0)) + PublicOpinion.GOVERNMENT_FATIGUE))
-	# Gerçek erken seçim: sandık o ana kadar gerçekleşen etkiyle kurulur.
 	cm.early_election_pending = true
-	var pressure_at_vote: float = float(cm.economy["pressure"])
 	cm.set_rng_seed(5)
+	var revenue_before: float = cm.state_treasury()
 	end_round()
 	check("erken seçim yapıldı", cm.last_election_round == cm.round_number - 1 and not cm.early_election_pending)
-	check("seçim tur sonu ekonomisinden sonra (gelir girdi, baskı bir adım ilerledi)",
-		float(cm.economy["pressure"]) > pressure_at_vote and float(cm.economy["revenue"]) > 0.0)
-
-	print("")
-	print("=== 6) İNDİRİMDEN SONRA SEÇİM: SADECE GERÇEKLEŞEN FAYDA ===")
-	new_game()
-	pass_tax(Economy.TAX_HIGH)
-	for i in 3:
-		end_round()
-	pass_tax(Economy.TAX_NORMAL)
-	var partial := election_share(1)
-	var settled_state: Dictionary = cm.economy.duplicate(true)
-	cm.economy["pressure"] = 0.0
-	var full := election_share(1)
-	cm.economy = settled_state
-	check("yeni indirimde seçim: fayda henüz tam değil", partial < full - 0.05, "%.2f < %.2f" % [partial, full])
+	check("seçim tur sonu gelirinden sonra (gelir girdi)", float(cm.economy["revenue"]) > 0.0 and cm.state_treasury() > revenue_before)
 	# Bekleyen yatırım dilimi seçimde sayılmaz.
+	new_game()
 	give_turn(1)
 	var inv_province: String = String(cm._province_ids[7])
 	cm.local_support = {}
@@ -254,47 +261,20 @@ func _initialize() -> void:
 		"%.2f" % local_now)
 
 	print("")
-	print("=== 7) KOALİSYON ORTAKLARI ===")
-	new_game()
-	pass_tax(Economy.TAX_HIGH)
-	end_round()
-	var mood_pm: Dictionary = cm.economy_mood(1)
-	var mood_partner: Dictionary = cm.economy_mood(2)
-	check("ortak da ekonomik memnuniyetsizliği taşır", not mood_partner.is_empty())
-	check("ortağın payı başbakanınkinden küçük (PARTNER_SHARE)", near(float(mood_partner.get("isveren", 0.0)),
-		float(mood_pm.get("isveren", 0.0)) * Economy.PARTNER_SHARE, 0.01))
-	check("muhalefet ekonomiden etkilenmez", cm.economy_mood(3).is_empty())
-	var partner_now := election_share(2)
-	var pm_now := election_share(1)
-	cm.economy["pressure"] = 0.0
-	cm.economy["index"] = Economy.START_INDEX
-	var partner_neutral := election_share(2)
-	var pm_neutral := election_share(1)
-	# Hitap modeli (0.0.213): geçici kayıp hitabı %0'ın altına indiremez; ortak az
-	# hitap ettiği gruplarda az kaybeder, başbakanın kaybı ondan büyüktür.
-	check("ortağın vergi kaybı başbakanınkinden küçük", partner_neutral - partner_now < pm_neutral - pm_now,
-		"ortak %.2f -> %.2f, başbakan %.2f -> %.2f" % [partner_neutral, partner_now, pm_neutral, pm_now])
-
-	print("")
 	print("=== 8) ÇİFT SAYIM YOK ===")
 	new_game()
 	pass_tax(Economy.TAX_HIGH)
 	end_round()
 	var raw: Dictionary = pm.parties[1]["groups"]
 	var eff: Dictionary = cm.effective_groups(1)
-	var mood: Dictionary = cm.economy_mood(1)
-	var ok_layer := true
-	for group in VoterGroups.GROUP_IDS:
-		var expected_value := clampf(float(raw[group]) + float(mood.get(group, 0.0)), 0.0, 100.0)
-		if not near(float(eff[group]), expected_value):
-			ok_layer = false
-	check("seçimdeki grup değeri = kalıcı yakınlık + ekonomi (bir kez)", ok_layer)
 	var eff_again: Dictionary = cm.effective_groups(1)
 	check("tekrar sormak etkiyi biriktirmez", str(eff) == str(eff_again))
 	var econ_copy: Dictionary = cm.economy.duplicate(true)
+	var national_copy := str(cm.national_support)
 	cm._push_state({"type": "opinion"})
 	cm.opinion_changed.emit()
-	check("durum yayını / arayüz yenilemesi ekonomiyi ilerletmez", str(econ_copy) == str(cm.economy))
+	check("durum yayını / arayüz yenilemesi ekonomiyi ilerletmez", str(econ_copy) == str(cm.economy) and national_copy == str(cm.national_support))
+	check("ham yakınlık sözlüğü değişmedi", raw.size() == VoterGroups.GROUP_IDS.size())
 
 	print("")
 	print("=== 8b) HAZİNE KOTASI: BAKANLIK PUANINA ORANTILI ===")
@@ -337,7 +317,7 @@ func _initialize() -> void:
 		"%.1f / %.1f" % [cm.state_quota(1), cm.state_treasury() * pm_share])
 
 	print("")
-	print("=== 9) KAYIT / YÜKLEME (GEÇİŞ SIRASINDA) ===")
+	print("=== 9) KAYIT / YÜKLEME ===")
 	new_game()
 	pass_tax(Economy.TAX_HIGH)
 	end_round()
@@ -351,11 +331,10 @@ func _initialize() -> void:
 	cm.economy = Economy.start_state()
 	cm._apply_state(packed)
 	check("yüklenen ekonomi aynı", str(cm.economy) == saved)
-	check("yüklemeden sonra geçiş sürüyor", not Economy.is_settled(cm.economy) and cm.pending_investments(1).size() == 1)
+	check("yüklemeden sonra yatırım dilimi sürüyor", cm.pending_investments(1).size() == 1 and cm.tax_level() == Economy.TAX_LOW)
 	var copy_after: Dictionary = cm.economy.duplicate(true)
 	Economy.advance(copy_after)
-	check("yüklemeden sonra bir tur aynı sonucu verir (çift etki yok)", near(float(copy_after["treasury"]), float(reference["treasury"]))
-		and near(float(copy_after["pressure"]), float(reference["pressure"])))
+	check("yüklemeden sonra bir tur aynı sonucu verir (çift etki yok)", near(float(copy_after["treasury"]), float(reference["treasury"])))
 	var old_state: Dictionary = packed.duplicate(true)
 	old_state.erase("economy")
 	cm._apply_state(old_state)
@@ -364,7 +343,7 @@ func _initialize() -> void:
 	partial_state["economy"] = {"tax": Economy.TAX_HIGH, "treasury": 900.0}
 	cm._apply_state(partial_state)
 	check("eksik alanlar doldurulur", cm.tax_level() == Economy.TAX_HIGH and near(cm.state_treasury(), 900.0)
-		and cm.economy.has("investments") and cm.economy.has("pressure"))
+		and cm.economy.has("investments") and cm.economy.has("prev"))
 
 	print("")
 	print("=== 10) GÖSTERİM YARDIMCILARI ===")
@@ -375,12 +354,6 @@ func _initialize() -> void:
 	check("para karakteri gösterilmez (yer tutucu simgeye döner)", not Economy.money_full(100.0).contains("¤")
 		and not GameRules.cost_text(15.0).contains("¤"))
 	check("yüzde biçimi", Economy.percent_text(8.44) == "%8,4")
-	new_game()
-	check("göstergeler aralıkta", cm.inflation() > 0.0 and cm.unemployment() > 0.0 and cm.economy_index() <= 100.0)
-	pass_tax(Economy.TAX_LOW)
-	check("düşük vergi enflasyonu hemen artırır (gösterge güncel)", cm.inflation() > Economy.INFLATION_BASE)
-	check("yerleşme oranı 0..1", Economy.settle_ratio(cm.economy) > 0.0 and Economy.settle_ratio(cm.economy) < 1.0,
-		"%.2f" % Economy.settle_ratio(cm.economy))
 
 	print("")
 	print("=== 11) BOTLAR AYNI KURALLARLA ===")

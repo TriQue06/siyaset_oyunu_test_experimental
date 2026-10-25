@@ -211,7 +211,7 @@ func _econ_snapshot() -> Dictionary:
 	for i in incomes:
 		imax = maxi(imax, int(i))
 	return {"round": cm.round_number, "treasury": cm.state_treasury(), "tax": cm.tax_level(),
-		"index": cm.economy_index(), "funds_avg": fsum / maxf(1.0, funds.size()), "funds_max": fmax,
+		"funds_avg": fsum / maxf(1.0, funds.size()), "funds_max": fmax,
 		"orgs_total": total_orgs, "orgs_max": max_orgs, "org_income_max": imax}
 
 func _top_party(seats: Dictionary) -> int:

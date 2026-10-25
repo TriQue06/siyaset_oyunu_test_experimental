@@ -53,11 +53,6 @@ func _initialize() -> void:
 	check("komsu il etkilenmez", PP.hometown_activity(neighbor, me) == 0.0)
 	check("is insani her tur ek gelir alir", cm.turn_income(me) >= PP.BUSINESS_TURN_INCOME)
 	check("teknokrat vergi tepkisini azaltir", is_equal_approx(PP.party_effect(me, "tax_mood"), 0.8))
-	var econ: Dictionary = cm.economy.duplicate(true)
-	econ["pressure"] = 1.0
-	var mood_full: Dictionary = Economy.group_mood(econ, 1.0)
-	var mood_tech: Dictionary = Economy.group_mood(econ, 1.0, 0.8)
-	check("vergi tepkisi carpani group_mood'a yansir", mood_full.is_empty() or absf(float(mood_tech.values()[0])) < absf(float(mood_full.values()[0])) + 0.001)
 	check("cekirdek gruplar korundu (botlar az pay alabilir)", float(pm.parties[me]["groups"]["isci"]) <= VoterGroups.CORE_START + 0.001 and float(pm.parties[me]["groups"]["isci"]) > VoterGroups.CORE_START * 0.8, str(pm.parties[me]["groups"]["isci"]))
 	check("aktiviteye eklendi", cm.activity_of(home, me) >= PublicOpinion.org_activity(2) + PP.HOMETOWN_ACTIVITY - 0.01,
 		"%.2f" % cm.activity_of(home, me))

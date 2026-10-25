@@ -76,7 +76,7 @@ func _initialize() -> void:
 		print("screenshot: midgame")
 		var cmx = root.get_node("CardManager")
 		var saved_agenda: Dictionary = cmx.agenda
-		cmx.agenda = {"type": "gundem_isveren", "until": cmx.round_number + 1, "index": 1}
+		cmx.agenda = {"type": "kriz_isveren", "until": cmx.round_number + 1, "index": 1}
 		scene._refresh_agenda_banner()
 		await create_timer(0.2).timeout
 		root.get_texture().get_image().save_png("%s/midgame_agenda.png" % OS.get_user_data_dir())

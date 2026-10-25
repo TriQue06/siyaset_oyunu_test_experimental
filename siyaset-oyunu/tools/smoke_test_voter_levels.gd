@@ -120,7 +120,33 @@ func run() -> void:
 	var score_after := float(isci_after[0]) + 2.0 * float(isci_after[1]) + 3.0 * float(isci_after[2])
 	var expected_drop: float = got * cm.OPPOSITE_LOSS * cm.vb_size_factor(pi)
 	check(got > 0.0 and absf((score_before - score_after) - expected_drop) < got * 0.01,
-		"isverene kazanc, iscide kazancin yarisi kadar (il buyuklugune gore) seviye dusurur", "kazanc %.0f, dusus %.0f" % [got, score_before - score_after])
+		"isverene kazanc, iscide kazancin %80'i kadar (il buyuklugune gore) seviye dusurur", "kazanc %.0f, dusus %.0f" % [got, score_before - score_after])
+	check(absf(5.0 * cm.OPPOSITE_LOSS - 4.0) < 0.001 and absf(5.0 * cm.OPPOSITE_LOSS_CRISIS - 2.0) < 0.001,
+		"5 isveren kazanilirsa 4 isci, krizde 2 isci kaybedilir")
+	# Siyasi kriz isverenin: zit gruptan kayip yariya iner.
+	clear_all()
+	setc(a, pi, "isci", count * 0.2, count * 0.2, 0.0)
+	cm.agenda = {"type": "kriz_isveren", "until": cm.round_number + 1}
+	isci_before = cell(a, pi, "isci")
+	got = cm._vb_pull(a, pi, VoterGroups.GROUP_IDS.find("isveren"), count * 0.1, cm.MITING_STEAL, cm.MITING_DEMOTE)
+	cm._vb_opposite_loss(a, pi, VoterGroups.GROUP_IDS.find("isveren"), got)
+	isci_after = cell(a, pi, "isci")
+	score_before = float(isci_before[0]) + 2.0 * float(isci_before[1]) + 3.0 * float(isci_before[2])
+	score_after = float(isci_after[0]) + 2.0 * float(isci_after[1]) + 3.0 * float(isci_after[2])
+	expected_drop = got * cm.OPPOSITE_LOSS_CRISIS * cm.vb_size_factor(pi)
+	check(got > 0.0 and absf((score_before - score_after) - expected_drop) < got * 0.01,
+		"krizin grubunda zit gruptan kayip yariya iner", "kazanc %.0f, dusus %.0f" % [got, score_before - score_after])
+	# Kriz isverenin iken isciye kazanmak tam kayip (kriz yalnizca kendi grubunda).
+	clear_all()
+	setc(a, pi, "isveren", count * 0.2, count * 0.2, 0.0)
+	var isv_before := cell(a, pi, "isveren")
+	got = cm._vb_pull(a, pi, VoterGroups.GROUP_IDS.find("isci"), count * 0.1, cm.MITING_STEAL, cm.MITING_DEMOTE)
+	cm._vb_opposite_loss(a, pi, VoterGroups.GROUP_IDS.find("isci"), got)
+	var isv_after := cell(a, pi, "isveren")
+	var drop_full := (float(isv_before[0]) + 2.0 * float(isv_before[1])) - (float(isv_after[0]) + 2.0 * float(isv_after[1]))
+	check(absf(drop_full - got * cm.OPPOSITE_LOSS * cm.vb_size_factor(pi)) < got * 0.01,
+		"krizin karsit grubuna kazanmak tam kayip verir", "kazanc %.0f, dusus %.0f" % [got, drop_full])
+	cm.agenda = {}
 
 	print("=== il buyuklugu ===")
 	var sizes: Array = []

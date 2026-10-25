@@ -533,7 +533,8 @@ func _place_card_bar() -> void:
 		style.bg_color = DESK_COLOR
 		style.border_color = UiTheme.INK
 		style.border_width_top = 2
-		UiSkin.apply_style(_card_bar_panel, "panel", style)
+		# Ekranı boydan boya kaplayan masa: kenar çerçevesi yok, yalnız üst çizgi.
+		_card_bar_panel.add_theme_stylebox_override("panel", style)
 		add_child(_card_bar_panel)
 		move_child(_card_bar_panel, 1)
 	_set_rect(_card_bar_panel, _r(R_DESK))
@@ -684,7 +685,8 @@ func _apply_layout() -> void:
 		strip_style.bg_color = Color("1d1838")
 		strip_style.border_color = UiTheme.INK
 		strip_style.border_width_bottom = 2
-		UiSkin.apply_style(_strip_bg, "panel", strip_style)
+		# Boydan boya bant: kenar çerçevesi yok, yalnız alt çizgi.
+		_strip_bg.add_theme_stylebox_override("panel", strip_style)
 		_strip_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(_strip_bg)
 		move_child(_strip_bg, 1)
@@ -882,7 +884,7 @@ func _menu_button_rect() -> Rect2:
 	var button: Control = overlay.get_node_or_null("%OpenSettingsButton") if overlay != null else null
 	if button != null and button.size.y > 0.0:
 		return button.get_global_rect()
-	return Rect2(get_viewport_rect().size.x - 124.0, 16.0, 108.0, 44.0)
+	return Rect2(get_viewport_rect().size.x - 124.0, 10.0, 108.0, 44.0)
 
 func _refresh_band_date() -> void:
 	if _band_period == null:

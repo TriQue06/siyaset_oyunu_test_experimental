@@ -37,7 +37,7 @@ const HOVER_ONLY_SEATS := 30
 var _hover_id: String = ""
 
 ## Normal görünümdeki parti dairesinin tek vekil noktasına oranı.
-const SUMMARY_SCALE := 1.5
+const SUMMARY_SCALE := 1.95  # 0.0.248: %30 büyük (1,5 → 1,95)
 ## Hover'da açılma geçişi (saniye).
 const FADE_TIME := 0.15
 ## Açılan ilin geçiş oranı (0 = özet, 1 = ayrı noktalar).
@@ -349,7 +349,7 @@ class SeatCountLabels extends Node2D:
 			var text: String = item[2]
 			var alpha: float = item[3]
 			var fill: Color = item[4]
-			var size := maxi(9, int(roundf(half * (1.7 if text.length() == 1 else 1.3))))
+			var size := maxi(10, int(roundf(half * (1.7 if text.length() == 1 else 1.3))) + 1)
 			var text_size := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size)
 			var pos := Vector2(center.x - text_size.x * 0.5, center.y + (font.get_ascent(size) - font.get_descent(size)) * 0.5).round()
 			var ink := UiTheme.INK if fill.get_luminance() > 0.62 else Color.WHITE

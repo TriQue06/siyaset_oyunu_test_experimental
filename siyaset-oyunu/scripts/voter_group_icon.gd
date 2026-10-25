@@ -10,7 +10,7 @@ var bare: bool = false
 static func make(group_id: String, size_px: float = 22.0, bare_icon: bool = false) -> VoterGroupIcon:
 	var icon := VoterGroupIcon.new()
 	icon.group = group_id
-	icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	icon.bare = bare_icon
 	icon.custom_minimum_size = Vector2(size_px, size_px)
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -65,7 +65,10 @@ static func draw_medallion(canvas: CanvasItem, c: Vector2, r: float, color: Colo
 ## 0.0.243: semboller Material simgeleri (GroupIconSvg); c merkezli, yarı
 ## genişliği s olan kareye ink renginde çizilir.
 static func draw_symbol(canvas: CanvasItem, icon_name: String, c: Vector2, s: float, ink: Color) -> void:
-	var tex := GroupIconSvg.texture(icon_name)
+	# Ekrandaki gerçek piksel boyu (pencere ölçeği dahil): simge o boyda rasterleşir.
+	var xform := canvas.get_viewport().get_final_transform() * canvas.get_global_transform_with_canvas()
+	var px := int(ceil(s * 2.0 * maxf(0.01, xform.get_scale().x)))
+	var tex := GroupIconSvg.texture_px(icon_name, px)
 	if tex == null:
 		return
 	canvas.draw_texture_rect(tex, Rect2(c - Vector2(s, s), Vector2(s, s) * 2.0), false, ink)

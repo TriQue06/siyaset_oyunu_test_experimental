@@ -47,7 +47,6 @@ const R_ACTIONS := Rect2(536, 568, 560, 136)
 const R_FUNDS := Rect2(1112, 568, 152, 134)
 ## Stüdyo masasındaki meclis yuvasının yüksekliği (oylamada büyür).
 const PARL_SLOT_HEIGHT := 150.0
-const PARL_SLOT_VOTE_HEIGHT := 286.0
 ## Sağ üstte Menü düğmesi: şerit oraya kadar uzanmaz.
 const MENU_RESERVE := 140.0
 ## Alt bantta kartların, hamlelerin ve sağdaki kontrollerin payı.
@@ -1056,7 +1055,9 @@ func _place_parliament_badge() -> void:
 				_province_panel.hide()
 		_refresh_side_tabs()
 	if _parl_slot != null:
-		_parl_slot.custom_minimum_size.y = (PARL_SLOT_VOTE_HEIGHT if voting else PARL_SLOT_HEIGHT) * _r(R_SIDE).size.y / R_SIDE.size.y
+		# 0.0.258: oylamada meclis ortaya, harita bu yuvaya geçer; yuva büyümez
+		# (eskiden 286'ya çıkıp haritayı uzatıyor, altındaki ekonomiyi itiyordu).
+		_parl_slot.custom_minimum_size.y = PARL_SLOT_HEIGHT * _r(R_SIDE).size.y / R_SIDE.size.y
 	var vote_row := bottom_area.get_node_or_null("ChamberSplit/ParliamentChamber/ParliamentVBox/VoteButtonRow") as Control
 	if vote_row != null:
 		vote_row.visible = voting
@@ -1091,7 +1092,7 @@ func _update_vote_swap(delta: float) -> void:
 		_swap_home_parl = _parl_slot.get_global_rect()
 	elif not _swap_home_parl.has_area():
 		var side := _r(R_SIDE)
-		_swap_home_parl = Rect2(side.position + Vector2(0.0, 48.0), Vector2(side.size.x, PARL_SLOT_VOTE_HEIGHT * side.size.y / R_SIDE.size.y))
+		_swap_home_parl = Rect2(side.position + Vector2(0.0, 48.0), Vector2(side.size.x, PARL_SLOT_HEIGHT * side.size.y / R_SIDE.size.y))
 	var voting := GovernmentManager.is_voting()
 	if voting:
 		_vote_end_wait = VOTE_SWAP_RETURN_DELAY

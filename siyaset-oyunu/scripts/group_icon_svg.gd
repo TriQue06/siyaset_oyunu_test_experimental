@@ -28,3 +28,19 @@ static func texture(icon_name: String) -> Texture2D:
 	var tex := ImageTexture.create_from_image(image)
 	_cache[icon_name] = tex
 	return tex
+
+## Ekranda tam bu piksel boyunda çizilecek simge (önbellekli). Büyük dokuyu
+## küçültmek kenarları yumuşatıyordu; tam boyda rasterleşen SVG her
+## çözünürlükte keskin kalır (0.0.258).
+static func texture_px(icon_name: String, px: int) -> Texture2D:
+	px = clampi(px, 8, 512)
+	var key := "%s@%d" % [icon_name, px]
+	if _cache.has(key):
+		return _cache[key]
+	if not SVGS.has(icon_name):
+		return null
+	var image := Image.new()
+	image.load_svg_from_string(String(SVGS[icon_name]), float(px) / 128.0)
+	var tex := ImageTexture.create_from_image(image)
+	_cache[key] = tex
+	return tex

@@ -29,15 +29,19 @@ const DESIGN := Vector2(1280, 720)
 ## (VEKİL / PUAN) · ortada harita · sağda sekmeli stüdyo masası (HÜKÜMET
 ## sekmesinde meclis diyagramı) · altta Meclis Salonu'nun masası.
 const R_BAND := Rect2(0, 0, 1280, 64)
-const R_BOARD := Rect2(16, 72, 272, 448)
-const R_MAP := Rect2(304, 72, 672, 448)
-const R_SIDE := Rect2(992, 72, 272, 448)
-const R_DESK := Rect2(0, 528, 1280, 192)
-const R_HAND := Rect2(16, 560, 504, 128)
+## SİMETRİ (0.0.250): bütün boşluklar 16 (kenarlar, sütunlar arası, bant ile
+## paneller arası, paneller ile masa arası, masanın alt kenarı). Ekranda da
+## eşit kalırlar: bkz. _r (boşluklar tek ölçekle, paneller kalan yeri doldurur).
+const GAP := 16.0
+const R_BOARD := Rect2(16, 80, 272, 440)
+const R_MAP := Rect2(304, 80, 672, 440)
+const R_SIDE := Rect2(992, 80, 272, 440)
+const R_DESK := Rect2(0, 536, 1280, 184)
+const R_HAND := Rect2(16, 568, 504, 136)
 ## 0.0.232: kart bozdurma yok; Turu Bitir hamleler alanında, para sağda.
-const R_ACTIONS := Rect2(536, 560, 560, 136)
-## Alt kenar hamle düğmelerinin alt kenarıyla aynı (560 + 64 + 6 + 64).
-const R_FUNDS := Rect2(1112, 560, 152, 134)
+const R_ACTIONS := Rect2(536, 568, 560, 136)
+## Alt kenar hamle düğmelerinin alt kenarıyla aynı (568 + 64 + 6 + 64).
+const R_FUNDS := Rect2(1112, 568, 152, 134)
 ## Stüdyo masasındaki meclis yuvasının yüksekliği (oylamada büyür).
 const PARL_SLOT_HEIGHT := 150.0
 const PARL_SLOT_VOTE_HEIGHT := 286.0
@@ -544,8 +548,11 @@ func _place_card_bar() -> void:
 	hand_container.alignment = BoxContainer.ALIGNMENT_BEGIN
 	hand_container.grow_horizontal = Control.GROW_DIRECTION_END
 	hand_area.clip_contents = false
-	hand_container.offset_top = -CARD_DISPLAY_SIZE.y
-	hand_container.offset_bottom = 0.0
+	# Kartların üst kenarı hamle düğmeleri ve kasa levhasıyla aynı hizada.
+	hand_container.anchor_top = 0.0
+	hand_container.anchor_bottom = 0.0
+	hand_container.offset_top = 0.0
+	hand_container.offset_bottom = CARD_DISPLAY_SIZE.y
 	_fit_hand_width(CardManager.my_inventory().size())
 	_place_desk_labels()
 
@@ -563,9 +570,46 @@ var _side_tab := 0
 var _strip_bg: Panel
 
 ## Tasarım ızgarasındaki bir dikdörtgeni ekran boyutuna ölçekler.
+## Tasarım (1280x720) dikdörtgenini ekrana taşır. Eskiden x ve y ayrı
+## oranlarla esniyordu: geniş ya da kısa pencerede yatay boşluklar dikeyden
+## farklı çıkıyordu. Artık parçalı: tasarımdaki her 16'lık BOŞLUK ekranda aynı
+## boyda (GAP × min ölçek); paneller ve masa kalan yeri orantılı doldurur.
+const _X_MAIN := [0.0, 16.0, 288.0, 304.0, 976.0, 992.0, 1264.0, 1280.0]
+const _X_DESK := [0.0, 16.0, 520.0, 536.0, 1096.0, 1112.0, 1264.0, 1280.0]
+const _Y_ROWS := [0.0, 64.0, 80.0, 520.0, 536.0, 568.0, 704.0, 720.0]
+
 func _r(rect: Rect2) -> Rect2:
-	var k := get_viewport_rect().size / DESIGN
-	return Rect2(rect.position * k, rect.size * k)
+	var view := get_viewport_rect().size
+	var k := view / DESIGN
+	var gap := GAP * minf(k.x, k.y)
+	var xs: Array = _X_DESK if rect.position.y >= 536.0 - 0.5 else _X_MAIN
+	var x0 := _remap(rect.position.x, xs, view.x, gap)
+	var y0 := _remap(rect.position.y, _Y_ROWS, view.y, gap)
+	var x1 := _remap(rect.end.x, xs, view.x, gap)
+	var y1 := _remap(rect.end.y, _Y_ROWS, view.y, gap)
+	return Rect2(x0, y0, x1 - x0, y1 - y0)
+
+## Parçalı eşleme: 16'lık parçalar "gap" piksel, diğerleri kalan alanı tasarım
+## oranında paylaşır; parça içinde doğrusal.
+static func _remap(v: float, stops: Array, total: float, gap: float) -> float:
+	var gaps := 0
+	var other := 0.0
+	for i in range(1, stops.size()):
+		var len := float(stops[i]) - float(stops[i - 1])
+		if is_equal_approx(len, GAP):
+			gaps += 1
+		else:
+			other += len
+	var scale := maxf(0.0, total - gaps * gap) / maxf(1.0, other)
+	var out := 0.0
+	for i in range(1, stops.size()):
+		var a := float(stops[i - 1])
+		var b := float(stops[i])
+		var seg := gap if is_equal_approx(b - a, GAP) else (b - a) * scale
+		if v <= b or i == stops.size() - 1:
+			return out + (v - a) / (b - a) * seg
+		out += seg
+	return out
 
 func _set_rect(control: Control, rect: Rect2) -> void:
 	control.set_anchors_preset(Control.PRESET_TOP_LEFT)
@@ -588,11 +632,12 @@ func _place_desk_labels() -> void:
 			var label := _section_label("")
 			add_child(label)
 			_desk_labels[key] = label
-	var k := get_viewport_rect().size / DESIGN
-	(_desk_labels["hand"] as Label).position = Vector2(16, 538) * k
-	(_desk_labels["actions"] as Label).position = Vector2(536, 538) * k
-	(_desk_labels["turn"] as Label).position = Vector2(1112, 538) * k
-	(_desk_labels["actions"] as Label).text = L.t("HAMLELER")
+	# Masa başlıkları masanın üst kenarıyla içeriğin arasında, sütunlara hizalı.
+	(_desk_labels["hand"] as Label).position = _r(Rect2(16, 546, 0, 0)).position
+	(_desk_labels["actions"] as Label).position = _r(Rect2(536, 546, 0, 0)).position
+	(_desk_labels["turn"] as Label).position = _r(Rect2(1112, 546, 0, 0)).position
+	# İpucu başlığın yanında (masanın alt kenarına taşmasın).
+	(_desk_labels["actions"] as Label).text = L.t("HAMLELER") + "  ·  " + L.t("teşkilat, miting, yatırım: haritada bir ile dokun")
 	_refresh_desk_labels()
 
 func _refresh_desk_labels() -> void:
@@ -3837,9 +3882,6 @@ func _build_action_buttons() -> void:
 	pass_button.set_meta("action_color", ACTION_COLOR_PASS)
 	_action_grid.add_child(pass_button)
 	_action_tab_of[pass_button] = 0
-	var hint := PopupKit.label(L.t("Teşkilat, miting, yatırım: haritada bir ile dokun."), 11, UiTheme.TEXT_MUTED)
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	actions_vbox.add_child(hint)
 	var filler := Control.new()
 	filler.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	filler.mouse_filter = Control.MOUSE_FILTER_IGNORE

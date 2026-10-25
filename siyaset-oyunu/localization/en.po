@@ -3,6 +3,9 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: en\n"
 
+msgid "teşkilat, miting, yatırım: haritada bir ile dokun"
+msgstr "organization, rally, investment: tap a province on the map"
+
 msgid "İTTİFAKLAR"
 msgstr "ALLIANCES"
 

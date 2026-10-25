@@ -31,6 +31,8 @@ const BASELINE_GAP := 0.0
 ## Yayın ortasındaki boşluğa sığsın diye küçük: 24 punto bazı koltukların
 ## üstüne biniyordu.
 const COUNT_FONT_SIZE := 18
+## COUNT_FONT_SIZE bu genişlikteki diyagram içindir (sağ sütundaki olağan boy).
+const COUNT_REF_WIDTH := 249.0
 var _total_seats: int = 0
 var _layout_total: int = -1
 var _layout: Dictionary = {}
@@ -165,6 +167,11 @@ func _refresh_count_plate() -> void:
 func _place_count_plate() -> void:
 	if _count_plate == null:
 		return
+	# 0.0.256: sayı diyagramla birlikte büyür / küçülür (seçim gecesi, oylama
+	# büyütmesi): punto diyagram genişliğiyle orantılı.
+	var ratio := size.x / COUNT_REF_WIDTH if size.x > 0.0 else 1.0
+	_count_label.add_theme_font_size_override("font_size", clampi(roundi(COUNT_FONT_SIZE * ratio), 9, 120))
+	_count_plate.size = Vector2.ZERO
 	var plate_size := _count_plate.get_combined_minimum_size()
 	_count_plate.size = plate_size
 	var origin := _arc_origin()

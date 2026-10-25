@@ -441,9 +441,9 @@ func _ready() -> void:
 	_abstain_button = Button.new()
 	# OY DÜĞMELERİ: simge üstte, ad altta; EVET yeşil, ÇEKİMSER sarı, HAYIR
 	# kırmızı. DAR SÜTUNDA DA SIĞSIN: üçü satırı eşit paylaşır.
-	_style_vote_button(vote_yes_button, L.t("EVET"), L.t("onayla"), VOTE_COLOR_YES)
-	_style_vote_button(_abstain_button, L.t("ÇEKİMSER"), L.t("oy yok"), VOTE_COLOR_ABSTAIN)
-	_style_vote_button(vote_no_button, L.t("HAYIR"), L.t("reddet"), VOTE_COLOR_NO)
+	_style_vote_button(vote_yes_button, L.t("EVET"), "", VOTE_COLOR_YES)
+	_style_vote_button(_abstain_button, L.t("ÇEKİMSER"), "", VOTE_COLOR_ABSTAIN)
+	_style_vote_button(vote_no_button, L.t("HAYIR"), "", VOTE_COLOR_NO)
 	_abstain_button.pressed.connect(_on_vote_pressed.bind(GovernmentManager.VOTE_ABSTAIN))
 	vote_yes_button.get_parent().add_child(_abstain_button)
 	vote_yes_button.get_parent().move_child(_abstain_button, vote_yes_button.get_index() + 1)

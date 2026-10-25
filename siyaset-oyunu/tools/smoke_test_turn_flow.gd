@@ -108,6 +108,8 @@ func _initialize() -> void:
 	cm.funds[1] = 200.0
 	cm._apply_organization(1, province)
 	check("il panelinden teskilat kurulur", cm.organization_level(province, 1) == 1)
+	# Çekilen kart "esnek hareket" çıkarsa sınır iki katına çıkar: sınır testi için kapat.
+	cm._flow_for(1)["flex"] = false
 	var before_miting: float = cm.funds_of(1)
 	cm._apply_miting_move(1, province, 0.0, [], 0)
 	check("kucuk miting 10 milyon", is_equal_approx(before_miting - cm.funds_of(1), 10.0) and cm.miting_count(1) == 1)

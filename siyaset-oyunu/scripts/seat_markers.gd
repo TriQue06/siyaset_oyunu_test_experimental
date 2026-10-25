@@ -37,7 +37,7 @@ const HOVER_ONLY_SEATS := 30
 var _hover_id: String = ""
 
 ## Normal görünümdeki parti dairesinin tek vekil noktasına oranı.
-const SUMMARY_SCALE := 1.95  # 0.0.248: %30 büyük (1,5 → 1,95)
+const SUMMARY_SCALE := 1.725  # 0.0.251: 1,5 ile 1,95 arası
 ## Hover'da açılma geçişi (saniye).
 const FADE_TIME := 0.15
 ## Açılan ilin geçiş oranı (0 = özet, 1 = ayrı noktalar).

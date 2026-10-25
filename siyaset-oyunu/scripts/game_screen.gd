@@ -33,6 +33,9 @@ const R_BAND := Rect2(0, 0, 1280, 64)
 ## paneller arası, paneller ile masa arası, masanın alt kenarı). Ekranda da
 ## eşit kalırlar: bkz. _r (boşluklar tek ölçekle, paneller kalan yeri doldurur).
 const GAP := 16.0
+## Boşluğun ekrandaki boyu (tasarım birimi): 0.0.251'de 16'dan 12'ye; kazanılan
+## yeri paneller (en çok harita) alır.
+const GAP_SCREEN := 12.0
 const R_BOARD := Rect2(16, 80, 272, 440)
 const R_MAP := Rect2(304, 80, 672, 440)
 const R_SIDE := Rect2(992, 80, 272, 440)
@@ -581,7 +584,7 @@ const _Y_ROWS := [0.0, 64.0, 80.0, 520.0, 536.0, 568.0, 704.0, 720.0]
 func _r(rect: Rect2) -> Rect2:
 	var view := get_viewport_rect().size
 	var k := view / DESIGN
-	var gap := GAP * minf(k.x, k.y)
+	var gap := GAP_SCREEN * minf(k.x, k.y)
 	var xs: Array = _X_DESK if rect.position.y >= 536.0 - 0.5 else _X_MAIN
 	var x0 := _remap(rect.position.x, xs, view.x, gap)
 	var y0 := _remap(rect.position.y, _Y_ROWS, view.y, gap)

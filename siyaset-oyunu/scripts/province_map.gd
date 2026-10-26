@@ -30,9 +30,9 @@ const COAST_WIDTH := 1.4
 const HOVER_COLOR := Color(1, 1, 1, 0.85)
 ## ÜLKE haritasının çizgileri (referans: Türkiye / İspanya seçim haritaları).
 const COUNTRY_BORDER_COLOR := Color(1, 1, 1, 0.92)
-const COUNTRY_BORDER_WIDTH := 0.9
+const COUNTRY_BORDER_WIDTH := 1.4
 const COUNTRY_COAST_COLOR := Color(0.03, 0.03, 0.07, 0.95)
-const COUNTRY_COAST_WIDTH := 1.3
+const COUNTRY_COAST_WIDTH := 2.0
 
 var grid_width: int = 0
 var grid_height: int = 0

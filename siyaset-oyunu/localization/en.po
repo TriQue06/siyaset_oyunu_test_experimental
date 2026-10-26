@@ -54,8 +54,8 @@ msgstr "SKIP FOR NOW"
 msgid "Şimdilik atlarsan bu tur içinde YARDIM hamlesiyle istediğin kadar yardım edebilirsin."
 msgstr "If you skip for now, you can still send aid as often as you like this round with the AID move."
 
-msgid "%s KABUL EDİLDİ — vergiler %s → %s. Dönem geliri %s → %s. %s +%d puan."
-msgstr "%s PASSED — taxes %s → %s. Term revenue %s → %s. %s +%d points."
+msgid "%s KABUL EDİLDİ — vergiler %s » %s. Dönem geliri %s » %s. %s +%d puan."
+msgstr "%s PASSED — taxes %s » %s. Term revenue %s » %s. %s +%d points."
 
 msgid "Kriz yatıştı: %d dönem sakin, sonra yeni krizler."
 msgstr "Crisis has calmed: %d quiet term(s), then new crises."
@@ -201,14 +201,14 @@ msgstr "SEND RELIEF · %s"
 msgid "dönem başına"
 msgstr "per term"
 
-msgid "%s → %s / dönem"
-msgstr "%s → %s / term"
+msgid "%s » %s / dönem"
+msgstr "%s » %s / term"
 
 msgid "%s B"
 msgstr "%s K"
 
-msgid "%s yatırımı · devlet hazinesi %s → %s\nGüçlü yerel etki: yarısı hemen, kalanı %d dönemde · ekonomi canlanır"
-msgstr "%s investment · state treasury %s → %s\nStrong local effect: half now, the rest within %d terms · the economy picks up"
+msgid "%s yatırımı · devlet hazinesi %s » %s\nGüçlü yerel etki: yarısı hemen, kalanı %d dönemde · ekonomi canlanır"
+msgstr "%s investment · state treasury %s » %s\nStrong local effect: half now, the rest within %d terms · the economy picks up"
 
 msgid "Botların dönemlik geliri ve bağış kampanyaları seçilen tutar kadar (¤ M) azalır. 0 = zayıflatma yok."
 msgstr "Bots' income per term and fundraising campaigns are reduced by the chosen amount (¤ M). 0 = no handicap."
@@ -291,8 +291,8 @@ msgstr "%s\nTopic: %s\nYour party's support in this group is %s; the meeting win
 msgid "sana bağlı seçmen"
 msgstr "voters with you"
 
-msgid "Oy: grubun ülke genelinde sana bağlı seçmen payı (▲▼ son seçimden beri)."
-msgstr "Vote: share of the group's voters nationwide who are with you (▲▼ since the last election)."
+msgid "Oy: grubun ülke genelinde sana bağlı seçmen payı (+/− son seçimden beri)."
+msgstr "Vote: share of the group's voters nationwide who are with you (+/− since the last election)."
 
 msgid "Grup toplantısı için mecliste grup gerekir: en az %d vekil."
 msgstr "A group meeting needs a parliamentary group: at least %d seats."
@@ -360,8 +360,8 @@ msgstr "Only one party remained in the %s alliance; it ended."
 msgid "%d karar bekliyor"
 msgstr "%d decisions waiting"
 
-msgid "Barajda ortak oy sayılır; her ilde ittifakın vekilleri üyelerin oyuna göre paylaşılır. Katılmak için bütün üyeler onaylamalı, davet yalnız liderden (★) gelir. İttifaklar seçimden sonra dağılır."
-msgstr "Combined votes count for the threshold; in each province the alliance's seats are shared by the members' votes. Joining needs every member's approval, only the leader (★) invites. Alliances dissolve after the election."
+msgid "Barajda ortak oy sayılır; her ilde ittifakın vekilleri üyelerin oyuna göre paylaşılır. Katılmak için bütün üyeler onaylamalı, davet yalnız liderden (•) gelir. İttifaklar seçimden sonra dağılır."
+msgstr "Combined votes count for the threshold; in each province the alliance's seats are shared by the members' votes. Joining needs every member's approval, only the leader (•) invites. Alliances dissolve after the election."
 
 msgid "İttifak kurmak, davet etmek, katılmak istemek ya da ayrılmak için sıranı bekle. Onay ve davet yanıtları her an verilebilir."
 msgstr "Wait for your turn to found, invite, apply or leave. Approvals and invitation answers can be given any time."
@@ -384,8 +384,8 @@ msgstr "Invitation: %s"
 msgid "Katılma isteği: %s"
 msgstr "Application: %s"
 
-msgid "kabul etti ✓"
-msgstr "accepted ✓"
+msgid "kabul etti"
+msgstr "accepted"
 
 msgid "yanıt bekleniyor …"
 msgstr "awaiting answer …"
@@ -615,11 +615,11 @@ msgstr "  · LEADER"
 msgid "  · OYUNCU"
 msgstr "  · PLAYER"
 
-msgid "  ●  CANLI  "
-msgstr "  ●  LIVE  "
+msgid "  CANLI  "
+msgstr "  LIVE  "
 
-msgid "  ★ memleket"
-msgstr "  ★ hometown"
+msgid "  · memleket"
+msgstr "  · hometown"
 
 msgid " %s +%d puan."
 msgstr " %s +%d points."
@@ -870,8 +870,8 @@ msgstr "%s / %s loss"
 msgid "%s BÖLÜNDÜ! Parti içi karışıklık sonunda %d milletvekili %s önderliğinde ayrılıp %s'yi kurdu."
 msgstr "%s SPLIT! After internal turmoil, %d MPs left under %s and founded %s."
 
-msgid "%s KABUL EDİLDİ — vergiler %s → %s. Dönem geliri %s → %s. Seçmen bunu kademeli hissedecek (yaklaşık %d dönem). %s +%d puan."
-msgstr "%s PASSED — taxes %s → %s. Revenue per term %s → %s. Voters will feel it gradually (about %d terms). %s +%d points."
+msgid "%s KABUL EDİLDİ — vergiler %s » %s. Dönem geliri %s » %s. Seçmen bunu kademeli hissedecek (yaklaşık %d dönem). %s +%d puan."
+msgstr "%s PASSED — taxes %s » %s. Revenue per term %s » %s. Voters will feel it gradually (about %d terms). %s +%d points."
 
 msgid "%s KONGRESİ  ·  CANLI YAYIN"
 msgstr "%s CONGRESS  ·  LIVE"
@@ -990,8 +990,8 @@ msgstr "%s organization level %d: %s"
 msgid "%s yatırımı tamamlandı"
 msgstr "%s investment completed"
 
-msgid "%s yatırımı · devlet hazinesi %s → %s milyon ¤\nGüçlü yerel etki: yarısı hemen, kalanı %d dönemde · ekonomi canlanır"
-msgstr "%s investment · state treasury %s → %s million ¤\nStrong local effect: half now, the rest within %d terms · the economy picks up"
+msgid "%s yatırımı · devlet hazinesi %s » %s milyon ¤\nGüçlü yerel etki: yarısı hemen, kalanı %d dönemde · ekonomi canlanır"
+msgstr "%s investment · state treasury %s » %s million ¤\nStrong local effect: half now, the rest within %d terms · the economy picks up"
 
 msgid "%s · %s · memleket %s"
 msgstr "%s · %s · hometown %s"
@@ -1017,8 +1017,8 @@ msgstr "%s takes the lead!  (%.1f%%)"
 msgid "%s — %s   (%d sandalye)"
 msgstr "%s — %s   (%d seats)"
 
-msgid "%s → %s milyon ¤ / dönem"
-msgstr "%s → %s million ¤ / term"
+msgid "%s » %s milyon ¤ / dönem"
+msgstr "%s » %s million ¤ / term"
 
 msgid "%s%s / dönem"
 msgstr "%s%s / term"
@@ -1101,8 +1101,8 @@ msgstr "%s: your party's support in this group is %s%s%s.\nThis is not the group
 msgid "%s: soldan bir partiye dokun  ·  Karta tekrar dokun: iptal"
 msgstr "%s: tap a party on the left  ·  Tap the card again: cancel"
 
-msgid "%s: teşkilat seviye %d → %d (%s) · %s"
-msgstr "%s: organization level %d → %d (%s) · %s"
+msgid "%s: teşkilat seviye %d » %d (%s) · %s"
+msgstr "%s: organization level %d » %d (%s) · %s"
 
 msgid "%s: teşkilat zaten en üst seviyede"
 msgstr "%s: organization already at the top level"
@@ -2503,7 +2503,7 @@ msgid "Partinde iç karışıklık daha zor büyür."
 msgstr "Turmoil grows more slowly in your party."
 
 msgid "Partini Kur  →"
-msgstr "Found Your Party  →"
+msgstr "Found Your Party "
 
 msgid "Partinin genel başkanı değilsin: sadece miting yapabilirsin (partine ve güvenilirliğine yazar)."
 msgstr "You're not the party leader: you can only hold rallies (they count for your party and your credibility)."
@@ -2910,11 +2910,11 @@ msgstr "Seats"
 msgid "Vergi"
 msgstr "Tax"
 
-msgid "Vergi %s → %s. Seçmen değişimi kademeli hissediyor; tamamen yerleşmesi yaklaşık %d dönem sürer. Seçim olursa sadece yerleşen kısım sayılır."
-msgstr "Tax %s → %s. Voters feel the change gradually; it takes about %d terms to settle fully. If an election comes, only the settled part counts."
+msgid "Vergi %s » %s. Seçmen değişimi kademeli hissediyor; tamamen yerleşmesi yaklaşık %d dönem sürer. Seçim olursa sadece yerleşen kısım sayılır."
+msgstr "Tax %s » %s. Voters feel the change gradually; it takes about %d terms to settle fully. If an election comes, only the settled part counts."
 
-msgid "Vergi %s → %s: seçmen tepkisi kademeli gelir, en çok başbakanın partisi hisseder"
-msgstr "Tax %s → %s: voters react gradually; the prime minister's party feels it most"
+msgid "Vergi %s » %s: seçmen tepkisi kademeli gelir, en çok başbakanın partisi hisseder"
+msgstr "Tax %s » %s: voters react gradually; the prime minister's party feels it most"
 
 msgid "Vergi %s. Hükümette kaldıkça seçimde bu gruplara yansır."
 msgstr "Tax %s. While in government, this carries over to these groups at the election."
@@ -3637,49 +3637,46 @@ msgid "— KANIT YOK"
 msgstr "— NO EVIDENCE"
 
 msgid "← Profilim"
-msgstr "← My Profile"
+msgstr "My Profile"
 
 msgid "▲▼ son seçimden beri"
 msgstr "▲▼ since the last election"
 
-msgid "●  CANLI"
-msgstr "●  LIVE"
+msgid "CANLI"
+msgstr "LIVE"
 
-msgid "★ Oda sahibi"
-msgstr "★ Room owner"
+msgid "Oda sahibi"
+msgstr "Room owner"
 
-msgid "⚙ LOBİ AYARLARI"
-msgstr "⚙ LOBBY SETTINGS"
+msgid "LOBİ AYARLARI"
+msgstr "LOBBY SETTINGS"
 
 msgid "⚠ KRİZ · %s"
-msgstr "⚠ CRISIS · %s"
+msgstr "CRISIS · %s"
 
 msgid "✓ ŞEFFAF · DOĞRULANDI"
-msgstr "✓ CLEAN · VERIFIED"
+msgstr "CLEAN · VERIFIED"
 
-msgid "✕ İptal Et"
-msgstr "✕ Cancel"
+msgid "İptal Et"
+msgstr "Cancel"
 
-msgid "🎲 Ad"
-msgstr "🎲 First name"
+msgid "Rastgele Ad"
+msgstr "Random First"
 
-msgid "🎲 Bot Profilini Rastgele Yap"
-msgstr "🎲 Randomize Bot Profile"
+msgid "Bot Profilini Rastgele Yap"
+msgstr "Randomize Bot Profile"
 
-msgid "🎲 Soyad"
-msgstr "🎲 Surname"
+msgid "Rastgele Soyad"
+msgstr "Surname"
 
-msgid "🎲 İkisi de"
-msgstr "🎲 Both"
+msgid "Rastgele İkisi"
+msgstr "Random Both"
 
-msgid "📋 KOPYALA"
-msgstr "📋 COPY"
-
-msgid "📋 Kopyala"
-msgstr "📋 Copy"
+msgid "KOPYALA"
+msgstr "COPY"
 
 msgid "🔒 Kilitle ve Hazır Ver"
-msgstr "🔒 Lock and Get Ready"
+msgstr "Lock and Get Ready"
 
 msgid "Botun adını, soyadını, geçmişini, memleketini ve çekirdek seçmen gruplarını rastgele değiştir"
 msgstr "Randomize the bot's first name, surname, background, hometown and core voter groups"
@@ -3697,7 +3694,7 @@ msgid "2× HIZ"
 msgstr "2× SPEED"
 
 msgid "ATLA ▸▸"
-msgstr "SKIP ▸▸"
+msgstr "SKIP"
 
 msgid "Tıkla ya da Boşluk: geç"
 msgstr "Click or Space: skip"
@@ -4011,8 +4008,8 @@ msgstr "Resume game"
 msgid "Kaldığın yerden devam et. Kısayol: ESC"
 msgstr "Continue where you left off. Shortcut: ESC"
 
-msgid "DEVAM ET →"
-msgstr "RESUME →"
+msgid "DEVAM ET"
+msgstr "RESUME"
 
 msgid "OYUNU KAYDET"
 msgstr "SAVE GAME"
@@ -4095,17 +4092,14 @@ msgstr "Game language"
 msgid "Arayüzde kullanılacak dil."
 msgstr "Language used in the interface."
 
-msgid "● Çevrim dışı · Oyun duraklatıldı"
-msgstr "● Offline · Game paused"
+msgid "Çevrim dışı · Oyun duraklatıldı"
+msgstr "Offline · Game paused"
 
-msgid "● Çevrim içi · Oyun devam ediyor"
-msgstr "● Online · Game continues"
+msgid "Çevrim içi · Oyun devam ediyor"
+msgstr "Online · Game continues"
 
-msgid "● SİYASET OYUNU"
-msgstr "● POLITICS GAME"
-
-msgid "KOPYALA"
-msgstr "COPY"
+msgid "SİYASET OYUNU"
+msgstr "POLITICS GAME"
 
 msgid "TEKRAR BAS · AYRIL"
 msgstr "PRESS AGAIN · LEAVE"
@@ -4251,9 +4245,6 @@ msgstr "If you rally here (unfocused; with your organisation you can pick %d foc
 msgid "Burada miting yaparsan (teşkilatsız: etkisi düşük, odak seçilemez):"
 msgstr "If you rally here (no organisation: weak effect, no focus):"
 
-msgid "SİYASET OYUNU"
-msgstr "POLITICS GAME"
-
 msgid "onayla"
 msgstr "approve"
 
@@ -4287,8 +4278,8 @@ msgstr "Vote"
 msgid "Hitap"
 msgstr "Appeal"
 
-msgid "Oy: gruptaki tahmini oy payın · Hitap: grubun sana bağlı kısmı (▲▼ son seçimden beri)"
-msgstr "Vote: your estimated share of the group's vote · Appeal: the part of the group committed to you (▲▼ since the last election)"
+msgid "Oy: gruptaki tahmini oy payın · Hitap: grubun sana bağlı kısmı (+/− son seçimden beri)"
+msgstr "Vote: your estimated share of the group's vote · Appeal: the part of the group committed to you (+/− since the last election)"
 
 msgid " · kişilik: %s"
 msgstr " · personality: %s"
@@ -4389,9 +4380,6 @@ msgstr "Create your politician, found your party, pick your voters."
 msgid "Hazırsın. Değiştirmek için hazırlığı iptal et."
 msgstr "You're ready. Cancel ready to make changes."
 
-msgid "← Geri"
-msgstr "← Back"
-
 msgid "Cinsiyet"
 msgstr "Gender"
 
@@ -4443,8 +4431,8 @@ msgstr "no party name"
 msgid "Bu botun siyasetçisini ve partisini düzenle"
 msgstr "Edit this bot's politician and party"
 
-msgid "İleri →"
-msgstr "Next →"
+msgid "İleri"
+msgstr "Next"
 
 msgid "Bot düzenleniyor: değişiklikler anında kaydedilir."
 msgstr "Editing a bot: changes are saved instantly."
@@ -4452,8 +4440,8 @@ msgstr "Editing a bot: changes are saved instantly."
 msgid "Herkesin hazır olması bekleniyor…"
 msgstr "Waiting for everyone to be ready…"
 
-msgid "🔒 Hazırım"
-msgstr "🔒 I'm ready"
+msgid "Hazırım"
+msgstr "I'm ready"
 
 msgid "Eksik: %s"
 msgstr "Missing: %s"
@@ -4572,8 +4560,8 @@ msgstr "next: %s"
 msgid "sıra sende değil"
 msgstr "not your turn"
 
-msgid "bu tur tamamlandı ✓"
-msgstr "done this turn ✓"
+msgid "bu tur tamamlandı"
+msgstr "done this turn"
 
 msgid "ilk seçimden sonra açılır"
 msgstr "opens after the first election"
@@ -4593,8 +4581,8 @@ msgstr "POPULISM ACTIVE · %d terms"
 msgid "Meclis işleri bu tur için tamam."
 msgstr "Parliament business is done for this turn."
 
-msgid "← Haritaya dön"
-msgstr "← Back to map"
+msgid "Haritaya dön"
+msgstr "Back to map"
 
 msgid "Akış yerinde kalır; MECLİS düğmesiyle kaldığın yerden devam edersin."
 msgstr "The flow stays put; continue where you left off with the PARLIAMENT button."
@@ -4627,10 +4615,10 @@ msgid "Gündemdeki kriz: %s. Bu grupla toplanmak ek ulusal destek getirir."
 msgstr "Crisis on the agenda: %s. Meeting this group brings extra national support."
 
 msgid "  ★ çekirdek"
-msgstr "  ★ core"
+msgstr "  core"
 
 msgid "  ⚠ karşıt"
-msgstr "  ⚠ opposed"
+msgstr "  opposed"
 
 msgid "  · kriz"
 msgstr "  · crisis"
@@ -4663,7 +4651,7 @@ msgid "Kabul edilirse bu dönemin sonunda sandık kurulur."
 msgstr "If accepted, elections are held at the end of this term."
 
 msgid "  ✓ sunuldu"
-msgstr "  ✓ proposed"
+msgstr "  proposed"
 
 msgid "  · şu an yok"
 msgstr "  · not now"
@@ -4876,7 +4864,7 @@ msgid "Önce kartını çek. Kart ya hemen etki eder ya da eline gelir."
 msgstr "Draw your card first. It either takes effect at once or goes into your hand."
 
 msgid "🂠  KART ÇEK"
-msgstr "🂠  DRAW CARD"
+msgstr "DRAW CARD"
 
 msgid "Çekiliyor…"
 msgstr "Drawing…"
@@ -4977,8 +4965,8 @@ msgstr "You can lay into a rival at the rally: minus for them, plus for you. It 
 msgid "Sırada miting / yatırım sınırı"
 msgstr "Rally / investment limit per turn"
 
-msgid "ATLA  ▸"
-msgstr "SKIP  ▸"
+msgid "ATLA"
+msgstr "SKIP"
 
 msgid "Kartı kapat, devam et"
 msgstr "Close the card and continue"

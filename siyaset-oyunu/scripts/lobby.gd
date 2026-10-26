@@ -6,10 +6,12 @@ extends Control
 ## girmez; sadece oda kurulunca üretilen 5 harfli kod yeterlidir. Oda nerede
 ## kapanırsa kapansın oyuncu buraya sebebiyle birlikte döner.
 
-const CARD_WIDTH := 320.0
+## 0.0.265: giriş ekranının bütün ögeleri 1,5 kat (küçük kalıyordu).
+const S := 1.5
+const CARD_WIDTH := 320.0 * S
 const ACCENT := UiTheme.GOLD
-const BG_TOP := UiTheme.BG
-const BG_BOTTOM := UiTheme.INK
+const BG_TOP := UiTheme.FELT_LIGHT
+const BG_BOTTOM := UiTheme.FELT_DARK
 
 var name_edit: LineEdit
 var create_button: Button
@@ -70,13 +72,13 @@ func _build_background() -> void:
 			var count := 18 + row * 5
 			for i in count:
 				var a := PI + PI * (float(i) + 0.5) / count
-				var color := Color(UiTheme.PANEL_LIGHT, 0.5) if (i + row) % 5 != 0 else Color(ACCENT, 0.18)
+				var color := Color(UiTheme.PANEL, 0.07) if (i + row) % 5 != 0 else Color(ACCENT, 0.12)
 				arc.draw_circle(center + Vector2(cos(a), sin(a)) * radius, 7.0, color, true, -1.0, true))
 	add_child(arc)
 
 ## Panel zemini: 9-slice PNG (pixel çerçeve). Renk parametresi kalmadı — tarz
 ## tek yerden geliyor; sadece koyu/normal ayrımı var.
-func _panel_style(dark: bool = false, padding: int = 24) -> StyleBoxTexture:
+func _panel_style(dark: bool = false, padding: int = 24) -> StyleBox:
 	var style := UiSkin.stylebox(UiSkin.PANEL_DARK if dark else UiSkin.PANEL)
 	style.set_content_margin_all(padding)
 	return style
@@ -84,8 +86,8 @@ func _panel_style(dark: bool = false, padding: int = 24) -> StyleBoxTexture:
 func _button(text: String, color: Color, height: float = 54.0) -> Button:
 	var button := Button.new()
 	button.text = text
-	button.custom_minimum_size = Vector2(0, height)
-	button.add_theme_font_size_override("font_size", UiTheme.FS_HEAD)
+	button.custom_minimum_size = Vector2(0, height * S)
+	button.add_theme_font_size_override("font_size", int(UiTheme.FS_HEAD * S))
 	UiSkin.skin_color_button(button, color)
 	return button
 
@@ -94,9 +96,9 @@ func _field(placeholder: String, max_length: int) -> LineEdit:
 	edit.placeholder_text = placeholder
 	edit.max_length = max_length
 	edit.alignment = HORIZONTAL_ALIGNMENT_CENTER
-	edit.custom_minimum_size = Vector2(0, 40)
+	edit.custom_minimum_size = Vector2(0, 40 * S)
 	edit.add_theme_font_override("font", UiTheme.mono())
-	edit.add_theme_font_size_override("font_size", UiTheme.FS_HEAD)
+	edit.add_theme_font_size_override("font_size", int(UiTheme.FS_HEAD * S))
 	var style := UiSkin.stylebox(UiSkin.SLOT)
 	style.set_content_margin_all(UiTheme.PAD_S)
 	UiSkin.apply_style(edit, "normal", style)
@@ -108,7 +110,7 @@ func _field(placeholder: String, max_length: int) -> LineEdit:
 func _small_label(text: String) -> Label:
 	var label := Label.new()
 	label.text = text
-	label.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
+	label.add_theme_font_size_override("font_size", int(UiTheme.FS_SMALL * S))
 	label.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
 	return label
 
@@ -118,28 +120,29 @@ func _build_card() -> void:
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(center)
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 14)
+	column.add_theme_constant_override("separation", int(16 * S))
 	center.add_child(column)
 
 	# KİMLİK: ince, hap biçimli ayrı bir şerit (oda kartından farklı görünür).
 	var profile := PanelContainer.new()
 	var profile_style := _panel_style(false, UiTheme.PAD_M)
-	profile_style.set_content_margin_all(8)
-	profile_style.content_margin_left = 16
-	profile_style.content_margin_right = 10
+	profile_style.set_content_margin_all(10 * S)
+	profile_style.content_margin_left = 18 * S
+	profile_style.content_margin_right = 10 * S
 	UiSkin.apply_style(profile, "panel", profile_style)
 	profile.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	column.add_child(profile)
 	var profile_row := HBoxContainer.new()
-	profile_row.add_theme_constant_override("separation", 10)
+	profile_row.add_theme_constant_override("separation", int(10 * S))
 	profile.add_child(profile_row)
 	var who := _small_label(L.t("Oyuncu adın"))
 	who.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	who.add_theme_color_override("font_color", ACCENT)
+	who.add_theme_color_override("font_color", UiTheme.HEAD)
+	who.add_theme_font_override("font", UiTheme.mono(true))
 	profile_row.add_child(who)
 	name_edit = _field(L.t("Oyuncu adı"), 20)
-	name_edit.custom_minimum_size = Vector2(190, 34)
-	name_edit.add_theme_font_size_override("font_size", 15)
+	name_edit.custom_minimum_size = Vector2(190 * S, 34 * S)
+	name_edit.add_theme_font_size_override("font_size", int(15 * S))
 	name_edit.text = PlayerProfile.player_name
 	name_edit.text_changed.connect(_on_name_changed)
 	profile_row.add_child(name_edit)
@@ -148,37 +151,40 @@ func _build_card() -> void:
 	var card := PanelContainer.new()
 	card.custom_minimum_size = Vector2(CARD_WIDTH, 0)
 	var card_style := _panel_style(true, 24)
-	card_style.set_content_margin_all(18)
+	card_style.set_content_margin_all(20 * S)
 	UiSkin.apply_style(card, "panel", card_style)
 	column.add_child(card)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 10)
+	box.add_theme_constant_override("separation", int(12 * S))
 	card.add_child(box)
 
 	# MOD SEÇİCİ: iki sekme. Seçili olan altın, diğeri sönük.
 	var tabs := HBoxContainer.new()
-	tabs.add_theme_constant_override("separation", 6)
+	tabs.add_theme_constant_override("separation", int(8 * S))
 	box.add_child(tabs)
 	_online_tab = _button(L.t("Çevrim İçi"), ACCENT, 38.0)
 	_online_tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_online_tab.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
+	_online_tab.add_theme_font_size_override("font_size", int(UiTheme.FS_BODY * S))
 	_online_tab.pressed.connect(_set_mode.bind(true))
 	tabs.add_child(_online_tab)
 	_offline_tab = _button(L.t("Çevrim Dışı"), UiTheme.PANEL_LIGHT, 38.0)
 	_offline_tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_offline_tab.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
+	_offline_tab.add_theme_font_size_override("font_size", int(UiTheme.FS_BODY * S))
 	_offline_tab.pressed.connect(_set_mode.bind(false))
 	tabs.add_child(_offline_tab)
 
 	# ÇEVRİM DIŞI: tek buton, kod alanı ve katılma yok.
 	_offline_box = VBoxContainer.new()
-	_offline_box.add_theme_constant_override("separation", 8)
+	_offline_box.add_theme_constant_override("separation", int(10 * S))
 	box.add_child(_offline_box)
-	var offline_hint := _small_label("Sunucu yok, oda kodu yok.
-Sadece sen ve eklediğin botlar.")
-	offline_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	offline_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_offline_box.add_child(offline_hint)
+	# İki ayrı satır: sarmalı tek etiket yeni yazı tipinde boyunu yanlış ölçüyordu.
+	var hint_box := VBoxContainer.new()
+	hint_box.add_theme_constant_override("separation", 0)
+	_offline_box.add_child(hint_box)
+	for line in [L.t("Sunucu yok, oda kodu yok."), L.t("Sadece sen ve eklediğin botlar.")]:
+		var offline_hint := _small_label(line)
+		offline_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		hint_box.add_child(offline_hint)
 	_offline_button = _button(L.t("Botlarla Oyna"), UiTheme.GREEN_DARK, 42.0)
 	_offline_button.pressed.connect(_on_offline_pressed)
 	_offline_box.add_child(_offline_button)
@@ -199,7 +205,7 @@ Sadece sen ve eklediğin botlar.")
 		_offline_box.add_child(when)
 
 	_online_box = VBoxContainer.new()
-	_online_box.add_theme_constant_override("separation", 10)
+	_online_box.add_theme_constant_override("separation", int(12 * S))
 	box.add_child(_online_box)
 
 	create_button = _button(L.t("Oda Kur"), ACCENT, 42.0)
@@ -207,7 +213,7 @@ Sadece sen ve eklediğin botlar.")
 	_online_box.add_child(create_button)
 
 	var divider := HBoxContainer.new()
-	divider.add_theme_constant_override("separation", 8)
+	divider.add_theme_constant_override("separation", int(8 * S))
 	var left := HSeparator.new()
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	left.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -220,10 +226,10 @@ Sadece sen ve eklediğin botlar.")
 	_online_box.add_child(divider)
 
 	var join_row := HBoxContainer.new()
-	join_row.add_theme_constant_override("separation", 8)
+	join_row.add_theme_constant_override("separation", int(10 * S))
 	code_edit = _field(L.t("ODA KODU"), 5)
-	code_edit.custom_minimum_size = Vector2(0, 40)
-	code_edit.add_theme_font_size_override("font_size", 16)
+	code_edit.custom_minimum_size = Vector2(0, 44 * S)
+	code_edit.add_theme_font_size_override("font_size", int(16 * S))
 	code_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	code_edit.secret_character = "•"
 	code_edit.secret = GameSettings.streamer_mode
@@ -231,7 +237,7 @@ Sadece sen ve eklediğin botlar.")
 	code_edit.text_submitted.connect(func(_t): _on_join_pressed())
 	join_row.add_child(code_edit)
 	join_button = _button(L.t("Katıl"), UiTheme.BLUE, 44.0)
-	join_button.custom_minimum_size.x = 96
+	join_button.custom_minimum_size.x = 96 * S
 	join_button.pressed.connect(_on_join_pressed)
 	join_row.add_child(join_button)
 	_online_box.add_child(join_row)
@@ -239,8 +245,8 @@ Sadece sen ve eklediğin botlar.")
 	status_label = Label.new()
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	status_label.custom_minimum_size = Vector2(CARD_WIDTH - 36.0, 18)
-	status_label.add_theme_font_size_override("font_size", 12)
+	status_label.custom_minimum_size = Vector2(CARD_WIDTH - 40.0 * S, 18 * S)
+	status_label.add_theme_font_size_override("font_size", int(12 * S))
 	box.add_child(status_label)
 	_set_mode(true)
 
@@ -256,17 +262,17 @@ func _set_mode(online: bool) -> void:
 func _build_footer() -> void:
 	var version := Label.new()
 	version.text = L.t("sürüm %s") % MultiplayerManager.game_version()
-	version.add_theme_font_size_override("font_size", 13)
-	version.modulate = UiTheme.TEXT_MUTED
+	version.add_theme_font_size_override("font_size", int(13 * S))
+	version.add_theme_color_override("font_color", Color(UiTheme.PANEL, 0.6))
 	version.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	version.position += Vector2(12, -28)
+	version.position += Vector2(16, -40)
 	version.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(version)
 	var quit := _button(L.t("Çıkış"), UiTheme.PANEL_LIGHT, 36.0)
-	quit.add_theme_font_size_override("font_size", 13)
-	quit.custom_minimum_size.x = 84
+	quit.add_theme_font_size_override("font_size", int(13 * S))
+	quit.custom_minimum_size.x = 84 * S
 	quit.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-	quit.position += Vector2(-100, -46)
+	quit.position += Vector2(-84 * S - 16, -36 * S - 18)
 	quit.pressed.connect(func(): get_tree().quit())
 	add_child(quit)
 

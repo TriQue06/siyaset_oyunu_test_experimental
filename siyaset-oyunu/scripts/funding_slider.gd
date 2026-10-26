@@ -133,8 +133,8 @@ func _draw() -> void:
 		draw_circle(Vector2(cx, y), THUMB_R, UiTheme.INK)
 		draw_circle(Vector2(cx, y), THUMB_R - 2.5, tint)
 		draw_arc(Vector2(cx, y), THUMB_R + (2.5 if active else 0.5), 0.0, TAU, 28,
-			Color(UiTheme.TEXT, 0.95 if active else 0.55), 2.0 if active else 1.2, true)
-		draw_circle(Vector2(cx, y), 2.5, UiTheme.TEXT)
+			Color(UiTheme.TEAL, 0.95 if active else 0.55), 2.0 if active else 1.2, true)
+		draw_circle(Vector2(cx, y), 2.5, UiTheme.PANEL_DARK)
 
 func _draw_blocked(from: float, to: float, y: float) -> void:
 	if to - from < 1.0:

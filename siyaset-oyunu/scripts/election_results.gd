@@ -25,12 +25,12 @@ const MAP_REFRESH_INTERVAL := 0.3
 const FLASH_SECONDS := 2.6
 const TICKER_SPEED := 120.0
 
-const BG_TOP := UiTheme.BG
-const BG_BOTTOM := UiTheme.INK
-const STRIP_COLOR := UiTheme.PANEL_DARK
+const BG_TOP := UiTheme.FELT_LIGHT
+const BG_BOTTOM := UiTheme.FELT_DARK
+const STRIP_COLOR := UiTheme.WOOD
 const RED := UiTheme.RED
 const GOLD := UiTheme.GOLD
-const TEXT_DIM := UiTheme.TEXT_MUTED
+const TEXT_DIM := UiTheme.HEAD
 const UNCOUNTED := UiTheme.PANEL_LIGHT
 
 const FLAVOR := [
@@ -406,7 +406,7 @@ func _ticker_text() -> String:
 			parts.append("%s %%%.1f" % [_party_name(peer_id), float(national[peer_id])])
 	parts.append(L.t(FLAVOR[_ticker_round % FLAVOR.size()]))
 	_ticker_round += 1
-	return "     ●     ".join(PackedStringArray(parts))
+	return "     ·     ".join(PackedStringArray(parts))
 
 func _leave() -> void:
 	if _leaving:
@@ -485,7 +485,7 @@ func _build_ui() -> void:
 	add_child(_top_bar)
 	_live_badge = _panel(RED)
 	_top_bar.add_child(_live_badge)
-	_live_label = _label(L.t("●  CANLI"), 20, Color.WHITE)
+	_live_label = _label(L.t("CANLI"), 20, Color.WHITE)
 	_live_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_live_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_live_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -493,12 +493,12 @@ func _build_ui() -> void:
 	_title = _label(L.t("SEÇİM GECESİ  ·  ÖZEL YAYIN"), 26, Color.WHITE)
 	_top_bar.add_child(_title)
 	_subtitle = _label("%d  ·  %s" % [GameRules.election_year(CardManager.last_election_round),
-		L.t("ERKEN SEÇİM") if CardManager.last_election_was_early else L.t("GENEL SEÇİM")], 14, GOLD)
+		L.t("ERKEN SEÇİM") if CardManager.last_election_was_early else L.t("GENEL SEÇİM")], 14, UiTheme.WOOD_TEXT_MUTED)
 	_top_bar.add_child(_subtitle)
 	_clock = _label("21:00", 34, Color.WHITE)
 	_clock.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_top_bar.add_child(_clock)
-	_counted = _label("", 22, GOLD)
+	_counted = _label("", 22, UiTheme.WOOD_TEXT)
 	_counted.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_top_bar.add_child(_counted)
 
@@ -523,11 +523,11 @@ func _build_ui() -> void:
 	_parliament = ParliamentDiagram.new()
 	_parliament.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_parliament)
-	_majority_label = _label("", 12, TEXT_DIM)
+	_majority_label = _label("", 12, UiTheme.TEXT_MUTED)
 	_majority_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	add_child(_majority_label)
 
-	_final_stamp = _label(L.t("KESİN OLMAYAN SONUÇLAR"), 22, GOLD)
+	_final_stamp = _label(L.t("KESİN OLMAYAN SONUÇLAR"), 22, UiTheme.RED_DARK)
 	_final_stamp.visible = false
 	add_child(_final_stamp)
 
@@ -554,7 +554,7 @@ func _build_ui() -> void:
 	_cam_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_cam_flash)
 
-	_ticker_bg = _panel(UiTheme.INK)
+	_ticker_bg = _panel(UiTheme.WOOD_DARK)
 	add_child(_ticker_bg)
 	_ticker_tag = _panel(RED)
 	_ticker_bg.add_child(_ticker_tag)
@@ -683,10 +683,8 @@ func _update_camera(delta: float) -> void:
 
 func _style_frames(big: int) -> void:
 	for i in _frames.size():
-		var box := StyleBoxFlat.new()
-		box.bg_color = Color(UiTheme.PANEL_DARK, 0.55)
-		box.set_border_width_all(3)
-		box.border_color = GOLD if i == big else UiTheme.PANEL_LIGHT
+		# Karton pano: büyük pencere hardal kenarlı.
+		var box := UiSkin.board(UiTheme.PANEL, GOLD if i == big else UiTheme.TEAL)
 		(_frames[i] as Panel).add_theme_stylebox_override("panel", box)
 
 ## Pencere dikdörtgenlerini ekrana uygular (pencere başlığı + içerik).
@@ -783,7 +781,7 @@ func _panel(color: Color) -> Panel:
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return panel
 
-func _label(text: String, font_size: int, color: Color, outline: bool = true) -> Label:
+func _label(text: String, font_size: int, color: Color, outline: bool = false) -> Label:
 	var label := Label.new()
 	label.text = text
 	label.add_theme_font_override("font", UiTheme.mono())
@@ -841,7 +839,7 @@ class LiveBars extends Control:
 			var sub_color := Color(UiTheme.TEXT_MUTED, alpha)
 			if String(r.get("alliance", "")) != "":
 				sub_line = String(r["alliance"])
-				sub_color = Color(stripe.lightened(0.35), alpha)
+				sub_color = Color(stripe.darkened(0.3), alpha)
 			draw_string(font, Vector2(text_x, y + h * 0.5 + 4 + name_size * 0.8), sub_line, HORIZONTAL_ALIGNMENT_LEFT,
 				name_w - text_x, maxi(9, name_size - 6), sub_color)
 			var trend := float(r.get("trend", 0.0))

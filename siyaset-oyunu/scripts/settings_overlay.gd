@@ -3,9 +3,9 @@ extends CanvasLayer
 const FPS_OPTIONS := [30, 48, 60, 120, 144, 165, 240, 0]
 const CATEGORIES := [["game", "Oyun menüsü", "Oyuna devam et, kaydet veya oturumdan ayrıl."], ["display", "Görüntü", "Ekran modu ve performans tercihleri."], ["sound", "Ses", "Müzik ve efektleri ayrı ayrı ayarla."], ["play", "Oynanış", "Bilgi panelleri ve olay gösterimleri."], ["language", "Dil", "Arayüzün dilini seç."]]
 const ART := "res://assets/ui/settings/"
-const MUTED := Color("b1a6d1")
-const FONT := preload("res://assets/fonts/IBMPlexMono-Regular.ttf")
-const BOLD := preload("res://assets/fonts/IBMPlexMono-Bold.ttf")
+const MUTED := UiTheme.TEXT_MUTED
+const FONT := preload("res://assets/fonts/body.tres")
+const BOLD := preload("res://assets/fonts/display_bold.tres")
 
 @onready var panel: Control = %FullScreenPanel
 @onready var open_settings_button: Button = %OpenSettingsButton
@@ -57,7 +57,7 @@ func _margin(parent: Node, horizontal: int, vertical: int) -> MarginContainer:
 
 func _surface(color: Color) -> PanelContainer:
 	var surface := PanelContainer.new()
-	var style := UiSkin.color_box(color, UiSkin.FILL, 0)
+	var style := UiSkin.flat(color, 0)
 	for side in [SIDE_LEFT, SIDE_TOP, SIDE_RIGHT, SIDE_BOTTOM]:
 		style.set_content_margin(side, 0)
 	surface.add_theme_stylebox_override("panel", style)
@@ -74,50 +74,41 @@ func _button(text: String, callback: Callable, kind: String = "normal", font_siz
 	return button
 
 func _style_button(button: Button, kind: String = "normal") -> void:
-	for state in ["normal", "hover", "pressed", "disabled", "focus"]:
-		var box := UiSkin.stylebox(ART + kind + ".png")
+	# Masa oyunu: tombul karton düğme (normal krem, seçili hardal, tehlike kırmızı).
+	var color: Color = {"gold": UiTheme.GOLD, "danger": UiTheme.RED}.get(kind, UiTheme.PANEL_LIGHT)
+	UiSkin.skin_color_button(button, color)
+	for state in ["normal", "hover", "pressed", "disabled", "focus", "hover_pressed"]:
+		var box := button.get_theme_stylebox(state) as StyleBoxFlat
 		box.content_margin_left = 18
 		box.content_margin_right = 18
-		box.content_margin_top = 10
-		box.content_margin_bottom = 10
-		if state == "hover" or state == "focus":
-			box.modulate_color = Color(1.15, 1.15, 1.15)
-		elif state == "pressed":
-			box.modulate_color = Color(0.85, 0.85, 0.85)
-		elif state == "disabled":
-			box.modulate_color = Color(0.6, 0.6, 0.6)
-		button.add_theme_stylebox_override(state, box)
-	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
-		button.add_theme_color_override(state, UiTheme.INK if kind == "gold" else UiTheme.TEXT)
-	button.add_theme_font_override("font", BOLD if kind == "gold" else FONT)
 
 func _build_menu() -> void:
 	_pages.clear()
 	_nav_buttons.clear()
 	_rows.clear()
 	_display_buttons.clear()
-	var frame := _surface(Color("65528e"))
+	var frame := _surface(UiTheme.TEAL)
 	frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	panel.add_child(frame)
 	var shell := VBoxContainer.new()
 	shell.add_theme_constant_override("separation", 3)
-	var inner := _surface(UiTheme.INK)
+	var inner := _surface(UiTheme.BG)
 	_margin(frame, 3, 3).add_child(inner)
 	inner.add_child(shell)
-	var header := _surface(Color("241d43"))
+	var header := _surface(UiTheme.WOOD)
 	shell.add_child(header)
 	var heading := HBoxContainer.new()
 	heading.add_theme_constant_override("separation", 14)
 	_margin(header, 24, 18).add_child(heading)
 	var brand := VBoxContainer.new()
 	brand.add_theme_constant_override("separation", 7)
-	brand.add_child(_label("OYUN MENÜSÜ", 21, UiTheme.TEXT, true))
-	brand.add_child(_label("SİYASET OYUNU / AYARLAR", 10, MUTED))
+	brand.add_child(_label("OYUN MENÜSÜ", 24, UiTheme.WOOD_TEXT, true))
+	brand.add_child(_label("SİYASET OYUNU / AYARLAR", 12, UiTheme.WOOD_TEXT_MUTED))
 	heading.add_child(brand)
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	heading.add_child(spacer)
-	_status = _label("", 10, Color("74e6a0"))
+	_status = _label("", 12, UiTheme.WOOD_TEXT)
 	_status.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	heading.add_child(_status)
 	heading.add_child(_button("DEVAM ET · ESC", close_menu, "gold"))
@@ -125,7 +116,7 @@ func _build_menu() -> void:
 	body.add_theme_constant_override("separation", 3)
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	shell.add_child(body)
-	_nav_panel = _surface(Color("201a3c"))
+	_nav_panel = _surface(UiTheme.PANEL)
 	_nav_panel.custom_minimum_size.x = 217
 	body.add_child(_nav_panel)
 	var nav_scroll := ScrollContainer.new()
@@ -139,15 +130,15 @@ func _build_menu() -> void:
 	_content_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_content_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_content_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-	var scroll_bg := _surface(UiTheme.BG)
+	var scroll_bg := _surface(UiTheme.PANEL_LIGHT)
 	scroll_bg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_child(scroll_bg)
 	scroll_bg.add_child(_content_scroll)
 	var scrollbar := _content_scroll.get_v_scroll_bar()
 	scrollbar.custom_minimum_size.x = 12
-	scrollbar.add_theme_stylebox_override("scroll", UiSkin.color_box(UiTheme.INK, UiSkin.FILL, 0))
+	scrollbar.add_theme_stylebox_override("scroll", UiSkin.flat(UiTheme.SLOT, 99))
 	for state in ["grabber", "grabber_highlight", "grabber_pressed"]:
-		var style := UiSkin.stylebox(ART + "scroll.png", 3)
+		var style := UiSkin.flat(UiTheme.TEAL, 99)
 		style.content_margin_left = 3
 		style.content_margin_right = 3
 		scrollbar.add_theme_stylebox_override(state, style)
@@ -176,20 +167,20 @@ func _build_menu() -> void:
 		description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		words.add_child(description)
 		page_heading.add_child(words)
-		var tag := _label("OTURUM" if key == "game" else "KİŞİSEL AYARLAR", 10, UiTheme.GOLD)
+		var tag := _label("OTURUM" if key == "game" else "KİŞİSEL AYARLAR", 10, UiTheme.HEAD)
 		tag.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		page_heading.add_child(tag)
 		page.add_child(page_heading)
 		_gap(page, 20)
 		var card := PanelContainer.new()
-		var card_style := UiSkin.stylebox(ART + "card.png")
+		var card_style := UiSkin.board()
 		for side in [SIDE_LEFT, SIDE_TOP, SIDE_RIGHT, SIDE_BOTTOM]: card_style.set_content_margin(side, 3)
 		card.add_theme_stylebox_override("panel", card_style)
 		page.add_child(card)
 		var card_content := VBoxContainer.new()
 		card_content.add_theme_constant_override("separation", 0)
 		_margin(card, 20, 20).add_child(card_content)
-		var card_title := _label(_caps(L.t(entry[1])), 12, UiTheme.GOLD, true)
+		var card_title := _label(_caps(L.t(entry[1])), 12, UiTheme.HEAD, true)
 		card_content.add_child(card_title)
 		_gap(card_content, 18)
 		_build_category(key, card_content)
@@ -201,12 +192,12 @@ func _build_menu() -> void:
 	_gap(nav, 14)
 	var shortcuts := _label("ESC · Oyuna dön\n\nF11 · Tam ekran", 10, MUTED)
 	_margin(nav, 8, 0).add_child(shortcuts)
-	var footer := _surface(Color("201a3c"))
+	var footer := _surface(UiTheme.WOOD)
 	shell.add_child(footer)
 	var footer_row := HBoxContainer.new()
 	footer_row.add_theme_constant_override("separation", 12)
 	_margin(footer, 24, 12).add_child(footer_row)
-	_notice = _label("Tercihler değiştirildiğinde anında uygulanır.", 10, MUTED)
+	_notice = _label("Tercihler değiştirildiğinde anında uygulanır.", 12, UiTheme.WOOD_TEXT_MUTED)
 	_notice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	footer_row.add_child(_notice)
@@ -228,7 +219,7 @@ func _row(box: VBoxContainer, title: String, help: String, control: Control) -> 
 	var index: int = int(box.get_meta("row_count", 0))
 	if index > 0:
 		_gap(box, 17)
-		var line := _surface(Color("51426f"))
+		var line := _surface(UiTheme.PANEL_LIGHT)
 		line.custom_minimum_size.y = 1
 		box.add_child(line)
 		_gap(box, 17)
@@ -273,17 +264,23 @@ func _toggle(value: bool, callback: Callable) -> HBoxContainer:
 	var control := HBoxContainer.new()
 	control.custom_minimum_size.x = 76
 	control.add_theme_constant_override("separation", 8)
-	var text := _label("Açık" if value else "Kapalı", 10, UiTheme.GOLD)
+	var text := _label("Açık" if value else "Kapalı", 10, UiTheme.HEAD)
 	text.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	control.add_child(text)
 	var check := Button.new()
 	check.toggle_mode = true
 	check.button_pressed = value
 	check.custom_minimum_size = Vector2(38, 24)
+	# Anahtar: kapalıyken oyuk, açıkken deniz yeşili hap.
 	for state in ["normal", "hover", "focus", "disabled"]:
-		check.add_theme_stylebox_override(state, UiSkin.stylebox(ART + "toggle_off.png", 3))
+		var off := UiSkin.groove()
+		off.set_corner_radius_all(99)
+		check.add_theme_stylebox_override(state, off)
 	for state in ["pressed", "hover_pressed"]:
-		check.add_theme_stylebox_override(state, UiSkin.stylebox(ART + "toggle_on.png", 3))
+		var on := UiSkin.flat(UiTheme.TEAL, 99)
+		on.border_color = UiTheme.TEAL_DARK
+		on.border_width_bottom = 3
+		check.add_theme_stylebox_override(state, on)
 	check.toggled.connect(func(on):
 		text.text = L.t("Açık" if on else "Kapalı")
 		callback.call(on))
@@ -299,7 +296,7 @@ func _range(value: float, minimum: float, maximum: float, step: float, formatter
 	control.add_child(outputs)
 	var left := _label(formatter.call(minimum), 10, MUTED)
 	outputs.add_child(left)
-	var current := _label(formatter.call(value), 10, UiTheme.GOLD)
+	var current := _label(formatter.call(value), 10, UiTheme.HEAD)
 	current.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	current.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	outputs.add_child(current)
@@ -310,15 +307,15 @@ func _range(value: float, minimum: float, maximum: float, step: float, formatter
 	slider.max_value = maximum
 	slider.step = step
 	slider.value = value
-	var track := UiSkin.color_box(UiTheme.INK, UiSkin.FILL, 0)
-	track.content_margin_top = 2
-	track.content_margin_bottom = 2
+	var track := UiSkin.groove()
+	track.set_corner_radius_all(99)
+	track.content_margin_top = 4
+	track.content_margin_bottom = 4
 	slider.add_theme_stylebox_override("slider", track)
-	slider.add_theme_stylebox_override("grabber_area", UiSkin.color_box(UiTheme.GOLD, UiSkin.FILL, 0))
-	slider.add_theme_stylebox_override("grabber_area_highlight", UiSkin.color_box(UiTheme.GOLD, UiSkin.FILL, 0))
-	slider.add_theme_icon_override("grabber", load(ART + "grabber.png"))
-	slider.add_theme_icon_override("grabber_highlight", load(ART + "grabber.png"))
-	slider.add_theme_icon_override("grabber_disabled", load(ART + "grabber.png"))
+	slider.add_theme_stylebox_override("grabber_area", UiSkin.flat(UiTheme.GOLD, 99))
+	slider.add_theme_stylebox_override("grabber_area_highlight", UiSkin.flat(UiTheme.GOLD, 99))
+	for icon in ["grabber", "grabber_highlight", "grabber_disabled"]:
+		slider.add_theme_icon_override(icon, UiSkin.knob_texture())
 	slider.value_changed.connect(func(v):
 		current.text = formatter.call(v)
 		callback.call(v))
@@ -328,7 +325,7 @@ func _range(value: float, minimum: float, maximum: float, step: float, formatter
 func _build_category(key: String, box: VBoxContainer) -> void:
 	match key:
 		"game":
-			_row(box, "Oyuna dön", "Kaldığın yerden devam et. Kısayol: ESC", _button("DEVAM ET →", close_menu, "gold"))
+			_row(box, "Oyuna dön", "Kaldığın yerden devam et. Kısayol: ESC", _button("DEVAM ET", close_menu, "gold"))
 			_save_button = _button("OYUNU KAYDET", _save_game)
 			_row(box, "Oyun kaydı", "Çevrim dışı oyunun ilerlemesini kaydet.", _save_button)
 			_seed_copy = _button("— · KOPYALA", func():
@@ -404,7 +401,7 @@ func open_menu() -> void:
 	_seed_copy.text = (str(GameMap.seed_value()) if in_game else "—") + " · " + L.t("KOPYALA")
 	_save_button.disabled = path != "res://scenes/GameScreen.tscn" or not MultiplayerManager.offline_mode or SaveGame.block_reason() != ""
 	_tutorial_button.disabled = path != "res://scenes/GameScreen.tscn"
-	_status.text = L.t("● Çevrim dışı · Oyun duraklatıldı") if MultiplayerManager.offline_mode and in_game else L.t("● Çevrim içi · Oyun devam ediyor") if in_game else L.t("● SİYASET OYUNU")
+	_status.text = L.t("Çevrim dışı · Oyun duraklatıldı") if MultiplayerManager.offline_mode and in_game else L.t("Çevrim içi · Oyun devam ediyor") if in_game else L.t("SİYASET OYUNU")
 	_select_category("game")
 	panel.show()
 	_sync_pause()

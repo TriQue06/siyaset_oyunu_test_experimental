@@ -19,20 +19,28 @@ const MAP_UNIT_SCALE := 1.0
 ## 1 = altıgenler arası boşluk yok: sadece il sınırları görünür.
 const CELL_INSET := 1.0
 const LAND_COLOR := Color(0.27, 0.30, 0.40)
-const SEA_COLOR := Color(0.14, 0.17, 0.27, 0.55)
-const REGION_BORDER_COLOR := Color(0.94, 0.95, 0.98, 0.9)
+## 0.0.265 masa oyunu: açık deniz yeşili deniz, krem il sınırları, koyu
+## kahve kıyı; ülkenin altında karton kalınlığı (EXTRUDE).
+const SEA_COLOR := Color("93D2D7")
+const REGION_BORDER_COLOR := Color(1.0, 0.98, 0.94, 0.95)
 ## Açık zeminli katmanlarda (ör. teşkilat: seviye 0 = neredeyse beyaz) beyaz
 ## sınır kaybolur; o zaman koyu sınır kullanılır (bkz. set_dark_borders).
 const REGION_BORDER_DARK := Color(0.10, 0.11, 0.18, 0.95)
 const REGION_BORDER_WIDTH := 1.7
-const COAST_COLOR := Color(0.62, 0.72, 0.92, 0.8)
+const COAST_COLOR := Color("4A3A26")
 const COAST_WIDTH := 1.4
 const HOVER_COLOR := Color(1, 1, 1, 0.85)
 ## ÜLKE haritasının çizgileri (referans: Türkiye / İspanya seçim haritaları).
-const COUNTRY_BORDER_COLOR := Color(1, 1, 1, 0.92)
+const COUNTRY_BORDER_COLOR := Color(1.0, 0.98, 0.94, 0.95)
 const COUNTRY_BORDER_WIDTH := 1.4
-const COUNTRY_COAST_COLOR := Color(0.03, 0.03, 0.07, 0.95)
-const COUNTRY_COAST_WIDTH := 2.0
+const COUNTRY_COAST_COLOR := Color("4A3A26")
+const COUNTRY_COAST_WIDTH := 1.7
+## Karton kalınlığı: kara, bu kadar aşağı kaydırılmış koyu bir kopyanın üstünde
+## durur (harita birimi); altında da yumuşak bir masa gölgesi.
+const EXTRUDE_DEPTH := 3.6
+const EXTRUDE_COLOR := Color("A9824F")
+const TABLE_SHADOW_DEPTH := 7.0
+const TABLE_SHADOW_COLOR := Color(0.04, 0.24, 0.26, 0.28)
 
 var grid_width: int = 0
 var grid_height: int = 0
@@ -45,6 +53,7 @@ var _border_mesh: ArrayMesh = null
 var _land_vertices := PackedVector2Array()
 var _land_vertex_region := PackedInt32Array()  # köşe -> bölge indeksi
 var _sea_mesh: ArrayMesh = null
+var _extrude_mesh: ArrayMesh = null
 var _border_vertices := PackedVector2Array()
 var _border_colors := PackedColorArray()
 var _edges: Dictionary = {}        # province_id -> Array[[a, b]] (bölge dış sınırı)
@@ -134,12 +143,37 @@ func _build_geometry() -> void:
 		sea_arrays[Mesh.ARRAY_VERTEX] = sea_vertices
 		sea_arrays[Mesh.ARRAY_COLOR] = sea_colors
 		_sea_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, sea_arrays)
+	_build_extrude()
 	if not _border_vertices.is_empty():
 		var arrays := []
 		arrays.resize(Mesh.ARRAY_MAX)
 		arrays[Mesh.ARRAY_VERTEX] = _border_vertices
 		arrays[Mesh.ARRAY_COLOR] = _border_colors
 		_border_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+
+## KARTON KALINLIĞI: kara üçgenlerinin aşağı kaydırılmış iki kopyası (önce
+## yumuşak masa gölgesi, sonra koyu karton kenarı); kara bunların üstüne çizilir.
+func _build_extrude() -> void:
+	_extrude_mesh = ArrayMesh.new()
+	if _land_vertices.is_empty():
+		return
+	var vertices := PackedVector2Array()
+	var colors := PackedColorArray()
+	for layer in [[TABLE_SHADOW_DEPTH, TABLE_SHADOW_COLOR], [EXTRUDE_DEPTH, EXTRUDE_COLOR]]:
+		var offset := Vector2(0, float(layer[0]))
+		var start := vertices.size()
+		vertices.append_array(_land_vertices)
+		for i in range(start, vertices.size()):
+			vertices[i] += offset
+		var tint := PackedColorArray()
+		tint.resize(_land_vertices.size())
+		tint.fill(layer[1])
+		colors.append_array(tint)
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_COLOR] = colors
+	_extrude_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 
 ## ÜLKE HARİTASI (0.0.261): deniz tek dikdörtgen; iller hücre üçgenlerinden;
 ## sınırlar CountryGenerator'ın yumuşatılmış ortak kenarları (her biri bir kez).
@@ -266,6 +300,8 @@ func _draw() -> void:
 		return
 	if _sea_mesh != null and _sea_mesh.get_surface_count() > 0:
 		draw_mesh(_sea_mesh, null)
+	if _extrude_mesh != null and _extrude_mesh.get_surface_count() > 0:
+		draw_mesh(_extrude_mesh, null)
 	if _land_mesh != null and _land_mesh.get_surface_count() > 0:
 		draw_mesh(_land_mesh, null)
 	if _border_mesh != null and _border_mesh.get_surface_count() > 0:

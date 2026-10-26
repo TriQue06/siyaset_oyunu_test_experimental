@@ -35,16 +35,12 @@ func _draw() -> void:
 	var inner := draw_tile(self, Rect2(c - Vector2(r, r), Vector2(r, r) * 2.0), VoterGroups.color(group))
 	draw_symbol(self, VoterGroups.icon(group), c - Vector2(0, inner * 0.06), inner * 0.78, ink)
 
-## KARO: koyu çerçeve, grubun renginde dolgu, altta hafif gölge şeridi (keskin
-## köşe; kartlar ve düğmelerle aynı dil). Sembolün ölçeği için iç yarı genişliği döner.
+## PUL (0.0.265): grubun renginde yuvarlak, konturs dolgu. Sembolün ölçeği
+## için yarıçap döner.
 static func draw_tile(canvas: CanvasItem, rect: Rect2, color: Color) -> float:
-	canvas.draw_rect(rect, Color("#0b0f16"), true)
-	var edge := maxf(1.0, rect.size.x * 0.06)
-	var inner := rect.grow(-edge)
-	canvas.draw_rect(inner, color, true)
-	var shade := inner.size.y * 0.16
-	canvas.draw_rect(Rect2(inner.position.x, inner.end.y - shade, inner.size.x, shade), Color(0, 0, 0, 0.22), true)
-	return inner.size.x * 0.5
+	var r := minf(rect.size.x, rect.size.y) * 0.5
+	canvas.draw_circle(rect.get_center(), r, color, true, -1.0, true)
+	return r * 0.92
 
 ## MADALYON (eski, harita lejantı gibi yerler için): grubun renginde dolu daire, koyu kontur, dışta grubun renginde
 ## yarı saydam hale (16 px ve üstünde) ve üstte hafif parlama. İç dairenin
@@ -55,11 +51,9 @@ static func draw_medallion(canvas: CanvasItem, c: Vector2, r: float, color: Colo
 		var halo := maxf(1.5, r * 0.12)
 		canvas.draw_arc(c, r - halo * 0.5, 0.0, TAU, 40, Color(color, 0.45), halo, true)
 		body = r - halo - 1.0
-	canvas.draw_circle(c, body, Color("#0b0f16"))
-	var inner := body - maxf(1.0, body * 0.1)
-	canvas.draw_circle(c, inner, color)
-	canvas.draw_arc(c, inner * 0.82, PI * 1.15, PI * 1.85, 16, Color(1, 1, 1, 0.22), maxf(1.0, inner * 0.12), true)
-	return inner
+	# 0.0.265: kontursuz yuvarlak pul.
+	canvas.draw_circle(c, body, color, true, -1.0, true)
+	return body
 
 ## Sembolü başka bir CanvasItem'a da çizebilmek için (harita lejantı vb.).
 ## 0.0.243: semboller Material simgeleri (GroupIconSvg); c merkezli, yarı

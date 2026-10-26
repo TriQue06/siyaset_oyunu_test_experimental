@@ -173,11 +173,11 @@ func _build_ui() -> void:
 	top.add_theme_constant_override("separation", 0)
 	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(top)
-	_title = UiTheme.mono_label(L.t("YENİ BİR PARTİ"), 26, UiTheme.GOLD, true)
+	_title = UiTheme.mono_label(L.t("YENİ BİR PARTİ"), 26, UiTheme.WOOD_TEXT, true)
 	top.add_child(_title)
-	top.add_child(PopupKit.label(L.t("Siyasetçini yarat, partini kur, seçmenini seç."), 13, UiTheme.TEXT_MUTED))
+	top.add_child(PopupKit.label(L.t("Siyasetçini yarat, partini kur, seçmenini seç."), 13, UiTheme.WOOD_TEXT_MUTED))
 	# Sağ üstte Menü düğmesi var: hazır sayısı onun solunda.
-	_ready_count = UiTheme.mono_label("", 16, UiTheme.TEXT_MUTED, true)
+	_ready_count = UiTheme.mono_label("", 16, UiTheme.WOOD_TEXT_MUTED, true)
 	_ready_count.anchor_left = 1.0
 	_ready_count.anchor_right = 1.0
 	_ready_count.offset_left = -400
@@ -261,7 +261,7 @@ func _build_step_panel() -> Control:
 	nav.add_theme_constant_override("separation", 10)
 	body.add_child(nav)
 	_back_button = Button.new()
-	_back_button.text = L.t("← Geri")
+	_back_button.text = L.t("Geri")
 	_back_button.focus_mode = Control.FOCUS_NONE
 	_back_button.custom_minimum_size = Vector2(130, 44)
 	_back_button.pressed.connect(func(): _show_step(_step - 1))
@@ -323,9 +323,9 @@ func _build_politician_page() -> Control:
 	var dice_row := HBoxContainer.new()
 	dice_row.add_theme_constant_override("separation", 8)
 	page.add_child(dice_row)
-	for spec in [[L.t("🎲 Ad"), L.t("Sadece adı değiştir"), true, false],
-			[L.t("🎲 Soyad"), L.t("Sadece soyadı değiştir"), false, true],
-			[L.t("🎲 İkisi de"), L.t("Ad ve soyadı birlikte değiştir"), true, true]]:
+	for spec in [[L.t("Rastgele Ad"), L.t("Sadece adı değiştir"), true, false],
+			[L.t("Rastgele Soyad"), L.t("Sadece soyadı değiştir"), false, true],
+			[L.t("Rastgele İkisi"), L.t("Ad ve soyadı birlikte değiştir"), true, true]]:
 		var dice := Button.new()
 		dice.text = spec[0]
 		dice.focus_mode = Control.FOCUS_NONE
@@ -342,7 +342,7 @@ func _build_politician_page() -> Control:
 	_lang_button.pressed.connect(_on_name_lang_pressed)
 	dice_row.add_child(_lang_button)
 	_bot_random_button = Button.new()
-	_bot_random_button.text = L.t("🎲 Bot Profilini Rastgele Yap")
+	_bot_random_button.text = L.t("Bot Profilini Rastgele Yap")
 	_bot_random_button.focus_mode = Control.FOCUS_NONE
 	_bot_random_button.custom_minimum_size = Vector2(0, 42)
 	_bot_random_button.pressed.connect(_on_bot_random_pressed)
@@ -424,7 +424,7 @@ func _choice_card(info: Dictionary, hover_key: String) -> Button:
 	t.clip_text = true
 	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(t)
-	var tag := UiTheme.mono_label("★ " + String(info.get("tag", "")), 12, UiTheme.GREEN)
+	var tag := UiTheme.mono_label("• " + String(info.get("tag", "")), 12, UiTheme.GREEN)
 	tag.clip_text = true
 	tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(tag)
@@ -466,7 +466,7 @@ func _detail_column(heading: String, info: Dictionary, appeal: Array, empty_text
 	if not appeal.is_empty():
 		col.add_child(_appeal_row(appeal))
 	col.add_child(PopupKit.note(String(info.get("blurb", "")), UiTheme.TEXT_MUTED))
-	col.add_child(PopupKit.note("★ " + String(info.get("perk", "")), UiTheme.GREEN))
+	col.add_child(PopupKit.note("• " + String(info.get("perk", "")), UiTheme.GREEN))
 	return col
 
 func _appeal_row(appeal: Array) -> Control:
@@ -604,7 +604,7 @@ func _build_color_row() -> void:
 		btn.focus_mode = Control.FOCUS_NONE
 		btn.clip_text = true
 		if taken:
-			btn.text = "✕"
+			btn.text = "X"
 			btn.add_theme_font_size_override("font_size", 12)
 		btn.disabled = taken
 		btn.modulate = Color.WHITE if not taken else Color(0.55, 0.55, 0.55, 1.0)
@@ -653,7 +653,7 @@ func _core_button(group: String) -> Button:
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.custom_minimum_size = Vector2(0, 58)
 	button.button_pressed = selected
-	UiSkin.skin_color_button(button, VoterGroups.color(group).darkened(0.25) if selected else UiTheme.PANEL)
+	UiSkin.skin_color_button(button, VoterGroups.color(group).darkened(0.25) if selected else UiTheme.PANEL_LIGHT)
 	var row := HBoxContainer.new()
 	row.set_anchors_preset(Control.PRESET_FULL_RECT)
 	row.offset_left = 10
@@ -679,7 +679,7 @@ func _core_button(group: String) -> Button:
 	blurb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	texts.add_child(blurb)
 	if selected:
-		var mark := UiTheme.mono_label("✔", 18, UiTheme.GOLD, true)
+		var mark := UiTheme.mono_label(L.t("SEÇİLİ"), 11, UiTheme.HEAD, true)
 		mark.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(mark)
@@ -744,7 +744,7 @@ func _refresh_card() -> void:
 	if _trait_id != "":
 		perks.append(String(PoliticianPresets.trait_info(_trait_id).get("perk", "")))
 	if not perks.is_empty():
-		_card_box.add_child(PopupKit.note("★ " + "\n★ ".join(perks), UiTheme.GREEN))
+		_card_box.add_child(PopupKit.note("• " + "\n• ".join(perks), UiTheme.GREEN))
 	_card_box.add_child(UiTheme.rule())
 	var party_row := HBoxContainer.new()
 	party_row.add_theme_constant_override("separation", 10)
@@ -818,7 +818,7 @@ func _refresh_players() -> void:
 		texts.add_theme_constant_override("separation", 0)
 		var player_name := String(MultiplayerManager.players.get(peer_id, {}).get("name", L.t("Sen")))
 		var player_label := PopupKit.label(player_name + (L.t(" (sen)") if int(peer_id) == my_id else "") \
-			+ ("  🤖" if MultiplayerManager.is_bot(peer_id) else ""), 12, UiTheme.TEXT_MUTED)
+			+ (L.t(" · bot") if MultiplayerManager.is_bot(peer_id) else ""), 12, UiTheme.TEXT_MUTED)
 		player_label.clip_text = true
 		texts.add_child(player_label)
 		var party_label := UiTheme.mono_label(String(party.get("name", L.t("parti kuruyor…"))), 15, UiTheme.TEXT, true)
@@ -830,7 +830,7 @@ func _refresh_players() -> void:
 				bits.append(PoliticianPresets.title(String(politician["background"])))
 			if PoliticianPresets.is_valid_trait(String(politician.get("trait", ""))):
 				bits.append(PoliticianPresets.trait_title(String(politician["trait"])))
-			var leader := PopupKit.label(" · ".join(bits), 11, UiTheme.GOLD)
+			var leader := PopupKit.label(" · ".join(bits), 11, UiTheme.HEAD)
 			leader.clip_text = true
 			texts.add_child(leader)
 		row.add_child(texts)
@@ -839,7 +839,7 @@ func _refresh_players() -> void:
 				and MultiplayerManager.players.size() > 1:
 			var editing: bool = int(peer_id) == live_target
 			var edit_button := Button.new()
-			edit_button.text = "✎" if int(peer_id) != my_id else L.t("Ben")
+			edit_button.text = L.t("Düzenle") if int(peer_id) != my_id else L.t("Ben")
 			UiSkin.skin_button(edit_button)
 			edit_button.focus_mode = Control.FOCUS_NONE
 			edit_button.add_theme_font_size_override("font_size", 14)
@@ -848,7 +848,7 @@ func _refresh_players() -> void:
 			edit_button.modulate = UiTheme.GOLD if editing else Color.WHITE
 			edit_button.pressed.connect(_start_editing.bind(-1 if int(peer_id) == my_id else int(peer_id)))
 			row.add_child(edit_button)
-		var ready_label := UiTheme.mono_label("✔" if PartyManager.is_ready(peer_id) else "…", 18,
+		var ready_label := UiTheme.mono_label(L.t("HAZIR") if PartyManager.is_ready(peer_id) else "…", 12,
 			UiTheme.GREEN if PartyManager.is_ready(peer_id) else UiTheme.TEXT_DIM, true)
 		ready_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(ready_label)
@@ -889,10 +889,10 @@ func _refresh() -> void:
 	for i in _step_buttons.size():
 		var b: Button = _step_buttons[i]
 		var done := _step_done(i)
-		b.text = "%d · %s%s" % [i + 1, L.t(STEP_TITLES[i]), "  ✓" if done else ""]
-		var color := UiTheme.GOLD if i == _step else (UiTheme.GREEN_DARK if done else UiTheme.PANEL)
+		b.text = "%d · %s%s" % [i + 1, L.t(STEP_TITLES[i]), "" if done else ""]
+		var color := UiTheme.GOLD if i == _step else (UiTheme.GREEN_DARK if done else UiTheme.PANEL_LIGHT)
 		UiSkin.skin_color_button(b, color)
-		var font_color := UiTheme.TEXT_ON_GOLD if i == _step else UiTheme.TEXT
+		var font_color := UiSkin.text_on(color)
 		for prop in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 			b.add_theme_color_override(prop, font_color)
 	_style_gender_buttons()
@@ -915,23 +915,23 @@ func _refresh_nav() -> void:
 	var last := _step == STEP_COUNT - 1
 	var missing := _missing_steps()
 	if _editing_bot():
-		_next_button.text = L.t("İleri →") if not last else L.t("Kendi partine dön")
+		_next_button.text = L.t("İleri") if not last else L.t("Kendi partine dön")
 		_next_button.disabled = false
 		_status.text = L.t("Bot düzenleniyor: değişiklikler anında kaydedilir.")
-		_status.add_theme_color_override("font_color", UiTheme.GOLD)
+		_status.add_theme_color_override("font_color", UiTheme.HEAD)
 		return
 	if _is_locked:
-		_next_button.text = L.t("✕ İptal Et")
+		_next_button.text = L.t("İptal Et")
 		_next_button.disabled = false
 		_status.text = L.t("Herkesin hazır olması bekleniyor…")
 		_status.add_theme_color_override("font_color", UiTheme.GREEN)
 	elif last:
-		_next_button.text = L.t("🔒 Hazırım")
+		_next_button.text = L.t("Hazırım")
 		_next_button.disabled = not missing.is_empty()
 		_status.text = L.t("Eksik: %s") % ", ".join(missing) if not missing.is_empty() else L.t("Her şey tamam. Hazır olduğunda bas.")
 		_status.add_theme_color_override("font_color", UiTheme.TEXT_MUTED if missing.is_empty() else UiTheme.RED)
 	else:
-		_next_button.text = L.t("İleri →")
+		_next_button.text = L.t("İleri")
 		_next_button.disabled = false
 		_status.text = L.t("Eksik: %s") % ", ".join(missing) if not missing.is_empty() else ""
 		_status.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
@@ -1074,7 +1074,7 @@ func _refresh_home_info() -> void:
 		_home_title.text = L.t("Bir il seç")
 		_home_body.text = L.t("Haritada bir ile tıkla: orası senin memleketin olur.")
 		return
-	_home_title.text = GameMap.name_of(id) + (L.t("  ★ memleket") if id == _hometown else "")
+	_home_title.text = GameMap.name_of(id) + (L.t("  · memleket") if id == _hometown else "")
 	_home_body.text = L.t("Memleketinde güçlü bir teşkilatla başlarsın; hemşehrilerin sana sahip çıkar.") \
 		if id == _hometown else L.t("Seçmek için tıkla.")
 
@@ -1089,7 +1089,7 @@ func _refresh_identity() -> void:
 	_name_hint.add_theme_color_override("font_color", UiTheme.TEXT_MUTED if valid else UiTheme.RED)
 	for i in _icon_grid.get_child_count():
 		var btn: TextureButton = _icon_grid.get_child(i)
-		btn.self_modulate = UiTheme.GOLD if i == _icon_index else Color.WHITE
+		btn.self_modulate = UiTheme.TEAL if i == _icon_index else UiTheme.TEXT_DIM
 	_build_color_row()
 
 func _on_party_name_changed(text: String) -> void:

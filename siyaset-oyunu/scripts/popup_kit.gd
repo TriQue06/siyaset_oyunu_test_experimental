@@ -34,26 +34,20 @@ static func frame(width: float, accent: Color, panel: PanelContainer = null) -> 
 		return [panel, plain]
 	var style := StyleBoxFlat.new()
 	style.bg_color = UiTheme.PANEL_DARK
-	style.border_color = UiTheme.INK
+	# Menünün kime/neye ait olduğu kenar renginden belli (üstte kalın).
+	style.border_color = accent
 	style.set_border_width_all(2)
-	style.border_width_top = 4
-	style.border_color = UiTheme.INK
+	style.border_width_top = 5
 	style.shadow_color = Color(0, 0, 0, 0.45)
 	style.shadow_size = 0
 	style.shadow_offset = Vector2(4, 5)
-	style.set_corner_radius_all(0)
+	style.set_corner_radius_all(UiTheme.RADIUS)
 	UiSkin.apply_style(panel, "panel", style)
 	panel.custom_minimum_size = Vector2(width, 0)
 	var outer := VBoxContainer.new()
 	outer.add_theme_constant_override("separation", 0)
 	outer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(outer)
-	# Renkli üst şerit: menünün kime/neye ait olduğu ilk bakışta belli olsun.
-	var stripe := ColorRect.new()
-	stripe.color = accent
-	stripe.custom_minimum_size = Vector2(0, 4)
-	stripe.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	outer.add_child(stripe)
 	var margin := MarginContainer.new()
 	for side in ["left", "right", "top", "bottom"]:
 		margin.add_theme_constant_override("margin_" + side, PAD)
@@ -88,7 +82,7 @@ static func header(title: String, subtitle: String, badge: Control = null, on_cl
 		names.add_child(label(subtitle, FS_SUB, KEY))
 	if on_close.is_valid():
 		var close := Button.new()
-		close.text = "✕"
+		close.text = "X"
 		close.custom_minimum_size = Vector2(30, 30)
 		close.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		close.focus_mode = Control.FOCUS_NONE
@@ -103,7 +97,7 @@ static func section(title: String, note: String = "") -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var t := UiTheme.mono_label(title.to_upper(), FS_SECTION, UiTheme.GOLD, true)
+	var t := UiTheme.mono_label(title.to_upper(), FS_SECTION, UiTheme.HEAD, true)
 	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(t)
 	var line := ColorRect.new()
@@ -151,7 +145,7 @@ static func chip(text: String, color: Color) -> Control:
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(color, 0.18)
+	style.bg_color = Color(color, 0.16)
 	style.border_color = color
 	style.set_border_width_all(1)
 	style.content_margin_left = 6
@@ -159,8 +153,13 @@ static func chip(text: String, color: Color) -> Control:
 	style.content_margin_top = 1
 	style.content_margin_bottom = 1
 	UiSkin.apply_style(panel, "panel", style)
-	var l := UiTheme.mono_label(text, 10, color.lightened(0.25), true)
+	var l := UiTheme.mono_label(text, 11, color.darkened(0.35), true)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Uzun çip satır kaydırır: dar panelde kartı genişletip taşırmasın.
+	if text.length() > 22:
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.custom_minimum_size.x = 1.0
+		panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.add_child(l)
 	return panel
 

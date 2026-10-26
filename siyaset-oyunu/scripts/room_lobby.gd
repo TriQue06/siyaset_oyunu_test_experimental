@@ -8,7 +8,7 @@ const SLIDE_DURATION := 0.2
 @onready var player_list_box: GridContainer = %PlayerListBox
 
 ## 8 sabit oyuncu kartı, 2 sütun. Robot butonu kartın sağ üst köşesine taşar.
-const SLOT_SIZE := Vector2(230, 86)
+const SLOT_SIZE := Vector2(230, 92)
 const BOT_BUTTON_SIZE := 34.0
 @onready var settings_button: Button = %SettingsButton
 @onready var start_button: Button = %StartButton
@@ -22,7 +22,7 @@ const BOT_BUTTON_SIZE := 34.0
 @onready var settings_vbox: VBoxContainer = $SettingsSidePanel/Margin/VBox
 
 ## Ayar paneli kodla kurulur (bkz. _build_settings_panel).
-const SECTION_COLOR := UiTheme.GOLD
+const SECTION_COLOR := UiTheme.HEAD
 var interval_value_label: Label
 var interval_minus: Button
 var interval_plus: Button
@@ -141,10 +141,14 @@ func _build_player_card(peer_id: int, index: int, am_owner: bool, local_id: int)
 	var color: Color = PartyPresets.COLORS[(index * 7) % PartyPresets.COLORS.size()]
 
 	var card := PanelContainer.new()
-	UiSkin.skin_panel(card, UiSkin.PANEL)
-	card.custom_minimum_size = Vector2(420, 60)
+	# Panel içindeki beyaz kart; senin kartın hardal kenarlı.
+	var card_style := UiSkin.card()
+	card_style.set_content_margin_all(2)
 	if peer_id == local_id:
-		card.modulate = Color(1.12, 1.08, 0.92)  # sıradaki/senin kartın hafif altın
+		card_style.border_color = UiTheme.GOLD
+		card_style.bg_color = Color("FFF6DC")
+	card.add_theme_stylebox_override("panel", card_style)
+	card.custom_minimum_size = Vector2(420, 60)
 
 	var margin := MarginContainer.new()
 	for side in ["left", "right", "top", "bottom"]:
@@ -157,10 +161,11 @@ func _build_player_card(peer_id: int, index: int, am_owner: bool, local_id: int)
 
 	var avatar := PanelContainer.new()
 	avatar.custom_minimum_size = Vector2(44, 44)
-	# Kare rozet (pixel tarz): koyu çizgi + düz renk.
-	var badge_style := UiSkin.color_box(color if not is_bot else UiTheme.PANEL_LIGHT, UiSkin.BUTTON_TINT_NORMAL)
-	badge_style.set_content_margin_all(0)
-	UiSkin.apply_style(avatar, "panel", badge_style)
+	# Yuvarlak pul: parti rengi, altında kalınlık.
+	var badge_style := UiSkin.flat(color if not is_bot else UiTheme.PANEL_LIGHT, 999)
+	badge_style.border_color = (color if not is_bot else UiTheme.PANEL_LIGHT).darkened(0.35)
+	badge_style.border_width_bottom = 4
+	avatar.add_theme_stylebox_override("panel", badge_style)
 	if is_bot:
 		var robot := RobotIcon.new()
 		robot.custom_minimum_size = Vector2(44, 44)
@@ -171,6 +176,8 @@ func _build_player_card(peer_id: int, index: int, am_owner: bool, local_id: int)
 		initial.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		initial.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		initial.add_theme_font_size_override("font_size", 20)
+		initial.add_theme_font_override("font", UiTheme.mono(true))
+		initial.add_theme_color_override("font_color", UiSkin.text_on(color))
 		avatar.add_child(initial)
 	row.add_child(avatar)
 
@@ -186,7 +193,7 @@ func _build_player_card(peer_id: int, index: int, am_owner: bool, local_id: int)
 	info.add_child(name_label)
 	var tags: Array[String] = []
 	if peer_id == MultiplayerManager.owner_id:
-		tags.append(L.t("★ Oda sahibi"))
+		tags.append(L.t("Oda sahibi"))
 	if peer_id == local_id:
 		tags.append(L.t("Sen"))
 	if is_bot:
@@ -196,7 +203,7 @@ func _build_player_card(peer_id: int, index: int, am_owner: bool, local_id: int)
 		tag_label.text = "  ·  ".join(tags)
 		tag_label.clip_text = true
 		tag_label.add_theme_font_size_override("font_size", 12)
-		tag_label.modulate = UiTheme.GOLD if peer_id == MultiplayerManager.owner_id else UiTheme.TEXT_MUTED
+		tag_label.add_theme_color_override("font_color", UiTheme.HEAD if peer_id == MultiplayerManager.owner_id else UiTheme.TEXT_MUTED)
 		info.add_child(tag_label)
 	row.add_child(info)
 
@@ -265,7 +272,7 @@ func _build_slot(card: Control, show_bot_button: bool, enabled: bool) -> Control
 	UiSkin.skin_color_button(button, UiTheme.GREEN_DARK if enabled else UiTheme.PANEL_DARK)
 	var robot := RobotIcon.new()
 	robot.set_anchors_preset(Control.PRESET_FULL_RECT)
-	robot.color = UiTheme.TEXT if enabled else UiTheme.TEXT_DIM
+	robot.color = UiTheme.ON_COLOR if enabled else UiTheme.TEXT_DIM
 	button.add_child(robot)
 	if enabled:
 		button.pressed.connect(MultiplayerManager.add_bot)
@@ -274,9 +281,10 @@ func _build_slot(card: Control, show_bot_button: bool, enabled: bool) -> Control
 
 func _build_empty_card(index: int) -> Control:
 	var card := PanelContainer.new()
-	UiSkin.skin_panel(card, UiSkin.PANEL)
-	card.modulate = Color(0.75, 0.75, 0.75, 1.0)
+	# Boş koltuk: içe basık oyuk.
+	card.add_theme_stylebox_override("panel", UiSkin.groove())
 	var label := Label.new()
+	label.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
 	label.text = "%d · %s" % [index + 1, L.t("Bot ekle") if MultiplayerManager.offline_mode else L.t("Boş")]
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -404,6 +412,8 @@ func _build_settings_panel() -> void:
 	var title := settings_vbox.get_node("HeaderRow/TitleLabel") as Label
 	title.text = L.t("OYUN KURALLARI")
 	title.add_theme_font_size_override("font_size", 16)
+	title.add_theme_font_override("font", UiTheme.mono(true))
+	title.add_theme_color_override("font_color", UiTheme.HEAD)
 	# Bölümler kaydırılabilir bir alanda: başlık ve ✕ hep görünür kalır.
 	var scroll := ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -591,9 +601,9 @@ func _section(title_text: String, note_text: String) -> VBoxContainer:
 		box.add_child(UiTheme.mono_label(title_text, 12, SECTION_COLOR, true))
 	else:
 		var panel := PanelContainer.new()
-		var style := UiSkin.stylebox(UiSkin.PANEL_DARK)
+		var style := UiSkin.card()
 		style.set_content_margin_all(UiTheme.PAD_M)
-		UiSkin.apply_style(panel, "panel", style)
+		panel.add_theme_stylebox_override("panel", style)
 		_sections_box.add_child(panel)
 		if category == "map":
 			_sections_box.move_child(panel, 0)
@@ -664,6 +674,7 @@ func _refresh_code_display() -> void:
 	var hint := get_node_or_null("CenterBox/HintLabel") as Label
 	if MultiplayerManager.offline_mode:
 		code_label.text = L.t("ÇEVRİM DIŞI OYUN")
+		code_label.add_theme_color_override("font_color", UiTheme.WOOD_TEXT_MUTED)
 		copy_code_button.hide()
 		if hint != null:
 			hint.text = L.t("Ağ yok: sadece sen ve eklediğin botlar oynar.")
@@ -673,6 +684,7 @@ func _refresh_code_display() -> void:
 		hint.text = L.t("Bu kodu arkadaşına gönder, o da 'Odaya Katıl' ekranına girsin.")
 	var shown := "•••••" if GameSettings.streamer_mode else MultiplayerManager.room_code
 	code_label.text = L.t("ODA KODU: %s") % shown
+	code_label.add_theme_color_override("font_color", UiTheme.WOOD_TEXT)
 
 func _on_streamer_mode_changed(_enabled: bool) -> void:
 	_refresh_code_display()
@@ -681,7 +693,7 @@ func _on_copy_code_pressed() -> void:
 	DisplayServer.clipboard_set(MultiplayerManager.room_code)
 	copy_code_button.text = L.t("Kopyalandı!")
 	await get_tree().create_timer(1.0).timeout
-	copy_code_button.text = L.t("📋 Kopyala")
+	copy_code_button.text = L.t("Kopyala")
 
 ## Lobi ayarları butonu: panel kapalıysa ekranın sağında açar ve ortadaki
 ## içeriği hafifçe sola kaydırır; açıksa tersini yapıp kapatır.
@@ -730,7 +742,7 @@ func _build_concept_a() -> void:
 	header.add_theme_constant_override("separation", 16)
 	header.custom_minimum_size.y = 44
 	root_box.add_child(header)
-	var title := UiTheme.mono_label(L.t("SİYASET OYUNU"), 24, UiTheme.TEXT, true)
+	var title := UiTheme.mono_label(L.t("SİYASET OYUNU"), 26, UiTheme.WOOD_TEXT, true)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title)
 	var code_row := center_box.get_node("CodeRow")
@@ -760,7 +772,7 @@ func _build_concept_a() -> void:
 	center_box.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	center_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	center_box.add_theme_constant_override("separation", 10)
-	var heading := UiTheme.mono_label(L.t("OYUNCULAR"), 16, UiTheme.GOLD, true)
+	var heading := UiTheme.mono_label(L.t("OYUNCULAR"), 16, UiTheme.HEAD, true)
 	center_box.add_child(heading)
 	center_box.move_child(heading, 0)
 	for child in center_box.get_children():
@@ -784,6 +796,7 @@ func _build_concept_a() -> void:
 	footer.add_theme_constant_override("separation", 10)
 	root_box.add_child(footer)
 	info_label.reparent(footer)
+	info_label.add_theme_color_override("font_color", UiTheme.WOOD_TEXT_MUTED)
 	info_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	leave_button.reparent(footer)

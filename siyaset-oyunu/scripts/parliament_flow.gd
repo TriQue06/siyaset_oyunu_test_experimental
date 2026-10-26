@@ -9,7 +9,7 @@ extends Control
 ## gerekirse hükümet kurma bitince kendiliğinden geri gelir.
 ## YASA sekmesi seçenekleri (grup yasası / vergi / anayasa) aynı pencerede
 ## açılır: yasa tasarlama alanı law_host'a gömülüdür (bkz. GameScreen),
-## "← Geri" meclis sekmelerine döndürür.
+## "Geri" meclis sekmelerine döndürür.
 
 signal law_tab_requested(tab: int)
 signal toast_requested(text: String)
@@ -166,10 +166,10 @@ func _build() -> void:
 		button.custom_minimum_size = Vector2(0, 38)
 		button.add_theme_font_override("font", UiTheme.mono(true))
 		button.add_theme_font_size_override("font_size", 14)
-		button.text = L.t(STAGE_TITLES[id]) + ("  ✓" if done else "")
+		button.text = L.t(STAGE_TITLES[id]) + ("" if done else "")
 		button.disabled = done or not available
 		var selected := id == _tab
-		var color := UiTheme.GOLD if selected else (UiTheme.GREEN_DARK if done else UiTheme.PANEL)
+		var color := UiTheme.GOLD if selected else (UiTheme.GREEN_DARK if done else UiTheme.PANEL_LIGHT)
 		UiSkin.skin_color_button(button, color)
 		var font_color := UiTheme.TEXT_ON_GOLD if selected else (UiTheme.TEXT if available or done else UiTheme.TEXT_DIM)
 		for prop in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_disabled_color"]:
@@ -185,7 +185,7 @@ func _build() -> void:
 	_content.size_flags_vertical = Control.SIZE_FILL if _law_page else Control.SIZE_EXPAND_FILL
 	if _law_page:
 		var back := Button.new()
-		back.text = L.t("← Geri")
+		back.text = L.t("Geri")
 		back.focus_mode = Control.FOCUS_NONE
 		back.custom_minimum_size = Vector2(140, 40)
 		UiSkin.skin_button(back)
@@ -207,7 +207,7 @@ func _build() -> void:
 		_content.add_child(filler)
 		_content.add_child(UiTheme.rule())
 		var away := Button.new()
-		away.text = L.t("← Haritaya dön")
+		away.text = L.t("Haritaya dön")
 		away.focus_mode = Control.FOCUS_NONE
 		away.custom_minimum_size = Vector2(170, 46)
 		UiSkin.skin_button(away)
@@ -244,7 +244,7 @@ func _build_speech() -> void:
 	_explain(L.t("Bir seçmen grubunun sorunlarını konuşarak o grubun desteğini kalıcı artırırsın. Karşıt grup biraz soğur."))
 	var crisis := CardManager.crisis_group()
 	if crisis != "":
-		_explain(L.t("Siyasi kriz: %s. Bu grupla toplanmak çok daha etkili, karşıt gruptan kayıp yarıya iner.") % VoterGroups.title(crisis), UiTheme.GOLD)
+		_explain(L.t("Siyasi kriz: %s. Bu grupla toplanmak çok daha etkili, karşıt gruptan kayıp yarıya iner.") % VoterGroups.title(crisis), UiTheme.HEAD)
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 6)
@@ -302,7 +302,7 @@ func _option(title: String, text: String, available: bool, action: Callable) -> 
 	button.text = "%s%s\n%s" % [title, "" if available else L.t("  · şu an yok"), text]
 	button.add_theme_font_size_override("font_size", 12)
 	button.disabled = not available
-	UiSkin.skin_color_button(button, STAGE_COLORS["law"].darkened(0.2) if available else UiTheme.PANEL)
+	UiSkin.skin_color_button(button, STAGE_COLORS["law"].darkened(0.2) if available else UiTheme.PANEL_LIGHT)
 	button.pressed.connect(action)
 	return button
 

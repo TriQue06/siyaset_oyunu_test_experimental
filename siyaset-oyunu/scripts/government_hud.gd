@@ -219,7 +219,7 @@ static func law_vote_hint(my_id: int) -> Dictionary:
 		var now := Economy.tax_title(CardManager.tax_level())
 		return {"yes": L.t("EVET: vergi %s olur (gelir %s / dönem)") % [Economy.tax_title(level), Economy.money_full(CardManager.expected_revenue(level))],
 			"no": L.t("HAYIR: vergi %s kalır") % now,
-			"short": L.t("Vergi %s → %s: seçmen tepkisi kademeli gelir, en çok başbakanın partisi hisseder") % [now, Economy.tax_title(level)]}
+			"short": L.t("Vergi %s » %s: seçmen tepkisi kademeli gelir, en çok başbakanın partisi hisseder") % [now, Economy.tax_title(level)]}
 	var no_text := L.t("HAYIR: yasaya yakın illerde güç kaybı, zıt illerde kazanç")
 	if my_id == proposer:
 		return {"yes": L.t("EVET: kabul edilirse yasanın etkisi 2 katına çıkar"), "no": no_text,

@@ -1,56 +1,82 @@
 class_name UiTheme
 extends RefCounted
-## ARAYÜZÜN TEK KAYNAĞI (Konsept C — Piksel).
+## ARAYÜZÜN TEK KAYNAĞI (0.0.265 · MASA OYUNU).
 ##
 ## Renk, yazı boyutu, boşluk, kenar kalınlığı: hepsi burada. Hiçbir ekran kendi
 ## rengini ya da punto değerini uydurmaz; hepsi buradan okur. Tarzı değiştirmek
 ## için TEK dosya düzenlenir.
 ##
-## Dokular (panel/buton zeminleri) assets/ui/ altındaki PNG'lerdir ve
-## tools/make_ui_art.py ile üretilir — oradaki palet buradakiyle aynıdır.
-##
-## TARZ: koyu mor-lacivert zemin, kalın koyu dış çizgi, pah (bevel) kenarlar,
-## sert gölge, altın vurgu, monospace başlık ve rakamlar.
+## TARZ: yeşil çuha masa üstünde kalın karton oyun tahtası. Paneller krem
+## karton (altında karton kalınlığı), düğmeler tombul ve altlarında koyu bir
+## "kalınlık" şeridi; basınca gömülür. Bant ve masa ahşap. Başlıklar Nunito Black,
+## gövde Nunito. Her yüzey vektör (StyleBoxFlat), hiçbir doku yok.
 
 # --- RENKLER ---------------------------------------------------------------
-## Ekran zemini (haritanın ve panellerin arkası).
-const BG := Color("181430")
-## Sert gölge / dış çizgi.
-const INK := Color("100D22")
-## Panel dolgusu ve pah renkleri.
-const PANEL := Color("2B2352")
-const PANEL_LIGHT := Color("4A3F7A")
-const PANEL_DARK := Color("1C1738")
-## Oyuk (kart yuvası, ilerleme çubuğu zemini).
-const SLOT := Color("100D22")
+## Ekran zemini: yeşil çuha masa.
+const BG := Color("1D5A3D")
+const FELT_LIGHT := Color("2E7A55")
+const FELT_DARK := Color("0F3524")
+## Mürekkep: koyu yazı, dış çizgi, koyu yazı zemini.
+const INK := Color("2D2A26")
+## Karton: panel dolgusu ve tonları.
+const PANEL := Color("F7EED8")
+## Pasif sekme / ikincil düğme / çip zemini.
+const PANEL_LIGHT := Color("E3D5B0")
+## Panel içindeki kart/satır zemini.
+const PANEL_DARK := Color("FFFAF0")
+## Oyuk (ilerleme çubuğu zemini, yazı kutusu).
+const SLOT := Color("EADFC4")
+## Karton kalınlığı (panellerin altındaki kenar).
+const EDGE := Color("B79A68")
+const EDGE_DARK := Color("8F744A")
+## Panel çerçevesi (çift ince çizgi).
+const TEAL := Color("1F6E70")
+const TEAL_DARK := Color("16575A")
+## Ahşap (üst bant, alt masa).
+const WOOD := Color("A8693A")
+const WOOD_LIGHT := Color("C88A4D")
+const WOOD_DARK := Color("8A5129")
+const WOOD_TEXT := Color("FFF6E0")
+const WOOD_TEXT_MUTED := Color("FFE3A8")
 
-## Yazı.
-const TEXT := Color("F2EFFF")
-const TEXT_MUTED := Color("A79BD6")
-const TEXT_DIM := Color("6B62A0")
-const TEXT_ON_GOLD := Color("100D22")
+## Yazı (karton üstünde).
+const TEXT := Color("2D2A26")
+const TEXT_MUTED := Color("6E655A")
+const TEXT_DIM := Color("A39A8A")
+const TEXT_ON_GOLD := Color("4A3203")
+## Renkli düğme / koyu zemin üstündeki yazı.
+const ON_COLOR := Color("FFFFFF")
+## Başlık ve vurgu yazısı (karton üstünde okunur).
+const HEAD := Color("1F6E70")
 
-## Vurgular.
-const GOLD := Color("FFC93C")
-const GOLD_DIM := Color("B08A22")
-const GREEN := Color("4BE08A")
-const GREEN_DARK := Color("258F53")
-const RED := Color("E8402A")
-const RED_DARK := Color("8E2215")
-const BLUE := Color("3A8DE0")
-const PURPLE := Color("A56BE8")
+## Vurgular (dolgular).
+const GOLD := Color("F2B632")
+const GOLD_DIM := Color("B58312")
+const GREEN := Color("2FA866")
+const GREEN_DARK := Color("1F8A4C")
+const RED := Color("D93636")
+const RED_DARK := Color("A12424")
+const BLUE := Color("2B6FD9")
+const PURPLE := Color("7B4FD6")
 
 ## Anlam renkleri (puan, oy, uyarı).
-const POSITIVE := GREEN
+const POSITIVE := GREEN_DARK
 const NEGATIVE := RED
 const NEUTRAL := TEXT_MUTED
 
 # --- ÖLÇÜLER ---------------------------------------------------------------
-## Dokulardaki dış çizgi kalınlığı (make_ui_art.py ile aynı).
-const BORDER := 3
-## 9-slice kenar payı: 16x16 dokuda kenarların esnemeden kalacağı pay.
+## Çerçeve çizgisi kalınlığı.
+const BORDER := 2
+## Köşe yuvarlaklığı: panel / düğme / küçük parça.
+const RADIUS_PANEL := 16
+const RADIUS := 12
+const RADIUS_S := 8
+## Karton kalınlığı: panel ve düğmelerin altındaki koyu şerit.
+const THICK_PANEL := 7
+const THICK := 6
+const THICK_S := 3
+## Eski adlar (9-slice dönemi): bazı yerler hâlâ okur.
 const SLICE := 5
-## Sert gölge kayması (panellerin altına/sağına).
 const SHADOW := 6
 
 ## Boşluk basamakları — aralara elle sayı yazılmaz, bunlar kullanılır.
@@ -69,10 +95,12 @@ const PAD_L := 18
 const TOUCH_MIN := 44
 
 # --- YAZI ------------------------------------------------------------------
-## Monospace: başlıklar, rakamlar, butonlar. Gövde metni varsayılan yazı tipi.
-const FONT_MONO := "res://assets/fonts/IBMPlexMono-SemiBold.ttf"
-const FONT_MONO_BOLD := "res://assets/fonts/IBMPlexMono-Bold.ttf"
-const FONT_MONO_REGULAR := "res://assets/fonts/IBMPlexMono-Regular.ttf"
+## Başlık yazısı (Nunito, çok kalın): başlıklar, rakamlar, düğmeler. Gövde (Nunito):
+## varsayılan yazı tipi. İkisi de Türkçe harflerin tamamını içerir.
+const FONT_MONO := "res://assets/fonts/display.tres"
+const FONT_MONO_BOLD := "res://assets/fonts/display_bold.tres"
+const FONT_MONO_REGULAR := "res://assets/fonts/body_bold.tres"
+const FONT_BODY := "res://assets/fonts/body.tres"
 
 ## Punto basamakları.
 const FS_HUGE := 42   # seçim gecesi rakamı, yıl
@@ -82,29 +110,32 @@ const FS_BODY := 16   # normal metin
 const FS_SMALL := 14  # ikincil metin
 const FS_TINY := 12   # etiket, ipucu
 
-static func mono(bold: bool = false) -> FontFile:
-	return load(FONT_MONO_BOLD if bold else FONT_MONO) as FontFile
+## Başlık yazı tipi (adı eski: önceden monospace idi).
+static func mono(bold: bool = false) -> Font:
+	return load(FONT_MONO_BOLD if bold else FONT_MONO) as Font
 
-static func mono_regular() -> FontFile:
-	return load(FONT_MONO_REGULAR) as FontFile
+static func mono_regular() -> Font:
+	return load(FONT_MONO_REGULAR) as Font
+
+static func body() -> Font:
+	return load(FONT_BODY) as Font
 
 # --- YARDIMCILAR -----------------------------------------------------------
 
-## Panel başlığı: monospace, altın, büyük harf, "> " önekli.
-## Monospace geniş olduğu için başlık paneli ZORLA GENİŞLETMEZ: sığmazsa
-## satır kaydırır (sol panelin 260 piksellik genişliği sabit kalsın).
-static func section_label(text: String, color: Color = GOLD) -> Label:
+## Panel başlığı: başlık yazısı, deniz yeşili, büyük harf.
+## Başlık paneli ZORLA GENİŞLETMEZ: sığmazsa satır kaydırır.
+static func section_label(text: String, color: Color = HEAD) -> Label:
 	var label := Label.new()
-	label.text = "> " + text.to_upper()
-	label.add_theme_font_override("font", mono())
-	label.add_theme_font_size_override("font_size", FS_TINY + 3)
+	label.text = text.to_upper()
+	label.add_theme_font_override("font", mono(true))
+	label.add_theme_font_size_override("font_size", FS_TINY + 1)
 	label.add_theme_color_override("font_color", color)
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.custom_minimum_size.x = 1.0
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return label
 
-## Monospace etiket (rakamlar, başlıklar).
+## Başlık yazısıyla etiket (rakamlar, başlıklar).
 static func mono_label(text: String, size: int = FS_HEAD, color: Color = TEXT, bold: bool = false) -> Label:
 	var label := Label.new()
 	label.text = text
@@ -121,19 +152,16 @@ static func body_label(text: String, size: int = FS_BODY, color: Color = TEXT) -
 	label.add_theme_color_override("font_color", color)
 	return label
 
-## Kartın solunda parti renginde dikey şerit. PanelContainer çocuklarını
-## kendi alanına yaydığı için şerit KUTUNUN İÇİNE, sabit genişlikte bir öge
-## olarak eklenir (üste bindirilmez).
+## Kartın solunda parti renginde dikey şerit (yuvarlak uçlu). PanelContainer
+## çocuklarını kendi alanına yaydığı için şerit KUTUNUN İÇİNE eklenir.
 static func stripe(color: Color, width: int = 6) -> Control:
 	var bar := UiSkin.color_surface(color, UiSkin.FILL)
 	bar.custom_minimum_size.x = width
 	bar.size_flags_vertical = Control.SIZE_FILL
 	return bar
 
-## İki nokta arasını ayıran 3 piksellik çizgi (HSeparator yerine).
+## İki bölümü ayıran ince, yuvarlak uçlu çizgi (HSeparator yerine).
 static func rule(color: Color = PANEL_LIGHT) -> Control:
-	var line := ColorRect.new()
-	line.color = color
+	var line := UiSkin.color_surface(color, UiSkin.FILL)
 	line.custom_minimum_size.y = BORDER
-	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return line

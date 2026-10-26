@@ -76,7 +76,7 @@ func _build_panel() -> void:
 	_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	_panel.custom_minimum_size = Vector2(PANEL_WIDTH, 0)
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color("1d1838")
+	style.bg_color = UiTheme.PANEL
 	style.border_color = UiTheme.GOLD
 	style.set_border_width_all(2)
 	style.border_width_top = 4
@@ -95,7 +95,7 @@ func _build_panel() -> void:
 	_panel.add_child(box)
 	var head := HBoxContainer.new()
 	box.add_child(head)
-	_title = UiTheme.mono_label("", 14, UiTheme.GOLD, true)
+	_title = UiTheme.mono_label("", 14, UiTheme.HEAD, true)
 	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(_title)
 	_counter = UiTheme.mono_label("", 10, UiTheme.TEXT_DIM)

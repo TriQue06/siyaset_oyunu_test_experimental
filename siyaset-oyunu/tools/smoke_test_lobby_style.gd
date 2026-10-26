@@ -50,7 +50,7 @@ func run() -> void:
 		check(is_equal_approx(lobby._lobby_columns.get_child(0).size.y, base_height), "adding bot preserves panel height")
 		for slot in lobby.player_list_box.get_children():
 			var card: Control = slot.get_meta("card")
-			check(is_equal_approx(card.size.y, 71.0), "empty and occupied cards fixed height")
+			check(is_equal_approx(card.size.y, 77.0), "empty and occupied cards fixed height")
 	slots = lobby.player_list_box.get_children()
 	(lobby.world_choice_buttons["turn_seconds"][3] as Button).pressed.emit()
 	check(int(mm.world_settings["turn_seconds"]) == 90, "button changes server setting")
@@ -61,12 +61,12 @@ func run() -> void:
 	flat.content_margin_left = 9
 	skin.apply_style(panel, "panel", flat)
 	var style = panel.get_theme_stylebox("panel")
-	check(style is StyleBoxTexture and style.texture.resource_path == skin.BUTTON_TINT_NORMAL, "information rectangle uses menu frame")
+	check(style is StyleBoxFlat and style.bg_color == Color.RED and style.corner_radius_top_left > 0, "information rectangle uses rounded board frame")
 	check(style.get_content_margin(SIDE_LEFT) == 9, "frame preserves layout margins")
 	var outline := StyleBoxFlat.new()
 	outline.draw_center = false
 	skin.apply_style(panel, "panel", outline)
-	check(panel.get_theme_stylebox("panel") == outline, "card outline remains transparent")
+	check(not (panel.get_theme_stylebox("panel") as StyleBoxFlat).draw_center, "card outline remains transparent")
 	for slot in slots:
 		if not slot.is_queued_for_deletion():
 			var card: Control = slot.get_meta("card")

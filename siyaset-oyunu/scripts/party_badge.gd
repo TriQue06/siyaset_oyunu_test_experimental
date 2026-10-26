@@ -3,9 +3,8 @@ extends RefCounted
 ## Bir partinin "logosu": parti rengi + ikon. Oyun ekranındaki oyuncu panelinde
 ## (pixel-art çerçeveli) ve listelerde kullanılır. game_screen.gd'den ayrıldı.
 ##
-## TARZ (Konsept C): yuvarlak değil KARE rozet — kalın koyu dış çizgi, içinde
-## düz parti rengi. Kendi partin altın çizgiyle ayrılır. Yuvarlak köşe ve
-## yumuşak gölge yok; her şey PNG dokudan (bkz. UiSkin.color_box).
+## TARZ (0.0.265 masa oyunu): yuvarlak pul — parti rengi, altında koyu
+## kalınlık; kendi partin hardal kenarla ayrılır. Vektör (StyleBoxFlat).
 
 ## Oyuncu panelindeki logoların pixel-art çerçevesi. Çerçevenin ortasındaki
 ## saydam delik, logonun görüneceği alandır; deliğin konumu/boyutu koda
@@ -33,19 +32,24 @@ static func build(party: Dictionary, size: Vector2, icon_pixel_size: int, is_sel
 	wrap.custom_minimum_size = size
 	wrap.mouse_filter = Control.MOUSE_FILTER_STOP
 
-	# Dış çizgi: kendi partinde altın, diğerlerinde koyu mürekkep.
-	var outline := UiSkin.color_surface(UiTheme.GOLD if is_self else UiTheme.INK, UiSkin.FILL)
-	outline.set_anchors_preset(Control.PRESET_FULL_RECT)
-	wrap.add_child(outline)
-	# İçerideki düz parti rengi (çizgi kalınlığı kadar içeride).
-	var edge := 3.0 if is_self else 2.0
-	var body := UiSkin.color_surface(party.get("bg_color", UiTheme.PANEL_LIGHT), UiSkin.FILL)
-	body.set_anchors_preset(Control.PRESET_FULL_RECT)
-	body.offset_left = edge
-	body.offset_top = edge
-	body.offset_right = -edge
-	body.offset_bottom = -edge
-	wrap.add_child(body)
+	# MASA OYUNU PULU: parti renginde yuvarlak pul, altında koyu kalınlık;
+	# kendi partinde dışta hardal halka.
+	var color: Color = party.get("bg_color", UiTheme.PANEL_LIGHT)
+	var disc := Panel.new()
+	disc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := UiSkin.flat(color, 999)
+	style.border_color = color.darkened(0.38)
+	style.border_width_bottom = maxi(2, int(size.y * 0.09))
+	if is_self:
+		style.shadow_color = UiTheme.GOLD
+		style.shadow_size = 1
+		style.expand_margin_left = 0.0
+		style.border_color = UiTheme.GOLD_DIM
+		style.set_border_width_all(2)
+		style.border_width_bottom = maxi(3, int(size.y * 0.1))
+	disc.add_theme_stylebox_override("panel", style)
+	disc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	wrap.add_child(disc)
 
 	if party.has("icon_index"):
 		var icon := TextureRect.new()
@@ -56,11 +60,11 @@ static func build(party: Dictionary, size: Vector2, icon_pixel_size: int, is_sel
 		icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.set_anchors_preset(Control.PRESET_FULL_RECT)
-		var margin := size.y * 0.22
+		var margin := size.y * 0.24
 		icon.offset_left = margin
-		icon.offset_top = margin
+		icon.offset_top = margin - size.y * 0.03
 		icon.offset_right = -margin
-		icon.offset_bottom = -margin
+		icon.offset_bottom = -margin - size.y * 0.03
 		wrap.add_child(icon)
 
 	return wrap

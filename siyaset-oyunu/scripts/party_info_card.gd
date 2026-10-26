@@ -34,7 +34,7 @@ static func build(peer_id: int, my_id: int, on_action: Callable = Callable(), wi
 	var alliance_id := CardManager.alliance_of(peer_id)
 	if alliance_id >= 0:
 		var alliance: Dictionary = CardManager.alliances[alliance_id]
-		box.add_child(PopupKit.kv(L.t("İttifak"), String(alliance.get("name", "")), alliance.get("color", UiTheme.GOLD)))
+		box.add_child(PopupKit.kv(L.t("İttifak"), String(alliance.get("name", "")), alliance.get("color", UiTheme.HEAD)))
 	# GENEL BAŞKANIN PROFİLİ: eski mesleği (ve memleketi).
 	var leader_id := CardManager.party_of(peer_id) if not independent else peer_id
 	var job := PoliticianPresets.title(PoliticianPresets.background_of(leader_id))
@@ -198,33 +198,11 @@ static func role_text(peer_id: int) -> String:
 ## payları ülke geneli oy oranı hakkında doğrudan fikir verir.
 static func _add_group_section(box: VBoxContainer, peer_id: int) -> void:
 	var pid := CardManager.party_of(peer_id)
-	var groups := PartyManager.groups_of(pid)
-	var before: Dictionary = CardManager.election_groups.get(pid, {})
 	var votes := CardManager.group_vote_estimates(pid)
 	var levels := CardManager.group_level_shares(pid)
 	box.add_child(PopupKit.section(L.t("Seçmen grupları"), L.t("sana bağlı seçmen")))
 	box.add_child(_group_chart(votes, levels))
-	# Sıkı tablo: ad · oy ▲▼ (0.0.228: oy = grubun partiye bağlı payı; hitap ile aynı).
-	var table := GridContainer.new()
-	table.columns = 2
-	table.add_theme_constant_override("h_separation", 4)
-	table.add_theme_constant_override("v_separation", 1)
-	table.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(table)
-	for head in [L.t("Grup"), L.t("Oy")]:
-		var h := _label(head, 8, DIM)
-		if head != L.t("Grup"):
-			h.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		table.add_child(h)
-	for group in VoterGroups.GROUP_IDS:
-		var value := float(votes.get(group, groups.get(group, 0.0)))
-		var delta := value - float(before[group]) if before.has(group) else 0.0
-		var name := _label(VoterGroups.title(group), 8, VoterGroups.color(group).lightened(0.25))
-		name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		table.add_child(name)
-		var arrow := "▲" if delta >= 0.05 else ("▼" if delta <= -0.05 else "")
-		table.add_child(_num_cell(L.pct(value, 1) + arrow, UiTheme.GREEN if delta >= 0.05 else (UiTheme.RED if delta <= -0.05 else UiTheme.TEXT)))
-	box.add_child(PopupKit.note(L.t("Oy: grubun ülke genelinde sana bağlı seçmen payı (▲▼ son seçimden beri)."), DIM, _text_width()))
+	# 0.0.265: sütunlar yeterli; altta ayrıca oy listesi yok.
 
 static func _num_cell(text: String, color: Color) -> Label:
 	var label := _label(text, 8, color)

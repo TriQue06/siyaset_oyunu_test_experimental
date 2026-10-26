@@ -1717,7 +1717,7 @@ func alliance_preview_text(party_id: int, alliance_id: int, count: int = 3) -> S
 	for row in alliance_preview(party_id, alliance_id):
 		if parts.size() >= count or absf(float(row[2]) - float(row[1])) < 0.5:
 			break
-		parts.append("%s %d → %d" % [VoterGroups.title(String(row[0])), roundi(float(row[1])), roundi(float(row[2]))])
+		parts.append("%s %d » %d" % [VoterGroups.title(String(row[0])), roundi(float(row[1])), roundi(float(row[2]))])
 	return ", ".join(PackedStringArray(parts))
 
 ## Partinin şu an geçerli toplantı bonusları: grup -> bonus.
@@ -2991,7 +2991,7 @@ func _apply_tax_result(proposer: int, level: int, passed: bool) -> void:
 	economy["tax_round"] = round_number
 	_ease_turmoil(party_of(proposer), PublicOpinion.TURMOIL_EASE_LAW)
 	_push_state({"type": "opinion", "peer_id": proposer, "econ": {"kind": "tax", "from": old, "to": level},
-		"message": L.t("%s KABUL EDİLDİ — vergiler %s → %s. Dönem geliri %s → %s. %s +%d puan.") % [
+		"message": L.t("%s KABUL EDİLDİ — vergiler %s » %s. Dönem geliri %s » %s. %s +%d puan.") % [
 		title, Economy.tax_title(old), Economy.tax_title(level), Economy.money_full(expected_revenue(old)),
 		Economy.money_full(expected_revenue(level)), _actor_name(proposer), law_pass_score(true)]})
 

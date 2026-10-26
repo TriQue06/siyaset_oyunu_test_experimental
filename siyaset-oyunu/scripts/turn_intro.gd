@@ -163,13 +163,8 @@ func _show_prompt() -> void:
 	show()
 	_dim.show()
 	var frame := PanelContainer.new()
-	var frame_style := StyleBoxFlat.new()
-	frame_style.bg_color = UiTheme.PANEL_DARK
-	frame_style.border_color = UiTheme.GOLD
-	frame_style.set_border_width_all(3)
-	frame_style.set_content_margin_all(UiTheme.PAD_L)
-	frame_style.shadow_color = Color(0, 0, 0, 0.5)
-	frame_style.shadow_offset = Vector2(6, 8)
+	var frame_style := UiSkin.board(UiTheme.PANEL, UiTheme.GOLD)
+	frame_style.set_content_margin_all(UiTheme.PAD_L + 4)
 	frame.add_theme_stylebox_override("panel", frame_style)
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_layer.add_child(frame)
@@ -178,7 +173,7 @@ func _show_prompt() -> void:
 	box.add_theme_constant_override("separation", 14)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	frame.add_child(box)
-	box.add_child(_centered(UiTheme.mono_label(L.t("SIRA SENDE"), 30, UiTheme.GOLD, true)))
+	box.add_child(_centered(UiTheme.mono_label(L.t("SIRA SENDE"), 30, UiTheme.HEAD, true)))
 	var note := PopupKit.note(L.t("Rastgele bir kart çek ya da bu sıra atla. Kart ya hemen etki eder ya da eline gelir."), UiTheme.TEXT, 420)
 	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(_centered(note))
@@ -219,7 +214,7 @@ func _show_prompt() -> void:
 	for key in ["icon_normal_color", "icon_hover_color", "icon_pressed_color", "icon_focus_color"]:
 		button.add_theme_color_override(key, UiTheme.TEXT)
 	var skip := Button.new()
-	skip.text = L.t("ATLA  ▸")
+	skip.text = L.t("ATLA")
 	skip.focus_mode = Control.FOCUS_NONE
 	skip.custom_minimum_size = Vector2(150, 56)
 	skip.add_theme_font_override("font", UiTheme.mono(true))
@@ -353,14 +348,16 @@ func _card_face(entry: Dictionary) -> Control:
 	style.bg_color = UiTheme.PANEL_DARK
 	style.border_color = accent
 	style.set_border_width_all(4)
-	style.set_corner_radius_all(0)
+	style.set_corner_radius_all(UiTheme.RADIUS_PANEL)
+	style.anti_aliasing = true
 	style.content_margin_left = 0
 	style.content_margin_right = 0
 	style.content_margin_top = 0
 	style.content_margin_bottom = 12
-	style.shadow_color = Color(0, 0, 0, 0.55)
-	style.shadow_size = 10
-	style.shadow_offset = Vector2(4, 8)
+	# Karton kalınlığı (vurgu renginin koyusu).
+	style.shadow_color = accent.darkened(0.45)
+	style.shadow_size = 1
+	style.shadow_offset = Vector2(0, 7)
 	panel.add_theme_stylebox_override("panel", style)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
@@ -370,8 +367,9 @@ func _card_face(entry: Dictionary) -> Control:
 	var ribbon := PanelContainer.new()
 	var ribbon_style := StyleBoxFlat.new()
 	ribbon_style.bg_color = accent.darkened(0.25)
-	ribbon_style.corner_radius_top_left = 0
-	ribbon_style.corner_radius_top_right = 0
+	ribbon_style.corner_radius_top_left = UiTheme.RADIUS_PANEL - 4
+	ribbon_style.corner_radius_top_right = UiTheme.RADIUS_PANEL - 4
+	ribbon_style.anti_aliasing = true
 	ribbon_style.set_content_margin_all(6)
 	ribbon.add_theme_stylebox_override("panel", ribbon_style)
 	ribbon.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -380,8 +378,8 @@ func _card_face(entry: Dictionary) -> Control:
 	ribbon_box.add_theme_constant_override("separation", 0)
 	ribbon_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ribbon.add_child(ribbon_box)
-	ribbon_box.add_child(_centered_label(L.t("ŞANS KARTI"), 11, UiTheme.INK if accent == UiTheme.GOLD else UiTheme.TEXT))
-	ribbon_box.add_child(_centered_label(String(style_info[1]), 10, UiTheme.INK if accent == UiTheme.GOLD else UiTheme.TEXT))
+	ribbon_box.add_child(_centered_label(L.t("ŞANS KARTI"), 11, UiSkin.text_on(accent.darkened(0.25))))
+	ribbon_box.add_child(_centered_label(String(style_info[1]), 10, UiSkin.text_on(accent.darkened(0.25))))
 	if card == "":
 		box.add_child(_centered_label(L.t("Elin dolu"), 22, UiTheme.TEXT))
 		box.add_child(_framed_text(L.t("Elinde en fazla %d kart durabilir; bu tur kart çekilmedi. Elindeki kartları oynayarak yer açabilirsin.") % CardManager.MAX_HAND_SIZE, accent))
@@ -392,7 +390,7 @@ func _card_face(entry: Dictionary) -> Control:
 	art_style.bg_color = UiTheme.INK
 	art_style.border_color = accent.darkened(0.3)
 	art_style.set_border_width_all(2)
-	art_style.set_corner_radius_all(0)
+	art_style.set_corner_radius_all(UiTheme.RADIUS_S)
 	art_frame.add_theme_stylebox_override("panel", art_style)
 	art_frame.custom_minimum_size = Vector2(CARD_SIZE.x - 32.0, 132)
 	art_frame.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -432,7 +430,7 @@ func _framed_text(text: String, accent: Color) -> Control:
 	frame_style.bg_color = Color(accent, 0.1)
 	frame_style.border_color = Color(accent, 0.45)
 	frame_style.set_border_width_all(1)
-	frame_style.set_corner_radius_all(0)
+	frame_style.set_corner_radius_all(UiTheme.RADIUS_S)
 	frame_style.set_content_margin_all(8)
 	frame.add_theme_stylebox_override("panel", frame_style)
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -460,11 +458,8 @@ func _show_aid(disaster_id: int) -> void:
 	_layer.add_child(box)
 	_aid_box = box
 	var head := PanelContainer.new()
-	var head_style := StyleBoxFlat.new()
-	head_style.bg_color = Disaster.color(kind).darkened(0.55)
-	head_style.border_color = Disaster.color(kind)
-	head_style.set_border_width_all(3)
-	head_style.set_content_margin_all(10)
+	var head_style := UiSkin.board(UiTheme.PANEL, Disaster.color(kind).darkened(0.1))
+	head_style.set_content_margin_all(12)
 	head.add_theme_stylebox_override("panel", head_style)
 	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(head)
@@ -503,7 +498,7 @@ func _show_aid(disaster_id: int) -> void:
 		CardManager.skip_aid()
 		_close())
 	texts.add_child(PopupKit.note(L.t("Şimdilik atlarsan bu tur içinde YARDIM hamlesiyle istediğin kadar yardım edebilirsin."),
-		UiTheme.GOLD, 300))
+		UiTheme.HEAD, 300))
 	box.reset_size()
 	var size := box.get_combined_minimum_size()
 	var final_pos := (get_viewport_rect().size - size) * 0.5

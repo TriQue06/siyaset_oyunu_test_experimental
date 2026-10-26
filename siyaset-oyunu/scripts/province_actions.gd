@@ -37,13 +37,9 @@ var max_height := 440.0
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	z_index = 96
-	# Harita panelinin bir parçası gibi: aynı zemin, ince çerçeve, gölgesiz.
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color("141a36")
-	style.border_color = UiTheme.INK
-	style.set_border_width_all(2)
-	style.border_width_top = 3
-	style.set_content_margin_all(UiTheme.PAD_S + 2)
+	# Haritanın yanında karton pano (masa oyunu).
+	var style := UiSkin.board()
+	style.set_content_margin_all(UiTheme.PAD_S + 4)
 	add_theme_stylebox_override("panel", style)
 	custom_minimum_size = Vector2(WIDTH, 0)
 	_scroll = ScrollContainer.new()
@@ -142,7 +138,7 @@ func _build_header() -> void:
 	info.pressed.connect(func(): info_requested.emit(province_id))
 	row.add_child(info)
 	var x := Button.new()
-	x.text = "✕"
+	x.text = "X"
 	x.focus_mode = Control.FOCUS_NONE
 	x.custom_minimum_size = Vector2(44, 40)
 	UiSkin.skin_button(x)
@@ -170,7 +166,7 @@ func _build_tabs() -> void:
 		button.add_theme_font_override("font", UiTheme.mono(true))
 		button.add_theme_font_size_override("font_size", 12)
 		var color: Color = spec[2]
-		UiSkin.skin_color_button(button, color if tab == key else color.darkened(0.55))
+		UiSkin.skin_color_button(button, color if tab == key else color.lerp(UiTheme.PANEL_LIGHT, 0.55))
 		button.pressed.connect(func():
 			tab = "" if tab == key else key
 			refresh())
@@ -189,7 +185,7 @@ func _choice_button(text: String, selected: bool, color: Color, action: Callable
 	button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	button.disabled = not enabled
 	button.add_theme_font_size_override("font_size", 11)
-	UiSkin.skin_color_button(button, color if selected else color.darkened(0.5))
+	UiSkin.skin_color_button(button, color if selected else color.lerp(UiTheme.PANEL_LIGHT, 0.55))
 	if selected:
 		for key in ["font_color", "font_hover_color", "font_pressed_color"]:
 			button.add_theme_color_override(key, UiTheme.GOLD.lightened(0.3))
@@ -204,7 +200,7 @@ func _confirm_button(text: String, enabled: bool, action: Callable) -> Button:
 	button.disabled = not enabled
 	button.add_theme_font_override("font", UiTheme.mono(true))
 	button.add_theme_font_size_override("font_size", 15)
-	UiSkin.skin_color_button(button, UiTheme.GREEN_DARK if enabled else UiTheme.PANEL)
+	UiSkin.skin_color_button(button, UiTheme.GREEN_DARK if enabled else UiTheme.PANEL_LIGHT)
 	button.pressed.connect(action)
 	return button
 
@@ -320,7 +316,7 @@ func _build_miting() -> void:
 	var gains := _gain_preview(me)
 	if gains != "":
 		_body.add_child(PopupKit.note(L.t("Beklenen hitap: %s") % gains, UiTheme.GREEN))
-	_body.add_child(PopupKit.kv(L.t("Toplam bedel"), GameRules.cost_text(cost), UiTheme.GOLD))
+	_body.add_child(PopupKit.kv(L.t("Toplam bedel"), GameRules.cost_text(cost), UiTheme.HEAD))
 	var ok := CardManager.can_miting(me, province_id, 0.0, _miting_tier, _smear)
 	if not ok:
 		_body.add_child(PopupKit.note(L.t("Parti kasası yetmiyor (%s gerekir).") % GameRules.cost_text(cost), UiTheme.RED))

@@ -13,7 +13,7 @@ var diagram: Control
 const COLOR_YES := Color("2E9E4F")
 const COLOR_NO := Color("C4303C")
 const COLOR_ABSTAIN := Color("B59A1E")
-const COLOR_PENDING := Color("2A2F52")
+const COLOR_PENDING := UiTheme.PANEL_LIGHT
 
 var _bar: Control
 var _status: Label

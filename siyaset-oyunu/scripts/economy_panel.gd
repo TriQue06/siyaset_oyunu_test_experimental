@@ -17,8 +17,8 @@ extends VBoxContainer
 
 signal tax_policy_requested
 
-const TILE_BG := Color("15112b")
-const TILE_BORDER := Color("3f3775")
+const TILE_BG := UiTheme.PANEL_DARK
+const TILE_BORDER := UiTheme.PANEL_LIGHT
 const TAX_COLORS := [UiTheme.GREEN, UiTheme.GOLD, UiTheme.RED]
 const CAPTION_SIZE := 9
 const VALUE_SIZE := 14
@@ -60,7 +60,8 @@ func _build_header() -> void:
 	row.add_theme_constant_override("separation", 6)
 	add_child(row)
 	var title := UiTheme.section_label(L.t("BÜTÇE"))
-	title.add_theme_font_size_override("font_size", 12)
+	title.add_theme_font_size_override("font_size", 13)
+	title.autowrap_mode = TextServer.AUTOWRAP_OFF
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(title)
 	# VERGİ ŞERİDİ: üç kademe yan yana; yürürlükteki dolu renkli.
@@ -75,8 +76,8 @@ func _build_header() -> void:
 		button.text = Economy.tax_title(level).to_upper()
 		button.focus_mode = Control.FOCUS_NONE
 		button.add_theme_font_override("font", UiTheme.mono(true))
-		button.add_theme_font_size_override("font_size", 9)
-		button.custom_minimum_size = Vector2(0, 20)
+		button.add_theme_font_size_override("font_size", 10)
+		button.custom_minimum_size = Vector2(0, 22)
 		button.pressed.connect(func(): tax_policy_requested.emit())
 		strip.add_child(button)
 		_tax_buttons.append(button)
@@ -140,10 +141,10 @@ func _make_treasury_row() -> Control:
 	cap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	line.add_child(cap)
 	# Para simgesi tutarın solunda ("¤ 200 M").
-	var icon := UiTheme.mono_label(L.t("¤"), VALUE_SIZE + 1, UiTheme.GOLD, true)
+	var icon := UiTheme.mono_label(L.t("¤"), VALUE_SIZE + 1, UiTheme.HEAD, true)
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	line.add_child(icon)
-	var value := UiTheme.mono_label("—", VALUE_SIZE + 1, UiTheme.GOLD, true)
+	var value := UiTheme.mono_label("—", VALUE_SIZE + 1, UiTheme.HEAD, true)
 	value.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	line.add_child(value)
 	var unit := UiTheme.mono_label(L.t("M"), DELTA_SIZE, UiTheme.TEXT_MUTED)
@@ -171,9 +172,11 @@ func refresh() -> void:
 	for i in _tax_buttons.size():
 		var button := _tax_buttons[i] as Button
 		var active := i == level
-		UiSkin.skin_color_button(button, TAX_COLORS[i] if active else UiTheme.PANEL_DARK)
-		button.add_theme_color_override("font_color", UiTheme.INK if active else UiTheme.TEXT_DIM)
-		button.add_theme_color_override("font_hover_color", UiTheme.INK if active else UiTheme.TEXT)
+		UiSkin.skin_color_button(button, TAX_COLORS[i] if active else UiTheme.PANEL_LIGHT)
+		UiSkin.compact(button)
+		if not active:
+			button.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
+			button.add_theme_color_override("font_hover_color", UiTheme.TEXT)
 	var prev: Dictionary = econ.get("prev", {})
 	if _treasury_tween == null or not _treasury_tween.is_running():
 		_shown_treasury = CardManager.state_treasury()
@@ -219,7 +222,7 @@ func _set_delta(key: String, prev: Dictionary, prev_key: String, now: float, up_
 		return
 	# Göstergelerde sadece yön; hazinede tutar da yazar (gerçek para hareketi).
 	var number := Economy.money_text(absf(shown)) if key == "treasury" else ""
-	label.text = ("▲" if shown > 0.0 else "▼") + number
+	label.text = ("+" if shown > 0.0 else "−") + number
 	label.add_theme_color_override("font_color", UiTheme.GREEN if (shown > 0.0) == up_good else UiTheme.RED)
 
 func _show_treasury(value: float) -> void:
@@ -428,7 +431,7 @@ static func _policy_card(me: int, level: int, current: int, selected: int, on_se
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	for state in ["normal", "hover", "pressed", "disabled"]:
 		var style := StyleBoxFlat.new()
-		style.bg_color = Color(color, 0.16) if is_current else (Color("2a2350") if state == "hover" and not is_current else TILE_BG)
+		style.bg_color = Color(color, 0.16) if is_current else (UiTheme.SLOT if state == "hover" and not is_current else TILE_BG)
 		style.border_color = color if is_current else (UiTheme.TEXT if is_selected else TILE_BORDER)
 		style.set_border_width_all(2 if is_current or is_selected else 1)
 		style.border_width_top = 4 if is_current or is_selected else 1
@@ -474,7 +477,7 @@ static func _fill_policy_detail(detail: VBoxContainer, me: int, level: int, curr
 	detail.add_child(UiTheme.mono_label(CardPresets.card_title(law_type), 13, TAX_COLORS[level], true))
 	var revenue_now := CardManager.expected_revenue(current)
 	var revenue_new := CardManager.expected_revenue(level)
-	detail.add_child(PopupKit.kv(L.t("Hazine geliri"), L.t("%s → %s / dönem") % [Economy.money_full(revenue_now), Economy.money_full(revenue_new)],
+	detail.add_child(PopupKit.kv(L.t("Hazine geliri"), L.t("%s » %s / dönem") % [Economy.money_full(revenue_now), Economy.money_full(revenue_new)],
 		UiTheme.GREEN if revenue_new > revenue_now else UiTheme.RED))
 	var effect := CardManager.tax_turn_effect(level)
 	var effect_word := L.t("etkisi yok") if is_zero_approx(effect) else (L.t("hükümete her sıra artı") if effect > 0.0 else L.t("hükümete her sıra eksi"))

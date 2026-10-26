@@ -20,7 +20,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.094, 0.078, 0.188, 1)
+color = Color(0.1137, 0.3529, 0.2392, 1)
 
 [node name="SettingsButton" type="Button" parent="." unique_id=991531772]
 unique_name_in_owner = true
@@ -33,7 +33,7 @@ offset_top = 72.0
 offset_right = -16.0
 offset_bottom = 112.0
 grow_horizontal = 0
-text = "⚙ LOBİ AYARLARI"
+text = "LOBİ AYARLARI"
 
 [node name="LeaveButton" type="Button" parent="." unique_id=20727936]
 unique_name_in_owner = true
@@ -74,7 +74,7 @@ vertical_alignment = 1
 [node name="CopyCodeButton" type="Button" parent="CenterBox/CodeRow" unique_id=625778156]
 unique_name_in_owner = true
 layout_mode = 2
-text = "📋 KOPYALA"
+text = "KOPYALA"
 
 [node name="HintLabel" type="Label" parent="CenterBox"]
 layout_mode = 2
@@ -134,7 +134,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.094, 0.078, 0.188, 1)
+color = Color(0.1137, 0.3529, 0.2392, 1)
 
 [node name="Margin" type="MarginContainer" parent="SettingsSidePanel" unique_id=1097474865]
 layout_mode = 1
@@ -163,4 +163,4 @@ text = "Lobi Ayarları"
 [node name="SideCloseButton" type="Button" parent="SettingsSidePanel/Margin/VBox/HeaderRow" unique_id=676178667]
 unique_name_in_owner = true
 layout_mode = 2
-text = "✕"
+text = "X"

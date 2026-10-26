@@ -20,7 +20,7 @@ static func name_row(group: String, value_text: String = "", value_color: Color 
 	var icon := VoterGroupIcon.make(group, icon_size)
 	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(icon)
-	var name := PopupKit.label(VoterGroups.title(group), font_size, VoterGroups.color(group).lightened(0.35))
+	var name := PopupKit.label(VoterGroups.title(group), font_size, VoterGroups.color(group).darkened(0.3))
 	name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name.clip_text = false
 	name.autowrap_mode = TextServer.AUTOWRAP_OFF
@@ -59,7 +59,7 @@ static func affinity_row(group: String, value: float, bonus: float = 0.0, delta:
 	# Değer: destek oranı; değişim sadece yön oku (büyüklüğü ipucunda).
 	var text := VoterGroups.percent_text(value)
 	if absf(delta) >= 0.5:
-		text += " " + ("▲" if delta > 0.0 else "▼")
+		text += " " + ("+" if delta > 0.0 else "−")
 	box.add_child(name_row(group, text, UiTheme.TEXT))
 	box.add_child(bar(value / 100.0, VoterGroups.color(group), BAR_HEIGHT, bonus / 100.0, VoterGroups.color(group).lightened(0.55)))
 	return box

@@ -239,7 +239,7 @@ func _build() -> void:
 	var live := PanelContainer.new()
 	UiSkin.apply_style(live, "panel", UiSkin.color_box(RED))
 	live.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	live.add_child(_label(L.t("  ●  CANLI  "), 18, Color.WHITE))
+	live.add_child(_label(L.t("  CANLI  "), 18, Color.WHITE))
 	top_row.add_child(live)
 	var swatch := ColorRect.new()
 	swatch.color = color

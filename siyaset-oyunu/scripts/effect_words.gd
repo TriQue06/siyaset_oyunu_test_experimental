@@ -89,7 +89,7 @@ static func arrows(value: float, scale: String = "national") -> String:
 	if i == 0:
 		return "·"
 	var count := 1 if i <= 1 else (2 if i <= 2 else 3)
-	return ("▲" if value > 0.0 else "▼").repeat(count)
+	return ("+" if value > 0.0 else "−").repeat(count)
 
 ## 0–100 arası bir güç / uyum değeri için kısa sözcük.
 static func strength(value: float) -> String:

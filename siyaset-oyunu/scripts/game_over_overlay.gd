@@ -21,7 +21,7 @@ func _ready() -> void:
 
 	var backdrop := ColorRect.new()
 	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	backdrop.color = Color(UiTheme.INK.r, UiTheme.INK.g, UiTheme.INK.b, 0.95)
+	backdrop.color = Color(UiTheme.FELT_DARK, 0.96)
 	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(backdrop)
 
@@ -34,7 +34,7 @@ func _ready() -> void:
 	center.add_child(vbox)
 
 	var ranking: Array = CardManager.final_ranking
-	var over := _label(L.t("OYUN BİTTİ"), 16, DIM)
+	var over := _label(L.t("OYUN BİTTİ"), 16, UiTheme.WOOD_TEXT_MUTED)
 	vbox.add_child(over)
 	_reveal.append(over)
 
@@ -46,13 +46,13 @@ func _ready() -> void:
 		badge.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		winner_box.add_child(badge)
-		winner_box.add_child(_label(L.t("KAZANAN"), 13, DIM))
+		winner_box.add_child(_label(L.t("KAZANAN"), 13, UiTheme.WOOD_TEXT_MUTED))
 		winner_box.add_child(_label(String(winner.get("name", "?")), 30, Color(winner.get("color", Color.WHITE)).lightened(0.35)))
 		winner_box.add_child(_label(L.t("%s  ·  %d puan") % [winner.get("leader", "?"), int(winner.get("score", 0))], 15, GOLD))
 		vbox.add_child(winner_box)
 		_reveal.append(winner_box)
 
-	var reason := _label(CardManager.game_end_reason, 13, DIM)
+	var reason := _label(CardManager.game_end_reason, 13, UiTheme.WOOD_TEXT_MUTED)
 	reason.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vbox.add_child(reason)
 	_reveal.append(reason)
@@ -102,7 +102,7 @@ func _ranking_row(index: int, entry: Dictionary, is_me: bool) -> Control:
 	panel.add_child(row)
 	# Solda parti renginde şerit; kazanan/kendi satırın altın renkli olur.
 	row.add_child(UiTheme.stripe(GOLD if is_me else color))
-	var rank := _label("%d." % (index + 1), 18, GOLD if index == 0 else Color.WHITE)
+	var rank := _label("%d." % (index + 1), 18, UiTheme.HEAD if index == 0 else UiTheme.TEXT)
 	rank.custom_minimum_size = Vector2(34, 0)
 	row.add_child(rank)
 	var badge := PartyBadge.build(_party_for(entry), Vector2(30, 30), 64)
@@ -112,7 +112,7 @@ func _ranking_row(index: int, entry: Dictionary, is_me: bool) -> Control:
 	var names := HBoxContainer.new()
 	names.add_theme_constant_override("separation", 8)
 	names.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var party_name := _label(String(entry.get("name", "?")), 17, GOLD if is_me else Color.WHITE)
+	var party_name := _label(String(entry.get("name", "?")), 17, UiTheme.HEAD if is_me else UiTheme.TEXT)
 	names.add_child(party_name)
 	var leader := _label(String(entry.get("leader", "?")) + (L.t("  (sen)") if is_me else ""), 12, DIM)
 	names.add_child(leader)
@@ -121,7 +121,7 @@ func _ranking_row(index: int, entry: Dictionary, is_me: bool) -> Control:
 	seats.custom_minimum_size = Vector2(56, 0)
 	seats.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	row.add_child(seats)
-	var score := _label("%d" % int(entry.get("score", 0)), 20, Color.WHITE)
+	var score := _label("%d" % int(entry.get("score", 0)), 20, UiTheme.TEXT)
 	score.custom_minimum_size = Vector2(56, 0)
 	score.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	row.add_child(score)

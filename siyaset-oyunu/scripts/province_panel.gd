@@ -160,7 +160,7 @@ func _build_appeal(me: int) -> void:
 	var closeness := PublicOpinion.appeal_closeness(appeal)
 	var closeness_text := L.t("çok yakın") if closeness >= 0.75 else (L.t("yakın") if closeness >= PublicOpinion.CLOSENESS_NEAR \
 		else (L.t("uzak") if closeness >= 0.3 else L.t("çok uzak")))
-	var closeness_color := UiTheme.GREEN if closeness >= PublicOpinion.CLOSENESS_NEAR else (UiTheme.GOLD if closeness >= 0.3 else UiTheme.RED)
+	var closeness_color := UiTheme.GREEN if closeness >= PublicOpinion.CLOSENESS_NEAR else (UiTheme.GOLD_DIM if closeness >= 0.3 else UiTheme.RED)
 	_body.add_child(PopupKit.section(L.t("Partin bu ilde"), L.t("seçmen grupları")))
 	_body.add_child(PopupKit.kv(L.t("Seçmen sana"), closeness_text, closeness_color))
 	var groups := CardManager.effective_groups(me)
@@ -245,7 +245,7 @@ func _build_own(me: int) -> void:
 	if level > 0:
 		_body.add_child(PopupKit.kv(L.t("Teşkilat desteği"), EffectWords.amount(CardManager.org_bonus(province_id, me), "local"), UiTheme.GREEN))
 		var risk := CardManager.miting_risk(me, province_id)
-		var color := UiTheme.GREEN if risk < 0.12 else (UiTheme.GOLD if risk < 0.25 else UiTheme.RED)
+		var color := UiTheme.GREEN if risk < 0.12 else (UiTheme.GOLD_DIM if risk < 0.25 else UiTheme.RED)
 		_body.add_child(PopupKit.kv(L.t("Miting provokasyonu"), EffectWords.risk(risk), color))
 		var mult := PublicOpinion.org_action_mult(level)
 		if not is_equal_approx(mult, 1.0):

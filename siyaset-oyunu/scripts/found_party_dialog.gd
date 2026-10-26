@@ -120,7 +120,7 @@ func _ready() -> void:
 
 func _refresh() -> void:
 	for i in _icon_grid.get_child_count():
-		(_icon_grid.get_child(i) as TextureButton).self_modulate = UiTheme.GOLD if i == _icon_index else Color.WHITE
+		(_icon_grid.get_child(i) as TextureButton).self_modulate = UiTheme.TEAL if i == _icon_index else UiTheme.TEXT_DIM
 	for swatch in _color_row.get_children():
 		var color: Color = swatch.get_meta("color")
 		var selected := color.is_equal_approx(_color)
@@ -128,7 +128,7 @@ func _refresh() -> void:
 			UiSkin.BUTTON_TINT_HOVER if selected else UiSkin.BUTTON_TINT_NORMAL)
 		for state in ["normal", "hover", "pressed", "disabled"]:
 			UiSkin.apply_style(swatch, state, style)
-		swatch.text = "✕" if swatch.disabled else ("●" if selected else "")
+		swatch.text = "X" if swatch.disabled else ("•" if selected else "")
 	for child in _preview.get_children():
 		child.queue_free()
 	var badge := PartyBadge.build({"bg_color": _color, "icon_index": _icon_index, "icon_color": Color.WHITE}, Vector2(64, 64), 128)

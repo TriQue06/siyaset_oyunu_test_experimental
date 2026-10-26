@@ -6,16 +6,19 @@ extends RefCounted
 ## YÖNTEM (Azgaar tarzı):
 ##   1. Harita binlerce küçük hücreye bölünür: sarsılmış ızgara noktaları ve
 ##      onların Voronoi hücreleri (Delaunay üçgenlemesinin çevrel merkezleri).
-##   2. Kara: gürültü (fbm) + eliptik düşüş + birkaç yarımada tümseği; eşik,
-##      karanın payı LAND_FRACTION olacak şekilde seçilir. En büyük kara
-##      parçası ve yeterince büyük adalar kalır, göller doldurulur.
-##   3. İller: dengeli dağılmış tohum hücrelerden çok kaynaklı Dijkstra ile
-##      büyür. Kenar maliyeti "sırt" gürültüsüyle artar: sınırlar dağ sırtı ve
-##      vadi gibi doğal çizgilere oturur; her tohumun kendi hızı il boylarını
-##      çeşitlendirir (büyükşehirler küçük, kırsal büyük).
-##   4. Çizim (geometry): hücre köşelerinden sınırda olanlar, iki komşusunun
-##      ortalamasına doğru birkaç kez çekilir (kavşaklar sabit). İki il AYNI
-##      köşeleri paylaştığı için yumuşatılmış sınırlar yine kusursuz oturur.
+##   2. Kara: gürültü (fbm) + eliptik düşüş + birkaç yarımada tümseği + ince
+##      kıyı gürültüsü; eşik, karanın payı LAND_FRACTION olacak şekilde seçilir.
+##      Küçük adacıklar en yakın ile bağlanır, büyük adalar kendi ilidir; iç
+##      kesimlere birkaç GÖL oyulur.
+##   3. İller: tohumlar bir YOĞUNLUK alanına göre dağılır (kıyıda ve haritanın
+##      bir yakasında sık: küçük iller; içerde ve öbür yakada seyrek: büyük
+##      iller, Türkiye'nin batısı / doğusu gibi). Çok kaynaklı Dijkstra ile
+##      büyürler; kenar maliyeti "sırt" ve "arazi" gürültüsüyle değişir:
+##      sınırlar doğal çizgilere oturur, iller vadiler boyunca uzar.
+##   4. Çizim (geometry): sınır köşeleri hafifçe yumuşatılır, sonra iki ölçekli
+##      gürültüyle kıvrılır (orta: köşeli kıvrımlar, ince: kırışık doku; gerçek
+##      seçim haritalarındaki gibi). İki il AYNI köşeleri paylaştığı için sınırlar
+##      yine kusursuz oturur.
 ##
 ## AĞDA GİDEN VERİ: noktalar (0,01'e yuvarlanmış), her noktanın ili (-1 deniz)
 ## ve il listesi. Üçgenleme ve yumuşatma herkesin cihazında aynı girdiden,
@@ -26,7 +29,7 @@ const WIDTH := 900.0
 const HEIGHT := 410.0
 ## Küçük hücrelerin aralığı (harita birimi). Küçüldükçe sınırlar incelir ama
 ## üretim ve çizim yavaşlar.
-const SPACING := 8.0
+const SPACING := 6.0
 ## Kenar payı: bu kadar hücre ülkeye ait olamaz (deniz çerçevesi).
 const MARGIN_CELLS := 3
 const LAND_FRACTION := 0.5
@@ -34,12 +37,19 @@ const LAND_FRACTION := 0.5
 const CROP_PAD := SPACING * 2.5
 ## Varsayılan il sayısı (province_scale 1); eski altıgen haritayla aynı ölçek.
 const PROVINCES := 46
-const MIN_PROVINCE_CELLS := 12
-const MIN_ISLAND_CELLS := 45
+const MIN_PROVINCE_CELLS := 20
+## Bu kadar hücreden büyük ada kendi ilidir; daha küçükleri en yakın ile bağlanır.
+const MIN_ISLAND_CELLS := 160
+## Bundan küçük adacıklar silinir.
+const MIN_ISLET_CELLS := 3
+## İç kesimlere oyulan göllerin sayısı ve boyu (hücre).
+const LAKES := Vector2i(1, 3)
+const LAKE_CELLS := Vector2i(12, 45)
 const METRO_COUNT := 5
-const SMOOTH_ITERATIONS := 6
-## Sınır kıvrımlarının genliği (harita birimi).
-const WIGGLE := 3.2
+const SMOOTH_ITERATIONS := 2
+## Sınır kıvrımlarının genliği (harita birimi): orta ölçek ve ince kırışıklık.
+const WIGGLE := 2.4
+const FINE_WIGGLE := 0.75
 const VOTERS_PER_SEAT := 100000
 
 static func generate(seed_value: int, province_scale: float = 1.0, seat_total: int = 300) -> Dictionary:
@@ -48,10 +58,11 @@ static func generate(seed_value: int, province_scale: float = 1.0, seat_total: i
 	var points := _points(rng)
 	var topo := topology(points)
 	var land := _land(points, topo, rng)
+	var open_sea := _open_sea(points, land, topo)
 	var count := maxi(6, int(roundf(PROVINCES / maxf(0.25, province_scale))))
-	var labels := _grow(points, topo, land, count, rng)
+	var labels := _grow(points, topo, land, open_sea, count, rng)
 	count = _compact(labels, points)
-	var coastal := _coastal(labels, topo, count)
+	var coastal := _coastal(labels, topo, count, open_sea)
 	var population := _population(points, topo, labels, count, rng)
 	var seats := HexGridGenerator._allocate_seats(population, seat_total)
 	var names := _names(points, labels, count, coastal, population, rng)
@@ -72,9 +83,21 @@ static func generate(seed_value: int, province_scale: float = 1.0, seat_total: i
 			box = box.expand(points[i])
 	box = box.grow(CROP_PAD)
 	var flat: Array = []
+	var shifted := PackedVector2Array()
 	for p in points:
-		flat.append(snappedf(p.x - box.position.x, 0.01))
-		flat.append(snappedf(p.y - box.position.y, 0.01))
+		var q := Vector2(snappedf(p.x - box.position.x, 0.01), snappedf(p.y - box.position.y, 0.01))
+		flat.append(q.x)
+		flat.append(q.y)
+		shifted.append(q)
+	# Üçgenleme kaydırmayla değişmez: çizim (geometry) aynı haritayı yeniden
+	# üçgenlemesin diye önbellek kırpılmış koordinatlara taşınır.
+	var moved := topo.duplicate()
+	var centers: PackedVector2Array = (topo["centers"] as PackedVector2Array).duplicate()
+	for t in centers.size():
+		centers[t] -= box.position
+	moved["centers"] = centers
+	_topo_cache_points = shifted
+	_topo_cache = moved
 	return {"kind": KIND, "seed": seed_value, "width": ceilf(box.size.x), "height": ceilf(box.size.y), "points": flat,
 		"labels": Array(labels), "regions": regions}
 
@@ -100,12 +123,26 @@ static func _points(rng: RandomNumberGenerator) -> PackedVector2Array:
 ##   adj      : Array[PackedInt32Array], nokta -> komşu noktalar
 ##   ptris    : Array[PackedInt32Array], nokta -> üçgenler (açıya göre sıralı)
 ##   edge_tris: Dictionary, a * n + b (a < b) -> Vector2i(t1, t2) (t2 = -1: dış kenar)
+static var _topo_cache_points := PackedVector2Array()
+static var _topo_cache: Dictionary = {}
+
 static func topology(points: PackedVector2Array) -> Dictionary:
+	# Aynı noktalar (üretimden hemen sonra çizim) için yeniden hesaplanmaz.
+	if not _topo_cache.is_empty() and points == _topo_cache_points:
+		return _topo_cache
+	var topo := _topology(points)
+	_topo_cache_points = points
+	_topo_cache = topo
+	return topo
+
+static func _topology(points: PackedVector2Array) -> Dictionary:
 	var n := points.size()
 	var tris := Geometry2D.triangulate_delaunay(points)
 	var tcount := tris.size() / 3
 	var centers := PackedVector2Array()
 	centers.resize(tcount)
+	var mids := PackedVector2Array()  # üçgen ağırlık merkezleri (halka sırası)
+	mids.resize(tcount)
 	var adj_sets: Array = []
 	var ptris: Array = []
 	for i in n:
@@ -121,6 +158,7 @@ static func topology(points: PackedVector2Array) -> Dictionary:
 		var mid := (points[a] + points[b] + points[c]) / 3.0
 		var cc := _circumcenter(points[a], points[b], points[c])
 		centers[t] = cc if cc.distance_to(mid) < SPACING * 0.75 else mid
+		mids[t] = mid
 		for pair in [[a, b], [b, c], [c, a]]:
 			var u: int = mini(pair[0], pair[1])
 			var v: int = maxi(pair[0], pair[1])
@@ -140,8 +178,22 @@ static func topology(points: PackedVector2Array) -> Dictionary:
 		# Halka sırası üçgenlerin AĞIRLIK merkezinin açısıyla (çevrel merkez
 		# üçgenin dışına düşebilir ve sırayı bozar; ağırlık merkezi bozmaz).
 		var origin := points[i]
-		var sorted: Array = ptris[i]
-		sorted.sort_custom(func(x, y): return (_centroid(points, tris, x) - origin).angle() < (_centroid(points, tris, y) - origin).angle())
+		var ring: Array = ptris[i]
+		# Küçük halka: açılar bir kez hesaplanır, araya sokarak sıralanır.
+		var angles: Array = []
+		for t in ring:
+			angles.append((mids[int(t)] - origin).angle())
+		for x in range(1, ring.size()):
+			var key_t: int = ring[x]
+			var key_a: float = angles[x]
+			var y := x - 1
+			while y >= 0 and float(angles[y]) > key_a:
+				ring[y + 1] = ring[y]
+				angles[y + 1] = angles[y]
+				y -= 1
+			ring[y + 1] = key_t
+			angles[y + 1] = key_a
+		var sorted := ring
 		ptris[i] = PackedInt32Array(sorted)
 	return {"tris": tris, "centers": centers, "adj": adj, "ptris": ptris, "edge_tris": edge_tris, "n": n}
 
@@ -170,8 +222,11 @@ static func _land(points: PackedVector2Array, topo: Dictionary, rng: RandomNumbe
 	noise.seed = rng.randi()
 	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	noise.fractal_type = FastNoiseLite.FRACTAL_FBM
-	noise.fractal_octaves = 5
+	noise.fractal_octaves = 6
 	noise.frequency = 0.0055
+	var crinkle := FastNoiseLite.new()
+	crinkle.seed = rng.randi()
+	crinkle.frequency = 0.045
 	var warp := FastNoiseLite.new()
 	warp.seed = rng.randi()
 	warp.frequency = 0.004
@@ -193,7 +248,7 @@ static func _land(points: PackedVector2Array, topo: Dictionary, rng: RandomNumbe
 			continue
 		var q := p + Vector2(warp.get_noise_2d(p.x, p.y), warp.get_noise_2d(p.x + 913.0, p.y - 377.0)) * 60.0
 		var d := ((q - center) / radius).length()
-		var h := (1.0 - d) + noise.get_noise_2d(p.x, p.y) * 0.75
+		var h := (1.0 - d) + noise.get_noise_2d(p.x, p.y) * 0.75 + crinkle.get_noise_2d(p.x, p.y) * 0.07
 		for bump in bumps:
 			var dist: float = (p - (bump[0] as Vector2)).length()
 			h += float(bump[2]) * exp(-(dist * dist) / (2.0 * float(bump[1]) * float(bump[1])))
@@ -208,12 +263,10 @@ static func _land(points: PackedVector2Array, topo: Dictionary, rng: RandomNumbe
 	land.resize(n)
 	for i in n:
 		land[i] = 1 if height[i] > threshold else 0
-	# Kara parçaları: en büyüğü ve büyük adalar kalır.
-	var comps := _components(land, 1, topo)
-	comps.sort_custom(func(a, b): return a.size() > b.size())
-	for k in comps.size():
-		if k > 0 and (comps[k] as Array).size() < MIN_ISLAND_CELLS:
-			for i in comps[k]:
+	# Adacıklar: çok küçükleri silinir (kalanlar bir ile bağlanır, bkz. _grow).
+	for comp in _components(land, 1, topo):
+		if (comp as Array).size() < MIN_ISLET_CELLS:
+			for i in comp:
 				land[i] = 0
 	# Göller: dış denize bağlı olmayan su doldurulur.
 	for comp in _components(land, 0, topo):
@@ -225,7 +278,85 @@ static func _land(points: PackedVector2Array, topo: Dictionary, rng: RandomNumbe
 		if not open:
 			for i in comp:
 				land[i] = 1
+	_carve_lakes(points, land, topo, rng)
 	return land
+
+## İç kesimlere gürültülü kıyılı birkaç göl oyulur (denizden uzak hücrelerden
+## büyür; göl kıyısı da ince koyu çizgiyle çizilir).
+static func _carve_lakes(points: PackedVector2Array, land: PackedByteArray, topo: Dictionary, rng: RandomNumberGenerator) -> void:
+	var depth := _coast_depth(land, topo)
+	var deep: Array = []
+	for i in land.size():
+		if land[i] == 1 and depth[i] >= 7:
+			deep.append(i)
+	if deep.is_empty():
+		return
+	var noise := FastNoiseLite.new()
+	noise.seed = rng.randi()
+	noise.frequency = 0.08
+	for _k in rng.randi_range(LAKES.x, LAKES.y):
+		var start: int = deep[rng.randi_range(0, deep.size() - 1)]
+		if land[start] == 0:
+			continue
+		var target := rng.randi_range(LAKE_CELLS.x, LAKE_CELLS.y)
+		var lake: Array = [start]
+		var seen := {start: true}
+		var frontier: Array = [start]
+		while lake.size() < target and not frontier.is_empty():
+			# Gürültüsü en düşük sınır hücresi göle katılır: kıyı girintili olur.
+			var best := 0
+			var best_v := INF
+			for k in frontier.size():
+				var p := points[int(frontier[k])]
+				var v := noise.get_noise_2d(p.x, p.y) * 0.6 + p.distance_to(points[start]) * 0.035
+				if v < best_v:
+					best_v = v
+					best = k
+			var cur: int = frontier[best]
+			frontier.remove_at(best)
+			if cur != start:
+				lake.append(cur)
+			for nb in (topo["adj"][cur] as PackedInt32Array):
+				if not seen.has(nb) and land[nb] == 1 and depth[nb] >= 4:
+					seen[nb] = true
+					frontier.append(nb)
+		for i in lake:
+			land[i] = 0
+
+## Kara hücrelerinin suya uzaklığı (hücre adımı; su 0).
+static func _coast_depth(land: PackedByteArray, topo: Dictionary) -> PackedInt32Array:
+	var depth := PackedInt32Array()
+	depth.resize(land.size())
+	depth.fill(-1)
+	var queue: Array = []
+	for i in land.size():
+		if land[i] == 0:
+			depth[i] = 0
+			queue.append(i)
+	var head := 0
+	while head < queue.size():
+		var cur: int = queue[head]
+		head += 1
+		for nb in (topo["adj"][cur] as PackedInt32Array):
+			if depth[nb] < 0:
+				depth[nb] = depth[cur] + 1
+				queue.append(nb)
+	return depth
+
+## Açık deniz (çerçeveye bağlı su); göller değil.
+static func _open_sea(points: PackedVector2Array, land: PackedByteArray, topo: Dictionary) -> PackedByteArray:
+	var out := PackedByteArray()
+	out.resize(land.size())
+	for comp in _components(land, 0, topo):
+		var open := false
+		for i in comp:
+			if not _inside(points[i]):
+				open = true
+				break
+		if open:
+			for i in comp:
+				out[i] = 1
+	return out
 
 static func _components(land: PackedByteArray, value: int, topo: Dictionary) -> Array:
 	var seen := PackedByteArray()
@@ -249,36 +380,56 @@ static func _components(land: PackedByteArray, value: int, topo: Dictionary) -> 
 
 # --- 3. İller ---------------------------------------------------------------------
 
-static func _grow(points: PackedVector2Array, topo: Dictionary, land: PackedByteArray, count: int, rng: RandomNumberGenerator) -> PackedInt32Array:
+static func _grow(points: PackedVector2Array, topo: Dictionary, land: PackedByteArray, open_sea: PackedByteArray, count: int, rng: RandomNumberGenerator) -> PackedInt32Array:
 	var n := points.size()
 	var labels := PackedInt32Array()
 	labels.resize(n)
 	labels.fill(-1)
-	var land_cells: Array = []
-	for i in n:
-		if land[i] == 1:
-			land_cells.append(i)
-	# Her kara parçasına (ada) en az bir tohum; kalanlar en iyi aday yöntemiyle
-	# (rastgele adaylardan mevcut tohumlara en uzak olanı) dengeli dağılır.
-	var seeds: Array = []
+	# Kara parçaları: ana kara ve büyük adalar tohum alır; küçük adalar sonra
+	# en yakın ile bağlanır.
 	var comps := _components(land, 1, topo)
 	comps.sort_custom(func(a, b): return a.size() > b.size())
-	for comp in comps:
+	var seeded: Array = []
+	var seeded_cells := 0
+	for k in comps.size():
+		if k == 0 or (comps[k] as Array).size() >= MIN_ISLAND_CELLS:
+			seeded.append(comps[k])
+			seeded_cells += (comps[k] as Array).size()
+	# YOĞUNLUK: kıyıda ve haritanın bir yakasında sık tohum (küçük iller).
+	var depth := _coast_depth(land, topo)
+	var axis := Vector2.from_angle(rng.randf() * TAU)
+	var dense_noise := FastNoiseLite.new()
+	dense_noise.seed = rng.randi()
+	dense_noise.frequency = 0.006
+	var density := PackedFloat32Array()
+	density.resize(n)
+	for i in n:
+		if land[i] == 0:
+			continue
+		var p := points[i]
+		var along := ((p - Vector2(WIDTH, HEIGHT) * 0.5).dot(axis) / (WIDTH * 0.5) + 1.0) * 0.5
+		var shore := 0.55 * exp(-float(maxi(0, depth[i] - 1)) / 5.0) if open_sea.size() > 0 else 0.0
+		density[i] = (0.75 + 0.75 * clampf(along, 0.0, 1.0)) * (1.0 + shore) * (0.85 + 0.3 * (dense_noise.get_noise_2d(p.x, p.y) + 1.0) * 0.5)
+	var seeds: Array = []
+	for comp in seeded:
 		var arr: Array = comp
-		var share := maxi(1, int(roundf(float(count) * arr.size() / land_cells.size())))
+		var share := maxi(1, int(roundf(float(count) * arr.size() / seeded_cells)))
 		for k in share:
-			seeds.append(_best_candidate(arr, seeds, points, rng))
-	var noise := FastNoiseLite.new()
-	noise.seed = rng.randi()
-	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	noise.fractal_type = FastNoiseLite.FRACTAL_RIDGED
-	noise.fractal_octaves = 3
-	noise.frequency = 0.012
+			seeds.append(_best_candidate(arr, seeds, points, density, rng))
+	var ridge_noise := FastNoiseLite.new()
+	ridge_noise.seed = rng.randi()
+	ridge_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	ridge_noise.fractal_type = FastNoiseLite.FRACTAL_RIDGED
+	ridge_noise.fractal_octaves = 3
+	ridge_noise.frequency = 0.011
+	# ARAZİ: büyük ölçekli düz ova / engebe; iller ovalarda uzar.
+	var terrain := FastNoiseLite.new()
+	terrain.seed = rng.randi()
+	terrain.fractal_octaves = 3
+	terrain.frequency = 0.008
 	var speed: Array = []
 	for k in seeds.size():
-		speed.append(rng.randf_range(0.75, 1.35))
-	for k in mini(3, seeds.size()):
-		speed[rng.randi_range(0, seeds.size() - 1)] = 0.6  # büyükşehir: küçük il
+		speed.append(rng.randf_range(0.7, 1.45) / sqrt(density[int(seeds[k])]))
 	var dist := PackedFloat32Array()
 	dist.resize(n)
 	dist.fill(INF)
@@ -299,25 +450,48 @@ static func _grow(points: PackedVector2Array, topo: Dictionary, land: PackedByte
 			if land[nb] == 0:
 				continue
 			var mid := (points[cur] + points[nb]) * 0.5
-			var ridge := (noise.get_noise_2d(mid.x, mid.y) + 1.0) * 0.5
-			var step := points[cur].distance_to(points[nb]) * (0.55 + 2.2 * ridge * ridge) / float(speed[lab])
+			var ridge := (ridge_noise.get_noise_2d(mid.x, mid.y) + 1.0) * 0.5
+			var rough := 0.55 + 0.9 * (terrain.get_noise_2d(mid.x, mid.y) + 1.0) * 0.5
+			var step := points[cur].distance_to(points[nb]) * (0.4 + 2.8 * ridge * ridge * ridge) * rough / float(speed[lab])
 			if cost + step < dist[nb]:
 				dist[nb] = cost + step
 				labels[nb] = lab
 				heap.push(cost + step, nb)
+	_attach_islets(points, labels, land, topo)
 	_merge_small(labels, topo)
 	return labels
 
-static func _best_candidate(cells: Array, seeds: Array, points: PackedVector2Array, rng: RandomNumberGenerator) -> int:
+## Tohum almamış küçük adalar en yakın ilin parçası olur (Yunan adaları gibi).
+static func _attach_islets(points: PackedVector2Array, labels: PackedInt32Array, land: PackedByteArray, topo: Dictionary) -> void:
+	for comp in _components(land, 1, topo):
+		var arr: Array = comp
+		if labels[int(arr[0])] >= 0:
+			continue
+		var probe := points[int(arr[0])]
+		var best := -1
+		var best_d := INF
+		for i in points.size():
+			if labels[i] >= 0:
+				var d := points[i].distance_squared_to(probe)
+				if d < best_d:
+					best_d = d
+					best = labels[i]
+		for i in arr:
+			labels[int(i)] = best
+
+## En iyi aday: rastgele adaylardan mevcut tohumlara (yoğunlukla ölçeklenmiş)
+## uzaklığı en büyük olan. Yoğun yerde aynı uzaklık "daha uzak" sayılır.
+static func _best_candidate(cells: Array, seeds: Array, points: PackedVector2Array, density: PackedFloat32Array, rng: RandomNumberGenerator) -> int:
 	var best: int = cells[rng.randi_range(0, cells.size() - 1)]
 	if seeds.is_empty():
 		return best
 	var best_d := -1.0
-	for _k in 14:
+	for _k in 16:
 		var c: int = cells[rng.randi_range(0, cells.size() - 1)]
 		var d := INF
 		for s in seeds:
 			d = minf(d, points[c].distance_squared_to(points[int(s)]))
+		d *= density[c] * density[c]
 		if d > best_d:
 			best_d = d
 			best = c
@@ -378,7 +552,7 @@ static func _compact(labels: PackedInt32Array, points: PackedVector2Array) -> in
 			labels[i] = int(remap[labels[i]])
 	return order.size()
 
-static func _coastal(labels: PackedInt32Array, topo: Dictionary, count: int) -> Array:
+static func _coastal(labels: PackedInt32Array, topo: Dictionary, count: int, open_sea: PackedByteArray) -> Array:
 	var out: Array = []
 	out.resize(count)
 	out.fill(false)
@@ -387,7 +561,7 @@ static func _coastal(labels: PackedInt32Array, topo: Dictionary, count: int) -> 
 		if v < 0 or out[v]:
 			continue
 		for nb in (topo["adj"][i] as PackedInt32Array):
-			if labels[nb] < 0:
+			if labels[nb] < 0 and open_sea[nb] == 1:
 				out[v] = true
 				break
 	return out
@@ -537,10 +711,14 @@ static func geometry(map_data: Dictionary) -> Dictionary:
 	wiggle.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	wiggle.fractal_type = FastNoiseLite.FRACTAL_FBM
 	wiggle.fractal_octaves = 2
-	wiggle.frequency = 0.05
+	wiggle.frequency = 0.04
+	var fine := FastNoiseLite.new()
+	fine.seed = int(map_data.get("seed", 0)) + 7
+	fine.frequency = 0.22
 	for t in chain.keys():
 		var c := centers[t]
-		centers[t] = c + Vector2(wiggle.get_noise_2d(c.x, c.y), wiggle.get_noise_2d(c.x + 517.0, c.y - 311.0)) * WIGGLE
+		centers[t] = c + Vector2(wiggle.get_noise_2d(c.x, c.y), wiggle.get_noise_2d(c.x + 517.0, c.y - 311.0)) * WIGGLE \
+			+ Vector2(fine.get_noise_2d(c.x, c.y), fine.get_noise_2d(c.x - 211.0, c.y + 97.0)) * FINE_WIGGLE
 	# Dolgu: her kara hücresinin çokgeni üçgenlenir (köşeler oynadığı için hücre
 	# içbükey olabilir; yelpaze taşıp boşluk bırakırdı).
 	var fills: Array = []
@@ -646,6 +824,30 @@ static func _centers(points: PackedVector2Array, labels: PackedInt32Array, topo:
 	for r in count:
 		out.append(points[int(best[r])] if int(best[r]) >= 0 else Vector2.ZERO)
 	return out
+
+## İlin ANA KARA parçası sayısı (başka bir ile değen parçalar; adalar sayılmaz).
+## Yapboz denetimi: her il için 1 olmalı (testler ve önizleme).
+static func mainland_parts(labels: PackedInt32Array, topo: Dictionary, region: int) -> int:
+	var seen := {}
+	var parts := 0
+	for start in labels.size():
+		if labels[start] != region or seen.has(start):
+			continue
+		var touches := false
+		seen[start] = true
+		var queue: Array = [start]
+		while not queue.is_empty():
+			var cur: int = queue.pop_back()
+			for nb in (topo["adj"][cur] as PackedInt32Array):
+				if labels[nb] == region:
+					if not seen.has(nb):
+						seen[nb] = true
+						queue.append(nb)
+				elif labels[nb] >= 0:
+					touches = true
+		if touches:
+			parts += 1
+	return parts
 
 ## Küçük ikili yığın (Dijkstra için): [maliyet, düğüm].
 class _Heap:

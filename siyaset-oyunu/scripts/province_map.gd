@@ -28,6 +28,11 @@ const REGION_BORDER_WIDTH := 1.7
 const COAST_COLOR := Color(0.62, 0.72, 0.92, 0.8)
 const COAST_WIDTH := 1.4
 const HOVER_COLOR := Color(1, 1, 1, 0.85)
+## ÜLKE haritasının çizgileri (referans: Türkiye / İspanya seçim haritaları).
+const COUNTRY_BORDER_COLOR := Color(1, 1, 1, 0.92)
+const COUNTRY_BORDER_WIDTH := 0.9
+const COUNTRY_COAST_COLOR := Color(0.03, 0.03, 0.07, 0.95)
+const COUNTRY_COAST_WIDTH := 1.3
 
 var grid_width: int = 0
 var grid_height: int = 0
@@ -156,9 +161,10 @@ func _build_country() -> void:
 		_edges[ids[ra]].append([a, b])
 		if rb >= 0:
 			_edges[ids[rb]].append([a, b])
+		# Seçim haritaları gibi (0.0.262): il sınırı ince beyaz, kıyı ince koyu.
 		var coast := rb < 0
-		var width := COAST_WIDTH if coast else REGION_BORDER_WIDTH
-		var color := Color.WHITE if _white_borders else (COAST_COLOR if coast else (REGION_BORDER_DARK if _dark_borders else REGION_BORDER_COLOR))
+		var width := COUNTRY_COAST_WIDTH if coast else COUNTRY_BORDER_WIDTH
+		var color := COUNTRY_COAST_COLOR if coast else (REGION_BORDER_DARK if _dark_borders else COUNTRY_BORDER_COLOR)
 		_append_segment(a, b, width, color)
 
 ## İlin tamamını tek çağrıda boyar (afet / odak parıltısı).

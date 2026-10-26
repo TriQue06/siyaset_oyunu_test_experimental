@@ -75,21 +75,9 @@ func _initialize() -> void:
 	var topo := CountryGenerator.topology(geo["points"])
 	var ok_contiguous := true
 	for r in game_map.ids.size():
-		var cells: Array = []
-		for i in labels.size():
-			if labels[i] == r:
-				cells.append(i)
-		var seen := {cells[0]: true}
-		var queue: Array = [cells[0]]
-		while not queue.is_empty():
-			var cur: int = queue.pop_back()
-			for n in (topo["adj"][cur] as PackedInt32Array):
-				if not seen.has(n) and labels[n] == r:
-					seen[n] = true
-					queue.append(n)
-		if seen.size() != cells.size():
+		if CountryGenerator.mainland_parts(labels, topo, r) != 1:
 			ok_contiguous = false
-	check("her secim bolgesi tek parca", ok_contiguous)
+	check("her secim bolgesinin ana karasi tek parca (adalar baglanabilir)", ok_contiguous)
 	var total := 0
 	var min_seats := 999
 	for id in game_map.ids:

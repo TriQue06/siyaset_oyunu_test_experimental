@@ -39,7 +39,7 @@ func _initialize() -> void:
 		for r in regions.size():
 			var tris: PackedVector2Array = geo["tris"][r]
 			var hue := fmod(float(r) * 0.618034, 1.0)
-			var color := Color.from_hsv(hue, 0.45, 0.62 + 0.18 * float(int(regions[r]["seats"]) > 8))
+			var color := Color.from_hsv(hue, 0.55, 0.78 + 0.12 * float(int(regions[r]["seats"]) > 8))
 			var indices := PackedInt32Array()
 			indices.resize(tris.size())
 			for i in tris.size():
@@ -50,7 +50,8 @@ func _initialize() -> void:
 			RenderingServer.canvas_item_add_triangle_array(canvas.get_canvas_item(), indices, tris, colors)
 		for seg in geo["segments"]:
 			var coast: bool = int(seg[3]) < 0
-			canvas.draw_line(seg[0], seg[1], Color(0.62, 0.72, 0.92) if coast else Color(0.95, 0.95, 0.98, 0.9), (1.6 if coast else 1.1) / scale * 1.4, true)
+			# Referans seçim haritaları gibi: il sınırı ince beyaz, kıyı ince koyu.
+			canvas.draw_line(seg[0], seg[1], Color(0.04, 0.04, 0.08) if coast else Color(1, 1, 1, 0.95), (1.4 if coast else 1.0) / scale, true)
 		var font := ThemeDB.fallback_font
 		for r in regions.size():
 			var c: Vector2 = geo["centers"][r]
@@ -90,26 +91,14 @@ func _initialize() -> void:
 					symmetric = false
 		check("komşuluk simetrik", symmetric)
 		print("  komşusuz il (ada): %d, en az vekil %d" % [lonely, min_seats])
-		# Her il tek parça mı (hücreleri bağlı mı)?
+		# Her ilin ana karası tek parça mı? (Bağlı adalar ayrı parça sayılmaz.)
 		var labels: PackedInt32Array = geo["labels"]
 		var topo := CountryGenerator.topology(geo["points"])
 		var broken := 0
 		for r in regions.size():
-			var cells: Array = []
-			for i in labels.size():
-				if labels[i] == r:
-					cells.append(i)
-			var seen := {cells[0]: true}
-			var queue: Array = [cells[0]]
-			while not queue.is_empty():
-				var cur: int = queue.pop_back()
-				for nb in (topo["adj"][cur] as PackedInt32Array):
-					if labels[nb] == r and not seen.has(nb):
-						seen[nb] = true
-						queue.append(nb)
-			if seen.size() != cells.size():
+			if CountryGenerator.mainland_parts(labels, topo, r) > 1:
 				broken += 1
-		check("her il tek parça", broken == 0, "%d parçalı il" % broken)
+		check("her ilin ana karası tek parça", broken == 0, "%d parçalı il" % broken)
 		canvas.queue_redraw()
 		await process_frame
 		await process_frame

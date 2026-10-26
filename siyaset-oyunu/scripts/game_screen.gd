@@ -5608,7 +5608,9 @@ func _set_map_layer(layer: int, animate: bool = true) -> void:
 		return
 	if _map_slide_tween != null and _map_slide_tween.is_running():
 		_map_slide_tween.kill()
-	var width := _map_clip.size.x
+	# Kayma mesafesi desen hücresinin katı: denizin dalgaları haritayla birlikte
+	# kayarken anlık görüntüdeki dalgalarla hep çakışık kalır.
+	var width := ceilf(_map_clip.size.x / TableSurface.Sea.CELL_W) * TableSurface.Sea.CELL_W
 	_map_snapshot.texture = ImageTexture.create_from_image(snapshot)
 	_map_snapshot.position = Vector2.ZERO
 	_map_snapshot.size = _map_clip.size
@@ -5617,12 +5619,31 @@ func _set_map_layer(layer: int, animate: bool = true) -> void:
 	# İl incelenirken harita yakınlaştırılmış konumuna kayar.
 	var home := map_holder.position if map_holder.isolated_id != "" else Vector2.ZERO
 	map_holder.position = home + Vector2(width * direction, 0.0)
-	_map_slide_tween = create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-	_map_slide_tween.tween_property(_map_snapshot, "position:x", -width * direction, MAP_SLIDE_DURATION)
-	_map_slide_tween.tween_property(map_holder, "position:x", home.x, MAP_SLIDE_DURATION)
-	_map_slide_tween.chain().tween_callback(func():
+	var sea := _map_bg as TableSurface.Sea
+	if sea != null:
+		sea.scroll = 0.0
+	# Görüntü yakalama (GPU'dan okuma) o kareyi uzatır; kayma bir kare sonra
+	# başlar ki uzun kare animasyonda sıçrama yapmasın.
+	await get_tree().process_frame
+	if not is_inside_tree():
+		return
+	await get_tree().process_frame
+	if not is_inside_tree():
+		return
+	_map_slide_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	# Kayma tam ekran pikseline yuvarlanır: vekil pulları yeniden çizilmeden kayar.
+	var pixel := 1.0 / maxf(0.0001, get_viewport().get_final_transform().get_scale().x)
+	_map_slide_tween.tween_method(func(t: float):
+		var shift := roundf(width * direction * t / pixel) * pixel
+		_map_snapshot.position.x = -shift
+		map_holder.position.x = home.x + width * direction - shift
+		if sea != null:
+			sea.scroll = -shift, 0.0, 1.0, MAP_SLIDE_DURATION)
+	_map_slide_tween.tween_callback(func():
 		_map_snapshot.hide()
 		_map_snapshot.texture = null
+		if sea != null:
+			sea.scroll = 0.0
 		map_holder.position = home)
 	if _queued_layer != -1:
 		var queued := _queued_layer

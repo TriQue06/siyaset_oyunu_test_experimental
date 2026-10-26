@@ -121,34 +121,58 @@ static func sea() -> Panel:
 	return p
 
 class Sea extends Panel:
-	func _ready() -> void:
-		resized.connect(queue_redraw)
-		clip_contents = true
+	## Desen hücresinin genişliği (tasarım birimi).
+	const CELL_W := 26.0 * 1.29 / 1.5
+	## Dalga deseninin yatay kayması: harita katmanı kayarken desen haritayla
+	## birlikte akar (0.0.267; eskiden zemin sabit, anlık görüntüdeki deniz
+	## üstünde kayıyordu, iki desen birbirine yapışık gibi görünüyordu).
+	var scroll := 0.0:
+		set(value):
+			scroll = value
+			if _waves != null:
+				_waves.queue_redraw()
+	## Dalgalar kenar çizgisinin içinde, kırpılan ayrı katmanda; desen boyut
+	## değişince bir kez kurulur, kayarken yalnız ötelenerek çizilir.
+	var _waves: Control
+	var _pts := PackedVector2Array()
 
-	func _draw() -> void:
+	func _ready() -> void:
+		clip_contents = true
+		_waves = Control.new()
+		_waves.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_waves.clip_contents = true
+		_waves.draw.connect(_draw_waves)
+		add_child(_waves)
+		resized.connect(_build)
+		_build()
+
+	func _build() -> void:
+		var inset := UiTheme.d(3)
+		_waves.position = Vector2(inset, inset)
+		_waves.size = (size - Vector2(inset, inset) * 2.0).max(Vector2.ZERO)
 		# Desen hücresi 26x12 (harita birimi, ≈1,29 ölçek) -> tasarım birimi.
 		var k := 1.29 / 1.5
-		var cw := 26.0 * k
 		var ch := 12.0 * k
-		var inset := UiTheme.d(3)
-		var pts := PackedVector2Array()
-		var y := inset + ch * 0.5
-		while y < size.y - inset:
-			var x := inset
-			while x < size.x - inset:
+		_pts.clear()
+		var y := ch * 0.5
+		while y < _waves.size.y:
+			var x := -CELL_W
+			while x < _waves.size.x:
 				var prev := Vector2.ZERO
 				for i in 9:
 					var u := float(i) / 8.0
-					var px := x + (2.0 + 16.0 * u) * k
-					var py := y + (7.0 - 6.0 - 2.0 * sin(u * TAU)) * k
-					var pt := Vector2(px, py)
-					if i > 0 and px < size.x - inset:
-						pts.append(prev)
-						pts.append(pt)
+					var pt := Vector2(x + (2.0 + 16.0 * u) * k, y + (1.0 - 2.0 * sin(u * TAU)) * k)
+					if i > 0:
+						_pts.append(prev)
+						_pts.append(pt)
 					prev = pt
-				x += cw
+				x += CELL_W
 			y += ch
-		draw_multiline(pts, Color(0.9, 0.965, 0.97, 0.6), maxf(1.0, k), true)
+		_waves.queue_redraw()
+
+	func _draw_waves() -> void:
+		_waves.draw_set_transform(Vector2(fposmod(scroll, CELL_W), 0.0))
+		_waves.draw_multiline(_pts, Color(0.9, 0.965, 0.97, 0.6), maxf(1.0, 1.29 / 1.5), true)
 
 ## Sahnenin düz renkli "Background" zeminini çuhayla değiştirir (en arkaya).
 static func cover(root: Control) -> void:

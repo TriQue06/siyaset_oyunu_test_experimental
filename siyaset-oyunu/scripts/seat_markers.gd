@@ -68,9 +68,7 @@ func _ready() -> void:
 	image.fill(Color.WHITE)
 	_white_texture = ImageTexture.create_from_image(image)
 	var shader := Shader.new()
-	# Geçiş için konturla birlikte bütün daire saydamlaşabilsin (COLOR.a).
-	shader.code = ParliamentDiagram.SEAT_SHADER.replace("outer * mix(outline_color.a, fill.a, inner))",
-		"outer * mix(outline_color.a, 1.0, inner) * fill.a)")
+	shader.code = PAWN_SHADER
 	var shader_material := ShaderMaterial.new()
 	shader_material.shader = shader
 	material = shader_material
@@ -100,9 +98,17 @@ func _process(delta: float) -> void:
 func _is_crowded(province_id: String) -> bool:
 	return province_id != "" and (_seats.get(province_id, []) as Array).size() > HOVER_ONLY_SEATS
 
+var _drawn_key := Vector3(-1, -1, -1)
+
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_TRANSFORM_CHANGED:
-		queue_redraw()
+		# Tam piksellik öteleme (katman kayması) çizimin piksel hizasını bozmaz:
+		# yeniden çizmeye gerek yok. Ölçek ya da kesirli kayma değişince çizilir.
+		var xform := get_viewport().get_final_transform() * get_global_transform_with_canvas()
+		var key := Vector3(xform.get_scale().x, fposmod(xform.origin.x, 1.0), fposmod(xform.origin.y, 1.0))
+		if not key.is_equal_approx(_drawn_key):
+			_drawn_key = key
+			queue_redraw()
 
 ## Altıgen haritada merkezler GameMap'ten gelir (bölgenin iç hücresi).
 func _load_seat_centers() -> void:
@@ -279,9 +285,7 @@ func _draw() -> void:
 	var scale: float = maxf(0.0001, xform.get_scale().x)
 	var inv := xform.affine_inverse()
 
-	# Pul çizimi kendi dairelerini çizer; eski kontur gölgelendiricisi kullanılmaz.
-	material = null
-	var shader_material := material as ShaderMaterial
+	var shader_material: ShaderMaterial = null
 	_label_items.clear()
 	for g in _groups:
 		var radius: float = g["radius"]
@@ -324,15 +328,34 @@ func _draw() -> void:
 	_labels.queue_redraw()
 
 ## KONSEPT VEKİL PULU (0.0.266): krem pul, parti renginin koyusunda kenar,
-## altında 1,6 birimlik ahşap rengi sert gölge ve hafif yumuşak gölge.
+## altında ahşap rengi sert gölge ve hafif yumuşak gölge. 0.0.267: dört
+## yumuşatılmış daire yerine pul başına TEK dörtgen; katmanları PAWN_SHADER
+## çizer (harita kayarken her karede yüzlerce daire çizmek kareyi 30-50 ms
+## uzatıyordu).
+const PAWN_LIP := 0.24
+const PAWN_SHADER := """
+shader_type canvas_item;
+float disc(vec2 p, vec2 c, float aa) {
+	return clamp((1.0 - length(p - c)) / aa + 0.5, 0.0, 1.0);
+}
+void fragment() {
+	// UV -> pul yarıçapı birimi; merkez (0,0), dörtgen alta gölge kadar uzun.
+	vec2 p = vec2(UV.x * 2.0 - 1.0, UV.y * (2.0 + 1.6 * %f) - 1.0);
+	float aa = max(fwidth(p.x), 0.0001);
+	vec4 col = vec4(0.0, 0.0, 0.0, 0.18 * disc(p, vec2(0.0, 1.6 * %f), aa));
+	float lip = disc(p, vec2(0.0, %f), aa);
+	col = mix(col, vec4(0.561, 0.424, 0.251, 1.0), lip);
+	col = mix(col, vec4(COLOR.rgb * 0.7, 1.0), disc(p, vec2(0.0), aa));
+	col = mix(col, vec4(1.0, 0.98, 0.941, 1.0), disc(p / 0.8, vec2(0.0), aa / 0.8));
+	COLOR = vec4(col.rgb, col.a * COLOR.a);
+}
+""" % [PAWN_LIP, PAWN_LIP, PAWN_LIP]
+
 func _draw_pawn(inv: Transform2D, screen_scale: float, center_px: Vector2, half_px: int, color: Color, alpha: float) -> void:
 	var c: Vector2 = inv * center_px
 	var r := float(half_px) / screen_scale
-	var lip := r * 0.24
-	draw_circle(c + Vector2(0, lip * 1.6), r, Color(0, 0, 0, 0.18 * alpha), true, -1.0, true)
-	draw_circle(c + Vector2(0, lip), r, Color(Color("8F6C40"), alpha), true, -1.0, true)
-	draw_circle(c, r, Color(color.lerp(Color.BLACK, 0.3), alpha), true, -1.0, true)
-	draw_circle(c, r * 0.8, Color(Color("FFFAF0"), alpha), true, -1.0, true)
+	draw_texture_rect(_white_texture, Rect2(c - Vector2(r, r), Vector2(2.0 * r, r * (2.0 + 1.6 * PAWN_LIP))),
+		false, Color(color, alpha))
 
 ## Ekran piksel uzayında (tam sayı merkez, tam sayı yarıçap) antialiased daire;
 ## yerel uzaya geri çevrilerek çizilir. Bütün dairelerin merkezi ve yarıçapı

@@ -67,21 +67,29 @@ func _initialize() -> void:
 	mm.room_code = ""
 	gm.result_hold_seconds = 0.0
 
-	print("=== 1) ALTIGEN HARITA ===")
+	print("=== 1) ULKE HARITASI ===")
+	# 0.0.261: rastgele harita serbest sekilli ULKE (CountryGenerator).
+	check("rastgele harita ulke haritasi", game_map.is_country())
+	var geo: Dictionary = game_map.country
+	var labels: PackedInt32Array = geo["labels"]
+	var topo := CountryGenerator.topology(geo["points"])
 	var ok_contiguous := true
-	for id in game_map.ids:
-		var cells: Array = game_map.region_cells(id)
+	for r in game_map.ids.size():
+		var cells: Array = []
+		for i in labels.size():
+			if labels[i] == r:
+				cells.append(i)
 		var seen := {cells[0]: true}
 		var queue: Array = [cells[0]]
 		while not queue.is_empty():
 			var cur: int = queue.pop_back()
-			for n in HexGridGenerator.neighbor_cells(cur, game_map.cols, game_map.rows):
-				if not seen.has(n) and game_map.region_at_cell(n) == id:
+			for n in (topo["adj"][cur] as PackedInt32Array):
+				if not seen.has(n) and labels[n] == r:
 					seen[n] = true
 					queue.append(n)
 		if seen.size() != cells.size():
 			ok_contiguous = false
-	check("her secim bolgesi bitisik altigenlerden olusur", ok_contiguous)
+	check("her secim bolgesi tek parca", ok_contiguous)
 	var total := 0
 	var min_seats := 999
 	for id in game_map.ids:
@@ -92,18 +100,23 @@ func _initialize() -> void:
 	for id in game_map.ids:
 		names[game_map.name_of(id)] = true
 	check("bolge adlari benzersiz", names.size() == game_map.ids.size())
-	var a: Dictionary = HexGridGenerator.generate(99)
-	var b: Dictionary = HexGridGenerator.generate(99)
+	var a: Dictionary = CountryGenerator.generate(99)
+	var b: Dictionary = CountryGenerator.generate(99)
 	check("ayni tohum ayni harita", str(a) == str(b))
 	var probe: String = game_map.ids[3]
-	var cell: int = game_map.region_cells(probe)[0]
-	check("noktadan bolge bulunur", game_map.province_at(game_map.cell_center(cell)) == probe)
+	check("noktadan bolge bulunur", game_map.province_at(game_map.center_of(probe)) == probe)
+	var all_found := true
+	for id in game_map.ids:
+		if game_map.province_at(game_map.center_of(id)) != id:
+			all_found = false
+	check("her ilin merkezi kendi ilinde", all_found)
+	check("haritanin disi il degil", game_map.province_at(Vector2(-50, -50)) == "")
 
 	cm.fixed_map_seed = 0
 	mm.map_seed = mm.clean_map_seed(" 00123-45 ")
 	check("tohum temizlenir (sadece rakam)", mm.map_seed == "12345", mm.map_seed)
 	new_game({1: groups(["isveren", "dindar"]), 2: groups(["isci", "ilerici"])})
-	check("lobi tohumu oyunun haritasini belirler", game_map.seed_value() == 12345 		and str(game_map.data["cells"]) == str(HexGridGenerator.generate(12345)["cells"]))
+	check("lobi tohumu oyunun haritasini belirler", game_map.seed_value() == 12345 		and str(game_map.data["labels"]) == str(CountryGenerator.generate(12345)["labels"]))
 	mm.map_seed = ""
 	new_game({1: groups(["isveren", "dindar"]), 2: groups(["isci", "ilerici"])})
 	check("tohum bossa rastgele tohum atanir", game_map.seed_value() > 0 and game_map.seed_value() != 12345)

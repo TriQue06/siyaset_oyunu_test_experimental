@@ -7,7 +7,9 @@ extends Node
 ## "province_id" oyunun her yerinde bir SEÇİM BÖLGESİ (il) kimliğidir: "b01"...
 ##
 ## HARİTA TÜRÜ (lobi ayarı world_settings["map_mode"], 0.0.219):
-##   random          rastgele altıgen ülke (HexGridGenerator)
+##   random          rastgele ÜLKE (0.0.261: CountryGenerator; serbest şekilli,
+##                   yapboz gibi oturan iller). Eski kayıtlardaki altıgen
+##                   ülke (HexGridGenerator, "cells") hâlâ okunur.
 ##   turkiye_altigen Türkiye'nin 81 ili, 80 sütunluk altıgen ızgara
 ## Türkiye verisi data/*.json (tools/harita/turkiye_harita_uret.py üretir). Ağda
 ## yalnız {"preset", "seed"} gider; herkes aynı dosyayı yerelden okur.
@@ -40,9 +42,13 @@ var _neighbors: Dictionary = {}    # province_id -> Array[province_id]
 var _region_cells: Dictionary = {} # province_id -> Array[hücre]
 var _centers: Dictionary = {}      # province_id -> Vector2 (etiket/nokta merkezi)
 var _coastal: Dictionary = {}
+## ÜLKE haritası (CountryGenerator.geometry); altıgen haritada boş.
+var country: Dictionary = {}
+var _buckets: Dictionary = {}  # Vector2i -> Array[nokta] (il sorgusu)
+const BUCKET := CountryGenerator.SPACING * 1.5
 
 func _ready() -> void:
-	set_data(HexGridGenerator.generate(DEFAULT_SEED))
+	set_data(CountryGenerator.generate(DEFAULT_SEED))
 
 ## Host: yeni oyun için yeni harita.
 func generate_new(seed_value: int) -> void:
@@ -50,7 +56,7 @@ func generate_new(seed_value: int) -> void:
 	if PRESET_FILES.has(mode):
 		set_data({"preset": mode, "seed": seed_value})
 		return
-	set_data(HexGridGenerator.generate(seed_value, float(MultiplayerManager.world_settings["province_scale"]), int(MultiplayerManager.world_settings["province_seats"])))
+	set_data(CountryGenerator.generate(seed_value, float(MultiplayerManager.world_settings["province_scale"]), int(MultiplayerManager.world_settings["province_seats"])))
 
 ## Türkiye haritası dosyası (bir kez okunur).
 static func load_preset(preset: String) -> Dictionary:
@@ -66,6 +72,9 @@ static func preset_seat_total(preset: String) -> int:
 	for region in load_preset(preset).get("regions", []):
 		total += int(region["seats"])
 	return total
+
+func is_country() -> bool:
+	return not country.is_empty()
 
 func is_turkey() -> bool:
 	return PRESET_FILES.has(String(data.get("preset", "")))
@@ -84,12 +93,16 @@ func set_data(new_data: Dictionary) -> void:
 	else:
 		data = new_data
 	_full = full
+	country = {}
+	_buckets.clear()
 	hex_radius = float(full.get("hex_radius", HEX_RADIUS))
-	cols = int(full["cols"])
-	rows = int(full["rows"])
+	var is_country_map := String(full.get("kind", "")) == CountryGenerator.KIND
+	cols = 0 if is_country_map else int(full["cols"])
+	rows = 0 if is_country_map else int(full["rows"])
 	cells = []
-	for v in full["cells"]:
-		cells.append(int(v))
+	if not is_country_map:
+		for v in full["cells"]:
+			cells.append(int(v))
 	ids.clear()
 	_index_of.clear()
 	_names.clear()
@@ -104,8 +117,35 @@ func set_data(new_data: Dictionary) -> void:
 		_names[id] = String(region["name"])
 		_seats[id] = int(region["seats"])
 		_coastal[id] = bool(region.get("coastal", false))
-	_derive()
+	if is_country_map:
+		_derive_country(full)
+	else:
+		_derive()
 	map_changed.emit()
+
+## Ülke haritası: çizim geometrisi, komşuluk, merkezler ve il sorgusu kovaları.
+func _derive_country(full: Dictionary) -> void:
+	country = CountryGenerator.geometry(full)
+	_neighbors.clear()
+	_region_cells.clear()
+	_centers.clear()
+	for r in ids.size():
+		var id: String = ids[r]
+		var list: Array = []
+		for o in country["neighbors"][r]:
+			list.append(ids[int(o)])
+		_neighbors[id] = list
+		_centers[id] = country["centers"][r]
+		_region_cells[id] = []
+	var points: PackedVector2Array = country["points"]
+	var labels: PackedInt32Array = country["labels"]
+	for i in points.size():
+		if labels[i] < 0:
+			continue
+		var key := Vector2i(floori(points[i].x / BUCKET), floori(points[i].y / BUCKET))
+		if not _buckets.has(key):
+			_buckets[key] = []
+		(_buckets[key] as Array).append(i)
 
 func seed_value() -> int:
 	return int(data.get("seed", 0))
@@ -233,6 +273,8 @@ func region_at_cell(cell: int) -> String:
 # --- Geometri (sivri tepeli, odd-r) ----------------------------------------------
 
 func map_size() -> Vector2:
+	if is_country():
+		return Vector2(float(_full["width"]), float(_full["height"]))
 	return Vector2(SQRT3 * hex_radius * (cols + 0.5), 1.5 * hex_radius * (rows - 1) + 2.0 * hex_radius)
 
 func cell_center(cell: int) -> Vector2:
@@ -277,7 +319,24 @@ func cell_at(point: Vector2) -> int:
 	return row * cols + col
 
 func province_at(point: Vector2) -> String:
+	if is_country():
+		return _country_province_at(point)
 	return region_at_cell(cell_at(point))
+
+## Ülke haritasında nokta sorgusu: yakındaki hücrelerin üçgenleri denenir
+## (çizilen yumuşatılmış sınırla birebir aynı).
+func _country_province_at(point: Vector2) -> String:
+	var base := Vector2i(floori(point.x / BUCKET), floori(point.y / BUCKET))
+	var cell_tris: Dictionary = country["cell_tris"]
+	var labels: PackedInt32Array = country["labels"]
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			for i in _buckets.get(base + Vector2i(dx, dy), []):
+				var tris: PackedVector2Array = cell_tris.get(i, PackedVector2Array())
+				for k in range(0, tris.size(), 3):
+					if Geometry2D.point_is_inside_triangle(point, tris[k], tris[k + 1], tris[k + 2]):
+						return ids[labels[i]]
+	return ""
 
 func electorate_counts() -> Dictionary:
 	var result := {}

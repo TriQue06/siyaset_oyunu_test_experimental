@@ -1,5 +1,6 @@
 extends Node2D
-## ALTIGEN HARİTA — vektörel, düz (flat) stil. Veri GameMap'ten gelir; harita
+## İL HARİTASI — vektörel, düz (flat) stil: altıgen ızgara (Türkiye, eski
+## kayıtlar) ya da serbest şekilli ÜLKE (CountryGenerator, 0.0.261). Veri GameMap'ten gelir; harita
 ## değişince (yeni oyun) kendini yeniden kurar.
 ##
 ## ÇİZİM MALİYETİ: yüzlerce altıgen tek tek draw_polygon ile çizilmez (web'de
@@ -84,6 +85,12 @@ func _build_geometry() -> void:
 	for id in ids:
 		_edges[id] = []
 		_region_tris[id] = PackedVector2Array()
+	if GameMap.is_country():
+		var map_size := GameMap.map_size()
+		sea_vertices.append_array([Vector2.ZERO, Vector2(map_size.x, 0), map_size, Vector2.ZERO, map_size, Vector2(0, map_size.y)])
+		for _i in 6:
+			sea_colors.append(SEA_COLOR)
+		_build_country()
 	for cell in GameMap.cells.size():
 		var region: int = GameMap.cells[cell]
 		var inner := GameMap.cell_corners(cell, CELL_INSET)
@@ -128,6 +135,31 @@ func _build_geometry() -> void:
 		arrays[Mesh.ARRAY_VERTEX] = _border_vertices
 		arrays[Mesh.ARRAY_COLOR] = _border_colors
 		_border_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+
+## ÜLKE HARİTASI (0.0.261): deniz tek dikdörtgen; iller hücre üçgenlerinden;
+## sınırlar CountryGenerator'ın yumuşatılmış ortak kenarları (her biri bir kez).
+func _build_country() -> void:
+	var geo: Dictionary = GameMap.country
+	for r in ids.size():
+		var tris: PackedVector2Array = geo["tris"][r]
+		_region_tris[ids[r]] = tris
+		_land_vertices.append_array(tris)
+		var marks := PackedInt32Array()
+		marks.resize(tris.size())
+		marks.fill(r)
+		_land_vertex_region.append_array(marks)
+	for seg in geo["segments"]:
+		var a: Vector2 = seg[0]
+		var b: Vector2 = seg[1]
+		var ra: int = seg[2]
+		var rb: int = seg[3]
+		_edges[ids[ra]].append([a, b])
+		if rb >= 0:
+			_edges[ids[rb]].append([a, b])
+		var coast := rb < 0
+		var width := COAST_WIDTH if coast else REGION_BORDER_WIDTH
+		var color := Color.WHITE if _white_borders else (COAST_COLOR if coast else (REGION_BORDER_DARK if _dark_borders else REGION_BORDER_COLOR))
+		_append_segment(a, b, width, color)
 
 ## İlin tamamını tek çağrıda boyar (afet / odak parıltısı).
 func _fill_region(province_id: String, color: Color) -> void:

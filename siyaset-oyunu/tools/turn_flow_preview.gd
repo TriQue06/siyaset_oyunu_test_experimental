@@ -103,7 +103,8 @@ func _initialize() -> void:
 	scene._refresh_turn_flow_ui()
 	await _wait(0.3)
 	_shot("tf_4_desk")
-	check("MECLIS dugmesi gensoruyu gosteriyor", scene._parl_button.text.contains(L.t("gensoru")), scene._parl_button.text)
+	var parl_sub: String = (scene._parl_button.get_node("ActionText/Sub") as Label).text
+	check("MECLIS dugmesi gensoruyu gosteriyor", parl_sub.contains(L.t("gensoru")), parl_sub)
 	scene._on_parliament_button_pressed()
 	await _wait(1.0)
 	_shot("tf_5_censure")

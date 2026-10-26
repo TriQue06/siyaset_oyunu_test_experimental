@@ -4,7 +4,8 @@ extends RefCounted
 ## meclis durum metni. Hepsi mevcut autoload durumundan okuyarak çizer,
 ## kendi durumu yoktur.
 
-const BADGE_SIZE := Vector2(26, 26)
+## Konsept .gov .chipico: 32 px pul.
+const BADGE_SIZE := Vector2(32.0 / 1.5, 32.0 / 1.5)
 const BADGE_ICON_PIXEL_SIZE := 48
 const TITLE_COLOR := UiTheme.TEXT_MUTED
 const DIM_COLOR := UiTheme.TEXT_MUTED
@@ -19,11 +20,16 @@ static func _clear(box: Container) -> void:
 	for child in box.get_children():
 		child.queue_free()
 
-static func _label(text: String, font_size: int, modulate: Color = Color.WHITE) -> Label:
+## Konsept .gov: anahtar Nunito 800 (soluk), değer Siyaset Display (koyu).
+static func _label(text: String, font_size: int, color: Color = UiTheme.TEXT) -> Label:
 	var label := Label.new()
 	label.text = text
 	label.add_theme_font_size_override("font_size", font_size)
-	label.modulate = modulate
+	label.add_theme_color_override("font_color", color)
+	if color == DIM_COLOR:
+		label.add_theme_font_override("font", UiTheme.mono_regular())
+	else:
+		label.add_theme_font_override("font", UiTheme.mono(true))
 	label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	return label
 
@@ -50,13 +56,13 @@ static func _badge(peer_id: int) -> Control:
 static func _leadership_row(pm: int, deputy: int) -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
-	var pm_label := _label(L.t("Başbakan"), 12, DIM_COLOR)
+	var pm_label := _label(L.t("Başbakan"), UiTheme.fs(16), DIM_COLOR)
 	row.add_child(pm_label)
 	var chip := _party_chip(pm, true)
 	row.add_child(chip)
 	var used := pm_label.get_combined_minimum_size().x + 28.0 + 16.0
 	if deputy != -1:
-		var dep_label := _label(L.t("·  Yrd."), 12, DIM_COLOR)
+		var dep_label := _label(L.t("Yrd."), UiTheme.fs(16), DIM_COLOR)
 		row.add_child(dep_label)
 		row.add_child(_party_chip(deputy, false))
 		used += dep_label.get_combined_minimum_size().x + 28.0 + 12.0
@@ -65,7 +71,7 @@ static func _leadership_row(pm: int, deputy: int) -> Control:
 	if name_label != null:
 		var room := 250.0 - used
 		var font := name_label.get_theme_font("font")
-		var size := 13
+		var size := UiTheme.fs(20)
 		while size > 8 and font.get_string_size(name_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > room:
 			size -= 1
 		name_label.add_theme_font_size_override("font_size", size)
@@ -84,7 +90,7 @@ static func _party_chip(peer_id: int, show_name: bool) -> Control:
 		chip.size_flags_horizontal = Control.SIZE_SHRINK_END
 	chip.add_child(_badge(peer_id))
 	if show_name:
-		var name_label := _label(party_name_of(peer_id), 13)
+		var name_label := _label(party_name_of(peer_id), UiTheme.fs(20))
 		name_label.name = "Name"
 		name_label.clip_text = true
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -119,7 +125,6 @@ static func fill_government_panel(box: VBoxContainer) -> void:
 		var title := section_title(L.t("%s\n%s teklifi") % [
 			L.t("KOALİSYON GÖRÜŞMESİ") if GovernmentManager.is_coalition_stage() else L.t("OYLANAN HÜKÜMET"),
 			party_name_of(GovernmentManager.proposal_peer_id)])
-		title.modulate = UiTheme.GOLD
 		box.add_child(title)
 		_fill_cabinet(box, GovernmentManager.proposal_assignments)
 		return
@@ -170,7 +175,7 @@ static func _fill_cabinet(box: VBoxContainer, government: Dictionary) -> void:
 
 	var ministry_row := HBoxContainer.new()
 	ministry_row.add_theme_constant_override("separation", 6)
-	var ministry_title := _label(L.t("Bakanlıklar"), 12, DIM_COLOR)
+	var ministry_title := _label(L.t("Bakanlıklar"), UiTheme.fs(16), DIM_COLOR)
 	ministry_title.custom_minimum_size = Vector2(92, 0)
 	ministry_row.add_child(ministry_title)
 	var chips := HFlowContainer.new()
@@ -183,7 +188,7 @@ static func _fill_cabinet(box: VBoxContainer, government: Dictionary) -> void:
 		var chip := HBoxContainer.new()
 		chip.add_theme_constant_override("separation", 3)
 		chip.add_child(_badge(peer_id))
-		chip.add_child(_label("×%d" % int(ministries[peer_id]), 14))
+		chip.add_child(_label("×%d" % int(ministries[peer_id]), UiTheme.fs(20)))
 		chips.add_child(chip)
 	ministry_row.add_child(chips)
 	box.add_child(ministry_row)
@@ -193,8 +198,27 @@ static func _fill_cabinet(box: VBoxContainer, government: Dictionary) -> void:
 		seats += GovernmentManager.seats_of(peer_id)
 	var total := GovernmentManager.total_seats()
 	var majority: bool = seats * 2 > total
-	box.add_child(_label(L.t("%d/%d sandalye — %s") % [seats, total, L.t("çoğunluk var") if majority else L.t("AZINLIK")],
-		UiTheme.FS_TINY, UiTheme.TEXT_MUTED if majority else UiTheme.RED))
+	var summary := _label(L.t("%d/%d sandalye — %s") % [seats, total, L.t("çoğunluk var") if majority else L.t("AZINLIK")],
+		UiTheme.fs(19), UiTheme.TEXT_MUTED if majority else UiTheme.ON_COLOR)
+	if not majority:
+		# Konsept .warn: kırmızı kurdele, koyu kalınlık, hafif eğik.
+		var ribbon := BoardBox.new()
+		ribbon.fill = UiTheme.CRISIS
+		ribbon.set_radius(UiTheme.d(10))
+		ribbon.lips = [[UiTheme.d(4), UiTheme.CRISIS_DARK]]
+		ribbon.content_margin_left = UiTheme.d(14)
+		ribbon.content_margin_right = UiTheme.d(14)
+		ribbon.content_margin_top = UiTheme.d(5)
+		ribbon.content_margin_bottom = UiTheme.d(5)
+		summary.add_theme_stylebox_override("normal", ribbon)
+		summary.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		summary.rotation_degrees = -1.5
+		var wrap := MarginContainer.new()
+		wrap.add_theme_constant_override("margin_top", int(UiTheme.d(6)))
+		wrap.add_child(summary)
+		box.add_child(wrap)
+	else:
+		box.add_child(summary)
 
 ## Yasa oylaması: 1. satır yasa ve oy durumu, 2. satır bu oyuncu için oyların
 ## genel etkisi (yasanın hedef seçmen grubu ve karşıtı).

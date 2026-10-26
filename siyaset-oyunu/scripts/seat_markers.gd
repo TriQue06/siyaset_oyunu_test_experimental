@@ -279,6 +279,8 @@ func _draw() -> void:
 	var scale: float = maxf(0.0001, xform.get_scale().x)
 	var inv := xform.affine_inverse()
 
+	# Pul çizimi kendi dairelerini çizer; eski kontur gölgelendiricisi kullanılmaz.
+	material = null
 	var shader_material := material as ShaderMaterial
 	_label_items.clear()
 	for g in _groups:
@@ -315,11 +317,22 @@ func _draw() -> void:
 					break
 				var color: Color = colors[idx]
 				var center_px := Vector2(x0_px + col * step_px, y_px)
-				_draw_circle_at_screen_px(inv, scale, center_px, outline_half_px, Color(color, color.a * alpha))
+				_draw_pawn(inv, scale, center_px, outline_half_px, color, alpha)
 				if not counts.is_empty():
 					_label_items.append([center_px, dot_half_px, str(counts[idx]), alpha, color])
 				idx += 1
 	_labels.queue_redraw()
+
+## KONSEPT VEKİL PULU (0.0.266): krem pul, parti renginin koyusunda kenar,
+## altında 1,6 birimlik ahşap rengi sert gölge ve hafif yumuşak gölge.
+func _draw_pawn(inv: Transform2D, screen_scale: float, center_px: Vector2, half_px: int, color: Color, alpha: float) -> void:
+	var c: Vector2 = inv * center_px
+	var r := float(half_px) / screen_scale
+	var lip := r * 0.24
+	draw_circle(c + Vector2(0, lip * 1.6), r, Color(0, 0, 0, 0.18 * alpha), true, -1.0, true)
+	draw_circle(c + Vector2(0, lip), r, Color(Color("8F6C40"), alpha), true, -1.0, true)
+	draw_circle(c, r, Color(color.lerp(Color.BLACK, 0.3), alpha), true, -1.0, true)
+	draw_circle(c, r * 0.8, Color(Color("FFFAF0"), alpha), true, -1.0, true)
 
 ## Ekran piksel uzayında (tam sayı merkez, tam sayı yarıçap) antialiased daire;
 ## yerel uzaya geri çevrilerek çizilir. Bütün dairelerin merkezi ve yarıçapı
@@ -352,5 +365,4 @@ class SeatCountLabels extends Node2D:
 			var size := maxi(10, int(roundf(half * (1.7 if text.length() == 1 else 1.3))) + 1)
 			var text_size := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size)
 			var pos := Vector2(center.x - text_size.x * 0.5, center.y + (font.get_ascent(size) - font.get_descent(size)) * 0.5).round()
-			var ink := UiTheme.INK if fill.get_luminance() > 0.62 else Color.WHITE
-			draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(ink, alpha))
+			draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(UiTheme.INK, alpha))

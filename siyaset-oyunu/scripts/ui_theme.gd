@@ -1,6 +1,6 @@
 class_name UiTheme
 extends RefCounted
-## ARAYÜZÜN TEK KAYNAĞI (0.0.265 · MASA OYUNU).
+## ARAYÜZÜN TEK KAYNAĞI (0.0.266 · MASA OYUNU, HTML konseptiyle birebir).
 ##
 ## Renk, yazı boyutu, boşluk, kenar kalınlığı: hepsi burada. Hiçbir ekran kendi
 ## rengini ya da punto değerini uydurmaz; hepsi buradan okur. Tarzı değiştirmek
@@ -8,8 +8,9 @@ extends RefCounted
 ##
 ## TARZ: yeşil çuha masa üstünde kalın karton oyun tahtası. Paneller krem
 ## karton (altında karton kalınlığı), düğmeler tombul ve altlarında koyu bir
-## "kalınlık" şeridi; basınca gömülür. Bant ve masa ahşap. Başlıklar Nunito Black,
-## gövde Nunito. Her yüzey vektör (StyleBoxFlat), hiçbir doku yok.
+## "kalınlık" şeridi; basınca gömülür. Bant ve masa ahşap. Başlıklar Siyaset
+## Display (Lilita One + Türkçe harfler), gövde Nunito. Her yüzey vektör
+## (BoardBox / StyleBoxFlat). Ölçüler konseptin 1920 px'lik HTML'inden: d(px).
 
 # --- RENKLER ---------------------------------------------------------------
 ## Ekran zemini: yeşil çuha masa.
@@ -32,6 +33,16 @@ const EDGE_DARK := Color("8F744A")
 ## Panel çerçevesi (çift ince çizgi).
 const TEAL := Color("1F6E70")
 const TEAL_DARK := Color("16575A")
+const TEAL_DEEP := Color("0D3A3C")
+## İç kartların kalınlığı.
+const CARD_LIP := Color("C9B689")
+## Ahşap üstündeki yazının gölgesi.
+const WOOD_SHADOW := Color("6A3B18")
+## Kasa yeşili.
+const MONEY := Color("1F8A4C")
+## Kriz kırmızısı.
+const CRISIS := Color("C42B2B")
+const CRISIS_DARK := Color("7F1B1B")
 ## Ahşap (üst bant, alt masa).
 const WOOD := Color("A8693A")
 const WOOD_LIGHT := Color("C88A4D")
@@ -41,7 +52,10 @@ const WOOD_TEXT_MUTED := Color("FFE3A8")
 
 ## Yazı (karton üstünde).
 const TEXT := Color("2D2A26")
-const TEXT_MUTED := Color("6E655A")
+const TEXT_MUTED := Color("7A7166")
+const TEXT_MUTED2 := Color("6A6258")
+## Pasif sekme yazısı.
+const TAB_TEXT := Color("5D6B6B")
 const TEXT_DIM := Color("A39A8A")
 const TEXT_ON_GOLD := Color("4A3203")
 ## Renkli düğme / koyu zemin üstündeki yazı.
@@ -120,7 +134,19 @@ static func mono_regular() -> Font:
 static func body() -> Font:
 	return load(FONT_BODY) as Font
 
+## Nunito 900 (konseptteki en kalın gövde yazısı: süre, kasa etiketi).
+static func body_black() -> Font:
+	return load("res://assets/fonts/body_black.tres") as Font
+
 # --- YARDIMCILAR -----------------------------------------------------------
+
+## Konseptin HTML pikselini (1920 genişlik) tasarım birimine çevirir.
+static func d(html_px: float) -> float:
+	return html_px / 1.5
+
+## Konsept puntosu (HTML px) -> oyun puntosu.
+static func fs(html_px: float) -> int:
+	return int(round(html_px / 1.5))
 
 ## Panel başlığı: başlık yazısı, deniz yeşili, büyük harf.
 ## Başlık paneli ZORLA GENİŞLETMEZ: sığmazsa satır kaydırır.
@@ -128,8 +154,18 @@ static func section_label(text: String, color: Color = HEAD) -> Label:
 	var label := Label.new()
 	label.text = text.to_upper()
 	label.add_theme_font_override("font", mono(true))
-	label.add_theme_font_size_override("font_size", FS_TINY + 1)
+	label.add_theme_font_size_override("font_size", fs(19))
 	label.add_theme_color_override("font_color", color)
+	# Konsept .sech: solda 14 px hardal nokta, altında koyu hardal gölge.
+	var dot := BoardBox.new()
+	dot.draw_fill = false
+	dot.dot_radius = d(7)
+	dot.dot_pos = Vector2(d(7), d(13))
+	dot.dot_color = GOLD
+	dot.dot_lip = d(2)
+	dot.dot_lip_color = GOLD_DIM
+	dot.content_margin_left = d(22)
+	label.add_theme_stylebox_override("normal", dot)
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.custom_minimum_size.x = 1.0
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL

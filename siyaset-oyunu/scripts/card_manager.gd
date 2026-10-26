@@ -4212,22 +4212,22 @@ func _finish_round() -> void:
 		# SON SEÇİM: kurulan hükümet puanlarını alınca oyun biter (bkz. on_block_state_changed).
 		early_election_pending = false
 		final_election_pending = true
-		_hold_election(finished_round, early and no_government and not early_election_pending)
+		_hold_election(finished_round, early)
 		return
 
 	# Erken seçim: takvim bu tura sabitlenir — kalan seçimler buradan itibaren aralıkla.
 	if early:
-		var by_parliament := early_election_pending
 		early_election_pending = false
 		election_anchor = finished_round
 		GameRules.set_election_anchor(election_anchor)
 		max_rounds_override = finished_round + left_after * GameRules.ELECTION_INTERVAL
 		GameRules.set_max_rounds_override(max_rounds_override)
-		_hold_election(finished_round, not by_parliament)
+		_hold_election(finished_round, true)
 		_schedule_agenda()
 		return
 
 	if scheduled:
+		early_election_pending = false
 		_hold_election(finished_round, false)
 	else:
 		_decay_opinion()
@@ -5687,7 +5687,7 @@ func _emit_post_event(event: Dictionary) -> void:
 		"round":
 			log_event(L.t("%s başladı.") % GameRules.period_label(round_number), -1, "", "round")
 		"election":
-			log_event(L.t("%d genel seçimi yapıldı.") % GameRules.election_year(last_election_round), -1, "", "election")
+			log_event((L.t("%s erken seçimi yapıldı.") if last_election_was_early else L.t("%s genel seçimi yapıldı.")) % GameRules.election_label(last_election_round), -1, "", "election")
 			var mine := party_of(multiplayer.get_unique_id())
 			var trend := election_trend(mine)
 			if trend != "":

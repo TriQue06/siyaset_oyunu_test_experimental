@@ -54,6 +54,7 @@ var _sections_box: VBoxContainer
 var _center_base_x: float = 0.0
 
 func _ready() -> void:
+	TableSurface.cover(self)
 	_build_concept_a()
 	_build_settings_panel()
 	_refresh_code_display()

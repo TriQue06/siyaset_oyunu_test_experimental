@@ -81,7 +81,7 @@ var _map_frame := Rect2()
 var _bars: LiveBars
 var _parliament: ParliamentDiagram
 var _background: TextureRect
-var _top_bar: Panel
+var _top_bar: Control
 var _live_badge: Panel
 var _live_label: Label
 var _title: Label
@@ -97,7 +97,7 @@ var _majority_label: Label
 var _flash: Panel
 var _flash_tag: Label
 var _flash_text: Label
-var _ticker_bg: Panel
+var _ticker_bg: Control
 var _ticker_tag: Panel
 var _ticker_clip: Control
 var _ticker_label: Label
@@ -456,20 +456,7 @@ func _party_color(peer_id) -> Color:
 # --- Arayüz kurulumu ---------------------------------------------------------------
 
 func _build_ui() -> void:
-	_background = TextureRect.new()
-	var gradient := Gradient.new()
-	gradient.set_color(0, BG_TOP)
-	gradient.set_color(1, BG_BOTTOM)
-	var texture := GradientTexture2D.new()
-	texture.gradient = gradient
-	texture.fill_from = Vector2(0.5, 0.0)
-	texture.fill_to = Vector2(0.5, 1.0)
-	_background.texture = texture
-	_background.stretch_mode = TextureRect.STRETCH_SCALE
-	_background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_background.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_background)
+	add_child(TableSurface.felt())
 
 	for i in 3:
 		var frame := Panel.new()
@@ -481,7 +468,7 @@ func _build_ui() -> void:
 	_map = (load("res://scenes/Map.tscn") as PackedScene).instantiate()
 	add_child(_map)
 
-	_top_bar = _panel(STRIP_COLOR)
+	_top_bar = TableSurface.wood("band")
 	add_child(_top_bar)
 	_live_badge = _panel(RED)
 	_top_bar.add_child(_live_badge)
@@ -492,7 +479,7 @@ func _build_ui() -> void:
 	_live_badge.add_child(_live_label)
 	_title = _label(L.t("SEÇİM GECESİ  ·  ÖZEL YAYIN"), 26, Color.WHITE)
 	_top_bar.add_child(_title)
-	_subtitle = _label("%d  ·  %s" % [GameRules.election_year(CardManager.last_election_round),
+	_subtitle = _label("%s  ·  %s" % [GameRules.election_label(CardManager.last_election_round).to_upper(),
 		L.t("ERKEN SEÇİM") if CardManager.last_election_was_early else L.t("GENEL SEÇİM")], 14, UiTheme.WOOD_TEXT_MUTED)
 	_top_bar.add_child(_subtitle)
 	_clock = _label("21:00", 34, Color.WHITE)
@@ -554,7 +541,7 @@ func _build_ui() -> void:
 	_cam_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_cam_flash)
 
-	_ticker_bg = _panel(UiTheme.WOOD_DARK)
+	_ticker_bg = TableSurface.wood("desk")
 	add_child(_ticker_bg)
 	_ticker_tag = _panel(RED)
 	_ticker_bg.add_child(_ticker_tag)
@@ -739,8 +726,8 @@ func _start_paper() -> void:
 	var majority := seats * 2 > _sim.total_seats
 	var shown := _event_fx.present("el|%d" % CardManager.last_election_round, {
 		"headline": L.t("SANDIKTAN TEK PARTİ ÇOĞUNLUĞU!") if majority else L.t("SANDIKTAN KOALİSYON MECLİSİ ÇIKTI!"),
-		"subtitle": L.t("%d seçimi: %s %d vekille birinci (oy oranı %s).") % [
-			GameRules.election_year(CardManager.last_election_round), _party_name(winner), seats,
+		"subtitle": L.t("%s seçimi: %s %d vekille birinci (oy oranı %s).") % [
+			GameRules.election_label(CardManager.last_election_round), _party_name(winner), seats,
 			L.pct(float(CardManager.last_vote_shares.get(winner, 0.0)))] + _alliance_paper_line(),
 		"party": winner, "accent": GOLD, "stamp": L.t("BİRİNCİ PARTİ"), "sound": "law_passed",
 		"status": L.t("%d VEKİL") % seats})

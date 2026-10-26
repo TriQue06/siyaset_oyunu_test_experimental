@@ -4982,3 +4982,33 @@ msgstr "You can hold at most %d cards; no card was drawn this turn. Play cards f
 
 msgid "Silinen: %s"
 msgstr "Wiped out: %s"
+
+msgid "%s genel seçimi yapıldı."
+msgstr "The %s general election was held."
+
+msgid "%s erken seçimi yapıldı."
+msgstr "The %s snap election was held."
+
+msgid "Sonraki seçim %s"
+msgstr "Next election %s"
+
+msgid "Sonraki seçim: %s"
+msgstr "Next election: %s"
+
+msgid "%s seçimi: %s %d vekille birinci (oy oranı %s)."
+msgstr "%s election: %s comes first with %d MPs (%s of the vote)."
+
+msgid "KRİZ"
+msgstr "CRISIS"
+
+msgid "Yrd."
+msgstr "Dep."
+
+msgid "Düzenle"
+msgstr "Edit"
+
+msgid "HAZIR"
+msgstr "READY"
+
+msgid " · bot"
+msgstr " · bot"

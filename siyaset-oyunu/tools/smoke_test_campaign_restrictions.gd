@@ -34,7 +34,7 @@ func run() -> void:
 	var skin = load("res://scripts/ui_skin.gd")
 	for button in screen._action_tab_of:
 		var style = button.get_theme_stylebox("normal")
-		check(style is StyleBoxFlat and style.border_width_bottom == UiTheme.THICK, "universal action frame " + button.text.split("\n")[0])
+		check(style is BoardBox and not (style as BoardBox).lips.is_empty(), "universal action frame (kalınlıklı tombul düğme)")
 		check(is_equal_approx(button.modulate.a, 1.0), "action frame stays opaque")
 	var markers = screen.map_holder.get_node("SeatMarkers")
 	var count := 0

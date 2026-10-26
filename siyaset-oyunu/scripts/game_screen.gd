@@ -67,7 +67,8 @@ const PLAYER_TAB_COLUMNS := [
 	[["OY", 56.0], ["VEKİL", 50.0]],
 	[["VEKİL", 46.0], ["ULUSAL", 52.0], ["PUAN", 44.0]],
 ]
-const PLAYER_TAB_HEIGHT := 34.0
+## Sekme yüksekliği (konsept: 44 px).
+const PLAYER_TAB_HEIGHT := 44.0 / 1.5
 ## Sütun başlığı satırının yüksekliği ve iki satırlık kartın alt sınırı.
 const PLAYER_HEADER_HEIGHT := 20.0
 ## Alt haznede meclisin (sol) aldığı pay; kalan sağ kısım el kartlarına.
@@ -100,7 +101,7 @@ const BADGE_ICON_PIXEL_SIZE := 64
 const CARD_DISPLAY_SCALE := 4.0 / 3.0
 ## Kart üstündeki bant/rozet ölçüleri 2 kat büyük karta göre yazılmıştı;
 ## hepsi bu oranla küçülüyor ki kartla orantılı kalsınlar.
-const CARD_TITLE_SIZE := 12
+const CARD_TITLE_SIZE := 10
 const CARD_TITLE_MIN_SIZE := 8
 const CARD_ART_RATIO := CARD_DISPLAY_SCALE / 2.0
 const CARD_DISPLAY_SIZE := Vector2(72, 96) * CARD_DISPLAY_SCALE
@@ -250,7 +251,7 @@ const FUNDS_ICON_SIZE := 34.0
 var _proposer_chip: PanelContainer
 var _proposer_row: HBoxContainer
 ## Kart barının zemini (ekranın altındaki tam genişlik şeridi).
-var _card_bar_panel: Panel
+var _card_bar_panel: Control
 var _funds_plate: PanelContainer
 var _funds_box: HBoxContainer
 var _funds_label: Label
@@ -260,16 +261,16 @@ var _funds_label: Label
 const ACTION_BUTTON_WIDTH := 72.0
 ## HAMLE VE MECLİS DÜĞMESİ RENKLERİ (0.0.215): parti kurma ekranındaki paletten.
 const ACTION_COLOR_MITING := Color("F2132A")    # kırmızı
-const ACTION_COLOR_AID := Color("FA6E66")       # somon
+const ACTION_COLOR_AID := Color("D93636")       # kırmızı (konsept)
 const ACTION_COLOR_ORG := Color("2569CF")       # koyu mavi
 const ACTION_COLOR_INVEST := Color("31C440")    # yeşil
-const ACTION_COLOR_LAW := Color("7647CC")       # indigo
+const ACTION_COLOR_LAW := Color("7B4FD6")       # mor (konsept MECLİS)
 const ACTION_COLOR_CENSURE := Color("A6325A")   # bordo
 const ACTION_COLOR_EARLY := Color("F0A824")     # sarı-turuncu
 const ACTION_COLOR_SPEECH := Color("3FB586")    # su yeşili
 const ACTION_COLOR_CONGRESS := Color("AB39DB")  # mor
-const ACTION_COLOR_ALLIANCE := Color("F27E1F")  # turuncu
-const ACTION_COLOR_PASS := Color("244FB3")      # lacivert
+const ACTION_COLOR_ALLIANCE := Color("F08A24")  # turuncu (konsept)
+const ACTION_COLOR_PASS := UiTheme.TEAL         # deniz yeşili (konsept TURU BİTİR)
 const VOTE_COLOR_YES := Color("31C440")         # yeşil
 const VOTE_COLOR_ABSTAIN := Color("FAD028")     # sarı
 const VOTE_COLOR_NO := Color("F2132A")          # kırmızı
@@ -358,6 +359,7 @@ var _alliance_swatches: Array[Button] = []
 var _alliance_create_button: Button
 
 func _ready() -> void:
+	TableSurface.cover(self)
 	AudioManager.play_game_music()
 	map_holder.province_clicked.connect(_on_province_clicked)
 	_refresh_game_settings_label()
@@ -418,7 +420,8 @@ func _ready() -> void:
 	if actions_panel != null:
 		UiSkin.skin_panel(actions_panel, UiSkin.PANEL_DARK)
 	# Monospace yazı geniş: panelin kendi genişliğini aşmasını engelle.
-	left_panel.clip_contents = true
+	# Kalınlık ve gölge panelin dışına taşar: kırpılmasın (içerik kendi kaydırıcısında).
+	left_panel.clip_contents = false
 	# custom_minimum_size ASGARİ ölçüdür, azami değil: eskiden panel içeriği
 	# 260'ı aşınca sağa doğru büyüyüp diyagramın üstüne biniyordu. Artık düz
 	# Panel olduğu için genişlik çapalarla sabit; burada bir şey zorlamıyoruz.
@@ -530,11 +533,9 @@ func _top_area_height() -> float:
 ## kartlar içinde yan yana durur.
 func _place_card_bar() -> void:
 	if _card_bar_panel == null:
-		_card_bar_panel = Panel.new()
-		_card_bar_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_card_bar_panel = TableSurface.wood("desk")
 		# Ekranı boydan boya kaplayan masa: diğer paneller gibi konturlu, ama
 		# kontur yalnız üst ve alt kenarda (0.0.260).
-		_card_bar_panel.add_theme_stylebox_override("panel", _edge_band_style(DESK_COLOR))
 		add_child(_card_bar_panel)
 		move_child(_card_bar_panel, 1)
 	_set_rect(_card_bar_panel, _r(R_DESK))
@@ -573,7 +574,7 @@ var _parl_summary: Label
 var _vote_bar: VoteTugBar
 var _side_tabs: HBoxContainer
 var _side_tab := 0
-var _strip_bg: Panel
+var _strip_bg: Control
 
 ## Tasarım ızgarasındaki bir dikdörtgeni ekran boyutuna ölçekler.
 ## Tasarım (1280x720) dikdörtgenini ekrana taşır. Eskiden x ve y ayrı
@@ -628,6 +629,35 @@ static func _edge_band_style(color: Color) -> StyleBox:
 	box.expand_margin_right = 16.0
 	return box
 
+## Bant kutusu: Menü düğmesinin boyunu aşmasın diye dikey boşluğu az.
+static func _band_plate() -> BoardBox:
+	var b := UiSkin.plate()
+	b.content_margin_left = UiTheme.d(10)
+	b.content_margin_right = UiTheme.d(14)
+	b.content_margin_top = UiTheme.d(2)
+	b.content_margin_bottom = UiTheme.d(2)
+	return b
+
+## Ahşap üstündeki yazının sert gölgesi (konsept: 0 Npx 0 #6a3b18).
+static func _wood_text_shadow(label: Control, px: float) -> void:
+	label.add_theme_color_override("font_shadow_color", UiTheme.WOOD_SHADOW)
+	label.add_theme_constant_override("shadow_offset_x", 0)
+	label.add_theme_constant_override("shadow_offset_y", maxi(1, int(round(UiTheme.d(px)))))
+
+## Panoların iç alanı (konsept: yanlarda 22, üstte 20, altta 22 px).
+static func _panel_inner(rect: Rect2) -> Rect2:
+	return Rect2(rect.position + Vector2(UiTheme.d(22), UiTheme.d(20)),
+		rect.size - Vector2(UiTheme.d(44), UiTheme.d(42)))
+
+func _board_inner() -> Rect2:
+	return _panel_inner(_r(R_BOARD))
+
+## HARİTA ALANI: orta panonun içinde, sekmelerin altında (konsept .mapwrap).
+func _map_area() -> Rect2:
+	var panel := _r(R_MAP)
+	return Rect2(panel.position + Vector2(UiTheme.d(16), UiTheme.d(84)),
+		panel.size - Vector2(UiTheme.d(32), UiTheme.d(84) + UiTheme.d(16)))
+
 func _set_rect(control: Control, rect: Rect2) -> void:
 	control.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	control.position = rect.position
@@ -637,7 +667,7 @@ static func _section_label(text: String) -> Label:
 	var label := Label.new()
 	label.text = text
 	label.add_theme_font_override("font", UiTheme.mono(true))
-	label.add_theme_font_size_override("font_size", 11)
+	label.add_theme_font_size_override("font_size", UiTheme.fs(18))
 	label.add_theme_color_override("font_color", UiTheme.HEAD)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return label
@@ -645,21 +675,38 @@ static func _section_label(text: String) -> Label:
 ## Masanın bölüm başlıkları: ELİM · HAMLELER · SIRA.
 func _place_desk_labels() -> void:
 	for key in ["hand", "actions", "turn"]:
-		if not _desk_labels.has(key):
+		if not _desk_labels.has(key) or not _desk_labels[key] is Label:
 			var label := _section_label("")
 			add_child(label)
 			_desk_labels[key] = label
 	# Masa başlıkları masanın üst kenarıyla içeriğin arasında, sütunlara hizalı.
 	for key in ["hand", "actions"]:
-		(_desk_labels[key] as Label).add_theme_color_override("font_color", UiTheme.WOOD_TEXT)
-		(_desk_labels[key] as Label).add_theme_font_size_override("font_size", 13)
+		var label := _desk_labels[key] as Label
+		label.add_theme_color_override("font_color", UiTheme.WOOD_TEXT)
+		label.add_theme_font_size_override("font_size", UiTheme.fs(19))
+		_wood_text_shadow(label, 2.0)
+	if not _desk_labels.has("hint"):
+		var hint := Label.new()
+		hint.add_theme_font_override("font", UiTheme.mono_regular())
+		hint.add_theme_font_size_override("font_size", UiTheme.fs(16))
+		hint.add_theme_color_override("font_color", UiTheme.WOOD_TEXT_MUTED)
+		hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(hint)
+		_desk_labels["hint"] = hint
 	(_desk_labels["hand"] as Label).position = _r(Rect2(16, 546, 0, 0)).position
 	(_desk_labels["actions"] as Label).position = _r(Rect2(536, 546, 0, 0)).position
 	(_desk_labels["turn"] as Label).position = _r(Rect2(1112, 546, 0, 0)).position
 	# 0.0.260: sıra göstergesi yalnız üst bantta (para levhasının üstünde yok).
 	(_desk_labels["turn"] as Label).visible = false
 	# İpucu başlığın yanında (masanın alt kenarına taşmasın).
-	(_desk_labels["actions"] as Label).text = L.t("HAMLELER") + "  ·  " + L.t("teşkilat, miting, yatırım: haritada bir ile dokun")
+	(_desk_labels["actions"] as Label).text = L.t("HAMLELER")
+	var hint := _desk_labels["hint"] as Label
+	hint.text = "·  " + L.t("teşkilat, miting, yatırım: haritada bir ile dokun")
+	var actions_label := _desk_labels["actions"] as Label
+	actions_label.reset_size()
+	hint.reset_size()
+	hint.position = actions_label.position + Vector2(actions_label.size.x + UiTheme.d(10),
+		(actions_label.size.y - hint.size.y) * 0.5)
 	_refresh_desk_labels()
 
 func _refresh_desk_labels() -> void:
@@ -686,7 +733,8 @@ func _apply_layout() -> void:
 	# Harita SADECE üst bölgeye (TOP_AREA_HEIGHT_RATIO) ve sağdaki deste/
 	# oyuncu şeridi hariç kalan genişliğe sığacak şekilde ölçekleniyor —
 	# geniş, dikdörtgen bir alanı doldurması hedefleniyor.
-	var map_rect := _r(R_MAP)
+	var map_rect := _map_area()
+	_ensure_center_board()
 	if _swap_engaged:
 		_place_map(_swap_map_rect)
 	elif _map_split:
@@ -698,14 +746,12 @@ func _apply_layout() -> void:
 
 	# CANLI YAYIN BANDI: CANLI · başlık + tarih · sıra kimde (Menü sağda).
 	if _strip_bg == null:
-		_strip_bg = Panel.new()
+		_strip_bg = TableSurface.wood("band")
 		# Boydan boya bant: kontur üst ve alt kenarda, yanlarda yok (0.0.260).
-		_strip_bg.add_theme_stylebox_override("panel", _edge_band_style(UiTheme.WOOD))
-		_strip_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(_strip_bg)
 		move_child(_strip_bg, 1)
 	# 0.0.255: bant sayaç şeridinin ALTINDAN başlar (ikisi üst üste binmez).
-	_set_rect(_strip_bg, _r(Rect2(0, TIMER_BAR_HEIGHT, 1280, R_BAND.size.y - TIMER_BAR_HEIGHT)))
+	_set_rect(_strip_bg, _r(Rect2(0, 0, 1280, R_BAND.size.y)))
 	_place_date_chip(map_rect)
 
 	# SKOR TABLOSU (sol): VEKİL ve PUAN sekmeleri.
@@ -713,7 +759,7 @@ func _apply_layout() -> void:
 	_set_rect(_board_bg, _r(R_BOARD))
 	var strip := get_node_or_null("PlayerPanel") as Control
 	if strip != null:
-		_set_rect(strip, _r(R_BOARD).grow(-8.0))
+		_set_rect(strip, _board_inner())
 
 	_detach_actions_panel()
 
@@ -790,15 +836,24 @@ func _detach_actions_panel() -> void:
 ## Harita alanının zemini (harita bunun ortasına oturur).
 func _ensure_map_bg(rect: Rect2) -> void:
 	if _map_bg == null:
-		_map_bg = Panel.new()
-		var style := UiSkin.flat(Color("93D2D7"), UiTheme.RADIUS)
-		style.border_color = UiTheme.TEAL
-		style.set_border_width_all(3)
-		_map_bg.add_theme_stylebox_override("panel", style)
-		_map_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# Deniz (dalgalı) haritanın arkasında; haritanın kendi denizi çizilmez.
+		_map_bg = TableSurface.sea()
 		add_child(_map_bg)
-		move_child(_map_bg, 1)
+		move_child(_map_bg, _center_bg.get_index() + 1 if _center_bg != null else 1)
+		map_holder.set("draw_sea", false)
 	_set_rect(_map_bg, rect)
+
+## ORTA PANO: harita sekmeleri ve haritanın oturduğu karton pano.
+var _center_bg: Panel
+
+func _ensure_center_board() -> void:
+	if _center_bg == null:
+		_center_bg = Panel.new()
+		_center_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_center_bg.add_theme_stylebox_override("panel", UiSkin.board())
+		add_child(_center_bg)
+		move_child(_center_bg, 1)
+	_set_rect(_center_bg, _r(R_MAP))
 
 ## YAYIN BANDI: kırmızı CANLI rozeti, "SİYASET GÜNDEMİ" ve altında tarih /
 ## baraj / sonraki seçim; ortada sıranın kimde olduğu ve kalan süre.
@@ -810,7 +865,7 @@ var _band_turn_key := ""
 
 var _band_period: Label
 var _band_crisis: PanelContainer
-var _band_crisis_title: Label
+var _band_crisis_title: RichTextLabel
 var _band_crisis_text: Label
 ## Krizin seçmen grubu simgesi (kutunun solunda).
 var _band_crisis_icon: VoterGroupIcon
@@ -821,50 +876,69 @@ func _place_date_chip(_map_rect: Rect2) -> void:
 	if _date_label == null:
 		_band_period = Label.new()
 		_band_period.add_theme_font_override("font", UiTheme.mono(true))
-		_band_period.add_theme_font_size_override("font_size", 21)
+		# Konsept: dönem 34 px, ahşap üstünde açık krem ve sert koyu gölge.
+		_band_period.add_theme_font_size_override("font_size", UiTheme.fs(34))
 		_band_period.add_theme_color_override("font_color", UiTheme.WOOD_TEXT)
+		_wood_text_shadow(_band_period, 3.0)
 		_band_period.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(_band_period)
 		_date_label = Label.new()
-		_date_label.add_theme_font_override("font", UiTheme.mono(true))
-		_date_label.add_theme_font_size_override("font_size", 12)
+		_date_label.add_theme_font_override("font", UiTheme.mono_regular())
+		_date_label.add_theme_font_size_override("font_size", UiTheme.fs(16))
 		_date_label.add_theme_color_override("font_color", UiTheme.WOOD_TEXT_MUTED)
 		_date_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(_date_label)
 		# KRİZ / GÜNDEM kutusu.
+		# KRİZ kutusu (konsept .box.crisis): koyu pul + hardal simge, başlıkta
+		# kırmızı "KRİZ", altında tek satır etki.
 		_band_crisis = PanelContainer.new()
 		_band_crisis.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_band_crisis.clip_contents = true
-		var crisis_box := Control.new()
-		crisis_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_band_crisis.add_child(crisis_box)
-		_band_crisis_title = Label.new()
-		_band_crisis_title.add_theme_font_override("font", UiTheme.mono(true))
-		_band_crisis_title.add_theme_font_size_override("font_size", 14)
+		_band_crisis.add_theme_stylebox_override("panel", _band_plate())
+		var crisis_row := HBoxContainer.new()
+		crisis_row.add_theme_constant_override("separation", int(UiTheme.d(14)))
+		crisis_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_band_crisis.add_child(crisis_row)
+		_band_crisis_icon = VoterGroupIcon.make("isci", UiTheme.d(44))
+		_band_crisis_icon.tile_override = UiTheme.INK
+		_band_crisis_icon.ink_override = UiTheme.GOLD
+		_band_crisis_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		crisis_row.add_child(_band_crisis_icon)
+		var crisis_texts := VBoxContainer.new()
+		crisis_texts.alignment = BoxContainer.ALIGNMENT_CENTER
+		crisis_texts.add_theme_constant_override("separation", int(UiTheme.d(4)))
+		crisis_texts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		crisis_texts.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		crisis_row.add_child(crisis_texts)
+		_band_crisis_title = RichTextLabel.new()
+		_band_crisis_title.bbcode_enabled = true
+		_band_crisis_title.fit_content = true
+		_band_crisis_title.autowrap_mode = TextServer.AUTOWRAP_OFF
+		_band_crisis_title.scroll_active = false
+		_band_crisis_title.clip_contents = false
+		_band_crisis_title.add_theme_font_override("normal_font", UiTheme.mono(true))
+		_band_crisis_title.add_theme_font_size_override("normal_font_size", UiTheme.fs(22))
+		_band_crisis_title.add_theme_color_override("default_color", UiTheme.TEXT)
 		_band_crisis_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		crisis_box.add_child(_band_crisis_title)
+		crisis_texts.add_child(_band_crisis_title)
 		_band_crisis_text = Label.new()
-		_band_crisis_text.add_theme_font_size_override("font_size", 11)
-		_band_crisis_text.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
+		_band_crisis_text.add_theme_font_size_override("font_size", UiTheme.fs(15))
+		_band_crisis_text.add_theme_color_override("font_color", UiTheme.TEXT_MUTED2)
+		_band_crisis_text.clip_text = true
 		_band_crisis_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		crisis_box.add_child(_band_crisis_text)
-		_band_crisis_icon = VoterGroupIcon.make("isci", 32.0)
-		crisis_box.add_child(_band_crisis_icon)
-		_band_crisis_title.position = Vector2(42, 3)
-		_band_crisis_text.position = Vector2(42, 23)
+		crisis_texts.add_child(_band_crisis_text)
 		add_child(_band_crisis)
 		_band_turn = PanelContainer.new()
 		_band_turn.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_band_turn.clip_contents = true
+		_band_turn.add_theme_stylebox_override("panel", _band_plate())
 		_band_turn_row = HBoxContainer.new()
-		_band_turn_row.add_theme_constant_override("separation", 10)
+		_band_turn_row.add_theme_constant_override("separation", int(UiTheme.d(14)))
 		_band_turn_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_band_turn.add_child(_band_turn_row)
 		add_child(_band_turn)
 		# SÜRE ŞERİDİ: ekranın en üstünde, sırası gelenin renginde, süre
 		# azaldıkça soldan sağa uzar (dolunca süre biter).
 		_timer_bar_bg = ColorRect.new()
-		_timer_bar_bg.color = UiTheme.WOOD_DARK
+		_timer_bar_bg.color = Color(0, 0, 0, 0.22)
 		_timer_bar_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_timer_bar_bg.z_index = 7
 		add_child(_timer_bar_bg)
@@ -879,7 +953,7 @@ func _place_date_chip(_map_rect: Rect2) -> void:
 	# 0.0.260: aralarındaki boşluk Menü'nün bantla üst/alt boşluğu kadar;
 	# kutular Menü'den sola doğru dizilir.
 	var menu := _menu_button_rect()
-	var band := _r(Rect2(0, TIMER_BAR_HEIGHT, 1280, R_BAND.size.y - TIMER_BAR_HEIGHT))
+	var band := _r(Rect2(0, 0, 1280, R_BAND.size.y))
 	var gap := maxf(2.0, ((menu.position.y - band.position.y) + (band.end.y - menu.end.y)) * 0.5)
 	var turn_w := _r(Rect2(760, 0, 380, 0)).size.x
 	var crisis_w := _r(Rect2(300, 0, 444, 0)).size.x
@@ -927,23 +1001,8 @@ func _refresh_band_crisis() -> void:
 	if not _band_crisis.visible:
 		return
 	var data := CardPresets.agenda_data(agenda)
-	var style := UiSkin.flat(UiTheme.PANEL_DARK, UiTheme.RADIUS)
-	style.border_color = UiTheme.RED
-	style.set_border_width_all(2)
-	style.border_width_bottom = 4
-	style.content_margin_left = 6
-	style.content_margin_right = 10
-	style.content_margin_top = 0
-	style.content_margin_bottom = 0
-	_band_crisis.add_theme_stylebox_override("panel", style)
-	var side := clampf(_band_crisis.size.y - 12.0, 20.0, 40.0)
 	_band_crisis_icon.set_group(String(data.get("group", "")))
-	_band_crisis_icon.size = Vector2(side, side)
-	_band_crisis_icon.position = Vector2(2, (_band_crisis.size.y - side) * 0.5 - 2.0)
-	_band_crisis_title.position = Vector2(side + 12.0, 3)
-	_band_crisis_text.position = Vector2(side + 12.0, 23)
-	_band_crisis_title.text = L.t("KRİZ · %s") % data["title"]
-	_band_crisis_title.add_theme_color_override("font_color", UiTheme.RED_DARK)
+	_band_crisis_title.text = "[color=#%s]%s[/color] · %s" % [UiTheme.CRISIS.to_html(false), L.t("KRİZ"), data["title"]]
 	_band_crisis_text.text = L.t("%s ile toplantı ve yasa çok daha etkili") % data["group_title"]
 
 func _refresh_timer_bar() -> void:
@@ -979,34 +1038,52 @@ func _refresh_band_turn() -> void:
 		return
 	var data := PartyManager.data_of(CardManager.party_of(peer_id))
 	var color: Color = data.get("bg_color", UiTheme.GOLD)
-	var style := UiSkin.flat(UiTheme.PANEL_DARK, UiTheme.RADIUS)
-	style.border_color = color
-	style.set_border_width_all(2)
-	style.border_width_bottom = 4
-	style.content_margin_left = 8
-	style.content_margin_right = 10
-	style.content_margin_top = 0
-	style.content_margin_bottom = 2
-	_band_turn.add_theme_stylebox_override("panel", style)
-	var side := clampf(_band_turn.size.y - 14.0, 20.0, 40.0)
+	var side := UiTheme.d(44)
 	var badge := PartyBadge.build(PartyManager.data_of(peer_id), Vector2(side, side), BADGE_ICON_PIXEL_SIZE)
 	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_band_turn_row.add_child(badge)
 	var texts := VBoxContainer.new()
-	texts.add_theme_constant_override("separation", 0)
+	texts.add_theme_constant_override("separation", int(UiTheme.d(4)))
 	texts.alignment = BoxContainer.ALIGNMENT_CENTER
 	texts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	texts.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_band_turn_row.add_child(texts)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", int(UiTheme.d(6)))
+	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	texts.add_child(head)
 	var party_text := L.t("Bağımsız") if PartyManager.is_independent(peer_id) else String(PartyManager.data_of(peer_id).get("name", "?"))
-	var title_text := (L.t("SIRA SENDE · %s") if peer_id == multiplayer.get_unique_id() else L.t("SIRA · %s")) % party_text
-	var title := _avatar_label(title_text, 14, color.darkened(0.25) if color.get_luminance() > 0.45 else color)
+	# Konsept: "SIRA SENDE" parti renginde, köşesi 8 px, altı koyu kalın hap.
+	var pill := Label.new()
+	pill.text = L.t("SIRA SENDE") if peer_id == multiplayer.get_unique_id() else L.t("SIRA")
+	pill.add_theme_font_override("font", UiTheme.mono(true))
+	pill.add_theme_font_size_override("font_size", UiTheme.fs(22))
+	pill.add_theme_color_override("font_color", UiSkin.text_on(color))
+	pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var pill_box := BoardBox.new()
+	pill_box.fill = color
+	pill_box.set_radius(UiTheme.d(8))
+	pill_box.lips = [[UiTheme.d(2), color.lerp(Color.BLACK, 0.4)]]
+	pill_box.content_margin_left = UiTheme.d(8)
+	pill_box.content_margin_right = UiTheme.d(8)
+	pill.add_theme_stylebox_override("normal", pill_box)
+	head.add_child(pill)
+	var title := _avatar_label("· " + party_text, UiTheme.fs(22), UiTheme.TEXT)
 	title.add_theme_font_override("font", UiTheme.mono(true))
 	title.clip_text = true
-	texts.add_child(title)
-	var sub_text := PoliticianPresets.display_name(peer_id) + (("  ·  " + timer) if timer != "" else "")
-	var sub := _avatar_label(sub_text, 11, UiTheme.TEXT_MUTED)
-	sub.clip_text = true
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(title)
+	var sub := RichTextLabel.new()
+	sub.bbcode_enabled = true
+	sub.fit_content = true
+	sub.autowrap_mode = TextServer.AUTOWRAP_OFF
+	sub.scroll_active = false
+	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sub.add_theme_font_size_override("normal_font_size", UiTheme.fs(15))
+	sub.add_theme_font_size_override("bold_font_size", UiTheme.fs(15))
+	sub.add_theme_font_override("bold_font", UiTheme.body_black())
+	sub.add_theme_color_override("default_color", UiTheme.TEXT_MUTED2)
+	sub.text = PoliticianPresets.display_name(peer_id) + ((" · [b][color=#%s]%s[/color][/b]" % [UiTheme.TEAL.to_html(false), timer]) if timer != "" else "")
 	texts.add_child(sub)
 
 ## MECLİS: stüdyo masasının HÜKÜMET sekmesinde, sekmelerin hemen altındaki
@@ -1045,8 +1122,8 @@ func _place_parliament_badge() -> void:
 			vbox.add_child(_parl_title)
 			vbox.move_child(_parl_title, 0)
 			_parl_summary = Label.new()
-			_parl_summary.add_theme_font_override("font", UiTheme.mono(true))
-			_parl_summary.add_theme_font_size_override("font_size", 12)
+			_parl_summary.add_theme_font_override("font", UiTheme.mono_regular())
+			_parl_summary.add_theme_font_size_override("font_size", UiTheme.fs(15))
 			_parl_summary.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			_parl_summary.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			vbox.add_child(_parl_summary)
@@ -1127,7 +1204,7 @@ func _update_vote_swap(delta: float) -> void:
 	else:
 		_vote_end_wait = maxf(0.0, _vote_end_wait - delta)
 	var want := voting or _vote_end_wait > 0.0
-	var home_map := _r(R_MAP)
+	var home_map := _map_area()
 	if not _swap_engaged:
 		_swap_map_rect = home_map
 		_swap_parl_rect = _swap_home_parl
@@ -1217,7 +1294,7 @@ func _refresh_parliament_summary() -> void:
 	var majority := total / 2 + 1
 	_parl_summary.text = (L.t("Hük %d · çoğ %d · Muh %d") % [gov, majority, total - gov]) if GovernmentManager.has_government() \
 		else L.t("Hükümet yok · çoğunluk %d") % majority
-	_parl_summary.add_theme_color_override("font_color", UiTheme.TEXT)
+	_parl_summary.add_theme_color_override("font_color", UiTheme.TEXT_MUTED2)
 
 ## SAĞ SÜTUN: üstte sekmeler; Hükümet (hükümet + son olaylar), Log (sadece
 ## log), Seçili (dokunulan il / parti). Eski bilgi kutusu ve sıra göstergesi
@@ -1228,8 +1305,10 @@ func _setup_side_column() -> void:
 		return
 	var margin := left_panel.get_node_or_null("LeftMargin") as MarginContainer
 	if margin != null:
-		for side in ["left", "right", "top", "bottom"]:
-			margin.add_theme_constant_override("margin_" + side, 8)
+		margin.add_theme_constant_override("margin_left", int(UiTheme.d(22)))
+		margin.add_theme_constant_override("margin_right", int(UiTheme.d(22)))
+		margin.add_theme_constant_override("margin_top", int(UiTheme.d(20)))
+		margin.add_theme_constant_override("margin_bottom", int(UiTheme.d(22)))
 	for node_name in ["InfoPlate", L.t("Separator1"), L.t("TurnIndicator"), L.t("TurnSpacer")]:
 		var node := vbox.get_node_or_null(node_name) as Control
 		if node != null:
@@ -1383,8 +1462,7 @@ func _refresh_side_tabs() -> void:
 	var active := SIDE_TAB_SELECTED if selected_open else _side_tab
 	for i in _side_tabs.get_child_count():
 		var tab := _side_tabs.get_child(i) as Button
-		UiSkin.skin_color_button(tab, UiTheme.GOLD if i == active else UiTheme.PANEL_LIGHT)
-		tab.add_theme_color_override("font_color", UiTheme.INK if i == active else UiTheme.TEXT_MUTED)
+		_style_tab_button(tab, i == active, true)
 		tab.disabled = i == SIDE_TAB_SELECTED and not selected_open
 		# Pencere modunda il ve profil pencerede açılır: "Seçili" sekmesine gerek yok.
 		tab.visible = i != SIDE_TAB_SELECTED or not _window_mode()
@@ -1753,7 +1831,8 @@ func _refresh_province_winner_colors() -> void:
 		# koltuğu alan partinin kendi rengi, tam opak.
 		var party_color: Color = PartyManager.data_of(winner_id).get("bg_color", Color(0.5, 0.5, 0.5))
 		party_color.a = 1.0
-		_seat_layer_colors[province_id] = party_color
+		# Konsept: il dolgusu parti renginin %82'si + beyaz (basılı tahta tonu).
+		_seat_layer_colors[province_id] = party_color.lerp(Color.WHITE, 0.18)
 	_apply_map_layer_colors()
 
 ## Harita üzerindeki il başına milletvekili noktalarını (SeatMarkers, bkz.
@@ -1794,7 +1873,7 @@ func _next_election_text(next_election: int, colon: bool) -> String:
 		return L.t("Başka seçim yok")
 	if next_election <= CardManager.round_number:
 		return L.t("Seçim bu dönemin sonunda")
-	return (L.t("Sonraki seçim: %d") if colon else L.t("Sonraki seçim %d")) % GameRules.election_year(next_election)
+	return (L.t("Sonraki seçim: %s") if colon else L.t("Sonraki seçim %s")) % GameRules.election_label(next_election)
 
 func _refresh_game_settings_label() -> void:
 	var next_election := CardManager.next_election_round()
@@ -1880,9 +1959,6 @@ func _refresh_player_tabs() -> void:
 	for i in _player_tab_buttons.size():
 		var button := _player_tab_buttons[i] as Button
 		_style_tab_button(button, i == _player_tab, true)
-		button.add_theme_color_override("font_color", UiTheme.INK if i == _player_tab else UiTheme.TEXT_MUTED)
-		button.add_theme_font_override("font", UiTheme.mono(true))
-		button.add_theme_font_size_override("font_size", 13)
 
 ## Tablonun sütun başlıkları: parti adının sağında, satırlarla aynı hizada.
 func _build_player_header() -> Control:
@@ -1963,13 +2039,13 @@ func _rebuild_player_panel_now() -> void:
 		player_tabs.show()
 	var party_ids := _ordered_party_ids()
 	player_panel_list.columns = 1
-	player_panel_list.add_theme_constant_override("v_separation", 4)
+	player_panel_list.add_theme_constant_override("v_separation", int(PLAQUE_GAP))
 	var panel := get_node_or_null("PlayerPanel") as Control
 	if panel != null:
 		panel.clip_contents = true
-	var inner := _r(R_BOARD).grow(-8.0)
-	var list_height: float = inner.size.y - PLAYER_TAB_HEIGHT - 6.0
-	var plaque_height: float = clampf(list_height / maxf(1.0, party_ids.size()) - 4.0, 50.0, 60.0)
+	var inner := _board_inner()
+	var list_height: float = inner.size.y - PLAYER_TAB_HEIGHT - PLAQUE_GAP * 2.0
+	var plaque_height: float = clampf(list_height / maxf(1.0, party_ids.size()) - PLAQUE_GAP, 44.0, PLAQUE_HEIGHT)
 	for pid in party_ids:
 		var plaque := _build_plaque(int(pid), inner.size.x)
 		plaque.custom_minimum_size.y = plaque_height
@@ -2007,20 +2083,22 @@ func _build_plaque(pid: int, width: float) -> Control:
 	var card := PanelContainer.new()
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
-	card.clip_contents = true
-	# MASA OYUNU: beyaz karton kart, parti renginde kenar ve kalınlık;
-	# sırası gelen partide hardal kenar.
-	var style := UiSkin.flat(Color("FFF6DC") if is_turn else UiTheme.PANEL_DARK, UiTheme.RADIUS)
-	style.border_color = UiTheme.GOLD if is_turn else color.lerp(UiTheme.PANEL_DARK, 0.45)
-	style.set_border_width_all(3 if is_turn else 2)
-	style.border_width_bottom = 5
-	style.content_margin_left = 8
-	style.content_margin_right = 10
-	style.content_margin_top = 6
-	style.content_margin_bottom = 7
+	# KONSEPT .prow: beyaz kart, parti renginde (%45) kenar ve kalınlık,
+	# hafif gölge. Sırası gelen partide kenar hardal.
+	var style := UiSkin.card(UiTheme.PANEL_DARK, color.lerp(UiTheme.PANEL_DARK, 0.55), color.lerp(UiTheme.CARD_LIP, 0.55))
+	if is_turn:
+		style.rings = [[0.0, UiTheme.d(3), UiTheme.GOLD]]
+		style.lips = [[UiTheme.d(4), UiTheme.GOLD_DIM]]
+	style.shadow_color = Color(0, 0, 0, 0.12)
+	style.shadow_offset = Vector2(0, UiTheme.d(6))
+	style.shadow_size = UiTheme.d(6)
+	style.content_margin_left = UiTheme.d(8)
+	style.content_margin_right = UiTheme.d(12)
+	style.content_margin_top = UiTheme.d(8)
+	style.content_margin_bottom = UiTheme.d(8)
 	card.add_theme_stylebox_override("panel", style)
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 7)
+	row.add_theme_constant_override("separation", int(UiTheme.d(12)))
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(row)
 	# BÜYÜK LOGO.
@@ -2044,7 +2122,7 @@ func _build_plaque(pid: int, width: float) -> Control:
 		var alliance: Dictionary = CardManager.alliances[alliance_id]
 		tags.append([String(alliance.get("name", "")), alliance.get("color", UiTheme.GOLD), UiTheme.INK])
 	if GovernmentManager.has_government() and CardManager.is_government_party(pid):
-		tags.append([L.t("PM") if GovernmentManager.main_gov_peer_id == pid else L.t("HÜK"), UiTheme.GREEN_DARK, UiTheme.ON_COLOR])
+		tags.append([L.t("PM") if GovernmentManager.main_gov_peer_id == pid else L.t("HÜK"), UiTheme.GOLD, UiTheme.TEXT_ON_GOLD])
 	if mine:
 		tags.append([L.t("SEN"), UiTheme.TEAL, UiTheme.ON_COLOR])
 	var populism_left := CardManager.populism_rounds_left(pid)
@@ -2068,7 +2146,7 @@ func _build_plaque(pid: int, width: float) -> Control:
 	var seats_text := str(int(CardManager.last_seats.get(pid, 0))) if has_seats else "—"
 	var name_text := L.t("Bağımsız") if independent else String(party.get("name", "?"))
 	var inner: float = width - 12.0 - PLAQUE_BADGE - 7.0
-	var name_label := _avatar_label(name_text, _fit_font_size(name_text, inner - tags_width - 34.0, 16, 9),
+	var name_label := _avatar_label(name_text, _fit_font_size(name_text, inner - tags_width - 34.0, UiTheme.fs(23), 9),
 		UiTheme.TEXT)
 	name_label.clip_text = true
 	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -2085,8 +2163,12 @@ func _build_plaque(pid: int, width: float) -> Control:
 		tag_control.custom_minimum_size.x = minf(tag_limit, String(tag[0]).length() * 9.0 + 10.0)
 		tag_control.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		head.add_child(tag_control)
-	var seats_label := _avatar_label(seats_text, 19, color.darkened(0.2))
+	# Vekil sayısı parti renginde, altında koyu sert gölge (konsept .pseats).
+	var seats_label := _avatar_label(seats_text, UiTheme.fs(28), color)
 	seats_label.add_theme_font_override("font", UiTheme.mono(true))
+	seats_label.add_theme_color_override("font_shadow_color", color.lerp(Color.BLACK, 0.55))
+	seats_label.add_theme_constant_override("shadow_offset_x", 0)
+	seats_label.add_theme_constant_override("shadow_offset_y", int(round(UiTheme.d(2))))
 	seats_label.clip_text = false
 	head.add_child(seats_label)
 
@@ -2099,13 +2181,13 @@ func _build_plaque(pid: int, width: float) -> Control:
 		leader_text += L.t(" · üye ") + PoliticianPresets.display_name(int(members[1]))
 	var share: float = float(CardManager.last_vote_shares.get(pid, 0.0))
 	var share_text := (L.t("%%%.1f") % share) if CardManager.last_vote_shares.has(pid) else ""
-	var leader := _avatar_label(leader_text, _fit_font_size(leader_text, inner - 44.0, 13, 8), UiTheme.TEXT_MUTED)
+	var leader := _avatar_label(leader_text, _fit_font_size(leader_text, inner - 44.0, UiTheme.fs(15), 8), UiTheme.TEXT_MUTED)
 	leader.clip_text = true
 	leader.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	leader.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	foot.add_child(leader)
-	var share_label := _avatar_label(share_text, 13, UiTheme.TEXT_MUTED)
-	share_label.add_theme_font_override("font", UiTheme.mono(true))
+	var share_label := _avatar_label(share_text, UiTheme.fs(15), UiTheme.TEXT_MUTED)
+	share_label.add_theme_font_override("font", UiTheme.mono_regular())
 	share_label.clip_text = false
 	foot.add_child(share_label)
 	# KALIN OY ÇUBUĞU: en çok oy alan parti tam dolu, diğerleri ona oranla.
@@ -2116,16 +2198,24 @@ func _build_plaque(pid: int, width: float) -> Control:
 	bar.custom_minimum_size = Vector2(0, PLAQUE_BAR)
 	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# Yuvarlak uçlu oyuk ve içinde parti renginde dolgu.
-	var bar_bg := UiSkin.color_surface(UiTheme.SLOT, UiSkin.TRACK)
-	bar_bg.add_theme_stylebox_override("panel", UiSkin.flat(UiTheme.SLOT, 99))
-	bar_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	bar.add_child(bar_bg)
-	var fill := UiSkin.color_surface(color, UiSkin.TRACK)
-	fill.add_theme_stylebox_override("panel", UiSkin.flat(color, 99))
-	fill.anchor_bottom = 1.0
-	fill.anchor_right = clampf(share / top_share, 0.0, 1.0) if top_share > 0.0 else 0.0
-	bar.add_child(fill)
+	# Konsept .pbar: içe basık oyuk ve parti renginde, 14+2 px çizgili dolgu.
+	var ratio := clampf(share / top_share, 0.0, 1.0) if top_share > 0.0 else 0.0
+	bar.draw.connect(func():
+		var r := Rect2(Vector2.ZERO, bar.size)
+		var rad := r.size.y * 0.5
+		var groove := UiSkin.flat(UiTheme.SLOT, int(rad))
+		groove.border_color = UiTheme.SLOT.darkened(0.08)
+		groove.border_width_top = int(maxf(1.0, UiTheme.d(2)))
+		bar.draw_style_box(groove, r)
+		if ratio <= 0.0:
+			return
+		var w := maxf(r.size.y, r.size.x * ratio)
+		bar.draw_style_box(UiSkin.flat(color, int(rad)), Rect2(r.position, Vector2(w, r.size.y)))
+		var step := UiTheme.d(16)
+		var x := step - UiTheme.d(2)
+		while x < w - rad:
+			bar.draw_rect(Rect2(x, 0, UiTheme.d(2), r.size.y), color.lerp(Color.WHITE, 0.2))
+			x += step)
 	stack.add_child(bar)
 
 	card.set_meta("peer_id", pid)
@@ -2141,8 +2231,11 @@ func _build_plaque(pid: int, width: float) -> Control:
 	)
 	return card
 
-const PLAQUE_BADGE := 40.0
-const PLAQUE_BAR := 9.0
+## Konsept .prow: satır 82, aralık 12, pul 46, çubuk 10 (px).
+const PLAQUE_BADGE := 46.0 / 1.5
+const PLAQUE_BAR := 10.0 / 1.5
+const PLAQUE_HEIGHT := 82.0 / 1.5
+const PLAQUE_GAP := 12.0 / 1.5
 
 # --- Tur göstergesi (geçici; kalıcı görseli kullanıcı sonra ekleyecek) -----
 
@@ -2194,8 +2287,8 @@ func _update_turn_indicator_text() -> void:
 func _refresh_pass_button() -> void:
 	var active := CardManager.can_act()
 	pass_button.disabled = not active
-	_set_action_text(pass_button, L.t("TURU BİTİR"), "")
 	UiSkin.skin_action_button(pass_button, ACTION_COLOR_PASS, active)
+	_set_action_text(pass_button, L.t("TURU BİTİR"), "")
 	# Para bittiyse tur kendiliğinden geçmez; düğme nabız gibi atarak hatırlatır.
 	var should_pulse: bool = active and CardManager.funds_of(multiplayer.get_unique_id()) <= 0
 	if should_pulse and _pass_pulse == null:
@@ -2339,26 +2432,63 @@ func _build_hand_card(card_type: String, hand_index: int) -> Control:
 		for art: TextureRect in [card, shadow]:
 			art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 			art.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-		# MASA OYUNU KARTI (0.0.265): görsel yuvarlak köşeli bir kartın içine
-		# kırpılır; gölge de aynı biçimde, altında krem kenar ve kalınlık.
+		# KONSEPT KARTI (.card): krem kart, içte kartın renginde ince çizgi,
+		# altında kalınlık ve gölge; görsel üstte yuvarlak köşeli pencerede,
+		# adı altta koyu yazıyla. Elde hafif yelpaze açısı.
 		holder.remove_child(shadow)
 		shadow.queue_free()
-		var drop := Panel.new()
-		drop.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		drop.size = CARD_DISPLAY_SIZE
-		drop.position = SHADOW_OFFSET
-		drop.add_theme_stylebox_override("panel", UiSkin.flat(SHADOW_COLOR, CARD_RADIUS))
-		holder.add_child(drop)
-		holder.move_child(drop, 0)
+		var edge_color := CardPresets.art_edge_color(card_type)
+		var face_box := BoardBox.new()
+		face_box.fill = UiTheme.PANEL_DARK
+		face_box.set_radius(UiTheme.d(12))
+		face_box.rings = [[UiTheme.d(5), UiTheme.d(2), edge_color]]
+		face_box.lips = [[UiTheme.d(4), Color("D8CAA6")]]
+		face_box.shadow_color = Color(0, 0, 0, 0.4)
+		face_box.shadow_offset = Vector2(0, UiTheme.d(10))
+		face_box.shadow_size = UiTheme.d(9)
+		var face_panel := Panel.new()
+		face_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		face_panel.size = CARD_DISPLAY_SIZE
+		face_panel.add_theme_stylebox_override("panel", face_box)
+		holder.add_child(face_panel)
+		holder.move_child(face_panel, 0)
+		var art_rect := Rect2(Vector2(UiTheme.d(12), UiTheme.d(12)),
+			CARD_DISPLAY_SIZE - Vector2(UiTheme.d(24), UiTheme.d(66)))
 		var clip := Panel.new()
-		clip.mouse_filter = Control.MOUSE_FILTER_PASS
-		clip.size = CARD_DISPLAY_SIZE
-		clip.add_theme_stylebox_override("panel", UiSkin.flat(UiTheme.PANEL_DARK, CARD_RADIUS))
+		clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		clip.position = art_rect.position
+		clip.size = art_rect.size
+		clip.add_theme_stylebox_override("panel", UiSkin.flat(UiTheme.INK, int(UiTheme.d(6))))
 		clip.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
-		holder.add_child(clip)
-		card.reparent(clip, false)
-		clip.add_child(_card_art_title(card_type, CardManager.my_inventory().size() * CARD_DISPLAY_SIZE.x > _r(R_HAND).size.x))
-		holder.add_child(_card_art_edge(CardPresets.art_edge_color(card_type)))
+		face_panel.add_child(clip)
+		var art := TextureRect.new()
+		art.texture = card.texture
+		art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		art.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		clip.add_child(art)
+		var title := Label.new()
+		title.text = CardPresets.card_short_title(card_type)
+		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		title.autowrap_mode = TextServer.AUTOWRAP_WORD
+		title.add_theme_font_override("font", UiTheme.mono(true))
+		title.add_theme_font_size_override("font_size", _hand_title_font_size(CARD_DISPLAY_SIZE.x - UiTheme.d(20)))
+		title.add_theme_constant_override("line_spacing", -2)
+		title.add_theme_color_override("font_color", UiTheme.INK)
+		title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		title.position = Vector2(UiTheme.d(8), art_rect.end.y + UiTheme.d(2))
+		title.size = Vector2(CARD_DISPLAY_SIZE.x - UiTheme.d(16), CARD_DISPLAY_SIZE.y - art_rect.end.y - UiTheme.d(8))
+		face_panel.add_child(title)
+		# Tıklama yüzeyi kartın tamamı (görselsiz, görünmez).
+		card.texture = null
+		card.self_modulate = Color(1, 1, 1, 0)
+		holder.move_child(card, -1)
+		var fan := [-4.0, 3.0, -2.0, 2.5, -3.0, 2.0, -1.5, 3.5]
+		holder.pivot_offset = CARD_DISPLAY_SIZE * Vector2(0.5, 1.0)
+		holder.rotation_degrees = fan[hand_index % fan.size()]
 		_wire_hand_card(wrapper, holder, card, card_type, hand_index)
 		return wrapper
 
@@ -3584,15 +3714,18 @@ func _avatar_tag(text: String, bg: Color, _fg: Color) -> Control:
 	var tag := Label.new()
 	tag.text = text
 	tag.add_theme_font_override("font", UiTheme.mono(true))
-	tag.add_theme_font_size_override("font_size", 10)
+	tag.add_theme_font_size_override("font_size", UiTheme.fs(13))
 	# Yazı rengi zemine göre (açık zeminde koyu, koyu zeminde beyaz).
 	tag.add_theme_color_override("font_color", UiSkin.text_on(bg))
 	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# Küçük yuvarlak hap (ince: 8 oyuncuda satır taşmasın).
-	var style := UiSkin.flat(bg, 5)
-	style.content_margin_left = 4
-	style.content_margin_right = 4
+	# Konsept .tagx: köşesi 6 px hap, altında 2 px koyu kalınlık.
+	var style := BoardBox.new()
+	style.fill = bg
+	style.set_radius(UiTheme.d(6))
+	style.lips = [[UiTheme.d(2), bg.lerp(Color.BLACK, 0.3)]]
+	style.content_margin_left = UiTheme.d(6)
+	style.content_margin_right = UiTheme.d(6)
 	style.content_margin_top = 0
 	style.content_margin_bottom = 0
 	tag.add_theme_stylebox_override("normal", style)
@@ -3854,7 +3987,8 @@ func _refresh_score_panel() -> void:
 # --- Hamleler: yasa tasarla, teşkilat, karalama hedefi -------------------
 
 ## Hamle düğmelerinin ortak puntosu (MECLİS, İTTİFAK, KONGRE, TURU BİTİR).
-const ACTION_FONT_SIZE := 14
+## Konsept .act: 32 px.
+const ACTION_FONT_SIZE := 21
 ## Kasa rengi: dolar banknotunun koyu yeşili (0.0.242).
 const FUNDS_COLOR := UiTheme.GREEN_DARK
 const EMPTY_SEAT_COLOR := UiTheme.TEXT
@@ -3880,36 +4014,47 @@ func _build_action_buttons() -> void:
 	_funds_plate.offset_top = FUNDS_PLATE_TOP
 	_funds_plate.offset_bottom = FUNDS_PLATE_TOP + FUNDS_PLATE_HEIGHT
 	_funds_plate.mouse_filter = Control.MOUSE_FILTER_STOP
+	# Konsept .money: karton pano (çift kalınlık, içte deniz yeşili çizgi),
+	# büyük yeşil tutar ve altında "PARTİ KASASI".
 	var funds_style := UiSkin.board()
-	funds_style.content_margin_left = UiTheme.PAD_S
-	funds_style.content_margin_right = UiTheme.PAD_S
-	funds_style.content_margin_top = 2
-	funds_style.content_margin_bottom = 2
-	UiSkin.apply_style(_funds_plate, "panel", funds_style)
+	funds_style.rings = [[UiTheme.d(5), UiTheme.d(2), UiTheme.TEAL]]
+	funds_style.dot_radius = 0.0
+	funds_style.set_content_margin_all(UiTheme.d(10))
+	_funds_plate.add_theme_stylebox_override("panel", funds_style)
 	add_child(_funds_plate)
+	var funds_column := VBoxContainer.new()
+	funds_column.alignment = BoxContainer.ALIGNMENT_CENTER
+	funds_column.add_theme_constant_override("separation", int(UiTheme.d(2)))
+	funds_column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_funds_plate.add_child(funds_column)
 	_funds_box = HBoxContainer.new()
 	_funds_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	_funds_box.add_theme_constant_override("separation", 8)
+	_funds_box.add_theme_constant_override("separation", int(UiTheme.d(8)))
 	_funds_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_funds_plate.add_child(_funds_box)
-	var funds_icon := CoinIcon.make(FUNDS_ICON_SIZE, FUNDS_COLOR)
-	funds_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_funds_box.add_child(funds_icon)
+	funds_column.add_child(_funds_box)
+	var dollar := Label.new()
+	dollar.text = "$"
+	dollar.add_theme_font_override("font", UiTheme.mono(true))
+	dollar.add_theme_font_size_override("font_size", UiTheme.fs(50))
+	dollar.add_theme_color_override("font_color", FUNDS_COLOR)
+	dollar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_funds_box.add_child(dollar)
 	_funds_label = Label.new()
 	_funds_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_funds_label.add_theme_font_override("font", UiTheme.mono(true))
-	_funds_label.add_theme_font_size_override("font_size", 26)
+	_funds_label.add_theme_font_size_override("font_size", UiTheme.fs(50))
 	_funds_label.add_theme_color_override("font_color", FUNDS_COLOR)
 	_funds_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# Tutar ve altında küçük birim: plaka eski genişliğinde kalır.
-	var amount_box := VBoxContainer.new()
-	amount_box.add_theme_constant_override("separation", -8)
-	amount_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	amount_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_funds_box.add_child(amount_box)
 	_funds_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	amount_box.add_child(_funds_label)
-	var unit := Label.new()
+	_funds_box.add_child(_funds_label)
+	var caption := Label.new()
+	caption.text = L.t("PARTİ KASASI")
+	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	caption.add_theme_font_override("font", UiTheme.mono_regular())
+	caption.add_theme_font_size_override("font_size", UiTheme.fs(13))
+	caption.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
+	caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	funds_column.add_child(caption)
 	_funds_plate.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_show_toast(_funds_rules))
@@ -3987,35 +4132,71 @@ func _action_button(title: String, cost_text: String, color: Color) -> Button:
 ## Sekme düğmesi (hamle ve yasa sekmeleri): harita katman düğmeleri gibi kare,
 ## seçili olan altın; lit false ise yazı sönük.
 func _style_tab_button(button: Button, active: bool, lit: bool) -> void:
-	button.add_theme_font_override("font", UiTheme.mono(true))
-	button.add_theme_font_size_override("font_size", 13)
+	UiSkin.skin_tab(button, active)
+	button.add_theme_font_size_override("font_size", UiTheme.fs(19))
 	button.custom_minimum_size.y = PLAYER_TAB_HEIGHT
-	var color := UiTheme.GOLD if active else UiTheme.PANEL_LIGHT
-	for state in ["normal", "hover", "pressed", "focus"]:
-		var c := color.lightened(0.08) if state == "hover" and not active else color
-		UiSkin.apply_style(button, state, _layer_button_style(c, false, false))
-	var font := UiTheme.TEXT_ON_GOLD if active else (UiTheme.TEXT if lit else UiTheme.TEXT_DIM)
-	for key in ["font_color", "font_hover_color", "font_pressed_color"]:
-		button.add_theme_color_override(key, font)
+	if not lit and not active:
+		for key in ["font_color", "font_hover_color", "font_pressed_color"]:
+			button.add_theme_color_override(key, UiTheme.TEXT_DIM)
 
 ## Hamle düğmesinin iki satırı (ad + bedel). DAR KUTUYA SIĞSIN: en uzun satır
 ## düğmeye sığana kadar yazı küçülür (İngilizce "EARLY ELECTION" gibi; ad
 ## kısaltılmaz).
 func _set_action_text(button: Button, title: String, cost_text: String) -> void:
-	# 0.0.242: bütün hamle düğmeleri MECLİS ile aynı yazı tipi ve puntoda;
-	# ikinci satır yalnız gerekiyorsa (bedel, bekleyen karar).
-	button.text = title if cost_text == "" else "%s\n%s" % [title, cost_text]
-	# Sığdırma düğmenin GERÇEK genişliğine göre (ızgarada genişler); daha
-	# yerleşmemişse hamle ızgarasının bir sütunu.
+	# Konsept .act: başlık Siyaset Display 32 px, alt satır Nunito 800 18 px;
+	# ikisi de yüzün ortasında, basınca yüzle birlikte iner.
+	button.text = ""
+	var box := button.get_node_or_null("ActionText") as VBoxContainer
+	if box == null:
+		box = VBoxContainer.new()
+		box.name = "ActionText"
+		box.alignment = BoxContainer.ALIGNMENT_CENTER
+		box.add_theme_constant_override("separation", 0)
+		box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		button.add_child(box)
+		for key in ["Title", "Sub"]:
+			var label := Label.new()
+			label.name = key
+			label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			label.add_theme_font_override("font", UiTheme.mono(true) if key == "Title" else UiTheme.mono_regular())
+			box.add_child(label)
+		var shift := func(y: float): box.position.y = y
+		button.button_down.connect(shift.bind(UiTheme.d(7)))
+		button.button_up.connect(func(): box.position.y = -UiTheme.d(2) if button.is_hovered() else 0.0)
+		button.mouse_entered.connect(func(): box.position.y = UiTheme.d(7) if button.button_pressed else -UiTheme.d(2))
+		button.mouse_exited.connect(shift.bind(0.0))
+	var head := box.get_node("Title") as Label
+	var sub := box.get_node("Sub") as Label
+	head.text = title
+	sub.text = cost_text
+	sub.visible = cost_text != ""
 	var cell := (_r(R_ACTIONS).size.x - ACTION_BUTTON_GAP * 2.0) / 3.0
-	var width := maxf(button.size.x, maxf(ACTION_BUTTON_WIDTH, cell)) - 10.0
+	var width := maxf(button.size.x, maxf(ACTION_BUTTON_WIDTH, cell)) - UiTheme.d(20)
 	var font := UiTheme.mono(true)
-	button.add_theme_font_override("font", font)
 	var size := ACTION_FONT_SIZE
-	while size > 6 and (font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width
-			or font.get_string_size(cost_text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width):
+	while size > 8 and font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width:
 		size -= 1
-	button.add_theme_font_size_override("font_size", size)
+	head.add_theme_font_size_override("font_size", size)
+	var sub_size := UiTheme.fs(18)
+	while sub_size > 7 and UiTheme.mono_regular().get_string_size(cost_text, HORIZONTAL_ALIGNMENT_LEFT, -1, sub_size).x > width:
+		sub_size -= 1
+	sub.add_theme_font_size_override("font_size", sub_size)
+	_sync_action_text(button)
+
+## Düğmenin yazı rengi ve sert gölgesi alt etiketlere de geçer.
+func _sync_action_text(button: Button) -> void:
+	var box := button.get_node_or_null("ActionText")
+	if box == null:
+		return
+	var ink := button.get_theme_color("font_color")
+	var shadow := button.get_theme_color("font_shadow_color")
+	for label in box.get_children():
+		(label as Label).add_theme_color_override("font_color", ink)
+		(label as Label).add_theme_color_override("font_shadow_color", shadow if label.name == "Title" else Color(0, 0, 0, 0))
+		(label as Label).add_theme_constant_override("shadow_offset_y", int(round(UiTheme.d(3))))
+		(label as Label).add_theme_constant_override("shadow_offset_x", 0)
 
 ## Neden şu an bu hamle yapılamıyor? (Buton ipucu ve uyarı yazısı.)
 func _action_block_reason(cost: float, is_law: bool = false) -> String:
@@ -5130,15 +5311,14 @@ func _ensure_map_clip() -> void:
 
 func _build_layer_bar() -> void:
 	_layer_bar = HBoxContainer.new()
-	_layer_bar.add_theme_constant_override("separation", 6)
+	_layer_bar.add_theme_constant_override("separation", int(UiTheme.d(8)))
 	_layer_bar.z_index = 5
 	add_child(_layer_bar)
 	for i in MAP_LAYER_TITLES.size():
 		var button := Button.new()
 		button.text = MAP_LAYER_TITLES[i]
-		button.custom_minimum_size = Vector2(84, 34)
+		button.custom_minimum_size = Vector2(UiTheme.d(120), PLAYER_TAB_HEIGHT)
 		button.focus_mode = Control.FOCUS_NONE
-		button.add_theme_font_size_override("font_size", 13)
 		button.pressed.connect(_on_layer_button_pressed.bind(i))
 		_layer_bar.add_child(button)
 		_layer_buttons.append(button)
@@ -5186,8 +5366,8 @@ func _place_layer_bar() -> void:
 		return
 	_layer_bar.reset_size()
 	var rect := _r(R_MAP)
-	# Harita alanının sol üst köşesinde (maketteki sekmeler gibi).
-	_layer_bar.position = rect.position + Vector2(8.0, 8.0)
+	# Orta panonun sol üstünde (konsept: 22, 20).
+	_layer_bar.position = rect.position + Vector2(UiTheme.d(22), UiTheme.d(20))
 	_layer_bar.z_index = 6
 	_layer_legend.reset_size()
 	# Gösterge düğmelerin sağında, aynı satırda ortalı.
@@ -5215,15 +5395,7 @@ func _refresh_layer_bar() -> void:
 	for i in _layer_buttons.size():
 		var button: Button = _layer_buttons[i]
 		var active := i == _map_layer
-		var color := UiTheme.GOLD if active else UiTheme.PANEL_LIGHT
-		var first := i == 0
-		var last := i == _layer_buttons.size() - 1
-		for state in ["normal", "hover", "pressed", "focus"]:
-			var c := color.lightened(0.08) if state == "hover" and not active else color
-			UiSkin.apply_style(button, state, _layer_button_style(c, first, last))
-		button.add_theme_color_override("font_color", UiTheme.INK if active else UiTheme.TEXT)
-		button.add_theme_color_override("font_hover_color", UiTheme.INK if active else UiTheme.TEXT)
-		button.add_theme_color_override("font_pressed_color", UiTheme.INK)
+		_style_tab_button(button, active, true)
 	if _group_picker != null:
 		_group_picker.visible = _map_layer == MapLayer.GROUPS
 		for pick in _group_picker.get_children():
@@ -5704,6 +5876,7 @@ func _map_tint(color: Color, strength: float) -> Color:
 func _set_action_available(button: Button, available: bool) -> void:
 	button.modulate = Color.WHITE
 	UiSkin.skin_action_button(button, button.get_meta("action_color", UiTheme.PANEL_LIGHT), available)
+	_sync_action_text(button)
 
 # --- TUR AKIŞI ARAYÜZÜ (0.0.231) -------------------------------------------------------
 ## KART ÇEK + afet sahnesi (TurnIntro), MECLİS akışı (ParliamentFlow) ve il işlem
@@ -5779,7 +5952,7 @@ func _open_province_actions(province_id: String) -> void:
 	map_holder.set_isolated(province_id)
 	if not _map_split:
 		_map_split = true
-		_animate_map_rect(_r(R_MAP), halves[0])
+		_animate_map_rect(_map_area(), halves[0])
 	else:
 		_place_map(halves[0])
 
@@ -5788,11 +5961,11 @@ func _on_province_actions_closed() -> void:
 	map_holder.set_isolated("")
 	if _map_split:
 		_map_split = false
-		_animate_map_rect(_map_split_rects()[0], _r(R_MAP))
+		_animate_map_rect(_map_split_rects()[0], _map_area())
 
 ## [harita yarısı, hamle yarısı]: harita alanının sol ve sağ yarısı.
 func _map_split_rects() -> Array:
-	var map := _r(R_MAP)
+	var map := _map_area()
 	var half := (map.size.x - 8.0) * 0.5
 	return [Rect2(map.position, Vector2(half, map.size.y)),
 		Rect2(map.position + Vector2(half + 8.0, 0.0), Vector2(half, map.size.y))]
@@ -5831,9 +6004,9 @@ func _refresh_parliament_button() -> void:
 		sub = L.t("genel başkan yürütür")
 	else:
 		sub = L.t("bu tur yapılacak iş yok")
-	_parl_button.text = "%s\n%s" % [L.t("MECLİS"), sub]
 	var live := stage != ""
 	UiSkin.skin_action_button(_parl_button, ACTION_COLOR_LAW, live)
+	_set_action_text(_parl_button, L.t("MECLİS"), sub)
 	if live and _parl_pulse == null:
 		_parl_pulse = create_tween().set_loops()
 		_parl_pulse.tween_property(_parl_button, "modulate", Color(1.35, 1.25, 1.6), 0.6).set_trans(Tween.TRANS_SINE)

@@ -227,7 +227,15 @@ static func period_label(round_number: int) -> String:
 	return "%d %s" % [year_of_round(round_number),
 		L.t("1. yarı") if half_of_round(round_number) == 0 else L.t("2. yarı")]
 
-## round_number'uncu turun sonunda yapılan seçimin adı olan yıl.
+## SEÇİMİN ADI (0.0.266): seçim, yapıldığı dönemin adıyla anılır ("2001 2.
+## yarı"). Eskiden biten turun ertesi yılıyla anılıyordu ("2002"): bant
+## "Sonraki seçim 2002" derken seçim 2001'in son döneminde geliyor, 2002'ye
+## girince seçim olmuyordu (takvim kaymış gibi görünüyordu); erken seçimler
+## ise kendi yılıyla anılıyordu.
+static func election_label(round_number: int) -> String:
+	return period_label(round_number)
+
+## round_number'uncu turun sonunda yapılan seçimin ertesi yılı (eski ad; testler).
 static func election_year(round_number: int) -> int:
 	return START_YEAR + maxi(1, round_number) / ROUNDS_PER_YEAR
 

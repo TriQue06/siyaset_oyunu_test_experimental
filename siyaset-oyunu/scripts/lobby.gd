@@ -46,16 +46,8 @@ func _ready() -> void:
 # --- Görünüm ---------------------------------------------------------------------
 
 func _build_background() -> void:
-	var bg := TextureRect.new()
-	var gradient := Gradient.new()
-	gradient.colors = PackedColorArray([BG_TOP, BG_BOTTOM])
-	var texture := GradientTexture2D.new()
-	texture.gradient = gradient
-	texture.fill_from = Vector2(0.5, 0.0)
-	texture.fill_to = Vector2(0.5, 1.0)
-	bg.texture = texture
-	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	bg.stretch_mode = TextureRect.STRETCH_SCALE
+	add_child(TableSurface.felt())
+	var bg := Control.new()
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	bg.gui_input.connect(_on_background_gui_input)

@@ -34,6 +34,9 @@ func _ready() -> void:
 	_build_menu()
 	panel.hide()
 	open_settings_button.pressed.connect(_on_menu_button_pressed)
+	# Konsept .menu: deniz yeşili, iki kat koyu kalınlık, beyaz yazı.
+	UiSkin.skin_menu_button(open_settings_button)
+	open_settings_button.add_theme_font_size_override("font_size", UiTheme.fs(26))
 	GameSettings.display_mode_changed.connect(func(_mode): _refresh_display_buttons())
 	get_viewport().size_changed.connect(_adapt_layout)
 
@@ -78,7 +81,7 @@ func _style_button(button: Button, kind: String = "normal") -> void:
 	var color: Color = {"gold": UiTheme.GOLD, "danger": UiTheme.RED}.get(kind, UiTheme.PANEL_LIGHT)
 	UiSkin.skin_color_button(button, color)
 	for state in ["normal", "hover", "pressed", "disabled", "focus", "hover_pressed"]:
-		var box := button.get_theme_stylebox(state) as StyleBoxFlat
+		var box := button.get_theme_stylebox(state)
 		box.content_margin_left = 18
 		box.content_margin_right = 18
 

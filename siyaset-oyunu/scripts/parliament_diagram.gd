@@ -30,7 +30,7 @@ const BASELINE_GAP := 0.0
 ## Ortadaki toplam vekil sayısının yazı boyutu (diyagram boyutundan bağımsız).
 ## Yayın ortasındaki boşluğa sığsın diye küçük: 24 punto bazı koltukların
 ## üstüne biniyordu.
-const COUNT_FONT_SIZE := 18
+const COUNT_FONT_SIZE := 20
 ## COUNT_FONT_SIZE bu genişlikteki diyagram içindir (sağ sütundaki olağan boy).
 const COUNT_REF_WIDTH := 249.0
 var _total_seats: int = 0
@@ -39,6 +39,7 @@ var _layout: Dictionary = {}
 var _min_gap_norm: float = 0.0 # en yakın iki koltuk merkezi arası (normalize)
 ## Vekil sayısının oturduğu levha (kendi zemini olan ek katman).
 var _count_plate: PanelContainer
+var _shadow_mmi: MultiMeshInstance2D
 var _count_label: Label
 
 ## KOLTUKLAR TEK MultiMesh İLE ÇİZİLİR (tek çizim çağrısı). Eskiden koltuk başına iki draw_circle vardı: 500 koltuk =
@@ -139,16 +140,21 @@ func _ready() -> void:
 func _build_count_plate() -> void:
 	_count_plate = PanelContainer.new()
 	_count_plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := UiSkin.stylebox(UiSkin.SLOT)
-	style.content_margin_left = 10
-	style.content_margin_right = 10
-	style.content_margin_top = 2
-	style.content_margin_bottom = 2
-	UiSkin.apply_style(_count_plate, "panel", style)
+	# Konsept .hn: deniz yeşili hap, beyaz sayı, altında koyu kalınlık.
+	var style := BoardBox.new()
+	style.fill = UiTheme.TEAL
+	style.set_radius(UiTheme.d(12))
+	style.lips = [[UiTheme.d(4), UiTheme.TEAL_DARK]]
+	style.content_margin_left = UiTheme.d(14)
+	style.content_margin_right = UiTheme.d(14)
+	style.content_margin_top = UiTheme.d(2)
+	style.content_margin_bottom = UiTheme.d(2)
+	_count_plate.add_theme_stylebox_override("panel", style)
 	_count_label = Label.new()
 	_count_label.add_theme_font_override("font", UiTheme.mono(true))
 	_count_label.add_theme_font_size_override("font_size", COUNT_FONT_SIZE)
-	_count_label.add_theme_color_override("font_color", UiTheme.TEXT)
+	_count_label.add_theme_color_override("font_color", UiTheme.ON_COLOR)
+	_count_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_count_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_count_plate.add_child(_count_label)
@@ -170,13 +176,19 @@ func _place_count_plate() -> void:
 	# 0.0.256: sayı diyagramla birlikte büyür / küçülür (seçim gecesi, oylama
 	# büyütmesi): punto diyagram genişliğiyle orantılı.
 	var ratio := size.x / COUNT_REF_WIDTH if size.x > 0.0 else 1.0
-	_count_label.add_theme_font_size_override("font_size", clampi(roundi(COUNT_FONT_SIZE * ratio), 9, 120))
-	_count_plate.size = Vector2.ZERO
-	var plate_size := _count_plate.get_combined_minimum_size()
+	var font_size := clampi(roundi(COUNT_FONT_SIZE * ratio), 9, 120)
+	_count_label.add_theme_font_size_override("font_size", font_size)
+	# Boyut doğrudan yazıdan hesaplanır: en küçük boy bir kare gecikmeli
+	# güncellendiği için levha önceki boyuyla yanlış yere oturuyordu.
+	var font := UiTheme.mono(true)
+	var style := _count_plate.get_theme_stylebox("panel")
+	var text_w := font.get_string_size(_count_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	var plate_size := Vector2(text_w + style.content_margin_left + style.content_margin_right,
+		font.get_height(font_size) + style.content_margin_top + style.content_margin_bottom).ceil()
 	_count_plate.size = plate_size
 	var origin := _arc_origin()
 	_count_plate.position = Vector2(origin.x - plate_size.x * 0.5,
-		origin.y - plate_size.y - BASELINE_GAP)
+		origin.y - plate_size.y - BASELINE_GAP).round()
 
 ## Yayın (koltukların) ekrandaki genişliği: altındaki öğeler bu genişliğe hizalanır.
 func arc_width() -> float:
@@ -210,7 +222,16 @@ func _ensure_multimeshes() -> void:
 	_seat_mmi.texture = _white_texture
 	# Her diyagram kendi kontur ayarını taşısın: malzeme kopyalanır.
 	_seat_mmi.material = _seat_material.duplicate()
+	# Konsept: her koltuk pulunun altında küçük sert gölge (aynı çoklu ağ,
+	# kaydırılmış ve kararmış).
+	_shadow_mmi = MultiMeshInstance2D.new()
+	_shadow_mmi.texture = _white_texture
+	_shadow_mmi.material = _seat_mmi.material
+	_shadow_mmi.self_modulate = Color(0, 0, 0, 0.35)
+	add_child(_shadow_mmi)
 	add_child(_seat_mmi)
+	if _count_plate != null:
+		move_child(_count_plate, -1)
 
 ## Koltuk konumları ve yarıçapları — sadece kontrol boyutu değişince.
 func _rebuild_instances() -> void:
@@ -226,11 +247,14 @@ func _rebuild_instances() -> void:
 		_seat_mmi.multimesh = mm
 	_seat_mmi.multimesh.instance_count = count
 	_seat_mmi.visible = count > 0
+	_shadow_mmi.multimesh = _seat_mmi.multimesh
+	_shadow_mmi.visible = count > 0
 	if count == 0:
 		return
 	var scale: float = minf(size.x * 0.5, size.y * 0.96)
 	var origin := _arc_origin()
 	var radius := _seat_radius_px(scale)
+	_shadow_mmi.position = Vector2(0, maxf(1.0, radius * 0.28))
 	var material := _seat_mmi.material as ShaderMaterial
 	material.set_shader_parameter("outline_color", outline_color)
 	material.set_shader_parameter("inner_ratio", 1.0 - outline_ratio)

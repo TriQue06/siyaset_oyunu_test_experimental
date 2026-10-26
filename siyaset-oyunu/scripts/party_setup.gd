@@ -162,11 +162,7 @@ func _editing_bot() -> bool:
 # --- Kurulum -----------------------------------------------------------------------
 
 func _build_ui() -> void:
-	var bg := ColorRect.new()
-	bg.color = UiTheme.BG
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(bg)
+	add_child(TableSurface.felt())
 
 	var top := VBoxContainer.new()
 	top.position = Vector2(24, 12)

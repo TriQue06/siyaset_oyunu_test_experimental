@@ -6,6 +6,9 @@ extends Control
 var group: String = ""
 ## Rozet yerine sadece sembol (renkli) çizilsin mi?
 var bare: bool = false
+## Pul ve sembol rengi değiştirilebilir (bantta kriz: koyu pul, hardal sembol).
+var tile_override := Color(0, 0, 0, 0)
+var ink_override := Color(0, 0, 0, 0)
 
 static func make(group_id: String, size_px: float = 22.0, bare_icon: bool = false) -> VoterGroupIcon:
 	var icon := VoterGroupIcon.new()
@@ -32,8 +35,11 @@ func _draw() -> void:
 		draw_symbol(self, VoterGroups.icon(group), c, r * 0.9, ink)
 		return
 	# KESKİN KARO (0.0.186): köşeli, grubun renginde; sembol karonun çoğunu kaplar.
-	var inner := draw_tile(self, Rect2(c - Vector2(r, r), Vector2(r, r) * 2.0), VoterGroups.color(group))
-	draw_symbol(self, VoterGroups.icon(group), c - Vector2(0, inner * 0.06), inner * 0.78, ink)
+	if ink_override.a > 0.0:
+		ink = ink_override
+	var tile := tile_override if tile_override.a > 0.0 else VoterGroups.color(group)
+	var inner := draw_tile(self, Rect2(c - Vector2(r, r), Vector2(r, r) * 2.0), tile)
+	draw_symbol(self, VoterGroups.icon(group), c - Vector2(0, inner * 0.06), inner * 0.7, ink)
 
 ## PUL (0.0.265): grubun renginde yuvarlak, konturs dolgu. Sembolün ölçeği
 ## için yarıçap döner.

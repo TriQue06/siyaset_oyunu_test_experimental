@@ -9,7 +9,7 @@ extends RefCounted
 static func note_election() -> void:
 	var cm = CardManager
 	var lines := PackedStringArray()
-	lines.append("=== %d SEÇİMİ (tur %d)%s ===" % [GameRules.election_year(cm.last_election_round), cm.last_election_round,
+	lines.append("=== %s SEÇİMİ (tur %d)%s ===" % [GameRules.election_label(cm.last_election_round), cm.last_election_round,
 		" · ERKEN" if cm.last_election_was_early else ""])
 	var ids: Array = cm.last_vote_shares.keys()
 	ids.sort_custom(func(a, b): return float(cm.last_vote_shares[a]) > float(cm.last_vote_shares[b]))

@@ -31,16 +31,19 @@ const COAST_COLOR := Color("4A3A26")
 const COAST_WIDTH := 1.4
 const HOVER_COLOR := Color(1, 1, 1, 0.85)
 ## ÜLKE haritasının çizgileri (referans: Türkiye / İspanya seçim haritaları).
-const COUNTRY_BORDER_COLOR := Color(1.0, 0.98, 0.94, 0.95)
-const COUNTRY_BORDER_WIDTH := 1.4
+const COUNTRY_BORDER_COLOR := Color("FFFAF0")
+const COUNTRY_BORDER_WIDTH := 1.3
 const COUNTRY_COAST_COLOR := Color("4A3A26")
-const COUNTRY_COAST_WIDTH := 1.7
+const COUNTRY_COAST_WIDTH := 1.4
+## Kıyının denize taşan açık halesi (konsept: #d9f1f2, 9 birim, %80).
+const COAST_HALO_COLOR := Color("CBEBED")  # #d9f1f2 %80, denizle önceden karışık (üst üste binme koyulaşmasın)
+const COAST_HALO_WIDTH := 9.0
 ## Karton kalınlığı: kara, bu kadar aşağı kaydırılmış koyu bir kopyanın üstünde
 ## durur (harita birimi); altında da yumuşak bir masa gölgesi.
-const EXTRUDE_DEPTH := 3.6
-const EXTRUDE_COLOR := Color("A9824F")
-const TABLE_SHADOW_DEPTH := 7.0
-const TABLE_SHADOW_COLOR := Color(0.04, 0.24, 0.26, 0.28)
+const EXTRUDE_DEPTH := 6.3
+const EXTRUDE_COLOR := Color("B08A5A")
+const TABLE_SHADOW_DEPTH := 9.0
+const TABLE_SHADOW_COLOR := Color(0.043, 0.227, 0.251, 0.3)
 
 var grid_width: int = 0
 var grid_height: int = 0
@@ -53,7 +56,11 @@ var _border_mesh: ArrayMesh = null
 var _land_vertices := PackedVector2Array()
 var _land_vertex_region := PackedInt32Array()  # köşe -> bölge indeksi
 var _sea_mesh: ArrayMesh = null
+## Oyun ekranı denizi kendisi (dalgalı zeminle) çizer; burada çizilmez.
+var draw_sea := true
 var _extrude_mesh: ArrayMesh = null
+var _halo_mesh: ArrayMesh = null
+var _coast_segments: Array = []
 var _border_vertices := PackedVector2Array()
 var _border_colors := PackedColorArray()
 var _edges: Dictionary = {}        # province_id -> Array[[a, b]] (bölge dış sınırı)
@@ -174,10 +181,35 @@ func _build_extrude() -> void:
 	arrays[Mesh.ARRAY_VERTEX] = vertices
 	arrays[Mesh.ARRAY_COLOR] = colors
 	_extrude_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	# Kıyı halesi: kıyı çizgisi boyunca denize taşan açık şerit (yuvarlak uçlu).
+	_halo_mesh = ArrayMesh.new()
+	if _coast_segments.is_empty():
+		return
+	var hv := PackedVector2Array()
+	var w := COAST_HALO_WIDTH * 0.5
+	for seg in _coast_segments:
+		var a: Vector2 = seg[0]
+		var b: Vector2 = seg[1]
+		var dir := (b - a).normalized()
+		var n := Vector2(-dir.y, dir.x) * w
+		hv.append_array([a + n, b + n, b - n, a + n, b - n, a - n])
+		for k in 8:
+			var a0 := TAU * k / 8.0
+			var a1 := TAU * (k + 1) / 8.0
+			hv.append_array([b, b + Vector2(cos(a0), sin(a0)) * w, b + Vector2(cos(a1), sin(a1)) * w])
+	var hc := PackedColorArray()
+	hc.resize(hv.size())
+	hc.fill(Color(COAST_HALO_COLOR, 1.0))
+	var harrays := []
+	harrays.resize(Mesh.ARRAY_MAX)
+	harrays[Mesh.ARRAY_VERTEX] = hv
+	harrays[Mesh.ARRAY_COLOR] = hc
+	_halo_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, harrays)
 
 ## ÜLKE HARİTASI (0.0.261): deniz tek dikdörtgen; iller hücre üçgenlerinden;
 ## sınırlar CountryGenerator'ın yumuşatılmış ortak kenarları (her biri bir kez).
 func _build_country() -> void:
+	_coast_segments.clear()
 	var geo: Dictionary = GameMap.country
 	for r in ids.size():
 		var tris: PackedVector2Array = geo["tris"][r]
@@ -197,6 +229,8 @@ func _build_country() -> void:
 			_edges[ids[rb]].append([a, b])
 		# Seçim haritaları gibi (0.0.262): il sınırı ince beyaz, kıyı ince koyu.
 		var coast := rb < 0
+		if coast:
+			_coast_segments.append([a, b])
 		var width := COUNTRY_COAST_WIDTH if coast else COUNTRY_BORDER_WIDTH
 		var color := COUNTRY_COAST_COLOR if coast else (REGION_BORDER_DARK if _dark_borders else COUNTRY_BORDER_COLOR)
 		_append_segment(a, b, width, color)
@@ -298,8 +332,10 @@ func _draw() -> void:
 			for edge in _edges.get(isolated_id, []):
 				draw_line(edge[0], edge[1], Color(UiTheme.RED, 0.9), 4.0 * px, false)
 		return
-	if _sea_mesh != null and _sea_mesh.get_surface_count() > 0:
+	if draw_sea and _sea_mesh != null and _sea_mesh.get_surface_count() > 0:
 		draw_mesh(_sea_mesh, null)
+	if _halo_mesh != null and _halo_mesh.get_surface_count() > 0:
+		draw_mesh(_halo_mesh, null)
 	if _extrude_mesh != null and _extrude_mesh.get_surface_count() > 0:
 		draw_mesh(_extrude_mesh, null)
 	if _land_mesh != null and _land_mesh.get_surface_count() > 0:

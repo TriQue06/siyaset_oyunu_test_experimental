@@ -37,16 +37,20 @@ static func build(party: Dictionary, size: Vector2, icon_pixel_size: int, is_sel
 	var color: Color = party.get("bg_color", UiTheme.PANEL_LIGHT)
 	var disc := Panel.new()
 	disc.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := UiSkin.flat(color, 999)
-	style.border_color = color.darkened(0.38)
-	style.border_width_bottom = maxi(2, int(size.y * 0.09))
+	# Konsept .pico: tepesi açık (beyazla %40) renge geçen pul, altta iç
+	# koyuluk, koyu kalınlık ve yumuşak gölge; kendi partinde hardal halka.
+	var style := BoardBox.new()
+	style.fill = color.lerp(Color.WHITE, 0.4)
+	style.fill_bottom = color
+	style.set_radius(size.y * 0.5)
+	style.shade_size = size.y * 0.087
+	style.shade_color = Color(0, 0, 0, 0.22)
+	style.lips = [[size.y * 0.087, color.lerp(Color.BLACK, 0.45)]]
+	style.shadow_color = Color(0, 0, 0, 0.25)
+	style.shadow_offset = Vector2(0, size.y * 0.13)
+	style.shadow_size = size.y * 0.09
 	if is_self:
-		style.shadow_color = UiTheme.GOLD
-		style.shadow_size = 1
-		style.expand_margin_left = 0.0
-		style.border_color = UiTheme.GOLD_DIM
-		style.set_border_width_all(2)
-		style.border_width_bottom = maxi(3, int(size.y * 0.1))
+		style.rings = [[0.0, maxf(1.5, size.y * 0.06), UiTheme.GOLD]]
 	disc.add_theme_stylebox_override("panel", style)
 	disc.set_anchors_preset(Control.PRESET_FULL_RECT)
 	wrap.add_child(disc)

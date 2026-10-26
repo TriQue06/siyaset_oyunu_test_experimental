@@ -41,7 +41,7 @@ func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_PASS
 	_build_header()
 	add_child(_make_treasury_row())
-	_tax_effect = UiTheme.mono_label("", DELTA_SIZE, UiTheme.TEXT_MUTED, true)
+	_tax_effect = UiTheme.body_label("", UiTheme.fs(15), UiTheme.TEXT_MUTED)
 	_tax_effect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tax_effect.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(_tax_effect)
@@ -66,9 +66,10 @@ func _build_header() -> void:
 	row.add_child(title)
 	# VERGİ ŞERİDİ: üç kademe yan yana; yürürlükteki dolu renkli.
 	var strip := HBoxContainer.new()
-	strip.add_theme_constant_override("separation", 2)
+	strip.add_theme_constant_override("separation", int(UiTheme.d(6)))
 	row.add_child(strip)
-	var caption := UiTheme.mono_label(L.t("VERGİ"), CAPTION_SIZE, UiTheme.TEXT_DIM, true)
+	var caption := UiTheme.mono_label(L.t("VERGİ"), UiTheme.fs(12), UiTheme.TEXT_MUTED)
+	caption.add_theme_font_override("font", UiTheme.mono_regular())
 	caption.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	strip.add_child(caption)
 	for level in Economy.TAX_LEVELS:
@@ -76,8 +77,8 @@ func _build_header() -> void:
 		button.text = Economy.tax_title(level).to_upper()
 		button.focus_mode = Control.FOCUS_NONE
 		button.add_theme_font_override("font", UiTheme.mono(true))
-		button.add_theme_font_size_override("font_size", 10)
-		button.custom_minimum_size = Vector2(0, 22)
+		button.add_theme_font_size_override("font_size", UiTheme.fs(13))
+		button.custom_minimum_size = Vector2(0, UiTheme.d(30))
 		button.pressed.connect(func(): tax_policy_requested.emit())
 		strip.add_child(button)
 		_tax_buttons.append(button)
@@ -122,32 +123,31 @@ func _make_tile(key: String, caption: String, _tip: String) -> Control:
 func _make_treasury_row() -> Control:
 	var panel := PanelContainer.new()
 	panel.mouse_filter = Control.MOUSE_FILTER_PASS
-	var style := StyleBoxFlat.new()
-	style.bg_color = TILE_BG
-	style.border_color = TILE_BORDER
-	style.set_border_width_all(1)
-	style.border_width_left = 3
-	style.content_margin_left = 7
-	style.content_margin_right = 6
-	style.content_margin_top = 1
-	style.content_margin_bottom = 2
-	UiSkin.apply_style(panel, "panel", style)
+	# Konsept .treas: beyaz kart, ince kenar, 3 px kalınlık.
+	var style := UiSkin.card(UiTheme.PANEL_DARK, UiTheme.PANEL_LIGHT, UiTheme.CARD_LIP, 3.0)
+	style.set_radius(UiTheme.d(12))
+	style.content_margin_left = UiTheme.d(14)
+	style.content_margin_right = UiTheme.d(14)
+	style.content_margin_top = UiTheme.d(6)
+	style.content_margin_bottom = UiTheme.d(6)
+	panel.add_theme_stylebox_override("panel", style)
 	var line := HBoxContainer.new()
-	line.add_theme_constant_override("separation", 5)
+	line.add_theme_constant_override("separation", int(UiTheme.d(8)))
 	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(line)
-	var cap := UiTheme.mono_label(L.t("HAZİNE"), CAPTION_SIZE, UiTheme.TEXT_DIM, true)
+	var cap := UiTheme.mono_label(L.t("HAZİNE"), UiTheme.fs(14), UiTheme.TEXT_MUTED)
+	cap.add_theme_font_override("font", UiTheme.mono_regular())
 	cap.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	cap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	line.add_child(cap)
 	# Para simgesi tutarın solunda ("¤ 200 M").
-	var icon := UiTheme.mono_label(L.t("¤"), VALUE_SIZE + 1, UiTheme.HEAD, true)
+	var icon := UiTheme.mono_label(L.t("¤"), UiTheme.fs(28), UiTheme.MONEY, true)
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	line.add_child(icon)
-	var value := UiTheme.mono_label("—", VALUE_SIZE + 1, UiTheme.HEAD, true)
+	var value := UiTheme.mono_label("—", UiTheme.fs(28), UiTheme.MONEY, true)
 	value.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	line.add_child(value)
-	var unit := UiTheme.mono_label(L.t("M"), DELTA_SIZE, UiTheme.TEXT_MUTED)
+	var unit := UiTheme.mono_label(L.t("M"), UiTheme.fs(28), UiTheme.MONEY, true)
 	unit.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	unit.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	line.add_child(unit)
@@ -155,7 +155,8 @@ func _make_treasury_row() -> Control:
 	delta.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	delta.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	line.add_child(delta)
-	_income_label = UiTheme.mono_label("", DELTA_SIZE, UiTheme.TEXT_MUTED)
+	_income_label = UiTheme.mono_label("", UiTheme.fs(14), UiTheme.TEXT_MUTED)
+	_income_label.add_theme_font_override("font", UiTheme.mono_regular())
 	_income_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_income_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_income_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -172,10 +173,11 @@ func refresh() -> void:
 	for i in _tax_buttons.size():
 		var button := _tax_buttons[i] as Button
 		var active := i == level
-		UiSkin.skin_color_button(button, TAX_COLORS[i] if active else UiTheme.PANEL_LIGHT)
-		UiSkin.compact(button)
+		# Konsept: seçili kademe deniz yeşili, diğerleri oyuk renginde.
+		UiSkin.skin_color_button(button, UiTheme.TEAL if active else UiTheme.SLOT)
+		UiSkin.compact(button, int(UiTheme.d(8)))
 		if not active:
-			button.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
+			button.add_theme_color_override("font_color", UiTheme.TEXT_MUTED2)
 			button.add_theme_color_override("font_hover_color", UiTheme.TEXT)
 	var prev: Dictionary = econ.get("prev", {})
 	if _treasury_tween == null or not _treasury_tween.is_running():
@@ -342,12 +344,21 @@ func _count_treasury(from: float, to: float) -> void:
 
 ## Kutunun çerçevesi bir an olayın renginde parlar.
 func _flash(key: String, color: Color) -> void:
-	var style := _tiles[key]["style"] as StyleBoxFlat
-	style.border_color = color
-	style.set_border_width_all(2)
+	var style: StyleBox = _tiles[key]["style"]
+	if style is BoardBox:
+		# Kartın kenar çizgisi bir an olayın renginde parlar, sonra söner.
+		var box := style as BoardBox
+		var tween := create_tween()
+		tween.tween_method(func(c: Color):
+			box.border_color = c
+			box.emit_changed(), color, TILE_BORDER, 0.8).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		return
+	var flat := style as StyleBoxFlat
+	if flat == null:
+		return
+	flat.border_color = color
 	var tween := create_tween()
-	tween.tween_property(style, "border_color", TILE_BORDER, 0.8).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tween.tween_callback(func(): style.set_border_width_all(1))
+	tween.tween_property(flat, "border_color", TILE_BORDER, 0.8).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
 ## Kutunun üstünden yükselip sönen tutar ("−100", "+140").
 func _float_text(key: String, text: String, color: Color) -> void:

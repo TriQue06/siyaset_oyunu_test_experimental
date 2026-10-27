@@ -1803,7 +1803,7 @@ func tax_turn_effect(level: int = -1) -> float:
 	return Economy.tax_turn_effect(tax_level() if level < 0 else level, tax_cycle_mult())
 
 ## Bu partinin bir sıradaki vergi payı (hükümette değilse 0): bakanlık puanı
-## payı × teknokrat gibi kişilik çarpanı.
+## payı × meslek çarpanı.
 func tax_turn_effect_of(peer_id: int, level: int = -1) -> float:
 	var pid := party_of(peer_id)
 	if not GovernmentManager.has_government() or not GovernmentManager.government_party_ids().has(pid):
@@ -2864,7 +2864,7 @@ func _advance_economy() -> String:
 ## Karalama: hedefe eksi, karalayana artı; ikisi de o ildeki güçleriyle ölçeklenir.
 func _apply_propaganda(peer_id: int, target_peer_id: int, province_id: String) -> void:
 	var damage := PublicOpinion.propaganda_damage(party_strength(province_id, target_peer_id))
-	# Meslek/kişilik: atanın karalama gücü × hedefin karalamaya direnci.
+	# Meslek: atanın karalama gücü × hedefin karalamaya direnci.
 	var profile_mult := PoliticianPresets.effect(peer_id, "propaganda_out") \
 		* PoliticianPresets.party_effect(target_peer_id, "propaganda_in")
 	damage *= profile_mult

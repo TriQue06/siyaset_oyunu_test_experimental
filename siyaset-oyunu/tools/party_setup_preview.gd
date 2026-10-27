@@ -50,9 +50,8 @@ func _initialize() -> void:
 
 	scene._show_step(1)
 	scene._on_background_pressed("gazeteci")
-	scene._on_trait_pressed("sert")
 	await _frames(3)
-	check("meslek ve kisilik adimi tamam", scene._step_done(1))
+	check("meslek adimi tamam", scene._step_done(1))
 	_shot("2_meslek")
 
 	scene._show_step(2)
@@ -72,8 +71,7 @@ func _initialize() -> void:
 		root.push_input(ev, true)
 		await process_frame
 	check("memleket gercek tiklamayla secildi", scene._hometown == target, "%s / %s" % [target, scene._hometown])
-	check("siyasetci tamamlaninca gonderildi", pm.politicians.has(me) and pm.politicians[me]["background"] == "gazeteci"
-		and pm.politicians[me]["trait"] == "sert" and pm.politicians[me]["hometown"] == target)
+	check("siyasetci tamamlaninca gonderildi", pm.politicians.has(me) and pm.politicians[me]["background"] == "gazeteci" and pm.politicians[me]["hometown"] == target)
 	check("portre alani var (bos)", pm.politicians.get(me, {}).get("portrait", "x") == "")
 	_shot("3_memleket")
 
@@ -113,15 +111,13 @@ func _initialize() -> void:
 	scene._on_party_name_changed("Robotlar")
 	scene._on_icon_selected(3)
 	scene._on_background_pressed("hukukcu")
-	scene._on_trait_pressed("teknokrat")
 	var bot_home := String(gmap.province_ids()[5])
 	scene._on_province_clicked(bot_home)
 	await _frames(3)
 	var bot_party: Dictionary = pm.parties[edited_bot]
 	check("oda sahibi botun adini ve logosunu degistirdi", bot_party["name"] == "Robotlar" and int(bot_party["icon_index"]) == 3, str(bot_party))
 	var bot_pol: Dictionary = pm.politicians[edited_bot]
-	check("oda sahibi botun meslegini, kisiligini, memleketini degistirdi", bot_pol["background"] == "hukukcu"
-		and bot_pol["trait"] == "teknokrat" and bot_pol["hometown"] == bot_home, str(bot_pol))
+	check("oda sahibi botun meslegini, memleketini degistirdi", bot_pol["background"] == "hukukcu" and bot_pol["hometown"] == bot_home, str(bot_pol))
 	check("kendi partim degismedi", pm.parties[me]["name"] == my_before["name"] and int(pm.parties[me]["icon_index"]) == int(my_before["icon_index"]))
 	_shot("bot")
 	var changed := 0
@@ -156,7 +152,7 @@ func _initialize() -> void:
 	var again: Node = (load("res://scenes/PartySetup.tscn") as PackedScene).instantiate()
 	root.add_child(again)
 	await _frames(4)
-	check("yeniden acilinca secimler yerinde", again._background_id == "gazeteci" and again._trait_id == "sert"
+	check("yeniden acilinca secimler yerinde", again._background_id == "gazeteci"
 		and again._hometown == target and again._party_name == "Deneme")
 	mm.owner_id = 77
 	check("oda sahibi olmayan bot partisini degistiremez", (func():

@@ -4458,8 +4458,8 @@ msgstr "Party identity"
 msgid "Kim olduğunu seç: adın ve soyadın."
 msgstr "Choose who you are: your name and surname."
 
-msgid "Meslek oyun boyunca sana bir avantaj verir; kişilik tarzını biraz daha belirler."
-msgstr "Your profession gives you an edge all game; your personality shapes your style a little more."
+msgid "Meslek oyun boyunca sana bir avantaj verir."
+msgstr "Your profession gives you an edge all game."
 
 msgid "Haritadan bir il seç: memleketinde güçlü bir teşkilatla başlarsın."
 msgstr "Pick a province on the map: you start with a strong office in your hometown."

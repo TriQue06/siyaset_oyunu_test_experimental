@@ -28,9 +28,9 @@ func _initialize() -> void:
 	check("logo kimligi kalici", presets.icon_id(0).begins_with("base:") and presets.icon_index_of(presets.icon_id(4)) == 4)
 
 	# Portre alanı: biçim temizlenir, bozuk kimlik boş kalır.
-	var data: Dictionary = PP.make("Ayla", "Gökyelken", "gazeteci", "", "f", "sert", "Demo:Ayla Foto")
+	var data: Dictionary = PP.make("Ayla", "Gökyelken", "gazeteci", "", "f", "Demo:Ayla Foto")
 	check("portre kimligi temizlenir", data["portrait"] == "demo:aylafoto", data["portrait"])
-	check("bozuk portre bos kalir", PP.make("A", "B", "gazeteci", "", "m", "", "bozuk")["portrait"] == "")
+	check("bozuk portre bos kalir", PP.make("A", "B", "gazeteci", "", "m", "bozuk")["portrait"] == "")
 	check("bas harfler", PP.initials(data) == "AG")
 	check("cozulemeyen portrenin dokusu yok", CP.portrait_texture("base:yok") == null and not CP.has_portrait("base:yok"))
 	var portrait = load("res://scripts/politician_portrait.gd").make(data, Color.RED, 64.0)

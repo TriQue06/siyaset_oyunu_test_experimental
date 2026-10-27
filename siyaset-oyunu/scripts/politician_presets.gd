@@ -6,7 +6,6 @@ extends RefCounted
 ##     parti kurulumunda seçilir). Her meslek EFFECTS çarpanları ve bazılarında
 ##     özel başlangıç (iş insanı parası, belediye başkanı teşkilatları) verir.
 ##     Kayıtta alan adı geriye uyum için "background".
-##   - KİŞİLİK (0.0.229): TRAITS'ten biri; küçük çarpanlar. Yoksa rastgele.
 ##   - MEMLEKET: haritadan seçilen il. Oyuna orada 2. seviye teşkilatla
 ##     başlanır ve memlekette kalıcı "hemşehri" desteği vardır (il aktivitesi;
 ##     ilin seçmen profili değişmez). Komşu iller ETKİLENMEZ.
@@ -19,7 +18,7 @@ extends RefCounted
 ##   appeal: o gruplarda kazanç (yasa, miting) APPEAL_MULT kat.
 ## ARAYÜZ METİNLERİ SAYI İÇERMEZ (özet anlatım); sayılar sadece burada.
 ## Veri PartyManager.politicians[peer] içinde durur (partiden bağımsız) =
-##   {"gender", "first_name", "surname", "name" (ad + soyad), "background", "trait", "hometown",
+##   {"gender", "first_name", "surname", "name" (ad + soyad), "background", "hometown",
 ##    "portrait" (portre kimliği, "" = yok; bkz. ContentPacks / PoliticianPortrait)}
 ## İSİM TAMAMEN RASTGELE (elle yazılmaz): random_name(). SOYAD ileride çok
 ## yerde kullanılacak (bkz. surname_of). Soyadlar uydurma kök + ekten üretilir;
@@ -59,23 +58,6 @@ const BACKGROUNDS := {
 }
 const BACKGROUND_ORDER := ["sendikaci", "is_insani", "belediye_baskani", "emekli_subay",
 	"gazeteci", "hukukcu", "aktivist"]
-
-## Kişilik -> {title, tag, blurb, perk, effects}. Sıra ekranda da bu sıra.
-const TRAITS := {
-	"hatip": {"title": "Hatip", "tag": "Kürsü",
-		"blurb": "Kürsüye çıktın mı salon susar.",
-		"perk": "Mitinglerin biraz daha etkili.",
-		"effects": {"miting": 1.1}},
-	"sert": {"title": "Sert", "tag": "Kavga",
-		"blurb": "Lafını esirgemezsin, kavgadan kaçmazsın.",
-		"perk": "Karalamaların daha sert, mitinglerin biraz daha etkili; ama sana atılan karalamalar da biraz daha işler.",
-		"effects": {"miting": 1.05, "propaganda_out": 1.2, "propaganda_in": 1.05}},
-	"teknokrat": {"title": "Teknokrat", "tag": "Rakamlar",
-		"blurb": "Rakamlarla konuşursun, piyasa sana güvenir.",
-		"perk": "Hükümetteyken vergilere seçmen tepkisi daha az olur.",
-		"effects": {"tax_mood": 0.8}},
-}
-const TRAIT_ORDER := ["hatip", "sert", "teknokrat"]
 
 ## Mesleğin hitap ettiği gruplarda kazanç çarpanı.
 const APPEAL_MULT := 1.1
@@ -211,32 +193,18 @@ static func background(id: String) -> Dictionary:
 static func title(id: String) -> String:
 	return L.t(String(BACKGROUNDS.get(id, {}).get("title", "")))
 
-static func is_valid_trait(id: String) -> bool:
-	return TRAITS.has(id)
-
-static func trait_info(id: String) -> Dictionary:
-	return L.tr_dict(TRAITS.get(id, {}))
-
-static func trait_title(id: String) -> String:
-	return L.t(String(TRAITS.get(id, {}).get("title", "")))
-
-static func random_trait(rng: RandomNumberGenerator = null) -> String:
-	var index := (rng.randi() if rng != null else randi()) % TRAIT_ORDER.size()
-	return String(TRAIT_ORDER[index])
-
 static func random_background(rng: RandomNumberGenerator = null) -> String:
 	var index := (rng.randi() if rng != null else randi()) % BACKGROUND_ORDER.size()
 	return String(BACKGROUND_ORDER[index])
 
-## trait_id boş ya da geçersizse rastgele bir kişilik verilir (botlar, eski kayıtlar).
 ## portrait: portre kimliği ("<paket>:<ad>"); biçimi bozuksa boş kalır.
 static func make(first_name: String, surname: String, background_id: String, hometown: String,
-		gender: String = "m", trait_id: String = "", portrait: String = "") -> Dictionary:
+		gender: String = "m", portrait: String = "") -> Dictionary:
 	first_name = first_name.strip_edges()
 	surname = surname.strip_edges()
 	return {"gender": gender if GENDERS.has(gender) else "m", "first_name": first_name, "surname": surname,
 		"name": ("%s %s" % [first_name, surname]).left(NAME_MAX_LENGTH),
-		"background": background_id, "trait": trait_id if is_valid_trait(trait_id) else random_trait(),
+		"background": background_id,
 		"hometown": hometown, "portrait": clean_portrait(portrait)}
 
 ## Portre kimliği "<paket>:<ad>" biçiminde mi? Değilse "" (ağdan gelen veri de buradan geçer).
@@ -251,8 +219,7 @@ static func clean_portrait(portrait: String) -> String:
 ## Kara liste (BANNED_SURNAMES) yalnız RASTGELE üretimde uygulanır (0.0.223):
 ## oyuncu elle istediği adı yazabilir, kendisi ya da botlar için.
 static func is_valid(data: Dictionary) -> bool:
-	var trait_id := String(data.get("trait", ""))
-	return is_valid_background(String(data.get("background", ""))) and (trait_id == "" or is_valid_trait(trait_id)) \
+	return is_valid_background(String(data.get("background", ""))) \
 		and String(data.get("first_name", "")) != "" and String(data.get("surname", "")) != ""
 
 ## ELLE YAZILAN İSİM: her kelimenin baş harfi büyük, gerisi küçük (Türkçe
@@ -384,9 +351,6 @@ static func background_of(peer_id: int) -> String:
 static func hometown_of(peer_id: int) -> String:
 	return String(of(peer_id).get("hometown", ""))
 
-static func trait_of(peer_id: int) -> String:
-	return String(of(peer_id).get("trait", ""))
-
 static func portrait_of(peer_id: int) -> String:
 	return String(of(peer_id).get("portrait", ""))
 
@@ -406,23 +370,18 @@ static func party_has_background(party_or_peer: int, id: String) -> bool:
 			return true
 	return false
 
-## HAMLEYİ YAPAN siyasetçinin meslek × kişilik çarpanı (bkz. etki anahtarları).
+## HAMLEYİ YAPAN siyasetçinin meslek çarpanı (bkz. etki anahtarları).
 static func effect(peer_id: int, key: String) -> float:
-	return float(BACKGROUNDS.get(background_of(peer_id), {}).get("effects", {}).get(key, 1.0)) \
-		* float(TRAITS.get(trait_of(peer_id), {}).get("effects", {}).get(key, 1.0))
+	return float(BACKGROUNDS.get(background_of(peer_id), {}).get("effects", {}).get(key, 1.0))
 
-## PARTİNİN çarpanı: üyelerdeki her farklı meslek ve kişilik bir kez sayılır.
+## PARTİNİN çarpanı: üyelerdeki her farklı meslek bir kez sayılır.
 static func party_effect(party_or_peer: int, key: String) -> float:
 	var backgrounds := {}
-	var traits := {}
 	for member in PartyManager.members_of(PartyManager.party_of(party_or_peer)):
 		backgrounds[background_of(int(member))] = true
-		traits[trait_of(int(member))] = true
 	var mult := 1.0
 	for id in backgrounds.keys():
 		mult *= float(BACKGROUNDS.get(id, {}).get("effects", {}).get(key, 1.0))
-	for id in traits.keys():
-		mult *= float(TRAITS.get(id, {}).get("effects", {}).get(key, 1.0))
 	return mult
 
 ## Partinin bu gruba hitap çarpanı (bir üyenin mesleği o gruba hitap ediyorsa).

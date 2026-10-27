@@ -452,6 +452,7 @@ func _build_settings_panel() -> void:
 	var threshold_row := _value_row(election, L.t("Seçim barajı"))
 	threshold_value_label = threshold_row
 	threshold_slider = HSlider.new()
+	threshold_slider.scrollable = false  # tekerlek/iki parmak kaydırma sayfayı kaydırır, ayarı değil
 	election.add_child(threshold_slider)
 
 	var votes_box := _section(L.t("MECLİS OYLAMA SÜRESİ"), "")
@@ -529,6 +530,7 @@ func _build_settings_panel() -> void:
 		var target_box: VBoxContainer = world_box
 		world_values[key] = _value_row(target_box, labels[key])
 		var control := HSlider.new()
+		control.scrollable = false
 		var values: Array = MultiplayerManager.WORLD_OPTIONS[key]
 		control.min_value = float(values[0])
 		control.max_value = float(values[-1])

@@ -219,9 +219,6 @@ static func fill_party(box: VBoxContainer, peer_id: int, on_close: Callable) -> 
 	var job := PoliticianPresets.title(PoliticianPresets.background_of(leader_id))
 	if job != "":
 		bits.append(job)
-	var trait_title := PoliticianPresets.trait_title(PoliticianPresets.trait_of(leader_id))
-	if trait_title != "":
-		bits.append(trait_title)
 	var pawn := PartyBadge.build(party, Vector2(d(86), d(86)), 192, pid == CardManager.party_of(me))
 	pawn.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(_banner(color, pawn, title, " · ".join(bits), on_close))

@@ -212,7 +212,7 @@ static func _grow_regions(land: Array, rng: RandomNumberGenerator, province_scal
 			land_cells.append(i)
 	# 0.0.251: ortalamada ~2 il daha az (-4 → -6).
 	# 0.0.269: her ayarda ortalama 5 il daha az.
-	var target := maxi(8, int(round((land_cells.size() / HEXES_PER_REGION - 6.0) * province_scale)) - 5)
+	var target := maxi(8, int(round((land_cells.size() / HEXES_PER_REGION - 6.0) * province_scale)) - 6)
 	# Birbirinden uzak tohumlar: önce geniş aralık, yetmezse daralt.
 	var seeds: Array = []
 	var shuffled := land_cells.duplicate()

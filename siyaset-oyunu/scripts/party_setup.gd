@@ -1,10 +1,10 @@
 extends Control
 ## PARTİ KURMA SİHİRBAZI (0.0.230) — eski "Siyasetçini Oluştur" ve "Partini Kur"
 ## ekranları TEK ekranda, beş adımda:
-##   1 Siyasetçi (cinsiyet, ad, soyad, isim dili) · 2 Meslek ve kişilik ·
+##   1 Siyasetçi (cinsiyet, ad, soyad, isim dili) · 2 Meslek ·
 ##   3 Memleket (harita) · 4 Parti kimliği (ad, logo, renk) · 5 Seçmen (2 çekirdek grup)
 ## Adımlar sırayla gelir ama üstteki adım şeridinden istenen adıma atlanabilir.
-## Sağda hep görünen ADAY KARTI (portre, meslek + kişilik, memleket, parti) ve
+## Sağda hep görünen ADAY KARTI (portre, meslek, memleket, parti) ve
 ## ODA listesi (herkesin partisi, hazır durumu; oda sahibine bot düzenleme).
 ## Hazır olmak için her adım tamam olmalı; "Hazırım" siyasetçiyi ve partiyi
 ## birlikte gönderir (set_my_politician + set_party_and_ready). Herkes hazır
@@ -15,9 +15,9 @@ extends Control
 
 const MAP_SCENE := preload("res://scenes/Map.tscn")
 const STEP_COUNT := 5
-const STEP_TITLES := ["Siyasetçi", "Meslek ve kişilik", "Memleket", "Parti kimliği", "Seçmen"]
+const STEP_TITLES := ["Siyasetçi", "Meslek", "Memleket", "Parti kimliği", "Seçmen"]
 const STEP_HINTS := ["Kim olduğunu seç: adın ve soyadın.",
-	"Meslek oyun boyunca sana bir avantaj verir; kişilik tarzını biraz daha belirler.",
+	"Meslek oyun boyunca sana bir avantaj verir.",
 	"Haritadan bir il seç: memleketinde güçlü bir teşkilatla başlarsın.",
 	"Partinin adı, logosu ve rengi.",
 	"Partinin dayanacağı iki çekirdek seçmen grubunu seç."]
@@ -44,7 +44,6 @@ var _surname: String = ""
 ## Rastgele isimlerin dili; oyun diliyle başlar.
 var _name_lang: String = "en" if L.is_en() else "tr"
 var _background_id: String = ""
-var _trait_id: String = ""
 var _hometown: String = ""
 var _portrait: String = ""
 var _party_name: String = ""
@@ -80,7 +79,6 @@ var _lang_button: Button
 var _bot_random_button: Button
 # 2 meslek / kişilik
 var _profession_cards: Dictionary = {}
-var _trait_cards: Dictionary = {}
 var _detail_box: HBoxContainer
 # 3 memleket
 var _map_clip: Control
@@ -147,14 +145,11 @@ func _politician_from(data: Dictionary) -> void:
 	_background_id = String(data.get("background", ""))
 	if not PoliticianPresets.is_valid_background(_background_id):
 		_background_id = ""
-	_trait_id = String(data.get("trait", ""))
-	if not PoliticianPresets.is_valid_trait(_trait_id):
-		_trait_id = ""
 	_hometown = String(data.get("hometown", ""))
 	_portrait = String(data.get("portrait", ""))
 
 func _draft_politician() -> Dictionary:
-	return PoliticianPresets.make(_first_name, _surname, _background_id, _hometown, _gender, _trait_id, _portrait)
+	return PoliticianPresets.make(_first_name, _surname, _background_id, _hometown, _gender, _portrait)
 
 func _editing_bot() -> bool:
 	return _edit_target != -1 and _edit_target != multiplayer.get_unique_id()
@@ -356,7 +351,7 @@ func _name_field(placeholder: String) -> LineEdit:
 	edit.text_changed.connect(_on_name_typed.bind(edit))
 	return edit
 
-# --- 2 · Meslek ve kişilik ---------------------------------------------------------
+# --- 2 · Meslek ---------------------------------------------------------
 
 func _build_profile_page() -> Control:
 	var built := _scroll_page()
@@ -372,16 +367,6 @@ func _build_profile_page() -> Control:
 		card.pressed.connect(_on_background_pressed.bind(String(id)))
 		grid.add_child(card)
 		_profession_cards[id] = card
-	page.add_child(PopupKit.section(L.t("Kişilik")))
-	var trait_row := GridContainer.new()
-	trait_row.columns = 3
-	trait_row.add_theme_constant_override("h_separation", 8)
-	page.add_child(trait_row)
-	for id in PoliticianPresets.TRAIT_ORDER:
-		var card := _choice_card(PoliticianPresets.trait_info(String(id)), "t:" + String(id))
-		card.pressed.connect(_on_trait_pressed.bind(String(id)))
-		trait_row.add_child(card)
-		_trait_cards[id] = card
 	_detail_box = HBoxContainer.new()
 	_detail_box.add_theme_constant_override("separation", 14)
 	page.add_child(_detail_box)
@@ -435,20 +420,16 @@ func _style_choice(button: Button, selected: bool) -> void:
 			style = UiSkin.card(UiTheme.PANEL_LIGHT if not hover else UiTheme.PANEL_LIGHT.lightened(0.35), UiTheme.PANEL_LIGHT.darkened(0.08))
 		button.add_theme_stylebox_override(state, style)
 
-## Alttaki ayrıntı: solda meslek, sağda kişilik (üzerine gelinen kart öne çıkar).
+## Alttaki ayrıntı: meslek (üzerine gelinen kart öne çıkar).
 func _refresh_detail() -> void:
 	for child in _detail_box.get_children():
 		_detail_box.remove_child(child)
 		child.queue_free()
 	var bg_id := _background_id
-	var trait_id := _trait_id
 	if _hovered_profile.begins_with("b:"):
 		bg_id = _hovered_profile.substr(2)
-	elif _hovered_profile.begins_with("t:"):
-		trait_id = _hovered_profile.substr(2)
 	_detail_box.add_child(_detail_column(L.t("Meslek"), PoliticianPresets.background(bg_id),
 		PoliticianPresets.BACKGROUNDS.get(bg_id, {}).get("appeal", []), L.t("Bir meslek seç.")))
-	_detail_box.add_child(_detail_column(L.t("Kişilik"), PoliticianPresets.trait_info(trait_id), [], L.t("Bir kişilik seç.")))
 
 func _detail_column(heading: String, info: Dictionary, appeal: Array, empty_text: String) -> Control:
 	var col := VBoxContainer.new()
@@ -726,15 +707,11 @@ func _refresh_card() -> void:
 	who.add_child(chips)
 	chips.add_child(PopupKit.chip(PoliticianPresets.title(_background_id) if _background_id != "" else L.t("meslek ?"),
 		UiTheme.GOLD if _background_id != "" else UiTheme.TEXT_DIM))
-	chips.add_child(PopupKit.chip(PoliticianPresets.trait_title(_trait_id) if _trait_id != "" else L.t("kişilik ?"),
-		UiTheme.PURPLE if _trait_id != "" else UiTheme.TEXT_DIM))
 	who.add_child(PopupKit.note(L.t("Memleket: %s") % GameMap.name_of(_hometown) if _hometown != "" else L.t("Memleket seçilmedi"),
 		UiTheme.TEXT_MUTED))
 	var perks: Array = []
 	if _background_id != "":
 		perks.append(String(PoliticianPresets.background(_background_id).get("perk", "")))
-	if _trait_id != "":
-		perks.append(String(PoliticianPresets.trait_info(_trait_id).get("perk", "")))
 	if not perks.is_empty():
 		_card_box.add_child(PopupKit.note("• " + "\n• ".join(perks), UiTheme.GREEN))
 	_card_box.add_child(UiTheme.rule())
@@ -821,8 +798,6 @@ func _refresh_players() -> void:
 			var bits: Array = [String(politician.get("name", ""))]
 			if PoliticianPresets.is_valid_background(String(politician.get("background", ""))):
 				bits.append(PoliticianPresets.title(String(politician["background"])))
-			if PoliticianPresets.is_valid_trait(String(politician.get("trait", ""))):
-				bits.append(PoliticianPresets.trait_title(String(politician["trait"])))
 			var leader := PopupKit.label(" · ".join(bits), 11, UiTheme.HEAD)
 			leader.clip_text = true
 			texts.add_child(leader)
@@ -865,7 +840,7 @@ func _show_step(index: int) -> void:
 func _step_done(index: int) -> bool:
 	match index:
 		0: return _first_name != "" and _surname != ""
-		1: return _background_id != "" and _trait_id != ""
+		1: return _background_id != ""
 		2: return _hometown != ""
 		3: return PartyManager.is_valid_name(_party_name)
 		4: return VoterGroups.is_valid_core(_core) and (_visited.has(4) or _editing_bot())
@@ -892,7 +867,6 @@ func _refresh() -> void:
 	_lang_button.text = PoliticianPresets.name_lang_title(_name_lang)
 	_bot_random_button.visible = _editing_bot()
 	_mark_cards(_profession_cards, _background_id)
-	_mark_cards(_trait_cards, _trait_id)
 	_refresh_detail()
 	_paint_map()
 	_refresh_home_info()
@@ -1005,10 +979,6 @@ func _on_name_typed(text: String, edit: LineEdit) -> void:
 
 func _on_background_pressed(id: String) -> void:
 	_background_id = id
-	_politician_changed()
-
-func _on_trait_pressed(id: String) -> void:
-	_trait_id = id
 	_politician_changed()
 
 func _on_province_clicked(province_id: String) -> void:
@@ -1143,7 +1113,7 @@ func _on_parties_updated() -> void:
 
 func _own_snapshot() -> Dictionary:
 	return {"gender": _gender, "first_name": _first_name, "surname": _surname, "lang": _name_lang,
-		"background": _background_id, "trait": _trait_id, "hometown": _hometown, "portrait": _portrait,
+		"background": _background_id, "hometown": _hometown, "portrait": _portrait,
 		"party": _party_name, "icon": _icon_index, "color": _bg_color, "core": _core.duplicate(),
 		"step": _step, "visited": _visited.duplicate()}
 

@@ -611,7 +611,7 @@ func _request_randomize_bot_politician(bot_id: int) -> void:
 		return
 	_randomize_bot_politician(bot_id)
 
-## Oda sahibi: botun siyasetçisini baştan yazar (ad, cinsiyet, meslek, kişilik,
+## Oda sahibi: botun siyasetçisini baştan yazar (ad, cinsiyet, meslek,
 ## memleket). Parti kurma sihirbazında bot düzenlenirken kullanılır.
 func set_bot_politician(bot_id: int, data: Dictionary) -> void:
 	if not MultiplayerManager.is_local_owner() or not MultiplayerManager.is_bot(bot_id) 			or not PoliticianPresets.is_valid(data):
@@ -643,7 +643,7 @@ func set_politician_host(peer_id: int, data: Dictionary) -> void:
 func _apply_politician(peer_id: int, data: Dictionary) -> void:
 	politicians[peer_id] = PoliticianPresets.make(String(data.get("first_name", "")),
 		String(data.get("surname", "")), String(data.get("background", "")), String(data.get("hometown", "")),
-		String(data.get("gender", "m")), String(data.get("trait", "")), String(data.get("portrait", "")))
+		String(data.get("gender", "m")), String(data.get("portrait", "")))
 	if MultiplayerManager.room_code != "" and MultiplayerManager.is_host:
 		_broadcast_parties()
 	parties_updated.emit()

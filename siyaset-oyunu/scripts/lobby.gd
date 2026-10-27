@@ -122,7 +122,7 @@ func _build_card() -> void:
 	profile_style.content_margin_left = 18 * S
 	profile_style.content_margin_right = 10 * S
 	UiSkin.apply_style(profile, "panel", profile_style)
-	profile.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	# Oda kartıyla aynı genişlikte (sütun genişliği = CARD_WIDTH).
 	column.add_child(profile)
 	var profile_row := HBoxContainer.new()
 	profile_row.add_theme_constant_override("separation", int(10 * S))
@@ -133,7 +133,8 @@ func _build_card() -> void:
 	who.add_theme_font_override("font", UiTheme.mono(true))
 	profile_row.add_child(who)
 	name_edit = _field(L.t("Oyuncu adı"), 20)
-	name_edit.custom_minimum_size = Vector2(190 * S, 34 * S)
+	name_edit.custom_minimum_size = Vector2(0, 34 * S)
+	name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_edit.add_theme_font_size_override("font_size", int(15 * S))
 	name_edit.text = PlayerProfile.player_name
 	name_edit.text_changed.connect(_on_name_changed)
@@ -165,18 +166,17 @@ func _build_card() -> void:
 	_offline_tab.pressed.connect(_set_mode.bind(false))
 	tabs.add_child(_offline_tab)
 
+	# İki mod aynı yuvada üst üste: yuva ikisinin uzununa göre sabit, kart
+	# sekme değişince boy değiştirmez.
+	var mode_stack := PanelContainer.new()
+	mode_stack.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	box.add_child(mode_stack)
+
 	# ÇEVRİM DIŞI: tek buton, kod alanı ve katılma yok.
 	_offline_box = VBoxContainer.new()
 	_offline_box.add_theme_constant_override("separation", int(10 * S))
-	box.add_child(_offline_box)
-	# İki ayrı satır: sarmalı tek etiket yeni yazı tipinde boyunu yanlış ölçüyordu.
-	var hint_box := VBoxContainer.new()
-	hint_box.add_theme_constant_override("separation", 0)
-	_offline_box.add_child(hint_box)
-	for line in [L.t("Sunucu yok, oda kodu yok."), L.t("Sadece sen ve eklediğin botlar.")]:
-		var offline_hint := _small_label(line)
-		offline_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		hint_box.add_child(offline_hint)
+	_offline_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	mode_stack.add_child(_offline_box)
 	_offline_button = _button(L.t("Botlarla Oyna"), UiTheme.GREEN_DARK, 42.0)
 	_offline_button.pressed.connect(_on_offline_pressed)
 	_offline_box.add_child(_offline_button)
@@ -198,7 +198,8 @@ func _build_card() -> void:
 
 	_online_box = VBoxContainer.new()
 	_online_box.add_theme_constant_override("separation", int(12 * S))
-	box.add_child(_online_box)
+	_online_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	mode_stack.add_child(_online_box)
 
 	create_button = _button(L.t("Oda Kur"), ACCENT, 42.0)
 	create_button.pressed.connect(_on_create_pressed)
@@ -240,6 +241,8 @@ func _build_card() -> void:
 	status_label.custom_minimum_size = Vector2(CARD_WIDTH - 40.0 * S, 18 * S)
 	status_label.add_theme_font_size_override("font_size", int(12 * S))
 	box.add_child(status_label)
+	mode_stack.custom_minimum_size.y = maxf(_online_box.get_combined_minimum_size().y,
+		_offline_box.get_combined_minimum_size().y)
 	_set_mode(true)
 
 ## Mod sekmesi değişti: ilgili kutu görünür, diğeri gizlenir.

@@ -305,6 +305,7 @@ func _range(value: float, minimum: float, maximum: float, step: float, formatter
 	outputs.add_child(current)
 	outputs.add_child(_label(formatter.call(maximum), 10, MUTED))
 	var slider := HSlider.new()
+	slider.scrollable = false  # tekerlek/iki parmak kaydırma sayfayı kaydırır, ayarı değil
 	slider.custom_minimum_size.y = 24
 	slider.min_value = minimum
 	slider.max_value = maximum

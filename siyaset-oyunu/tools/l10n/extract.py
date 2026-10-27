@@ -14,7 +14,7 @@ CONST_BLOCKS = {
     'scripts/party_setup.gd': ['STEP_TITLES', 'STEP_HINTS', 'GENDER_STYLE'],
     'scripts/parliament_flow.gd': ['STAGE_TITLES', 'STAGE_SHORT'],
     'scripts/province_actions.gd': ['TIER_NAMES', 'TIER_NOTES', 'INVEST_NOTES'],
-    'scripts/politician_presets.gd': ['BACKGROUNDS', 'TRAITS'],
+    'scripts/politician_presets.gd': ['BACKGROUNDS'],
     'scripts/voter_groups.gd': ['GROUPS'],
 }
 

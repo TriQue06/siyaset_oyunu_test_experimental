@@ -549,13 +549,14 @@ func _build_identity_page() -> Control:
 	_icon_grid = GridContainer.new()
 	_icon_grid.columns = 16
 	_icon_grid.add_theme_constant_override("h_separation", 6)
-	_icon_grid.add_theme_constant_override("v_separation", 6)
+	_icon_grid.add_theme_constant_override("v_separation", 10)
 	page.add_child(_icon_grid)
 	# 0.0.269: her logo partinin renginde 3B pul; seçili olanda hardal halka.
 	for i in PartyPresets.icon_count():
 		var btn := Button.new()
 		btn.focus_mode = Control.FOCUS_NONE
-		btn.custom_minimum_size = Vector2(ICON_BUTTON_SIZE, ICON_BUTTON_SIZE + 4)
+		# Kare: pul dairesi düğmenin tamamını kaplar, ikon tam ortasına oturur.
+		btn.custom_minimum_size = Vector2(ICON_BUTTON_SIZE, ICON_BUTTON_SIZE)
 		var icon := TextureRect.new()
 		icon.name = "Icon"
 		icon.texture = PartyPresets.get_icon_texture(i, GRID_ICON_PIXEL_SIZE)

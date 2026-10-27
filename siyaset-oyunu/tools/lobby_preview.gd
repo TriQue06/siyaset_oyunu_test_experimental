@@ -32,37 +32,39 @@ func _initialize() -> void:
 	root.add_child(scene)
 	for i in 10:
 		await process_frame
-	var grid: GridContainer = scene.player_list_box
-	check("8 kart, 2 sutun", grid.get_child_count() == 8 and grid.columns == 2, str(grid.get_child_count()))
-	var enabled := 0
-	var disabled := 0
-	for slot in grid.get_children():
-		for child in slot.get_children():
-			if child is Button:
-				if child.disabled:
-					disabled += 1
-				else:
-					enabled += 1
-	check("sadece ilk bos kartta etkin robot butonu", enabled == 1 and disabled == 3, "etkin %d, pasif %d" % [enabled, disabled])
+	var rows: VBoxContainer = scene.player_list_box
+	check("8 satir", rows.get_child_count() == 8, str(rows.get_child_count()))
+	var add_buttons := 0
+	for row in rows.get_children():
+		for button in row.find_children("*", "Button", true, false):
+			if String(button.text) == "Bot" and not button.disabled:
+				add_buttons += 1
+	check("sadece ilk bos satirda Bot dugmesi", add_buttons == 1, "dugme %d" % add_buttons)
 	var start: Button = scene.start_button
 	var bottom: float = start.get_global_rect().end.y
 	check("baslat butonu ekranda", start.visible and bottom <= root.get_visible_rect().size.y, "alt kenar %.0f / %.0f" % [bottom, root.get_visible_rect().size.y])
 
 	# Lobi ayarları: oyun süresi (4 turda bir, 7 seçim) ve artırma.
 	check("varsayilan: 4 yilda bir, 5 secim, 40 tur (20 yil), rastgele parti kapali", mm.election_interval == 4 and mm.election_count == 5 and GameRules.MAX_ROUNDS == 40 and not mm.random_parties)
-	scene._on_settings_pressed()
-	for i in 20:
+	scene._on_section_pressed("elections")
+	for i in 5:
 		await process_frame
 	scene.count_plus.pressed.emit()
 	await process_frame
 	check("secim sayisi +1 -> 9 secim, 72 tur", mm.election_count == 9 and GameRules.MAX_ROUNDS == 72 and GameRules.is_election_round(72))
 	check("ozet yaziyor", String(scene.game_length_summary.text).find("36") != -1, scene.game_length_summary.text)
 	root.get_texture().get_image().save_png("%s/lobby_settings.png" % OS.get_user_data_dir())
-	var sc := scene.settings_vbox.get_child(1) as ScrollContainer
-	sc.scroll_vertical = 100000
-	for i in 5:
-		await process_frame
-	root.get_texture().get_image().save_png("%s/lobby_settings_bottom.png" % OS.get_user_data_dir())
+	for id in ["timing", "bots"]:
+		scene._on_section_pressed(id)
+		for i in 5:
+			await process_frame
+		root.get_texture().get_image().save_png("%s/lobby_settings_%s.png" % [OS.get_user_data_dir(), id])
+	# Tohum girilince harita onizlemesi gorunur.
+	mm.set_map_seed("12345")
+	await create_timer(0.6).timeout
+	check("tohumla harita onizlemesi", scene._map != null and scene._map_clip.visible and not scene._map_placeholder.visible)
+	root.get_texture().get_image().save_png("%s/lobby_map.png" % OS.get_user_data_dir())
+	mm.set_map_seed("")
 	scene.count_minus.pressed.emit()
 	# Doldur: 8 kart dolunca buton kalmamalı; başlat yine ekranda.
 	mm.room_code = ""

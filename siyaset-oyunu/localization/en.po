@@ -5183,3 +5183,78 @@ msgstr "Health"
 
 msgid "Milli Savunma"
 msgstr "Defense"
+
+msgid "%d seçim · %%%s"
+msgstr "%d elections · %%%s"
+
+msgid "%d sn · %d sn"
+msgstr "%d s · %d s"
+
+msgid "%d'de başlar · %d seçim, %s yılda bir · %s yıl"
+msgstr "Starts in %d · %d elections, every %s years · %s years"
+
+msgid "Aynı tohum her zaman aynı ülkeyi üretir."
+msgstr "The same seed always makes the same country."
+
+msgid "Ayrıl"
+msgstr "Leave"
+
+msgid "BAŞLANGIÇ"
+msgstr "START"
+
+msgid "Başlamak için en az %d oyuncu gerekir."
+msgstr "At least %d players are needed to start."
+
+msgid "Bot gelir zayıflatması"
+msgstr "Bot income penalty"
+
+msgid "Botlar ve oda"
+msgstr "Bots and room"
+
+msgid "Harita ve meclis"
+msgstr "Map and parliament"
+
+msgid "Haritayı önceden görmek için \"Yeni harita\"ya dokun ya da tohum yaz."
+msgstr "Tap \"New map\" or type a seed to preview the map."
+
+msgid "Her oyunda rastgele ülke"
+msgstr "A random country every game"
+
+msgid "Kurallar"
+msgstr "Rules"
+
+msgid "Meclis oylama süresi"
+msgstr "Parliament vote time"
+
+msgid "Oyuncular"
+msgstr "Players"
+
+msgid "Oyunu başlat"
+msgstr "Start game"
+
+msgid "Oyunu oda sahibi başlatır · %s"
+msgstr "The host starts the game · %s"
+
+msgid "Seçimler"
+msgstr "Elections"
+
+msgid "Süreler"
+msgstr "Timers"
+
+msgid "Yeni harita"
+msgstr "New map"
+
+msgid "sen"
+msgstr "you"
+
+msgid "tohum: %s"
+msgstr "seed: %s"
+
+msgid "tohum: rastgele"
+msgstr "seed: random"
+
+msgid "zayıflatma %s"
+msgstr "penalty %s"
+
+msgid "Ülke"
+msgstr "Country"

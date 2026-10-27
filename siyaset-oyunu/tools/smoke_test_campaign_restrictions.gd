@@ -18,11 +18,6 @@ func run() -> void:
 	cm.turn_order = [1, 2]
 	cm.current_turn_index = 0
 	gm.phase = gm.Phase.IDLE
-	cm.speech_required = true
-	cm.funds[1] = 100.0
-	check(not cm.needs_speech(1), "campaign meeting unavailable")
-	cm._apply_speech(1, "isci")
-	check(cm.funds_of(1) == 100.0, "blocked meeting does not spend money")
 	var province: String = cm._province_ids[0]
 	check(cm.start_disaster("deprem", [province]).is_empty(), "campaign disaster cannot start")
 	cm.disaster["owed"] = true
@@ -46,9 +41,5 @@ func run() -> void:
 	screen.queue_free()
 	await process_frame
 	cm.last_election_round = 1
-	cm.last_seats[cm.party_of(1)] = 10
-	check(not cm.needs_speech(1), "no meeting without a parliamentary group (0.0.227)")
-	cm.last_seats[cm.party_of(1)] = cm.group_seat_requirement()
-	check(cm.needs_speech(1), "meeting available after first election with a group")
 	check(not cm.start_disaster("deprem", [province]).is_empty(), "disaster available after first election")
 	quit(1 if fails else 0)

@@ -1,15 +1,12 @@
 extends Node
 ## Autoload. Kart envanteri, oynama sırası, PARA ve hamleler, tur/seçim döngüsü,
-## seçim sonuçları, İLLERİN SEÇMEN PROFİLİ, GRUP TOPLANTILARI, AKTİVİTE (il puanı
+## seçim sonuçları, İLLERİN SEÇMEN PROFİLİ, AKTİVİTE (il puanı
 ## + il başkanlığı), oyuncuya
 ## özel istihbarat (anket/gözcü) ve oyun sonu. Host yetkili: host-olmayan
 ## istemcinin isteği önce host'a "any_peer" RPC ile gider, host doğrulayıp
 ## uygular ve herkese yayınlar.
 ##
 ## TUR AKIŞI (bir oyuncunun sırası):
-##   0) GRUP TOPLANTISI (isteğe bağlı, dönemde partide bir kez): 8 seçmen
-##      grubundan birini seçer; o grupta GEÇİCİ destek (PublicOpinion.MEETING_BONUS:
-##      bu tur +10, sonraki +3, sonraki +1). Toplantı yapmamanın cezası yok.
 ##   a) KART OYNA: elden saklanabilir bir kart oyna (kartların bedeli yok).
 ##   b) YASA TASARLA (GameRules.LAW_FUNDS_COST): meclise yasa sun; meclis yoksa
 ##      oylamasız SEÇİM VAADİ olur.
@@ -144,12 +141,6 @@ var turmoil: Dictionary = {}
 ## BÖLÜNEN PARTİLER: ayrılan (yapay zekâ) partinin peer_id -> {"parent": ana parti,
 ## "elections": ayrıldıktan sonra atlattığı seçim, "since": ayrıldığı tur}.
 var splinters: Dictionary = {}
-## GRUP TOPLANTISI: sırası gelen oyuncunun PARTİSİ bu dönem toplantı yaptı mı?
-## (Grup toplantısı partiye aittir: iki kişilik partide biri yaptıysa
-## diğeri o dönem yapamaz; bkz. speech_rounds.)
-var speech_done: bool = false
-## Parti -> grup toplantısı yaptığı son dönem.
-var speech_rounds: Dictionary = {}
 ## ERKEN SEÇİM önergesi bedelsiz (0.0.182): parti başına bir seçim aralığında
 ## (GameRules.ELECTION_INTERVAL tur) bir önerge. parti -> önerge turu.
 var early_requests: Dictionary = {}
@@ -157,12 +148,6 @@ var early_requests: Dictionary = {}
 var congress_rounds: Dictionary = {}
 ## Bir önceki seçimin oy oranları (kongrede "oy kaybı" ölçüsü).
 var previous_vote_shares: Dictionary = {}
-## Testler için: false ise toplantı hakkı hiç açılmaz.
-var speech_required: bool = true
-## GEÇİCİ GRUP DESTEĞİ: parti -> {grup -> toplantının yapıldığı tur}. Bonus
-## toplantı turundan itibaren PublicOpinion.MEETING_BONUS ile azalır; aynı gruba
-## yeni toplantı eskisinin yerini alır (toplanmaz).
-var group_meetings: Dictionary = {}
 ## MİTİNG YORGUNLUĞU (azalan getiri): parti -> {grup -> birikmiş kazanç}.
 ## Her tur sonunda PublicOpinion.MITING_FATIGUE_DECAY ile söner.
 var miting_fatigue: Dictionary = {}
@@ -294,12 +279,12 @@ var _rng := RandomNumberGenerator.new()
 ##     "aid_for": bu sırada karar verilen afet id'si, "parl_closed": kapanan
 ##     meclis aşamaları, "mitings", "invests": bu sıradaki başarılı hamleler}.
 ## MECLİS SEKMELERİ (0.0.246) PARL_STAGES: sıra yok, oyuncu istediği sekmeden
-## başlar. Bir sekmenin hamlesi yapılınca (gensoru verildi, toplantı yapıldı,
+## başlar. Bir sekmenin hamlesi yapılınca (gensoru verildi,
 ## yasa / anayasa / erken seçim sunuldu) o sekme bu sıra kapanır, yeniden
 ## açılmaz. Botlar bir sekmeyi "geç" ile de kapatabilir (_apply_parl_pass).
 ## enforce_turn_flow: testler eski serbest akışa dönebilsin (çekim zorunluluğu
 ## ve meclis sırası uygulanmaz); miting / yatırım sınırı her zaman geçerli.
-const PARL_STAGES := ["censure", "speech", "law"]
+const PARL_STAGES := ["censure", "law"]
 ## Çekim bekleyen oyuncunun sunum süresi: bu sürede tur sayacı işlemez; dolunca
 ## kart kendiliğinden çekilir (AFK açığı yok).
 const INTRO_TIMEOUT := 15.0
@@ -601,8 +586,6 @@ func _parl_stage_available(peer_id: int, stage: String) -> bool:
 	match stage:
 		"censure":
 			return can_censure(peer_id)
-		"speech":
-			return needs_speech(peer_id)
 		"law":
 			return can_propose_law(peer_id) or can_propose_constitution(peer_id) or can_early_election(peer_id)
 	return false
@@ -748,7 +731,7 @@ func current_turn_peer_id() -> int:
 	return turn_order[current_turn_index % turn_order.size()]
 
 ## OYUNCU / PARTİ: sıra, para, el, puan ve güvenilirlik OYUNCUYA (peer_id);
-## destek, teşkilat, vekil, seçmen grubu yakınlığı, yasa/toplantı hakkı PARTİYE aittir. Parti
+## destek, teşkilat, vekil, seçmen grubu yakınlığı, yasa hakkı PARTİYE aittir. Parti
 ## anahtarı genel başkanın peer_id'sidir (bkz. PartyManager.party_of). Parti
 ## düzeyindeki sorgular ve yazmalar argümanı her zaman party_of'tan geçirir:
 ## yardımcı da kendi peer_id'siyle sorsa partisinin verisini görür.
@@ -1144,25 +1127,6 @@ func is_government_party(peer_id: int) -> bool:
 ## hamle sayısı sınırsız, para belirler.)
 func can_choose_main_action(peer_id: int) -> bool:
 	return peer_id == current_turn_peer_id() and not is_turn_blocked()
-
-## Bu oyuncu bu sırada grup toplantısı yapabilir mi? (Toplantı isteğe bağlıdır;
-## yapmamanın cezası yok.) Toplantı hakkı DÖNEMLİKTİR ve partiye aittir: o
-## dönem partisi toplandıysa toplanamaz; kasası yetmiyorsa da hakkı yok. (Önbellekteki speech_done'a güvenilmez: turun ilk oyuncusunun
-## sırası tur numarası artmadan başlar, eski dönemin bilgisi taşınıyordu.)
-## MECLİS GRUBU (0.0.227): grup toplantısını yalnız meclis grubu olan parti
-## yapabilir. Grup için meclisin 1/30'u kadar vekil gerekir, 5'in katına
-## yukarı yuvarlanır (500 ve 600 sandalyede 20). İlk seçimden önce meclis boş.
-const GROUP_SEAT_FRACTION := 1.0 / 30.0
-func group_seat_requirement() -> int:
-	return int(ceil(float(TOTAL_SEATS) * GROUP_SEAT_FRACTION / 5.0 - 0.0001)) * 5
-
-func has_parliament_group(peer_id: int) -> bool:
-	return int(last_seats.get(party_of(peer_id), 0)) >= group_seat_requirement()
-
-func needs_speech(peer_id: int) -> bool:
-	return last_election_round > 0 and has_parliament_group(peer_id) and speech_required and not turn_order.is_empty() and peer_id == current_turn_peer_id() and not is_party_member(peer_id) \
-		and int(speech_rounds.get(party_of(peer_id), 0)) != round_number and funds_of(peer_id) >= GameRules.SPEECH_FUNDS_COST \
-		and _parl_stage_ok(peer_id, "speech")
 
 ## Bu oyuncu şu an bir yasa sunabilir mi? (law_type verilirse o yasa geçerli mi.)
 ## law_type boşsa: grup yasası YA DA vergi yasası sunabiliyorsa true.
@@ -1721,12 +1685,10 @@ func province_voters() -> Dictionary:
 func province_profile(province_id: String) -> Dictionary:
 	return province_voters().get(province_id, {})
 
-## Partinin seçimde kullanılan grup yakınlıkları: kalıcı ulusal yakınlık +
-## geçici toplantı bonusu. at_round: bonusun hesaplandığı tur (-1: şimdiki).
-func effective_groups(peer_id: int, at_round: int = -1) -> Dictionary:
+## Partinin seçimde kullanılan grup yakınlıkları (ittifakta karışım).
+func effective_groups(peer_id: int) -> Dictionary:
 	var pid := party_of(peer_id)
-	var bonus := meeting_bonuses(pid, at_round)
-	var groups := VoterGroups.with_bonus(PartyManager.groups_of(pid), bonus)
+	var groups := PartyManager.groups_of(pid)
 	var alliance_id := alliance_of(pid)
 	if alliances_enabled and alliance_id >= 0:
 		groups = VoterGroups.alliance_blend(groups, _alliance_blend_members(alliances[alliance_id].get("members", [])))
@@ -1765,18 +1727,6 @@ func alliance_preview_text(party_id: int, alliance_id: int, count: int = 3) -> S
 			break
 		parts.append("%s %d » %d" % [VoterGroups.title(String(row[0])), roundi(float(row[1])), roundi(float(row[2]))])
 	return ", ".join(PackedStringArray(parts))
-
-## Partinin şu an geçerli toplantı bonusları: grup -> bonus.
-func meeting_bonuses(peer_id: int, at_round: int = -1) -> Dictionary:
-	if at_round < 0:
-		at_round = round_number
-	var result := {}
-	var entry: Dictionary = group_meetings.get(party_of(peer_id), {})
-	for group in entry.keys():
-		var bonus := PublicOpinion.meeting_bonus(at_round - int(entry[group]))
-		if bonus > 0.0:
-			result[group] = bonus
-	return result
 
 ## Partinin bu ildeki GRUP UYUMU (0..100, 50 nötr).
 func appeal_of(province_id: String, peer_id: int) -> float:
@@ -2083,15 +2033,15 @@ func projection_all(viewer: int = -1) -> Dictionary:
 		result[province_id] = entry
 	return result
 
-## Ülke genelinde yarışan partilerin seçimdeki grup yakınlıkları (toplantı
-## bonusu dahil). BAĞIMSIZLAR dahil değil: sadece memleketlerinde aday olurlar
-## (bkz. _add_independent_seats). at_round: bonusların turu (-1: şimdiki).
-func _group_profiles(at_round: int = -1) -> Dictionary:
+## Ülke genelinde yarışan partilerin seçimdeki grup yakınlıkları.
+## BAĞIMSIZLAR dahil değil: sadece memleketlerinde aday olurlar
+## (bkz. _add_independent_seats).
+func _group_profiles() -> Dictionary:
 	var result := {}
 	for peer_id in party_ids():
 		if PartyManager.is_independent(peer_id):
 			continue
-		result[peer_id] = effective_groups(peer_id, at_round)
+		result[peer_id] = effective_groups(peer_id)
 	return result
 
 ## Bu parti bu ilde miting yaparsa provokasyon olasılığı (0..0.5): ilin seçmen
@@ -2207,7 +2157,6 @@ func init_game() -> void:
 	law_rounds = {}
 	tax_rounds = {}
 	constitution_rounds = {}
-	speech_rounds = {}
 	early_requests = {}
 	congress_rounds = {}
 	previous_vote_shares = {}
@@ -2220,7 +2169,6 @@ func init_game() -> void:
 	agenda = {}
 	crisis = {}
 	_agenda_pairs = []
-	group_meetings = {}
 	miting_fatigue = {}
 	election_groups = {}
 	former_parties = {}
@@ -2370,7 +2318,6 @@ func abandon_game() -> void:
 	local_support = {}
 	province_events = {}
 	province_profiles = {}
-	group_meetings = {}
 	miting_fatigue = {}
 	election_groups = {}
 	former_parties = {}
@@ -2379,7 +2326,6 @@ func abandon_game() -> void:
 	turmoil = {}
 	splinters = {}
 	credibility = {}
-	speech_done = false
 	funds = {}
 	game_finished = false
 	final_ranking = []
@@ -2552,8 +2498,6 @@ func _apply_pass(peer_id: int, voluntary: bool = true) -> void:
 	# Kartını çekmeden biten sıra: kart yine verilir (eski otomatik dağıtım gibi).
 	if needs_turn_draw(peer_id):
 		_apply_draw(peer_id, true)
-	# Grup toplantısı isteğe bağlıdır: yapmamanın cezası yok (rakibe kısa
-	# vadeli fırsat bırakmış olursun).
 	var wrapped := _advance_turn()
 	_push_state({"type": "passed", "peer_id": peer_id})
 	_finish_round_if_needed(wrapped)
@@ -3196,7 +3140,7 @@ func _log_province(province_id: String, text: String) -> void:
 ##             anda 3. seviye tutulamaz (yeni 3. seviye diğerini 2'ye indirir).
 ##   KASET   : hedef partinin bütün seçmeni bir seviye düşer (ilahiyatçı: yarısı);
 ##   KARALAMA: aynısı yalnız hedef ilde.
-##   YASA / GRUP TOPLANTISI: ülke genelinde grubun seçmeninden çeker ve kendi
+##   YASA    : ülke genelinde grubun seçmeninden çeker ve kendi
 ##             seçmenini yükseltir.
 ##   İTTİFAK : ortaklar birbirinin seçmenini çalmaz, seviyesini düşürmez.
 ## Kendiliğinden seviye kaybı yok: düşüş rakiplerin baskısıyla olur; teşkilat
@@ -3218,14 +3162,11 @@ const MITING_PROMOTE := [0.25, 0.1]
 const INVEST_PULL := 0.10
 const INVEST_STEAL := [1.0, 0.5, 0.15]
 const INVEST_DEMOTE := [0.3, 0.2]
-## Ülke çapı (yasa, toplantı): eski hitap puanı başına grubun bu kadar yüzdesi.
+## Ülke çapı (yasa): eski hitap puanı başına grubun bu kadar yüzdesi.
 const NATIONAL_PULL_MULT := 1.5
 const NATIONAL_STEAL := [1.0, 0.1, 0.02]
 const NATIONAL_DEMOTE := [0.4, 0.1]
 const NATIONAL_PROMOTE := [0.15, 0.05]
-## Grup toplantısı (güçlü, kalıcı): grubun ülke genelindeki seçmeninden çekilen pay (puan).
-const MEETING_PULL_POINTS := 6.0
-const MEETING_PROMOTE := [0.3, 0.12]
 ## ZIT GRUP KAYBI (0.0.268): bir gruba kazanılan her seçmen için zıt gruptaki
 ## kendi seçmeninden BİREBİR aynı sayıda seçmen bir seviye düşer (5 işveren →
 ## 5 işçi). İstisna yok: kriz, teşkilat ya da il büyüklüğü oranı değiştirmez.
@@ -3545,7 +3486,7 @@ func _vb_invest(province_id: String, parts: Dictionary, scale: float) -> float:
 	_vb_sync_all()
 	return gained
 
-## ÜLKE ÇAPI GRUP ETKİSİ (yasa, toplantı, geçmiş): eski hitap puanı amount
+## ÜLKE ÇAPI GRUP ETKİSİ (yasa, geçmiş): eski hitap puanı amount
 ## grubun seçmeninin yaklaşık amount × NATIONAL_PULL_MULT yüzdesine denk gelir.
 ## amount < 0: kendi seçmeninden o kadarı bir seviye düşer. promote: [r1, r2].
 ## Dönüş: grubun ülke geneli payındaki değişim (puan).
@@ -3660,7 +3601,7 @@ func _vb_unpack(data) -> void:
 			voter_base[int(pid)] = PackedFloat32Array(data[pid])
 	_vb_ready = false
 
-# --- Grup yakınlıkları ve toplantı -------------------------------------------------
+# --- Grup yakınlıkları -------------------------------------------------
 
 ## Partilerin grup yakınlıklarını değiştirir (bkz. PartyManager.apply_group_deltas).
 ## changes: [{"peer", "group", "amount"}]. Dönüş: gerçekleşen [{"peer", "group", "delta"}].
@@ -3686,45 +3627,7 @@ func _shift_groups(changes: Array) -> Array:
 		result.append({"peer": pid, "group": group, "delta": _vb_national_group(pid, group, amount)})
 	return result
 
-## Sıra gelen oyuncunun GRUP TOPLANTISI: bir seçmen grubunun sorunlarını konuşur.
-func make_speech(group: String) -> void:
-	var me := multiplayer.get_unique_id()
-	if not needs_speech(me) or is_turn_blocked():
-		return
-	if _is_authority():
-		_apply_speech(me, group)
-	else:
-		_request_speech.rpc_id(1, group)
-
-func _apply_speech(peer_id: int, group: String) -> void:
-	if not needs_speech(peer_id) or is_turn_blocked() or not VoterGroups.is_group(group):
-		return
-	_note_main_action(peer_id)
-	_parl_close(peer_id, "speech")
-	funds[peer_id] = funds_of(peer_id) - GameRules.SPEECH_FUNDS_COST
-	speech_done = true
-	var pid := party_of(peer_id)
-	speech_rounds[pid] = round_number
-	# 0.0.228: toplantı KALICI ve güçlü: grubun ülke genelindeki seçmeninden
-	# çeker, partinin o gruptaki seçmenini yükseltir (zıt grupta yarısı kadar kayıp).
-	var points := MEETING_PULL_POINTS * (PublicOpinion.AGENDA_LAW_MULT if crisis_group() == group else 1.0) \
-		* PoliticianPresets.effect(peer_id, "speech")
-	var moved := _vb_national_group(pid, group, _own_effect(pid, points), MEETING_PROMOTE)
-	var text := L.t("%s, %s ile grup toplantısı yaptı (%s): o grupta %s.") % [
-		_party_name(peer_id), VoterGroups.title(group), String(VoterGroups.data(group).get("meeting", "")),
-		EffectWords.change(moved, "group")]
-	if crisis_group() == group:
-		_add_national(pid, PublicOpinion.CRISIS_RESPONSE_NATIONAL)
-		text += L.t(" Krize yanıt verdi (ulusal destek).")
-	_push_state({"type": "speech", "peer_id": peer_id, "message": text})
-
-@rpc("any_peer", "reliable")
-func _request_speech(group: String) -> void:
-	if not MultiplayerManager.is_host:
-		return
-	_apply_speech(multiplayer.get_remote_sender_id(), group)
-
-## Tur sonu: miting yorgunluğu söner, süresi dolan toplantı kayıtları silinir.
+## Tur sonu: miting yorgunluğu söner.
 func _decay_group_effects(next_round: int) -> void:
 	for pid in miting_fatigue.keys():
 		var entry: Dictionary = miting_fatigue[pid]
@@ -3736,13 +3639,6 @@ func _decay_group_effects(next_round: int) -> void:
 				entry[group] = value
 		if entry.is_empty():
 			miting_fatigue.erase(pid)
-	for pid in group_meetings.keys():
-		var entry: Dictionary = group_meetings[pid]
-		for group in entry.keys():
-			if next_round - int(entry[group]) >= PublicOpinion.MEETING_BONUS.size():
-				entry.erase(group)
-		if entry.is_empty():
-			group_meetings.erase(pid)
 
 # --- Karışıklık ve bölünme ------------------------------------------------------------
 
@@ -4105,9 +4001,6 @@ func _order_turns_by_votes() -> void:
 ## gönderilecek state olayına iliştirilsin diye _pending_dealt'ta beklet.
 func _grant_turn_income() -> void:
 	var peer_id := current_turn_peer_id()
-	# Grup toplantısı PARTİYE aittir: partinin diğer üyesi bu dönem toplandıysa
-	# bu oyuncu toplanamaz.
-	speech_done = peer_id != -1 and int(speech_rounds.get(party_of(peer_id), 0)) == round_number
 	_start_turn_flow(peer_id)
 	if peer_id == -1:
 		return
@@ -4227,9 +4120,6 @@ func _finish_round() -> void:
 	var finished_round := round_number
 	round_number += 1
 	_expire_alliance_requests()
-	# Yeni dönem: sıradaki oyuncunun toplantı bilgisi yeni döneme göre.
-	var current := current_turn_peer_id()
-	speech_done = current != -1 and int(speech_rounds.get(party_of(current), 0)) == round_number
 
 	# Ayrılan partiler dönebilir, çok karışan parti bölünür; sonra karışıklık söner.
 	_check_reunions()
@@ -4319,8 +4209,7 @@ func election_modifiers(public_view: bool = false) -> Dictionary:
 
 func _hold_election(finished_round: int, early: bool) -> void:
 	var mods := election_modifiers()
-	# Toplantı bonusları seçimin yapıldığı (biten) tura göre: son tur toplantısı tam etkili.
-	var groups := _group_profiles(finished_round).duplicate(true)
+	var groups := _group_profiles().duplicate(true)
 	# Denge analizi (tools/balance_sim.gd) için seçimin girdileri; ağda gönderilmez.
 	last_election_inputs = {
 		"mods": mods, "groups": groups, "voters": province_voters(),
@@ -4332,7 +4221,7 @@ func _hold_election(finished_round: int, early: bool) -> void:
 	var result := ElectionModel.compute(groups, _province_seat_counts, province_voters(),
 		MultiplayerManager.election_threshold, _election_rng(finished_round), mods, alliance_membership() if alliances_enabled else {},
 		vb_election_state())
-	_add_independent_seats(result, groups, mods, finished_round)
+	_add_independent_seats(result, groups, mods)
 	# Fesihten kalan Bağımsızlar bloğu seçimle dağılır (aşağıda sonuçlar yazılınca).
 	if PartyManager.parties.has(PartyManager.BLOC_ID):
 		PartyManager.parties.erase(PartyManager.BLOC_ID)
@@ -4399,7 +4288,7 @@ func alliance_membership() -> Dictionary:
 ## partisinden bir sandalye alır. Az bir miting bile yetebilir (hemşehri desteği).
 const INDEPENDENT_QUOTA_FACTOR := 0.6
 
-func _add_independent_seats(result: Dictionary, groups: Dictionary, mods: Dictionary, at_round: int = -1) -> void:
+func _add_independent_seats(result: Dictionary, groups: Dictionary, mods: Dictionary) -> void:
 	var province_results: Dictionary = result["province_results"]
 	var seats: Dictionary = result["seats"]
 	var vote_shares: Dictionary = result["vote_shares"]
@@ -4414,7 +4303,7 @@ func _add_independent_seats(result: Dictionary, groups: Dictionary, mods: Dictio
 		if not province_results.has(home):
 			continue
 		var field := groups.duplicate()
-		field[pid] = effective_groups(pid, at_round)
+		field[pid] = effective_groups(pid)
 		var shares := ElectionModel.expected_shares(field, province_profile(home), mods["national"], local_mods.get(home, {}))
 		var share := float(shares.get(pid, 0.0))
 		var seats_here := province_seat_count(home)
@@ -4946,8 +4835,8 @@ func _dissolve_temporary_party(pid: int) -> void:
 				temp_orgs[province_id] = int(organizations[province_id][pid])
 		_remember_former_party(deputy, pid, temp_orgs)
 		_make_independent(deputy, PartyManager.groups_of(pid).duplicate())
-	for table in [national_support, _hidden_national_delta, _visible_national_support, populism, turmoil, law_rounds, speech_rounds, congress_rounds,
-			group_meetings, miting_fatigue, election_groups,
+	for table in [national_support, _hidden_national_delta, _visible_national_support, populism, turmoil, law_rounds, congress_rounds,
+			miting_fatigue, election_groups,
 			national_list, last_seats, election_seats, last_vote_shares, previous_vote_shares, inventories, funds, credibility]:
 		table.erase(pid)
 	passed_threshold.erase(pid)
@@ -5449,8 +5338,8 @@ func _rekey_party(old_id: int, new_id: int, new_member: int) -> void:
 		var others: Array = former_allies[pid]
 		if others.has(old_id):
 			others[others.find(old_id)] = new_id
-	for table in [national_support, _hidden_national_delta, _visible_national_support, populism, turmoil, law_rounds, speech_rounds, congress_rounds,
-			group_meetings, miting_fatigue, election_groups,
+	for table in [national_support, _hidden_national_delta, _visible_national_support, populism, turmoil, law_rounds, congress_rounds,
+			miting_fatigue, election_groups,
 			national_list, last_seats, election_seats, last_vote_shares, previous_vote_shares, party_congress]:
 		if table.has(old_id):
 			table[new_id] = table[old_id]
@@ -5504,8 +5393,6 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"constitution_rounds": constitution_rounds,
 		"populism": populism,
 		"splinters": splinters,
-		"speech_done": speech_done,
-		"speech_rounds": speech_rounds,
 		"early_requests": early_requests,
 		"congress_rounds": congress_rounds,
 		"previous_vote_shares": previous_vote_shares,
@@ -5534,7 +5421,6 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"events": province_events,
 		"organizations": organizations,
 		"province_profiles": province_profiles,
-		"group_meetings": group_meetings,
 		"miting_fatigue": miting_fatigue,
 		"election_groups": election_groups,
 		"former_parties": former_parties,
@@ -5615,8 +5501,6 @@ func _apply_state(state: Dictionary) -> void:
 	constitution_rounds = state.get("constitution_rounds", {})
 	populism = state.get("populism", {})
 	splinters = state.get("splinters", {})
-	speech_done = bool(state.get("speech_done", false))
-	speech_rounds = state.get("speech_rounds", {})
 	early_requests = state.get("early_requests", {})
 	congress_rounds = state.get("congress_rounds", {})
 	previous_vote_shares = state.get("previous_vote_shares", {})
@@ -5648,7 +5532,6 @@ func _apply_state(state: Dictionary) -> void:
 	local_support = state["local"]
 	province_events = state["events"]
 	organizations = state.get("organizations", {})
-	group_meetings = state.get("group_meetings", {})
 	miting_fatigue = state.get("miting_fatigue", {})
 	election_groups = state.get("election_groups", {})
 	former_parties = state.get("former_parties", {})

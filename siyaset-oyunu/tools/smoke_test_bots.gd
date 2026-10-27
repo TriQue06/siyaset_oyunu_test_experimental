@@ -130,10 +130,6 @@ func _initialize() -> void:
 			moved = true
 	check("grup destekleri 8 grupta, 0..100 araliginda", valid)
 	check("botlarin yasa/miting hamleleri grup desteklerini degistirdi", moved)
-	check("botlar grup toplantisi yapti", int(played.get("speech", 0)) > 0, str(played))
-	var bot0: int = cm.turn_order[0]
-	var meeting: Dictionary = brain.choose_speech(bot0)
-	check("bot toplanti degerini grup adiyla hesaplar", VoterGroups.is_group(String(meeting.get("group", ""))), str(meeting))
 	check("botlar farkli hamle turleri yapti", played.size() >= 5, str(played))
 	var funds_ok := true
 	for peer_id in cm.funds.keys():

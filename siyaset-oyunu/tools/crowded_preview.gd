@@ -24,7 +24,6 @@ func _initialize() -> void:
 	var mm = root.get_node("MultiplayerManager")
 	var pm = root.get_node("PartyManager")
 	var cm = root.get_node("CardManager")
-	cm.speech_required = false  # önizleme: konuşma paneli ayrıca çekilir
 	root.get_node("BotManager").set_process(false)
 	mm.room_code = ""
 	mm.election_threshold = 3.0

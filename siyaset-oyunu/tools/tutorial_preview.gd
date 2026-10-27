@@ -1,6 +1,6 @@
 extends SceneTree
 ## İLK OYUN REHBERİ ÖNİZLEMESİ: 10 adım sırayla açılır, her birinin görüntüsü alınır.
-## destekleri), yasa paneli (8 grup + etki önizlemesi), grup toplantısı paneli ve
+## destekleri), yasa paneli (8 grup + etki önizlemesi) ve
 ## haritanın "Seçmen" katmanı. Ekran görüntüleri kullanıcı veri klasörüne yazılır.
 ##   godot --resolution 1600x900 --path . --script res://tools/voter_groups_preview.gd
 

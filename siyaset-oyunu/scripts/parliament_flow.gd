@@ -1,7 +1,7 @@
 class_name ParliamentFlow
 extends Control
 ## MECLİS (0.0.246): MECLİS düğmesiyle açılan pencere. Üstte parti kurma
-## ekranındaki adımlar gibi SEKMELER: GENSORU · GRUP TOPLANTISI · YASA.
+## ekranındaki adımlar gibi SEKMELER: GENSORU · YASA.
 ## Sıra yok: oyuncu istediği sekmeyi açar. Bir sekmenin hamlesi yapılınca o
 ## sekme bu sıra kapanır (✓, tıklanamaz). Kullanılamayan sekme sönük durur.
 ## Hangi sekmenin kapandığı CardManager'dan okunur (otorite orada): pencereyi
@@ -15,8 +15,8 @@ signal law_tab_requested(tab: int)
 signal toast_requested(text: String)
 
 const WIDTH := 640.0
-const STAGE_TITLES := {"censure": "GENSORU", "speech": "GRUP TOPLANTISI", "law": "YASA"}
-const STAGE_COLORS := {"censure": Color("A6325A"), "speech": Color("3FB586"), "law": Color("7647CC")}
+const STAGE_TITLES := {"censure": "GENSORU", "law": "YASA"}
+const STAGE_COLORS := {"censure": Color("A6325A"), "law": Color("7647CC")}
 
 ## Oyuncu pencereyi açtı mı (oylama sonrası kendiliğinden geri gelsin diye).
 var engaged := false
@@ -30,9 +30,6 @@ var _tab := ""
 var _law_page := false
 var _shown_key := ""
 var _dim: ColorRect
-## TUR BAŞI GRUP TOPLANTISI (0.0.268): kart ve afetten sonra pencere toplantı
-## sekmesiyle kendiliğinden açılır; alttaki düğme "DAHA SONRA" olur.
-var intro := false
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -71,24 +68,13 @@ func _ready() -> void:
 ## MECLİS düğmesi: ilk kullanılabilir sekmeyle açılır.
 func open_flow() -> void:
 	engaged = true
-	intro = false
 	_tab = ""
-	_law_page = false
-	_shown_key = ""
-	refresh()
-
-## Tur başında grup toplantısı (en düşük öncelik: kart ve afetten sonra).
-func open_speech_intro() -> void:
-	engaged = true
-	intro = true
-	_tab = "speech"
 	_law_page = false
 	_shown_key = ""
 	refresh()
 
 func close_flow() -> void:
 	engaged = false
-	intro = false
 	_law_page = false
 	hide()
 
@@ -133,10 +119,6 @@ func refresh() -> void:
 		_law_page = false
 		hide()
 		toast_requested.emit(L.t("Meclis işleri bu tur için tamam."))
-		return
-	# Tur başı toplantısı yapıldı: pencere kapanır (diğer sekmelere geçilmez).
-	if intro and not CardManager.parliament_stage_available(me, "speech"):
-		close_flow()
 		return
 	# Açık sekme kapandıysa (hamle yapıldı) ilk kullanılabilir sekmeye geçilir.
 	if _tab == "" or not CardManager.parliament_stage_available(me, _tab):
@@ -194,7 +176,6 @@ func _build() -> void:
 			button.add_theme_color_override(prop, font_color)
 		button.pressed.connect(func():
 			_tab = id
-			intro = false
 			_law_page = false
 			_shown_key = ""
 			refresh())
@@ -215,8 +196,6 @@ func _build() -> void:
 		match _tab:
 			"censure":
 				_build_censure(color)
-			"speech":
-				_build_speech()
 			"law":
 				_build_law()
 		# Alt düğme pencerenin dibinde: sekmeler arasında pencere boyu sabit.
@@ -226,8 +205,7 @@ func _build() -> void:
 		_content.add_child(filler)
 		_content.add_child(UiTheme.rule())
 		var away := Button.new()
-		# Tur başı toplantısı: istersen sonra MECLİS düğmesinden yapılır.
-		away.text = L.t("DAHA SONRA") if intro else L.t("Haritaya dön")
+		away.text = L.t("Haritaya dön")
 		away.focus_mode = Control.FOCUS_NONE
 		away.custom_minimum_size = Vector2(170, 46)
 		UiSkin.skin_button(away)
@@ -257,15 +235,8 @@ func _build_censure(color: Color) -> void:
 	_content.add_child(_big_button(L.t("GENSORU VER · %s") % GameRules.cost_text(GameRules.CENSURE_FUNDS_COST), color, func():
 		CardManager.censure()))
 
-func _build_speech() -> void:
-	_explain(L.t("Bir seçmen grubunun sorunlarını konuşarak o grubun desteğini kalıcı artırırsın. Karşıt grup aynı ölçüde soğur."))
-	var crisis := CardManager.crisis_group()
-	if crisis != "":
-		_explain(L.t("Siyasi kriz: %s. Bu grupla toplanmak çok daha etkili.") % VoterGroups.title(crisis), UiTheme.HEAD)
-	_content.add_child(group_grid(func(group: String): CardManager.make_speech(group)))
-
-## SEKİZ SEÇMEN GRUBU DÜĞMESİ (iki sütun): grup toplantısı ve grup yasası
-## (0.0.268) birebir aynı ızgarayı kullanır. Düğmeye basmak hamleyi yapar.
+## SEKİZ SEÇMEN GRUBU DÜĞMESİ (iki sütun): grup yasası ekranı. Düğmeye
+## basmak yasayı sunar.
 static func group_grid(on_pick: Callable, available: Callable = func(_group: String) -> bool: return true) -> GridContainer:
 	var crisis := CardManager.crisis_group()
 	var grid := GridContainer.new()

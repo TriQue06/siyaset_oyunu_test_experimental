@@ -1,7 +1,7 @@
 extends SceneTree
 ## SEÇMEN GRUPLARI testleri (yerel mod, RPC yok): grup tanımları, oy hesabı
 ## (normalizasyon, sıfır destek, dört çiftin tek seçmen sayılması, bölgesel
-## yoğunluk ve sayım yöntemleri), miting / yatırım / yasa / grup toplantısının
+## yoğunluk ve sayım yöntemleri), miting / yatırım / yasanın
 ## etkileri ve çift uygulanmaması; ayrıca altıgen harita, anayasa, olay logu,
 ## karışıklık ve bölünme.
 ##   godot --headless --path . --script res://tools/smoke_test_voter_groups.gd
@@ -60,7 +60,6 @@ func _initialize() -> void:
 	# Eski serbest akış: bu test mekanikleri sınar (tur akışı: smoke_test_turn_flow).
 	cm.enforce_turn_flow = false
 	cm.allow_temporary_parties = false
-	cm.speech_required = false  # meclis konuşması ayrıca test edilir
 	gm = root.get_node("GovernmentManager")
 	game_map = root.get_node("GameMap")
 	cm.fixed_map_seed = 1950
@@ -118,7 +117,7 @@ func _initialize() -> void:
 	var group_colors := {}
 	for group in VoterGroups.GROUP_IDS:
 		var d := VoterGroups.data(group)
-		for key in ["title", "color", "icon", "opposite", "pair", "blurb", "issues", "law_title", "law_problem", "meeting", "law_backlash", "miting_backlash"]:
+		for key in ["title", "color", "icon", "opposite", "pair", "blurb", "issues", "law_title", "law_problem", "law_backlash", "miting_backlash"]:
 			if not d.has(key):
 				defs_ok = false
 		if VoterGroups.opposite(VoterGroups.opposite(group)) != group or VoterGroups.pair_of(group) != VoterGroups.pair_of(VoterGroups.opposite(group)):
@@ -406,50 +405,6 @@ func _initialize() -> void:
 	for i in cm.EVENT_LOG_LIMIT + 10:
 		cm.log_event("kayit %d" % i)
 	check("log siniri asilmaz", cm.event_log.size() == cm.EVENT_LOG_LIMIT)
-
-	print("")
-	print("=== 6) GRUP TOPLANTISI: MECLIS GRUBU, KALICI SECMEN (0.0.228) ===")
-	new_game({1: groups(["isveren", "dindar"]), 2: groups(["isci", "ilerici"]), 3: groups(["genc", "milliyetci"])})
-	cm.speech_required = true
-	cm.speech_done = false
-	cm.crisis = {}
-	cm.funds[1] = 100.0
-	var org_pid: String = game_map.ids[2]
-	cm.organizations[org_pid] = {1: 1}
-	cm.last_election_round = 1  # toplantı ilk seçimden sonra
-	cm.last_seats = {1: 40, 2: 40, 3: 5}
-	check("sira gelince toplanti hakki var (grup varsa)", cm.needs_speech(1) and not cm.needs_speech(2))
-	check("toplantisiz da hamle yapilabilir", cm.can_choose_main_action(1) and cm.can_miting(1, org_pid) \
-		and cm.can_play_card(1, "bagis_kampanyasi"))
-	cm._apply_speech(2, "isci")
-	check("sirasi olmayan toplanamaz", not cm.speech_done)
-	var permanent: Dictionary = pm.parties[1]["groups"].duplicate()
-	cm._apply_speech(1, "emekli")
-	check("toplanti kalici secmen kazandirir", cm.speech_done and float(pm.parties[1]["groups"]["emekli"]) > float(permanent["emekli"]) + 3.0,
-		"%.2f -> %.2f" % [float(permanent["emekli"]), float(pm.parties[1]["groups"]["emekli"])])
-	check("bedel %d para" % GameRules.SPEECH_FUNDS_COST, near(cm.funds_of(1), 100.0 - GameRules.SPEECH_FUNDS_COST))
-	var after_one: Dictionary = pm.parties[1]["groups"].duplicate()
-	cm._apply_speech(1, "genc")
-	check("turda tek toplanti", str(pm.parties[1]["groups"]) == str(after_one))
-	var nat1: float = cm.national_of(1)
-	cm._apply_pass(1, true)
-	check("toplanan partiye ceza yok", near(cm.national_of(1), nat1))
-	check("siradaki oyuncu toplanabilir", cm.current_turn_peer_id() == 2 and cm.needs_speech(2))
-	var nat2: float = cm.national_of(2)
-	cm._apply_pass(2, true)
-	check("toplanti yapmamak ulusal ceza getirmez", near(cm.national_of(2), nat2))
-	check("grubu olmayan parti toplanamaz", not cm.has_parliament_group(3))
-	var r0: int = cm.round_number
-	cm.agenda = {"type": "gundem_emekli", "until": r0 + 1}
-	cm.speech_rounds = {}
-	cm.last_seats[3] = 40
-	cm.current_turn_index = cm.turn_order.find(3)
-	var nat3: float = cm.national_of(3)
-	cm.funds[3] = 50.0
-	cm._apply_speech(3, "emekli")
-	check("gundemin grubuyla toplanti ulusal destek getirir", near(cm.national_of(3) - nat3, PublicOpinion.CRISIS_RESPONSE_NATIONAL))
-	cm.speech_required = false
-	cm.crisis = {}
 
 	print("")
 	print("=== 9) KARISIKLIK, BOLUNME VE GERI DONUS ===")

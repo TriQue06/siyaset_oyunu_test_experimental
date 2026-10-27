@@ -162,7 +162,7 @@ const ELECTION_FUNDS_BONUS := 10
 ## (işçi/işveren, genç/emekli, dindar/ilerici, özerkçi/milliyetçi) olur.
 ## YASA her zaman HER grup için sunulabilir; gündem sadece o gruba eğilimi
 ## ÖDÜLLENDİRİR: o gruba yasa daha güçlü (PublicOpinion.AGENDA_LAW_MULT), o
-## gruba yasa sunan, EVET diyen ya da onunla toplanan parti ulusal destek
+## gruba yasa sunan ya da EVET diyen parti ulusal destek
 ## kazanır (PublicOpinion.CRISIS_RESPONSE_NATIONAL).
 const AGENDA_ROUNDS := 1
 const AGENDA_GAP := 0
@@ -180,8 +180,6 @@ const ORG_FUNDS_COST := 10
 ## TEŞKİLAT GELİRİ: her ildeki teşkilat tur başında yerel bağış getirir
 ## (1. seviye +2,5, 2. seviye +8 milyon ¤). Üst sınır yok (0.0.227).
 const ORG_INCOME := [0.0, 2.5, 8.0]
-## GRUP TOPLANTISI bedeli (sırada bir kez; bir seçmen grubuyla, geçici destek).
-const SPEECH_FUNDS_COST := 0
 const ORG_UPGRADE_FUNDS_COST := 30
 
 ## Bu ildeki teşkilatı bir seviye ilerletmenin bedeli (current_level: şu anki

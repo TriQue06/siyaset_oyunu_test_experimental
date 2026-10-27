@@ -137,7 +137,6 @@ func _initialize() -> void:
 	gm = root.get_node("GovernmentManager")
 	root.get_node("BotManager").set_process(false)
 	cm.allow_temporary_parties = false
-	cm.speech_required = false
 	cm.fixed_map_seed = 1950
 	mm.room_code = ""
 	gm.result_hold_seconds = 0.0

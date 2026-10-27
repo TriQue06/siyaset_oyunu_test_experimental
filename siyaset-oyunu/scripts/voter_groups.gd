@@ -13,8 +13,7 @@ extends RefCounted
 ##      her zaman 100 − ilk; kayan nokta hatası oluşamaz.
 ##   2. PARTİ YAKINLIĞI: her partinin 8 grubun her birindeki ULUSAL desteği
 ##      (0..100, 50 nötr). PartyManager.parties[peer]["groups"] içinde durur.
-##      Yasa ve miting kalıcı olarak bunu değiştirir; grup toplantısı ise
-##      üstüne GEÇİCİ bir bonus ekler (bkz. CardManager.group_meetings).
+##      Yasa ve miting kalıcı olarak bunu değiştirir.
 ##
 ## OY HESABI (ElectionModel.support):
 ##   çift puanı  = pay_A × yakınlık_A + pay_B × yakınlık_B        (0..100)
@@ -50,7 +49,6 @@ const GROUPS := {
 		"issues": ["ücretler", "iş güvencesi", "sendikal haklar"],
 		"law_title": "Asgari Ücret ve Sendika Hakları Yasası",
 		"law_problem": "Düşük ücretler ve güvencesiz çalışma",
-		"meeting": "Ücretler, iş güvencesi ve sendikal haklar",
 		"law_backlash": 1.0, "miting_backlash": 1.0,
 	},
 	"isveren": {
@@ -60,7 +58,6 @@ const GROUPS := {
 		"issues": ["yatırım ortamı", "vergi yükü", "bürokrasi"],
 		"law_title": "Vergi İndirimi ve Yatırım Teşvik Yasası",
 		"law_problem": "Ağır vergi yükü ve yatırım önündeki engeller",
-		"meeting": "Yatırım ortamı, vergi yükü ve işletmelerin sorunları",
 		"law_backlash": 1.0, "miting_backlash": 1.0,
 	},
 	"genc": {
@@ -70,7 +67,6 @@ const GROUPS := {
 		"issues": ["eğitim", "barınma", "istihdam"],
 		"law_title": "Burs, Yurt ve Genç İstihdamı Yasası",
 		"law_problem": "Pahalı eğitim, barınma sorunu ve genç işsizliği",
-		"meeting": "Eğitim, barınma ve genç istihdamı",
 		"law_backlash": 1.0, "miting_backlash": 1.0,
 	},
 	"emekli": {
@@ -80,7 +76,6 @@ const GROUPS := {
 		"issues": ["emekli aylıkları", "sağlık", "yaşam maliyeti"],
 		"law_title": "Emekli Aylığı ve Sağlık Güvencesi Yasası",
 		"law_problem": "Düşük aylıklar ve yükselen sağlık giderleri",
-		"meeting": "Emekli aylıkları, sağlık ve yaşam maliyeti",
 		"law_backlash": 1.0, "miting_backlash": 1.0,
 	},
 	"dindar": {
@@ -90,7 +85,6 @@ const GROUPS := {
 		"issues": ["inanç özgürlüğü", "din eğitimi", "aile değerleri"],
 		"law_title": "İnanç Özgürlüğü ve Din Eğitimi Yasası",
 		"law_problem": "İnanç pratiklerine yönelik kısıtlamalar",
-		"meeting": "İnanç özgürlüğü ve din eğitimi",
 		"law_backlash": 1.0, "miting_backlash": 1.0,
 	},
 	"ilerici": {
@@ -100,7 +94,6 @@ const GROUPS := {
 		"issues": ["ayrımcılık", "eşit yurttaşlık", "bireysel özgürlükler"],
 		"law_title": "Ayrımcılık Karşıtı Eşit Yurttaşlık Yasası",
 		"law_problem": "Ayrımcılık ve eşit olmayan yurttaşlık",
-		"meeting": "Ayrımcılık, eşit yurttaşlık ve bireysel özgürlükler",
 		"law_backlash": 1.0, "miting_backlash": 1.0,
 	},
 	"ozerkci": {
@@ -110,7 +103,6 @@ const GROUPS := {
 		"issues": ["yerel yetkiler", "bölgesel temsil", "yerinden yönetim"],
 		"law_title": "Yerel Yönetimler ve Bölgesel Temsil Yasası",
 		"law_problem": "Merkezde toplanan yetkiler ve zayıf yerel temsil",
-		"meeting": "Yerel yetkiler ve bölgesel temsil",
 		"law_backlash": 1.0, "miting_backlash": 1.0,
 	},
 	"milliyetci": {
@@ -120,7 +112,6 @@ const GROUPS := {
 		"issues": ["ulusal egemenlik", "güvenlik", "ulusal birlik"],
 		"law_title": "Ulusal Güvenlik ve Birlik Yasası",
 		"law_problem": "Güvenlik kaygıları ve bölünme korkusu",
-		"meeting": "Ulusal egemenlik ve güvenlik",
 		"law_backlash": 1.0, "miting_backlash": 1.0,
 	},
 }
@@ -445,14 +436,6 @@ static func alliance_blend(own: Dictionary, members: Array) -> Dictionary:
 		var near := value + ALLIANCE_BLEND * (mean - value)
 		near += ALLIANCE_SYNERGY * together / 100.0 * (AFFINITY_MAX - near)
 		result[group] = clampf(near, AFFINITY_MIN, AFFINITY_MAX)
-	return result
-
-static func with_bonus(affinities: Dictionary, bonus: Dictionary) -> Dictionary:
-	if bonus.is_empty():
-		return affinities
-	var result := affinities.duplicate()
-	for group in bonus.keys():
-		result[group] = clampf(float(result.get(group, AFFINITY_NEUTRAL)) + float(bonus[group]), AFFINITY_MIN, AFFINITY_MAX)
 	return result
 
 ## İL UYUMU (0..100): partinin yakınlıklarının ilin 4 çift dağılımıyla

@@ -1,7 +1,7 @@
 extends SceneTree
 ## TUR AKIŞI TESTİ (0.0.231): sıra başında tek kart çekimi (anında / saklanabilir),
 ## afet yardım kararı (geçilen karar aynı sıra yeniden açılmaz), MECLİS akışı
-## (gensoru → toplantı → yasa → soruşturma; geçilen aşama geri gelmez, uygun
+## (gensoru → yasa; geçilen aşama geri gelmez, uygun
 ## olmayan atlanır), il hamlelerinde bütçe kademeleri, sıra başına 3 miting /
 ## 3 yatırım sınırı ve mitingin içinde karalama.
 ##   godot --headless --path . --script res://tools/smoke_test_turn_flow.gd
@@ -209,11 +209,8 @@ func _initialize() -> void:
 	cm.funds = {1: 200.0, 2: 200.0, 3: 200.0}
 	give_turn(2)
 	cm._apply_draw(2)
-	check("cogunluk hukumetinde gensoru yok, ilk asama toplanti", cm.parliament_stage(2) == "speech", cm.parliament_stage(2))
-	check("0.0.246 sekmeler sirasiz: toplanti yapmadan da yasa sunulabilir", cm.can_propose_law(2, cp.law_type("isci")))
-	cm._apply_speech(2, "isci")
-	check("toplanti yapildi, yasa asamasi", cm.parliament_stage(2) == "law", cm.parliament_stage(2))
-	check("toplanti ayni sira tekrar yapilamaz", not cm.needs_speech(2))
+	check("cogunluk hukumetinde gensoru yok, ilk asama yasa", cm.parliament_stage(2) == "law", cm.parliament_stage(2))
+	check("yasa sunulabilir", cm.can_propose_law(2, cp.law_type("isci")))
 	cm._apply_law(2, cp.law_type("isci"))
 	check("yasa oylamasi acildi", gm.phase == gm.Phase.VOTING)
 	check("teklif sunulunca yasa sekmesi bu sira kapandi", cm.parliament_closed_stages(2).has("law") and not cm.can_propose_constitution(2))
@@ -231,15 +228,13 @@ func _initialize() -> void:
 	print("=== 4) GECILEN ASAMA GERI ALINAMAZ, MECLISE GIRMEDEN TUR BITER ===")
 	give_turn(3)
 	cm._apply_draw(3)
-	check("grubu olan oyuncuda toplanti asamasi", cm.parliament_stage(3) == "speech")
-	cm._apply_parl_pass(3, "speech")
-	check("toplanti gecildi: ayni sira yapilamaz", not cm.needs_speech(3) and cm.parliament_stage(3) == "law")
-	cm._apply_speech(3, "emekli")
-	check("gecilen toplantiya dogrudan cagri reddedilir", int(cm.speech_rounds.get(3, 0)) != cm.round_number)
-	cm._apply_parl_pass(3, "speech")
-	check("gecilmis asamayi tekrar gecmek akisi bozmaz", cm.parliament_stage(3) == "law")
+	check("muhalefette yasa asamasi", cm.parliament_stage(3) == "law", cm.parliament_stage(3))
+	cm._apply_parl_pass(3, "law")
+	check("yasa gecildi: ayni sira acilmaz", cm.parliament_stage(3) == "" and not cm.can_early_election(3))
+	cm._apply_parl_pass(3, "law")
+	check("gecilmis asamayi tekrar gecmek akisi bozmaz", cm.parliament_stage(3) == "")
 	cm._apply_parl_pass(3, "censure")
-	check("sirasi gelmeyen asama gecilemez", cm.parliament_stage(3) == "law")
+	check("sirasi gelmeyen asama gecilemez", cm.parliament_stage(3) == "")
 	cm._apply_pass(3)
 	check("meclise girmeden tur bitirilebilir", cm.current_turn_peer_id() != 3)
 
@@ -248,11 +243,6 @@ func _initialize() -> void:
 	give_turn(3)
 	cm._apply_draw(3)
 	check("vekilsiz oyuncuda meclis akisi yok", cm.parliament_stage(3) == "", cm.parliament_stage(3))
-	give_turn(2)
-	cm._apply_draw(2)
-	cm.last_seats[2] = cm.group_seat_requirement() - 5
-	var small_stage: String = cm.parliament_stage(2)
-	check("grubu olmayan vekilli oyuncuda toplanti atlanir", small_stage in ["law", ""], small_stage)
 
 	print("=== 6) AZINLIK HUKUMETI: GENSORU ONCELIKLI ===")
 	new_game()
@@ -266,27 +256,23 @@ func _initialize() -> void:
 	give_turn(2)
 	cm._apply_draw(2)
 	check("yetkili muhalefette ilk asama gensoru", cm.parliament_stage(2) == "censure", cm.parliament_stage(2))
-	check("sekmeler sirasiz: gensoru vermeden de toplanti yapilabilir", cm.needs_speech(2))
+	check("sekmeler sirasiz: gensoru vermeden de yasa sunulabilir", cm.parliament_stage_available(2, "law"))
 	cm._apply_censure_move(2)
 	check("gensoru oylamasi basladi", gm.phase == gm.Phase.VOTING)
 	finish_vote(gm.VOTE_NO)
 	check("gensoru reddedildi, sira devam ediyor", cm.current_turn_peer_id() == 2 and not cm.is_turn_blocked())
-	check("gensorudan sonra akis guncel yetkilerle devam eder", cm.parliament_stage(2) == "speech", cm.parliament_stage(2))
+	check("gensorudan sonra akis guncel yetkilerle devam eder", cm.parliament_stage(2) == "law", cm.parliament_stage(2))
 	check("gensoru ayni sira yeniden verilemez", not cm.can_censure(2))
 
 	print("=== 7) VERGI, ANAYASA VE ERKEN SECIM YASA ALANINDA ===")
 	give_turn(1)
 	cm._apply_draw(1)
-	if cm.parliament_stage(1) == "speech":
-		cm._apply_parl_pass(1, "speech")
 	check("hukumet: yasa alaninda vergi yasasi", cm.parliament_stage(1) == "law" and cm.can_propose_tax_law(1, 0))
 	check("yasa alaninda anayasa", cm.can_propose_constitution(1))
 	give_turn(3)
 	cm._apply_draw(3)
 	if cm.parliament_stage(3) == "censure":
 		cm._apply_parl_pass(3, "censure")
-	if cm.parliament_stage(3) == "speech":
-		cm._apply_parl_pass(3, "speech")
 	cm.round_number = 2
 	check("muhalefet: yasa alaninda erken secim", cm.parliament_stage(3) == "law" and cm.can_early_election(3), cm.parliament_stage(3))
 	cm._apply_early_election_move(3)

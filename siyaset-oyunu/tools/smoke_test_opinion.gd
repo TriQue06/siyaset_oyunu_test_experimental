@@ -88,7 +88,6 @@ func _initialize() -> void:
 	# Eski serbest akış: bu test mekanikleri sınar (tur akışı: smoke_test_turn_flow).
 	cm.enforce_turn_flow = false
 	cm.allow_temporary_parties = false
-	cm.speech_required = false  # meclis konuşması ayrıca test edilir
 	cm.fixed_map_seed = 1950
 	gm = root.get_node("GovernmentManager")
 	gp = root.get_node("GovernmentPresets")

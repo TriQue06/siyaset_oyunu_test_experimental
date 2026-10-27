@@ -237,11 +237,6 @@ func run() -> void:
 	var shares: Dictionary = ElectionModel.voter_shares(st, cm._vb_parties(), {}, {})
 	check(float(shares[a]) > 0.5, "ildeki seçmenin yarisi bagli parti ilde ilk sirada", "%.2f" % shares[a])
 
-	print("=== toplanti grubu ===")
-	cm.TOTAL_SEATS = 600
-	check(cm.group_seat_requirement() == 20, "600 sandalyede grup 20 vekil")
-	cm.TOTAL_SEATS = 500
-	check(cm.group_seat_requirement() == 20, "500 sandalyede grup 20 vekil (5'in katina yukari)")
 	print("")
 	print("SONUC: ", "TUM TESTLER GECTI" if fails == 0 else "%d HATA" % fails)
 	quit(1 if fails > 0 else 0)

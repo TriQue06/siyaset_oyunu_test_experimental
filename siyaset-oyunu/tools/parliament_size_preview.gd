@@ -94,7 +94,7 @@ func _initialize() -> void:
 	var sizes := {}
 	flow.open_flow()
 	await _wait(0.4)
-	for tab in ["censure", "speech", "law"]:
+	for tab in ["censure", "law"]:
 		flow._tab = tab
 		flow._law_page = false
 		flow._shown_key = "x"

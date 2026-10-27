@@ -71,7 +71,6 @@ func _initialize() -> void:
 	cm = root.get_node("CardManager")
 	gm = root.get_node("GovernmentManager")
 	cm.allow_temporary_parties = false
-	cm.speech_required = false
 	cm.fixed_map_seed = 1950
 	mm.room_code = ""
 	gm.result_hold_seconds = 0.0

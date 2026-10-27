@@ -109,31 +109,6 @@ func _initialize() -> void:
 		await create_timer(0.3).timeout
 		root.get_texture().get_image().save_png("%s/midgame_power.png" % OS.get_user_data_dir())
 		print("screenshot: midgame_power")
-		# MECLİS KONUŞMASI: sıra bende, henüz konuşmadım.
-		var cms = root.get_node("CardManager")
-		cms.current_turn_index = cms.turn_order.find(mm.owner_id)
-		cms.speech_done = false
-		gm._clear_proposal()
-		gm._set_phase(gm.Phase.GOVERNING)
-		cms._push_state({"type": "timer"})
-		scene._speech_open_key = "%d:%d" % [cms.round_number, cms.current_turn_index]
-		scene._refresh_speech_panel()
-		await create_timer(0.3).timeout
-		root.get_texture().get_image().save_png("%s/midgame_speech.png" % OS.get_user_data_dir())
-		print("screenshot: midgame_speech")
-		# İkinci konuşma: panel genişlememeli (eski sütunlar hemen kalkmalı).
-		var first_width: float = scene._speech_panel.size.x
-		cms.speech_done = true
-		cms._push_state({"type": "timer"})
-		pm.parties[mm.owner_id]["groups"]["isveren"] = 75.0
-		cms.speech_done = false
-		cms._push_state({"type": "timer"})
-		scene._speech_open_key = "%d:%d" % [cms.round_number, cms.current_turn_index]
-		scene._refresh_speech_panel()
-		await create_timer(0.3).timeout
-		print("KONUSMA SERIDI genislik %.0f -> %.0f %s" % [first_width, scene._speech_panel.size.x,
-			"AYNI" if absf(first_width - scene._speech_panel.size.x) < 1.0 else "GENISLEDI"])
-		scene._speech_panel.hide()
 		scene._set_map_layer(0, false)
 		await create_timer(0.3).timeout
 		# Olay logundaki odak düğmesi: ili olan son kaydı haritada göster.

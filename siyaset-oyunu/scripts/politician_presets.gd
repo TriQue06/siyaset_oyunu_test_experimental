@@ -11,12 +11,12 @@ extends RefCounted
 ##     başlanır ve memlekette kalıcı "hemşehri" desteği vardır (il aktivitesi;
 ##     ilin seçmen profili değişmez). Komşu iller ETKİLENMEZ.
 ## ETKİ ANAHTARLARI (çarpan, yoksa 1):
-##   HAMLEYİ YAPAN siyasetçiye bakar (effect): miting, speech (grup toplantısı),
+##   HAMLEYİ YAPAN siyasetçiye bakar (effect): miting,
 ##     law (grup yasası), propaganda_out (attığın karalama), reputation_out (attığın kaset).
 ##   PARTİYE bakar (party_effect, partinin herhangi bir üyesi): propaganda_in
 ##     (sana atılan karalama), turmoil_in (iç karışıklık), steal_in (senden
 ##     çalınan vekil), org (teşkilat gücü), tax_mood (vergiye seçmen tepkisi).
-##   appeal: o gruplarda kazanç (yasa, toplantı, miting) APPEAL_MULT kat.
+##   appeal: o gruplarda kazanç (yasa, miting) APPEAL_MULT kat.
 ## ARAYÜZ METİNLERİ SAYI İÇERMEZ (özet anlatım); sayılar sadece burada.
 ## Veri PartyManager.politicians[peer] içinde durur (partiden bağımsız) =
 ##   {"gender", "first_name", "surname", "name" (ad + soyad), "background", "trait", "hometown",
@@ -54,8 +54,8 @@ const BACKGROUNDS := {
 		"effects": {"steal_in": 0.75}, "appeal": []},
 	"aktivist": {"title": "Aktivist", "tag": "Sokak ve gençler",
 		"blurb": "Sokaktan geldin; eylemleri sen başlattın.",
-		"perk": "Mitinglerin daha etkili, gençler ve ilericiler sana ısınır; yasa ve grup toplantıların daha zayıf.",
-		"effects": {"miting": 1.25, "law": 0.75, "speech": 0.75}, "appeal": ["genc", "ilerici"]},
+		"perk": "Mitinglerin daha etkili, gençler ve ilericiler sana ısınır; yasaların daha zayıf.",
+		"effects": {"miting": 1.25, "law": 0.75}, "appeal": ["genc", "ilerici"]},
 }
 const BACKGROUND_ORDER := ["sendikaci", "is_insani", "belediye_baskani", "emekli_subay",
 	"gazeteci", "hukukcu", "aktivist"]
@@ -64,8 +64,8 @@ const BACKGROUND_ORDER := ["sendikaci", "is_insani", "belediye_baskani", "emekli
 const TRAITS := {
 	"hatip": {"title": "Hatip", "tag": "Kürsü",
 		"blurb": "Kürsüye çıktın mı salon susar.",
-		"perk": "Mitinglerin biraz, grup toplantıların belirgin biçimde daha etkili.",
-		"effects": {"miting": 1.1, "speech": 1.2}},
+		"perk": "Mitinglerin biraz daha etkili.",
+		"effects": {"miting": 1.1}},
 	"sert": {"title": "Sert", "tag": "Kavga",
 		"blurb": "Lafını esirgemezsin, kavgadan kaçmazsın.",
 		"perk": "Karalamaların daha sert, mitinglerin biraz daha etkili; ama sana atılan karalamalar da biraz daha işler.",

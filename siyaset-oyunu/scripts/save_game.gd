@@ -94,7 +94,7 @@ static func _collect() -> Dictionary:
 			"round_end_pending": cm._round_end_pending, "last_agenda_pair": cm._last_agenda_pair,
 			"rng_state": cm._rng.state, "rng_seed": cm._rng.seed,
 			"crisis_rng_state": cm._crisis_rng.state, "crisis_rng_seed": cm._crisis_rng.seed,
-			"congress_time_left": cm._congress_time_left, "speech_required": cm.speech_required,
+			"congress_time_left": cm._congress_time_left,
 			"allow_temporary_parties": cm.allow_temporary_parties, "event_log": cm.event_log,
 		},
 		"gm": GovernmentManager._pack_state(),
@@ -184,7 +184,6 @@ static func apply(data: Dictionary) -> void:
 	CardManager._crisis_rng.seed = int(host.get("crisis_rng_seed", CardManager._crisis_rng.seed))
 	CardManager._crisis_rng.state = int(host.get("crisis_rng_state", CardManager._crisis_rng.state))
 	CardManager._congress_time_left = float(host.get("congress_time_left", 0.0))
-	CardManager.speech_required = bool(host.get("speech_required", true))
 	CardManager.allow_temporary_parties = bool(host.get("allow_temporary_parties", true))
 	CardManager.event_log = host.get("event_log", [])
 	GovernmentManager._sync_state(data["gm"])

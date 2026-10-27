@@ -12,7 +12,6 @@ extends RefCounted
 ##       * MİTİNG: partinin hitabı ilin baskın gruplarına kayar: o gruplarda
 ##                 ulusal yakınlık (kalıcı, azalan getirili), karşıtlarda
 ##                 daha küçük kayıp,
-##       * GRUP TOPLANTISI: seçilen grupta GEÇİCİ bonus (+10 / +3 / +1, sonra 0).
 ##   - AKTİVİTE (yerel memnuniyet): o ilde yapılanlar — miting, YATIRIM,
 ##     karalama (il puanı, tur sonunda söner) + teşkilat (seviye başına kalıcı
 ##     puan). Yatırım grup yakınlığına DOKUNMAZ; sadece burayı büyütür.
@@ -107,8 +106,8 @@ const GOVERNMENT_FATIGUE := 1.1
 # --- Gensoru ------------------------------------------------------------------
 ## Reddedilen gensoruyu getiren parti bu kadar ulusal destek kaybeder.
 const CENSURE_REJECTED_NATIONAL := -0.25
-## GÜNDEME YANIT: gündemdeki gruba yasa sunan, o yasaya EVET diyen ya da o
-## grupla toplantı yapan parti bu kadar ulusal puan kazanır (eski kriz 0,4).
+## GÜNDEME YANIT: gündemdeki gruba yasa sunan ya da o yasaya EVET diyen
+## parti bu kadar ulusal puan kazanır (eski kriz 0,4).
 const CRISIS_RESPONSE_NATIONAL := 0.6
 ## Gündemdeki gruba sunulan yasanın grup etkisi (sunana) bu kadar büyür.
 const AGENDA_LAW_MULT := 1.3
@@ -147,13 +146,6 @@ const LAW_GOV_YES_ON_OPPOSITION := -1.0
 const LAW_PARTNER_YES_NATIONAL := 0.5
 const LAW_PARTNER_NO_NATIONAL := -0.4
 const LAW_PM_PARTNER_NO_NATIONAL := -0.8
-
-# --- Grup toplantısı ------------------------------------------------------------
-## GEÇİCİ destek: toplantının yapıldığı tur, sonraki tur, ondan sonraki tur
-## seçilen grupta bu kadar yakınlık bonusu (sonra 0). Bonus kalıcı yakınlığı
-## DEĞİŞTİRMEZ, seçim hesabında üstüne eklenir; aynı gruba yeni toplantı
-## bonusları TOPLAMAZ (en büyüğü geçerli). Toplantı yapmamanın cezası YOK.
-const MEETING_BONUS := [4.0, 1.2, 0.4]
 
 # --- Koalisyondan çekilme ---------------------------------------------------
 ## Çekilmek PUAN TABLOSUNA dokunmaz; sadece sonraki seçime yansıyan ulusal
@@ -254,12 +246,6 @@ const REUNION_TURMOIL := 2.0
 ## Grup uyumunun (0..100) 0..1 karşılığı (il menüsü ve güç hesabı için).
 static func appeal_closeness(appeal: float) -> float:
 	return clampf((appeal - APPEAL_LOW) / (APPEAL_HIGH - APPEAL_LOW), 0.0, 1.0)
-
-## Grup toplantısının toplantıdan `age` tur sonraki bonusu.
-static func meeting_bonus(age: int) -> float:
-	if age < 0 or age >= MEETING_BONUS.size():
-		return 0.0
-	return float(MEETING_BONUS[age])
 
 ## Miting yorgunluğunun kazanç çarpanı.
 static func miting_fatigue_mult(fatigue: float) -> float:

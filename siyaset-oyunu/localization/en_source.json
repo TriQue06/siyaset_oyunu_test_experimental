@@ -1699,5 +1699,10 @@
 "OLUMSUZ · HEMEN UYGULANDI": "NEGATIVE · APPLIED AT ONCE",
 "ŞANS KARTI": "CHANCE CARD",
 "Elinde en fazla %d kart durabilir; bu tur kart çekilmedi. Elindeki kartları oynayarak yer açabilirsin.": "You can hold at most %d cards; no card was drawn this turn. Play cards from your hand to make room.",
-"Silinen: %s": "Wiped out: %s"
+"Silinen: %s": "Wiped out: %s",
+"%s için yasa çok daha etkili": "laws for %s are far more effective",
+"Mitinglerin daha etkili, gençler ve ilericiler sana ısınır; yasaların daha zayıf.": "Your rallies hit harder and youth and progressives warm to you; your laws are weaker.",
+"Mitinglerin biraz daha etkili.": "Your rallies are a bit stronger.",
+"Çekirdek gruplarda %%%d, diğerlerinde %%%d hitapla başlarsın; çekirdek gruplarda kazancın %d katıdır. Hitap yasa ve mitingle büyür, rakipler senden seçmen çalabilir.": "You start with %%%d appeal in your core groups and %%%d in the others; gains in core groups are %dx. Appeal grows with laws and rallies, and rivals can steal voters from you.",
+"Sıran gelince önce kartını çekersin. Teşkilat, miting ve yatırım için haritada bir ile dokun. MECLİS düğmesi gensoru ve yasayı açar; istersen hiç girmeden turu bitirebilirsin.": "When your turn comes, you draw your card first. Tap a province on the map for organization, rallies and investment. The PARLIAMENT button opens the censure motion and law; you can also end your turn without entering."
 }

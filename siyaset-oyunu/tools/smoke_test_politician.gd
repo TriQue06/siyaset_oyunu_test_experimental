@@ -84,12 +84,11 @@ func _initialize() -> void:
 	pm.politicians[bot]["background"] = "sendikaci"
 	pm.politicians[bot]["trait"] = "hatip"
 	check("sendikaci + hatip miting carpani", is_equal_approx(PP.effect(bot, "miting"), 1.25 * 1.1))
-	check("hatip grup toplantisi", is_equal_approx(PP.effect(bot, "speech"), 1.2))
 	check("sendikaci iscilere hitap", is_equal_approx(PP.group_appeal(bot, "isci"), 1.1) and is_equal_approx(PP.group_appeal(bot, "isveren"), 1.0))
 	pm.politicians[bot]["background"] = "aktivist"
 	pm.politicians[bot]["trait"] = "sert"
-	check("aktivist: miting guclu, yasa ve toplanti zayif", is_equal_approx(PP.effect(bot, "miting"), 1.25 * 1.05)
-		and is_equal_approx(PP.effect(bot, "law"), 0.75) and is_equal_approx(PP.effect(bot, "speech"), 0.75))
+	check("aktivist: miting guclu, yasa zayif", is_equal_approx(PP.effect(bot, "miting"), 1.25 * 1.05)
+		and is_equal_approx(PP.effect(bot, "law"), 0.75))
 	check("aktivist genclere ve ilericilere hitap", is_equal_approx(PP.group_appeal(bot, "genc"), 1.1) and is_equal_approx(PP.group_appeal(bot, "ilerici"), 1.1))
 	check("sert: karalama guclu, gelen karalama biraz guclu", is_equal_approx(PP.effect(bot, "propaganda_out"), 1.2)
 		and is_equal_approx(PP.party_effect(bot, "propaganda_in"), 1.05))

@@ -8,7 +8,7 @@ extends RefCounted
 ## seçmen grubu dağılımı herkese açık, kendi grup yakınlıkları). Bir hamlenin
 ## değeri çoğunlukla "ülke genelinde (vekil ağırlıklı) grup uyumum ne kadar
 ## artar" sorusudur (bkz. _appeal_gain): yasa ve miting yakınlıkları kalıcı
-## değiştirir, toplantı seçime yakın turlarda değerlidir. Gizli bonus yok.
+## değiştirir. Gizli bonus yok.
 ##
 ## HAMLE SINIRI YOK: BotManager, choose_action "pass" (turu bitir) diyene kadar
 ## hamle yaptırır. Her seçeneğin puanından para bedeli × FUNDS_VALUE düşülür;
@@ -26,9 +26,6 @@ const APPEAL_TO_POINTS := 1.4
 ## Yasa ve mitingin grup kazancı KALICIDIR (ulusal puan gibi her tur sönmez):
 ## bot onu birkaç turluk etki olarak değerlendirir.
 const PERMANENT_GAIN_VALUE := 3.0
-## Grup toplantısı puanı: uyum kazancı × bu + kriz grubuysa CRISIS_MEETING_BONUS.
-const MEETING_VALUE := 1.5
-const CRISIS_MEETING_BONUS := 1.2
 ## Yasanın taban puanı: yasa her tur meclisi durdurur, bot onu sadece gerçekten
 ## işe yarayacaksa sunsun (miting / il başkanlığı / kartlar öne geçebilsin).
 const LAW_BASE_SCORE := 1.0
@@ -206,18 +203,12 @@ static func _funds_value(bot: int) -> float:
 	return FUNDS_VALUE * clampf(40.0 / maxf(10.0, float(CardManager.funds_of(bot))), 0.2, 1.5)
 
 ## Dönüş: {"type": "card"} | {"type": "law", "law"} | {"type": "organization",
-## "province"} | {"type": "miting", "province"} | {"type": "speech", "group"} |
-## {"type": "pass"}
+## "province"} | {"type": "miting", "province"} | {"type": "pass"}
 static func choose_action(bot: int) -> Dictionary:
 	# MECLİS AKIŞI (0.0.231): açık aşama sırayla ya yapılır ya geçilir.
 	var stage := CardManager.parliament_stage(bot)
 	if stage != "":
 		return _choose_parliament(bot, stage)
-	# GRUP TOPLANTISI isteğe bağlı: değerliyse (seçime yakın / kriz) önce yapılır.
-	if CardManager.needs_speech(bot):
-		var meeting := choose_speech(bot)
-		if not meeting.is_empty() and float(meeting["score"]) - GameRules.SPEECH_FUNDS_COST * _funds_value(bot) > PASS_ACTION_SCORE:
-			return {"type": "speech", "group": meeting["group"]}
 	# SEÇİMDEN OLUMLU ÇIKAN BOT KONGREYE GİDER (iktidarını tazeler).
 	var pid := CardManager.party_of(bot)
 	if CardManager.can_hold_congress(bot) and CardManager.bot_congress_due(pid):
@@ -245,10 +236,6 @@ static func _choose_parliament(bot: int, stage: String) -> Dictionary:
 			if CardManager.can_censure(bot) and _censure_worth_it(bot):
 				_bloc_forming = bloc_active()
 				return {"type": "censure"}
-		"speech":
-			var meeting := choose_speech(bot)
-			if not meeting.is_empty() and float(meeting["score"]) - GameRules.SPEECH_FUNDS_COST * funds_value > PASS_ACTION_SCORE:
-				return {"type": "speech", "group": meeting["group"]}
 		"law":
 			var best := {}
 			var best_score := PASS_ACTION_SCORE
@@ -602,31 +589,6 @@ static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 				best = action
 				best_score = score
 
-	return best
-
-## GRUP TOPLANTISI: geçici bonus seçime kaç tur kaldığına göre değerlidir
-## (seçim bu tur sonundaysa +10, bir tur sonraysa +3...). Grup, ülkede en
-## kalabalık olan ve bot için en çok uyum getiren gruptur; kriz grubu ek puan.
-## Dönüş: {"group", "score"} (boş: toplantı hiç değmez).
-## 0.0.228: toplantı KALICI seçmen kazandırır: bot çekirdek grubuyla toplanır
-## (zıt gruba asla), kriz grubu ek puan.
-static func choose_speech(bot: int) -> Dictionary:
-	var crisis := CardManager.crisis_group()
-	var core: Array = PartyManager.data_of(CardManager.party_of(bot)).get("core", [])
-	var best := {}
-	for group in VoterGroups.GROUP_IDS:
-		var score := 0.4
-		if core.has(group):
-			score = 1.2
-		elif core.has(VoterGroups.opposite(group)):
-			score = -1.0
-		if group == crisis:
-			score += CRISIS_MEETING_BONUS
-		# Eşitlikte botlar hep aynı grubu seçmesin.
-		score += float((absi(bot) + CardManager.round_number + group.length()) % 7) * 0.005
-		score += _jitter(bot, 0.2)  # zayıf bot bazen yanlış grupla toplanır
-		if best.is_empty() or score > float(best["score"]):
-			best = {"group": group, "score": score}
 	return best
 
 ## Seçim desteğini en çok artıracak yasa: gündemdeki iki grup için, geçme

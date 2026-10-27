@@ -267,7 +267,6 @@ const ACTION_COLOR_INVEST := Color("31C440")    # yeşil
 const ACTION_COLOR_LAW := Color("7B4FD6")       # mor (konsept MECLİS)
 const ACTION_COLOR_CENSURE := Color("A6325A")   # bordo
 const ACTION_COLOR_EARLY := Color("F0A824")     # sarı-turuncu
-const ACTION_COLOR_SPEECH := Color("3FB586")    # su yeşili
 const ACTION_COLOR_CONGRESS := Color("AB39DB")  # mor
 const ACTION_COLOR_ALLIANCE := Color("F08A24")  # turuncu (konsept)
 const ACTION_COLOR_PASS := UiTheme.TEAL         # deniz yeşili (konsept TURU BİTİR)
@@ -327,16 +326,6 @@ var _law_points_label: Label
 ## Haritanın sağ üstünde gündem bandı.
 var _agenda_banner: PanelContainer
 var _agenda_label: Label
-
-## MECLİS KONUŞMASI paneli (sıra gelince, hamleden önce zorunlu).
-## Eksen sütunu genişliği (panel = 3 sütun).
-const SPEECH_COLUMN_WIDTH := 150.0
-var _speech_panel: PanelContainer
-var _speech_rows: GridContainer
-var _speech_note: Label
-var _speech_key: String = ""
-## GRUP TOPLANTISI hamle düğmesiyle bu sırada (tur:sıra) açıldı mı?
-var _speech_open_key: String = ""
 ## EKONOMİ: sağ sütundaki özet (Hükümet sekmesi) ve Vergi Politikası paneli.
 var _economy_panel: EconomyPanel
 var _tax_panel: PanelContainer
@@ -436,7 +425,6 @@ func _ready() -> void:
 	_build_funding_ui()
 	_build_agenda_banner()
 	_build_propaganda_menu()
-	_build_speech_panel()
 	_build_turn_flow_ui()
 	vote_yes_button.pressed.connect(_on_vote_pressed.bind(GovernmentManager.VOTE_YES))
 	vote_no_button.pressed.connect(_on_vote_pressed.bind(GovernmentManager.VOTE_NO))
@@ -488,7 +476,7 @@ func _build_tutorial() -> void:
 		L.t("Bu senin partinin parası: sıran geldikçe dolar, hamleler buradan ödenir. Sağdaki EKONOMİ'de görünen DEVLET HAZİNESİ ayrıdır; onu sadece hükümet, yatırım için kullanır."),
 		func() -> Rect2: return _r(R_FUNDS), mine)
 	_tutorial.add_step("hamleler", L.t("Hamleler"),
-		L.t("Sıran gelince önce kartını çekersin. Teşkilat, miting ve yatırım için haritada bir ile dokun. MECLİS düğmesi gensoru, grup toplantısı ve yasayı sırayla açar; istersen hiç girmeden turu bitirebilirsin."),
+		L.t("Sıran gelince önce kartını çekersin. Teşkilat, miting ve yatırım için haritada bir ile dokun. MECLİS düğmesi gensoru ve yasayı açar; istersen hiç girmeden turu bitirebilirsin."),
 		func() -> Rect2: return _r(R_ACTIONS), mine)
 	_tutorial.add_step("secmen", L.t("Seçmen grupları"),
 		L.t("Oylar 8 seçmen grubundan gelir. Seçmen katmanı her grubun hangi illerde yoğun olduğunu gösterir; partin hangi gruplara yakınsa o illerde güçlüdür. Bir ile tıkla: oradaki durumunu görürsün."),
@@ -995,7 +983,7 @@ func _refresh_band_crisis() -> void:
 	var data := CardPresets.agenda_data(agenda)
 	_band_crisis_icon.set_group(String(data.get("group", "")))
 	_band_crisis_title.text = "[color=#%s]%s[/color] · %s" % [UiTheme.CRISIS.to_html(false), L.t("KRİZ"), data["title"]]
-	_band_crisis_text.text = L.t("%s ile toplantı ve yasa çok daha etkili") % data["group_title"]
+	_band_crisis_text.text = L.t("%s için yasa çok daha etkili") % data["group_title"]
 
 func _refresh_timer_bar() -> void:
 	if _timer_bar == null:
@@ -2244,7 +2232,6 @@ func _on_turn_changed(_peer_id: int) -> void:
 			AudioManager.play("turn_start")
 	_update_turn_indicator()
 	_refresh_band_crisis()
-	_refresh_speech_panel()
 	_refresh_pass_button()
 	_refresh_hand_interactivity()
 	_refresh_action_buttons()
@@ -2355,8 +2342,6 @@ func _process(delta: float) -> void:
 	_update_vote_swap(delta)
 	_sync_parliament_to_slot()
 	_refresh_timer_bar()
-	if _turn_intro != null:
-		_maybe_offer_speech()
 	if _smear_ghost != null:
 		_update_smear_drag()
 	# Fare kımıldamadıysa il / parti tespiti her karede yapılmaz (performans);
@@ -4086,7 +4071,7 @@ func _build_action_buttons() -> void:
 	# genişliğini büyütünce komşusunun üstüne biniyordu. Izgara bunu yapısal
 	# olarak önler.
 	# HAMLELER (0.0.231): eski SAHA / MECLİS / PARTİ / SİYASET sekmeleri yok.
-	# MECLİS tek giriş (gensoru → toplantı → yasa); İTTİFAK ve
+	# MECLİS tek giriş (gensoru, yasa); İTTİFAK ve
 	# KONGRE yerinde. Teşkilat, miting ve yatırım haritadaki il panelinden,
 	# afet yardımı tur başındaki sahneden yapılır.
 	_parl_button = Button.new()
@@ -4771,8 +4756,8 @@ func _build_law_designer() -> void:
 	_law_tax_box = _law_pages[LawTab.TAX]
 	_law_tax_box.add_theme_constant_override("separation", 6)
 	_law_tax_box.custom_minimum_size = Vector2(404, 0)
-	# 0.0.268: GRUP YASASI birebir GRUP TOPLANTISI gibi: açıklama, sekiz
-	# grup düğmesi; gruba basmak yasayı sunar.
+	# 0.0.268: GRUP YASASI: açıklama, sekiz grup düğmesi; gruba basmak
+	# yasayı sunar.
 	group_page.add_theme_constant_override("separation", 10)
 	_law_detail = VBoxContainer.new()
 	_law_detail.add_theme_constant_override("separation", 10)
@@ -4942,7 +4927,7 @@ func _refresh_law_tabs() -> void:
 static func _signed(value: float) -> String:
 	return ("+" if value >= 0.0 else "−") + String.num(snappedf(absf(value), 0.1), 1).replace(".", ",")
 
-## Grup yasası açıklaması (grup toplantısındaki gibi kısa): ne olur, bedeli,
+## Grup yasası açıklaması (kısa): ne olur, bedeli,
 ## kriz varsa krizin grubu.
 func _refresh_law_detail() -> void:
 	if _law_detail == null:
@@ -5623,138 +5608,6 @@ static func _org_level_text(level: int) -> String:
 			return L.t("yüksek oy bonusu, yüksek isabetli anket")
 	return ""
 
-# --- Grup toplantısı -----------------------------------------------------------------
-
-## GRUP TOPLANTISI paneli (TOPLANTI düğmesiyle açılır): haritanın üst
-## kenarında 8 seçmen grubu (4 × 2). Bir gruba basınca toplantı yapılır.
-func _build_speech_panel() -> void:
-	_speech_panel = PanelContainer.new()
-	var style := UiSkin.stylebox(UiSkin.PANEL)
-	style.set_content_margin_all(UiTheme.PAD_S)
-	UiSkin.apply_style(_speech_panel, "panel", style)
-	_speech_panel.z_index = 109
-	_speech_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 4)
-	_speech_panel.add_child(box)
-	var title := Label.new()
-	var header := HBoxContainer.new()
-	header.add_theme_constant_override("separation", 6)
-	box.add_child(header)
-	title.text = L.t("GRUP TOPLANTISI · bir seçmen grubunun sorunlarını gündeme getir")
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 11)
-	title.add_theme_color_override("font_color", UiTheme.HEAD)
-	header.add_child(title)
-	# Kapat: şerit gizlenir; hamle düğmesiyle yeniden açılır.
-	var skip := Button.new()
-	skip.text = L.t("Kapat")
-	skip.add_theme_font_size_override("font_size", 11)
-	UiSkin.skin_button(skip)
-	skip.pressed.connect(func():
-		_speech_open_key = ""
-		_speech_panel.hide())
-	header.add_child(skip)
-	_speech_note = Label.new()
-	_speech_note.add_theme_font_size_override("font_size", 10)
-	_speech_note.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
-	box.add_child(_speech_note)
-	_speech_rows = GridContainer.new()
-	_speech_rows.columns = 4
-	_speech_rows.add_theme_constant_override("h_separation", 4)
-	_speech_rows.add_theme_constant_override("v_separation", 4)
-	box.add_child(_speech_rows)
-	_speech_panel.hide()
-	add_child(_speech_panel)
-
-func _refresh_speech_panel() -> void:
-	if _speech_panel == null:
-		return
-	var me := multiplayer.get_unique_id()
-	var wanted := CardManager.needs_speech(me) and not CardManager.is_turn_blocked() and not CardManager.game_finished \
-		and _speech_open_key == "%d:%d" % [CardManager.round_number, CardManager.current_turn_index]
-	if not wanted:
-		_speech_panel.hide()
-		_speech_key = ""
-		return
-	var groups := CardManager.effective_groups(me)
-	var key := "%d:%d:%s:%s" % [CardManager.round_number, CardManager.current_turn_index, str(groups), CardManager.crisis_group()]
-	if key != _speech_key:
-		_speech_key = key
-		# Eski sütunlar HEMEN çıkarılır: queue_free kare sonuna kadar beklerken panel
-		# eski + yeni sütunlarla (6 sütun) ölçülüp gereksiz genişliyordu.
-		for child in _speech_rows.get_children():
-			_speech_rows.remove_child(child)
-			child.queue_free()
-		_speech_note.text = _meeting_timing_text()
-		for group in VoterGroups.GROUP_IDS:
-			_speech_rows.add_child(_speech_row(group, float(groups.get(group, VoterGroups.AFFINITY_NEUTRAL))))
-	if not _speech_panel.visible:
-		_speech_panel.show()
-		if _province_panel != null:
-			_province_panel.hide()
-		_close_law_page()
-	_place_speech_panel.call_deferred()
-
-func _place_speech_panel() -> void:
-	if _speech_panel == null or not _speech_panel.visible:
-		return
-	_speech_panel.reset_size()
-	var viewport_size := get_viewport_rect().size
-	var left := LEFT_PANEL_WIDTH
-	var right := viewport_size.x - RIGHT_COLUMN_WIDTH
-	# Haritanın üst kenarı: harita görünür kalsın.
-	_speech_panel.position = Vector2((left + right - _speech_panel.size.x) * 0.5, 8.0)
-
-## Toplantının seçime göre zamanlaması: bonus seçimde ne kadar olur?
-func _meeting_timing_text() -> String:
-	# 0.0.228: toplantı kalıcıdır (seçmen tabanı).
-	return L.t("Kalıcı: grubun ülke genelindeki seçmeninden çekersin ve o gruptaki seçmenlerinin sadakati artar. Zıt grupta seçmenlerinin bir kısmı soğur.")
-
-## Bir seçmen grubu düğmesi: simge + tam ad + partinin şu anki desteği.
-## Gündem bu grubu istiyorsa altın not.
-func _speech_row(group: String, value: float) -> Control:
-	var button := Button.new()
-	button.focus_mode = Control.FOCUS_NONE
-	button.custom_minimum_size = Vector2(SPEECH_COLUMN_WIDTH, 38)
-	button.clip_text = false
-	# Grubun renginde açık karton düğme (koyu yazı okunur).
-	UiSkin.skin_color_button(button, VoterGroups.color(group).lerp(UiTheme.PANEL_DARK, 0.7))
-	var crisis := CardManager.crisis_group() == group
-	var row := HBoxContainer.new()
-	row.set_anchors_preset(Control.PRESET_FULL_RECT)
-	row.offset_left = 4
-	row.offset_right = -2
-	row.add_theme_constant_override("separation", 4)
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	button.add_child(row)
-	var icon := VoterGroupIcon.make(group, 20.0)
-	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(icon)
-	var texts := VBoxContainer.new()
-	texts.alignment = BoxContainer.ALIGNMENT_CENTER
-	texts.add_theme_constant_override("separation", -2)
-	texts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	texts.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_child(texts)
-	var name := Label.new()
-	name.text = VoterGroups.title(group)
-	name.add_theme_font_size_override("font_size", 9)
-	name.add_theme_color_override("font_color", UiTheme.TEXT)
-	name.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	texts.add_child(name)
-	var sub := Label.new()
-	sub.text = L.t("destek %s%s") % [VoterGroups.percent_text(value), L.t(" · KRİZ") if crisis else ""]
-	sub.add_theme_font_size_override("font_size", 9)
-	sub.add_theme_color_override("font_color", UiTheme.HEAD if crisis else UiTheme.TEXT_MUTED)
-	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	texts.add_child(sub)
-	button.pressed.connect(func():
-		_speech_panel.hide()
-		CardManager.make_speech(group))
-	return button
-
 func _build_propaganda_menu() -> void:
 	_propaganda_menu = PanelContainer.new()
 	UiSkin.skin_panel(_propaganda_menu, UiSkin.PANEL_DARK)
@@ -5896,34 +5749,12 @@ func _refresh_turn_flow_ui() -> void:
 		return
 	_turn_intro.refresh()
 	_parliament_flow.refresh()
-	_maybe_offer_speech()
 	if _province_actions.visible:
 		if not _can_open_province_actions():
 			_province_actions.close()
 		else:
 			_province_actions.refresh()
 	_refresh_parliament_button()
-
-## TUR BAŞI GRUP TOPLANTISI (0.0.268): kart çekimi ve afet kararından sonra
-## (en düşük öncelik) her sıramda bir kez meclis penceresi toplantı sekmesiyle
-## açılır. "DAHA SONRA" ile kapanır; toplantı sonra MECLİS'ten yapılabilir.
-var _speech_offered_serial := -1
-
-func _maybe_offer_speech() -> void:
-	var me := multiplayer.get_unique_id()
-	var flow: Dictionary = CardManager.turn_flow
-	if int(flow.get("peer", -1)) != me or int(flow.get("serial", -1)) == _speech_offered_serial:
-		return
-	if not CardManager.can_act() or CardManager.game_finished or _turn_intro.is_busy() or _turn_intro.hold.call():
-		return
-	if CardManager.needs_turn_draw(me) or CardManager.aid_pending(me):
-		return
-	if _parliament_flow.visible or _province_actions.visible:
-		return
-	_speech_offered_serial = int(flow.get("serial", -1))
-	if CardManager.parliament_stage_available(me, "speech"):
-		_deselect_hand_card()
-		_parliament_flow.open_speech_intro()
 
 ## İl işlem paneli: sıra bende, tur başı sunumu bitti, oylama yok.
 func _can_open_province_actions() -> bool:
@@ -5968,7 +5799,7 @@ func _refresh_parliament_button() -> void:
 		var open: PackedStringArray = []
 		for id in CardManager.PARL_STAGES:
 			if CardManager.parliament_stage_available(me, String(id)):
-				open.append({"censure": L.t("gensoru"), "speech": L.t("toplantı"), "law": L.t("yasa")}[id])
+				open.append({"censure": L.t("gensoru"), "law": L.t("yasa")}[id])
 		sub = L.t("açık: %s") % ", ".join(open)
 	elif not CardManager.can_act():
 		sub = L.t("sıra sende değil")

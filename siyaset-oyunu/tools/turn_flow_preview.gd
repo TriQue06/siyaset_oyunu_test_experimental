@@ -1,6 +1,6 @@
 extends SceneTree
 ## TUR AKIŞI ÖNİZLEMESİ (0.0.231): KART ÇEK, kart açılışı, afet yardım sahnesi,
-## MECLİS akışı (gensoru, toplantı, yasa), il işlem paneli (miting ve karalama,
+## MECLİS akışı (gensoru, yasa), il işlem paneli (miting ve karalama,
 ## yatırım). Ekran görüntüleri user:// içine tf_*.png; ekrana sığma kontrolleri.
 ##   godot --resolution 1280x720 --path . --script res://tools/turn_flow_preview.gd
 ##   (PREVIEW_SIZE=900x600 gibi dar ekran da denenebilir)
@@ -113,16 +113,12 @@ func _initialize() -> void:
 	# 0.0.246 SEKMELER: sırasız; istenen sekmeye doğrudan geçilir.
 	var flow = scene._parliament_flow
 	var tab_buttons: Array = flow._tabs_row.get_children()
-	check("uc sekme (gensoru, toplanti, yasa)", tab_buttons.size() == 3, str(tab_buttons.size()))
-	(tab_buttons[2] as Button).pressed.emit()
+	check("iki sekme (gensoru, yasa)", tab_buttons.size() == 2, str(tab_buttons.size()))
+	(tab_buttons[1] as Button).pressed.emit()
 	await _wait(0.5)
 	_shot("tf_7_law")
 	check("gensoru gecmeden yasa sekmesi acildi", flow._tab == "law" and not cm.parliament_closed_stages(me).has("censure"))
 	check("yasa paneli ekrana sigiyor", _inside(flow._panel), str(flow._panel.get_global_rect()))
-	(flow._tabs_row.get_children()[1] as Button).pressed.emit()
-	await _wait(0.5)
-	_shot("tf_6_speech")
-	check("toplanti sekmesi", flow._tab == "speech")
 	flow.open_law_page(0)
 	await _wait(0.5)
 	_shot("tf_8_law_designer")

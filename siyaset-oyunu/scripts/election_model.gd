@@ -7,8 +7,7 @@ extends RefCounted
 ##   1. Her ilin bir SEÇMEN PROFİLİ var: 4 ikili dağılım (işçi/işveren,
 ##      genç/emekli, dindar/ilerici, özerkçi/milliyetçi). Profil oyun başında
 ##      üretilir (komşu iller benzer) ve oyun boyunca değişmez.
-##   2. Her partinin 8 grupta ULUSAL YAKINLIĞI var (0..100) + grup toplantısının
-##      geçici bonusu. Partinin ildeki UYUMU = 4 çiftte (pay × yakınlık)
+##   2. Her partinin 8 grupta ULUSAL YAKINLIĞI var (0..100). Partinin ildeki UYUMU = 4 çiftte (pay × yakınlık)
 ##      toplamlarının ortalaması; ham destek = exp(SHARPNESS × (uyum − 50)).
 ##      Aynı gruplara hitap eden iki parti o gruptaki oyu BÖLER.
 ##   3. Ham destek KAMUOYU çarpanıyla (ulusal puan + il aktivitesi: miting,

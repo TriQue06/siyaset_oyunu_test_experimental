@@ -68,7 +68,7 @@ func end_round() -> void:
 func election_share(pid: int) -> float:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 777
-	var result := ElectionModel.compute(cm._group_profiles(cm.round_number), cm._province_seat_counts, cm.province_voters(),
+	var result := ElectionModel.compute(cm._group_profiles(), cm._province_seat_counts, cm.province_voters(),
 		0.0, rng, cm.election_modifiers())
 	return float(result["vote_shares"].get(pid, 0.0))
 
@@ -84,7 +84,6 @@ func _initialize() -> void:
 	gm = root.get_node("GovernmentManager")
 	cp = root.get_node("CardPresets")
 	cm.allow_temporary_parties = false
-	cm.speech_required = false
 	cm.fixed_map_seed = 1950
 	mm.room_code = ""
 	gm.result_hold_seconds = 0.0

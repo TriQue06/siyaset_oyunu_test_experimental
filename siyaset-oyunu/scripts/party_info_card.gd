@@ -2,8 +2,7 @@ class_name PartyInfoCard
 extends RefCounted
 ## Sağdaki oyuncu kartının üstüne gelince çıkan parti profili: parti ve oyuncu
 ## adı, meclis / oy / puan / kamuoyu bilgisi, hükümetteki yeri ve 8 seçmen
-## grubundaki ULUSAL desteği (grup renginde çubuklar, son seçimden beri değişim,
-## varsa geçici toplantı desteği).
+## grubundaki ULUSAL desteği (grup renginde çubuklar, son seçimden beri değişim).
 
 const WIDTH := 320.0
 const DIM := UiTheme.TEXT_MUTED

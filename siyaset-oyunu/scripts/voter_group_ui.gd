@@ -1,7 +1,7 @@
 class_name VoterGroupUI
 extends RefCounted
-## Seçmen gruplarının ORTAK arayüz parçaları (il paneli, parti kartı, yasa ve
-## toplantı ekranları aynı görsel dili kullansın). Grup adı her yerde TAM
+## Seçmen gruplarının ORTAK arayüz parçaları (il paneli, parti kartı ve yasa
+## ekranları aynı görsel dili kullansın). Grup adı her yerde TAM
 ## yazılır (kısaltma yok, gerekirse yazı küçülür); renk her zaman simge ve
 ## metinle birlikte kullanılır.
 
@@ -51,8 +51,7 @@ static func bar(fill: float, color: Color, height: float = BAR_HEIGHT, extra: fl
 	return holder
 
 ## Partinin bir gruptaki ULUSAL desteği: ad + değer satırı, altında çubuk.
-## bonus: geçici toplantı bonusu (çubukta açık renkle, metinde ayrıca).
-static func affinity_row(group: String, value: float, bonus: float = 0.0, delta: float = 0.0) -> Control:
+static func affinity_row(group: String, value: float, delta: float = 0.0) -> Control:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 1)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -61,7 +60,7 @@ static func affinity_row(group: String, value: float, bonus: float = 0.0, delta:
 	if absf(delta) >= 0.5:
 		text += " " + ("+" if delta > 0.0 else "−")
 	box.add_child(name_row(group, text, UiTheme.TEXT))
-	box.add_child(bar(value / 100.0, VoterGroups.color(group), BAR_HEIGHT, bonus / 100.0, VoterGroups.color(group).lightened(0.55)))
+	box.add_child(bar(value / 100.0, VoterGroups.color(group), BAR_HEIGHT))
 	return box
 
 ## İl profilinde bir ÇİFT: üstte ilk grup ve yüzdesi, ortada iki renkli

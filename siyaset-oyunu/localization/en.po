@@ -5114,3 +5114,18 @@ msgstr "no poll this term"
 
 msgid "%d puan"
 msgstr "%d pts"
+
+msgid "%s için yasa çok daha etkili"
+msgstr "laws for %s are far more effective"
+
+msgid "Mitinglerin daha etkili, gençler ve ilericiler sana ısınır; yasaların daha zayıf."
+msgstr "Your rallies hit harder and youth and progressives warm to you; your laws are weaker."
+
+msgid "Mitinglerin biraz daha etkili."
+msgstr "Your rallies are a bit stronger."
+
+msgid "Çekirdek gruplarda %%%d, diğerlerinde %%%d hitapla başlarsın; çekirdek gruplarda kazancın %d katıdır. Hitap yasa ve mitingle büyür, rakipler senden seçmen çalabilir."
+msgstr "You start with %%%d appeal in your core groups and %%%d in the others; gains in core groups are %dx. Appeal grows with laws and rallies, and rivals can steal voters from you."
+
+msgid "Sıran gelince önce kartını çekersin. Teşkilat, miting ve yatırım için haritada bir ile dokun. MECLİS düğmesi gensoru ve yasayı açar; istersen hiç girmeden turu bitirebilirsin."
+msgstr "When your turn comes, you draw your card first. Tap a province on the map for organization, rallies and investment. The PARLIAMENT button opens the censure motion and law; you can also end your turn without entering."

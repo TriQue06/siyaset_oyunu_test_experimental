@@ -622,7 +622,7 @@ func _build_voters_page() -> Control:
 	_core_grid.add_theme_constant_override("h_separation", 8)
 	_core_grid.add_theme_constant_override("v_separation", 8)
 	page.add_child(_core_grid)
-	page.add_child(PopupKit.note(L.t("Çekirdek gruplarda %%%d, diğerlerinde %%%d hitapla başlarsın; çekirdek gruplarda kazancın %d katıdır. Hitap yasa, miting ve toplantıyla büyür, rakipler senden seçmen çalabilir.") % [
+	page.add_child(PopupKit.note(L.t("Çekirdek gruplarda %%%d, diğerlerinde %%%d hitapla başlarsın; çekirdek gruplarda kazancın %d katıdır. Hitap yasa ve mitingle büyür, rakipler senden seçmen çalabilir.") % [
 		int(VoterGroups.CORE_START), int(VoterGroups.AFFINITY_NEUTRAL), int(VoterGroups.CORE_GAIN_MULT)], UiTheme.TEXT_MUTED))
 	page.add_child(PopupKit.note(L.t("Aynı çiftten iki grup birlikte seçilemez (ör. işçi ve işveren)."), UiTheme.TEXT_DIM))
 	return built[0]

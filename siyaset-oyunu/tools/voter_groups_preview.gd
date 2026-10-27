@@ -1,6 +1,6 @@
 extends SceneTree
 ## SEÇMEN GRUPLARI ÖNİZLEMESİ: il paneli (seçmen profili), parti kartı (grup
-## destekleri), yasa paneli (8 grup + etki önizlemesi), grup toplantısı paneli ve
+## destekleri), yasa paneli (8 grup + etki önizlemesi) ve
 ## haritanın "Seçmen" katmanı. Ekran görüntüleri kullanıcı veri klasörüne yazılır.
 ##   godot --resolution 1600x900 --path . --script res://tools/voter_groups_preview.gd
 
@@ -33,9 +33,7 @@ func _initialize() -> void:
 	var me: int = mm.owner_id
 	cm.current_turn_index = cm.turn_order.find(me)
 	cm.funds[me] = 120.0
-	cm.speech_rounds = {}
 	cm.agenda = {"type": "gundem_isci", "until": cm.round_number + 1}
-	cm.group_meetings[me] = {"emekli": cm.round_number}
 	pm.apply_group_deltas([{"peer": me, "group": "isci", "amount": 6.0}])
 	cm._push_state({"type": "timer"})
 
@@ -73,12 +71,6 @@ func _initialize() -> void:
 	await _frames(10)
 	_shot("vg_law_designer")
 	scene._law_designer.hide()
-	scene._speech_open_key = "%d:%d" % [cm.round_number, cm.current_turn_index]
-	scene._refresh_speech_panel()
-	await _frames(10)
-	_shot("vg_meeting_panel")
-	scene._speech_panel.hide()
-	scene._speech_open_key = ""
 	for group in ["isci", "dindar", "ozerkci"]:
 		scene._map_group = group
 		scene._set_map_layer(3, false)

@@ -4910,8 +4910,14 @@ func _refresh_law_designer() -> void:
 	var me := multiplayer.get_unique_id()
 	var grid := ParliamentFlow.group_grid(_propose_law_clicked_group,
 		func(group: String) -> bool: return CardManager.can_propose_law(me, CardPresets.law_type(group)))
-	_law_rows.replace_by(grid)
+	# Eski ızgara silinip yerine yenisi konur (replace_by eski düğmeleri yeniye
+	# taşıyordu: sekmeler arasında gidip gelince gruplar çoğalıyordu).
+	var parent := _law_rows.get_parent()
+	var index := _law_rows.get_index()
+	parent.remove_child(_law_rows)
 	_law_rows.queue_free()
+	parent.add_child(grid)
+	parent.move_child(grid, index)
 	_law_rows = grid
 	_refresh_law_detail()
 

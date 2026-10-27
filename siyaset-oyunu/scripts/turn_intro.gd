@@ -194,14 +194,16 @@ func _show_prompt() -> void:
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	icon.modulate = UiTheme.TEXT
+	# 0.0.268: ATLA gibi beyaz yazı ve simge, altında sert gölge.
+	icon.modulate = UiTheme.ON_COLOR
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	content.add_child(icon)
 	var caption := Label.new()
 	caption.text = L.t("KART ÇEK")
 	caption.add_theme_font_override("font", UiTheme.mono(true))
 	caption.add_theme_font_size_override("font_size", 28)
-	caption.add_theme_color_override("font_color", UiTheme.TEXT)
+	caption.add_theme_color_override("font_color", UiTheme.ON_COLOR)
+	UiSkin._text_shadow(caption, true)
 	caption.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	content.add_child(caption)
@@ -210,9 +212,7 @@ func _show_prompt() -> void:
 	button.add_theme_font_size_override("font_size", 28)
 	UiSkin.skin_color_button(button, UiTheme.GOLD_DIM)
 	for key in ["font_color", "font_hover_color", "font_pressed_color"]:
-		button.add_theme_color_override(key, UiTheme.TEXT)
-	for key in ["icon_normal_color", "icon_hover_color", "icon_pressed_color", "icon_focus_color"]:
-		button.add_theme_color_override(key, UiTheme.TEXT)
+		button.add_theme_color_override(key, UiTheme.ON_COLOR)
 	var skip := Button.new()
 	skip.text = L.t("ATLA")
 	skip.focus_mode = Control.FOCUS_NONE
@@ -275,20 +275,25 @@ func _reveal_next() -> void:
 	var skip := Control.new()
 	skip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_layer.add_child(skip)
+	# 0.0.268: kart TÜM EKRANIN tam ortasında (gerçek boyuyla ortalanır).
 	var view := get_viewport_rect().size
-	var center := Vector2((view.x - CARD_SIZE.x) * 0.5 - 60.0, (view.y - CARD_SIZE.y) * 0.5)
-	skip.position = center + Vector2(CARD_SIZE.x + 24.0, CARD_SIZE.y * 0.5 - 28.0)
+	face.reset_size()
+	var face_size := face.get_combined_minimum_size().max(CARD_SIZE)
+	face.size = face_size
+	var center := ((view - face_size) * 0.5).round()
 	skip.modulate.a = 0.0
-	face.position = center + Vector2(0, 60)
-	face.pivot_offset = CARD_SIZE * 0.5
-	face.scale = Vector2(0.35, 0.35)
-	face.rotation = -0.25
+	face.position = center + Vector2(0, 90)
+	face.pivot_offset = face_size * 0.5
+	# Masadan kalkıp dönerek açılır: yan dönük (dar) başlar, yüzü çevrilir.
+	face.scale = Vector2(0.05, 0.6)
+	face.rotation = -0.18
 	face.modulate.a = 0.0
 	AudioManager.play("card_drawn")
 	var tw := _tween()
 	tw.set_parallel(true)
 	tw.tween_property(face, "position", center, REVEAL_IN).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_property(face, "scale", Vector2.ONE, REVEAL_IN).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(face, "scale:y", 1.0, REVEAL_IN).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(face, "scale:x", 1.0, REVEAL_IN * 1.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.tween_property(face, "rotation", 0.0, REVEAL_IN)
 	tw.tween_property(face, "modulate:a", 1.0, REVEAL_IN * 0.6)
 	tw.tween_property(skip, "modulate:a", 1.0, REVEAL_IN)
@@ -306,7 +311,7 @@ func _dismiss_card(face: Control, skip: Control, result: String, token: int) -> 
 	tw.tween_property(skip, "modulate:a", 0.0, REVEAL_OUT * 0.5)
 	if result == "hand":
 		var target := hand_rect.call() as Rect2
-		var dest := target.position + target.size * 0.5 - CARD_SIZE * 0.5
+		var dest := target.position + target.size * 0.5 - face.size * 0.5
 		tw.tween_property(face, "position", dest, REVEAL_OUT).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
 		tw.tween_property(face, "scale", Vector2(0.35, 0.35), REVEAL_OUT)
 		tw.tween_property(face, "modulate:a", 0.0, REVEAL_OUT)
@@ -344,32 +349,38 @@ func _card_face(entry: Dictionary) -> Control:
 	panel.custom_minimum_size = CARD_SIZE
 	panel.size = CARD_SIZE
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := StyleBoxFlat.new()
-	style.bg_color = UiTheme.PANEL_DARK
-	style.border_color = accent
-	style.set_border_width_all(4)
-	style.set_corner_radius_all(UiTheme.RADIUS_PANEL)
-	style.anti_aliasing = true
-	style.content_margin_left = 0
-	style.content_margin_right = 0
-	style.content_margin_top = 0
-	style.content_margin_bottom = 12
-	# Karton kalınlığı (vurgu renginin koyusu).
-	style.shadow_color = accent.darkened(0.45)
-	style.shadow_size = 1
-	style.shadow_offset = Vector2(0, 7)
+	# 0.0.268 MASA OYUNU KARTI: krem karton, içte türün renginde çift çizgi,
+	# altta iki kat kalınlık ve masaya düşen yumuşak gölge (paneller gibi).
+	var style := BoardBox.new()
+	style.fill = UiTheme.PANEL
+	style.fill_bottom = Color("EFE2C0")
+	style.set_radius(UiTheme.d(20))
+	style.highlight_size = UiTheme.d(3)
+	style.highlight_color = Color(1, 1, 1, 0.6)
+	style.rings = [[UiTheme.d(7), UiTheme.d(4), accent], [UiTheme.d(13), UiTheme.d(1), Color(accent, 0.6)]]
+	style.lips = [[UiTheme.d(9), UiTheme.EDGE], [UiTheme.d(13), UiTheme.EDGE_DARK]]
+	style.shadow_color = Color(0, 0, 0, 0.5)
+	style.shadow_offset = Vector2(0, UiTheme.d(26))
+	style.shadow_size = UiTheme.d(22)
+	style.content_margin_left = UiTheme.d(16)
+	style.content_margin_right = UiTheme.d(16)
+	style.content_margin_top = UiTheme.d(16)
+	style.content_margin_bottom = UiTheme.d(24)
 	panel.add_theme_stylebox_override("panel", style)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(box)
-	# Üst şerit: "ŞANS KARTI" ve türü.
+	# Üst şerit: "ŞANS KARTI" ve türü (kalınlıklı renkli plaka).
 	var ribbon := PanelContainer.new()
-	var ribbon_style := StyleBoxFlat.new()
-	ribbon_style.bg_color = accent.darkened(0.25)
-	ribbon_style.corner_radius_top_left = UiTheme.RADIUS_PANEL - 4
-	ribbon_style.corner_radius_top_right = UiTheme.RADIUS_PANEL - 4
-	ribbon_style.anti_aliasing = true
+	var ribbon_color := accent.darkened(0.1)
+	var ribbon_style := BoardBox.new()
+	ribbon_style.fill = ribbon_color.lightened(0.12)
+	ribbon_style.fill_bottom = ribbon_color
+	ribbon_style.set_radius(UiTheme.d(12))
+	ribbon_style.highlight_size = UiTheme.d(2)
+	ribbon_style.highlight_color = Color(1, 1, 1, 0.35)
+	ribbon_style.lips = [[UiTheme.d(5), ribbon_color.darkened(0.4)]]
 	ribbon_style.set_content_margin_all(6)
 	ribbon.add_theme_stylebox_override("panel", ribbon_style)
 	ribbon.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -378,19 +389,21 @@ func _card_face(entry: Dictionary) -> Control:
 	ribbon_box.add_theme_constant_override("separation", 0)
 	ribbon_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ribbon.add_child(ribbon_box)
-	ribbon_box.add_child(_centered_label(L.t("ŞANS KARTI"), 11, UiSkin.text_on(accent.darkened(0.25))))
-	ribbon_box.add_child(_centered_label(String(style_info[1]), 10, UiSkin.text_on(accent.darkened(0.25))))
+	var ribbon_title := _centered_label(L.t("ŞANS KARTI"), 13, UiTheme.ON_COLOR)
+	UiSkin._text_shadow(ribbon_title, true)
+	ribbon_box.add_child(ribbon_title)
+	ribbon_box.add_child(_centered_label(String(style_info[1]), 10, UiTheme.ON_COLOR))
 	if card == "":
 		box.add_child(_centered_label(L.t("Elin dolu"), 22, UiTheme.TEXT))
 		box.add_child(_framed_text(L.t("Elinde en fazla %d kart durabilir; bu tur kart çekilmedi. Elindeki kartları oynayarak yer açabilirsin.") % CardManager.MAX_HAND_SIZE, accent))
 		return panel
 	# Görsel: kenarlardan içeride, çerçeveli.
 	var art_frame := PanelContainer.new()
-	var art_style := StyleBoxFlat.new()
-	art_style.bg_color = UiTheme.INK
-	art_style.border_color = accent.darkened(0.3)
-	art_style.set_border_width_all(2)
-	art_style.set_corner_radius_all(UiTheme.RADIUS_S)
+	# Görsel penceresi: içe basık oyuk, türün renginde ince kenar.
+	var art_style := BoardBox.new()
+	art_style.fill = UiTheme.INK
+	art_style.set_radius(UiTheme.d(10))
+	art_style.rings = [[0.0, UiTheme.d(3), accent.darkened(0.2)]]
 	art_frame.add_theme_stylebox_override("panel", art_style)
 	art_frame.custom_minimum_size = Vector2(CARD_SIZE.x - 32.0, 132)
 	art_frame.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -422,15 +435,11 @@ func _centered_label(text: String, size: int, color: Color) -> Label:
 ## Kartın etki metni: hafif açık zeminli, kenarlıklı bir çerçevede.
 func _framed_text(text: String, accent: Color) -> Control:
 	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 12)
-	margin.add_theme_constant_override("margin_right", 12)
+	margin.add_theme_constant_override("margin_left", 0)
+	margin.add_theme_constant_override("margin_right", 0)
 	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var frame := PanelContainer.new()
-	var frame_style := StyleBoxFlat.new()
-	frame_style.bg_color = Color(accent, 0.1)
-	frame_style.border_color = Color(accent, 0.45)
-	frame_style.set_border_width_all(1)
-	frame_style.set_corner_radius_all(UiTheme.RADIUS_S)
+	var frame_style := UiSkin.groove(Color(UiTheme.PANEL_DARK, 1.0))
 	frame_style.set_content_margin_all(8)
 	frame.add_theme_stylebox_override("panel", frame_style)
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE

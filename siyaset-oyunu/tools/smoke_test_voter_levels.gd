@@ -114,16 +114,14 @@ func run() -> void:
 	var got: float = cm._vb_pull(a, pi, VoterGroups.GROUP_IDS.find("isveren"), count * 0.1, cm.MITING_STEAL, cm.MITING_DEMOTE)
 	cm._vb_opposite_loss(a, pi, VoterGroups.GROUP_IDS.find("isveren"), got)
 	var isci_after := cell(a, pi, "isci")
-	# Seviye toplamı (1×L1 + 2×L2 + 3×L3) kazancın yarısı kadar azalmalı;
-	# 0.0.232: düşüş ilin büyüklük çarpanıyla ölçeklenir (kalabalık ilde hızlı).
+	# 0.0.268: seviye toplamı (1×L1 + 2×L2 + 3×L3) kazancın BİREBİR aynısı kadar
+	# azalır; il büyüklüğü, teşkilat ve kriz oranı değiştirmez.
 	var score_before := float(isci_before[0]) + 2.0 * float(isci_before[1]) + 3.0 * float(isci_before[2])
 	var score_after := float(isci_after[0]) + 2.0 * float(isci_after[1]) + 3.0 * float(isci_after[2])
-	var expected_drop: float = got * cm.OPPOSITE_LOSS * cm.vb_size_factor(pi)
-	check(got > 0.0 and absf((score_before - score_after) - expected_drop) < got * 0.01,
-		"isverene kazanc, iscide kazancin %80'i kadar (il buyuklugune gore) seviye dusurur", "kazanc %.0f, dusus %.0f" % [got, score_before - score_after])
-	check(absf(5.0 * cm.OPPOSITE_LOSS - 4.0) < 0.001 and absf(5.0 * cm.OPPOSITE_LOSS_CRISIS - 2.0) < 0.001,
-		"5 isveren kazanilirsa 4 isci, krizde 2 isci kaybedilir")
-	# Siyasi kriz isverenin: zit gruptan kayip yariya iner.
+	check(got > 0.0 and absf((score_before - score_after) - got) < got * 0.01,
+		"isverene kazanc kadar iscide seviye duser (birebir)", "kazanc %.0f, dusus %.0f" % [got, score_before - score_after])
+	check(is_equal_approx(5.0 * cm.OPPOSITE_LOSS, 5.0), "5 isveren kazanilirsa 5 isci kaybedilir")
+	# Siyasi kriz isverenin: kayıp yine birebir (istisna yok).
 	clear_all()
 	setc(a, pi, "isci", count * 0.2, count * 0.2, 0.0)
 	cm.agenda = {"type": "kriz_isveren", "until": cm.round_number + 1}
@@ -133,20 +131,41 @@ func run() -> void:
 	isci_after = cell(a, pi, "isci")
 	score_before = float(isci_before[0]) + 2.0 * float(isci_before[1]) + 3.0 * float(isci_before[2])
 	score_after = float(isci_after[0]) + 2.0 * float(isci_after[1]) + 3.0 * float(isci_after[2])
-	expected_drop = got * cm.OPPOSITE_LOSS_CRISIS * cm.vb_size_factor(pi)
-	check(got > 0.0 and absf((score_before - score_after) - expected_drop) < got * 0.01,
-		"krizin grubunda zit gruptan kayip yariya iner", "kazanc %.0f, dusus %.0f" % [got, score_before - score_after])
-	# Kriz isverenin iken isciye kazanmak tam kayip (kriz yalnizca kendi grubunda).
+	check(got > 0.0 and absf((score_before - score_after) - got) < got * 0.01,
+		"krizde de zit gruptan kayip birebir", "kazanc %.0f, dusus %.0f" % [got, score_before - score_after])
+	# Teşkilatlı ilde de kayıp birebir (kalkan zıt grup kaybına uygulanmaz).
 	clear_all()
+	cm.agenda = {}
+	var prov := String(cm._province_ids[pi])
+	var org_before = cm.organizations.get(prov, {}).duplicate()
+	cm.organizations[prov] = {a: 2}
 	setc(a, pi, "isveren", count * 0.2, count * 0.2, 0.0)
 	var isv_before := cell(a, pi, "isveren")
 	got = cm._vb_pull(a, pi, VoterGroups.GROUP_IDS.find("isci"), count * 0.1, cm.MITING_STEAL, cm.MITING_DEMOTE)
 	cm._vb_opposite_loss(a, pi, VoterGroups.GROUP_IDS.find("isci"), got)
 	var isv_after := cell(a, pi, "isveren")
 	var drop_full := (float(isv_before[0]) + 2.0 * float(isv_before[1])) - (float(isv_after[0]) + 2.0 * float(isv_after[1]))
-	check(absf(drop_full - got * cm.OPPOSITE_LOSS * cm.vb_size_factor(pi)) < got * 0.01,
-		"krizin karsit grubuna kazanmak tam kayip verir", "kazanc %.0f, dusus %.0f" % [got, drop_full])
-	cm.agenda = {}
+	check(absf(drop_full - got) < got * 0.01, "teskilatli ilde de kayip birebir", "kazanc %.0f, dusus %.0f" % [got, drop_full])
+	cm.organizations[prov] = org_before
+
+	print("=== miting odagi ===")
+	# Grup seçilse de seçilmese de ildeki seviye atlayan seçmen sayısı aynı
+	# (çekilen toplamın aynılığı yukarıda sınanıyor); odak yalnız dağılımı değiştirir.
+	clear_all()
+	for g in VoterGroups.GROUP_IDS:
+		setc(a, pi, g, count * 0.1, count * 0.05, 0.0)
+	var promoted := []
+	for focus in [[], ["isci"], ["emekli", "genc"]]:
+		var shares: Array = cm.miting_promote_shares(a, pi, focus)
+		var sum := 0.0
+		for level in 2:
+			for gi in 8:
+				sum += float(cell(a, pi, VoterGroups.GROUP_IDS[gi])[level]) * float(shares[level][gi])
+		promoted.append(sum)
+	check(absf(promoted[1] - promoted[0]) < promoted[0] * 0.001 and absf(promoted[2] - promoted[0]) < promoted[0] * 0.001,
+		"odakli ve odaksiz mitingde seviye atlayan secmen ayni", "odaksiz %.0f, isci %.0f, emekli+genc %.0f" % promoted)
+	var focus_shares: Array = cm.miting_promote_shares(a, pi, ["isci"])
+	check(float(focus_shares[0][0]) > float(focus_shares[0][1]), "odak grubu daha cok yukselir")
 
 	print("=== il buyuklugu ===")
 	var sizes: Array = []

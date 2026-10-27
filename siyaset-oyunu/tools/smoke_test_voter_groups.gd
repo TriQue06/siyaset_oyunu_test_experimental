@@ -126,7 +126,7 @@ func _initialize() -> void:
 		if not (VoterGroups.PAIRS[VoterGroups.pair_of(group)] as Array).has(group):
 			defs_ok = false
 		group_colors[VoterGroups.color(group).to_html()] = true
-		if float(d["law_backlash"]) <= 0.0 or float(d["law_backlash"]) >= 1.0:
+		if not is_equal_approx(float(d["law_backlash"]), 1.0):
 			defs_ok = false
 	check("her grubun tum alanlari var, karsit eslesmeleri simetrik", defs_ok)
 	check("8 farkli renk", group_colors.size() == 8)

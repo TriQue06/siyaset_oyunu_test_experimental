@@ -34,12 +34,27 @@ func _draw() -> void:
 		ink = VoterGroups.color(group)
 		draw_symbol(self, VoterGroups.icon(group), c, r * 0.9, ink)
 		return
-	# KESKİN KARO (0.0.186): köşeli, grubun renginde; sembol karonun çoğunu kaplar.
 	if ink_override.a > 0.0:
 		ink = ink_override
 	var tile := tile_override if tile_override.a > 0.0 else VoterGroups.color(group)
-	var inner := draw_tile(self, Rect2(c - Vector2(r, r), Vector2(r, r) * 2.0), tile)
-	draw_symbol(self, VoterGroups.icon(group), c - Vector2(0, inner * 0.06), inner * 0.7, ink)
+	# 0.0.268: PARTİ LOGOSU GİBİ 3B PUL (PartyBadge ile aynı katmanlar).
+	draw_style_box(pawn_style(tile, side), Rect2(c - Vector2(r, r), Vector2(r, r) * 2.0))
+	draw_symbol(self, VoterGroups.icon(group), c - Vector2(0, side * 0.03), r * 0.58, ink)
+
+## Parti logosunun pulu (PartyBadge.build ile birebir): tepesi açık renge
+## geçen dolgu, altta iç koyuluk, koyu kalınlık ve yumuşak gölge.
+static func pawn_style(color: Color, side: float) -> BoardBox:
+	var style := BoardBox.new()
+	style.fill = color.lerp(Color.WHITE, 0.4)
+	style.fill_bottom = color
+	style.set_radius(side * 0.5)
+	style.shade_size = side * 0.087
+	style.shade_color = Color(0, 0, 0, 0.22)
+	style.lips = [[side * 0.087, color.lerp(Color.BLACK, 0.45)]]
+	style.shadow_color = Color(0, 0, 0, 0.25)
+	style.shadow_offset = Vector2(0, side * 0.13)
+	style.shadow_size = side * 0.09
+	return style
 
 ## PUL (0.0.265): grubun renginde yuvarlak, konturs dolgu. Sembolün ölçeği
 ## için yarıçap döner.

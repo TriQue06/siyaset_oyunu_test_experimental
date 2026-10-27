@@ -63,8 +63,8 @@ msgstr "Crisis has calmed: %d quiet term(s), then new crises."
 msgid "SİYASİ KRİZ: %s — %s."
 msgstr "POLITICAL CRISIS: %s — %s."
 
-msgid "%s ile toplantı ve yasa çok daha etkili, karşıt gruptan kayıp yarıya iner"
-msgstr "meetings and laws for %s are far more effective, losses from the opposing group are halved"
+msgid "%s ile toplantı ve yasa çok daha etkili"
+msgstr "meetings and laws for %s are far more effective"
 
 msgid "BÜTÇE"
 msgstr "BUDGET"
@@ -114,8 +114,8 @@ msgstr "Crisis: %s — %s."
 msgid " Krizin grubu: etki daha güçlü, karşıt gruptan kayıp yarıya iner."
 msgstr " Crisis group: stronger effect, losses from the opposing group are halved."
 
-msgid "Siyasi kriz: %s. Bu grupla toplanmak çok daha etkili, karşıt gruptan kayıp yarıya iner."
-msgstr "Political crisis: %s. Meeting this group is far more effective, losses from the opposing group are halved."
+msgid "Siyasi kriz: %s. Bu grupla toplanmak çok daha etkili."
+msgstr "Political crisis: %s. Meeting this group is far more effective."
 
 msgid "2/3 sağlandı · kabul"
 msgstr "2/3 reached · passes"
@@ -4608,8 +4608,8 @@ msgstr "If accepted the government falls and a new one is formed; if rejected yo
 msgid "GENSORU VER · %s"
 msgstr "FILE CENSURE · %s"
 
-msgid "Bir seçmen grubunun sorunlarını konuşarak o grubun desteğini kalıcı artırırsın. Karşıt grup biraz soğur."
-msgstr "Discussing a voter group's problems lastingly raises its support. The opposing group cools a little."
+msgid "Bir seçmen grubunun sorunlarını konuşarak o grubun desteğini kalıcı artırırsın. Karşıt grup aynı ölçüde soğur."
+msgstr "Discussing a voter group's problems lastingly raises its support. The opposing group cools by the same amount."
 
 msgid "Gündemdeki kriz: %s. Bu grupla toplanmak ek ulusal destek getirir."
 msgstr "Crisis on the agenda: %s. Meeting this group brings extra national support."
@@ -5012,3 +5012,21 @@ msgstr "READY"
 
 msgid " · bot"
 msgstr " · bot"
+
+msgid "DAHA SONRA"
+msgstr "LATER"
+
+msgid "Bir seçmen grubu için yasa getir: kabul edilirse o grup sana ısınır, karşıt grup aynı ölçüde soğur. Meclis çoğunluğu gerekir."
+msgstr "Bring a law for a voter group: if it passes, that group warms to you and the opposing group cools by the same amount. Needs a parliamentary majority."
+
+msgid "Bedelsiz"
+msgstr "Free"
+
+msgid "Bedel %s"
+msgstr "Cost %s"
+
+msgid "%s · kabul edilirse +%d puan"
+msgstr "%s · +%d points if passed"
+
+msgid "Siyasi kriz: %s. Bu grup için yasa çok daha etkili."
+msgstr "Political crisis: %s. A law for this group is far more effective."

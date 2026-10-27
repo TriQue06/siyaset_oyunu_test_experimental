@@ -645,7 +645,7 @@ func _initialize() -> void:
 	cm.round_number = 9
 	cm.agenda = {"type": calendar[9], "until": 10}
 	check("gundem tek grubu odullendirir", cm.agenda_groups().size() == 1 and cm.crisis_type() == "")
-	check("ideolojik keskinlik: karsit kayip oranlari x1.2", is_equal_approx(float(VoterGroups.data("emekli")["law_backlash"]), 0.36))
+	check("0.0.268: karsit kayip birebir (oran 1)", is_equal_approx(float(VoterGroups.data("emekli")["law_backlash"]), 1.0))
 
 	print("")
 	print("=== 14) GRUP YAKINLIGINA BAGLI VEKIL CALMA, IL TAVANI, SECIM HEDIYESI ===")

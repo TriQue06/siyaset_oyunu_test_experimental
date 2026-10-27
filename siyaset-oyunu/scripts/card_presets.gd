@@ -275,7 +275,7 @@ func agenda_effect_text(agenda_type: String) -> String:
 	var data := agenda_data(agenda_type)
 	if data.is_empty():
 		return ""
-	return L.t("%s ile toplantı ve yasa çok daha etkili, karşıt gruptan kayıp yarıya iner") % data["group_title"]
+	return L.t("%s ile toplantı ve yasa çok daha etkili") % data["group_title"]
 
 func is_censure_card(card_type: String) -> bool:
 	return card_type == CENSURE_CARD_TYPE

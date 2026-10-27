@@ -3177,11 +3177,11 @@ const NATIONAL_PROMOTE := [0.15, 0.05]
 ## Grup toplantısı (güçlü, kalıcı): grubun ülke genelindeki seçmeninden çekilen pay (puan).
 const MEETING_PULL_POINTS := 6.0
 const MEETING_PROMOTE := [0.3, 0.12]
-## ZIT GRUP KAYBI (0.0.259): bir gruba kazanılan her seçmen için zıt gruptaki
-## kendi seçmeninden bu kadarı bir seviye düşer (5 işveren → 4 işçi). Siyasi
-## krizin grubunda kayıp yarıya iner (5 → 2).
-const OPPOSITE_LOSS := 0.8
-const OPPOSITE_LOSS_CRISIS := 0.4
+## ZIT GRUP KAYBI (0.0.268): bir gruba kazanılan her seçmen için zıt gruptaki
+## kendi seçmeninden BİREBİR aynı sayıda seçmen bir seviye düşer (5 işveren →
+## 5 işçi). İstisna yok: kriz, teşkilat ya da il büyüklüğü oranı değiştirmez.
+## (Eskiden 0,8; krizin grubunda 0,4; teşkilat ve il büyüklüğüyle de ölçekleniyordu.)
+const OPPOSITE_LOSS := 1.0
 ## Teşkilat kendi seçmeninin seviye düşüşünü bu oranda azaltır (seviye 0, 1, 2).
 const VB_ORG_SHIELD := [0.0, 0.3, 0.55]
 ## İL BÜYÜKLÜĞÜ (0.0.232): seviye ATLAMA hızı ilin vekil sayısıyla TERS, seviye
@@ -3418,13 +3418,12 @@ func _vb_promote(pid: int, pi: int, gi: int, r1: float, r2: float) -> void:
 func _vb_opposite(gi: int) -> int:
 	return VoterGroups.GROUP_IDS.find(VoterGroups.opposite(String(VoterGroups.GROUP_IDS[gi])))
 
-## Kazanılan seçmenin OPPOSITE_LOSS'u kadar zıt gruptaki kendi seçmeni bir
-## seviye düşer; grup siyasi krizin grubuysa OPPOSITE_LOSS_CRISIS kadar.
+## Kazanılan seçmen kadar zıt gruptaki kendi seçmeni bir seviye düşer
+## (OPPOSITE_LOSS = 1: birebir). Teşkilat kalkanı ve il büyüklüğü uygulanmaz.
 func _vb_opposite_loss(pid: int, pi: int, gi: int, gained: float) -> void:
 	var oi := _vb_opposite(gi)
 	if oi >= 0:
-		var ratio := OPPOSITE_LOSS_CRISIS if String(VoterGroups.GROUP_IDS[gi]) == crisis_group() else OPPOSITE_LOSS
-		_vb_demote_own(pid, pi, oi, gained * ratio)
+		_vb_demote_own(pid, pi, oi, gained * OPPOSITE_LOSS, false)
 
 ## MİTİNG. mult: teşkilat × geçmiş × popülizm. Dönüş: grup -> çekilen seçmen.
 func _vb_miting(pid: int, province_id: String, focus: Array, mult: float) -> Dictionary:
@@ -3455,11 +3454,31 @@ func _vb_miting(pid: int, province_id: String, focus: Array, mult: float) -> Dic
 		result[group] = got
 	var org_level := organization_level(province_id, pid)
 	var promo_mult := 1.0 + 0.3 * float(org_level)
+	# ODAK TOPLAMI DEĞİŞTİRMEZ (0.0.268): grup seçilse de seçilmese de ildeki
+	# yükselen seçmen sayısı aynı; odak yalnızca dağılımı odak gruplara kaydırır.
+	var shares := miting_promote_shares(pid, pi, focus)
 	for gi in VB_GROUPS:
-		var share := 1.0 if focus.has(VoterGroups.GROUP_IDS[gi]) else (1.0 / 3.0 if focus.is_empty() else 0.15)
-		_vb_promote(pid, pi, gi, float(MITING_PROMOTE[0]) * share * promo_mult, float(MITING_PROMOTE[1]) * share * promo_mult)
+		_vb_promote(pid, pi, gi, float(MITING_PROMOTE[0]) * float(shares[0][gi]) * promo_mult,
+			float(MITING_PROMOTE[1]) * float(shares[1][gi]) * promo_mult)
 	_vb_sync_all()
 	return result
+
+## Mitingin seviye yükseltme payları [[1->2 payları], [2->3 payları]] (grup
+## başına). Odaklı mitingde payların seçmenle ağırlıklı toplamı odaksızla aynı.
+func miting_promote_shares(pid: int, pi: int, focus: Array) -> Array:
+	var arr: PackedFloat32Array = voter_base[pid]
+	var shares := [[], []]
+	for level in 2:
+		var base := 0.0
+		var focused := 0.0
+		for gi in VB_GROUPS:
+			var n := arr[_vb_i(pi, gi, level)]
+			base += n / 3.0
+			focused += n * (1.0 if focus.has(VoterGroups.GROUP_IDS[gi]) else 0.15)
+		var k := base / focused if focused > 0.0 else 0.0
+		for gi in VB_GROUPS:
+			(shares[level] as Array).append(1.0 / 3.0 if focus.is_empty() 				else (1.0 if focus.has(VoterGroups.GROUP_IDS[gi]) else 0.15) * k)
+	return shares
 
 ## YATIRIM: ideolojiden bağımsız, ildeki bütün gruplardan nüfusla orantılı.
 ## parts: party -> pay (0..1, toplam 1). Dönüş: çekilen toplam seçmen.

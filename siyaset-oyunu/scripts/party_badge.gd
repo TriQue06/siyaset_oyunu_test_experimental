@@ -64,7 +64,8 @@ static func build(party: Dictionary, size: Vector2, icon_pixel_size: int, is_sel
 		icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.set_anchors_preset(Control.PRESET_FULL_RECT)
-		var margin := size.y * 0.24
+		# 0.0.268: ikon %7,5 büyük (pay 0,24 -> 0,22).
+		var margin := size.y * 0.22
 		icon.offset_left = margin
 		icon.offset_top = margin - size.y * 0.03
 		icon.offset_right = -margin

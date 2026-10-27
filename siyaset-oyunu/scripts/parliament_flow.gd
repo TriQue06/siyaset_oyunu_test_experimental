@@ -30,6 +30,9 @@ var _tab := ""
 var _law_page := false
 var _shown_key := ""
 var _dim: ColorRect
+## TUR BAŞI GRUP TOPLANTISI (0.0.268): kart ve afetten sonra pencere toplantı
+## sekmesiyle kendiliğinden açılır; alttaki düğme "DAHA SONRA" olur.
+var intro := false
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -68,13 +71,24 @@ func _ready() -> void:
 ## MECLİS düğmesi: ilk kullanılabilir sekmeyle açılır.
 func open_flow() -> void:
 	engaged = true
+	intro = false
 	_tab = ""
+	_law_page = false
+	_shown_key = ""
+	refresh()
+
+## Tur başında grup toplantısı (en düşük öncelik: kart ve afetten sonra).
+func open_speech_intro() -> void:
+	engaged = true
+	intro = true
+	_tab = "speech"
 	_law_page = false
 	_shown_key = ""
 	refresh()
 
 func close_flow() -> void:
 	engaged = false
+	intro = false
 	_law_page = false
 	hide()
 
@@ -119,6 +133,10 @@ func refresh() -> void:
 		_law_page = false
 		hide()
 		toast_requested.emit(L.t("Meclis işleri bu tur için tamam."))
+		return
+	# Tur başı toplantısı yapıldı: pencere kapanır (diğer sekmelere geçilmez).
+	if intro and not CardManager.parliament_stage_available(me, "speech"):
+		close_flow()
 		return
 	# Açık sekme kapandıysa (hamle yapıldı) ilk kullanılabilir sekmeye geçilir.
 	if _tab == "" or not CardManager.parliament_stage_available(me, _tab):
@@ -176,6 +194,7 @@ func _build() -> void:
 			button.add_theme_color_override(prop, font_color)
 		button.pressed.connect(func():
 			_tab = id
+			intro = false
 			_law_page = false
 			_shown_key = ""
 			refresh())
@@ -207,7 +226,8 @@ func _build() -> void:
 		_content.add_child(filler)
 		_content.add_child(UiTheme.rule())
 		var away := Button.new()
-		away.text = L.t("Haritaya dön")
+		# Tur başı toplantısı: istersen sonra MECLİS düğmesinden yapılır.
+		away.text = L.t("DAHA SONRA") if intro else L.t("Haritaya dön")
 		away.focus_mode = Control.FOCUS_NONE
 		away.custom_minimum_size = Vector2(170, 46)
 		UiSkin.skin_button(away)
@@ -216,10 +236,7 @@ func _build() -> void:
 	relayout()
 
 func _explain(text: String, color: Color = UiTheme.TEXT) -> void:
-	var label := PopupKit.note(text, color, WIDTH)
-	label.add_theme_font_size_override("font_size", 14)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_content.add_child(label)
+	_content.add_child(explain_label(text, color))
 
 func _big_button(text: String, color: Color, action: Callable) -> Button:
 	var button := Button.new()
@@ -241,20 +258,26 @@ func _build_censure(color: Color) -> void:
 		CardManager.censure()))
 
 func _build_speech() -> void:
-	_explain(L.t("Bir seçmen grubunun sorunlarını konuşarak o grubun desteğini kalıcı artırırsın. Karşıt grup biraz soğur."))
+	_explain(L.t("Bir seçmen grubunun sorunlarını konuşarak o grubun desteğini kalıcı artırırsın. Karşıt grup aynı ölçüde soğur."))
 	var crisis := CardManager.crisis_group()
 	if crisis != "":
-		_explain(L.t("Siyasi kriz: %s. Bu grupla toplanmak çok daha etkili, karşıt gruptan kayıp yarıya iner.") % VoterGroups.title(crisis), UiTheme.HEAD)
+		_explain(L.t("Siyasi kriz: %s. Bu grupla toplanmak çok daha etkili.") % VoterGroups.title(crisis), UiTheme.HEAD)
+	_content.add_child(group_grid(func(group: String): CardManager.make_speech(group)))
+
+## SEKİZ SEÇMEN GRUBU DÜĞMESİ (iki sütun): grup toplantısı ve grup yasası
+## (0.0.268) birebir aynı ızgarayı kullanır. Düğmeye basmak hamleyi yapar.
+static func group_grid(on_pick: Callable, available: Callable = func(_group: String) -> bool: return true) -> GridContainer:
+	var crisis := CardManager.crisis_group()
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 6)
 	grid.add_theme_constant_override("v_separation", 6)
-	_content.add_child(grid)
 	for group in VoterGroups.GROUP_IDS:
 		var button := Button.new()
 		button.focus_mode = Control.FOCUS_NONE
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.custom_minimum_size = Vector2(0, 48)
+		button.disabled = not bool(available.call(group))
 		UiSkin.skin_color_button(button, VoterGroups.color(group).darkened(0.35))
 		# Simge + grup adı (gündemdeki krizse "· kriz").
 		var row := HBoxContainer.new()
@@ -272,11 +295,21 @@ func _build_speech() -> void:
 		label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		label.add_theme_font_override("font", UiTheme.mono(true))
 		label.add_theme_font_size_override("font_size", 14)
-		label.add_theme_color_override("font_color", UiTheme.TEXT)
+		# Renkli düğmelerdeki gibi beyaz yazı, altında sert gölge.
+		label.add_theme_color_override("font_color", UiTheme.ON_COLOR)
+		UiSkin._text_shadow(label, true)
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(label)
-		button.pressed.connect(func(): CardManager.make_speech(group))
+		button.pressed.connect(func(): on_pick.call(group))
 		grid.add_child(button)
+	return grid
+
+## Meclis penceresindeki açıklama satırı (yasa sayfası da kullanır).
+static func explain_label(text: String, color: Color = UiTheme.TEXT) -> Label:
+	var label := PopupKit.note(text, color, WIDTH)
+	label.add_theme_font_size_override("font_size", 14)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	return label
 
 func _build_law() -> void:
 	var me := multiplayer.get_unique_id()

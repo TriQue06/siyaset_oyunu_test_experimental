@@ -38,6 +38,8 @@ var _hover_id: String = ""
 
 ## Normal görünümdeki parti dairesinin tek vekil noktasına oranı.
 const SUMMARY_SCALE := 1.725  # 0.0.251: 1,5 ile 1,95 arası
+## Hover'da açılan tek tek vekil noktalarının ölçeği (0.0.268: %10 büyük).
+const DETAIL_SCALE := 1.1
 ## Hover'da açılma geçişi (saniye).
 const FADE_TIME := 0.15
 ## Açılan ilin geçiş oranı (0 = özet, 1 = ayrı noktalar).
@@ -218,7 +220,7 @@ func _rebuild() -> void:
 ## Bir ilin çizim grubu. summary: parti başına tek daire + sayı; değilse her
 ## vekil ayrı nokta. fade: "" (tam), "in" (hover'da beliren), "out" (kaybolan).
 func _make_group(province_id: String, colors: Array, summary: bool, fade: String) -> Dictionary:
-	var radius := dot_radius * (SUMMARY_SCALE if summary else 1.0)
+	var radius := dot_radius * (SUMMARY_SCALE if summary else DETAIL_SCALE)
 	var cell := radius * 2.0 + dot_spacing
 	var dots: Array = colors
 	var counts: Array = []

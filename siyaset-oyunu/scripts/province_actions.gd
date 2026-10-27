@@ -1,26 +1,28 @@
 class_name ProvinceActions
 extends PanelContainer
-## İL İŞLEM PANELİ (0.0.231): sıram gelince haritada bir ile dokununca harita
-## paneli ikiye bölünür (0.0.232): harita solda, bu panel aynı alanın sağ
-## yarısında. Üç başlık: TEŞKİLAT, MİTİNG, YATIRIM; birine basınca yalnız
-## onun ayrıntısı açılır.
-##   MİTİNG: bütçe (küçük / orta / büyük) → isteğe bağlı hitap grupları (teşkilat
-##     seviyesi kadar; varsayılan genel halk) → özet ve MİTİNGİ DÜZENLE
-##     (karalama 0.0.237'den beri yine ayrı kart). Hazırlık ya da iptal hak ve
-##     para tüketmez; kart yalnız son onayda elden çıkar.
-##   YATIRIM: sadece hükümet partisi; bütçe → etki özeti → onay.
+## İL MENÜSÜ (0.0.269): haritada bir ile dokununca tıklanan yerin yanında
+## SABİT BOYUTLU bir bağlam menüsü açılır (harita artık ikiye bölünmez).
+## Ana sayfada alt alta TEŞKİLAT, MİTİNG, YATIRIM düğmeleri; birine basınca
+## ayrıntısı AYNI menüde (boyut değişmeden) açılır. Üstte GERİ / İLERİ:
+## tarayıcı gibi sayfalar arasında gezinir; vazgeçmek için GERİ.
+##   TEŞKİLAT: en üst seviyedeyse düğme yer almaz.
+##   MİTİNG ve YATIRIM: yalnız teşkilat kurulmuş ilde (miting için teşkilat şart).
+##   MİTİNG: bütçe -> isteğe bağlı hitap grupları (teşkilat seviyesi kadar) ->
+##     özet ve MİTİNGİ DÜZENLE. Hazırlık ya da GERİ hak ve para tüketmez.
 ## Kurallar ve sınırlar CardManager'da doğrulanır (sıra başına miting / yatırım sınırı lobi ayarı).
 
 signal closed
 signal info_requested(province_id: String)
 signal toast_requested(text: String)
 
-## Varsayılan genişlik (yerleşimde harita alanının sağ yarısına oturur).
-const WIDTH := 380.0
+## Menünün sabit boyutu (tasarım birimi).
+const MENU_SIZE := Vector2(320, 430)
+const WIDTH := 320.0
 var panel_width := WIDTH
 const TIER_NAMES := ["KÜÇÜK", "ORTA", "BÜYÜK"]
 const TIER_NOTES := ["daha az etki, paraya göre en verimli", "olağan miting", "en güçlü etki, en pahalı"]
 const INVEST_NOTES := ["küçük yatırım", "olağan yatırım", "büyük yatırım; il tavanına çabuk dayanır"]
+const PAGE_COLORS := {"org": Color("2569CF"), "miting": Color("D93636"), "invest": Color("2E9E52")}
 
 var province_id := ""
 var tab := ""
@@ -32,45 +34,92 @@ var _invest_tier := CardManager.DEFAULT_TIER
 var _sent_version := -1
 var _scroll: ScrollContainer
 var _body: VBoxContainer
-var max_height := 440.0
+var _nav: HBoxContainer
+var _back: Button
+var _forward: Button
+## İLERİ ile dönülecek sayfa (GERİ'ye basınca dolar, yeni sayfa açınca silinir).
+var _forward_page := ""
+var max_height := MENU_SIZE.y
 
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	z_index = 96
-	# Haritanın yanında karton pano (masa oyunu).
+	# Karton pano (masa oyunu): çift çizgi, kalınlık, masaya düşen gölge.
 	var style := UiSkin.board()
-	style.set_content_margin_all(UiTheme.PAD_S + 4)
+	style.set_content_margin_all(UiTheme.d(20))
 	add_theme_stylebox_override("panel", style)
-	custom_minimum_size = Vector2(WIDTH, 0)
+	custom_minimum_size = MENU_SIZE
+	size = MENU_SIZE
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 8)
+	add_child(column)
+	_nav = HBoxContainer.new()
+	_nav.add_theme_constant_override("separation", 6)
+	column.add_child(_nav)
+	_back = _nav_button(L.t("GERİ"), go_back)
+	_nav.add_child(_back)
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_nav.add_child(spacer)
+	_forward = _nav_button(L.t("İLERİ"), go_forward)
+	_nav.add_child(_forward)
+	var x := _nav_button("X", close)
+	x.custom_minimum_size.x = 40
+	_nav.add_child(x)
 	_scroll = ScrollContainer.new()
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	add_child(_scroll)
+	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(_scroll)
 	_body = VBoxContainer.new()
 	_body.add_theme_constant_override("separation", 6)
-	_body.custom_minimum_size = Vector2(WIDTH - 24.0, 0)
 	_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_scroll.add_child(_body)
 	hide()
 
-## Panel harita alanının sağ yarısına oturur (sabit boyut, içerik kayar).
+func _nav_button(text: String, action: Callable) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.focus_mode = Control.FOCUS_NONE
+	button.custom_minimum_size = Vector2(74, 34)
+	button.add_theme_font_override("font", UiTheme.mono(true))
+	button.add_theme_font_size_override("font_size", 13)
+	UiSkin.skin_color_button(button, UiTheme.TEAL)
+	button.pressed.connect(action)
+	return button
+
+## Menü tıklanan noktanın yanına oturur (sağa sığmazsa soluna), bounds içinde kalır.
+func place_at(point: Vector2, bounds: Rect2) -> void:
+	var pos := point + Vector2(18, -MENU_SIZE.y * 0.4)
+	if pos.x + MENU_SIZE.x > bounds.end.x:
+		pos.x = point.x - 18 - MENU_SIZE.x
+	pos.x = clampf(pos.x, bounds.position.x, maxf(bounds.position.x, bounds.end.x - MENU_SIZE.x))
+	pos.y = clampf(pos.y, bounds.position.y, maxf(bounds.position.y, bounds.end.y - MENU_SIZE.y))
+	position = pos.round()
+
+## Eski çağrılar için (önizleme betikleri): menü dikdörtgenin içine oturur.
 func set_panel_rect(rect: Rect2) -> void:
-	panel_width = rect.size.x
-	max_height = rect.size.y
-	position = rect.position
-	custom_minimum_size = rect.size
-	size = rect.size
-	_body.custom_minimum_size = Vector2(panel_width - 28.0, 0)
-	if visible:
-		refresh()
+	place_at(rect.position, rect)
 
 func open(p_province: String) -> void:
+	var fresh := p_province != province_id or not visible
 	if p_province != province_id:
-		tab = ""
 		_reset_miting()
 		_invest_tier = CardManager.DEFAULT_TIER
+	if fresh:
+		tab = ""
+		_forward_page = ""
 	province_id = p_province
+	size = MENU_SIZE
+	var was_visible := visible
 	show()
 	refresh()
+	if not was_visible:
+		pivot_offset = MENU_SIZE * 0.5
+		scale = Vector2(0.85, 0.85)
+		modulate.a = 0.0
+		var tw := create_tween().set_parallel(true)
+		tw.tween_property(self, "scale", Vector2.ONE, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw.tween_property(self, "modulate:a", 1.0, 0.12)
 
 func _reset_miting() -> void:
 	_miting_tier = CardManager.DEFAULT_TIER
@@ -81,17 +130,44 @@ func close() -> void:
 	hide()
 	province_id = ""
 	tab = ""
+	_forward_page = ""
 	closed.emit()
+
+## Sayfa aç (ana menüden): ileri geçmişi silinir.
+func open_page(page: String) -> void:
+	tab = page
+	_forward_page = ""
+	_scroll.scroll_vertical = 0
+	refresh()
+
+## GERİ: ayrıntıdan ana menüye (miting hazırlığı bırakılır, hak ve para gitmez).
+func go_back() -> void:
+	if tab == "":
+		return
+	_forward_page = tab
+	tab = ""
+	refresh()
+
+## İLERİ: GERİ ile çıkılan sayfaya dön (seçimler korunur).
+func go_forward() -> void:
+	if _forward_page == "" or not _page_available(_forward_page):
+		return
+	tab = _forward_page
+	_forward_page = ""
+	refresh()
 
 func refresh() -> void:
 	if province_id == "" or not visible:
 		return
+	if tab != "" and not _page_available(tab):
+		tab = ""
 	var keep := _scroll.scroll_vertical
 	for child in _body.get_children():
 		_body.remove_child(child)
 		child.queue_free()
+	_back.disabled = tab == ""
+	_forward.disabled = _forward_page == "" or not _page_available(_forward_page)
 	_build_header()
-	_build_tabs()
 	match tab:
 		"org":
 			_build_org()
@@ -100,77 +176,98 @@ func refresh() -> void:
 		"invest":
 			_build_invest()
 		_:
-			_body.add_child(PopupKit.note(L.t("Bu ilde ne yapmak istiyorsun? Bir başlık seç."), UiTheme.TEXT_MUTED))
+			_build_menu()
+	size = MENU_SIZE
 	_fit.call_deferred(keep)
 
 func _fit(keep: int) -> void:
-	_scroll.custom_minimum_size = Vector2(panel_width - 20.0, max_height - 24.0)
-	size = Vector2(panel_width, max_height)
+	size = MENU_SIZE
 	_scroll.scroll_vertical = keep
 
-# --- Başlık ve sekmeler ------------------------------------------------------------
+## Ana menüde hangi düğmeler var: teşkilat en üst seviyedeyse yok; miting ve
+## yatırım yalnız teşkilatlı ilde.
+func _page_available(page: String) -> bool:
+	var me := multiplayer.get_unique_id()
+	var level := CardManager.organization_level(province_id, me)
+	# Bağımsız siyasetçinin teşkilatı olmaz: her ilde miting yapar.
+	if PartyManager.is_independent(me):
+		return page == "miting"
+	match page:
+		"org":
+			return level < GameRules.ORG_MAX_LEVEL
+		"miting", "invest":
+			return level > 0
+	return false
+
+# --- Başlık ve ana menü ------------------------------------------------------------
 
 func _build_header() -> void:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 6)
-	_body.add_child(row)
-	var texts := VBoxContainer.new()
-	texts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	texts.add_theme_constant_override("separation", 0)
-	row.add_child(texts)
-	# Başlık yazıları paneli genişletmesin (dar ekranda harita alanından taşmasın).
 	var title := UiTheme.mono_label(ElectionNightSim.province_name(province_id), 20, UiTheme.TEXT, true)
 	title.clip_text = true
 	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	texts.add_child(title)
+	_body.add_child(title)
 	var me := multiplayer.get_unique_id()
 	var sub := PopupKit.label(L.t("%d vekil · teşkilatın: %s") % [CardManager.province_seat_count(province_id),
-		_level_name(CardManager.organization_level(province_id, me))], 11, UiTheme.TEXT_MUTED)
+		_level_name(CardManager.organization_level(province_id, me))], 12, UiTheme.TEXT_MUTED)
 	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	sub.custom_minimum_size.x = 0
-	texts.add_child(sub)
+	_body.add_child(sub)
+	if tab != "":
+		_section({"org": L.t("Teşkilat"), "miting": L.t("Miting"), "invest": L.t("Yatırım")}.get(tab, ""))
+
+func _build_menu() -> void:
+	var me := multiplayer.get_unique_id()
+	var level := CardManager.organization_level(province_id, me)
+	var limit := CardManager.action_limit(me)
+	var any := false
+	if _page_available("org"):
+		any = true
+		var cost := CardManager.org_cost_for(me, province_id)
+		_body.add_child(_menu_button("org", L.t("TEŞKİLAT KUR") if level == 0 else L.t("TEŞKİLATI GELİŞTİR"),
+			"%s · %s" % [_level_name(level + 1), GameRules.cost_text(cost)]))
+	if _page_available("miting"):
+		any = true
+		_body.add_child(_menu_button("miting", L.t("MİTİNG"), L.t("bu sıra %d/%d hakkın kaldı") % [limit - CardManager.miting_count(me), limit]))
+	if _page_available("invest"):
+		any = true
+		_body.add_child(_menu_button("invest", L.t("YATIRIM"), L.t("bu sıra %d/%d hakkın kaldı") % [limit - CardManager.invest_count(me), limit]))
+	if level == 0 and not PartyManager.is_independent(me):
+		_body.add_child(PopupKit.note(L.t("Miting ve yatırım için önce bu ilde teşkilat kur."), UiTheme.TEXT_MUTED))
+	elif not any:
+		_body.add_child(PopupKit.note(L.t("Bu ilde yapılacak hamle yok."), UiTheme.TEXT_MUTED))
 	var info := Button.new()
 	info.text = L.t("İL BİLGİSİ")
 	info.focus_mode = Control.FOCUS_NONE
-	info.custom_minimum_size = Vector2(90, 40)
-	info.add_theme_font_size_override("font_size", 11)
+	info.custom_minimum_size = Vector2(0, 38)
+	info.add_theme_font_size_override("font_size", 13)
 	UiSkin.skin_button(info)
 	info.pressed.connect(func(): info_requested.emit(province_id))
-	row.add_child(info)
-	var x := Button.new()
-	x.text = "X"
-	x.focus_mode = Control.FOCUS_NONE
-	x.custom_minimum_size = Vector2(44, 40)
-	UiSkin.skin_button(x)
-	x.pressed.connect(close)
-	row.add_child(x)
+	_body.add_child(info)
 
-func _build_tabs() -> void:
-	var me := multiplayer.get_unique_id()
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 4)
-	_body.add_child(row)
-	var specs := [
-		["org", L.t("TEŞKİLAT"), Color("2569CF")],
-		["miting", L.t("MİTİNG %d/%d") % [CardManager.action_limit(me) - CardManager.miting_count(me), CardManager.action_limit(me)], Color("F2132A")],
-		["invest", L.t("YATIRIM %d/%d") % [CardManager.action_limit(me) - CardManager.invest_count(me), CardManager.action_limit(me)], Color("31C440")],
-	]
-	for spec in specs:
-		var key := String(spec[0])
-		var button := Button.new()
-		button.text = String(spec[1])
-		button.focus_mode = Control.FOCUS_NONE
-		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		button.custom_minimum_size = Vector2(0, 44)
-		button.clip_text = true
-		button.add_theme_font_override("font", UiTheme.mono(true))
-		button.add_theme_font_size_override("font_size", 12)
-		var color: Color = spec[2]
-		UiSkin.skin_color_button(button, color if tab == key else color.lerp(UiTheme.PANEL_LIGHT, 0.55))
-		button.pressed.connect(func():
-			tab = "" if tab == key else key
-			refresh())
-		row.add_child(button)
+## Ana menüde alt alta duran büyük renkli düğme: başlık ve altında kısa bilgi.
+func _menu_button(page: String, title: String, sub: String) -> Button:
+	var button := Button.new()
+	button.focus_mode = Control.FOCUS_NONE
+	button.custom_minimum_size = Vector2(0, 66)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	UiSkin.skin_color_button(button, PAGE_COLORS[page])
+	var texts := VBoxContainer.new()
+	texts.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	texts.offset_bottom = -UiTheme.d(6)
+	texts.alignment = BoxContainer.ALIGNMENT_CENTER
+	texts.add_theme_constant_override("separation", 0)
+	texts.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(texts)
+	var head := UiTheme.mono_label(title, 20, UiTheme.ON_COLOR, true)
+	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiSkin._text_shadow(head, true)
+	texts.add_child(head)
+	var small := PopupKit.label(sub, 12, Color(UiTheme.ON_COLOR, 0.9))
+	small.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	small.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	texts.add_child(small)
+	button.pressed.connect(open_page.bind(page))
+	return button
 
 func _section(title: String) -> void:
 	_body.add_child(PopupKit.section(title))
@@ -283,7 +380,7 @@ func _build_miting() -> void:
 	var slots := CardManager.miting_focus_slots(me, province_id)
 	_section(L.t("2 · Kime hitap edeceksin?"))
 	if slots <= 0:
-		_body.add_child(PopupKit.note(L.t("Bu ilde teşkilatın yok: miting genel halka hitap eder. Teşkilat kurarsan belirli gruplara seslenebilirsin."), UiTheme.TEXT_MUTED))
+		_body.add_child(PopupKit.note(L.t("Miting genel halka hitap eder."), UiTheme.TEXT_MUTED))
 	else:
 		_body.add_child(PopupKit.note(L.t("İsteğe bağlı: en çok %d grup seç. Seçmezsen genel halka hitap edersin.") % slots, UiTheme.TEXT_MUTED))
 		var grid := GridContainer.new()
@@ -321,16 +418,6 @@ func _build_miting() -> void:
 	if not ok:
 		_body.add_child(PopupKit.note(L.t("Parti kasası yetmiyor (%s gerekir).") % GameRules.cost_text(cost), UiTheme.RED))
 	_body.add_child(_confirm_button(L.t("MİTİNGİ DÜZENLE · %s") % GameRules.cost_text(cost), ok, func(): _do_miting()))
-	var cancel := Button.new()
-	cancel.text = L.t("Hazırlığı iptal et")
-	cancel.focus_mode = Control.FOCUS_NONE
-	cancel.custom_minimum_size = Vector2(0, 40)
-	UiSkin.skin_button(cancel)
-	cancel.pressed.connect(func():
-		_reset_miting()
-		tab = ""
-		refresh())
-	_body.add_child(cancel)
 
 func _gain_preview(me: int) -> String:
 	var parts: PackedStringArray = []

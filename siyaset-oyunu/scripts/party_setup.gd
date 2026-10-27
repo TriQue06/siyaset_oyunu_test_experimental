@@ -90,8 +90,8 @@ var _home_body: Label
 # 4 parti kimliği
 var _name_edit: LineEdit
 var _name_hint: Label
-var _preview_bg: ColorRect
-var _preview_icon: TextureRect
+## Logo önizlemesi (3B pul; renk / logo değişince yeniden kurulur).
+var _preview_holder: CenterContainer
 var _icon_grid: GridContainer
 var _color_row: HFlowContainer
 # 5 seçmen
@@ -395,18 +395,9 @@ func _choice_card(info: Dictionary, hover_key: String) -> Button:
 	button.focus_mode = Control.FOCUS_NONE
 	button.toggle_mode = true
 	button.clip_contents = true
-	var frame := Panel.new()
-	frame.name = "SelectedFrame"
-	frame.set_anchors_preset(Control.PRESET_FULL_RECT)
-	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var ring := StyleBoxFlat.new()
-	# Zeminsiz: UiSkin zeminli kutuları dokuya çevirip çerçeveyi siler.
-	ring.draw_center = false
-	ring.border_color = UiTheme.GOLD
-	ring.set_border_width_all(3)
-	UiSkin.apply_style(frame, "panel", ring)
-	frame.visible = false
-	button.add_child(frame)
+	# 0.0.269 PÜRÜZSÜZ: bütün durumlar aynı geometride (kalkma / gömülme yok,
+	# yazı yerinden oynamaz); seçili kart hardal kenarlı, üstüne gelince açılır.
+	_style_choice(button, false)
 	var box := VBoxContainer.new()
 	box.set_anchors_preset(Control.PRESET_FULL_RECT)
 	box.offset_left = 10
@@ -432,6 +423,17 @@ func _choice_card(info: Dictionary, hover_key: String) -> Button:
 			_hovered_profile = ""
 			_refresh_detail())
 	return button
+
+func _style_choice(button: Button, selected: bool) -> void:
+	for state in ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]:
+		var hover: bool = state == "hover" or state == "hover_pressed"
+		var style: BoardBox
+		if selected:
+			style = UiSkin.card(Color("FFF4D6") if not hover else Color("FFF8E6"), UiTheme.GOLD, UiTheme.GOLD_DIM)
+			style.rings = [[0.0, UiTheme.d(4), UiTheme.GOLD]]
+		else:
+			style = UiSkin.card(UiTheme.PANEL_LIGHT if not hover else UiTheme.PANEL_LIGHT.lightened(0.35), UiTheme.PANEL_LIGHT.darkened(0.08))
+		button.add_theme_stylebox_override(state, style)
 
 ## Alttaki ayrıntı: solda meslek, sağda kişilik (üzerine gelinen kart öne çıkar).
 func _refresh_detail() -> void:
@@ -519,20 +521,10 @@ func _build_identity_page() -> Control:
 	var top := HBoxContainer.new()
 	top.add_theme_constant_override("separation", 16)
 	page.add_child(top)
-	_preview_bg = ColorRect.new()
-	_preview_bg.custom_minimum_size = Vector2(PREVIEW_SIZE, PREVIEW_SIZE)
-	_preview_bg.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	top.add_child(_preview_bg)
-	_preview_icon = TextureRect.new()
-	_preview_icon.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_preview_icon.offset_left = 22
-	_preview_icon.offset_top = 22
-	_preview_icon.offset_right = -22
-	_preview_icon.offset_bottom = -22
-	_preview_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_preview_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_preview_icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	_preview_bg.add_child(_preview_icon)
+	_preview_holder = CenterContainer.new()
+	_preview_holder.custom_minimum_size = Vector2(PREVIEW_SIZE, PREVIEW_SIZE + 16)
+	_preview_holder.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	top.add_child(_preview_holder)
 	var name_col := VBoxContainer.new()
 	name_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_col.add_theme_constant_override("separation", 6)
@@ -559,14 +551,21 @@ func _build_identity_page() -> Control:
 	_icon_grid.add_theme_constant_override("h_separation", 6)
 	_icon_grid.add_theme_constant_override("v_separation", 6)
 	page.add_child(_icon_grid)
+	# 0.0.269: her logo partinin renginde 3B pul; seçili olanda hardal halka.
 	for i in PartyPresets.icon_count():
-		var btn := TextureButton.new()
-		btn.texture_normal = PartyPresets.get_icon_texture(i, GRID_ICON_PIXEL_SIZE)
-		# ignore_texture_size olmadan düğme dokunun gerçek boyutuna büyür.
-		btn.ignore_texture_size = true
-		btn.custom_minimum_size = Vector2(ICON_BUTTON_SIZE, ICON_BUTTON_SIZE)
-		btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-		btn.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		var btn := Button.new()
+		btn.focus_mode = Control.FOCUS_NONE
+		btn.custom_minimum_size = Vector2(ICON_BUTTON_SIZE, ICON_BUTTON_SIZE + 4)
+		var icon := TextureRect.new()
+		icon.name = "Icon"
+		icon.texture = PartyPresets.get_icon_texture(i, GRID_ICON_PIXEL_SIZE)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		icon.position = Vector2(ICON_BUTTON_SIZE * 0.22, ICON_BUTTON_SIZE * 0.19)
+		icon.size = Vector2(ICON_BUTTON_SIZE, ICON_BUTTON_SIZE) * 0.56
+		btn.add_child(icon)
 		btn.pressed.connect(_on_icon_selected.bind(i))
 		_icon_grid.add_child(btn)
 	return built[0]
@@ -602,16 +601,12 @@ func _build_color_row() -> void:
 		if taken:
 			btn.text = "X"
 			btn.add_theme_font_size_override("font_size", 12)
+			btn.add_theme_color_override("font_disabled_color", UiTheme.ON_COLOR)
 		btn.disabled = taken
-		btn.modulate = Color.WHITE if not taken else Color(0.55, 0.55, 0.55, 1.0)
+		btn.modulate = Color.WHITE if not taken else Color(0.7, 0.7, 0.7, 1.0)
 		var selected := color.is_equal_approx(_bg_color)
-		var style := UiSkin.color_box(color, UiSkin.BUTTON_TINT_HOVER if selected else UiSkin.BUTTON_TINT_NORMAL)
-		for state in ["normal", "hover", "pressed", "disabled"]:
-			UiSkin.apply_style(btn, state, style)
-		if selected:
-			var ring := UiSkin.color_surface(UiTheme.GOLD, UiSkin.TARGET)
-			ring.set_anchors_preset(Control.PRESET_FULL_RECT)
-			btn.add_child(ring)
+		# 0.0.269: renkler de logolar gibi 3B yuvarlak pul; seçili renkte hardal halka.
+		_style_disc(btn, color, selected)
 		if not taken:
 			btn.pressed.connect(_on_color_selected.bind(i))
 		_color_row.add_child(btn)
@@ -760,27 +755,28 @@ func _refresh_card() -> void:
 	for group in _core:
 		core_row.add_child(PopupKit.chip(VoterGroups.title(String(group)), VoterGroups.color(String(group))))
 
+## Parti logosu: oyundaki gibi gölgeli 3B pul (0.0.269; eskiden kare).
 func _logo(icon_index: int, color: Color, side: float) -> Control:
-	var swatch := ColorRect.new()
-	swatch.custom_minimum_size = Vector2(side, side)
-	swatch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	swatch.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	swatch.color = color
-	swatch.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var party := {"bg_color": color, "icon_color": ICON_COLOR}
 	if icon_index >= 0:
-		var icon := TextureRect.new()
-		icon.texture = PartyPresets.get_icon_texture(icon_index, GRID_ICON_PIXEL_SIZE)
-		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon.set_anchors_preset(Control.PRESET_FULL_RECT)
-		var pad := side * 0.14
-		icon.offset_left = pad
-		icon.offset_top = pad
-		icon.offset_right = -pad
-		icon.offset_bottom = -pad
-		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		swatch.add_child(icon)
-	return swatch
+		party["icon_index"] = icon_index
+	var badge := PartyBadge.build(party, Vector2(side, side), PREVIEW_ICON_PIXEL_SIZE if side > 80.0 else GRID_ICON_PIXEL_SIZE)
+	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	badge.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return badge
+
+## Yuvarlak 3B pul düğme (renk ve logo seçici): bütün durumlarda aynı boy, seçili
+## olanda hardal halka; üstüne gelince hafif açılır.
+func _style_disc(btn: Button, color: Color, selected: bool) -> void:
+	var side := btn.custom_minimum_size.x
+	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
+		var tone := color.lightened(0.12) if state == "hover" else color
+		var style := VoterGroupIcon.pawn_style(tone, side)
+		if selected:
+			style.rings = [[0.0, maxf(2.0, side * 0.09), UiTheme.GOLD]]
+		style.content_margin_bottom = side * 0.087
+		btn.add_theme_stylebox_override(state, style)
 
 func _refresh_players() -> void:
 	if _players_list == null:
@@ -1054,10 +1050,7 @@ func _mark_cards(cards: Dictionary, selected: String) -> void:
 	for id in cards.keys():
 		var card: Button = cards[id]
 		card.button_pressed = id == selected
-		card.modulate = Color.WHITE if (selected == "" or id == selected) else Color(1, 1, 1, 0.7)
-		var frame := card.get_node_or_null("SelectedFrame")
-		if frame != null:
-			frame.visible = id == selected
+		_style_choice(card, id == selected)
 
 func _paint_map() -> void:
 	_map.clear_overlay()
@@ -1077,15 +1070,15 @@ func _refresh_home_info() -> void:
 # --- Etkileşim: parti ----------------------------------------------------------------
 
 func _refresh_identity() -> void:
-	_preview_bg.color = _bg_color
-	_preview_icon.texture = PartyPresets.get_icon_texture(_icon_index, PREVIEW_ICON_PIXEL_SIZE)
-	_preview_icon.modulate = ICON_COLOR
+	for child in _preview_holder.get_children():
+		_preview_holder.remove_child(child)
+		child.queue_free()
+	_preview_holder.add_child(_logo(_icon_index, _bg_color, PREVIEW_SIZE))
 	var valid := PartyManager.is_valid_name(_party_name)
 	_name_hint.text = L.t("%d-%d karakter") % [PartyManager.NAME_MIN_LENGTH, PartyManager.NAME_MAX_LENGTH]
 	_name_hint.add_theme_color_override("font_color", UiTheme.TEXT_MUTED if valid else UiTheme.RED)
 	for i in _icon_grid.get_child_count():
-		var btn: TextureButton = _icon_grid.get_child(i)
-		btn.self_modulate = UiTheme.TEAL if i == _icon_index else UiTheme.TEXT_DIM
+		_style_disc(_icon_grid.get_child(i) as Button, _bg_color, i == _icon_index)
 	_build_color_row()
 
 func _on_party_name_changed(text: String) -> void:

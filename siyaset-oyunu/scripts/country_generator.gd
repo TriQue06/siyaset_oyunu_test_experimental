@@ -59,7 +59,8 @@ static func generate(seed_value: int, province_scale: float = 1.0, seat_total: i
 	var topo := topology(points)
 	var land := _land(points, topo, rng)
 	var open_sea := _open_sea(points, land, topo)
-	var count := maxi(6, int(roundf(PROVINCES / maxf(0.25, province_scale))))
+	# 0.0.269: her il sayısı ayarında ortalama 5 il daha az.
+	var count := maxi(6, int(roundf(PROVINCES / maxf(0.25, province_scale))) - 5)
 	var labels := _grow(points, topo, land, open_sea, count, rng)
 	count = _compact(labels, points)
 	var coastal := _coastal(labels, topo, count, open_sea)

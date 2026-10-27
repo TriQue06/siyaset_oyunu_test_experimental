@@ -1499,8 +1499,8 @@ func can_miting(peer_id: int, province_id: String = "", state: float = -1.0, tie
 	# BAĞIMSIZ siyasetçinin teşkilatı yoktur: her ilde miting yapabilir.
 	if PartyManager.is_independent(peer_id):
 		return province_id == "" or has_province(province_id)
-	# 0.0.213: miting teşkilat istemez (teşkilatsız miting az getirir).
-	return province_id == "" or has_province(province_id)
+	# 0.0.269: miting için ilde TEŞKİLAT şart (eskiden teşkilatsız miting az getiriyordu).
+	return province_id == "" or (has_province(province_id) and organization_level(province_id, peer_id) > 0)
 
 ## Bu ilde mitingte seçilebilecek grup odağı sayısı = teşkilat seviyesi.
 func miting_focus_slots(peer_id: int, province_id: String) -> int:

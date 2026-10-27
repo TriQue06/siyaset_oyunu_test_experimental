@@ -12,10 +12,9 @@ extends Node2D
 ## Yerleşim: her il bir "nokta grubu" (n sandalye için satır/sütun ızgarası)
 ## oluşturur ve grup ilin merkezine (GameMap.center_of) oturur.
 ##
-## İKİ GÖRÜNÜM (0.0.244): NORMALDE her ilde parti başına TEK daire (1,5 kat
-## büyük), içinde o partinin vekil sayısı. Fare ilin üstüne gelince kısa bir
-## geçişle (FADE_TIME) her vekil ayrı nokta olarak açılır. İl incelemesinde
-## (set_only_province) doğrudan ayrı noktalar çizilir.
+## TEK GÖRÜNÜM (0.0.269): her vekil her zaman ayrı pul (eskiden parti başına
+## içinde sayı yazan tek daire vardı, ayrı pullar yalnız fareyle açılıyordu).
+## İl incelemesinde (set_only_province) yalnız o ilin pulları çizilir.
 
 @export var dot_radius: float = 4.6     # nokta yarıçapı (harita/viewBox birimi)
 @export var dot_outline_width: float = 2.0  # siyah kontur kalınlığı
@@ -30,24 +29,8 @@ extends Node2D
 ## en az bu kadar gerçek piksel boşluk kalmasını garanti eder.
 @export var min_screen_gap_px: int = 1
 
-## KALABALIK İLLER (0.0.221): HOVER_ONLY_SEATS'ten fazla vekili olan ilin
-## noktaları (ör. Türkiye haritasında İstanbul) normalde gizlidir; fare o ilin
-## üstüne gelince görünür ve o anda diğer bütün illerin noktaları gizlenir.
-const HOVER_ONLY_SEATS := 30
-var _hover_id: String = ""
-
-## Normal görünümdeki parti dairesinin tek vekil noktasına oranı.
-const SUMMARY_SCALE := 1.725  # 0.0.251: 1,5 ile 1,95 arası
-## Hover'da açılan tek tek vekil noktalarının ölçeği (0.0.268: %10 büyük).
+## Vekil pullarının ölçeği (0.0.268: %10 büyütüldü).
 const DETAIL_SCALE := 1.1
-## Hover'da açılma geçişi (saniye).
-const FADE_TIME := 0.15
-## Açılan ilin geçiş oranı (0 = özet, 1 = ayrı noktalar).
-var _fade := 1.0
-## Sayıları çizen çocuk düğüm (dairelerin shader'ı yazıyı bozmasın diye ayrı).
-var _labels: Node2D
-## _draw'da hesaplanan sayı yazıları: [ekran merkezi, yarıçap px, metin, alfa].
-var _label_items: Array = []
 
 ## Nokta grupları bölgenin merkezine (GameMap.center_of) çizilir.
 var _seat_centers: Dictionary = {}  # province_id -> Vector2 (harita/local birimi)
@@ -76,29 +59,7 @@ func _ready() -> void:
 	material = shader_material
 	# Harita (ebeveyn) yakınlaşınca/kayınca yeniden çiz: ölçek o anki ekrana göre.
 	set_notify_transform(true)
-	if _province_map != null and _province_map.has_signal("province_hovered"):
-		_province_map.province_hovered.connect(_on_province_hovered)
-	_labels = SeatCountLabels.new()
-	_labels.markers = self
-	add_child(_labels)
 	set_process(false)
-
-func _on_province_hovered(province_id: String) -> void:
-	if province_id == _hover_id:
-		return
-	_hover_id = province_id
-	_fade = 0.0 if province_id != "" else 1.0
-	set_process(province_id != "")
-	_rebuild()
-
-func _process(delta: float) -> void:
-	_fade = minf(1.0, _fade + delta / FADE_TIME)
-	queue_redraw()
-	if _fade >= 1.0:
-		set_process(false)
-
-func _is_crowded(province_id: String) -> bool:
-	return province_id != "" and (_seats.get(province_id, []) as Array).size() > HOVER_ONLY_SEATS
 
 var _drawn_key := Vector3(-1, -1, -1)
 
@@ -188,19 +149,10 @@ func _rebuild() -> void:
 		var colors: Array = _seats[province_id]
 		if colors.is_empty():
 			continue
-		if _only_id != "":
-			# İl incelemesi: yalnız bu il, doğrudan ayrı noktalar.
-			if province_id == _only_id:
-				groups.append(_make_group(province_id, colors, false, ""))
+		# İl incelemesi: yalnız bu il.
+		if _only_id != "" and province_id != _only_id:
 			continue
-		# Kalabalık il açılınca diğer iller gizlenir (açılan küme komşuları örter).
-		if _is_crowded(_hover_id) and province_id != _hover_id:
-			continue
-		if province_id == _hover_id:
-			groups.append(_make_group(province_id, colors, true, "out"))
-			groups.append(_make_group(province_id, colors, false, "in"))
-		else:
-			groups.append(_make_group(province_id, colors, true, ""))
+		groups.append(_make_group(province_id, colors))
 
 	# Sınır kelepçesi: büyük illerde nokta kümesi haritanın dışına taşmasın.
 	var map_size := Vector2.ZERO
@@ -217,30 +169,18 @@ func _rebuild() -> void:
 
 	queue_redraw()
 
-## Bir ilin çizim grubu. summary: parti başına tek daire + sayı; değilse her
-## vekil ayrı nokta. fade: "" (tam), "in" (hover'da beliren), "out" (kaybolan).
-func _make_group(province_id: String, colors: Array, summary: bool, fade: String) -> Dictionary:
-	var radius := dot_radius * (SUMMARY_SCALE if summary else DETAIL_SCALE)
+## Bir ilin çizim grubu: her vekil ayrı pul.
+func _make_group(province_id: String, colors: Array) -> Dictionary:
+	var radius := dot_radius * DETAIL_SCALE
 	var cell := radius * 2.0 + dot_spacing
 	var dots: Array = colors
-	var counts: Array = []
-	if summary:
-		dots = []
-		var index := {}
-		for c in colors:
-			var key := (c as Color).to_html()
-			if not index.has(key):
-				index[key] = dots.size()
-				dots.append(c)
-				counts.append(0)
-			counts[index[key]] += 1
 	var layout := _get_dot_layout(dots.size())
 	var max_cols := 0
 	for c in layout:
 		max_cols = max(max_cols, c)
 	var center: Vector2 = _seat_centers.get(province_id, _province_map.get_province_centroid(province_id))
-	return {"pos": center, "layout": layout, "colors": dots, "counts": counts, "radius": radius, "cell": cell,
-		"fade": fade, "half_w": max_cols * cell * 0.5, "half_h": layout.size() * cell * 0.5}
+	return {"pos": center, "layout": layout, "colors": dots, "radius": radius, "cell": cell,
+		"half_w": max_cols * cell * 0.5, "half_h": layout.size() * cell * 0.5}
 
 ## Grubun "çapası": öyle bir nokta ki, ızgara oradan kurulduğunda noktaların
 ## GERÇEK AĞIRLIK MERKEZİ tam olarak istenen `center`a düşsün. Son satır
@@ -288,7 +228,6 @@ func _draw() -> void:
 	var inv := xform.affine_inverse()
 
 	var shader_material: ShaderMaterial = null
-	_label_items.clear()
 	for g in _groups:
 		var radius: float = g["radius"]
 		var cell: float = g["cell"]
@@ -300,16 +239,8 @@ func _draw() -> void:
 			shader_material.set_shader_parameter("outline_color", dot_outline_color)
 			shader_material.set_shader_parameter("inner_ratio", float(dot_half_px) / float(outline_half_px))
 		var alpha := 1.0
-		match String(g["fade"]):
-			"in":
-				alpha = _fade
-			"out":
-				alpha = 1.0 - _fade
-		if alpha <= 0.01:
-			continue
 		var layout: Array = g["layout"]
 		var colors: Array = g["colors"]
-		var counts: Array = g["counts"]
 		var rows: int = layout.size()
 		var anchor_px: Vector2 = (xform * g["anchor"]).round()
 		var first_row_dy: int = int(roundf(-(rows - 1) * 0.5 * cell * scale))
@@ -324,10 +255,7 @@ func _draw() -> void:
 				var color: Color = colors[idx]
 				var center_px := Vector2(x0_px + col * step_px, y_px)
 				_draw_pawn(inv, scale, center_px, outline_half_px, color, alpha)
-				if not counts.is_empty():
-					_label_items.append([center_px, dot_half_px, str(counts[idx]), alpha, color])
 				idx += 1
-	_labels.queue_redraw()
 
 ## KONSEPT VEKİL PULU (0.0.266): krem pul, parti renginin koyusunda kenar,
 ## altında ahşap rengi sert gölge ve hafif yumuşak gölge. 0.0.267: dört
@@ -368,26 +296,3 @@ func _draw_circle_at_screen_px(inv: Transform2D, screen_scale: float, center_px:
 	var center: Vector2 = inv * center_px
 	draw_texture_rect(_white_texture, Rect2(center - Vector2(half_local, half_local), Vector2(half_local, half_local) * 2.0),
 		false, color)
-
-
-## Özet dairelerinin içindeki vekil sayıları: ekran pikselinde, dairenin
-## ortasında, açık renkli dairede koyu, koyu dairede beyaz yazı.
-class SeatCountLabels extends Node2D:
-	var markers: Node2D
-
-	func _draw() -> void:
-		if markers == null:
-			return
-		var xform := get_viewport().get_final_transform() * get_global_transform_with_canvas()
-		draw_set_transform_matrix(xform.affine_inverse())
-		var font := UiTheme.mono(true)
-		for item in markers._label_items:
-			var center: Vector2 = item[0]
-			var half: int = item[1]
-			var text: String = item[2]
-			var alpha: float = item[3]
-			var fill: Color = item[4]
-			var size := maxi(10, int(roundf(half * (1.7 if text.length() == 1 else 1.3))) + 1)
-			var text_size := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size)
-			var pos := Vector2(center.x - text_size.x * 0.5, center.y + (font.get_ascent(size) - font.get_descent(size)) * 0.5).round()
-			draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(UiTheme.INK, alpha))

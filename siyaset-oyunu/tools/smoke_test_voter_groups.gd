@@ -218,7 +218,8 @@ func _initialize() -> void:
 	var nat_before: float = cm.national_of(1)
 	var loc_before: float = cm.local_of(mid, 1)
 	check("uyumlu ilde provokasyon riski yok", near(cm.miting_risk(1, mid), 0.0), "%.2f" % cm.miting_risk(1, mid))
-	check("miting teskilat istemez", cm.can_miting(1, game_map.ids[4]) and cm.organization_level(game_map.ids[4], 1) == 0)
+	# 0.0.269: miting için teşkilat şart.
+	check("teskilatsiz ilde miting yapilamaz", not cm.can_miting(1, game_map.ids[4]) and cm.organization_level(game_map.ids[4], 1) == 0)
 	var g0 := float(cm.miting_group_gains(1, game_map.ids[4])[0]["gain"])
 	cm.organizations[game_map.ids[4]] = {1: 1}
 	var g1 := float(cm.miting_group_gains(1, game_map.ids[4])[0]["gain"])

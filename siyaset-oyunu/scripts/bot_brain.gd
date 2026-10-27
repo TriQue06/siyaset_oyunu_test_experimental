@@ -933,6 +933,9 @@ static func _eval_miting(bot: int) -> Dictionary:
 		best_fit = maxf(best_fit, _ideology_fit(bot, String(province_id), core))
 	for province_id in _seats().keys():
 		var org_level := CardManager.organization_level(String(province_id), bot)
+		# 0.0.269: miting için teşkilat şart (bağımsız hariç).
+		if org_level <= 0 and not PartyManager.is_independent(CardManager.party_of(bot)):
+			continue
 		var org_mult := PublicOpinion.miting_org_mult(org_level)
 		var risk := CardManager.miting_risk(bot, province_id)
 		var seats := float(CardManager.province_seat_count(province_id))
@@ -1024,12 +1027,17 @@ static func _eval_investment(bot: int) -> Dictionary:
 	var best_province := ""
 	var best_value := -INF
 	for province_id in _seats().keys():
+		# 0.0.269: yatırım yalnız teşkilatlı ilde.
+		if CardManager.organization_level(String(province_id), bot) <= 0:
+			continue
 		var room := clampf((PublicOpinion.INVEST_LIMIT - CardManager.local_of(province_id, bot)) / PublicOpinion.INVEST_LOCAL, 0.0, 1.0)
 		var value := float(CardManager.province_seat_count(province_id)) \
 			* (0.5 + PublicOpinion.appeal_closeness(CardManager.appeal_of(province_id, bot))) * room
 		if value > best_value:
 			best_value = value
 			best_province = province_id
+	if best_province == "":
+		return {}
 	# İl başkanlığı ve mitingle aynı ölçek (vekil/30).
 	return {"score": (0.8 + best_value / 30.0 * 1.2 * (1.3 if _election_soon() else 1.0)) * timing, "peer": -1, "province": best_province}
 

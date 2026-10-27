@@ -5030,3 +5030,27 @@ msgstr "%s · +%d points if passed"
 
 msgid "Siyasi kriz: %s. Bu grup için yasa çok daha etkili."
 msgstr "Political crisis: %s. A law for this group is far more effective."
+
+msgid "GERİ"
+msgstr "BACK"
+
+msgid "İLERİ"
+msgstr "FORWARD"
+
+msgid "TEŞKİLAT KUR"
+msgstr "BUILD BRANCH"
+
+msgid "TEŞKİLATI GELİŞTİR"
+msgstr "UPGRADE BRANCH"
+
+msgid "bu sıra %d/%d hakkın kaldı"
+msgstr "%d/%d left this turn"
+
+msgid "Miting ve yatırım için önce bu ilde teşkilat kur."
+msgstr "Build a branch here first to hold rallies and invest."
+
+msgid "Bu ilde yapılacak hamle yok."
+msgstr "Nothing to do in this province."
+
+msgid "Miting genel halka hitap eder."
+msgstr "The rally addresses the general public."

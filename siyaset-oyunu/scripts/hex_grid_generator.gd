@@ -29,7 +29,9 @@ const LAND_FRACTION := 0.56
 const HEXES_PER_REGION := 11.0
 const MIN_REGION_HEXES := 4
 const PROVINCE_SEATS := 300
-const MIN_SEATS := 2
+## 0.0.269: her ilde en az 3 vekil (toplam vekil sayısından bağımsız; toplam
+## yetmezse il başına 3 verilir).
+const MIN_SEATS := 3
 const METRO_COUNT := 5
 ## TIKIZ BÜYÜME: bölge her adımda birkaç aday hücreye bakar ve kendi
 ## hücreleriyle en çok komşu olanı alır (ince kollar/çıkıntılar oluşmasın).
@@ -209,7 +211,8 @@ static func _grow_regions(land: Array, rng: RandomNumberGenerator, province_scal
 		if land[i]:
 			land_cells.append(i)
 	# 0.0.251: ortalamada ~2 il daha az (-4 → -6).
-	var target := maxi(8, int(round((land_cells.size() / HEXES_PER_REGION - 6.0) * province_scale)))
+	# 0.0.269: her ayarda ortalama 5 il daha az.
+	var target := maxi(8, int(round((land_cells.size() / HEXES_PER_REGION - 6.0) * province_scale)) - 5)
 	# Birbirinden uzak tohumlar: önce geniş aralık, yetmezse daralt.
 	var seeds: Array = []
 	var shuffled := land_cells.duplicate()
@@ -434,7 +437,7 @@ static func _allocate_seats(population: Array, seat_total: int = 300) -> Array:
 	var seats: Array = []
 	seats.resize(count)
 	seats.fill(MIN_SEATS)
-	var left := seat_total - MIN_SEATS * count
+	var left := maxi(0, seat_total - MIN_SEATS * count)
 	var total := 0.0
 	for p in population:
 		total += float(p)

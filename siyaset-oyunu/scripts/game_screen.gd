@@ -285,9 +285,6 @@ var _parl_pulse: Tween
 var _turn_intro: TurnIntro
 var _parliament_flow: ParliamentFlow
 var _province_actions: ProvinceActions
-## İl hamleleri açıkken harita paneli ikiye bölünür (bkz. _open_province_actions).
-var _map_split := false
-var _map_split_tween: Tween
 ## Miting hamlesi için il seçme modu.
 var _pending_miting: bool = false
 ## MİTİNG ODAĞI (0.0.213): ildeki teşkilat seviyesi kadar grup seçilir.
@@ -736,9 +733,6 @@ func _apply_layout() -> void:
 	_ensure_center_board()
 	if _swap_engaged:
 		_place_map(_swap_map_rect)
-	elif _map_split:
-		_place_map(_map_split_rects()[0])
-		_province_actions.set_panel_rect(_map_split_rects()[1])
 	else:
 		_place_map(map_rect)
 	_place_layer_bar()
@@ -5542,8 +5536,6 @@ func _set_map_layer(layer: int, animate: bool = true) -> void:
 		if _map_snapshot.visible:
 			map_holder.position = Vector2.ZERO
 			_map_snapshot.hide()
-			if map_holder.isolated_id != "" and _map_split:
-				_place_map(_map_split_rects()[0])
 		# İki kare bekle: gizli butonlarla en az bir kare çizilmiş olsun.
 		await get_tree().process_frame
 		await get_tree().process_frame
@@ -5940,44 +5932,23 @@ func _open_province_actions(province_id: String) -> void:
 		return
 	_parliament_flow.close_flow()
 	_close_law_page()
-	var halves := _map_split_rects()
-	var right: Rect2 = halves[1]
-	_province_actions.set_panel_rect(right)
+	# 0.0.269: harita bölünmez; tıklanan yerin yanında bağlam menüsü açılır
+	# (orta panonun içinde kalır).
+	var board := _r(R_MAP).grow(-UiTheme.d(10))
+	_province_actions.place_at(get_viewport().get_mouse_position(), board)
 	_province_actions.open(province_id)
 	_highlight_province(province_id)
 	_pinned = false
 	_show_province_info(province_id)
 	_pinned = true
+	# İl bilgisi odak yakınlaşması başlatır; menü açıkken harita yerinde kalır.
 	if _focus_tween != null and _focus_tween.is_running():
 		_focus_tween.kill()
-	map_holder.set_isolated(province_id)
-	if not _map_split:
-		_map_split = true
-		_animate_map_rect(_map_area(), halves[0])
-	else:
-		_place_map(halves[0])
+	map_holder.scale = Vector2(_map_fit_scale, _map_fit_scale)
+	map_holder.position = Vector2.ZERO
 
 func _on_province_actions_closed() -> void:
 	_highlight_province("")
-	map_holder.set_isolated("")
-	if _map_split:
-		_map_split = false
-		_animate_map_rect(_map_split_rects()[0], _map_area())
-
-## [harita yarısı, hamle yarısı]: harita alanının sol ve sağ yarısı.
-func _map_split_rects() -> Array:
-	var map := _map_area()
-	var half := (map.size.x - 8.0) * 0.5
-	return [Rect2(map.position, Vector2(half, map.size.y)),
-		Rect2(map.position + Vector2(half + 8.0, 0.0), Vector2(half, map.size.y))]
-
-## Haritayı bir dikdörtgenden ötekine kısa bir animasyonla taşır (bölme / birleşme).
-func _animate_map_rect(from: Rect2, to: Rect2) -> void:
-	if _map_split_tween != null and _map_split_tween.is_valid():
-		_map_split_tween.kill()
-	_map_split_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	_map_split_tween.tween_method(func(t: float):
-		_place_map(Rect2(from.position.lerp(to.position, t), from.size.lerp(to.size, t))), 0.0, 1.0, 0.25)
 
 ## MECLİS düğmesi: açık aşamayı gösterir, yapılacak iş varken nabız gibi parlar.
 func _refresh_parliament_button() -> void:

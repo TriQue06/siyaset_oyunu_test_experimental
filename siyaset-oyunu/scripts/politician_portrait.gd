@@ -36,8 +36,9 @@ func _draw() -> void:
 		var src := Rect2((tex_size.x - side) * 0.5, (tex_size.y - side) * 0.25, side, side)
 		draw_texture_rect_region(_texture, rect, src)
 	else:
-		draw_rect(rect, _color.darkened(0.25))
-		draw_rect(rect.grow(-side_len * 0.06), _color)
+		# 0.0.269: parti logosu gibi gölgeli 3B pul (kare yok).
+		var disc := rect.grow(-side_len * 0.06)
+		draw_style_box(VoterGroupIcon.pawn_style(_color, disc.size.x), disc)
 		var font := UiTheme.mono(true)
 		var text := PoliticianPresets.initials(_data)
 		var font_size := int(side_len * 0.42)
@@ -45,4 +46,5 @@ func _draw() -> void:
 		var pos := rect.position + Vector2((side_len - text_size.x) * 0.5, (side_len + font.get_ascent(font_size) - font.get_descent(font_size)) * 0.5)
 		draw_string(font, pos + Vector2(2, 2), text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(0, 0, 0, 0.35))
 		draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color.WHITE)
+		return
 	draw_rect(rect, UiTheme.INK, false, 2.0)

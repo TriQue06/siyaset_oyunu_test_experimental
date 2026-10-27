@@ -370,6 +370,8 @@ func _initialize() -> void:
 	cm.economy["treasury"] = Economy.INVEST_COST * 1.5
 	check("bot: seçim uzakken son yedeği harcamaz", bb._eval_investment(1).is_empty())
 	cm.economy["treasury"] = Economy.INVEST_COST * 4.0
+	# 0.0.269: bot yalnız teşkilatlı ilde yatırım yapar.
+	cm.organizations[String(cm._province_ids[0])] = {cm.party_of(1): 1}
 	check("bot: yeterli hazinede yatırım değerlendirir", not bb._eval_investment(1).is_empty())
 	cm.economy["tax"] = Economy.TAX_HIGH
 	cm.early_election_pending = true

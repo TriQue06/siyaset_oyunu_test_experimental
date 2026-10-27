@@ -19,7 +19,13 @@ func run() -> void:
 			var seats := 0
 			for region in map["regions"]:
 				seats += int(region["seats"])
-			check(seats == 150, "seat conservation seed %d scale %.2f" % [seed_value, scale])
+			# 0.0.269: il başına en az 3 vekil; toplam yetmezse il başına 3 verilir.
+			var expected := maxi(150, 3 * (map["regions"] as Array).size())
+			check(seats == expected, "seat conservation seed %d scale %.2f (%d / %d)" % [seed_value, scale, seats, expected])
+			var min_ok := true
+			for region in map["regions"]:
+				min_ok = min_ok and int(region["seats"]) >= 3
+			check(min_ok, "her ilde en az 3 vekil seed %d scale %.2f" % [seed_value, scale])
 			counts.append(map["regions"].size())
 		for i in 3:
 			totals[i] += int(counts[i])
@@ -37,7 +43,7 @@ func run() -> void:
 	affinity["emekli"] = 90.0
 	var votes: Dictionary = model.shares_in_group(party_groups, "emekli")
 	check(float(votes[1]) > 0.9, "targeted party captures retired electorate")
-	mm._apply_world_settings({"province_scale": 0.75, "province_seats": 150, "national_seats": 0, "turn_seconds": 45})
+	mm._apply_world_settings({"province_scale": 0.75, "province_seats": 150, "national_seats": 0, "turn_seconds": 60})
 	var outcome: Dictionary = model.compute(party_groups, {"small": 50, "metro": 100}, profiles, 0.0, rng)
 	var seat_sum := 0
 	for value in outcome["seats"].values():
@@ -45,9 +51,9 @@ func run() -> void:
 	check(seat_sum == 150, "zero national list and total seats")
 	check(model.NATIONAL_LIST_SEATS == 0, "national list setting")
 	var rules = load("res://scripts/game_rules.gd")
-	check(rules.TURN_TIMEOUT == 45.0, "turn timeout setting")
+	check(rules.TURN_TIMEOUT == 60.0, "turn timeout setting")
 	mm._apply_world_settings({"turn_seconds": 30, "action_limit": 7})
-	check(int(mm.world_settings["turn_seconds"]) == 75 and int(mm.world_settings["action_limit"]) == 5, "old out-of-range values fall back to defaults")
+	check(int(mm.world_settings["turn_seconds"]) == 90 and int(mm.world_settings["action_limit"]) == 5, "old out-of-range values fall back to defaults")
 	rules.configure(1, 5)
 	check(rules.ELECTION_INTERVAL == 2, "one year election interval")
 	rules.configure(2.5, 5)

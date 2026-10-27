@@ -891,8 +891,11 @@ static func _eval_miting(bot: int) -> Dictionary:
 	var core: Array = PartyManager.data_of(CardManager.party_of(bot)).get("core", [])
 	var home := PoliticianPresets.hometown_of(bot)
 	var best_fit := 0.0001
+	var fits := {}
 	for province_id in _seats().keys():
-		best_fit = maxf(best_fit, _ideology_fit(bot, String(province_id), core))
+		var fit := _ideology_fit(bot, String(province_id), core)
+		fits[province_id] = fit
+		best_fit = maxf(best_fit, fit)
 	for province_id in _seats().keys():
 		var org_level := CardManager.organization_level(String(province_id), bot)
 		# 0.0.269: miting için teşkilat şart (bağımsız hariç).
@@ -901,7 +904,7 @@ static func _eval_miting(bot: int) -> Dictionary:
 		var org_mult := PublicOpinion.miting_org_mult(org_level)
 		var risk := CardManager.miting_risk(bot, province_id)
 		var seats := float(CardManager.province_seat_count(province_id))
-		var fit := _ideology_fit(bot, String(province_id), core)
+		var fit: float = fits[province_id]
 		var held := _province_hold(bot, String(province_id))
 		var stronghold := 1.0 + 0.35 * float(org_level) + (0.4 if String(province_id) == home else 0.0)
 		var value := pow(fit / best_fit, 4.0) * org_mult * stronghold * pow(maxf(1.0, seats), 0.15) / (1.0 + held * 4.0) * 0.6 \

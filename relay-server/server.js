@@ -168,15 +168,11 @@ function handleData(ws, payload) {
   const target = payload.readInt32LE(0);
   const gameData = payload.subarray(4);
 
-  const outFrame = Buffer.concat([
-    Buffer.from([TYPE.DATA]),
-    (() => {
-      const b = Buffer.alloc(4);
-      b.writeInt32LE(ws.peerId, 0);
-      return b;
-    })(),
-    gameData,
-  ]);
+  // Allocate once. Every byte is initialized before the frame is sent.
+  const outFrame = Buffer.allocUnsafe(5 + gameData.length);
+  outFrame.writeUInt8(TYPE.DATA, 0);
+  outFrame.writeInt32LE(ws.peerId, 1);
+  gameData.copy(outFrame, 5);
 
   if (target === 0) {
     for (const [id, peerWs] of room.peers) {

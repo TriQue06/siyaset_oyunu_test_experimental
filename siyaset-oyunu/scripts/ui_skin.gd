@@ -472,6 +472,11 @@ static func apply_style(control: Control, key: StringName, original: StyleBox) -
 ## Pasif hamleler de kalınlığını korur; yalnız gövde ve yazı söner.
 ## Button.disabled kullanılmaz: basınca engelin nedeni açıklanabilir.
 static func skin_action_button(button: Button, color: Color, available: bool) -> void:
+	# Reapplying identical styles reallocates BoardBoxes and invalidates layout.
+	var skin_key := [color, available]
+	if button.get_meta("action_skin_key", []) == skin_key:
+		return
+	button.set_meta("action_skin_key", skin_key)
 	# Pasif hamle: HTML'deki YARDIM gibi gri gövde, açık yazı.
 	skin_color_button(button, color if available else UiTheme.TEXT_DIM)
 	if not available:

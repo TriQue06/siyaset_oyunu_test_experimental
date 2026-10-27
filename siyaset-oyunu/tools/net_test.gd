@@ -34,6 +34,10 @@ func wait_until(cond: Callable, label: String) -> bool:
 			break
 		await create_timer(0.05).timeout
 		_elapsed += 0.05
+		# Custom SceneTree scripts disable the normal manager clocks.
+		if role == "host":
+			cm.tick(0.05)
+			gm.tick(0.05)
 		if _elapsed > TIMEOUT_SEC:
 			fail("zaman aşımı: " + label)
 			return false
@@ -103,6 +107,7 @@ func run_host() -> void:
 	mm.finish_party_setup()
 	cm.turn_order = [client_id, 1]
 	cm.current_turn_index = 0
+	cm._start_turn_flow(client_id)
 	cm.funds[client_id] = 10  # teşkilat (2) + her kart (en çok 3)
 	cm.inventories[client_id] = []
 	cm.inventories[1] = []
@@ -124,9 +129,9 @@ func run_host() -> void:
 	cm.state_version += 1
 	log_line("kayıp mesaj simüle edildi (round=99, yayın yok)")
 
-	if not await wait_until(func(): return mm.players.size() == 1, "client ayrıldı"):
+	if not await wait_until(func(): return mm.is_away(client_id), "client ayrıldı, bağlantı durumu güncellendi"):
 		return
-	if not await wait_until(func(): return cm.game_finished, "ayrılan oyuncu temizlendi -> yeterli oyuncu yok -> oyun bitti"):
+	if not await wait_until(func(): return cm.turn_order.has(client_id) and mm.is_ai_controlled(client_id), "ayrılan oyuncunun yerini bot devraldı"):
 		return
 	log_line("HOST PASS")
 	quit(0)
@@ -157,10 +162,10 @@ func run_client() -> void:
 	if not await wait_until(func(): return cm.organization_level(TestProvinces.id("izmir"), me) == 1 and not cm.province_poll(me, TestProvinces.id("izmir")).is_empty(), "teşkilat hamlesi RPC'si"):
 		return
 	cm.pass_turn()
-	if not await wait_until(func(): return cm.province_profiles.size() == 67, "illerin seçmen profilleri senkronlandı"):
+	if not await wait_until(func(): return not cm.province_profiles.is_empty() and cm.province_profiles.size() == root.get_node("GameMap").province_ids().size(), "illerin seçmen profilleri senkronlandı"):
 		return
-	if not await wait_until(func(): return cm.last_election_round == 1 and cm.last_province_results.size() == 67,
-			"seçim sonucu (67 il, büyük paket) alındı"):
+	if not await wait_until(func(): return cm.last_election_round == 1 and not cm.last_province_results.is_empty() and cm.last_province_results.size() == root.get_node("GameMap").province_ids().size(),
+			"seçim sonucu (bütün iller, büyük paket) alındı"):
 		return
 	if not await wait_until(func(): return _drive_government(me), "hükümet kuruldu (client)"):
 		return

@@ -10,12 +10,15 @@ func _t(label: String, f: Callable, n: int = 5) -> void:
 
 func _initialize() -> void:
 	await process_frame
+	seed(4242)
 	var mm = root.get_node("MultiplayerManager")
 	var pm = root.get_node("PartyManager")
 	var cm = root.get_node("CardManager")
 	var gm = root.get_node("GovernmentManager")
 	root.get_node("BotManager").set_process(false)
 	cm.allow_temporary_parties = false
+	cm.fixed_map_seed = 1950
+	cm.set_rng_seed(4242)
 	mm.start_offline("Barış")
 	for i in 7:
 		mm.add_bot()
@@ -43,6 +46,7 @@ func _initialize() -> void:
 			var cb2: Callable = c["callable"]
 			print("  CM %s -> %s.%s" % [sig, cb2.get_object(), cb2.get_method()])
 	_t("_rebuild_player_panel", scene._rebuild_player_panel)
+	_t("_rebuild_player_panel_now", scene._rebuild_player_panel_now)
 	_t("_on_turn_changed", func(): scene._on_turn_changed(cm.current_turn_peer_id()))
 	_t("_rebuild_hand", scene._rebuild_hand)
 	_t("_on_parties_updated", scene._on_parties_updated)
@@ -50,6 +54,19 @@ func _initialize() -> void:
 	_t("_refresh_action_buttons", scene._refresh_action_buttons)
 	_t("push_state opinion (tümü)", func(): cm._push_state({"type": "opinion"}))
 	_t("GM _emit_all", gm._emit_all)
+	_t("vb_election_state", cm.vb_election_state, 20)
+	_t("projection_all", cm.projection_all, 5)
+	var map = scene.map_holder
+	var palette_a := {}
+	var palette_b := {}
+	for id in map.ids:
+		palette_a[id] = Color(0.2, 0.4, 0.6, 1.0)
+		palette_b[id] = Color(0.8, 0.6, 0.4, 1.0)
+	var toggle := [false]
+	_t("map color upload", func():
+		toggle[0] = not toggle[0]
+		map.set_province_colors(palette_a if toggle[0] else palette_b)
+		map._update_land_colors(), 20)
 	var t0 := Time.get_ticks_usec()
 	for i in 60:
 		await process_frame

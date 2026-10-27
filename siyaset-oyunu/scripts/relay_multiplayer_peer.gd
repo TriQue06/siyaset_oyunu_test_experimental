@@ -42,6 +42,7 @@ var _transfer_channel: int = 0
 var _refusing_new_connections: bool = false
 
 var _incoming: Array = [] # her biri: {"sender": int, "data": PackedByteArray}
+var _incoming_head := 0
 
 var _pending_mode: int = -1 # 0=create, 1=join
 var _pending_name: String = ""
@@ -171,15 +172,22 @@ func _handle_frame(pkt: PackedByteArray) -> void:
 			room_closed_by_relay.emit(close_reason)
 
 func _get_available_packet_count() -> int:
-	return _incoming.size()
+	return _incoming.size() - _incoming_head
 
 func _get_max_packet_size() -> int:
 	return BUFFER_SIZE
 
 func _get_packet_script() -> PackedByteArray:
-	if _incoming.is_empty():
+	if _get_available_packet_count() == 0:
 		return PackedByteArray()
-	var entry: Dictionary = _incoming.pop_front()
+	var entry: Dictionary = _incoming[_incoming_head]
+	_incoming_head += 1
+	if _incoming_head == _incoming.size():
+		_incoming.clear()
+		_incoming_head = 0
+	elif _incoming_head >= 1024 and _incoming_head * 2 >= _incoming.size():
+		_incoming = _incoming.slice(_incoming_head)
+		_incoming_head = 0
 	return entry["data"]
 
 func _put_packet_script(p_buffer: PackedByteArray) -> int:
@@ -228,9 +236,9 @@ func _get_packet_peer() -> int:
 	# paket GERİDEN gelebiliyordu (ör. B'nin isteği yanlışlıkla A'nın
 	# göndericisi sanılabiliyordu). Artık ikisi tamamen bağımsız ve her
 	# zaman kuyruğun aynı (ilk) elemanına bakıyor, sıra sorunu imkansız.
-	if _incoming.is_empty():
+	if _get_available_packet_count() == 0:
 		return 0
-	return _incoming[0]["sender"]
+	return _incoming[_incoming_head]["sender"]
 
 func _is_server() -> bool:
 	return _unique_id == 1
@@ -240,6 +248,8 @@ func _poll_ok() -> bool:
 
 func _close() -> void:
 	_ws.close()
+	_incoming.clear()
+	_incoming_head = 0
 	_status = MultiplayerPeer.CONNECTION_DISCONNECTED
 
 func _disconnect_peer(p_peer: int, p_force: bool) -> void:

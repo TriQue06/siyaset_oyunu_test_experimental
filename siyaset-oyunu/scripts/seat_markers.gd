@@ -89,13 +89,17 @@ func clear_province(province_id: String) -> void:
 
 ## Tüm illeri tek seferde ayarlar (tek yeniden hesaplama). province_id -> Array[Color]
 func set_all(seats_by_province: Dictionary) -> void:
-	_seats = seats_by_province.duplicate()
+	if _seats == seats_by_province:
+		return
+	_seats = seats_by_province.duplicate(true)
 	_rebuild()
 
 ## İl incelemesi: yalnız bu ilin noktaları, kalabalık olsa da hep çizilir.
 var _only_id := ""
 
 func set_only_province(province_id: String) -> void:
+	if _only_id == province_id:
+		return
 	_only_id = province_id
 	_rebuild()
 

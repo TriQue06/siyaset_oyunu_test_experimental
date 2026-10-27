@@ -1894,9 +1894,14 @@ func province_poll(peer_id: int, province_id: String) -> Dictionary:
 	var error := poll_error(peer_id, province_id)
 	if error < 0.0:
 		return {}
-	var projection := province_projection(province_id)
+	var mods := election_modifiers(true)
+	var eligible := projected_eligible(mods)
+	var shares := expected_province_shares(province_id, mods)
+	var projection := {}
+	for pid in party_ids():
+		projection[pid] = {"percent": float(shares.get(pid, 0.0))}
 	return _noisy_poll(projection, error, "%s:%d:%d" % [province_id, party_of(peer_id), round_number], province_seat_count(province_id),
-		projected_eligible())
+		eligible)
 
 func _noisy_poll(projection: Dictionary, error: float, seed_text: String, seat_count: int, eligible: Array) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
@@ -1924,8 +1929,6 @@ func _noisy_poll(projection: Dictionary, error: float, seed_text: String, seat_c
 func projected_eligible(mods: Dictionary = {}) -> Array:
 	if mods.is_empty():
 		mods = election_modifiers(true)
-	var local_mods: Dictionary = mods["local"]
-	var groups := _group_profiles()
 	var national := {}
 	var total := 0.0
 	for province_id in _province_ids:
@@ -1945,13 +1948,15 @@ func projected_eligible(mods: Dictionary = {}) -> Array:
 ## Gürültüsüz beklenen il payları (peer -> yüzde): seçmen tabanı + kararsızların
 ## sandığa giden kısmı kamuoyu ağırlığıyla (bkz. ElectionModel.voter_shares).
 func expected_province_shares(province_id: String, mods: Dictionary) -> Dictionary:
+	_vb_ensure()
+	var parties := _vb_parties()
 	var local_here: Dictionary = (mods["local"] as Dictionary).get(province_id, {})
 	var opinion := {}
 	var noise := {}
-	for pid in _vb_parties():
+	for pid in parties:
 		opinion[pid] = PublicOpinion.multiplier(float((mods["national"] as Dictionary).get(pid, 0.0)), float(local_here.get(pid, 0.0)))
 		noise[pid] = 1.0
-	var shares := ElectionModel.voter_shares(vb_province_state(province_id), _vb_parties(), noise, opinion)
+	var shares := ElectionModel.voter_shares(_vb_province_state(province_id, parties), parties, noise, opinion)
 	for pid in shares.keys():
 		shares[pid] = float(shares[pid]) * 100.0
 	return shares
@@ -2001,8 +2006,6 @@ func province_projection(province_id: String) -> Dictionary:
 ## kadar yakın olunduğunu ölçmek için). peer_id = -1: tüm iller, gürültüsüz.
 func projection_all(viewer: int = -1) -> Dictionary:
 	var mods := election_modifiers(true)
-	var local_mods: Dictionary = mods["local"]
-	var groups := _group_profiles()
 	var eligible := projected_eligible(mods)
 	var result := {}
 	for province_id in _province_ids:
@@ -2139,6 +2142,8 @@ static func _log_kind(event: Dictionary) -> String:
 func init_game() -> void:
 	if not _is_authority():
 		return
+	_broadcast_snapshot.clear()
+	_received_snapshot.clear()
 	inventories.clear()
 	alliances = {}
 	alliance_requests = {}
@@ -3544,6 +3549,10 @@ func _vb_transfer(from_pid: int, to_pid: int, frac: float) -> void:
 ## İldeki bağlı seçmen (parti -> sayı) ve kararsızlar: seçim modelinin girdisi.
 func vb_province_state(province_id: String) -> Dictionary:
 	_vb_ensure()
+	return _vb_province_state(province_id, _vb_parties())
+
+## Callers scanning the country validate the base once, outside the province loop.
+func _vb_province_state(province_id: String, parties: Array) -> Dictionary:
 	var pi: int = _vb_index.get(province_id, -1)
 	var attached := {}
 	var undecided := 0.0
@@ -3553,7 +3562,7 @@ func vb_province_state(province_id: String) -> Dictionary:
 	var electorate := 0.0
 	for gi in VB_GROUPS:
 		electorate += _vb_count(pi, gi)
-	for pid in _vb_parties():
+	for pid in parties:
 		var n := 0.0
 		if voter_base.has(pid):
 			for gi in VB_GROUPS:
@@ -3564,9 +3573,11 @@ func vb_province_state(province_id: String) -> Dictionary:
 	return {"attached": attached, "undecided": undecided}
 
 func vb_election_state() -> Dictionary:
+	_vb_ensure()
+	var parties := _vb_parties()
 	var state := {}
 	for province_id in _province_ids:
-		state[province_id] = vb_province_state(String(province_id))
+		state[province_id] = _vb_province_state(String(province_id), parties)
 	return state
 
 ## Partinin her gruptaki ülke geneli seçmen payı seviyelere ayrılmış:
@@ -5480,11 +5491,15 @@ func _apply_state(state: Dictionary) -> void:
 				hand.erase(removed)
 	turn_order = state["turn_order"]
 	current_turn_index = int(state["turn_index"])
-	MultiplayerManager._apply_world_settings(state.get("world_settings", MultiplayerManager.world_settings))
+	var world: Dictionary = state.get("world_settings", MultiplayerManager.world_settings)
+	if world != MultiplayerManager.world_settings:
+		MultiplayerManager._apply_world_settings(world)
 	alliances_enabled = bool(state.get("alliances_enabled", true))
 	alliances = state.get("alliances", {})
 	alliance_requests = state.get("alliance_requests", {})
-	_vb_unpack(state.get("voter_base", {}))
+	var base: Dictionary = state.get("voter_base", {})
+	if base != voter_base:
+		_vb_unpack(base)
 	_next_alliance_request = int(state.get("alliance_request_next", 0))
 	former_allies = state.get("former_allies", {})
 	last_election_alliances = state.get("last_election_alliances", {})
@@ -5547,6 +5562,7 @@ func _apply_state(state: Dictionary) -> void:
 	game_end_reason = str(state["end_reason"])
 	if state.has("map") and int((state["map"] as Dictionary).get("seed", -1)) != GameMap.seed_value():
 		GameMap.set_data(state["map"])
+		_vb_ready = false
 	# Vekil sayıları HER durumda haritadan yeniden okunur: istemci haritayı aynı
 	# tohumla kendisi üretince (seed eşit) bu tablo açılıştaki varsayılan
 	# haritadan kalıyordu, her oyuncu ilde farklı vekil sayısı görüyordu.
@@ -5556,8 +5572,9 @@ func _apply_state(state: Dictionary) -> void:
 		last_province_results = state["province_results"]
 	# Eski sürüm (ideoloji eksenli) bir host'un durumu sessizce yeni profillere
 	# eşlenmez: geçersiz profiller hiç alınmaz (bkz. VoterGroups.is_valid_profile).
-	if state.has("province_profiles") and _valid_profiles(state["province_profiles"]):
+	if state.has("province_profiles") and province_profiles != state["province_profiles"] and _valid_profiles(state["province_profiles"]):
 		province_profiles = state["province_profiles"]
+		_vb_ready = false
 
 static func _valid_profiles(profiles) -> bool:
 	if not profiles is Dictionary:
@@ -5569,6 +5586,9 @@ static func _valid_profiles(profiles) -> bool:
 
 ## Host: durumu (sürümü artırarak) herkese yayınlar ve olayın sinyallerini
 ## kendi tarafında da doğrudan atar (.rpc() göndericide çalışmaz).
+var _broadcast_snapshot: Dictionary = {}
+var _received_snapshot: Dictionary = {}
+
 func _push_state(event: Dictionary, include_results: bool = false) -> void:
 	_prune_alliances()
 	if not _pending_log.is_empty():
@@ -5590,8 +5610,22 @@ func _push_state(event: Dictionary, include_results: bool = false) -> void:
 		_pending_econ = {}
 	state_version += 1
 	if not _is_local_only():
-		_receive_state.rpc(_pack_state(include_results or event.get("type", "") in ["full", "election", "player_left", "player_away", "player_back", "party_split", "party_merge", "party_change"]), event)
+		var full: bool = include_results or event.get("type", "") in ["full", "election", "player_left", "player_away", "player_back", "party_split", "party_merge", "party_change"]
+		var state := _pack_state(full)
+		if full or _broadcast_snapshot.is_empty() or int(_broadcast_snapshot["version"]) != state_version - 1:
+			_receive_state.rpc(state, event)
+		else:
+			_receive_state_delta.rpc(int(_broadcast_snapshot["version"]), _state_delta(state, _broadcast_snapshot), event)
+		# Packed arrays use copy-on-write; nested dictionaries need a snapshot.
+		_broadcast_snapshot = state.duplicate(true)
 	_emit_post_event(event)
+
+func _state_delta(state: Dictionary, previous: Dictionary) -> Dictionary:
+	var changes := {}
+	for key in state:
+		if not previous.has(key) or state[key] != previous[key]:
+			changes[key] = state[key]
+	return changes
 
 func _emit_post_event(event: Dictionary) -> void:
 	var type: String = event.get("type", "")
@@ -5654,6 +5688,7 @@ func _secret_play_confirmed(card_type: String) -> void:
 
 @rpc("authority", "reliable")
 func _receive_state(state: Dictionary, event: Dictionary) -> void:
+	_received_snapshot = state.duplicate(true)
 	# Animasyon sinyalleri ESKİ state üzerinden kurulsun diye önce bunlar.
 	if event.has("dealt"):
 		var dealt: Dictionary = event["dealt"]
@@ -5664,6 +5699,16 @@ func _receive_state(state: Dictionary, event: Dictionary) -> void:
 			card_played.emit(shown, str(event["card"]))
 	_apply_state(state)
 	_emit_post_event(event)
+
+## Same event and application path as a full snapshot; only transport is smaller.
+@rpc("authority", "reliable")
+func _receive_state_delta(base_version: int, changes: Dictionary, event: Dictionary) -> void:
+	if state_version != base_version or int(_received_snapshot.get("version", -1)) != base_version:
+		request_full_sync()
+		return
+	var state := _received_snapshot.duplicate()
+	state.merge(changes, true)
+	_receive_state(state, event)
 
 @rpc("authority", "reliable")
 func _heartbeat(card_version: int, gov_version: int, party_version: int) -> void:

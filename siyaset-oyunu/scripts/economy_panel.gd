@@ -26,6 +26,7 @@ const DELTA_SIZE := 10
 const SEGMENTS := 10
 
 var _tax_buttons: Array = []
+var _styled_tax_level := -1
 var _tiles: Dictionary = {}       # key -> {"panel", "style", "value", "delta"}
 var _income_label: Label
 var _tax_effect: Label
@@ -171,6 +172,8 @@ func refresh() -> void:
 	var econ: Dictionary = CardManager.economy
 	var level := CardManager.tax_level()
 	for i in _tax_buttons.size():
+		if _styled_tax_level == level:
+			break
 		var button := _tax_buttons[i] as Button
 		var active := i == level
 		# Konsept: seçili kademe deniz yeşili, diğerleri oyuk renginde.
@@ -179,6 +182,7 @@ func refresh() -> void:
 		if not active:
 			button.add_theme_color_override("font_color", UiTheme.TEXT_MUTED2)
 			button.add_theme_color_override("font_hover_color", UiTheme.TEXT)
+	_styled_tax_level = level
 	var prev: Dictionary = econ.get("prev", {})
 	if _treasury_tween == null or not _treasury_tween.is_running():
 		_shown_treasury = CardManager.state_treasury()

@@ -2013,9 +2013,6 @@ func _rebuild_player_panel_now() -> void:
 	if player_panel_list == null:
 		return
 	_ensure_board()
-	for child in player_panel_list.get_children():
-		player_panel_list.remove_child(child)
-		child.queue_free()
 	if player_tabs != null:
 		player_tabs.show()
 	var party_ids := _ordered_party_ids()
@@ -2027,15 +2024,50 @@ func _rebuild_player_panel_now() -> void:
 	var inner := _board_inner()
 	var list_height: float = inner.size.y - PLAYER_TAB_HEIGHT - PLAQUE_GAP * 2.0
 	var plaque_height: float = clampf(list_height / maxf(1.0, party_ids.size()) - PLAQUE_GAP, 44.0, PLAQUE_HEIGHT)
-	for pid in party_ids:
-		var plaque := _build_plaque(int(pid), inner.size.x)
+	var existing := {}
+	for child in player_panel_list.get_children():
+		existing[child.get_meta("peer_id", -1)] = child
+	for index in party_ids.size():
+		var pid: int = party_ids[index]
+		var key := _plaque_key(pid, inner.size.x)
+		var plaque: Control = existing.get(pid)
+		if plaque == null or plaque.get_meta("plaque_key", []) != key:
+			if plaque != null:
+				player_panel_list.remove_child(plaque)
+				plaque.queue_free()
+			plaque = _build_plaque(pid, inner.size.x)
+			plaque.set_meta("plaque_key", key)
+			player_panel_list.add_child(plaque)
 		plaque.custom_minimum_size.y = plaque_height
-		player_panel_list.add_child(plaque)
+		player_panel_list.move_child(plaque, index)
+		existing.erase(pid)
+	for child in existing.values():
+		player_panel_list.remove_child(child)
+		child.queue_free()
 	_board_scroll.visible = _player_tab == 0
 	_score_scroll.visible = _player_tab == 1
 	_refresh_score_table()
 	# Panel yeniden kuruldu: hedef seçme vurguları yeni düğümlere uygulanmalı.
 	_refresh_target_highlights()
+
+## Only inputs used by _build_plaque; snapshots must survive in-place mutations.
+func _plaque_key(pid: int, width: float) -> Array:
+	var party := PartyManager.data_of(pid)
+	var members := PartyManager.members_of(pid)
+	var people := []
+	for member in members:
+		people.append([PoliticianPresets.display_name(int(member)), MultiplayerManager.is_away(int(member))])
+	var alliance_id := CardManager.alliance_of(pid)
+	return [width, multiplayer.get_unique_id(), TranslationServer.get_locale(),
+		party.get("name"), party.get("bg_color"), party.get("icon_index"), party.get("icon_color"),
+		PartyManager.is_independent(pid), members.duplicate(), people,
+		CardManager.current_turn_peer_id(), CardManager.last_seats.get(pid),
+		CardManager.last_vote_shares.duplicate(), CardManager.populism_rounds_left(pid),
+		CardManager.alliances.get(alliance_id, {}).duplicate(true), MultiplayerManager.away_mode,
+		GovernmentManager.has_government(), CardManager.is_government_party(pid),
+		GovernmentManager.main_gov_peer_id, GovernmentManager.is_voting(),
+		GovernmentManager.eligible_voter_ids(), GovernmentManager.votes.duplicate(),
+		PoliticianPresets.display_name(pid)]
 
 ## Plaket sırası: oyun sırasına göre partiler (iki kişilik parti bir kez).
 func _ordered_party_ids() -> Array:
@@ -2296,16 +2328,27 @@ func _refresh_hand_interactivity() -> void:
 
 # --- El (envanter) ----------------------------------------------------------
 
+var _built_hand: Array = []
+var _hand_built := false
+var _built_hand_locale := ""
+
 func _rebuild_hand() -> void:
 	# El değişti: bekleyen hedef seçimi artık yanlış karta işaret edebilir.
 	_cancel_targeting()
 	_selected_hand_index = -1
 	if _card_info != null:
 		_card_info.hide()
+	var hand := CardManager.my_inventory()
+	if _hand_built and hand == _built_hand and _built_hand_locale == TranslationServer.get_locale():
+		_fit_hand_width(hand.size())
+		_refresh_hand_interactivity()
+		return
+	_built_hand = hand.duplicate()
+	_hand_built = true
+	_built_hand_locale = TranslationServer.get_locale()
 	for child in hand_container.get_children():
 		child.queue_free()
 	_hand_holders.clear()
-	var hand := CardManager.my_inventory()
 	for i in hand.size():
 		hand_container.add_child(_build_hand_card(hand[i], i))
 	_fit_hand_width(hand.size())
@@ -4138,6 +4181,10 @@ func _action_button(title: String, cost_text: String, color: Color) -> Button:
 ## Sekme düğmesi (hamle ve yasa sekmeleri): harita katman düğmeleri gibi kare,
 ## seçili olan altın; lit false ise yazı sönük.
 func _style_tab_button(button: Button, active: bool, lit: bool) -> void:
+	var style_key := [active, lit]
+	if button.get_meta("game_tab_key", []) == style_key:
+		return
+	button.set_meta("game_tab_key", style_key)
 	UiSkin.skin_tab(button, active)
 	button.add_theme_font_size_override("font_size", UiTheme.fs(19))
 	button.custom_minimum_size.y = PLAYER_TAB_HEIGHT
@@ -4149,6 +4196,11 @@ func _style_tab_button(button: Button, active: bool, lit: bool) -> void:
 ## düğmeye sığana kadar yazı küçülür (İngilizce "EARLY ELECTION" gibi; ad
 ## kısaltılmaz).
 func _set_action_text(button: Button, title: String, cost_text: String) -> void:
+	var text_key := [title, cost_text, button.size.x, _r(R_ACTIONS).size.x, TranslationServer.get_locale()]
+	if button.get_meta("action_text_key", []) == text_key:
+		_sync_action_text(button)
+		return
+	button.set_meta("action_text_key", text_key)
 	# Konsept .act: başlık Siyaset Display 32 px, alt satır Nunito 800 18 px;
 	# ikisi de yüzün ortasında, basınca yüzle birlikte iner.
 	button.text = ""
@@ -5459,8 +5511,7 @@ func _apply_map_layer_colors() -> void:
 					else:
 						colors[province_id] = MAP_UNKNOWN_COLOR
 	_province_base_colors = colors
-	map_holder.clear_overlay()
-	map_holder.set_province_colors(colors)
+	map_holder.replace_province_colors(colors)
 	var seat_markers := map_holder.get_node_or_null("SeatMarkers")
 	if seat_markers != null:
 		seat_markers.visible = _map_layer == MapLayer.SEATS

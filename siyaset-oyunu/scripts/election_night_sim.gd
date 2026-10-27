@@ -45,6 +45,7 @@ var _final_eligible: Array = []
 var _window: Dictionary = {}  # province_id -> Vector2(açılış, bitiş) (süre oranı)
 var _bias: Dictionary = {}    # province_id -> {peer_id: -1..1}
 var _wave: Dictionary = {}    # province_id -> {peer_id: [frekans1, faz1, frekans2, faz2]}
+var _allocation_cache: Dictionary = {}
 
 static func province_name(province_id: String) -> String:
 	var map = Engine.get_main_loop().root.get_node_or_null("GameMap") if Engine.get_main_loop() is SceneTree else null
@@ -55,6 +56,7 @@ var alliances: Dictionary = {}
 
 func setup(province_results: Dictionary, vote_shares: Dictionary, seats: Dictionary, passed: Array,
 		threshold_percent: float, seed_value: int, duration_seconds: float, alliance_membership: Dictionary = {}) -> void:
+	_allocation_cache.clear()
 	alliances = alliance_membership
 	duration = maxf(1.0, duration_seconds)
 	threshold = threshold_percent
@@ -201,7 +203,14 @@ func sample(t: float) -> Dictionary:
 		var p: Dictionary = provinces[province_id]
 		if float(p["c"]) <= 0.0:
 			continue
-		var alloc := ElectionModel.allocate(p["shares"], eligible, int(province_seats[province_id]))
+		var alloc: Dictionary
+		var cached: Dictionary = _allocation_cache.get(province_id, {})
+		if not cached.is_empty() and cached["method"] == ElectionModel.seat_method and cached["count"] == province_seats[province_id] and cached["eligible"] == eligible and cached["shares"] == p["shares"]:
+			alloc = (cached["seats"] as Dictionary).duplicate()
+		else:
+			alloc = ElectionModel.allocate(p["shares"], eligible, int(province_seats[province_id]))
+			_allocation_cache[province_id] = {"method": ElectionModel.seat_method, "count": province_seats[province_id], "eligible": eligible.duplicate(),
+				"shares": (p["shares"] as Dictionary).duplicate(), "seats": alloc.duplicate()}
 		p["seats"] = alloc
 		for peer_id in alloc.keys():
 			seats[peer_id] = int(seats[peer_id]) + int(alloc[peer_id])

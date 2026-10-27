@@ -82,7 +82,12 @@ var _instances_built_for := Vector2.ZERO
 
 ## entries: Array of {"seats": int, "color": Color} — sıra ÖNEMLİ, koltuklar
 ## bu sırayla soldan başlanarak dolduruluyor.
+var _last_entries: Array = []
+
 func set_results(entries: Array) -> void:
+	if entries == _last_entries and _seat_mmi != null:
+		return
+	_last_entries = entries.duplicate(true)
 	var total := 0
 	for e in entries:
 		total += int(e["seats"])

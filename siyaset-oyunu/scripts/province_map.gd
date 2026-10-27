@@ -55,6 +55,9 @@ var _land_mesh: ArrayMesh = null
 var _border_mesh: ArrayMesh = null
 var _land_vertices := PackedVector2Array()
 var _land_vertex_region := PackedInt32Array()  # köşe -> bölge indeksi
+var _land_attribute_data := PackedByteArray()
+var _land_palette: Array = []
+var _land_color_runs: Array = []
 var _sea_mesh: ArrayMesh = null
 ## Oyun ekranı denizi kendisi (dalgalı zeminle) çizer; burada çizilmez.
 var draw_sea := true
@@ -95,6 +98,9 @@ func _rebuild() -> void:
 		markers.clear_all()
 
 func _build_geometry() -> void:
+	_land_attribute_data.clear()
+	_land_palette.clear()
+	_land_color_runs.clear()
 	_land_vertices = PackedVector2Array()
 	_land_vertex_region = PackedInt32Array()
 	_edges.clear()
@@ -281,6 +287,29 @@ func _update_land_colors() -> void:
 	var palette: Array = []
 	for id in ids:
 		palette.append(_colors.get(id, LAND_COLOR))
+	if palette == _land_palette and _land_mesh.get_surface_count() > 0:
+		return
+	_land_palette = palette.duplicate()
+	# Geometry is immutable between map rebuilds. Update only the RGBA8
+	# attribute buffer, using exactly the truncation used by ArrayMesh import.
+	if _land_mesh.get_surface_count() > 0 and RenderingServer.mesh_surface_get_format_attribute_stride(_land_mesh.surface_get_format(0), _land_vertices.size()) == 4:
+		var packed_palette := []
+		for color: Color in palette:
+			packed_palette.append(_pack_land_color(color))
+		if _land_color_runs.is_empty():
+			for region in _land_vertex_region:
+				if _land_color_runs.is_empty() or _land_color_runs[-1][0] != region:
+					_land_color_runs.append([region, 1])
+				else:
+					_land_color_runs[-1][1] += 1
+		_land_attribute_data.clear()
+		for run in _land_color_runs:
+			var pixels := PackedInt32Array()
+			pixels.resize(run[1])
+			pixels.fill(packed_palette[run[0]])
+			_land_attribute_data.append_array(pixels.to_byte_array())
+		_land_mesh.surface_update_attribute_region(0, 0, _land_attribute_data)
+		return
 	var colors := PackedColorArray()
 	colors.resize(_land_vertices.size())
 	for i in _land_vertices.size():
@@ -291,6 +320,12 @@ func _update_land_colors() -> void:
 	arrays[Mesh.ARRAY_COLOR] = colors
 	_land_mesh.clear_surfaces()
 	_land_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+
+static func _pack_land_color(color: Color) -> int:
+	return int(clampf(color.r * 255.0, 0.0, 255.0)) \
+		| (int(clampf(color.g * 255.0, 0.0, 255.0)) << 8) \
+		| (int(clampf(color.b * 255.0, 0.0, 255.0)) << 16) \
+		| (int(clampf(color.a * 255.0, 0.0, 255.0)) << 24)
 
 ## İl paneli açıkken haritada yalnız bu il çizilir (bkz. game_screen _open_province_actions).
 var isolated_id := ""
@@ -517,6 +552,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			province_clicked.emit(id)
 
 func set_province_color(province_id: String, color: Color) -> void:
+	if _colors.get(province_id, Color.TRANSPARENT) == color:
+		return
 	if color.a <= 0.0:
 		_colors.erase(province_id)
 	else:
@@ -525,17 +562,32 @@ func set_province_color(province_id: String, color: Color) -> void:
 	queue_redraw()
 
 func set_province_colors(id_to_color: Dictionary) -> void:
+	var changed := false
 	for province_id in id_to_color.keys():
 		var color: Color = id_to_color[province_id]
+		if _colors.get(province_id, Color.TRANSPARENT) == color:
+			continue
+		changed = true
 		if color.a <= 0.0:
 			_colors.erase(province_id)
 		else:
 			_colors[province_id] = color
+	if changed:
+		_colors_dirty = true
+		queue_redraw()
+
+func clear_overlay() -> void:
+	if _colors.is_empty():
+		return
+	_colors.clear()
 	_colors_dirty = true
 	queue_redraw()
 
-func clear_overlay() -> void:
-	_colors.clear()
+## Replace a layer atomically, so unchanged colors do not rebuild the mesh.
+func replace_province_colors(colors: Dictionary) -> void:
+	if _colors == colors:
+		return
+	_colors = colors.duplicate()
 	_colors_dirty = true
 	queue_redraw()
 

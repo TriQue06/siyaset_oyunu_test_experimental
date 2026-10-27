@@ -195,8 +195,11 @@ func _page_available(page: String) -> bool:
 	match page:
 		"org":
 			return level < GameRules.ORG_MAX_LEVEL
-		"miting", "invest":
+		"miting":
 			return level > 0
+		"invest":
+			# Yatırımı yalnız hükümetteki partinin genel başkanı yapar.
+			return level > 0 and CardManager.is_government_party(me) and not CardManager.is_party_member(me)
 	return false
 
 # --- Başlık ve ana menü ------------------------------------------------------------

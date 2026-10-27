@@ -4828,7 +4828,7 @@ func _build_constitution_section(box: VBoxContainer) -> void:
 	UiSkin.skin_color_button(_constitution_button, UiTheme.GOLD.darkened(0.25))
 	_constitution_button.pressed.connect(_on_constitution_pressed)
 	box.add_child(_constitution_button)
-	_constitution_alliances = CheckButton.new()
+	_constitution_alliances = VectorSwitch.new()
 	_constitution_alliances.text = L.t("Seçim ittifakları açık")
 	_constitution_alliances.button_pressed = CardManager.alliances_enabled
 	_constitution_alliances.add_theme_font_size_override("font_size", UiTheme.FS_TINY)

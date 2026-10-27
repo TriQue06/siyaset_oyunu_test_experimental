@@ -100,11 +100,9 @@ func _slider_row(parent: VBoxContainer, title: String, color: Color) -> Array:
 	head.add_child(name_label)
 	var value := UiTheme.mono_label("", 13, color.lightened(0.15), true)
 	head.add_child(value)
-	var slider := HSlider.new()
+	var slider := VectorSlider.new()
 	slider.step = Disaster.AID_STEP
 	slider.min_value = 0.0
-	slider.focus_mode = Control.FOCUS_NONE
-	slider.custom_minimum_size = Vector2(0, 24)
 	slider.value_changed.connect(func(_v: float): _refresh())
 	col.add_child(slider)
 	return [slider, value, col]

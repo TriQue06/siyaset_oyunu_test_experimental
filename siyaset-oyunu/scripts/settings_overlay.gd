@@ -304,22 +304,11 @@ func _range(value: float, minimum: float, maximum: float, step: float, formatter
 	current.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	outputs.add_child(current)
 	outputs.add_child(_label(formatter.call(maximum), 10, MUTED))
-	var slider := HSlider.new()
-	slider.scrollable = false  # tekerlek/iki parmak kaydırma sayfayı kaydırır, ayarı değil
-	slider.custom_minimum_size.y = 24
+	var slider := VectorSlider.new()
 	slider.min_value = minimum
 	slider.max_value = maximum
 	slider.step = step
 	slider.value = value
-	var track := UiSkin.groove()
-	track.set_corner_radius_all(99)
-	track.content_margin_top = 4
-	track.content_margin_bottom = 4
-	slider.add_theme_stylebox_override("slider", track)
-	slider.add_theme_stylebox_override("grabber_area", UiSkin.flat(UiTheme.GOLD, 99))
-	slider.add_theme_stylebox_override("grabber_area_highlight", UiSkin.flat(UiTheme.GOLD, 99))
-	for icon in ["grabber", "grabber_highlight", "grabber_disabled"]:
-		slider.add_theme_icon_override(icon, UiSkin.knob_texture())
 	slider.value_changed.connect(func(v):
 		current.text = formatter.call(v)
 		callback.call(v))

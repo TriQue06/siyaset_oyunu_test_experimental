@@ -9,7 +9,7 @@ extends Control
 ##     tohum verir. Altta dört büyük rakamla oyunun özeti.
 ##   - Sağda katlanır KURAL bölümleri: biri açıkken diğerleri tek satırda
 ##     seçili değeri gösterir. Herkes görür, yalnız oda sahibi değiştirir.
-##   - Altta solda "Oyunu başlat", sağda "Ayrıl".
+##   - Altta solda "Ayrıl", sağda "Oyunu başlat".
 ## Arayüz tamamen kodla kurulur (sahne yalnız kök düğüm). Ölçüler konseptin
 ## 1280×720 ekranındaki pikselleri (konseptler/lobi_konseptleri.html).
 
@@ -390,7 +390,7 @@ func _build_rules() -> Control:
 	_apply_open_section()
 	return board
 
-## Altta solda "Oyunu başlat", ortada bilgi, sağda "Ayrıl".
+## Altta solda "Ayrıl", ortada bilgi, sağda "Oyunu başlat".
 func _build_footer() -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 14)
@@ -400,7 +400,6 @@ func _build_footer() -> Control:
 	start_button.add_theme_font_size_override("font_size", 20)
 	UiSkin.skin_color_button(start_button, UiTheme.GREEN_DARK)
 	start_button.pressed.connect(func(): MultiplayerManager.start_game())
-	row.add_child(start_button)
 	info_label = Label.new()
 	info_label.add_theme_font_override("font", UiTheme.body_black())
 	info_label.add_theme_font_size_override("font_size", 14)
@@ -420,6 +419,8 @@ func _build_footer() -> Control:
 	leave_button.add_theme_color_override("font_pressed_color", UiTheme.TEAL)
 	leave_button.pressed.connect(_on_leave_pressed)
 	row.add_child(leave_button)
+	row.move_child(leave_button, 0)
+	row.add_child(start_button)
 	return row
 
 # --- Tazeleme -----------------------------------------------------------------
@@ -481,6 +482,8 @@ func _refresh_settings_display() -> void:
 	random_parties_check.set_pressed_no_signal(MultiplayerManager.random_parties)
 	alliances_check.set_pressed_no_signal(bool(settings.get("alliances", true)))
 	away_bot_check.set_pressed_no_signal(MultiplayerManager.away_mode == MultiplayerManager.AWAY_BOT)
+	for check in [random_parties_check, alliances_check, away_bot_check]:
+		check.queue_redraw()
 
 	var t := MultiplayerManager.election_threshold
 	var interval := MultiplayerManager.election_interval
@@ -914,14 +917,10 @@ func _mark_seg(button: Button, on: bool, locked: bool) -> void:
 		button.add_theme_color_override(prop, ink)
 
 func _slider() -> HSlider:
-	var slider := HSlider.new()
-	slider.scrollable = false  # tekerlek / iki parmak kaydırma ayarı değiştirmez
-	slider.focus_mode = Control.FOCUS_NONE
-	slider.custom_minimum_size.y = 24
-	return slider
+	return VectorSlider.new()
 
 func _switch(text: String, tip: String) -> CheckButton:
-	var check := CheckButton.new()
+	var check := VectorSwitch.new()
 	check.text = text
 	check.tooltip_text = tip
 	check.focus_mode = Control.FOCUS_NONE
@@ -931,24 +930,7 @@ func _switch(text: String, tip: String) -> CheckButton:
 		check.add_theme_stylebox_override(state, StyleBoxEmpty.new())
 	for prop in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_focus_color"]:
 		check.add_theme_color_override(prop, UiTheme.TEXT)
-	# Konsept .sw: oyuk krem ray; açıkken yeşil, topuz sağda.
-	check.add_theme_icon_override("checked", _switch_texture(true))
-	check.add_theme_icon_override("unchecked", _switch_texture(false))
-	check.add_theme_icon_override("checked_disabled", _switch_texture(true))
-	check.add_theme_icon_override("unchecked_disabled", _switch_texture(false))
 	return check
-
-func _switch_texture(on: bool) -> Texture2D:
-	var key := "switch_%s" % on
-	if not _icon_cache.has(key):
-		var track := "#1F8A4C" if on else "#EADFC4"
-		var lip := "#14603A" if on else "#C9B689"
-		var knob_x := 33 if on else 13
-		var svg := '<svg xmlns="http://www.w3.org/2000/svg" width="46" height="28" viewBox="0 0 46 28"><rect x="0" y="0" width="46" height="26" rx="13" fill="%s"/><rect x="0" y="0" width="46" height="3" rx="1.5" fill="#000000" fill-opacity="0.08"/><circle cx="%d" cy="15" r="10" fill="%s"/><circle cx="%d" cy="13" r="10" fill="#FFFAF0"/></svg>' % [track, knob_x, lip, knob_x]
-		var image := Image.new()
-		image.load_svg_from_string(svg, 1.0)
-		_icon_cache[key] = ImageTexture.create_from_image(image)
-	return _icon_cache[key]
 
 func _teal_button(text: String, font_size: int) -> Button:
 	var button := Button.new()

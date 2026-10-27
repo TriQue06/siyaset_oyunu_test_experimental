@@ -48,7 +48,7 @@ func run() -> void:
 	check(equal, "all lobby player rows equal")
 	var start: Button = lobby.start_button
 	var leave: Button = lobby.leave_button
-	check(start.get_global_rect().position.x < leave.get_global_rect().position.x, "start on the left, leave on the right")
+	check(leave.get_global_rect().position.x < start.get_global_rect().position.x, "leave on the left, start on the right")
 	check(leave.get_global_rect().end.y <= lobby.size.y and leave.get_global_rect().end.x <= lobby.size.x, "lobby fits viewport")
 	for i in 3:
 		mm.add_bot()

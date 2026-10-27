@@ -25,18 +25,18 @@ func _initialize() -> void:
 	mm.room_code = ""
 	mm.players = {}
 	pm.parties = {}
-	var colors := [Color("F2132A"), Color("31C440"), Color("FAD028"), Color("244FB3")]
+	var colors := [Color("E0283A"), Color("2B8FD9"), Color("F08A24"), Color("7B5BD6"), Color("2BB5A8")]
 	var me: int = root.multiplayer.get_unique_id()
-	var ids := [me, 2, 3, 4]
+	var ids := [me, 2, 3, 4, 5]
 	for i in ids.size():
 		mm.players[ids[i]] = {"name": "Lider %d" % i, "bot": i != 0}
 		pm.parties[ids[i]] = {
-			"name": "Parti %d" % i, "icon_index": i, "icon_color": Color.WHITE,
+			"name": ["Yeni Yol", "Mavi Hareket", "Emek Birliği", "Ilım Cephesi", "Toprak Partisi"][i], "icon_index": i, "icon_color": Color.WHITE,
 			"bg_color": colors[i], "groups": VoterGroups.neutral_affinities(), "ready": true,
 		}
 	cm.init_game()
-	cm.last_seats = {me: 150, 2: 110, 3: 80, 4: 60}
-	cm.last_vote_shares = {me: 37.0, 2: 27.0, 3: 20.0, 4: 16.0}
+	cm.last_seats = {me: 112, 2: 68, 3: 41, 4: 25, 5: 54}
+	cm.last_vote_shares = {me: 37.0, 2: 23.0, 3: 14.0, 4: 8.0, 5: 18.0}
 	gm.start_formation()
 
 	var screen: Node = (load("res://scenes/GovernmentFormation.tscn") as PackedScene).instantiate()
@@ -67,10 +67,12 @@ func _initialize() -> void:
 	await create_timer(0.3).timeout
 	shot.call("4_tekrar_eklendi")
 	print("ortaklar: ", screen._partners)
-	# 5) Dagitim asamasi: ortak cikar/ekle sonrasi renkler
+	# 5) Ucuncu ortak ve gorev dagitimi (gorev kartina dokunmak sirayla dondurur)
 	screen._on_partner_toggled(3)
-	screen._step = 1  # Step.DISTRIBUTE
-	screen._rebuild()
+	for post_id in ["deputy_pm", "ministry_foreign", "ministry_justice"]:
+		screen._on_post_pressed(post_id)
+	screen._on_post_pressed("ministry_health")
+	screen._on_post_pressed("ministry_health")
 	await process_frame
 	await create_timer(0.3).timeout
 	shot.call("5_dagitim")

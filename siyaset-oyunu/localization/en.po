@@ -5129,3 +5129,57 @@ msgstr "You start with %%%d appeal in your core groups and %%%d in the others; g
 
 msgid "Sıran gelince önce kartını çekersin. Teşkilat, miting ve yatırım için haritada bir ile dokun. MECLİS düğmesi gensoru ve yasayı açar; istersen hiç girmeden turu bitirebilirsin."
 msgstr "When your turn comes, you draw your card first. Tap a province on the map for organization, rallies and investment. The PARLIAMENT button opens the censure motion and law; you can also end your turn without entering."
+
+msgid "Hükümeti Kur"
+msgstr "Form the Government"
+
+msgid "Teklif hakkı"
+msgstr "Proposals left"
+
+msgid "Kabine"
+msgstr "Cabinet"
+
+msgid "göreve dokun: ortaklar arasında sırayla döner"
+msgstr "tap a post: it rotates between partners"
+
+msgid "Paylar"
+msgstr "Shares"
+
+msgid "Teklifi sun"
+msgstr "Submit proposal"
+
+msgid "Çoğunluk var"
+msgstr "Majority"
+
+msgid "Çoğunluk yok"
+msgstr "No majority"
+
+msgid "çoğunluk %d"
+msgstr "majority %d"
+
+msgid "Görevli"
+msgstr "Mandate"
+
+msgid "Ortak"
+msgstr "Partner"
+
+msgid "İçişleri"
+msgstr "Interior"
+
+msgid "Dışişleri"
+msgstr "Foreign Affairs"
+
+msgid "Maliye"
+msgstr "Finance"
+
+msgid "Adalet"
+msgstr "Justice"
+
+msgid "Milli Eğitim"
+msgstr "Education"
+
+msgid "Sağlık"
+msgstr "Health"
+
+msgid "Milli Savunma"
+msgstr "Defense"

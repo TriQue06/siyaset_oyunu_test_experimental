@@ -15,6 +15,27 @@ static var _width := WIDTH
 static func build(peer_id: int, my_id: int, on_action: Callable = Callable(), width: float = WIDTH,
 		on_close: Callable = Callable()) -> PanelContainer:
 	_width = width
+	# 0.0.272: sağ panelde OYUN KARTI (bkz. InspectCard); işlemler altta.
+	if PopupKit.embedded:
+		var holder := PanelContainer.new()
+		holder.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+		holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		holder.custom_minimum_size.x = width
+		var gutter := MarginContainer.new()
+		gutter.add_theme_constant_override("margin_right", int(UiTheme.d(14)))
+		gutter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		holder.add_child(gutter)
+		var column := VBoxContainer.new()
+		column.add_theme_constant_override("separation", int(UiTheme.d(8)))
+		column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		gutter.add_child(column)
+		InspectCard.fill_party(column, peer_id, on_close)
+		if on_action.is_valid():
+			var actions := _actions(peer_id, my_id, on_action)
+			if actions != null:
+				holder.mouse_filter = Control.MOUSE_FILTER_STOP
+				column.add_child(actions)
+		return holder
 	var party: Dictionary = PartyManager.data_of(peer_id)
 	var color: Color = party.get("bg_color", Color(0.5, 0.5, 0.5))
 	var parts := PopupKit.frame(width, color)

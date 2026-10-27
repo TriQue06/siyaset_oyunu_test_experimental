@@ -309,7 +309,9 @@ func _initialize() -> void:
 	print("")
 	print("=== 9) TESKILAT BILGISI, KARALAMA ===")
 	var w: Dictionary = cm._draw_weights(3)
-	check("karalama destede; anket ve gozcu destede degil", not w.has("anket") and not w.has("gozcu") and w.has("karalama"))
+	# 0.0.272: anket kartı yeniden destede (ilk tur ve seçim sonrası ilk tur hariç).
+	var poll_ok: bool = w.has("anket") == (cm.round_number > 1 and cm.round_number != cm.last_election_round + 1)
+	check("karalama destede; gozcu degil; anket kurala gore", poll_ok and not w.has("gozcu") and w.has("karalama"))
 	cm.funds[3] = 50
 	cm.organizations = {}
 	cm.local_support = {}

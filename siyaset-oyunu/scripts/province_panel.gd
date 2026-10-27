@@ -88,6 +88,25 @@ func _rebuild() -> void:
 		remove_child(child)
 		child.queue_free()
 	_built_for = province_id
+	if embedded_mode:
+		# 0.0.272: sağ panelde OYUN KARTI (bkz. InspectCard); şerit de kayar.
+		add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+		_scroll = ScrollContainer.new()
+		_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		add_child(_scroll)
+		# Sağda kaydırma çubuğuna yer: içerik çubuğun altında kalmasın.
+		var gutter := MarginContainer.new()
+		gutter.add_theme_constant_override("margin_right", int(UiTheme.d(14)))
+		gutter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_scroll.add_child(gutter)
+		_body = VBoxContainer.new()
+		_body.add_theme_constant_override("separation", int(UiTheme.d(8)))
+		_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		gutter.add_child(_body)
+		_build_sections()
+		if is_visible_in_tree():
+			_fit.call_deferred()
+		return
 	PopupKit.embedded = embedded_mode
 	var parts := PopupKit.frame(panel_width, UiTheme.PANEL_LIGHT, self)
 	var root: VBoxContainer = parts[1]
@@ -117,6 +136,11 @@ func _rebuild() -> void:
 		_fit.call_deferred()
 
 func _build_sections() -> void:
+	if embedded_mode:
+		InspectCard.fill_province(_body, province_id, func():
+			hide()
+			closed.emit())
+		return
 	var me := multiplayer.get_unique_id()
 	_build_profile()
 	if PartyManager.parties.has(CardManager.party_of(me)):

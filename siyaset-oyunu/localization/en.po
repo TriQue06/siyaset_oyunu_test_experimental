@@ -5054,3 +5054,63 @@ msgstr "Nothing to do in this province."
 
 msgid "Miting genel halka hitap eder."
 msgstr "The rally addresses the general public."
+
+msgid "ANKET"
+msgstr "POLL"
+
+msgid "Anket"
+msgstr "Poll"
+
+msgid "%s ülke geneli bir anket yaptırdı."
+msgstr "%s commissioned a nationwide poll."
+
+msgid "ANINDA ETKİ: ülke geneli anket. Partilerin şu anki oy oranlarını yalnız sen görürsün; partilere dokunup \"Son anket\"e bak. Bu anki görüntüdür, seçime kadar kalır."
+msgstr "INSTANT: nationwide poll. Only you see the parties' current vote shares; tap a party and check \"Latest poll\". It is a snapshot and lasts until the election."
+
+msgid "Sandık"
+msgstr "Ballot box"
+
+msgid "SON SEÇİM"
+msgstr "LAST ELECTION"
+
+msgid "SON ANKET"
+msgstr "LATEST POLL"
+
+msgid "ilin nüfusu"
+msgstr "province population"
+
+msgid "Bu ilde sen"
+msgstr "You here"
+
+msgid "Teşkilatın %d/%d"
+msgstr "Branch %d/%d"
+
+msgid "Lider %s"
+msgstr "Leader %s"
+
+msgid "seçmen sana %s"
+msgstr "voters feel %s to you"
+
+msgid " · miting riski %s"
+msgstr " · rally risk %s"
+
+msgid "ülke geneli"
+msgstr "nationwide"
+
+msgid "halka: sadık seçmen"
+msgstr "ring: loyal voters"
+
+msgid "henüz seçim yok"
+msgstr "no election yet"
+
+msgid "%d vekil · %d. parti"
+msgstr "%d seats · #%d"
+
+msgid "~%d vekil · %d. parti"
+msgstr "~%d seats · #%d"
+
+msgid "bu dönem anket yok"
+msgstr "no poll this term"
+
+msgid "%d puan"
+msgstr "%d pts"

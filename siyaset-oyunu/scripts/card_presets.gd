@@ -54,6 +54,9 @@ const FUNDS_BONUS_STRONG_CARD_TYPE := "bagis_kampanyasi_guclu"
 const PENALTY_CARD_TYPE := "para_cezasi"
 const SELF_TURMOIL_CARD_TYPE := "parti_ici_karisiklik"
 const FLEX_CARD_TYPE := "esnek_hareket"
+## ANKET (0.0.272): çekildiği an ülke geneli oy oranlarının anlık görüntüsü;
+## yalnız çeken oyuncu görür (parti kartındaki "Son anket"). Seçimde sıfırlanır.
+const POLL_CARD_TYPE := "anket"
 ## Para cezası kasadaki paranın bu oranını siler.
 const PENALTY_SHARE := 0.2
 
@@ -95,6 +98,7 @@ const CARD_TYPES: Array[String] = [
 	"parti_ici_karisiklik",
 	"esnek_hareket",
 	"kart_calma",
+	"anket",
 ]
 
 const LAW_PREFIX := "law:"
@@ -341,6 +345,8 @@ func card_short_title(card_type: String) -> String:
 			return L.t("ESNEK\nHAREKET")
 		"kart_calma":
 			return L.t("KART\nÇALMA")
+		"anket":
+			return L.t("ANKET")
 		"isyan":
 			return L.t("İÇ\nKARIŞIKLIK")
 		"erken_secim":
@@ -377,6 +383,8 @@ func card_title(card_type: String) -> String:
 			return L.t("Parti İçi Karışıklık")
 		"esnek_hareket":
 			return L.t("Esnek Hareket")
+		"anket":
+			return L.t("Anket")
 		"bagis_kampanyasi_guclu":
 			return L.t("Büyük Bağış Kampanyası")
 		"gensoru":
@@ -446,6 +454,8 @@ func _card_effect_text(card_type: String) -> String:
 			return L.t("OLUMSUZ, ANINDA ETKİ: kendi partinde iç karışıklık çıkar; ulusal desteğin düşer, karışıklık birikirse parti bölünebilir.")
 		FLEX_CARD_TYPE:
 			return L.t("ANINDA ETKİ: esnek hareket. Bu sıra miting ve yatırım sınırın iki katına çıkar.")
+		POLL_CARD_TYPE:
+			return L.t("ANINDA ETKİ: ülke geneli anket. Partilerin şu anki oy oranlarını yalnız sen görürsün; partilere dokunup \"Son anket\"e bak. Bu anki görüntüdür, seçime kadar kalır.")
 		FUNDS_BONUS_STRONG_CARD_TYPE:
 			return L.t("ANINDA ETKİ: büyük bir bağış kampanyası, kasana hemen %s girer.") % GameRules.cost_text(GameRules.FUNDS_BONUS_STRONG)
 		EARLY_ELECTION_CARD_TYPE:

@@ -68,6 +68,9 @@ func copy() -> BoardBox:
 	return b
 
 func _draw(ci: RID, rect: Rect2) -> void:
+	# Yerleşim bitmeden (boyut 0) çokgen kurulamaz.
+	if rect.size.x < 1.0 or rect.size.y < 1.0:
+		return
 	var r := rect
 	r.position.y += offset_y
 	if shadow_color.a > 0.0 and shadow_size > 0.0:
@@ -152,8 +155,15 @@ func _poly(ci: RID, rect: Rect2, top: Color, bottom: Color, top_cut: float) -> v
 
 static func _arc(pts: PackedVector2Array, c: Vector2, r: float, a0: float, a1: float) -> void:
 	if r <= 0.01:
-		pts.append(c)
+		_add_point(pts, c)
 		return
 	for i in DETAIL + 1:
 		var a := lerpf(a0, a1, float(i) / DETAIL)
-		pts.append(c + Vector2(cos(a), sin(a)) * r)
+		_add_point(pts, c + Vector2(cos(a), sin(a)) * r)
+
+## Yarıçap kenarın yarısına eşitse (pul, hap) yaylar uç uca değer: aynı nokta
+## iki kez eklenmez (yinelenen köşe üçgenlemeyi bozuyordu).
+static func _add_point(pts: PackedVector2Array, p: Vector2) -> void:
+	if not pts.is_empty() and (pts[pts.size() - 1].distance_squared_to(p) < 0.0001 or pts[0].distance_squared_to(p) < 0.0001):
+		return
+	pts.append(p)

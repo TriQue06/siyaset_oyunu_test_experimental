@@ -94,6 +94,7 @@ const WEIGHT_FUNDS_BONUS_STRONG := 6.0
 const WEIGHT_PENALTY := 8.0
 const WEIGHT_SELF_TURMOIL := 6.0
 const WEIGHT_FLEX := 8.0
+const WEIGHT_POLL := 8.0
 const WEIGHT_CARD_THEFT := 6.0
 const WEIGHT_POPULISM := 12.0
 const WEIGHT_STEAL_STRONG := 6.0
@@ -173,6 +174,9 @@ var election_groups: Dictionary = {}
 var agenda: Dictionary = {}
 ## KRİZ: {"type": "kriz_<grup>", "until": tur}. Gündemle birlikte açılır.
 var crisis: Dictionary = {}
+## ANKET KARTI (0.0.272): peer -> {"round", "parties": {pid: {"percent", "seats"}}}.
+## Çekildiği anın görüntüsü (değişmez); seçimde sıfırlanır. Yalnız sahibi görür.
+var polls: Dictionary = {}
 var _crisis_rng := RandomNumberGenerator.new()
 ## Sadece host: gündem çiftlerinin sırası (her turda karıştırılır).
 var _agenda_pairs: Array = []
@@ -335,7 +339,7 @@ var _skip_stage_gate := false
 static func is_instant_card(card_type: String) -> bool:
 	return card_type in [CardPresets.POPULISM_CARD_TYPE, CardPresets.FUNDS_BONUS_CARD_TYPE,
 		CardPresets.FUNDS_BONUS_STRONG_CARD_TYPE, CardPresets.PENALTY_CARD_TYPE,
-		CardPresets.SELF_TURMOIL_CARD_TYPE, CardPresets.FLEX_CARD_TYPE]
+		CardPresets.SELF_TURMOIL_CARD_TYPE, CardPresets.FLEX_CARD_TYPE, CardPresets.POLL_CARD_TYPE]
 
 ## Olumsuz şans kartı mı? (Sunumda kırmızı.)
 static func is_negative_card(card_type: String) -> bool:
@@ -487,6 +491,9 @@ func _apply_instant(peer_id: int, card_type: String, entry: Dictionary = {}) -> 
 			if int(turn_flow.get("peer", -1)) == peer_id:
 				turn_flow["flex"] = true
 			return L.t("%s esnek hareket kartı çekti: bu sıra miting ve yatırım sınırı iki katı.") % _party_name(peer_id)
+		CardPresets.POLL_CARD_TYPE:
+			polls[peer_id] = {"round": round_number, "parties": national_poll_snapshot(peer_id)}
+			return L.t("%s ülke geneli bir anket yaptırdı.") % _party_name(peer_id)
 		CardPresets.FUNDS_BONUS_CARD_TYPE:
 			var weak_gain := funds_bonus_amount(peer_id, false)
 			funds[peer_id] = funds_of(peer_id) + weak_gain
@@ -496,6 +503,45 @@ func _apply_instant(peer_id: int, card_type: String, entry: Dictionary = {}) -> 
 			funds[peer_id] = funds_of(peer_id) + strong_gain
 			return L.t("%s büyük bir bağış kampanyası yaptı (+%s).") % [_party_name(peer_id), GameRules.cost_text(strong_gain)]
 	return ""
+
+## ANKET KARTININ VERİSİ: şu an seçim olsa ülke geneli oy oranı ve vekil
+## sayısı, hafif gürültülü (her il POLL_ERROR_HIGH kadar). pid -> {"percent", "seats"}.
+func national_poll_snapshot(peer_id: int) -> Dictionary:
+	var mods := election_modifiers(true)
+	var eligible := projected_eligible(mods)
+	var votes := {}
+	var seats := {}
+	var total := 0.0
+	for province_id in _province_ids:
+		var shares := expected_province_shares(province_id, mods)
+		var noisy := {}
+		for pid in shares.keys():
+			noisy[pid] = {"percent": float(shares[pid])}
+		noisy = _noisy_poll(noisy, GameRules.POLL_ERROR_HIGH, "anket:%s:%d:%d" % [province_id, party_of(peer_id), round_number],
+			province_seat_count(province_id), eligible)
+		# Seçmen sayısı ilin vekil sayısıyla orantılı (bkz. VOTERS_PER_SEAT).
+		var weight := float(province_seat_count(province_id))
+		for pid in noisy.keys():
+			votes[pid] = float(votes.get(pid, 0.0)) + float(noisy[pid]["percent"]) * weight
+			seats[pid] = int(seats.get(pid, 0)) + int(noisy[pid]["seats"])
+		total += weight
+	var result := {}
+	for pid in party_ids():
+		result[pid] = {"percent": float(votes.get(pid, 0.0)) / maxf(total, 0.0001), "seats": int(seats.get(pid, 0))}
+	return result
+
+## Bu oyuncunun son anketi (yoksa boş): {"round", "parties"}.
+func my_poll(peer_id: int) -> Dictionary:
+	return polls.get(peer_id, {})
+
+## İL KARTI ANKETİ (0.0.272): her ilde görünür; teşkilat isabeti artırır
+## (teşkilatsız: kaba tahmin, POLL_ERROR_ROUGH).
+func province_card_poll(peer_id: int, province_id: String) -> Dictionary:
+	var poll := province_poll(peer_id, province_id)
+	if not poll.is_empty():
+		return poll
+	return _noisy_poll(province_projection(province_id), GameRules.POLL_ERROR_ROUGH,
+		"%s:%d:%d:kaba" % [province_id, party_of(peer_id), round_number], province_seat_count(province_id), projected_eligible())
 
 ## AFET SAHNESİ bekleniyor mu? (Kart çekildikten sonra bir kez açılır; yardım
 ## ya da "şimdilik atla" ile kapanır. Sonra YARDIM hamlesi tur boyunca açık.)
@@ -2364,6 +2410,9 @@ func _draw_weights(peer_id: int = -1) -> Dictionary:
 	weights[CardPresets.PENALTY_CARD_TYPE] = WEIGHT_PENALTY
 	weights[CardPresets.SELF_TURMOIL_CARD_TYPE] = WEIGHT_SELF_TURMOIL
 	weights[CardPresets.FLEX_CARD_TYPE] = WEIGHT_FLEX
+	# Anket oyunun ilk turunda ve seçimden sonraki ilk turda gelmez.
+	if round_number > 1 and round_number != last_election_round + 1:
+		weights[CardPresets.POLL_CARD_TYPE] = WEIGHT_POLL
 	# Kart çalma da ilk seçimden önce desteye girmez (0.0.191).
 	if not last_seats.is_empty():
 		weights[CardPresets.CARD_THEFT_CARD_TYPE] = WEIGHT_CARD_THEFT
@@ -4300,6 +4349,8 @@ func _hold_election(finished_round: int, early: bool) -> void:
 	for pid in party_ids():
 		election_groups[pid] = PartyManager.groups_of(pid).duplicate()
 	last_election_round = finished_round
+	# Anketler seçimle sıfırlanır: yeni anket yaptırılana kadar boş.
+	polls = {}
 	# İTTİFAKLAR seçimle biter (0.0.225): ortaklar bir dönem former_allies'ta kalır.
 	if not alliances.is_empty():
 		_pending_log.append({"text": L.t("Seçim bitti: bütün seçim ittifakları dağıldı."), "peer_id": -1, "province": "", "kind": "alliance"})
@@ -5462,6 +5513,7 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"congress_active": congress_active,
 		"agenda": agenda,
 		"crisis": crisis,
+		"polls": polls,
 		"national_list": national_list,
 		"round": round_number,
 		"turn_time_left": _turn_time_left,
@@ -5572,6 +5624,7 @@ func _apply_state(state: Dictionary) -> void:
 	congress_active = bool(state.get("congress_active", false))
 	agenda = state.get("agenda", {})
 	crisis = state.get("crisis", {})
+	polls = state.get("polls", {})
 	national_list = state.get("national_list", {})
 	round_number = int(state["round"])
 	_turn_deadline_ms = Time.get_ticks_msec() + int(float(state["turn_time_left"]) * 1000.0)

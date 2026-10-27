@@ -138,6 +138,8 @@ const LAWS_PER_ROUND := 1
 ## 1. seviye YAKLAŞIK oy (±%35), 2. seviye %90 doğruluk (±%10).
 const POLL_ERROR_LOW := 0.35
 const POLL_ERROR_HIGH := 0.10
+## Teşkilatsız ilde il kartının kaba anketi (0.0.272).
+const POLL_ERROR_ROUGH := 0.5
 const MITING_FUNDS_COST := 15
 ## Yatırım (sadece hükümet partileri) ve gensoru (sadece muhalefet, hükümet
 ## azınlıktayken) hamleleri. Yatırımın asıl bedeli DEVLET HAZİNESİNDEN

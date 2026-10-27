@@ -2772,8 +2772,9 @@ func _unplayable_reason(card_type: String) -> String:
 # --- Sürükle-bırak -----------------------------------------------------------
 
 ## İmleç haritada hangi ilin üstünde? (Paneller ve alt hazne hariç.)
-func _province_under_mouse() -> String:
-	var mouse := get_viewport().get_mouse_position()
+func _province_under_mouse(mouse: Vector2 = Vector2.INF) -> String:
+	if mouse == Vector2.INF:
+		mouse = get_viewport().get_mouse_position()
 	var viewport_size := get_viewport_rect().size
 	if mouse.x < LEFT_PANEL_WIDTH or mouse.x > viewport_size.x - RIGHT_COLUMN_WIDTH \
 			or mouse.y < TOP_STRIP_HEIGHT or mouse.y >= viewport_size.y - CARD_BAR_HEIGHT:
@@ -2781,8 +2782,9 @@ func _province_under_mouse() -> String:
 	return map_holder.get_province_id_at(map_holder.get_global_transform().affine_inverse() * mouse)
 
 ## Fare şu an sağdaki parti panelinde hangi partinin üstünde?
-func _party_under_mouse() -> int:
-	var mouse_pos := get_viewport().get_mouse_position()
+func _party_under_mouse(mouse_pos: Vector2 = Vector2.INF) -> int:
+	if mouse_pos == Vector2.INF:
+		mouse_pos = get_viewport().get_mouse_position()
 	if _board_scroll != null and not _board_scroll.get_global_rect().has_point(mouse_pos):
 		return -1
 	for child in player_panel_list.get_children():
@@ -2965,23 +2967,97 @@ var _live_province := ""
 ## bilgisi sağ panelde GEÇİCİ açılır, fare çekilince kapanır ve en son
 ## açık sekmeye dönülür. TIKLAMA kalıcı açar (_pinned): fare gezinse de değişmez.
 var _pinned := false
+var _hover_info_drag_scroll: ScrollContainer
 
-func _update_live_province() -> void:
+## Hovering a province or party scrolls its inspector, before the source list
+## can consume the wheel. Direct scrolling over the inspector stays native.
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_MIDDLE and not event.pressed:
+			if _hover_info_drag_scroll != null:
+				_hover_info_drag_scroll = null
+				get_viewport().set_input_as_handled()
+			return
+		if event.button_index not in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN, MOUSE_BUTTON_MIDDLE]:
+			return
+		var scroll := _hover_info_scroll_target(event.position)
+		if scroll == null:
+			return
+		if event.button_index == MOUSE_BUTTON_MIDDLE:
+			_hover_info_drag_scroll = scroll
+		elif event.pressed:
+			_scroll_hover_info(scroll, 0.0, event.factor * (-1.0 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0))
+		get_viewport().set_input_as_handled()
+	elif event is InputEventMouseMotion and _hover_info_drag_scroll != null:
+		if _hover_info_scroll_valid(_hover_info_drag_scroll):
+			_scroll_hover_info(_hover_info_drag_scroll, -event.relative.y)
+			get_viewport().set_input_as_handled()
+		else:
+			_hover_info_drag_scroll = null
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		_hover_info_drag_scroll = null
+
+func _hover_info_scroll_valid(scroll: ScrollContainer) -> bool:
+	return is_instance_valid(scroll) and not scroll.is_queued_for_deletion() and scroll.is_visible_in_tree()
+
+func _hover_info_scroll_target(mouse: Vector2 = Vector2.INF) -> ScrollContainer:
+	if _window_mode() or not is_visible_in_tree() or _leaving_for_results or _layer_switching \
+			or _pending_org or _pending_miting or _pending_invest or _pending_province_hand_index != -1 \
+			or _pending_target_hand_index != -1 or _smear_ghost != null:
+		return null
+	if mouse == Vector2.INF:
+		mouse = get_viewport().get_mouse_position()
+	# Respect menus, modal overlays and other controls covering the source.
+	var hovered := get_viewport().gui_get_hovered_control()
+	if hovered != null and hovered != self and hovered.get_global_rect().has_point(mouse) \
+			and not (_board_scroll != null and (hovered == _board_scroll or _board_scroll.is_ancestor_of(hovered))):
+		return null
+	_update_live_province(mouse)
+	var party := _party_under_mouse(mouse)
+	if party != -1 and party == _profile_peer_id and _hover_info_scroll_valid(_profile_scroll):
+		return _profile_scroll
+	var province := _province_under_mouse(mouse)
+	if province != "" and _province_panel != null and _province_panel.embedded_mode \
+			and _province_panel.visible and _province_panel.province_id == province \
+			and _hover_info_scroll_valid(_province_panel._scroll):
+		return _province_panel._scroll
+	return null
+
+func _scroll_hover_info(scroll: ScrollContainer, amount: float, wheel_factor: float = 0.0) -> void:
+	if not _hover_info_scroll_valid(scroll):
+		return
+	# A wheel event may open the inspector before its first layout is complete.
+	if scroll.get_v_scroll_bar().page <= 0.0:
+		await get_tree().process_frame
+		if not _hover_info_scroll_valid(scroll):
+			return
+	var bar := scroll.get_v_scroll_bar()
+	if wheel_factor != 0.0:
+		var step := bar.custom_step if bar.custom_step > 0.0 else maxf(1.0, bar.page / 8.0)
+		amount = step * wheel_factor
+	bar.value = clampf(bar.value + amount, bar.min_value, maxf(bar.min_value, bar.max_value - bar.page))
+
+func _update_live_province(mouse: Vector2 = Vector2.INF) -> void:
+	if _hover_info_scroll_valid(_hover_info_drag_scroll):
+		return  # Middle-button dragging keeps the original inspector under control.
 	if _window_mode() or _pinned:
 		return
 	if _pending_org or _pending_miting or _pending_invest or _pending_province_hand_index != -1 			or _pending_target_hand_index != -1 or _layer_switching or not is_visible_in_tree():
 		return
-	var mouse := get_viewport().get_mouse_position()
+	if mouse == Vector2.INF:
+		mouse = get_viewport().get_mouse_position()
 	# Fare sağ paneldeyse açık olan bilgi kalır (kaydırılabilsin).
 	if left_panel.get_global_rect().has_point(mouse):
 		return
-	var party := _party_under_mouse()
+	var party := _party_under_mouse(mouse)
 	if party != -1:
 		if _profile_peer_id != party:
 			_profile_peer_id = party
 			_show_tooltip_for(party)
 		return
-	var province_id := _province_under_mouse()
+	var province_id := _province_under_mouse(mouse)
 	if province_id != "":
 		if not (province_id == _live_province and _province_panel != null and _province_panel.visible):
 			_show_province_info(province_id)

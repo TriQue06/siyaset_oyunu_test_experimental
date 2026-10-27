@@ -257,7 +257,8 @@ func _draw() -> void:
 				_draw_pawn(inv, scale, center_px, outline_half_px, color, alpha)
 				idx += 1
 
-## KONSEPT VEKİL PULU (0.0.266): krem pul, parti renginin koyusunda kenar,
+## VEKİL PULU (0.0.274, konsept "krem kenarlı"): içi parti renginde dolu, krem halkalı;
+## (0.0.266: krem pul, parti renginin koyusunda kenar,
 ## altında ahşap rengi sert gölge ve hafif yumuşak gölge. 0.0.267: dört
 ## yumuşatılmış daire yerine pul başına TEK dörtgen; katmanları PAWN_SHADER
 ## çizer (harita kayarken her karede yüzlerce daire çizmek kareyi 30-50 ms
@@ -272,11 +273,12 @@ void fragment() {
 	// UV -> pul yarıçapı birimi; merkez (0,0), dörtgen alta gölge kadar uzun.
 	vec2 p = vec2(UV.x * 2.0 - 1.0, UV.y * (2.0 + 1.6 * %f) - 1.0);
 	float aa = max(fwidth(p.x), 0.0001);
-	vec4 col = vec4(0.0, 0.0, 0.0, 0.18 * disc(p, vec2(0.0, 1.6 * %f), aa));
-	float lip = disc(p, vec2(0.0, %f), aa);
-	col = mix(col, vec4(0.561, 0.424, 0.251, 1.0), lip);
-	col = mix(col, vec4(COLOR.rgb * 0.7, 1.0), disc(p, vec2(0.0), aa));
-	col = mix(col, vec4(1.0, 0.98, 0.941, 1.0), disc(p / 0.8, vec2(0.0), aa / 0.8));
+	// 0.0.274 KREM KENARLI DOLU PUL: altta parti renginin koyusu kalınlık,
+	// krem halka, içi partinin renginde dolu.
+	vec4 col = vec4(0.0, 0.0, 0.0, 0.16 * disc(p, vec2(0.0, 1.6 * %f), aa));
+	col = mix(col, vec4(COLOR.rgb * 0.5, 1.0), disc(p, vec2(0.0, %f), aa));
+	col = mix(col, vec4(1.0, 0.98, 0.941, 1.0), disc(p, vec2(0.0), aa));
+	col = mix(col, vec4(COLOR.rgb, 1.0), disc(p / 0.82, vec2(0.0), aa / 0.82));
 	COLOR = vec4(col.rgb, col.a * COLOR.a);
 }
 """ % [PAWN_LIP, PAWN_LIP, PAWN_LIP]

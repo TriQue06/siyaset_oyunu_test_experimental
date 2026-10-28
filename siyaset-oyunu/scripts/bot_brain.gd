@@ -754,6 +754,8 @@ static func _law_vote_value(voter: int, law_type: String, choice: int, proposer:
 		value += PublicOpinion.APPROVAL_CRISIS_LAW_NO * share * PublicOpinion.APPROVAL_NATIONAL_MAX 			/ PublicOpinion.APPROVAL_NEUTRAL * share * APPROVAL_TURNS
 	return value
 
+## Yatırım isteğinin bot gözündeki değeri (il değeriyle aynı ölçek: vekil sayısı).
+const REQUEST_VALUE := 12.0
 ## Onay değişiminin bot hesabında kaç turluk ulusal puan sayıldığı.
 const APPROVAL_TURNS := 4.0
 
@@ -1000,12 +1002,18 @@ static func _eval_investment(bot: int) -> Dictionary:
 	var best_province := ""
 	var best_value := -INF
 	for province_id in _seats().keys():
+		# YATIRIM İSTEĞİ: karşılanmazsa onay ve il puanı gider; teşkilat şartı aranmaz.
+		var req := CardManager.invest_request(String(province_id))
+		var requested := not req.is_empty() and not bool(req.get("done", false)) \
+			and float(req["amount"]) <= CardManager.invest_tier_cost(CardManager.DEFAULT_TIER) + 0.001
 		# 0.0.269: yatırım yalnız teşkilatlı ilde.
-		if CardManager.organization_level(String(province_id), bot) <= 0:
+		if CardManager.organization_level(String(province_id), bot) <= 0 and not requested:
 			continue
 		var room := clampf((PublicOpinion.INVEST_LIMIT - CardManager.local_of(province_id, bot)) / PublicOpinion.INVEST_LOCAL, 0.0, 1.0)
 		var value := float(CardManager.province_seat_count(province_id)) \
 			* (0.5 + PublicOpinion.appeal_closeness(CardManager.appeal_of(province_id, bot))) * room
+		if requested:
+			value += REQUEST_VALUE
 		if value > best_value:
 			best_value = value
 			best_province = province_id

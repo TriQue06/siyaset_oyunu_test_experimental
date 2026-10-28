@@ -88,8 +88,17 @@ func _initialize() -> void:
 		var crop := img.get_region(Rect2i(Vector2i(side.position * sc), Vector2i(side.size * sc)))
 		crop.save_png("%s/approval_%d.png" % [out if out != "" else OS.get_user_data_dir(), i])
 		print("gauge rect ", gauge.get_global_rect(), " visible ", gauge.is_visible_in_tree())
-	img_full(out)
+	# YATIRIM İSTEKLERİ: ilk istek yapıldı, sıra son oyuncuda (dilimler kırmızı).
+	print("istekler: ", cm.invest_requests)
+	cm.current_turn_index = 0
+	await _frames(40)
+	img_full(out, "requests_start")
+	var first: String = String(cm.invest_requests.keys()[0])
+	cm.invest_requests[first]["done"] = true
+	cm.current_turn_index = cm.turn_order.size() - 1
+	await _frames(30)
+	img_full(out, "requests_last")
 	quit()
 
-func img_full(out: String) -> void:
-	root.get_texture().get_image().save_png("%s/approval_full.png" % (out if out != "" else OS.get_user_data_dir()))
+func img_full(out: String, file_name: String = "approval_full") -> void:
+	root.get_texture().get_image().save_png("%s/%s.png" % [out if out != "" else OS.get_user_data_dir(), file_name])

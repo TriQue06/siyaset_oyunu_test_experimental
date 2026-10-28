@@ -1761,5 +1761,12 @@
 "Mitingi düzenlemek için %d seçmen grubu seç.": "Pick %d voter groups to hold the rally.",
 "%d seçmen grubu seç (zorunlu). Büyük illerde 2, küçük illerde 1 grup hedeflenir.": "Pick %d voter groups (required). Large provinces target 2 groups, small ones 1.",
 "seçilmedi": "not chosen",
-"Burada miting yaparsan (%d seçmen grubu hedeflenir):": "If you rally here (%d voter groups targeted):"
+"Burada miting yaparsan (%d seçmen grubu hedeflenir):": "If you rally here (%d voter groups targeted):",
+"%s yatırım isteği karşılandı": "%s investment request met",
+"%s yatırım isteği karşılandı: hükümet onayı tur sonunda artacak.": "%s investment request met: government approval rises at the end of the round.",
+"%s yatırım isteği karşılanmadı": "%s investment request missed",
+"Karşılanmayan yatırım istekleri: %s. Hükümet bu illerde oy kaybetti.": "Missed investment requests: %s. The government lost votes in these provinces.",
+"yapıldı": "done",
+"Bu ilin yatırım isteği bu tur karşılandı.": "This province's investment request was met this round.",
+"Bu il bu tur %s yatırım istiyor: karşılarsan hükümet onayı artar, karşılanmazsa onay ve bu ildeki oy düşer.": "This province wants a %s investment this round: meet it and government approval rises; miss it and approval and votes here fall."
 }

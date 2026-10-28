@@ -459,6 +459,12 @@ func _build_invest() -> void:
 		_body.add_child(PopupKit.note(L.t("Bu sıra %d yatırımın hepsini yaptın.") % CardManager.action_limit(me), UiTheme.RED))
 		return
 	_body.add_child(PopupKit.note(L.t("Devlet hazinesinden il yatırımı: ildeki bütün seçmen memnun olur, ekonomi canlanır. Partinin hazine kotası bakanlık payına göredir."), UiTheme.TEXT_MUTED))
+	var req := CardManager.invest_request(province_id)
+	if not req.is_empty():
+		if bool(req.get("done", false)):
+			_body.add_child(PopupKit.note(L.t("Bu ilin yatırım isteği bu tur karşılandı."), UiTheme.GREEN))
+		else:
+			_body.add_child(PopupKit.note(L.t("Bu il bu tur %s yatırım istiyor: karşılarsan hükümet onayı artar, karşılanmazsa onay ve bu ildeki oy düşer.") % Economy.money_full(float(req["amount"])), UiTheme.GREEN))
 	_section(L.t("1 · Bütçe"))
 	var tiers := HBoxContainer.new()
 	tiers.add_theme_constant_override("separation", 4)

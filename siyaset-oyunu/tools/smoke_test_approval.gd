@@ -21,7 +21,8 @@ func near(a: float, b: float, eps: float = 0.05) -> bool:
 	return absf(a - b) < eps
 
 ## 1 başbakan, 2 ortak, 3 muhalefet.
-func new_game() -> void:
+## requests: false ise yatırım istekleri silinir (diğer bölümleri etkilemesin).
+func new_game(requests: bool = false) -> void:
 	mm.players = {}
 	pm.parties = {}
 	var cores := {1: ["isveren", "dindar"], 2: ["isci", "milliyetci"], 3: ["genc", "ilerici"]}
@@ -45,6 +46,8 @@ func new_game() -> void:
 	cm.agenda = {}
 	cm.crisis = {}
 	cm.start_approval()
+	if not requests:
+		cm.invest_requests = {}
 
 func _initialize() -> void:
 	load("res://scripts/bot_brain.gd").skill_variance = false
@@ -91,9 +94,11 @@ func _initialize() -> void:
 	var mid: float = cm.approval_value()
 	cm.start_disaster("deprem", [cm._province_ids[0]])
 	cm.disaster["active"]["aid"] = {3: 10.0}
+	cm.invest_requests = {}
 	cm._finish_round()
 	check("afet: muhalefet daha çok yardım etti, düşer", near(cm.approval_value(), mid + PublicOpinion.APPROVAL_DISASTER_LESS))
 	mid = cm.approval_value()
+	cm.invest_requests = {}
 	cm._finish_round()
 	check("olaysız tur: değişmez, fark 0", near(cm.approval_value(), mid) and near(cm.approval_delta(), 0.0))
 
@@ -143,13 +148,46 @@ func _initialize() -> void:
 	check("%50 altı ceza", cm.approval_national(1) < 0.0 and cm.approval_national(2) < 0.0)
 	check("muhalefet etkilenmez", near(cm.approval_national(3), 0.0, 0.001))
 
-	print("=== 5) KAYIT ===")
+	print("=== 5) YATIRIM İSTEKLERİ ===")
+	new_game(true)
+	var want := maxi(PublicOpinion.REQUEST_MIN, int(roundf(float(cm._province_ids.size()) / float(PublicOpinion.REQUEST_PROVINCES_PER))))
+	check("hükümet kurulunca istekler seçilir", cm.invest_requests.size() == want, "%d il" % cm.invest_requests.size())
+	var turns: Vector2i = cm.request_turns()
+	check("pasta dilimi = oyuncu sayısı, tur başında hepsi dolu", turns == Vector2i(3, 3))
+	cm.current_turn_index = 2
+	check("son sırada tek dilim kalır", cm.request_turns() == Vector2i(1, 3))
+	cm.current_turn_index = 0
+	var ids: Array = cm.invest_requests.keys()
+	var done_id: String = ids[0]
+	var miss_id: String = ids[1]
+	before = cm.approval_value()
+	var local_before: float = cm.local_of(miss_id, 1)
+	cm._fulfil_invest_request(done_id, float(cm.invest_requests[done_id]["amount"]) - 10.0)
+	check("istenenden az yatırım isteği karşılamaz", not bool(cm.invest_requests[done_id]["done"]))
+	cm._fulfil_invest_request(done_id, 150.0)
+	check("yatırım isteği karşılandı", bool(cm.invest_requests[done_id]["done"]))
+	check("onay tur içinde değişmez", near(cm.approval_value(), before, 0.001))
+	cm._finish_round()
+	var expected: float = before + PublicOpinion.APPROVAL_REQUEST_DONE + PublicOpinion.APPROVAL_REQUEST_MISSED * float(want - 1)
+	check("tur sonu: karşılanan +, karşılanmayan − (hepsi toplanır)", near(cm.approval_value(), expected), "%.1f -> %.1f (beklenen %.1f)" % [before, cm.approval_value(), expected])
+	check("karşılanmayan ilde hükümet partisi il puanı kaybeder", cm.local_of(miss_id, 1) < local_before - 0.5,
+		"%.2f -> %.2f" % [local_before, cm.local_of(miss_id, 1)])
+	check("yeni tur için yeni istekler", cm.invest_requests.size() == want and not cm.invest_requests.values().any(func(r): return bool(r["done"])))
+	gm.government = {}
+	gm.main_gov_peer_id = -1
+	cm._finish_round()
+	check("hükümet yokken istek yok", cm.invest_requests.is_empty())
+
+	print("=== 6) KAYIT ===")
 	new_game()
 	cm.approval["value"] = 57.0
 	var packed: Dictionary = cm._pack_state(true)
 	cm.approval = {}
+	var req_before: Dictionary = cm.invest_requests.duplicate(true)
+	cm.invest_requests = {}
 	cm._apply_state(packed)
 	check("onay durumla taşınır", near(cm.approval_value(), 57.0, 0.001))
+	check("istekler durumla taşınır", cm.invest_requests == req_before)
 
 	print("SONUC: %s (%d hata)" % ["TAMAM" if fails == 0 else "HATA", fails])
 	quit(1 if fails > 0 else 0)

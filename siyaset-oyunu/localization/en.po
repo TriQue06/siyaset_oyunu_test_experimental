@@ -5297,3 +5297,24 @@ msgstr "not chosen"
 
 msgid "Burada miting yaparsan (%d seçmen grubu hedeflenir):"
 msgstr "If you rally here (%d voter groups targeted):"
+
+msgid "%s yatırım isteği karşılandı"
+msgstr "%s investment request met"
+
+msgid "%s yatırım isteği karşılandı: hükümet onayı tur sonunda artacak."
+msgstr "%s investment request met: government approval rises at the end of the round."
+
+msgid "%s yatırım isteği karşılanmadı"
+msgstr "%s investment request missed"
+
+msgid "Karşılanmayan yatırım istekleri: %s. Hükümet bu illerde oy kaybetti."
+msgstr "Missed investment requests: %s. The government lost votes in these provinces."
+
+msgid "yapıldı"
+msgstr "done"
+
+msgid "Bu ilin yatırım isteği bu tur karşılandı."
+msgstr "This province's investment request was met this round."
+
+msgid "Bu il bu tur %s yatırım istiyor: karşılarsan hükümet onayı artar, karşılanmazsa onay ve bu ildeki oy düşer."
+msgstr "This province wants a %s investment this round: meet it and government approval rises; miss it and approval and votes here fall."

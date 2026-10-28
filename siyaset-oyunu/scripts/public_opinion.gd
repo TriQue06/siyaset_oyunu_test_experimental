@@ -127,6 +127,14 @@ const APPROVAL_CRISIS_LAW_NO := -22.0
 const APPROVAL_CRISIS_LAW_FAILED := -5.0
 ## Göstergede tutulan tur sayısı.
 const APPROVAL_HISTORY := 8
+## YATIRIM İSTEKLERİ (0.0.283): hükümet varken her tur birkaç il bir tutar
+## ister; istek bir tam tur sürer. Karşılanırsa onay artar; karşılanmazsa
+## onay düşer ve hükümet ortakları o ilde il puanı kaybeder (bakanlık payıyla).
+const REQUEST_PROVINCES_PER := 12
+const REQUEST_MIN := 2
+const APPROVAL_REQUEST_DONE := 2.0
+const APPROVAL_REQUEST_MISSED := -1.5
+const REQUEST_MISSED_LOCAL := -4.0
 ## Gündemdeki gruba sunulan yasanın grup etkisi (sunana) bu kadar büyür.
 const AGENDA_LAW_MULT := 1.3
 

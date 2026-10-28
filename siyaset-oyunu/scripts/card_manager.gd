@@ -235,6 +235,9 @@ var disaster: Dictionary = {}
 ## HÜKÜMET ONAYI (bkz. PublicOpinion.APPROVAL_*): {"value", "delta", "history",
 ## "pending": [{"text", "amount"}]}. Hükümet kurulunca start_approval başlatır.
 var approval: Dictionary = {}
+## YATIRIM İSTEKLERİ: province_id -> {"amount": milyon ¤, "done": bool}. Tur
+## sonunda karşılanmayanlar cezalandırılır, sonra yeni tur için yenileri seçilir.
+var invest_requests: Dictionary = {}
 ## Tur başında çıkan afetin gazete bilgisi (sonraki _push_state olaya ekler).
 var _pending_disaster_fx: Dictionary = {}
 ## Tur sonu ekonomi olayı: bir sonraki durum yayınına iliştirilir.
@@ -1275,6 +1278,67 @@ func start_approval() -> void:
 	value = clampf(snappedf(value, 0.1), 0.0, 100.0)
 	approval = {"value": value, "delta": 0.0, "history": [value], "pending": []}
 	_pending_log.append({"text": L.t("Hükümet onayı %%%s ile başladı.") % L.dec(value, 0), "peer_id": -1, "province": "", "kind": "government"})
+	invest_requests = {}
+	_ensure_invest_requests()
+
+# --- YATIRIM İSTEKLERİ ------------------------------------------------------------
+
+func invest_request(province_id: String) -> Dictionary:
+	return invest_requests.get(province_id, {})
+
+## İsteğin süresi: oynama sırasında kalan sıra sayısı (bu sıra dahil) / tur
+## başındaki sıra sayısı. Haritadaki pasta bu kadar dilimden oluşur.
+func request_turns() -> Vector2i:
+	var total := maxi(1, turn_order.size())
+	return Vector2i(clampi(total - current_turn_index, 1, total), total)
+
+## Yeni tur: hükümet varken il sayısı / REQUEST_PROVINCES_PER (en az REQUEST_MIN)
+## il, vekil sayısına göre küçük ya da büyük yatırım ister.
+func _roll_invest_requests() -> void:
+	invest_requests = {}
+	if not has_approval() or _province_ids.is_empty():
+		return
+	var count := maxi(PublicOpinion.REQUEST_MIN, int(roundf(float(_province_ids.size()) / float(PublicOpinion.REQUEST_PROVINCES_PER))))
+	var pool: Array = _province_ids.duplicate()
+	for province_id in active_disaster().get("provinces", []):
+		pool.erase(province_id)
+	_shuffle(pool)
+	var average := average_province_seats()
+	for province_id in pool.slice(0, mini(count, pool.size())):
+		var tier := 1 if province_seat_count(String(province_id)) > average else 0
+		invest_requests[String(province_id)] = {"amount": invest_tier_cost(tier), "done": false}
+
+## Hükümet kurulunca bu turun istekleri hemen seçilir (tur başını beklemez).
+func _ensure_invest_requests() -> void:
+	if invest_requests.is_empty():
+		_roll_invest_requests()
+
+func _fulfil_invest_request(province_id: String, amount: float) -> void:
+	var req: Dictionary = invest_requests.get(province_id, {})
+	if req.is_empty() or bool(req.get("done", false)) or amount + 0.001 < float(req["amount"]):
+		return
+	req["done"] = true
+	_approval_add(L.t("%s yatırım isteği karşılandı") % _province_name(province_id), PublicOpinion.APPROVAL_REQUEST_DONE)
+	_pending_log.append({"text": L.t("%s yatırım isteği karşılandı: hükümet onayı tur sonunda artacak.") % _province_name(province_id),
+		"peer_id": -1, "province": province_id, "kind": "invest"})
+
+## Tur bitti: karşılanmayan her istek onayı düşürür; hükümet ortakları o ilde
+## bakanlık paylarına göre il puanı kaybeder.
+func _settle_invest_requests() -> void:
+	if not has_approval():
+		invest_requests = {}
+		return
+	var missed: PackedStringArray = []
+	for province_id in invest_requests.keys():
+		if bool(invest_requests[province_id].get("done", false)) or not has_province(String(province_id)):
+			continue
+		missed.append(_province_name(String(province_id)))
+		_approval_add(L.t("%s yatırım isteği karşılanmadı") % _province_name(String(province_id)), PublicOpinion.APPROVAL_REQUEST_MISSED)
+		for pid in GovernmentManager.government_party_ids():
+			_add_local(String(province_id), int(pid), PublicOpinion.REQUEST_MISSED_LOCAL * quota_share(int(pid)))
+	if not missed.is_empty():
+		_pending_log.append({"text": L.t("Karşılanmayan yatırım istekleri: %s. Hükümet bu illerde oy kaybetti.") % ", ".join(missed),
+			"peer_id": -1, "province": "", "kind": "invest"})
 
 ## Tur içindeki bir olayın onaya etkisi: tur sonunda topluca uygulanır.
 func _approval_add(text: String, amount: float) -> void:
@@ -2274,6 +2338,7 @@ func init_game() -> void:
 	BotBrain.reset_skills()
 	funds = {}
 	approval = {}
+	invest_requests = {}
 	for peer_id in MultiplayerManager.players.keys():
 		inventories[peer_id] = []
 		funds[peer_id] = GameRules.FUNDS_START
@@ -2688,6 +2753,7 @@ func _apply_invest_move(peer_id: int, province_id: String, state: float = 1.0, t
 	economy["treasury"] = before - float(split["state"])
 	_event_message = ""
 	_apply_investment(peer_id, province_id, amount)
+	_fulfil_invest_request(province_id, amount)
 	_push_state({"type": "invest", "peer_id": peer_id, "province": province_id, "message": _event_message,
 		"econ": {"kind": "invest", "peer_id": peer_id, "province": province_id, "cost": float(split["state"]),
 			"party_cost": float(split["party"]), "before": before, "after": state_treasury()}})
@@ -4274,8 +4340,11 @@ func _finish_round() -> void:
 	# AFET: bitmiş turun afeti sona erer; yeni tur için zar atılır. Bu tur
 	# seçimle bitiyorsa yeni afet YENİ seçim dönemine sayılır.
 	_end_disaster()
-	# HÜKÜMET ONAYI tur sonunda (afet sonucu dahil) güncellenir; seçim yeni değeri görür.
+	# HÜKÜMET ONAYI tur sonunda (afet sonucu ve yatırım istekleri dahil)
+	# güncellenir; seçim yeni değeri görür. Sonra yeni turun istekleri seçilir.
+	_settle_invest_requests()
 	_settle_approval()
+	_roll_invest_requests()
 	var will_elect: bool = finished_round >= GameRules.MAX_ROUNDS or early_election_pending \
 		or GameRules.is_election_round(finished_round) \
 		or (not last_seats.is_empty() and not GovernmentManager.has_government()
@@ -5567,6 +5636,7 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"economy": economy,
 		"disaster": disaster,
 		"approval": approval,
+		"invest_requests": invest_requests,
 		"funds": funds,
 		"game_finished": game_finished,
 		"final_ranking": final_ranking,
@@ -5684,6 +5754,7 @@ func _apply_state(state: Dictionary) -> void:
 	economy = Economy.normalized(state.get("economy", {}))
 	disaster = state.get("disaster", {})
 	approval = state.get("approval", {})
+	invest_requests = state.get("invest_requests", {})
 	# PARTİ KASASI (milyon ¤). 0.0.166 öncesi durumda alan "mana" adındaydı;
 	# para ölçeği eski değerlerle birebir kurulduğu için (bkz. GameRules) değer
 	# aynen taşınır. İkisi de yoksa boş başlar (herkes 0).

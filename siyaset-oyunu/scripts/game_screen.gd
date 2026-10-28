@@ -365,6 +365,10 @@ func _ready() -> void:
 	# bazen birbirine yaklaşıyor/uzaklaşıyor" şikayetine yol açıyordu.
 	get_viewport().size_changed.connect(_apply_layout)
 
+	# YATIRIM İSTEKLERİ: vekil pullarının üstünde, ilin ortasında pasta zamanlayıcı.
+	var request_markers := InvestRequestMarkers.new()
+	request_markers.name = "InvestRequestMarkers"
+	map_holder.add_child(request_markers)
 	hover_tooltip.hide()
 	# Profil, harita katman düğmelerinin (z 5) ve il menüsünün üstünde.
 	hover_tooltip.z_index = 120

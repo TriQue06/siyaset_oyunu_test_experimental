@@ -68,10 +68,9 @@ func _build_background() -> void:
 				arc.draw_circle(center + Vector2(cos(a), sin(a)) * radius, 7.0, color, true, -1.0, true))
 	add_child(arc)
 
-## Panel zemini: 9-slice PNG (pixel çerçeve). Renk parametresi kalmadı — tarz
-## tek yerden geliyor; sadece koyu/normal ayrımı var.
-func _panel_style(dark: bool = false, padding: int = 24) -> StyleBox:
-	var style := UiSkin.stylebox(UiSkin.PANEL_DARK if dark else UiSkin.PANEL)
+## Ortak karton panel zemini.
+func _panel_style(padding: int = 24) -> StyleBox:
+	var style := UiSkin.board()
 	style.set_content_margin_all(padding)
 	return style
 
@@ -91,10 +90,10 @@ func _field(placeholder: String, max_length: int) -> LineEdit:
 	edit.custom_minimum_size = Vector2(0, 40 * S)
 	edit.add_theme_font_override("font", UiTheme.mono())
 	edit.add_theme_font_size_override("font_size", int(UiTheme.FS_HEAD * S))
-	var style := UiSkin.stylebox(UiSkin.SLOT)
+	var style := UiSkin.groove()
 	style.set_content_margin_all(UiTheme.PAD_S)
 	UiSkin.apply_style(edit, "normal", style)
-	var focus := UiSkin.color_box(UiTheme.GOLD, UiSkin.SLOT)
+	var focus := UiSkin.groove(UiTheme.GOLD)
 	focus.set_content_margin_all(UiTheme.PAD_S)
 	UiSkin.apply_style(edit, "focus", focus)
 	return edit
@@ -117,7 +116,7 @@ func _build_card() -> void:
 
 	# KİMLİK: ince, hap biçimli ayrı bir şerit (oda kartından farklı görünür).
 	var profile := PanelContainer.new()
-	var profile_style := _panel_style(false, UiTheme.PAD_M)
+	var profile_style := _panel_style(UiTheme.PAD_M)
 	profile_style.set_content_margin_all(10 * S)
 	profile_style.content_margin_left = 18 * S
 	profile_style.content_margin_right = 10 * S
@@ -143,7 +142,7 @@ func _build_card() -> void:
 	# ODA: kurma ve katılma.
 	var card := PanelContainer.new()
 	card.custom_minimum_size = Vector2(CARD_WIDTH, 0)
-	var card_style := _panel_style(true, 24)
+	var card_style := _panel_style(24)
 	card_style.set_content_margin_all(20 * S)
 	UiSkin.apply_style(card, "panel", card_style)
 	column.add_child(card)

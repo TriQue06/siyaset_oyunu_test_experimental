@@ -12,7 +12,7 @@ extends RefCounted
 ##      kesimlere birkaç GÖL oyulur.
 ##   3. İller: tohumlar bir YOĞUNLUK alanına göre dağılır (kıyıda ve haritanın
 ##      bir yakasında sık: küçük iller; içerde ve öbür yakada seyrek: büyük
-##      iller, Türkiye'nin batısı / doğusu gibi). Çok kaynaklı Dijkstra ile
+##      iller). Çok kaynaklı Dijkstra ile
 ##      büyürler; kenar maliyeti "sırt" ve "arazi" gürültüsüyle değişir:
 ##      sınırlar doğal çizgilere oturur, iller vadiler boyunca uzar.
 ##   4. Çizim (geometry): sınır köşeleri hafifçe yumuşatılır, sonra iki ölçekli
@@ -35,7 +35,7 @@ const MARGIN_CELLS := 3
 const LAND_FRACTION := 0.5
 ## Kırpılan haritada karanın çevresinde kalan deniz payı.
 const CROP_PAD := SPACING * 2.5
-## Varsayılan il sayısı (province_scale 1); eski altıgen haritayla aynı ölçek.
+## Varsayılan il sayısı (province_scale 1).
 const PROVINCES := 46
 const MIN_PROVINCE_CELLS := 20
 ## Bu kadar hücreden büyük ada kendi ilidir; daha küçükleri en yakın ile bağlanır.
@@ -74,7 +74,7 @@ static func _generate(seed_value: int, province_scale: float = 1.0, seat_total: 
 	count = _compact(labels, points)
 	var coastal := _coastal(labels, topo, count, open_sea)
 	var population := _population(points, topo, labels, count, rng)
-	var seats := HexGridGenerator._allocate_seats(population, seat_total)
+	var seats := ProvinceLayout.allocate_seats(population, seat_total)
 	var names := _names(points, labels, count, coastal, population, rng)
 	var regions: Array = []
 	for i in count:
@@ -113,7 +113,7 @@ static func _generate(seed_value: int, province_scale: float = 1.0, seat_total: 
 
 # --- 1. Noktalar ve üçgenleme ------------------------------------------------------
 
-## Sarsılmış, satırları kaydırılmış ızgara (Voronoi hücreleri altıgene yakın ama
+## Sarsılmış, satırları kaydırılmış nokta dizilimi (Voronoi hücreleri
 ## düzensiz). Haritanın dışında da bir halka nokta vardır: kenar hücreleri kapanır.
 static func _points(rng: RandomNumberGenerator) -> PackedVector2Array:
 	var out := PackedVector2Array()
@@ -596,7 +596,7 @@ static func _population(points: PackedVector2Array, topo: Dictionary, labels: Pa
 	pop.fill(0.0)
 	for i in land_cells:
 		var p := points[i]
-		# Hücre alanı eski altıgen hücreden küçük: yoğunluk hücre başına ölçeklenir.
+		# Nüfus yoğunluğu örnekleme alanına göre ölçeklenir.
 		var density := 0.6 + (noise.get_noise_2d(p.x, p.y) + 1.0) * 0.4
 		for nb in (topo["adj"][i] as PackedInt32Array):
 			if labels[nb] < 0:
@@ -629,13 +629,13 @@ static func _names(points: PackedVector2Array, labels: PackedInt32Array, count: 
 	var names: Array = []
 	names.resize(count)
 	for r in count:
-		# Yön adı (Kuzey/Güney...) için eski ızgara ölçeğine çevrilir.
+		# Yön adı için ülke içindeki normalize konum kullanılır.
 		var c: Vector2 = sums[r] / maxf(1.0, float(sizes[r]))
-		var center := Vector2(c.x / WIDTH * HexGridGenerator.COLS, c.y / HEIGHT * HexGridGenerator.ROWS)
+		var center := Vector2(c.x / WIDTH, c.y / HEIGHT)
 		var best := {}
 		var best_overlap := 999
 		for _try in 60:
-			var candidate := HexGridGenerator._make_name(rng, bool(coastal[r]), metros.has(r), center)
+			var candidate := ProvinceLayout.make_name(rng, bool(coastal[r]), metros.has(r), center)
 			if used.has(candidate["name"]):
 				continue
 			var overlap := 0
@@ -649,7 +649,7 @@ static func _names(points: PackedVector2Array, labels: PackedInt32Array, count: 
 				break
 		var name := String(best.get("name", ""))
 		if name == "" or used.has(name):
-			name = "%s %d" % [HexGridGenerator._pick(rng, HexGridGenerator.STANDALONE), r + 1]
+			name = "%s %d" % [ProvinceLayout.pick(rng, ProvinceLayout.STANDALONE), r + 1]
 		used[name] = true
 		for part in best.get("parts", []):
 			used_parts[part] = true

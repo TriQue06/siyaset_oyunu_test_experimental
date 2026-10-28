@@ -2,7 +2,7 @@ extends SceneTree
 ## SEÇMEN GRUPLARI testleri (yerel mod, RPC yok): grup tanımları, oy hesabı
 ## (normalizasyon, sıfır destek, dört çiftin tek seçmen sayılması, bölgesel
 ## yoğunluk ve sayım yöntemleri), miting / yatırım / yasanın
-## etkileri ve çift uygulanmaması; ayrıca altıgen harita, anayasa, olay logu,
+## etkileri ve çift uygulanmaması; ayrıca ülke haritası, anayasa, olay logu,
 ## karışıklık ve bölünme.
 ##   godot --headless --path . --script res://tools/smoke_test_voter_groups.gd
 
@@ -68,7 +68,7 @@ func _initialize() -> void:
 
 	print("=== 1) ULKE HARITASI ===")
 	# 0.0.261: rastgele harita serbest sekilli ULKE (CountryGenerator).
-	check("rastgele harita ulke haritasi", game_map.is_country())
+	check("rastgele harita ulke haritasi", not game_map.country.is_empty())
 	var geo: Dictionary = game_map.country
 	var labels: PackedInt32Array = geo["labels"]
 	var topo := CountryGenerator.topology(geo["points"])
@@ -82,7 +82,7 @@ func _initialize() -> void:
 	for id in game_map.ids:
 		total += game_map.seats_of(id)
 		min_seats = mini(min_seats, game_map.seats_of(id))
-	check("il vekilleri toplami 300, her bolgede en az 2", total == HexGridGenerator.PROVINCE_SEATS and total == 300 and min_seats >= 2, "%d / min %d" % [total, min_seats])
+	check("il vekilleri toplami 300, her bolgede en az 2", total == ProvinceLayout.PROVINCE_SEATS and total == 300 and min_seats >= 2, "%d / min %d" % [total, min_seats])
 	var names := {}
 	for id in game_map.ids:
 		names[game_map.name_of(id)] = true
@@ -259,7 +259,7 @@ func _initialize() -> void:
 	var tiny_profile: Dictionary = cm.province_profiles[tiny].duplicate(true)
 	VoterGroups.set_percent(tiny_profile, "emekli", 95)
 	tiny_profile.erase("_counts")
-	tiny_profile["_electorate"] = 3 * HexGridGenerator.VOTERS_PER_SEAT
+	tiny_profile["_electorate"] = 3 * ProvinceLayout.VOTERS_PER_SEAT
 	cm.province_profiles[tiny] = tiny_profile
 	cm.organizations[tiny] = {2: 2}
 	var tiny_gain := 0.0

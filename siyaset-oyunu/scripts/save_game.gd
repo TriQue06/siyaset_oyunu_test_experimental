@@ -125,6 +125,8 @@ static func _read(slot: String) -> Dictionary:
 	for key in ["turn_order", "inventories", "funds", "round", "map"]:
 		if not (dict["cm"] as Dictionary).has(key):
 			return {"error": L.t("Kayıt dosyası eksik ya da bozuk (%s).") % key}
+	if not GameMap.supports_data(dict["cm"]["map"]):
+		return {"error": L.t("Bu kaydın harita biçimi artık desteklenmiyor. Yeni bir oyun başlatın.")}
 	return dict
 
 ## Eski biçimleri bugünkü biçime yükseltir (şimdilik tek biçim var).

@@ -1,4 +1,5 @@
 {
+"Bu kaydın harita biçimi artık desteklenmiyor. Yeni bir oyun başlatın.": "This save uses a map format that is no longer supported. Start a new game.",
 "AFET: %s — %s. Bu tur boyunca YARDIM hamlesiyle bölgeye istendiği kadar yardım edilebilir.": "DISASTER: %s — %s. All round, the AID move can send help to the region as often as you like.",
 "Hükümet yok: vergi kimseyi etkilemez": "No government: taxes affect nobody",
 "Normal vergi: seçmene etkisi yok": "Normal tax: no effect on voters",
@@ -147,9 +148,7 @@
 "Türkçe": "Turkish",
 "İngilizce": "English",
 "İsim dilini değiştir": "Change name language",
-"Türkiye": "Türkiye",
 "%d (sabit)": "%d (fixed)",
-"Türkiye haritasında tohum yok": "No seed on the Türkiye map",
 "Harita": "Map",
 "AFET YARDIMI": "DISASTER RELIEF",
 "PARTİ KASASINDAN": "FROM PARTY FUNDS",

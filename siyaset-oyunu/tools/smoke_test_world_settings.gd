@@ -7,7 +7,7 @@ func check(ok: bool, label: String) -> void:
 		fails += 1
 	print(("[OK] " if ok else "[HATA] ") + label)
 func run() -> void:
-	var gen = load("res://scripts/hex_grid_generator.gd")
+	var gen = load("res://scripts/country_generator.gd")
 	var groups = load("res://scripts/voter_groups.gd")
 	var model = load("res://scripts/election_model.gd")
 	var mm = root.get_node("MultiplayerManager")

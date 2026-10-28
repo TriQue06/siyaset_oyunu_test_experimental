@@ -91,7 +91,7 @@ func _play_intro(backdrop: ColorRect) -> void:
 func _ranking_row(index: int, entry: Dictionary, is_me: bool) -> Control:
 	var color: Color = entry.get("color", Color(0.5, 0.5, 0.5))
 	var panel := PanelContainer.new()
-	var style := UiSkin.stylebox(UiSkin.PANEL_DARK)
+	var style := UiSkin.board()
 	style.content_margin_left = 12
 	style.content_margin_right = 14
 	style.content_margin_top = 4

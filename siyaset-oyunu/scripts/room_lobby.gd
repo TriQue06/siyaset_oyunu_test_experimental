@@ -4,7 +4,7 @@ extends Control
 ##   - Solda sekiz satırlık OYUNCU listesi: pul, ad, rol; oda sahibine
 ##     Devret / At (insan) ve Çıkar (bot); boş satırda kesik çizgili sandalye
 ##     ve ilk boş satırda "Bot" ekleme düğmesi.
-##   - Ortada ÜLKE: tohum girildiyse ya da Türkiye haritasıysa haritanın
+##   - Ortada ÜLKE: tohum girildiyse üretilen ülkenin
 ##     önizlemesi (yoksa "her oyunda rastgele"); "Yeni harita" rastgele bir
 ##     tohum verir. Altta dört büyük rakamla oyunun özeti.
 ##   - Sağda katlanır KURAL bölümleri: biri açıkken diğerleri tek satırda
@@ -58,7 +58,6 @@ var world_values: Dictionary = {}
 ## Düğmeli dünya ayarları (tur süresi, miting / yatırım sınırı): ayar -> düğmeler.
 var world_choice_buttons: Dictionary = {}
 var density_buttons: Array[Button] = []
-var map_mode_buttons: Array[Button] = []
 var vote_time_buttons: Array[Button] = []
 ## Kural bölümleri: kimlik -> {"body": Control, "summary": Label, "header": Button}.
 var _sections: Dictionary = {}
@@ -278,16 +277,6 @@ func _build_rules() -> Control:
 
 	# HARİTA VE MECLİS
 	var map_body := _rule_section(box, "map", "map", L.t("Harita ve meclis"))
-	map_body.add_child(_row_name(L.t("Harita")))
-	var mode_row := _seg_row()
-	map_body.add_child(mode_row)
-	var mode_names := {"random": L.t("Rastgele"), "turkiye_altigen": L.t("Türkiye")}
-	for mode in MultiplayerManager.WORLD_OPTIONS["map_mode"]:
-		var button := _seg_button(String(mode_names[mode]))
-		button.set_meta("value", mode)
-		button.pressed.connect(func(): MultiplayerManager.set_world_setting("map_mode", String(button.get_meta("value"))))
-		mode_row.add_child(button)
-		map_mode_buttons.append(button)
 	map_body.add_child(_row_name(L.t("İl sayısı")))
 	var density_row := _seg_row()
 	map_body.add_child(density_row)
@@ -453,20 +442,13 @@ func _refresh() -> void:
 func _refresh_settings_display() -> void:
 	var owner := MultiplayerManager.is_local_owner()
 	var settings: Dictionary = MultiplayerManager.world_settings
-	var turkey: bool = String(settings["map_mode"]) != "random"
 	for key in world_controls:
 		var control: HSlider = world_controls[key]
 		control.set_value_no_signal(float(settings[key]))
 		world_values[key].text = str(settings[key])
 		control.editable = owner
-	# Türkiye haritası: 81 il ve gerçek vekil dağılımı sabit; yalnız ulusal liste ayarlanır.
-	if turkey and world_controls.has("province_seats"):
-		(world_controls["province_seats"] as HSlider).editable = false
-		world_values["province_seats"].text = L.t("%d (sabit)") % GameMap.preset_seat_total(String(settings["map_mode"]))
-	for button in map_mode_buttons:
-		_mark_seg(button, String(button.get_meta("value")) == String(settings["map_mode"]), not owner)
 	for button in density_buttons:
-		_mark_seg(button, is_equal_approx(float(button.get_meta("value")), float(settings["province_scale"])), not owner or turkey)
+		_mark_seg(button, is_equal_approx(float(button.get_meta("value")), float(settings["province_scale"])), not owner)
 	for key in world_choice_buttons:
 		for button in world_choice_buttons[key]:
 			_mark_seg(button, button.get_meta("value") == settings[key], not owner)
@@ -474,11 +456,11 @@ func _refresh_settings_display() -> void:
 		_mark_seg(button, int(button.get_meta("seconds")) == MultiplayerManager.vote_timeout, not owner)
 	for button in bot_funds_buttons:
 		_mark_seg(button, is_equal_approx(float(button.get_meta("value")), MultiplayerManager.bot_funds_penalty), not owner)
-	map_seed_edit.editable = owner and not turkey
-	map_seed_edit.placeholder_text = L.t("Türkiye haritasında tohum yok") if turkey else L.t("Rastgele")
+	map_seed_edit.editable = owner
+	map_seed_edit.placeholder_text = L.t("Rastgele")
 	if not map_seed_edit.has_focus():
-		map_seed_edit.text = "" if turkey else MultiplayerManager.map_seed
-	_new_map_button.disabled = not owner or turkey
+		map_seed_edit.text = MultiplayerManager.map_seed
+	_new_map_button.disabled = not owner
 	random_parties_check.set_pressed_no_signal(MultiplayerManager.random_parties)
 	alliances_check.set_pressed_no_signal(bool(settings.get("alliances", true)))
 	away_bot_check.set_pressed_no_signal(MultiplayerManager.away_mode == MultiplayerManager.AWAY_BOT)
@@ -509,18 +491,17 @@ func _refresh_settings_display() -> void:
 		threshold_slider.set_value_no_signal(t)
 
 	# Özet rakamlar ve kapalı bölümlerin tek satırı.
-	var district := GameMap.preset_seat_total(String(settings["map_mode"])) if turkey else int(settings["province_seats"])
+	var district := int(settings["province_seats"])
 	var seats := district + int(settings["national_seats"])
 	_facts["start"].text = str(GameRules.START_YEAR)
 	_facts["elections"].text = str(count)
 	_facts["seats"].text = str(seats)
 	_facts["threshold"].text = "%%%s" % _format_threshold(t)
-	var mode_text := L.t("Türkiye") if turkey else L.t("Rastgele")
-	_sections["map"]["summary"].text = "%s · %d" % [mode_text, seats]
+	_sections["map"]["summary"].text = "%s · %d" % [L.t("Rastgele"), seats]
 	_sections["elections"]["summary"].text = L.t("%d seçim · %%%s") % [count, _format_threshold(t)]
 	_sections["timing"]["summary"].text = L.t("%d sn · %d sn") % [int(settings["turn_seconds"]), MultiplayerManager.vote_timeout]
 	_sections["bots"]["summary"].text = L.t("zayıflatma %s") % ("%.1f" % MultiplayerManager.bot_funds_penalty).replace(".0", "").replace(".", ",")
-	_seed_note.text = L.t("Türkiye") if turkey else (L.t("tohum: %s") % MultiplayerManager.map_seed if MultiplayerManager.map_seed != "" else L.t("tohum: rastgele"))
+	_seed_note.text = L.t("tohum: %s") % MultiplayerManager.map_seed if MultiplayerManager.map_seed != "" else L.t("tohum: rastgele")
 	info_label.text = _footer_text()
 	_map_timer.start()
 
@@ -536,8 +517,7 @@ func _footer_text() -> String:
 		return L.t("Oyunu oda sahibi başlatır · %s") % length
 	return length
 
-## Harita önizlemesi: Türkiye ya da tohumlu rastgele harita çizilir; tohumsuz
-## rastgele haritada yer tutucu görünür (her oyunda başka ülke).
+## Tohumlu ülke önizlemesi arka planda hazırlanır; tohumsuzken yer tutucu görünür.
 var _preview_thread: Thread
 var _preview_job_key := ""
 
@@ -547,39 +527,35 @@ func _exit_tree() -> void:
 
 func _update_map_preview() -> void:
 	var settings: Dictionary = MultiplayerManager.world_settings
-	var turkey: bool = String(settings["map_mode"]) != "random"
 	var has_seed: bool = MultiplayerManager.map_seed != ""
-	var show := turkey or has_seed
+	var show := has_seed
 	_map_placeholder.visible = not show
 	_map_clip.visible = show
 	if not show:
 		return
-	var key := "%s|%s|%s|%s" % [settings["map_mode"], MultiplayerManager.map_seed, settings["province_scale"], settings["province_seats"]]
+	var key := "%s|%s|%s" % [MultiplayerManager.map_seed, settings["province_scale"], settings["province_seats"]]
 	if key == _shown_map_key and _map != null:
 		return
-	if turkey:
-		GameMap.generate_new(int(MultiplayerManager.map_seed) if has_seed else 1)
-	else:
-		if _preview_thread == null:
-			var seed_value := int(MultiplayerManager.map_seed)
-			var scale_value := float(settings["province_scale"])
-			var seats_value := int(settings["province_seats"])
-			_preview_job_key = key
-			_preview_thread = Thread.new()
-			_preview_thread.start(func() -> Dictionary:
-				var generated := CountryGenerator.generate(seed_value, scale_value, seats_value)
-				return {"data": generated, "geometry": CountryGenerator.geometry(generated)})
-			_map_timer.start(0.05)
-			return
-		if _preview_thread.is_alive():
-			_map_timer.start(0.05)
-			return
-		var result: Dictionary = _preview_thread.wait_to_finish()
-		_preview_thread = null
-		if key != _preview_job_key:
-			_map_timer.start(0.05)
-			return
-		GameMap.set_data(result["data"], result["geometry"])
+	if _preview_thread == null:
+		var seed_value := int(MultiplayerManager.map_seed)
+		var scale_value := float(settings["province_scale"])
+		var seats_value := int(settings["province_seats"])
+		_preview_job_key = key
+		_preview_thread = Thread.new()
+		_preview_thread.start(func() -> Dictionary:
+			var generated := CountryGenerator.generate(seed_value, scale_value, seats_value)
+			return {"data": generated, "geometry": CountryGenerator.geometry(generated)})
+		_map_timer.start(0.05)
+		return
+	if _preview_thread.is_alive():
+		_map_timer.start(0.05)
+		return
+	var result: Dictionary = _preview_thread.wait_to_finish()
+	_preview_thread = null
+	if key != _preview_job_key:
+		_map_timer.start(0.05)
+		return
+	GameMap.set_data(result["data"], result["geometry"])
 	_shown_map_key = key
 	if _map == null:
 		_map = MAP_SCENE.instantiate()

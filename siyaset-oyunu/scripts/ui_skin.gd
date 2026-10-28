@@ -5,28 +5,6 @@ extends RefCounted
 ## 0.0.265 · MASA OYUNU: her yüzey vektör (StyleBoxFlat); doku yok, her
 ## çözünürlükte keskin. Paneller krem karton ve altlarında karton kalınlığı,
 ## düğmeler tombul, altlarında koyu bir kalınlık şeridi; basınca gömülür.
-## Eski PNG yolu sabitleri yalnız "hangi tür yüzey" anahtarı olarak kalır.
-
-const PANEL := "res://assets/ui/ui_panel.png"
-const PANEL_DARK := "res://assets/ui/ui_panel_dark.png"
-const SLOT := "res://assets/ui/ui_slot.png"
-const BUTTON_NORMAL := "res://assets/ui/ui_button_normal.png"
-const BUTTON_HOVER := "res://assets/ui/ui_button_hover.png"
-const BUTTON_PRESSED := "res://assets/ui/ui_button_pressed.png"
-const BUTTON_DISABLED := "res://assets/ui/ui_button_disabled.png"
-## Düz dolgu ve ince çubuk yuvası (renk verilerek kullanılır).
-const FILL := "res://assets/ui/ui_fill.png"
-const TRACK := "res://assets/ui/ui_track.png"
-## Renk verilen düğme yüzeyleri.
-const BUTTON_TINT_NORMAL := "res://assets/ui/ui_button_tint_normal.png"
-const BUTTON_TINT_HOVER := "res://assets/ui/ui_button_tint_hover.png"
-const BUTTON_TINT_PRESSED := "res://assets/ui/ui_button_tint_pressed.png"
-## Sadece çerçeve (içi boş): seçili/hedef vurgusu.
-const TARGET := "res://assets/ui/target_highlight.png"
-
-## Eski 9-slice payı (imza uyumu için; vektörde kullanılmaz).
-const SLICE_MARGIN := 5
-
 # --- Temel yüzeyler (HTML konseptiyle birebir; ölçüler UiTheme.d ile) -------
 
 ## Yuvarlak köşeli düz yüzey.
@@ -213,60 +191,16 @@ static func ring(color: Color, width: int = 3, radius: int = UiTheme.RADIUS) -> 
 	box.set_border_width_all(width)
 	return box
 
-# --- Eski arayüz (yol anahtarıyla yüzey türü) --------------------------------
-
-## Yol anahtarına göre yüzey (panel, oyuk, düğme durumları, dolgu, çerçeve).
-static func stylebox(path: String, _margin: int = SLICE_MARGIN) -> StyleBox:
-	match path:
-		PANEL:
-			return board()
-		PANEL_DARK:
-			return board()
-		SLOT:
-			return groove()
-		BUTTON_NORMAL, BUTTON_TINT_NORMAL:
-			return button_box(UiTheme.PANEL_LIGHT, "normal")
-		BUTTON_HOVER, BUTTON_TINT_HOVER:
-			return button_box(UiTheme.PANEL_LIGHT, "hover")
-		BUTTON_PRESSED, BUTTON_TINT_PRESSED:
-			return button_box(UiTheme.PANEL_LIGHT, "pressed")
-		BUTTON_DISABLED:
-			return button_box(UiTheme.PANEL_LIGHT, "disabled")
-		TRACK:
-			var track := groove()
-			track.set_radius(UiTheme.d(6))
-			track.set_content_margin_all(2)
-			return track
-		TARGET:
-			return ring(UiTheme.GOLD)
-	return flat(UiTheme.PANEL, UiTheme.RADIUS_S)
-
-## İstenen renkte yüzey: yol anahtarı türünü seçer (düğme, oyuk, dolgu...).
-static func color_box(color: Color, path: String = FILL, _margin: int = SLICE_MARGIN) -> StyleBox:
-	match path:
-		BUTTON_TINT_NORMAL, BUTTON_NORMAL:
-			return button_box(color, "normal")
-		BUTTON_TINT_HOVER, BUTTON_HOVER:
-			return button_box(color, "hover")
-		BUTTON_TINT_PRESSED, BUTTON_PRESSED:
-			return button_box(color, "pressed")
-		BUTTON_DISABLED:
-			return button_box(color, "disabled")
-		SLOT:
-			return groove(color)
-		TARGET:
-			return ring(color)
-		PANEL, PANEL_DARK:
-			return board(color)
-		TRACK:
-			var track := flat(color, 99)
-			track.set_content_margin_all(2)
-			return track
-	return flat(color, UiTheme.RADIUS_S)
+## İnce çubuk yuvası.
+static func track_box() -> BoardBox:
+	var track := groove()
+	track.set_radius(UiTheme.d(6))
+	track.set_content_margin_all(2)
+	return track
 
 ## Bir Panel/PanelContainer'a karton zemin uygular.
-static func skin_panel(panel: Control, path: String = PANEL) -> void:
-	panel.add_theme_stylebox_override("panel", stylebox(path))
+static func skin_panel(panel: Control) -> void:
+	panel.add_theme_stylebox_override("panel", board())
 
 ## Nötr (krem) düğme: dört durum.
 static func skin_button(button: Button) -> void:
@@ -385,17 +319,9 @@ static func skin_menu_button(button: Button) -> void:
 	_text_shadow(button, true, 0.25, 2.0)
 
 ## Renkli bir "yüzey" (parti rengi, çizgi, dolgu): yuvarlak köşeli düz panel.
-static func color_surface(color: Color, path: String = PANEL) -> Panel:
+static func color_surface(color: Color) -> Panel:
 	var rect := Panel.new()
-	var radius := UiTheme.RADIUS_S if path != FILL else 3
-	var style: StyleBox
-	if path == TARGET:
-		style = ring(color)
-	elif path == PANEL or path == PANEL_DARK:
-		style = board(color)
-	else:
-		style = flat(color, radius)
-	rect.add_theme_stylebox_override("panel", style)
+	rect.add_theme_stylebox_override("panel", flat(color, 3))
 	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return rect
 
@@ -431,9 +357,9 @@ static func _icon_layer(texture: Texture2D, offset: Vector2, color: Color) -> Te
 	return rect
 
 ## Ekrana yayılan karton panel zemini (arka plan katmanı olarak eklenir).
-static func panel_background(path: String = PANEL) -> Panel:
+static func panel_background() -> Panel:
 	var rect := Panel.new()
-	rect.add_theme_stylebox_override("panel", stylebox(path))
+	rect.add_theme_stylebox_override("panel", board())
 	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 	return rect

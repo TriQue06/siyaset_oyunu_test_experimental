@@ -8,7 +8,7 @@ extends Control
 ##   - Üstte CANLI etiketi, yayın saati ve açılan sandık oranı; altta SON DAKİKA
 ##     bandı ve kayan haber yazısı.
 ## Sayımın kendisi ElectionNightSim'de; her karede yeniden hesaplanıp çizilir
-## (harita GPU paletiyle boyanır, bkz. province_overlay.gd). Süre bitince
+## (haritanın mesh renkleri güncellenir, bkz. province_map.gd). Süre bitince
 ## kesin sonuç bir süre ekranda kalır, sonuç gazetesi (EventFx) BU ekranda
 ## oynar, sonra GameScreen'e dönülür (0.0.180; ATLA / 2× kaldırıldı).
 ## STÜDYO KAMERALARI (0.0.180): harita, oy oranları ve meclis üç pencerede;
@@ -687,8 +687,8 @@ func _apply_panes() -> void:
 	# Harita
 	var mr: Rect2 = _pane_now[0]
 	_map_frame = Rect2(mr.position + Vector2(pad, pad + head), mr.size - Vector2(pad * 2.0, pad * 2.0 + head))
-	if _map.grid_width > 0:
-		var native: Vector2 = Vector2(_map.grid_width, _map.grid_height) * float(_map.MAP_UNIT_SCALE)
+	if GameMap.map_size().x > 0:
+		var native: Vector2 = GameMap.map_size()
 		var fit: float = minf(_map_frame.size.x / native.x, _map_frame.size.y / native.y)
 		_map.scale = Vector2(fit, fit)
 		_map.position = _map_frame.position + (_map_frame.size - native * fit) * 0.5
@@ -764,7 +764,7 @@ func _layout_flash() -> void:
 
 func _panel(color: Color) -> Panel:
 	var panel := Panel.new()
-	UiSkin.apply_style(panel, "panel", UiSkin.color_box(color))
+	UiSkin.apply_style(panel, "panel", UiSkin.flat(color, UiTheme.RADIUS_S))
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return panel
 

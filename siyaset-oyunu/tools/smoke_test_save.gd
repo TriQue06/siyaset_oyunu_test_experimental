@@ -147,9 +147,16 @@ func _initialize() -> void:
 	f.store_var(partial, false)
 	f.close()
 	check("eksik alanlı kayıt reddedilir", save_game._read("eksik").has("error"))
+	var unsupported: Dictionary = save_game._collect()
+	unsupported["cm"]["map"] = {"kind": "obsolete"}
+	f = FileAccess.open(save_game.path_of("harita"), FileAccess.WRITE)
+	f.store_var(unsupported, false)
+	f.close()
+	check("desteklenmeyen haritalı kayıt reddedilir", save_game._read("harita").has("error"))
+	check("geçersiz harita mevcut oyunu değiştirmez", cm.round_number == round_now and not root.get_node("GameMap").country.is_empty())
 	check("kayıt yoksa anlaşılır hata", save_game._read("olmayan").has("error"))
 	check("kayıt özeti okunuyor", not save_game.summary("test").is_empty())
-	for slot in ["test", "bozuk", "yeni", "eksik"]:
+	for slot in ["test", "bozuk", "yeni", "eksik", "harita"]:
 		DirAccess.remove_absolute(save_game.path_of(slot))
 
 	print("")

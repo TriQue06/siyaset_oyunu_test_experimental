@@ -10,8 +10,7 @@ func _initialize() -> void:
 	root.get_node("GovernmentManager").set_process(false)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 73617
-	for mode in ["random", "turkiye_altigen"]:
-		root.get_node("MultiplayerManager").world_settings["map_mode"] = mode
+	for mode in ["random"]:
 		root.get_node("GameMap").generate_new(1950)
 		var map = load("res://scenes/Map.tscn").instantiate()
 		root.add_child(map)

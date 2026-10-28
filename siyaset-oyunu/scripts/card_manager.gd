@@ -97,7 +97,7 @@ const WEIGHT_EARLY_ELECTION := 6.0
 const WEIGHT_REPUTATION := 3.0
 const WEIGHT_REBELLION := 18.0
 
-## Meclis: haritadaki bölgelerin vekilleri (HexGridGenerator.PROVINCE_SEATS)
+## Meclis: haritadaki bölgelerin vekilleri (ProvinceLayout.PROVINCE_SEATS)
 ## + ulusal liste. Harita yüklenince yeniden hesaplanır.
 var TOTAL_SEATS := 500
 
@@ -2289,7 +2289,7 @@ func init_game() -> void:
 	GameRules.set_max_rounds_override(0)
 	_secret_news.clear()
 	province_events = {}
-	# YENİ ÜLKE: her oyunda rastgele altıgen harita (herkese tam durumla gider).
+	# Her oyunda üretilen ülke herkese tam durumla gönderilir.
 	# Lobide tohum girildiyse o ülke, yoksa rastgele (1..999 999 999) bir tohum.
 	var map_seed := fixed_map_seed
 	# Oyun başlarken (siyasetçi profilinden önce) kesinleşen harita.

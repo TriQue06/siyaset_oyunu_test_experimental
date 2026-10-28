@@ -1,36 +1,17 @@
 extends Node2D
-## İL HARİTASI — vektörel, düz (flat) stil: altıgen ızgara (Türkiye, eski
-## kayıtlar) ya da serbest şekilli ÜLKE (CountryGenerator, 0.0.261). Veri GameMap'ten gelir; harita
-## değişince (yeni oyun) kendini yeniden kurar.
-##
-## ÇİZİM MALİYETİ: yüzlerce altıgen tek tek draw_polygon ile çizilmez (web'de
-## çağrı başına maliyet yüksek). Kara altıgenleri tek bir ArrayMesh (köşe
-## renkli), sınırlar ikinci bir ArrayMesh; renk değişince sadece renk dizisi
-## yeniden yazılır. Hover ve odak parıltısı küçük ek çizimlerdir.
-##
-## Arayüz eski piksel haritayla aynıdır (grid_width/grid_height × MAP_UNIT_SCALE
-## = harita boyutu, get_province_id_at, set_province_colors ...), böylece oyun
-## ekranı ve seçim gecesi değişmeden kullanır.
+## Üretilen ülkeyi vektör yüzeylerle çizer; il renkleri mesh üzerinde güncellenir.
+## Veri ve sorgular GameMap'ten, ortak sınırlar CountryGenerator'dan gelir.
 
 signal province_clicked(province_id: String)
 signal province_hovered(province_id: String)  # "" = hiçbir il
 
-const MAP_UNIT_SCALE := 1.0
-## 1 = altıgenler arası boşluk yok: sadece il sınırları görünür.
-const CELL_INSET := 1.0
 const LAND_COLOR := Color(0.27, 0.30, 0.40)
 ## 0.0.265 masa oyunu: açık deniz yeşili deniz, krem il sınırları, koyu
 ## kahve kıyı; ülkenin altında karton kalınlığı (EXTRUDE).
 const SEA_COLOR := Color("93D2D7")
-const REGION_BORDER_COLOR := Color(1.0, 0.98, 0.94, 0.95)
-## Açık zeminli katmanlarda (ör. teşkilat: seviye 0 = neredeyse beyaz) beyaz
-## sınır kaybolur; o zaman koyu sınır kullanılır (bkz. set_dark_borders).
 const REGION_BORDER_DARK := Color(0.10, 0.11, 0.18, 0.95)
-const REGION_BORDER_WIDTH := 1.7
-const COAST_COLOR := Color("4A3A26")
-const COAST_WIDTH := 1.4
 const HOVER_COLOR := Color(1, 1, 1, 0.85)
-## ÜLKE haritasının çizgileri (referans: Türkiye / İspanya seçim haritaları).
+## Ortak il sınırları ve kıyı çizgileri.
 const COUNTRY_BORDER_COLOR := Color("FFFAF0")
 const COUNTRY_BORDER_WIDTH := 1.3
 const COUNTRY_COAST_COLOR := Color("4A3A26")
@@ -45,8 +26,6 @@ const EXTRUDE_COLOR := Color("B08A5A")
 const TABLE_SHADOW_DEPTH := 9.0
 const TABLE_SHADOW_COLOR := Color(0.043, 0.227, 0.251, 0.3)
 
-var grid_width: int = 0
-var grid_height: int = 0
 var ids: Array = []
 
 var _colors: Dictionary = {}       # province_id -> Color
@@ -74,12 +53,8 @@ var _colors_dirty := true
 ## Odak parıltısı: {"id", "color", "time", "duration", "icon"}; boşsa yok.
 var _pulse: Dictionary = {}
 var _dark_borders := false
-var _white_borders := false
 
 func _ready() -> void:
-	for child in get_children():
-		if child.name in ["Background", L.t("Overlay")]:
-			child.queue_free()
 	GameMap.map_changed.connect(_rebuild)
 	_rebuild()
 	set_process_unhandled_input(true)
@@ -87,9 +62,6 @@ func _ready() -> void:
 
 func _rebuild() -> void:
 	ids = GameMap.province_ids()
-	var size := GameMap.map_size()
-	grid_width = int(ceil(size.x))
-	grid_height = int(ceil(size.y))
 	_build_geometry()
 	_colors_dirty = true
 	queue_redraw()
@@ -112,41 +84,11 @@ func _build_geometry() -> void:
 	for id in ids:
 		_edges[id] = []
 		_region_tris[id] = PackedVector2Array()
-	if GameMap.is_country():
-		var map_size := GameMap.map_size()
-		sea_vertices.append_array([Vector2.ZERO, Vector2(map_size.x, 0), map_size, Vector2.ZERO, map_size, Vector2(0, map_size.y)])
-		for _i in 6:
-			sea_colors.append(SEA_COLOR)
-		_build_country()
-	for cell in GameMap.cells.size():
-		var region: int = GameMap.cells[cell]
-		var inner := GameMap.cell_corners(cell, CELL_INSET)
-		if region < 0:
-			var sea_center := GameMap.cell_center(cell)
-			for k in 6:
-				sea_vertices.append_array([sea_center, inner[k], inner[(k + 1) % 6]])
-				sea_colors.append_array([SEA_COLOR, SEA_COLOR, SEA_COLOR])
-			continue
-		var center := GameMap.cell_center(cell)
-		for k in 6:
-			_land_vertices.append_array([center, inner[k], inner[(k + 1) % 6]])
-			_land_vertex_region.append_array([region, region, region])
-			_region_tris[ids[region]].append_array([center, inner[k], inner[(k + 1) % 6]])
-		# Kenarlar: komşu başka bölgeyse bölge sınırı, denizse kıyı.
-		var outer := GameMap.cell_corners(cell, 1.0)
-		for k in 6:
-			var n := _neighbor_in_direction(cell, k)
-			var other: int = GameMap.cells[n] if n >= 0 else -1
-			if other == region:
-				continue
-			var a: Vector2 = outer[k]
-			var b: Vector2 = outer[(k + 1) % 6]
-			_edges[ids[region]].append([a, b])
-			if other >= 0 and other < region:
-				continue  # ortak sınırı bir kez çiz
-			var width := COAST_WIDTH if other < 0 else REGION_BORDER_WIDTH
-			var color := Color.WHITE if _white_borders else (COAST_COLOR if other < 0 else (REGION_BORDER_DARK if _dark_borders else REGION_BORDER_COLOR))
-			_append_segment(a, b, width, color)
+	var map_size := GameMap.map_size()
+	sea_vertices.append_array([Vector2.ZERO, Vector2(map_size.x, 0), map_size, Vector2.ZERO, map_size, Vector2(0, map_size.y)])
+	for _i in 6:
+		sea_colors.append(SEA_COLOR)
+	_build_country()
 	_land_mesh = ArrayMesh.new()
 	_border_mesh = ArrayMesh.new()
 	_sea_mesh = ArrayMesh.new()
@@ -255,19 +197,6 @@ func _fill_region(province_id: String, color: Color) -> void:
 	colors.fill(color)
 	RenderingServer.canvas_item_add_triangle_array(get_canvas_item(), indices, tris, colors)
 
-## Kenar k: köşe k ile k+1 arası; yönü 60k derece (0 = doğu, saat yönünde).
-func _neighbor_in_direction(cell: int, k: int) -> int:
-	var col := cell % GameMap.cols
-	var row := cell / GameMap.cols
-	var even := [Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 1), Vector2i(-1, 0), Vector2i(-1, -1), Vector2i(0, -1)]
-	var odd := [Vector2i(1, 0), Vector2i(1, 1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1), Vector2i(1, -1)]
-	var o: Vector2i = (odd if row % 2 == 1 else even)[k]
-	var c: int = col + o.x
-	var r: int = row + o.y
-	if c < 0 or r < 0 or c >= GameMap.cols or r >= GameMap.rows:
-		return -1
-	return r * GameMap.cols + c
-
 ## (Packed diziler GDScript'te değerle geçer: parametreye eklemek kaybolur,
 ## bu yüzden üye dizilere yazılır.)
 func _append_segment(a: Vector2, b: Vector2, width: float, color: Color) -> void:
@@ -360,7 +289,7 @@ func _draw() -> void:
 		# Büyütülmüş çizimde yumuşatılmış çizgi bulanıklaşır: kalınlık ekran
 		# pikseline göre, yumuşatmasız çizilir.
 		var px := 1.0 / maxf(0.0001, (get_viewport().get_final_transform() * get_global_transform_with_canvas()).get_scale().x)
-		var border := REGION_BORDER_DARK if _dark_borders else REGION_BORDER_COLOR
+		var border := REGION_BORDER_DARK if _dark_borders else COUNTRY_BORDER_COLOR
 		for edge in _edges.get(isolated_id, []):
 			draw_line(edge[0], edge[1], border, 2.0 * px, false)
 		if isolated_id in _disaster_ids:
@@ -524,7 +453,7 @@ func _draw_micro_icon(icon: String, pos: Vector2, color: Color, alpha: float) ->
 			draw_circle(pos + Vector2(0, -1.5), 3.5, fg)
 			draw_colored_polygon(PackedVector2Array([pos + Vector2(-3, 0), pos + Vector2(3, 0), pos + Vector2(0, 6)]), fg)
 
-# --- Eski arayüz ----------------------------------------------------------------
+# --- İl sorguları ve renklendirme ----------------------------------------------
 
 func get_province_centroid(province_id: String) -> Vector2:
 	return GameMap.center_of(province_id)
@@ -589,11 +518,4 @@ func replace_province_colors(colors: Dictionary) -> void:
 		return
 	_colors = colors.duplicate()
 	_colors_dirty = true
-	queue_redraw()
-
-func set_white_borders(enabled: bool) -> void:
-	if enabled == _white_borders:
-		return
-	_white_borders = enabled
-	_build_geometry()
 	queue_redraw()

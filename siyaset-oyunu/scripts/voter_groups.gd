@@ -230,7 +230,7 @@ static func dominant_group(profile: Dictionary) -> String:
 			best = group
 	return best
 
-## province_id -> Array[province_id] (altıgen haritadan).
+## province_id -> Array[province_id] (ülke geometrisinden).
 static func neighbors() -> Dictionary:
 	var map = Engine.get_main_loop().root.get_node_or_null("GameMap") if Engine.get_main_loop() is SceneTree else null
 	return map.neighbors() if map != null else {}

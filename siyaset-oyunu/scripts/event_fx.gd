@@ -394,7 +394,7 @@ func _sheet(data: Dictionary, _primary: bool) -> Control:
 	var status := String(data.get("status", ""))
 	if status != "":
 		var chip := PanelContainer.new()
-		UiSkin.apply_style(chip, "panel", UiSkin.color_box(accent))
+		UiSkin.apply_style(chip, "panel", UiSkin.flat(accent, UiTheme.RADIUS_S))
 		var chip_label := _label(status, 12, Color.WHITE if accent.get_luminance() < 0.6 else INK, true)
 		chip.add_child(chip_label)
 		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -409,7 +409,7 @@ func _sheet(data: Dictionary, _primary: bool) -> Control:
 	var stamp_text := String(data.get("stamp", ""))
 	if stamp_text != "":
 		var stamp := PanelContainer.new()
-		UiSkin.apply_style(stamp, "panel", UiSkin.color_box(accent, UiSkin.TARGET))
+		UiSkin.apply_style(stamp, "panel", UiSkin.ring(accent))
 		var stamp_label := _label(stamp_text, 20, accent, true)
 		stamp_label.add_theme_color_override("font_outline_color", PAPER)
 		stamp_label.add_theme_constant_override("outline_size", 6)
@@ -427,7 +427,7 @@ func _sheet(data: Dictionary, _primary: bool) -> Control:
 	# Skandal şeridi: resmin üstünden kayarak geçen kırmızı "SON DAKİKA".
 	if String(data.get("style", "")) == "scandal":
 		var ribbon := PanelContainer.new()
-		UiSkin.apply_style(ribbon, "panel", UiSkin.color_box(accent))
+		UiSkin.apply_style(ribbon, "panel", UiSkin.flat(accent, UiTheme.RADIUS_S))
 		ribbon.add_child(_label(L.t("SON DAKİKA"), 14, Color.WHITE, true))
 		ribbon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		sheet.add_child(ribbon)
@@ -449,8 +449,7 @@ func _label(text: String, size: int, color: Color, mono: bool) -> Label:
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return label
 
-## Düz renk alan (çizgi, çerçeve, kâğıt): ince çizgiler 9-slice dokuyla
-## çizilemediği için ColorRect.
+## Çizgi, çerçeve ve kâğıt efektleri için düz renk alan.
 func _rect(pos: Vector2, rect_size: Vector2, color: Color) -> Control:
 	var r := ColorRect.new()
 	r.color = color

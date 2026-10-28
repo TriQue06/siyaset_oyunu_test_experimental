@@ -6,19 +6,6 @@
 [ext_resource type="Script" path="res://scripts/parliament_diagram.gd" id="4"]
 [ext_resource type="Script" path="res://scripts/vote_share_panel.gd" id="5"]
 
-[ext_resource type="Texture2D" path="res://assets/ui/ui_panel.png" id="6"]
-
-[sub_resource type="StyleBoxTexture" id="StyleBoxFlat_turnindicator"]
-texture = ExtResource("6")
-texture_margin_left = 5.0
-texture_margin_top = 5.0
-texture_margin_right = 5.0
-texture_margin_bottom = 5.0
-content_margin_left = 12.0
-content_margin_top = 8.0
-content_margin_right = 12.0
-content_margin_bottom = 8.0
-
 [node name="GameScreen" type="Control" unique_id=958546920]
 layout_mode = 3
 anchors_preset = 15
@@ -253,7 +240,6 @@ mouse_filter = 2
 
 [node name="TurnIndicator" type="PanelContainer" parent="LeftPanel/LeftMargin/LeftScroll/LeftVBox" unique_id=3821004420]
 unique_name_in_owner = true
-theme_override_styles/panel = SubResource("StyleBoxFlat_turnindicator")
 layout_mode = 2
 
 [node name="TurnIndicatorMargin" type="MarginContainer" parent="LeftPanel/LeftMargin/LeftScroll/LeftVBox/TurnIndicator" unique_id=3821004421]

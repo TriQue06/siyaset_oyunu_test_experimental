@@ -44,7 +44,6 @@ var language: String = "tr" if not OS.get_locale_language().begins_with("en") el
 
 func _ready() -> void:
 	# Para simgesi bütün yazı tiplerine yedek olarak eklenir (yazı içi simge).
-	MoneyIcon.install()
 	# Ortak tema masa oyunu yüzeyleriyle dolar (bkz. UiSkin.install_theme).
 	UiSkin.install_theme()
 	_load()

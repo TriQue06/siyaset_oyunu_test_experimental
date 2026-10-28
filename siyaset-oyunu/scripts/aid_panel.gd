@@ -28,7 +28,7 @@ var _cancel: Button
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	z_index = 107
-	var style := UiSkin.stylebox(UiSkin.PANEL)
+	var style := UiSkin.board()
 	style.set_content_margin_all(UiTheme.PAD_S + 2)
 	UiSkin.apply_style(self, "panel", style)
 	custom_minimum_size = Vector2(WIDTH, 0)

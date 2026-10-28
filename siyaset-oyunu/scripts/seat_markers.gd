@@ -33,7 +33,6 @@ extends Node2D
 const DETAIL_SCALE := 1.1
 
 ## Nokta grupları bölgenin merkezine (GameMap.center_of) çizilir.
-var _seat_centers: Dictionary = {}  # province_id -> Vector2 (harita/local birimi)
 
 # province_id -> Array[Color] (o ildeki her sandalye için bir renk, parti rengi)
 var _seats: Dictionary = {}
@@ -48,7 +47,6 @@ var _groups: Array = []
 var _white_texture: Texture2D
 
 func _ready() -> void:
-	_load_seat_centers()
 	var image := Image.create(1, 1, false, Image.FORMAT_RGBA8)
 	image.fill(Color.WHITE)
 	_white_texture = ImageTexture.create_from_image(image)
@@ -72,10 +70,6 @@ func _notification(what: int) -> void:
 		if not key.is_equal_approx(_drawn_key):
 			_drawn_key = key
 			queue_redraw()
-
-## Altıgen haritada merkezler GameMap'ten gelir (bölgenin iç hücresi).
-func _load_seat_centers() -> void:
-	_seat_centers.clear()
 
 ## O ilin sandalye/renk listesini ayarlar ve tüm noktaları yeniden hesaplar.
 ## seat_colors: her eleman bir Color (o koltuktaki partinin rengi).
@@ -160,8 +154,8 @@ func _rebuild() -> void:
 
 	# Sınır kelepçesi: büyük illerde nokta kümesi haritanın dışına taşmasın.
 	var map_size := Vector2.ZERO
-	if _province_map != null and _province_map.grid_width > 0:
-		map_size = Vector2(_province_map.grid_width, _province_map.grid_height) * _province_map.MAP_UNIT_SCALE
+	if _province_map != null and GameMap.map_size().x > 0:
+		map_size = GameMap.map_size()
 	for g in groups:
 		if map_size.x > 0.0 and map_size.y > 0.0:
 			if g.half_w * 2.0 <= map_size.x:
@@ -182,7 +176,7 @@ func _make_group(province_id: String, colors: Array) -> Dictionary:
 	var max_cols := 0
 	for c in layout:
 		max_cols = max(max_cols, c)
-	var center: Vector2 = _seat_centers.get(province_id, _province_map.get_province_centroid(province_id))
+	var center: Vector2 = _province_map.get_province_centroid(province_id)
 	return {"pos": center, "layout": layout, "colors": dots, "radius": radius, "cell": cell,
 		"half_w": max_cols * cell * 0.5, "half_h": layout.size() * cell * 0.5}
 

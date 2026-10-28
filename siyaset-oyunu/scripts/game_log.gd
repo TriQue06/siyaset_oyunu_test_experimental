@@ -37,7 +37,7 @@ static func build() -> String:
 	out.append("Sürüm %s · yazıldı %s" % [str(ProjectSettings.get_setting("application/config/version", "?")), Time.get_datetime_string_from_system(false, true)])
 	out.append("")
 	out.append("--- KURALLAR ---")
-	out.append("Harita: %s · tohum %d · il %d" % [String(mm.world_settings.get("map_mode", "random")), GameMap.seed_value(), GameMap.province_ids().size()])
+	out.append("Harita: %s · tohum %d · il %d" % [CountryGenerator.KIND, GameMap.seed_value(), GameMap.province_ids().size()])
 	out.append("Baraj %%%s · seçim %s yılda bir · %d seçim · meclis %d (ulusal liste %d) · sayım %s" % [String.num(mm.election_threshold, 1),
 		GameRules.years_text(mm.election_interval), mm.election_count, cm.TOTAL_SEATS, ElectionModel.NATIONAL_LIST_SEATS, ElectionModel.method_title(mm.seat_method)])
 	out.append("İttifaklar: %s · tur süresi %d sn" % ["açık" if cm.alliances_enabled else "kapalı", int(mm.world_settings.get("turn_seconds", 90))])

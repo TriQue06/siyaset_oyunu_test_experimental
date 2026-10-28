@@ -20,7 +20,7 @@ func _initialize() -> void:
 	cm.set_process(false)
 	gm.set_process(false)
 	brain.skill_variance = false
-	for mode in ["random", "turkiye_altigen"]:
+	for mode in ["random"]:
 		for method in ["dhondt", "hare", "wta"]:
 			seed(925731)
 			cm.set_rng_seed(925731)
@@ -30,7 +30,6 @@ func _initialize() -> void:
 			mm.players = {}
 			pm.parties = {}
 			pm.politicians = {}
-			mm.world_settings["map_mode"] = mode
 			mm.seat_method = method
 			ElectionModel.seat_method = method
 			mm.stage = mm.Stage.PARTY_SETUP

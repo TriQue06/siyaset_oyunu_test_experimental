@@ -81,11 +81,9 @@ var players: Dictionary = {}
 var election_threshold: float = THRESHOLD_DEFAULT
 ## Oyun süresi: seçimler kaç turda bir ve kaç seçim olacak (bkz. GameRules.configure).
 var election_interval: float = GameRules.DEFAULT_ELECTION_INTERVAL
-## map_mode: "random" | "turkiye_altigen" (bkz. GameMap). Türkiye
-## haritalarında il milletvekilleri sabittir (gerçek dağılım); ulusal liste ek.
-## action_limit (0.0.232): bir oyuncunun sırasında en fazla kaç miting ve (ayrıca) kaç yatırım.
-const WORLD_DEFAULTS := {"alliances": true, "map_mode": "random", "province_scale": 1.0, "province_seats": 300, "national_seats": 0, "turn_seconds": 90, "action_limit": 5}
-const WORLD_OPTIONS := {"alliances": [true, false], "map_mode": ["random", "turkiye_altigen"], "province_scale": [0.75, 1.0, 1.25], "province_seats": [150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750], "national_seats": [0, 50, 100, 150, 200, 250, 300], "turn_seconds": [60, 75, 90, 105, 120], "action_limit": [4, 5, 6]}
+## Her oyun için rastgele ülke, il yoğunluğu, vekil sayıları ve tur kuralları.
+const WORLD_DEFAULTS := {"alliances": true, "province_scale": 1.0, "province_seats": 300, "national_seats": 0, "turn_seconds": 90, "action_limit": 5}
+const WORLD_OPTIONS := {"alliances": [true, false], "province_scale": [0.75, 1.0, 1.25], "province_seats": [150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750], "national_seats": [0, 50, 100, 150, 200, 250, 300], "turn_seconds": [60, 75, 90, 105, 120], "action_limit": [4, 5, 6]}
 var world_settings: Dictionary = WORLD_DEFAULTS.duplicate()
 var vote_timeout: int = 30
 const VOTE_TIME_OPTIONS := [15, 30, 45, 60]
@@ -1078,13 +1076,10 @@ func set_world_setting(key: String, value: Variant) -> void:
 	else:
 		_request_world_setting.rpc_id(1, key, value)
 
-## Ayar değişikliği uygulanmış yeni ayarlar. Türkiye haritasına geçince ulusal
-## liste kapalı başlar (isteyen ekler); rastgele haritaya dönünce varsayılana döner.
+## Ayar değişikliği uygulanmış yeni ayarlar.
 func _world_with(key: String, value: Variant) -> Dictionary:
 	var updated := world_settings.duplicate()
 	updated[key] = value
-	if key == "map_mode" and (value != "random") != (world_settings["map_mode"] != "random"):
-		updated["national_seats"] = 0 if value != "random" else WORLD_DEFAULTS["national_seats"]
 	return updated
 
 func _apply_world_settings(values: Dictionary) -> void:

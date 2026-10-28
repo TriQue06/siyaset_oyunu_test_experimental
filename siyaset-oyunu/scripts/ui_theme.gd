@@ -89,9 +89,6 @@ const RADIUS_S := 8
 const THICK_PANEL := 7
 const THICK := 6
 const THICK_S := 3
-## Eski adlar (9-slice dönemi): bazı yerler hâlâ okur.
-const SLICE := 5
-const SHADOW := 6
 
 ## Boşluk basamakları — aralara elle sayı yazılmaz, bunlar kullanılır.
 const GAP_XS := 4
@@ -191,13 +188,13 @@ static func body_label(text: String, size: int = FS_BODY, color: Color = TEXT) -
 ## Kartın solunda parti renginde dikey şerit (yuvarlak uçlu). PanelContainer
 ## çocuklarını kendi alanına yaydığı için şerit KUTUNUN İÇİNE eklenir.
 static func stripe(color: Color, width: int = 6) -> Control:
-	var bar := UiSkin.color_surface(color, UiSkin.FILL)
+	var bar := UiSkin.color_surface(color)
 	bar.custom_minimum_size.x = width
 	bar.size_flags_vertical = Control.SIZE_FILL
 	return bar
 
 ## İki bölümü ayıran ince, yuvarlak uçlu çizgi (HSeparator yerine).
 static func rule(color: Color = PANEL_LIGHT) -> Control:
-	var line := UiSkin.color_surface(color, UiSkin.FILL)
+	var line := UiSkin.color_surface(color)
 	line.custom_minimum_size.y = BORDER
 	return line

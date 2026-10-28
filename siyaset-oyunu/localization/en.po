@@ -444,9 +444,6 @@ msgstr "Change name language"
 msgid "%d (sabit)"
 msgstr "%d (fixed)"
 
-msgid "Türkiye haritasında tohum yok"
-msgstr "No seed on the Türkiye map"
-
 msgid "Harita"
 msgstr "Map"
 
@@ -5375,3 +5372,6 @@ msgstr "Government investment — brought by %s (%s)"
 
 msgid "Hükümet: seçtiğin ile devlet hazinesinden %s yatırım. İldeki bütün gruplardan seçmen kazanırsın."
 msgstr "Government: a %s investment from the state treasury in the chosen province. You win voters from every group there."
+
+msgid "Bu kaydın harita biçimi artık desteklenmiyor. Yeni bir oyun başlatın."
+msgstr "This save uses a map format that is no longer supported. Start a new game."

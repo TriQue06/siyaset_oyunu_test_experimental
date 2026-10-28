@@ -52,12 +52,9 @@ static func apply(pack: Dictionary) -> bool:
 		return false
 	var lobby: Dictionary = pack.get("lobby", {})
 	var world: Dictionary = lobby.get("world", {})
-	# Harita türü önce: değişince ulusal liste varsayılana döner, paket sonra üstüne yazar.
-	if world.has("map_mode"):
-		mm.set_world_setting("map_mode", world["map_mode"])
+	# Yalnız güncel dünya ayarları uygulanır; bilinmeyen anahtarlar yok sayılır.
 	for key in world.keys():
-		if key != "map_mode":
-			mm.set_world_setting(String(key), _number_like(world[key], mm.WORLD_DEFAULTS.get(key)))
+		mm.set_world_setting(String(key), _number_like(world[key], mm.WORLD_DEFAULTS.get(key)))
 	if lobby.has("threshold"):
 		mm.set_election_threshold(float(lobby["threshold"]))
 	if lobby.has("interval") or lobby.has("count"):

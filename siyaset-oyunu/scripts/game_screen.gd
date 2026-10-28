@@ -113,7 +113,7 @@ const TAP_MAX_MOVE_PX := 10.0
 ## Oylamada parlamento koltuklarının ve profil etiketlerinin rengi.
 const VOTE_COLORS := {1: UiTheme.GREEN, 0: UiTheme.GOLD, -1: UiTheme.RED}
 
-## HARİTA KATMANLARI: aynı Türkiye haritasının dört ayrı görünümü; butonlarla
+## HARİTA KATMANLARI: ülkenin dört ayrı görünümü; butonlarla
 ## geçilir, harita yan yana dizilmiş sayfalar gibi yana kayar.
 ##   SEATS        : son seçim (il kazananları + vekil daireleri)
 ##   ORGANIZATION : teşkilat seviyem (0 beyaz → en üst seviyede parti rengi)
@@ -390,11 +390,11 @@ func _ready() -> void:
 	CardManager.economy_event.connect(_on_economy_event)
 	GameSettings.province_view_changed.connect(_on_province_view_changed)
 
-	UiSkin.skin_panel(left_panel, UiSkin.PANEL_DARK)
+	UiSkin.skin_panel(left_panel)
 	# Yıl / sonraki seçim / baraj kendi levhasında dursun (ek UI katmanı).
 	var info_plate := get_node_or_null("%InfoPlate") as PanelContainer
 	if info_plate != null:
-		var plate_style := UiSkin.stylebox(UiSkin.SLOT)
+		var plate_style := UiSkin.groove()
 		plate_style.set_content_margin_all(UiTheme.PAD_S)
 		UiSkin.apply_style(info_plate, "panel", plate_style)
 	game_settings_label.add_theme_font_override("font", UiTheme.mono())
@@ -409,7 +409,7 @@ func _ready() -> void:
 		UiSkin.apply_style(board, "panel", StyleBoxEmpty.new())
 	var actions_panel := get_node_or_null("%ActionsPanel") as PanelContainer
 	if actions_panel != null:
-		UiSkin.skin_panel(actions_panel, UiSkin.PANEL_DARK)
+		UiSkin.skin_panel(actions_panel)
 	# Monospace yazı geniş: panelin kendi genişliğini aşmasını engelle.
 	# Kalınlık ve gölge panelin dışına taşar: kırpılmasın (içerik kendi kaydırıcısında).
 	left_panel.clip_contents = false
@@ -717,7 +717,7 @@ func _refresh_desk_labels() -> void:
 ## Viewport boyutuna bağlı TÜM mutlak-piksel yerleşim hesapları burada — hem
 ## açılışta hem her yeniden boyutlanmada (tam ekran vb.) çağrılır.
 func _apply_layout() -> void:
-	if map_holder == null or map_holder.grid_width <= 0:
+	if map_holder == null or GameMap.map_size().x <= 0:
 		return
 	var viewport_size := get_viewport_rect().size
 	# Harita SADECE üst bölgeye (TOP_AREA_HEIGHT_RATIO) ve sağdaki deste/
@@ -769,7 +769,7 @@ func _apply_layout() -> void:
 ## Haritayı (zemin + kırpma kutusu + ölçek) verilen dikdörtgene sığdırır.
 func _place_map(map_rect: Rect2) -> void:
 	_ensure_map_bg(map_rect)
-	var map_native_size: Vector2 = Vector2(map_holder.grid_width, map_holder.grid_height) * map_holder.MAP_UNIT_SCALE
+	var map_native_size: Vector2 = GameMap.map_size()
 	var fit_scale: float = minf(map_rect.size.x / map_native_size.x, map_rect.size.y / map_native_size.y) * MAP_FILL_RATIO
 	_map_fit_scale = fit_scale
 	if _focus_tween == null or not _focus_tween.is_running():
@@ -1176,7 +1176,7 @@ func _sync_parliament_to_slot() -> void:
 ## Her kare: oylama varsa harita meclisin yuvasına, meclis haritanın yerine
 ## kayar; bitince (gecikmeyle) geri döner.
 func _update_vote_swap(delta: float) -> void:
-	if _parl_bg == null or _parl_slot == null or map_holder == null or map_holder.grid_width <= 0:
+	if _parl_bg == null or _parl_slot == null or map_holder == null or GameMap.map_size().x <= 0:
 		return
 	# Meclisin yuvası: sekme açıkken gerçek yeri; Log / Seçili açıkken son bilinen yeri
 	# (fareyle parti incelemek oylama kamerasını bozmasın).
@@ -1347,7 +1347,7 @@ func _ensure_board() -> void:
 		return
 	_board_bg = Panel.new()
 	_board_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiSkin.skin_panel(_board_bg, UiSkin.PANEL_DARK)
+	UiSkin.skin_panel(_board_bg)
 	add_child(_board_bg)
 	move_child(_board_bg, 1)
 	var box := player_panel_list.get_parent() as VBoxContainer
@@ -2246,7 +2246,7 @@ func _build_plaque(pid: int, width: float) -> Control:
 	var halo := Panel.new()
 	halo.name = L.t("TargetHalo")
 	halo.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiSkin.apply_style(halo, "panel", UiSkin.color_box(UiTheme.GOLD, UiSkin.TARGET))
+	UiSkin.apply_style(halo, "panel", UiSkin.ring(UiTheme.GOLD))
 	halo.visible = false
 	card.add_child(halo)
 	card.gui_input.connect(func(event: InputEvent):
@@ -2743,7 +2743,7 @@ func _card_title_banner(card_type: String, crowded: bool = false) -> Control:
 	banner.position = Vector2(6.0 * CARD_ART_RATIO, 8.0 * CARD_ART_RATIO)
 	banner.size = Vector2(CARD_DISPLAY_SIZE.x - 12.0 * CARD_ART_RATIO, 44.0 * CARD_ART_RATIO)
 	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := UiSkin.stylebox(UiSkin.PANEL_DARK)
+	var style := UiSkin.board()
 	style.set_content_margin_all(4)
 	UiSkin.apply_style(banner, "panel", style)
 	var title := Label.new()
@@ -3149,7 +3149,7 @@ func _miting_gain_list(me: int, province_id: String, focus: Array = []) -> Array
 func _open_focus_panel(province_id: String) -> void:
 	if _focus_panel == null:
 		_focus_panel = PanelContainer.new()
-		var style := UiSkin.stylebox(UiSkin.PANEL)
+		var style := UiSkin.board()
 		style.set_content_margin_all(UiTheme.PAD_M)
 		_focus_panel.add_theme_stylebox_override("panel", style)
 		_focus_panel.z_index = 108
@@ -3609,7 +3609,7 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	# SIRA KİMDE: açık zemin + altın çerçeve + "SIRADA" etiketi (nabız gibi atar).
 	# BEN: altın rengi isim + "SEN" etiketi. İkisi birlikte olabilir.
-	var style := UiSkin.stylebox(UiSkin.PANEL if is_turn else UiSkin.PANEL_DARK)
+	var style := UiSkin.board()
 	style.content_margin_left = 6
 	# Sıra/hedef çerçevesi kartın üstüne çiziliyor: sayılar kenara değmesin.
 	style.content_margin_right = 14
@@ -3707,14 +3707,14 @@ func _build_avatar(peer_id: int, party: Dictionary) -> Control:
 	var halo := Panel.new()
 	halo.name = L.t("TargetHalo")
 	halo.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiSkin.apply_style(halo, "panel", UiSkin.color_box(UiTheme.GOLD, UiSkin.TARGET))
+	UiSkin.apply_style(halo, "panel", UiSkin.ring(UiTheme.GOLD))
 	halo.visible = false
 	card.add_child(halo)
 	if is_turn:
 		var frame := Panel.new()
 		frame.name = L.t("TurnFrame")
 		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		UiSkin.apply_style(frame, "panel", UiSkin.color_box(UiTheme.TEXT, UiSkin.TARGET))
+		UiSkin.apply_style(frame, "panel", UiSkin.ring(UiTheme.TEXT))
 		card.add_child(frame)
 		var pulse := frame.create_tween().set_loops()
 		pulse.tween_property(frame, "modulate:a", 0.35, 0.7).set_trans(Tween.TRANS_SINE)
@@ -3974,7 +3974,7 @@ func _build_waiting_overlay() -> void:
 	_waiting_overlay.z_index = 120
 	_waiting_overlay.hide()
 
-	var backdrop := UiSkin.panel_background(UiSkin.PANEL_DARK)
+	var backdrop := UiSkin.panel_background()
 	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
 	backdrop.modulate = Color(1, 1, 1, 0.93)
 	_waiting_overlay.add_child(backdrop)
@@ -4073,7 +4073,7 @@ var _law_group_chip: PanelContainer
 func _corner_chip() -> PanelContainer:
 	var chip := PanelContainer.new()
 	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := UiSkin.stylebox(UiSkin.SLOT)
+	var style := UiSkin.groove()
 	style.set_content_margin_all(6)
 	UiSkin.apply_style(chip, "panel", style)
 	var row := HBoxContainer.new()
@@ -4384,7 +4384,7 @@ func _refresh_action_buttons() -> void:
 
 func _build_agenda_banner() -> void:
 	_agenda_banner = PanelContainer.new()
-	var style := UiSkin.color_box(UiTheme.GOLD.darkened(0.45), UiSkin.BUTTON_TINT_NORMAL)
+	var style := UiSkin.button_box(UiTheme.GOLD.darkened(0.45))
 	style.set_content_margin_all(UiTheme.PAD_S)
 	UiSkin.apply_style(_agenda_banner, "panel", style)
 	_agenda_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -4847,7 +4847,7 @@ func _place_alliance_panel() -> void:
 
 func _build_law_designer() -> void:
 	_law_designer = PanelContainer.new()
-	var style := UiSkin.stylebox(UiSkin.PANEL)
+	var style := UiSkin.board()
 	style.set_content_margin_all(UiTheme.PAD_M)
 	UiSkin.apply_style(_law_designer, "panel", style)
 	_law_designer.z_index = 108
@@ -5135,7 +5135,7 @@ static func _one_decimal(value: float) -> String:
 
 func _build_tax_panel() -> void:
 	_tax_panel = PanelContainer.new()
-	var style := UiSkin.stylebox(UiSkin.PANEL)
+	var style := UiSkin.board()
 	style.set_content_margin_all(UiTheme.PAD_M)
 	UiSkin.apply_style(_tax_panel, "panel", style)
 	_tax_panel.z_index = 108
@@ -5470,7 +5470,7 @@ func _place_layer_bar() -> void:
 ## Harita katman düğmesi (Vekiller / Teşkilat / Güç). Köşe yarıçapı yok:
 ## pixel tarzda hepsi kare, seçili olan altın.
 func _layer_button_style(color: Color, _left: bool, _right: bool) -> StyleBox:
-	var style := UiSkin.color_box(color, UiSkin.BUTTON_TINT_NORMAL)
+	var style := UiSkin.button_box(color)
 	style.content_margin_left = 10
 	style.content_margin_right = 10
 	style.content_margin_top = 6
@@ -5587,7 +5587,6 @@ func _apply_map_layer_colors() -> void:
 	mine.a = 1.0
 	var colors := {}
 	map_holder.set_dark_borders(false)
-	map_holder.set_white_borders(_map_layer in [MapLayer.GROUPS, MapLayer.ORGANIZATION])
 	if _map_layer == MapLayer.SEATS:
 		colors = _seat_layer_colors.duplicate()
 	else:
@@ -5761,7 +5760,7 @@ static func _org_level_text(level: int) -> String:
 
 func _build_propaganda_menu() -> void:
 	_propaganda_menu = PanelContainer.new()
-	UiSkin.skin_panel(_propaganda_menu, UiSkin.PANEL_DARK)
+	UiSkin.skin_panel(_propaganda_menu)
 	_propaganda_menu.z_index = 112
 	_propaganda_menu.mouse_filter = Control.MOUSE_FILTER_STOP
 	_propaganda_menu.hide()
@@ -5790,7 +5789,7 @@ func _show_party_picker(title: String, targets: Array, selected: Callable) -> vo
 		_show_toast(L.t("Seçilebilecek parti yok."))
 		return
 	_party_picker = PanelContainer.new()
-	UiSkin.skin_panel(_party_picker, UiSkin.PANEL)
+	UiSkin.skin_panel(_party_picker)
 	_party_picker.z_index = 120
 	# EVRENSEL PARTİ LİSTESİ: logo ve düğme AYNI yükseklikte (PICKER_ROW);
 	# düğme genişliği en uzun parti adına göre (gereğinden geniş değil).

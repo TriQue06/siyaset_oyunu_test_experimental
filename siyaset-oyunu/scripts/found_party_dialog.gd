@@ -124,8 +124,7 @@ func _refresh() -> void:
 	for swatch in _color_row.get_children():
 		var color: Color = swatch.get_meta("color")
 		var selected := color.is_equal_approx(_color)
-		var style := UiSkin.color_box(color if not swatch.disabled else color.darkened(0.6),
-			UiSkin.BUTTON_TINT_HOVER if selected else UiSkin.BUTTON_TINT_NORMAL)
+		var style := UiSkin.button_box(color if not swatch.disabled else color.darkened(0.6), "hover" if selected else "normal")
 		for state in ["normal", "hover", "pressed", "disabled"]:
 			UiSkin.apply_style(swatch, state, style)
 		swatch.text = "X" if swatch.disabled else ("•" if selected else "")

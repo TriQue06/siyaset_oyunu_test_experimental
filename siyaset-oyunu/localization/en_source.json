@@ -1748,5 +1748,18 @@
 "tohum: %s": "seed: %s",
 "tohum: rastgele": "seed: random",
 "zayıflatma %s": "penalty %s",
-"Ülke": "Country"
+"Ülke": "Country",
+"%s kriz yasasına HAYIR dedi": "%s voted NO on the crisis law",
+"Afet yardımı": "Disaster aid",
+"Afet yardımı yetersiz": "Not enough disaster aid",
+"Hükümet onayı %%%s (%s): %s.": "Government approval %s%% (%s): %s.",
+"Hükümet onayı %%%s ile başladı.": "Government approval starts at %s%%.",
+"Kriz yasası geçti": "Crisis law passed",
+"Kriz yasası hükümet oylarıyla düştü": "Crisis law failed on government votes",
+"HÜKÜMET ONAYI": "APPROVAL",
+"%d seçmen grubu seç (zorunlu; büyük illerde 2, küçük illerde 1). Hedef gruplarda kazanç %s kat.": "Pick %d voter groups (required; 2 in large provinces, 1 in small ones). Gains in targeted groups x%s.",
+"Mitingi düzenlemek için %d seçmen grubu seç.": "Pick %d voter groups to hold the rally.",
+"%d seçmen grubu seç (zorunlu). Büyük illerde 2, küçük illerde 1 grup hedeflenir.": "Pick %d voter groups (required). Large provinces target 2 groups, small ones 1.",
+"seçilmedi": "not chosen",
+"Burada miting yaparsan (%d seçmen grubu hedeflenir):": "If you rally here (%d voter groups targeted):"
 }

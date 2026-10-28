@@ -232,6 +232,9 @@ var economy: Dictionary = Economy.start_state()
 ## döneminde çıkan afet, "owed": önceki dönemde hiç çıkmadı (garanti),
 ## "next_id"}.
 var disaster: Dictionary = {}
+## HÜKÜMET ONAYI (bkz. PublicOpinion.APPROVAL_*): {"value", "delta", "history",
+## "pending": [{"text", "amount"}]}. Hükümet kurulunca start_approval başlatır.
+var approval: Dictionary = {}
 ## Tur başında çıkan afetin gazete bilgisi (sonraki _push_state olaya ekler).
 var _pending_disaster_fx: Dictionary = {}
 ## Tur sonu ekonomi olayı: bir sonraki durum yayınına iliştirilir.
@@ -1241,6 +1244,86 @@ func has_proposed_law_this_round(peer_id: int, kind: String = "") -> bool:
 
 # --- Afet ve YARDIM GÖTÜR (bkz. Disaster) -------------------------------------
 
+# --- HÜKÜMET ONAYI ----------------------------------------------------------------
+
+func has_approval() -> bool:
+	return GovernmentManager.has_government() and approval.has("value")
+
+func approval_value() -> float:
+	return float(approval.get("value", PublicOpinion.APPROVAL_NEUTRAL))
+
+## Son tur sonu güncellemesinin farkı (göstergedeki artış/azalış etiketi).
+func approval_delta() -> float:
+	return float(approval.get("delta", 0.0))
+
+## Onayın bu hükümet partisine yazdığı ulusal puan: %50'den uzaklık ×
+## APPROVAL_NATIONAL_MAX, bakanlık payına göre bölünür.
+func approval_national(pid: int) -> float:
+	if not has_approval():
+		return 0.0
+	return PublicOpinion.APPROVAL_NATIONAL_MAX * (approval_value() - PublicOpinion.APPROVAL_NEUTRAL) \
+		/ PublicOpinion.APPROVAL_NEUTRAL * quota_share(pid)
+
+## Hükümet güvenoyu aldı: her ortağın oy oranı × bakanlık payı toplanır
+## (%50 oyla tek başına iktidar %50'den başlar).
+func start_approval() -> void:
+	if not _is_authority():
+		return
+	var value := 0.0
+	for pid in GovernmentManager.government_party_ids():
+		value += float(last_vote_shares.get(pid, 0.0)) * quota_share(int(pid))
+	value = clampf(snappedf(value, 0.1), 0.0, 100.0)
+	approval = {"value": value, "delta": 0.0, "history": [value], "pending": []}
+	_pending_log.append({"text": L.t("Hükümet onayı %%%s ile başladı.") % L.dec(value, 0), "peer_id": -1, "province": "", "kind": "government"})
+
+## Tur içindeki bir olayın onaya etkisi: tur sonunda topluca uygulanır.
+func _approval_add(text: String, amount: float) -> void:
+	if not has_approval() or is_zero_approx(amount):
+		return
+	var pending: Array = approval.get("pending", [])
+	pending.append({"text": text, "amount": amount})
+	approval["pending"] = pending
+
+func _settle_approval() -> void:
+	if not has_approval():
+		return
+	var before := approval_value()
+	var total := 0.0
+	var parts: PackedStringArray = []
+	for item in approval.get("pending", []):
+		total += float(item["amount"])
+		parts.append("%s %s" % [String(item["text"]), _signed_points(float(item["amount"]))])
+	var value := clampf(snappedf(before + total, 0.1), 0.0, 100.0)
+	var history: Array = approval.get("history", [])
+	history.append(value)
+	while history.size() > PublicOpinion.APPROVAL_HISTORY:
+		history.pop_front()
+	approval = {"value": value, "delta": value - before, "history": history, "pending": []}
+	if not parts.is_empty():
+		_pending_log.append({"text": L.t("Hükümet onayı %%%s (%s): %s.") % [L.dec(value, 0), _signed_points(value - before), ", ".join(parts)],
+			"peer_id": -1, "province": "", "kind": "government"})
+
+static func _signed_points(amount: float) -> String:
+	return ("+" if amount >= 0.0 else "−") + L.dec(absf(amount), 0)
+
+## Krizli grubun yasası: geçerse onay artar; HAYIR diyen hükümet partisi
+## bakanlık payı oranında ağır kaybettirir; hükümetin HAYIR'ıyla düşerse ek eksi.
+func _crisis_law_approval(votes: Dictionary, passed: bool, gov_ids: Array) -> void:
+	if not has_approval():
+		return
+	if passed:
+		_approval_add(L.t("Kriz yasası geçti"), PublicOpinion.APPROVAL_CRISIS_LAW_PASSED)
+	var said_no := false
+	for voter in votes.keys():
+		var pid := party_of(int(voter))
+		if int(voter) != pid or not gov_ids.has(pid):
+			continue
+		if GovernmentManager.normalize_vote(votes[voter]) == GovernmentManager.VOTE_NO:
+			said_no = true
+			_approval_add(L.t("%s kriz yasasına HAYIR dedi") % _party_name(pid), PublicOpinion.APPROVAL_CRISIS_LAW_NO * quota_share(pid))
+	if said_no and not passed:
+		_approval_add(L.t("Kriz yasası hükümet oylarıyla düştü"), PublicOpinion.APPROVAL_CRISIS_LAW_FAILED)
+
 func active_disaster() -> Dictionary:
 	return disaster.get("active", {})
 
@@ -1385,6 +1468,20 @@ func _end_disaster() -> void:
 		text = L.t("%s afeti sona erdi. Yardımlar: %s.") % [Disaster.title(String(active["kind"])), ", ".join(PackedStringArray(parts))]
 	_pending_log.append({"text": text, "peer_id": -1, "province": String((active.get("provinces", [""]) as Array)[0]), "kind": "disaster"})
 	disaster["active"] = {}
+	# Hükümet ortaklarının toplam yardımı muhalefetinkinden fazlaysa onay artar, değilse düşer.
+	if has_approval():
+		var gov_ids := GovernmentManager.government_party_ids()
+		var gov_aid := 0.0
+		var opp_aid := 0.0
+		for pid in aid_map.keys():
+			if gov_ids.has(int(pid)):
+				gov_aid += float(aid_map[pid])
+			else:
+				opp_aid += float(aid_map[pid])
+		if gov_aid > opp_aid:
+			_approval_add(L.t("Afet yardımı"), PublicOpinion.APPROVAL_DISASTER_MORE)
+		elif gov_aid < opp_aid or gov_aid <= 0.0:
+			_approval_add(L.t("Afet yardımı yetersiz"), PublicOpinion.APPROVAL_DISASTER_LESS)
 
 ## Yeni seçim dönemi: sayaç sıfırlanır; biten dönemde hiç afet çıkmadıysa
 ## yenisinde en az bir tane garanti.
@@ -1512,11 +1609,35 @@ func can_miting(peer_id: int, province_id: String = "", state: float = -1.0, tie
 	# 0.0.269: miting için ilde TEŞKİLAT şart (eskiden teşkilatsız miting az getiriyordu).
 	return province_id == "" or (has_province(province_id) and organization_level(province_id, peer_id) > 0)
 
-## Bu ilde mitingte seçilebilecek grup odağı sayısı = teşkilat seviyesi.
-func miting_focus_slots(peer_id: int, province_id: String) -> int:
-	return organization_level(province_id, peer_id)
+## MİTİNG HEDEFİ (0.0.282): seçmen grubu seçmek ZORUNLU ve teşkilattan
+## bağımsız. İllerin vekil sayısı ortalaması en yakın tam sayıya yuvarlanır;
+## ortalamanın altında vekil çıkaran ilde 1, ortalama ve üstünde 2 grup hedeflenir.
+func miting_focus_slots(_peer_id: int, province_id: String) -> int:
+	return 2 if province_seat_count(province_id) >= average_province_seats() else 1
 
-## Odak listesini temizler: geçerli, tekrarsız, en çok teşkilat seviyesi kadar.
+func average_province_seats() -> int:
+	if _province_seat_counts.is_empty():
+		return 0
+	var total := 0
+	for province_id in _province_seat_counts:
+		total += int(_province_seat_counts[province_id])
+	return int(roundf(float(total) / float(_province_seat_counts.size())))
+
+## Hedef grupları tam mı (mitingi düzenlemek için şart).
+func miting_focus_complete(peer_id: int, province_id: String, focus: Array) -> bool:
+	return _clean_focus(peer_id, province_id, focus).size() == miting_focus_slots(peer_id, province_id)
+
+func _complete_focus(peer_id: int, province_id: String, focus: Array) -> Array:
+	var result := _clean_focus(peer_id, province_id, focus)
+	var slots := miting_focus_slots(peer_id, province_id)
+	for group in BotBrain.miting_focus(peer_id, province_id, slots + result.size()):
+		if result.size() >= slots:
+			break
+		if not result.has(group):
+			result.append(group)
+	return result
+
+## Odak listesini temizler: geçerli, tekrarsız, en çok hedef sayısı kadar.
 func _clean_focus(peer_id: int, province_id: String, focus: Array) -> Array:
 	var result: Array = []
 	for group in focus:
@@ -2152,6 +2273,7 @@ func init_game() -> void:
 	event_log.clear()
 	BotBrain.reset_skills()
 	funds = {}
+	approval = {}
 	for peer_id in MultiplayerManager.players.keys():
 		inventories[peer_id] = []
 		funds[peer_id] = GameRules.FUNDS_START
@@ -2587,6 +2709,9 @@ func _apply_miting_move(peer_id: int, province_id: String, state: float = 0.0, f
 		tier: int = DEFAULT_TIER, smear_target: int = -1) -> void:
 	if not can_miting(peer_id, province_id, state, tier, smear_target):
 		return
+	# Arayüz hedef seçimini zorunlu tutar; eksik gelirse (eski istemci, test)
+	# kalan yerler partinin en uygun gruplarıyla dolar: her miting hedeflidir.
+	focus = _complete_focus(peer_id, province_id, focus)
 	_note_main_action(peer_id)
 	var flow := _flow_for(peer_id)
 	flow["mitings"] = int(flow.get("mitings", 0)) + 1
@@ -2599,7 +2724,7 @@ func _apply_miting_move(peer_id: int, province_id: String, state: float = 0.0, f
 	if float(split["state"]) > 0.0:
 		economy_event.emit({"kind": "invest", "cost": float(split["state"]), "before": before, "after": state_treasury()})
 	_event_message = ""
-	_apply_miting(peer_id, province_id, _clean_focus(peer_id, province_id, focus), miting_tier_mult(tier))
+	_apply_miting(peer_id, province_id, focus, miting_tier_mult(tier))
 	var miting_message := _event_message
 	if smear_target != -1:
 		var hand: Array = inventories.get(peer_id, [])
@@ -2960,6 +3085,8 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 						_add_national(partner, PublicOpinion.LAW_PARTNER_NO_NATIONAL * weight)
 						_add_national(pm_party, PublicOpinion.LAW_PM_PARTNER_NO_NATIONAL * weight)
 	var notes := ""
+	if crisis_group() == group:
+		_crisis_law_approval(votes, passed, gov_ids)
 	# KRİZE YANIT: krizin istediği gruba yasa sunan ya da EVET diyen kısmi ulusal destek kazanır.
 	if not crisis_parties.is_empty():
 		var names: PackedStringArray = []
@@ -4147,6 +4274,8 @@ func _finish_round() -> void:
 	# AFET: bitmiş turun afeti sona erer; yeni tur için zar atılır. Bu tur
 	# seçimle bitiyorsa yeni afet YENİ seçim dönemine sayılır.
 	_end_disaster()
+	# HÜKÜMET ONAYI tur sonunda (afet sonucu dahil) güncellenir; seçim yeni değeri görür.
+	_settle_approval()
 	var will_elect: bool = finished_round >= GameRules.MAX_ROUNDS or early_election_pending \
 		or GameRules.is_election_round(finished_round) \
 		or (not last_seats.is_empty() and not GovernmentManager.has_government()
@@ -4211,7 +4340,7 @@ func _finish_round() -> void:
 func election_modifiers(public_view: bool = false) -> Dictionary:
 	var national := _visible_national() if public_view else national_support.duplicate()
 	for peer_id in GovernmentManager.government_party_ids():
-		national[peer_id] = float(national.get(peer_id, 0.0)) + PublicOpinion.GOVERNMENT_FATIGUE
+		national[peer_id] = float(national.get(peer_id, 0.0)) + PublicOpinion.GOVERNMENT_FATIGUE + approval_national(int(peer_id))
 	# Popülizm sürerken seçim: seçmen vaatleri hatırlar.
 	for peer_id in party_ids():
 		if populism_rounds_left(peer_id) > 0:
@@ -5437,6 +5566,7 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"former_parties": former_parties,
 		"economy": economy,
 		"disaster": disaster,
+		"approval": approval,
 		"funds": funds,
 		"game_finished": game_finished,
 		"final_ranking": final_ranking,
@@ -5553,6 +5683,7 @@ func _apply_state(state: Dictionary) -> void:
 	# Eski sürüm durumunda ekonomi yoktur: güvenli başlangıç değerleri.
 	economy = Economy.normalized(state.get("economy", {}))
 	disaster = state.get("disaster", {})
+	approval = state.get("approval", {})
 	# PARTİ KASASI (milyon ¤). 0.0.166 öncesi durumda alan "mana" adındaydı;
 	# para ölçeği eski değerlerle birebir kurulduğu için (bkz. GameRules) değer
 	# aynen taşınır. İkisi de yoksa boş başlar (herkes 0).

@@ -328,6 +328,8 @@ var _agenda_banner: PanelContainer
 var _agenda_label: Label
 ## EKONOMİ: sağ sütundaki özet (Hükümet sekmesi) ve Vergi Politikası paneli.
 var _economy_panel: EconomyPanel
+## HÜKÜMET ONAYI ibresi: meclis diyagramının altında (hükümet varken).
+var _approval_gauge: ApprovalGauge
 var _tax_panel: PanelContainer
 var _tax_box: VBoxContainer
 var _tax_selected: int = -1
@@ -1314,11 +1316,15 @@ func _setup_side_column() -> void:
 		_parl_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		vbox.add_child(_parl_slot)
 		vbox.move_child(_parl_slot, 1)
-		# EKONOMİ ÖZETİ: meclisin hemen altında (sadece Hükümet sekmesinde).
+		# HÜKÜMET ONAYI: meclisin hemen altında.
+		_approval_gauge = ApprovalGauge.new()
+		vbox.add_child(_approval_gauge)
+		vbox.move_child(_approval_gauge, 2)
+		# EKONOMİ ÖZETİ: onayın altında (sadece Hükümet sekmesinde).
 		_economy_panel = EconomyPanel.new()
 		_economy_panel.tax_policy_requested.connect(_open_tax_panel)
 		vbox.add_child(_economy_panel)
-		vbox.move_child(_economy_panel, 2)
+		vbox.move_child(_economy_panel, 3)
 		_economy_panel.refresh()
 	_refresh_side_tabs()
 
@@ -1458,6 +1464,7 @@ func _refresh_side_tabs() -> void:
 		# Oylamada meclis yuvası büyür: ekonomi kutusu yer açar (hükümet bilgisi
 		# 720p'de de görünür kalsın), oylama bitince geri gelir.
 		_economy_panel.visible = not selected_open and _side_tab == 0 			and GovernmentManager.phase != GovernmentManager.Phase.VOTING
+	_refresh_approval()
 	_sync_parliament_to_slot()
 
 ## İl inceleme ayarı: PENCERE ise il ve profil haritanın üstünde pencerede açılır.
@@ -2912,12 +2919,8 @@ func _on_province_clicked(province_id: String) -> void:
 		_on_funding_confirmed()
 		return
 	if _pending_miting:
-		var focus := _miting_focus.duplicate()
-		_cancel_targeting()
-		if CardManager.can_miting(me, province_id):
-			CardManager.miting(province_id, 0.0, focus)
-		else:
-			_show_toast(_action_block_reason(GameRules.MITING_FUNDS_COST))
+		_open_focus_panel(province_id)
+		_on_focus_confirmed()
 		return
 	if _pending_org:
 		if not CardManager.can_build_organization(me, province_id):
@@ -3171,8 +3174,8 @@ func _fill_focus_panel() -> void:
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title)
 	header.add_child(PopupKit.chip(L.t("%d / %d grup") % [_miting_focus.size(), slots], UiTheme.GOLD))
-	_focus_box.add_child(PopupKit.note(L.t("Teşkilat seviyesi %d: en çok %d gruba odaklanabilirsin. Odak gruplarda kazanç %s kat; seçmezsen odaksız miting.") % [
-		slots, slots, _one_decimal(PublicOpinion.MITING_FOCUS_MULT)], UiTheme.TEXT_MUTED, 380))
+	_focus_box.add_child(PopupKit.note(L.t("%d seçmen grubu seç (zorunlu; büyük illerde 2, küçük illerde 1). Hedef gruplarda kazanç %s kat.") % [
+		slots, _one_decimal(PublicOpinion.MITING_FOCUS_MULT)], UiTheme.TEXT_MUTED, 380))
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 4)
@@ -3268,6 +3271,12 @@ func _on_focus_confirmed() -> void:
 		_cancel_targeting()
 		return
 	var focus := _miting_focus.duplicate()
+	var slots := CardManager.miting_focus_slots(me, province_id)
+	if focus.size() < slots:
+		# Hedef grup seçimi zorunlu: panel açık kalır.
+		_focus_panel.show()
+		_show_toast(L.t("Mitingi düzenlemek için %d seçmen grubu seç.") % slots)
+		return
 	_cancel_targeting()
 	if CardManager.can_miting(me, province_id):
 		CardManager.miting(province_id, 0.0, focus)
@@ -5087,8 +5096,18 @@ func _propose_law_clicked(law_type: String) -> void:
 func _refresh_economy() -> void:
 	if _economy_panel != null:
 		_economy_panel.refresh()
+	_refresh_approval()
 	if _tax_panel != null and _tax_panel.visible:
 		_fill_tax_panel()
+
+## Onay ibresi: hükümet varken Hükümet sekmesinde (oylamada meclis büyür, yer açar).
+func _refresh_approval() -> void:
+	if _approval_gauge == null:
+		return
+	var selected_open := _left_dock != null and _left_dock.visible
+	_approval_gauge.visible = CardManager.has_approval() and not selected_open and _side_tab == 0 		and GovernmentManager.phase != GovernmentManager.Phase.VOTING
+	if CardManager.has_approval():
+		_approval_gauge.set_value(CardManager.approval_value(), CardManager.approval_delta())
 
 ## Para hareketi / vergi değişikliği: ekonomi kutusu animasyonu oynatır; vergi
 ## değişince açık vergi paneli yeni duruma göre yenilenir.
@@ -5189,7 +5208,9 @@ func _on_funding_confirmed() -> void:
 		else:
 			_show_toast(CardManager.funding_block_reason(me, "invest", 1.0) if CardManager.is_government_party(me) else _invest_block_reason())
 	else:
-		if CardManager.can_miting(me, province_id, 0.0):
+		if not CardManager.miting_focus_complete(me, province_id, focus):
+			_show_toast(L.t("Mitingi düzenlemek için %d seçmen grubu seç.") % CardManager.miting_focus_slots(me, province_id))
+		elif CardManager.can_miting(me, province_id, 0.0):
 			CardManager.miting(province_id, 0.0, focus)
 		else:
 			_show_toast(CardManager.funding_block_reason(me, "miting", 0.0))

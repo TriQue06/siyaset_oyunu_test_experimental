@@ -5258,3 +5258,42 @@ msgstr "penalty %s"
 
 msgid "Ülke"
 msgstr "Country"
+
+msgid "%s kriz yasasına HAYIR dedi"
+msgstr "%s voted NO on the crisis law"
+
+msgid "Afet yardımı"
+msgstr "Disaster aid"
+
+msgid "Afet yardımı yetersiz"
+msgstr "Not enough disaster aid"
+
+msgid "Hükümet onayı %%%s (%s): %s."
+msgstr "Government approval %s%% (%s): %s."
+
+msgid "Hükümet onayı %%%s ile başladı."
+msgstr "Government approval starts at %s%%."
+
+msgid "Kriz yasası geçti"
+msgstr "Crisis law passed"
+
+msgid "Kriz yasası hükümet oylarıyla düştü"
+msgstr "Crisis law failed on government votes"
+
+msgid "HÜKÜMET ONAYI"
+msgstr "APPROVAL"
+
+msgid "%d seçmen grubu seç (zorunlu; büyük illerde 2, küçük illerde 1). Hedef gruplarda kazanç %s kat."
+msgstr "Pick %d voter groups (required; 2 in large provinces, 1 in small ones). Gains in targeted groups x%s."
+
+msgid "Mitingi düzenlemek için %d seçmen grubu seç."
+msgstr "Pick %d voter groups to hold the rally."
+
+msgid "%d seçmen grubu seç (zorunlu). Büyük illerde 2, küçük illerde 1 grup hedeflenir."
+msgstr "Pick %d voter groups (required). Large provinces target 2 groups, small ones 1."
+
+msgid "seçilmedi"
+msgstr "not chosen"
+
+msgid "Burada miting yaparsan (%d seçmen grubu hedeflenir):"
+msgstr "If you rally here (%d voter groups targeted):"

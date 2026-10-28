@@ -193,8 +193,7 @@ func _build_appeal(me: int) -> void:
 	if effects.is_empty():
 		return
 	var slots := CardManager.miting_focus_slots(me, province_id)
-	_body.add_child(PopupKit.note(L.t("Burada miting yaparsan (odaksız; teşkilatla %d grup odağı seçebilirsin):") % slots if slots > 0
-		else L.t("Burada miting yaparsan (teşkilatsız: etkisi düşük, odak seçilemez):"), DIM))
+	_body.add_child(PopupKit.note(L.t("Burada miting yaparsan (%d seçmen grubu hedeflenir):") % slots, DIM))
 	effects.sort_custom(func(a, b): return float(a["gain"]) > float(b["gain"]))
 	for effect in effects.slice(0, 4):
 		_body.add_child(VoterGroupUI.effect_row(String(effect["group"]),

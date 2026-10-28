@@ -768,6 +768,7 @@ func _resolve_proposal() -> void:
 			_set_phase(Phase.GOVERNING)
 			formed_round = CardManager.round_number
 			last_resolution_reason = L.t("%s hükümeti güvenoyu aldı.") % _party_name(main_gov_peer_id)
+			CardManager.start_approval()
 			CardManager.grant_government_funds(government_party_ids())
 			# Makam puanları TEK SEFER, hükümetin kurulduğu anda yazılır.
 			award_formation_scores()

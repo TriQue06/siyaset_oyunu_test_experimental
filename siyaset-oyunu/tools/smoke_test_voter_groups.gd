@@ -226,8 +226,15 @@ func _initialize() -> void:
 	var g2 := float(cm.miting_group_gains(1, game_map.ids[4])[0]["gain"])
 	cm.organizations.erase(game_map.ids[4])
 	check("teskilat 0 / 1 / 2: etki 1x / 2x / 3,5x", g0 > 0.0 and near(g1, 2.0 * g0) and near(g2, 3.5 * g0), "%.3f / %.3f / %.3f" % [g0, g1, g2])
-	check("odak sayisi = teskilat seviyesi", cm.miting_focus_slots(1, mid) == 1 and cm.miting_focus_slots(1, game_map.ids[4]) == 0)
-	check("fazla odak kirpilir", cm._clean_focus(1, mid, ["emekli", "genc", "emekli"]) == ["emekli"])
+	# 0.0.282: hedef grup sayısı teşkilattan bağımsız: ortalamanın altında vekil 1, üstünde 2.
+	var slots_ok := true
+	for pid in game_map.ids:
+		var want := 2 if cm.province_seat_count(pid) >= cm.average_province_seats() else 1
+		slots_ok = slots_ok and cm.miting_focus_slots(1, pid) == want
+	check("odak sayisi: ortalama vekilin alti 1, ustu 2 grup", slots_ok, "ortalama %d" % cm.average_province_seats())
+	var mid_slots: int = cm.miting_focus_slots(1, mid)
+	check("fazla odak kirpilir", cm._clean_focus(1, mid, ["emekli", "genc", "isci", "emekli"]).size() == mid_slots)
+	check("eksik odak tamamlanir", cm._complete_focus(1, mid, []).size() == mid_slots and cm._complete_focus(1, mid, ["emekli"])[0] == "emekli")
 	var plain_emekli := 0.0
 	for effect in cm.miting_group_gains(1, mid):
 		if effect["group"] == "emekli":

@@ -109,6 +109,24 @@ const CENSURE_REJECTED_NATIONAL := -0.25
 ## GÜNDEME YANIT: gündemdeki gruba yasa sunan ya da o yasaya EVET diyen
 ## parti bu kadar ulusal puan kazanır (eski kriz 0,4).
 const CRISIS_RESPONSE_NATIONAL := 0.6
+## HÜKÜMET ONAYI (0.0.282): kurulan hükümetin %0..%100 onayı. Başlangıç:
+## ortakların oy oranı × bakanlık payı toplamı. Yalnız TUR SONUNDA güncellenir
+## (tur içindeki olaylar bekleyen değişim olarak birikir). %50 nötr; üstü
+## hükümet ortaklarına ulusal puan, altı ceza yazar (bakanlık payına göre
+## bölünür; seçimde ve anketlerde election_modifiers ile).
+const APPROVAL_NEUTRAL := 50.0
+## Onay %100 (ya da %0) iken tek başına iktidara yazılan ulusal puan (±).
+const APPROVAL_NATIONAL_MAX := 2.0
+## Afet bitti: hükümet ortaklarının yardımı muhalefetinkinden fazlaysa / değilse.
+const APPROVAL_DISASTER_MORE := 4.0
+const APPROVAL_DISASTER_LESS := -3.0
+## Krizli (gündemdeki) grubun yasası: geçerse artı; hükümet partisi HAYIR
+## derse ağır eksi (× o partinin bakanlık payı); hükümet HAYIR'ıyla düşerse ek eksi.
+const APPROVAL_CRISIS_LAW_PASSED := 4.0
+const APPROVAL_CRISIS_LAW_NO := -22.0
+const APPROVAL_CRISIS_LAW_FAILED := -5.0
+## Göstergede tutulan tur sayısı.
+const APPROVAL_HISTORY := 8
 ## Gündemdeki gruba sunulan yasanın grup etkisi (sunana) bu kadar büyür.
 const AGENDA_LAW_MULT := 1.3
 

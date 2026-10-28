@@ -382,10 +382,8 @@ func _build_miting() -> void:
 	# 2) HİTAP
 	var slots := CardManager.miting_focus_slots(me, province_id)
 	_section(L.t("2 · Kime hitap edeceksin?"))
-	if slots <= 0:
-		_body.add_child(PopupKit.note(L.t("Miting genel halka hitap eder."), UiTheme.TEXT_MUTED))
-	else:
-		_body.add_child(PopupKit.note(L.t("İsteğe bağlı: en çok %d grup seç. Seçmezsen genel halka hitap edersin.") % slots, UiTheme.TEXT_MUTED))
+	_body.add_child(PopupKit.note(L.t("%d seçmen grubu seç (zorunlu). Büyük illerde 2, küçük illerde 1 grup hedeflenir.") % slots, UiTheme.TEXT_MUTED))
+	if slots > 0:
 		var grid := GridContainer.new()
 		grid.columns = 2
 		grid.add_theme_constant_override("h_separation", 4)
@@ -411,15 +409,18 @@ func _build_miting() -> void:
 	var names: PackedStringArray = []
 	for group in _focus:
 		names.append(VoterGroups.title(String(group)))
-	_body.add_child(PopupKit.kv(L.t("Hitap"), ", ".join(names) if not names.is_empty() else L.t("genel halk")))
+	_body.add_child(PopupKit.kv(L.t("Hitap"), ", ".join(names) if not names.is_empty() else L.t("seçilmedi")))
 	_body.add_child(PopupKit.kv(L.t("Provokasyon riski"), EffectWords.risk(CardManager.miting_risk(me, province_id))))
 	var gains := _gain_preview(me)
 	if gains != "":
 		_body.add_child(PopupKit.note(L.t("Beklenen hitap: %s") % gains, UiTheme.GREEN))
 	_body.add_child(PopupKit.kv(L.t("Toplam bedel"), GameRules.cost_text(cost), UiTheme.HEAD))
-	var ok := CardManager.can_miting(me, province_id, 0.0, _miting_tier, _smear)
-	if not ok:
+	var funded := CardManager.can_miting(me, province_id, 0.0, _miting_tier, _smear)
+	var ok := funded and _focus.size() == slots
+	if not funded:
 		_body.add_child(PopupKit.note(L.t("Parti kasası yetmiyor (%s gerekir).") % GameRules.cost_text(cost), UiTheme.RED))
+	elif not ok:
+		_body.add_child(PopupKit.note(L.t("Mitingi düzenlemek için %d seçmen grubu seç.") % slots, UiTheme.RED))
 	_body.add_child(_confirm_button(L.t("MİTİNGİ DÜZENLE · %s") % GameRules.cost_text(cost), ok, func(): _do_miting()))
 
 func _gain_preview(me: int) -> String:

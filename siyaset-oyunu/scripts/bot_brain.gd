@@ -747,7 +747,15 @@ static func _law_vote_value(voter: int, law_type: String, choice: int, proposer:
 			value += PublicOpinion.LAW_GOV_YES_ON_OPPOSITION
 		if CardManager.crisis_group() == group:
 			value += CRISIS_VOTE_BONUS
+	elif gov_ids.has(voter) and CardManager.crisis_group() == group and CardManager.has_approval():
+		# HÜKÜMET ONAYI: krizli grubun yasasına HAYIR onayı sertçe düşürür; onay
+		# sönmediği için birkaç turluk ulusal puan kaybı sayılır.
+		var share := CardManager.quota_share(voter)
+		value += PublicOpinion.APPROVAL_CRISIS_LAW_NO * share * PublicOpinion.APPROVAL_NATIONAL_MAX 			/ PublicOpinion.APPROVAL_NEUTRAL * share * APPROVAL_TURNS
 	return value
+
+## Onay değişiminin bot hesabında kaç turluk ulusal puan sayıldığı.
+const APPROVAL_TURNS := 4.0
 
 static func _best_law_vote(voter: int, law_type: String, proposer: int, gov_ids: Array) -> int:
 	if CardPresets.is_tax_law(law_type):
@@ -914,7 +922,7 @@ static func _eval_miting(bot: int) -> Dictionary:
 		if value > best_value:
 			best_value = value
 			best_province = province_id
-			best_focus = _miting_focus(bot, province_id, org_level)
+			best_focus = miting_focus(bot, province_id, CardManager.miting_focus_slots(bot, province_id))
 	if best_province == "":
 		return {}
 	var score := best_value * 1.4 * (1.4 if _election_soon() else 1.0)
@@ -954,7 +962,7 @@ static func _province_hold(bot: int, province_id: String) -> float:
 
 ## Botun mitingte odaklanacağı gruplar: ildeki teşkilat seviyesi kadar, ülke
 ## geneli uyumuna en çok katkı yapan gruplar (tek tek denenir).
-static func _miting_focus(bot: int, province_id: String, slots: int) -> Array:
+static func miting_focus(bot: int, province_id: String, slots: int) -> Array:
 	if slots <= 0:
 		return []
 	# 0.0.228: önce çekirdek gruplar (ildeki seçmen sayısıyla), sonra diğerleri;

@@ -421,8 +421,6 @@ func _initialize() -> void:
 	pm.parties[3]["groups"]["isci"] = 0.5
 	pm.apply_group_deltas([{"peer": 3, "group": "isci", "amount": -20.0}])
 	check("destek 0'in altina inmez", float(pm.parties[3]["groups"]["isci"]) >= 0.0)
-	check("il baskanligi miting riskini azaltir",
-		PublicOpinion.provocation_risk(2.0, 2) < PublicOpinion.provocation_risk(2.0, 0) and PublicOpinion.provocation_risk(20.0, 0) == 0.0)
 
 	print("")
 	print("=== 10) VEKIL CALMA IL VERISIZ UYGULANMAZ ===")

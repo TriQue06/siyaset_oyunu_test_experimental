@@ -3305,8 +3305,7 @@ func _select_target_province(province_id: String) -> void:
 	if _pending_invest:
 		detail = _invest_preview(pname)
 	elif _pending_miting:
-		detail = L.t("%s: miting (%s) · provokasyon: %s%s") % [pname, GameRules.cost_text(GameRules.MITING_FUNDS_COST),
-			EffectWords.risk(CardManager.miting_risk(me, province_id)), _miting_group_preview(me, province_id)]
+		detail = L.t("%s: miting (%s)%s") % [pname, GameRules.cost_text(GameRules.MITING_FUNDS_COST), _miting_group_preview(me, province_id)]
 	elif _pending_org:
 		var level := CardManager.organization_level(province_id, me)
 		detail = L.t("%s: teşkilat zaten en üst seviyede") % pname if level >= GameRules.ORG_MAX_LEVEL \
@@ -3314,7 +3313,7 @@ func _select_target_province(province_id: String) -> void:
 	else:
 		var card_type: String = CardManager.my_inventory()[_pending_province_hand_index]
 		if card_type == CardPresets.MITING_CARD_TYPE:
-			detail = L.t("%s: miting · provokasyon: %s") % [pname, EffectWords.risk(CardManager.miting_risk(me, province_id))]
+			detail = L.t("%s: miting") % pname
 		else:
 			detail = "%s: %s" % [pname, CardPresets.card_title(card_type)]
 	_set_target_hint(L.t("%s  ·  Onaylamak için tekrar dokun") % detail)

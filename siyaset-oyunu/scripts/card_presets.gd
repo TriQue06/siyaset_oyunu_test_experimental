@@ -11,7 +11,7 @@ extends Node
 ##   - PARA BONUSU     : zayıf +FUNDS_BONUS_WEAK, güçlü +FUNDS_BONUS_STRONG para.
 ##   - KART ÇALMA      : seçilen partinin elinden rastgele 1 kart çalınır (eli boşsa boşa gider).
 ## MİTİNG, YATIRIM, GENSORU kart değil, hamle; türleri hamlenin kimliği olarak durur.
-##   - MİTİNG    : seçilen ilde güç kazandırır; provokasyon riski var.
+##   - MİTİNG    : seçilen ilde seçmen kazandırır.
 ##   - YATIRIM   : sadece hükümet partilerine gelir; seçilen ile yatırım.
 ##   - KARALAMA  : bir ilde bir partiyi karalar: ona eksi, oynayana artı.
 ##   - VEKİL ÇALMA / GENSORU : koşullu özel kartlar.
@@ -463,7 +463,7 @@ func _card_effect_text(card_type: String) -> String:
 		CENSURE_CARD_TYPE:
 			return L.t("Hükümeti düşürmek için gensoru ver.\nSeçmek için dokun, tekrar dokun: kullan.")
 		MITING_CARD_TYPE:
-			return L.t("Seçtiğin ilde hedef seçmen gruplarından seçmen kazanırsın; partin bu gruplara yaklaşır. Seçmen sana uzaksa provokasyon riski var.")
+			return L.t("Seçtiğin ilde hedef seçmen gruplarından seçmen kazanırsın; partin bu gruplara yaklaşır.")
 		INVEST_CARD_TYPE:
 			return L.t("Hükümet: seçtiğin ile devlet hazinesinden %s yatırım. İldeki bütün gruplardan seçmen kazanırsın; etkinin yarısı hemen, kalanı sonraki dönemlerde.") % \
 				Economy.money_full(Economy.INVEST_COST)

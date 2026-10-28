@@ -143,15 +143,10 @@ func _initialize() -> void:
 	mm.room_code = ""
 	gm.result_hold_seconds = 0.0
 	var ids: Array = root.get_node("GameMap").province_ids()
-	# Mitingin yapılacağı il: her üç partinin provokasyon riski 0 olan ilk il.
+	# Mitingin yapılacağı il: ilk il.
+	P = String(ids[0])
 	new_game(777)
-	for id in ids:
-		P = String(id)
-		new_game(777)
-		if cm.miting_risk(A, P) == 0.0 and cm.miting_risk(B, P) == 0.0 and cm.miting_risk(C, P) == 0.0:
-			break
-	new_game(777)
-	print("İl: %s  (provokasyon riski A %.2f, B %.2f, C %.2f)" % [P, cm.miting_risk(A, P), cm.miting_risk(B, P), cm.miting_risk(C, P)])
+	print("İl: %s" % P)
 	print("Sabitler: kaset seviye düşürme %%%.0f + ülke geneli −%.1f puan, karışıklık: kaset +%.1f / miting −%.1f (0'ın altına inmez), bölünme eşiği %.1f" % [
 		PublicOpinion.KASET_DEMOTE * 100.0, PublicOpinion.REPUTATION_NATIONAL_DAMAGE, PublicOpinion.TURMOIL_REPUTATION,
 		PublicOpinion.TURMOIL_EASE_MITING, PublicOpinion.SPLIT_TURMOIL])
@@ -220,35 +215,6 @@ func _initialize() -> void:
 	print("  b) A karışıklığı 5,6 (eşik 7,0):  önce miting → %.2f, bölünme %s;  önce kaset → %.2f, bölünme %s" % [
 		t1a["pre"][A]["turmoil"], t1a["split"], t1b["pre"][A]["turmoil"], t1b["split"]])
 	print("     " + diff_line(t1a, t1b))
-	# e) Provokasyon riski olan il: zarı hangi miting atıyor?
-	var risky := ""
-	for id in ids:
-		new_game(777)
-		var r1: float = cm.miting_risk(A, String(id))
-		var r2: float = cm.miting_risk(C, String(id))
-		if r1 > 0.05:
-			risky = String(id)
-			break
-	if risky != "":
-		var keep := P
-		P = risky
-		new_game(777)
-		print("  e) Riskli il %s (A riski %.2f, C riski %.2f): iki miting, sıra ters, birkaç tohum" % [P, cm.miting_risk(A, P), cm.miting_risk(C, P)])
-		var differ := 0
-		for seed_value in range(1, 41):
-			var e1 := run("A → C", [["miting", A], ["miting", C]], Callable(), seed_value)
-			var e2 := run("C → A", [["miting", C], ["miting", A]], Callable(), seed_value)
-			var line := diff_line(e1, e2)
-			if line != "BİREBİR AYNI":
-				differ += 1
-				if differ <= 3:
-					print("     tohum %d: %s" % [seed_value, line])
-		print("     40 tohumdan %d tanesinde sonuç sıraya göre değişti" % differ)
-		# Aynı risk, kaset araya girince: kaset RNG kullanmaz.
-		var k1 := run("A miting → B→A kaset", [["miting", A], ["kaset", B, A]], Callable(), 3)
-		var k2 := run("B→A kaset → A miting", [["kaset", B, A], ["miting", A]], Callable(), 3)
-		print("     riskli ilde miting+kaset, sıra ters: " + diff_line(k1, k2))
-		P = keep
 	print("\n=== ÖZET ===")
 	var fails := 0
 	for pair in [["S1 / S1'", s1, s1r], ["S2 / S2'", s2, s2r], ["teşkilat / kaset", o1, o2], ["miting+teşkilat / kaset", m1, m2],

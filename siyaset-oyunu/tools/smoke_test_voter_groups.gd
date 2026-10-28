@@ -215,7 +215,6 @@ func _initialize() -> void:
 	var g_before: Dictionary = pm.parties[1]["groups"].duplicate()
 	var rival_before: Dictionary = pm.parties[2]["groups"].duplicate()
 	var far_before: float = cm.voter_total(1, game_map.ids[5])
-	check("uyumlu ilde provokasyon riski yok", near(cm.miting_risk(1, mid), 0.0), "%.2f" % cm.miting_risk(1, mid))
 	# 0.0.269: miting için teşkilat şart.
 	check("teskilatsiz ilde miting yapilamaz", not cm.can_miting(1, game_map.ids[4]) and cm.organization_level(game_map.ids[4], 1) == 0)
 	var g0 := float(cm.miting_group_gains(1, game_map.ids[4])[0]["gain"])

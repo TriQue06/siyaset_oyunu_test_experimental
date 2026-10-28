@@ -136,35 +136,20 @@ static func _ballot_row() -> HBoxContainer:
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return row
 
-## BU İLDE SEN: kadran (seçmenin sana yakınlığı) ve yerel güç.
+## BU İLDE SEN: ildeki seçmenin ne kadarının sana bağlı olduğu.
 static func _standing(province_id: String, me: int) -> Control:
 	var card := _card()
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", int(d(12)))
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(row)
-	var closeness := PublicOpinion.appeal_closeness(CardManager.appeal_of(province_id, me))
-	var dial := Dial.new()
-	dial.value = closeness
-	dial.custom_minimum_size = Vector2(d(84), d(46))
-	dial.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(dial)
 	var texts := VBoxContainer.new()
 	texts.add_theme_constant_override("separation", int(d(4)))
 	texts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	texts.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(texts)
 	var word := L.t("seçmenin %%%s'i senin") % L.dec(CardManager.attached_share(me, province_id), 0)
-	var color := UiTheme.GREEN_DARK if closeness >= PublicOpinion.CLOSENESS_NEAR else (Color("C97A12") if closeness >= 0.3 else UiTheme.CRISIS)
-	texts.add_child(_lbl(word.substr(0, 1).to_upper() + word.substr(1), 26, color, true))
-	var near := L.t("çok yakın") if closeness >= 0.75 else (L.t("yakın") if closeness >= PublicOpinion.CLOSENESS_NEAR \
-		else (L.t("uzak") if closeness >= 0.3 else L.t("çok uzak")))
-	var sub := L.t("seçmen sana %s") % near
-	if CardManager.organization_level(province_id, me) > 0:
-		sub += L.t(" · miting riski %s") % EffectWords.risk(CardManager.miting_risk(me, province_id))
-	var note := _lbl(sub, 13, UiTheme.TEXT_MUTED, false)
-	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	texts.add_child(note)
+	texts.add_child(_lbl(word.substr(0, 1).to_upper() + word.substr(1), 26, UiTheme.GREEN_DARK, true))
 	return card
 
 static func _events(province_id: String) -> Control:
@@ -648,27 +633,6 @@ class RingToken extends Control:
 			var width := UiTheme.d(9)
 			draw_arc(c, r - width * 0.5, -PI * 0.5, -PI * 0.5 + TAU * clampf(value, 0.0, 1.0),
 				maxi(3, int(64 * value)), VoterGroups.color(group), width, true)
-
-## Yarım daire kadran: kırmızıdan yeşile beş dilim, ibre değeri (0..1) gösterir.
-class Dial extends Control:
-	var value := 0.5
-	const COLORS := [Color("C42B2B"), Color("F2B632"), Color("E5D16A"), Color("7AC25A"), Color("1F8A4C")]
-
-	func _draw() -> void:
-		var c := Vector2(size.x * 0.5, size.y)
-		var r := minf(size.x * 0.5, size.y)
-		if r < 4.0:
-			return
-		for i in 5:
-			var pts := PackedVector2Array([c])
-			for k in 9:
-				var a := PI + PI * (float(i) + float(k) / 8.0) / 5.0
-				pts.append(c + Vector2(cos(a), sin(a)) * r)
-			draw_colored_polygon(pts, COLORS[i])
-		draw_circle(c, r * 0.58, InspectCard.CARD_BG, true, -1.0, true)
-		var angle := PI + PI * clampf(value, 0.0, 1.0)
-		draw_line(c, c + Vector2(cos(angle), sin(angle)) * r * 0.95, UiTheme.INK, UiTheme.d(3), true)
-		draw_circle(c, UiTheme.d(4), UiTheme.INK, true, -1.0, true)
 
 class DashedLine extends Control:
 	func _ready() -> void:

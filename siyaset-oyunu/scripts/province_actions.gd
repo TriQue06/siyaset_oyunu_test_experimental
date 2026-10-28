@@ -367,7 +367,7 @@ func _build_miting() -> void:
 	if left <= 0:
 		_body.add_child(PopupKit.note(L.t("Bu sıra %d mitingin hepsini yaptın. Sonraki sıranda yeniden miting yapabilirsin.") % CardManager.action_limit(me), UiTheme.RED))
 		return
-	_body.add_child(PopupKit.note(L.t("Miting ilde oy kazandırır ve partini ilin seçmen gruplarına yaklaştırır. Seçmen sana uzaksa provokasyon riski vardır."), UiTheme.TEXT_MUTED))
+	_body.add_child(PopupKit.note(L.t("Miting ilde oy kazandırır ve partini ilin seçmen gruplarına yaklaştırır."), UiTheme.TEXT_MUTED))
 	# 1) BÜTÇE
 	_section(L.t("1 · Bütçe"))
 	var tiers := HBoxContainer.new()
@@ -410,7 +410,6 @@ func _build_miting() -> void:
 	for group in _focus:
 		names.append(VoterGroups.title(String(group)))
 	_body.add_child(PopupKit.kv(L.t("Hitap"), ", ".join(names) if not names.is_empty() else L.t("seçilmedi")))
-	_body.add_child(PopupKit.kv(L.t("Provokasyon riski"), EffectWords.risk(CardManager.miting_risk(me, province_id))))
 	var gains := _gain_preview(me)
 	if gains != "":
 		_body.add_child(PopupKit.note(L.t("Beklenen hitap: %s") % gains, UiTheme.GREEN))

@@ -5345,3 +5345,15 @@ msgstr "%s%% of voters are yours"
 
 msgid "ANINDA ETKİ: çekildiği an başlar. Bu dönem boyunca hamlelerin çok daha etkili, kötü sonuçlar hafifler."
 msgstr "INSTANT: starts the moment it is drawn. This term your moves are much stronger and bad outcomes are softened."
+
+msgid "%s: miting (%s)%s"
+msgstr "%s: rally (%s)%s"
+
+msgid "%s: miting"
+msgstr "%s: rally"
+
+msgid "Miting ilde oy kazandırır ve partini ilin seçmen gruplarına yaklaştırır."
+msgstr "A rally wins votes in the province and brings your party closer to its voter groups."
+
+msgid "Seçtiğin ilde hedef seçmen gruplarından seçmen kazanırsın; partin bu gruplara yaklaşır."
+msgstr "You win voters from the targeted groups in the chosen province; your party moves closer to them."

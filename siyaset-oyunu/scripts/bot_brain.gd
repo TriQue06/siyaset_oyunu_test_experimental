@@ -924,14 +924,11 @@ static func _eval_miting(bot: int) -> Dictionary:
 		if org_level <= 0 and not PartyManager.is_independent(CardManager.party_of(bot)):
 			continue
 		var org_mult := PublicOpinion.miting_org_mult(org_level)
-		var risk := CardManager.miting_risk(bot, province_id)
 		var seats := float(CardManager.province_seat_count(province_id))
 		var fit: float = fits[province_id]
 		var held := _province_hold(bot, String(province_id))
 		var stronghold := 1.0 + 0.35 * float(org_level) + (0.4 if String(province_id) == home else 0.0)
-		var value := pow(fit / best_fit, 4.0) * org_mult * stronghold * pow(maxf(1.0, seats), 0.15) / (1.0 + held * 4.0) * 0.6 \
-			+ risk * PublicOpinion.PROVOCATION_NATIONAL
-		value *= 1.0 - risk
+		var value := pow(fit / best_fit, 4.0) * org_mult * stronghold * pow(maxf(1.0, seats), 0.15) / (1.0 + held * 4.0) * 0.6
 		value += _jitter(bot, 0.05)  # zayıf bot yanlış ilde miting yapar
 		if value > best_value:
 			best_value = value

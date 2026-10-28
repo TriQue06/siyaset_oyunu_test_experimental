@@ -1777,5 +1777,9 @@
 "Gensoru reddedildi, hükümet görevde. %s biraz seçmen kaybetti.": "Censure rejected, the government stays. %s lost a few voters.",
 "Sana bağlı seçmen": "Voters attached to you",
 "seçmenin %%%s'i senin": "%s%% of voters are yours",
-"ANINDA ETKİ: çekildiği an başlar. Bu dönem boyunca hamlelerin çok daha etkili, kötü sonuçlar hafifler.": "INSTANT: starts the moment it is drawn. This term your moves are much stronger and bad outcomes are softened."
+"ANINDA ETKİ: çekildiği an başlar. Bu dönem boyunca hamlelerin çok daha etkili, kötü sonuçlar hafifler.": "INSTANT: starts the moment it is drawn. This term your moves are much stronger and bad outcomes are softened.",
+"%s: miting (%s)%s": "%s: rally (%s)%s",
+"%s: miting": "%s: rally",
+"Miting ilde oy kazandırır ve partini ilin seçmen gruplarına yaklaştırır.": "A rally wins votes in the province and brings your party closer to its voter groups.",
+"Seçtiğin ilde hedef seçmen gruplarından seçmen kazanırsın; partin bu gruplara yaklaşır.": "You win voters from the targeted groups in the chosen province; your party moves closer to them."
 }

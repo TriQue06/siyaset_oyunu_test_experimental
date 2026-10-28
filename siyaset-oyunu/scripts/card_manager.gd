@@ -72,8 +72,6 @@ signal congress_started(data: Dictionary)
 signal economy_event(data: Dictionary)
 
 const MAX_HAND_SIZE := 9
-## Bağımsız siyasetçinin (teşkilatsız) mitinginde provokasyon riski çarpanı.
-const INDEPENDENT_MITING_RISK_MULT := 1.5
 ## Olay logunda tutulan en fazla kayıt.
 const EVENT_LOG_LIMIT := 80
 const HEARTBEAT_INTERVAL := 5.0
@@ -665,22 +663,6 @@ func _is_authority() -> bool:
 func set_rng_seed(value: int) -> void:
 	_rng.seed = value
 	_crisis_rng.seed = value + 7919
-	_roll_counts = {}
-
-## HAMLE SIRASINDAN BAĞIMSIZ ZARLAR (0.0.187): provokasyon zarı ve seçim
-## gürültüsü ortak _rng akışından değil, (oyun tohumu, tur, olay) üçlüsünden
-## türeyen kendi tohumlarından atılır. Böylece bir oyuncunun mitingi başka bir
-## oyuncunun zarını ya da seçimin sonucunu, hamlelerin sırasına göre kaydırmaz.
-## Aynı parti aynı ilde aynı turda tekrar miting yaparsa sayaç yeni zar verir.
-var _roll_counts: Dictionary = {}
-
-func _event_roll(key: String) -> float:
-	var full := "%d|%s" % [round_number, key]
-	var n := int(_roll_counts.get(full, 0))
-	_roll_counts[full] = n + 1
-	var rng := RandomNumberGenerator.new()
-	rng.seed = hash([_rng.seed, full, n])
-	return rng.randf()
 
 func _election_rng(at_round: int) -> RandomNumberGenerator:
 	var rng := RandomNumberGenerator.new()
@@ -2164,15 +2146,6 @@ func _group_profiles() -> Dictionary:
 		result[peer_id] = effective_groups(peer_id)
 	return result
 
-## Bu parti bu ilde miting yaparsa provokasyon olasılığı (0..0.5): ilin seçmen
-## profili partinin hitap ettiği gruplardan ne kadar uzaksa o kadar yüksek.
-func miting_risk(peer_id: int, province_id: String) -> float:
-	var risk := PublicOpinion.provocation_risk(appeal_of(province_id, peer_id), organization_level(province_id, peer_id))
-	# Bağımsız teşkilatsız miting yapar: provokasyon riski daha yüksek.
-	if PartyManager.is_independent(peer_id):
-		risk = minf(PublicOpinion.PROVOCATION_MAX_RISK, risk * INDEPENDENT_MITING_RISK_MULT)
-	return risk
-
 # --- Olay logu -----------------------------------------------------------------
 
 ## Loga kayıt ekler. peer_id: hamleyi yapan parti (-1: sistem), province:
@@ -2810,23 +2783,15 @@ func _actor_name(peer_id: int) -> String:
 func _province_name(province_id: String) -> String:
 	return GameMap.name_of(province_id)
 
-## Miting: riski ilin mevcut siyasi dengesine göre hesaplanır, zar atılır.
+## Miting: ildeki grupların bir kısmı seçmen olarak kazanılır (nüfusla
+## orantılı, kalıcı). 0.0.285: provokasyon riski kalktı, miting hep işler.
 func _apply_miting(peer_id: int, province_id: String, focus: Array = [], tier_mult: float = 1.0) -> void:
-	var risk := miting_risk(peer_id, province_id)
-	if _event_roll("miting|%d|%s" % [party_of(peer_id), province_id]) < risk:
-		_add_local(province_id, peer_id, PublicOpinion.PROVOCATION_LOCAL, true)
-		_add_national(peer_id, PublicOpinion.PROVOCATION_NATIONAL, true)
-		_log_province(province_id, L.t("%s mitinginde PROVOKASYON: ilde ve ülkede destek kaybı") % _party_name(peer_id))
-		_event_message = L.t("%s'da %s mitinginde provokasyon çıktı: parti ilde ve ülke genelinde destek kaybetti.") % [
-			_province_name(province_id), _party_name(peer_id)]
-	else:
-		# SEÇMEN: ildeki grupların bir kısmı kazanılır (nüfusla orantılı, kalıcı).
-		var moved := _apply_miting_positioning(peer_id, province_id, focus, tier_mult)
-		_log_province(province_id, L.t("%s miting yaptı") % _party_name(peer_id))
-		_ease_turmoil(peer_id, PublicOpinion.TURMOIL_EASE_MITING)
-		_event_message = L.t("%s, %s'da miting yaptı.") % [_actor_name(peer_id), _province_name(province_id)]
-		if moved != "":
-			_event_message += L.t(" Hitabı %s.") % moved
+	var moved := _apply_miting_positioning(peer_id, province_id, focus, tier_mult)
+	_log_province(province_id, L.t("%s miting yaptı") % _party_name(peer_id))
+	_ease_turmoil(peer_id, PublicOpinion.TURMOIL_EASE_MITING)
+	_event_message = L.t("%s, %s'da miting yaptı.") % [_actor_name(peer_id), _province_name(province_id)]
+	if moved != "":
+		_event_message += L.t(" Hitabı %s.") % moved
 
 ## MİTİNGİN SİYASİ HİTABI: ildeki her grubun nüfusla orantılı bir kısmı
 ## kazanılır (odak gruplarda daha çok), diğer partilerden ve kararsızlardan
@@ -4269,7 +4234,6 @@ func _finish_round() -> void:
 	# Tur sonu: ham karışıklık 0'a kırpılır (turmoil_of) ve söner.
 	for peer_id in turmoil.keys():
 		turmoil[peer_id] = turmoil_of(int(peer_id)) * PublicOpinion.TURMOIL_DECAY
-	_roll_counts = {}
 	# EKONOMİ: tur başına tek sefer, SEÇİMDEN ÖNCE (sandık o ana kadar
 	# gerçekleşmiş etkileri görür; bekleyen dilimler ve yerleşmemiş vergi
 	# etkisi sayılmaz).

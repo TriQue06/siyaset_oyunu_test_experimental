@@ -118,39 +118,24 @@ func _initialize() -> void:
 	check("il etkisi yalniz o ilde", cm.voter_total(1, konya_id) < here and near(cm.voter_total(1, other_id), there))
 
 	print("")
-	print("=== 2) PROVOKASYON RISKI ===")
-	var konya: Dictionary = voters[TestProvinces.id("konya")]
-	check("ile tam uyumlu parti: risk yok", near(PublicOpinion.provocation_risk(VoterGroups.appeal(matching(konya), konya)), 0.0))
-	var far_appeal := VoterGroups.appeal(groups(), konya)
-	var far_risk := PublicOpinion.provocation_risk(far_appeal)
-	check("ildeki hicbir gruba hitap etmeyen parti: en yuksek risk", near(far_risk, PublicOpinion.PROVOCATION_MAX_RISK), "%.2f (uyum %.1f)" % [far_risk, far_appeal])
-	check("il baskanligi riski azaltir", PublicOpinion.provocation_risk(far_appeal, 2) < far_risk * 0.6)
-	check("risk PROVOCATION_MAX_RISK'te durur", near(PublicOpinion.provocation_risk(-50.0), PublicOpinion.PROVOCATION_MAX_RISK))
-	new_game({1: matching(konya), 2: groups()})
-	check("cm.miting_risk ildeki uyumu kullanir", cm.miting_risk(2, TestProvinces.id("konya")) > cm.miting_risk(1, TestProvinces.id("konya")))
-
-	print("")
 	print("=== 3) MITING ===")
+	var konya: Dictionary = voters[TestProvinces.id("konya")]
 	new_game({1: matching(konya), 2: groups()})
-	check("ile hitap eden partinin riski 0", near(cm.miting_risk(1, TestProvinces.id("konya")), 0.0), "%.2f" % cm.miting_risk(1, TestProvinces.id("konya")))
 	var g_before: Dictionary = pm.parties[1]["groups"].duplicate()
-	var mv: float = cm.voter_total(1, konya_id)
+	var mv: float = cm.voter_total(2, konya_id)
+	cm._apply_miting(2, TestProvinces.id("konya"))
+	check("miting: ilde secmen kazanir", cm.voter_total(2, konya_id) > mv, "%.0f -> %.0f" % [mv, cm.voter_total(2, konya_id)])
 	cm._apply_miting(1, TestProvinces.id("konya"))
-	check("basarili miting: ilde secmen kazanir", cm.voter_total(1, konya_id) > mv)
 	check("basarili miting: grup yakinligi degisti (ulusal hitap)", str(pm.parties[1]["groups"]) != str(g_before))
-	check("ilde olay kaydi var", cm.province_events.get(TestProvinces.id("konya"), []).size() == 1)
+	check("ilde olay kaydi var", cm.province_events.get(TestProvinces.id("konya"), []).size() == 2)
 	new_game({1: matching(konya), 2: groups()})
-	var provoked := 0
-	var succeeded := 0
+	var lost := 0
 	for i in 40:
 		var before: float = cm.voter_total(2, konya_id)
 		cm._apply_miting(2, TestProvinces.id("konya"))
 		if cm.voter_total(2, konya_id) < before:
-			provoked += 1
-		else:
-			succeeded += 1
-	check("riskli ilde hem provokasyon hem basari gorulur", provoked > 0 and succeeded > 0,
-		"provokasyon %d, basari %d" % [provoked, succeeded])
+			lost += 1
+	check("provokasyon yok: uzak ilde miting de secmen kaybettirmez", lost == 0, "%d" % lost)
 	check("olay kaydi sinirli", cm.province_events[TestProvinces.id("konya")].size() == cm.PROVINCE_EVENT_LIMIT)
 
 	print("")

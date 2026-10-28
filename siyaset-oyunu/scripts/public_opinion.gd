@@ -43,15 +43,6 @@ const MITING_FOCUS_MULT := 2.5
 ## 0.0.217: çok kısık (miting art arda yapılabilmeli; sadece hafif dengeleme).
 const MITING_FATIGUE_SCALE := 25.0
 const MITING_FATIGUE_DECAY := 0.6
-## PROVOKASYON: ilde ve ülke genelinde seçmen kaybı (puan).
-const PROVOCATION_LOCAL := -2.5
-const PROVOCATION_NATIONAL := -1.0
-## Provokasyon riski: partinin ildeki GRUP UYUMU (0..100) SAFE_APPEAL ve
-## üstündeyse risk yok; FULL_APPEAL'e indikçe MAX_RISK'e çıkar (il seçmeni
-## partinin hitap ettiği gruplara uzak). İl başkanlığı riski seviye başına azaltır.
-const PROVOCATION_MAX_RISK := 0.3
-const PROVOCATION_SAFE_APPEAL := 8.0
-const PROVOCATION_FULL_APPEAL := 0.0
 
 # --- Yatırım (sadece hükümet partileri) ---------------------------------------
 ## Yatırım partinin siyasi kimliğine (grup yakınlığına) dokunmaz; ildeki BÜTÜN
@@ -120,8 +111,6 @@ const ORG_ACTIVITY_BY_LEVEL := [0.0, 2.5, 8.0]  # 0.0.227: 2. seviye 6 -> 8
 ## (Seviye 0 zaten hamle yapamaz; çarpanı 1.0 bırakıyoruz ki kural tek yerde
 ## dursun ve yanlışlıkla "etkisiz miting" oluşmasın.)
 const ORG_ACTION_MULT := [1.0, 1.0, 1.5]  # 0.0.227: 2. seviye 1,3 -> 1,5
-## Seviye başına miting provokasyon riskinin azalma oranı.
-const ORG_RISK_REDUCTION_PER_LEVEL := 0.35
 
 # --- Yasalar ------------------------------------------------------------------
 ## Yasa bir SEÇMEN GRUBUNU hedefler (gündemdeki çiftten). Etki ULUSALDIR ve
@@ -266,11 +255,6 @@ static func org_action_mult(level: int) -> float:
 
 static func org_activity(level: int) -> float:
 	return float(ORG_ACTIVITY_BY_LEVEL[clampi(level, 0, ORG_ACTIVITY_BY_LEVEL.size() - 1)])
-
-## 0..PROVOCATION_MAX_RISK arası provokasyon olasılığı (appeal: ildeki grup uyumu).
-static func provocation_risk(appeal: float, org_level: int = 0) -> float:
-	var t: float = clampf((PROVOCATION_SAFE_APPEAL - appeal) / (PROVOCATION_SAFE_APPEAL - PROVOCATION_FULL_APPEAL), 0.0, 1.0)
-	return PROVOCATION_MAX_RISK * t * maxf(0.0, 1.0 - ORG_RISK_REDUCTION_PER_LEVEL * org_level)
 
 ## Vekil payı değişimi (yüzde puan) -> ulusal puan.
 ## Çalınan vekil sayısına göre ulusal puan (çalan için eksi, çalınan için artı).

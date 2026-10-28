@@ -165,7 +165,7 @@ func _initialize() -> void:
 	cm._apply_invest_move(1, izmir)
 	check("yatirim hazineden: parti kasasi degismedi", cm.funds_of(1) == 100)
 	check("getiren parti ilde secmen kazanir", cm.voter_total(1, izmir) > iv1)
-	check("ortagin da sonraki dilimlerde payi var", cm.pending_investments(2).size() == 1 and iv2 >= 0.0)
+	check("ortagin da yatirimda payi var", float(cm.investment_shares(1).get(2, 0.0)) > 0.0 and iv2 >= 0.0)
 	check("muhalefet kazanmaz", cm.voter_total(3, izmir) <= iv3 + 0.001)
 	var inv_shares: Dictionary = cm.investment_shares(1)
 	var inv_sum := 0.0

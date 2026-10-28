@@ -5125,8 +5125,8 @@ func _on_economy_event(data: Dictionary) -> void:
 ## bakiyesi, etkinin zamanlaması.
 func _invest_preview(pname: String) -> String:
 	var before := CardManager.state_treasury()
-	return L.t("%s yatırımı · devlet hazinesi %s » %s\nGüçlü yerel etki: yarısı hemen, kalanı %d dönemde · ekonomi canlanır") % [
-		pname, Economy.money_full(before), Economy.money_full(before - Economy.INVEST_COST), Economy.INVEST_DELAY_ROUNDS]
+	return L.t("%s yatırımı · devlet hazinesi %s » %s") % [
+		pname, Economy.money_full(before), Economy.money_full(before - Economy.INVEST_COST)]
 
 static func _one_decimal(value: float) -> String:
 	if is_equal_approx(value, roundf(value)):

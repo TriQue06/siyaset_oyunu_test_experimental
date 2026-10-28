@@ -465,7 +465,7 @@ func _card_effect_text(card_type: String) -> String:
 		MITING_CARD_TYPE:
 			return L.t("Seçtiğin ilde hedef seçmen gruplarından seçmen kazanırsın; partin bu gruplara yaklaşır.")
 		INVEST_CARD_TYPE:
-			return L.t("Hükümet: seçtiğin ile devlet hazinesinden %s yatırım. İldeki bütün gruplardan seçmen kazanırsın; etkinin yarısı hemen, kalanı sonraki dönemlerde.") % \
+			return L.t("Hükümet: seçtiğin ile devlet hazinesinden %s yatırım. İldeki bütün gruplardan seçmen kazanırsın.") % \
 				Economy.money_full(Economy.INVEST_COST)
 		PROPAGANDA_CARD_TYPE:
 			return L.t("SAKLANABİLİR: miting hazırlarken kullanılır. Mitingin yapıldığı ilde seçtiğin partiyi karalarsın: ona eksi, sana artı. İlde güçlü olan partiye az işler; ayrı miting hakkı harcamaz, bedeli yok.")

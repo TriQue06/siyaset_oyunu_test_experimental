@@ -217,9 +217,9 @@ func _initialize() -> void:
 	check("hazineden tam bir kez yatırım bedeli düştü", near(cm.state_treasury(), t_before - Economy.INVEST_COST))
 	check("tamamı devletten: parti kasası değişmedi", near(cm.funds_of(1), funds_before))
 	var immediate: float = cm.voter_total(1, province) - v_inv1
-	check("etkinin bir kısmı hemen geldi (seçmen)", immediate > 0.0, "%.2f" % immediate)
+	check("etkinin tamamı hemen geldi (seçmen)", immediate > 0.0, "%.2f" % immediate)
 	check("ortağa da hemen gelen pay", cm.voter_total(2, province) > v_inv2)
-	check("kalan dilimler bekliyor", cm.pending_investments(1).size() == 1 and int(cm.pending_investments(1)[0]["rounds_left"]) == Economy.INVEST_DELAY_ROUNDS)
+	check("0.0.286: bekleyen dilim yok (hepsi hemen)", cm.pending_investments(1).is_empty())
 	check("muhalefet yatırımdan pay almaz", cm.pending_investments(3).is_empty() and cm.voter_total(3, province) <= v_inv3 + 0.001)
 	cm.economy["treasury"] = Economy.INVEST_COST - 1.0
 	check("hazine yetmezse tamamı devletten ödenemez", not cm.can_invest(1, province, 1.0))
@@ -231,7 +231,7 @@ func _initialize() -> void:
 	var local_before: float = cm.voter_total(1, province)
 	var treasury_before_round: float = cm.state_treasury()
 	end_round()
-	check("1. dilim tur sonunda geldi", cm.voter_total(1, province) > local_before,
+	check("tur sonunda ek dilim gelmez", near(cm.voter_total(1, province), local_before),
 		"%.2f -> %.2f" % [local_before, cm.voter_total(1, province)])
 	check("tur sonunda hazineden tekrar yatırım bedeli düşmez", cm.state_treasury() > treasury_before_round)
 	end_round()
@@ -257,7 +257,7 @@ func _initialize() -> void:
 	var inv_province: String = String(cm._province_ids[7])
 	cm._apply_invest_move(1, inv_province)
 	var now_voters: float = cm.voter_total(1, inv_province)
-	check("bekleyen dilim tur içinde seçmene yazılmaz", not cm.pending_investments(1).is_empty() and near(cm.voter_total(1, inv_province), now_voters))
+	check("yatırım bekleyen dilim bırakmaz", cm.pending_investments(1).is_empty() and near(cm.voter_total(1, inv_province), now_voters))
 
 	print("")
 	print("=== 8) ÇİFT SAYIM YOK ===")
@@ -330,7 +330,7 @@ func _initialize() -> void:
 	cm.economy = Economy.start_state()
 	cm._apply_state(packed)
 	check("yüklenen ekonomi aynı", str(cm.economy) == saved)
-	check("yüklemeden sonra yatırım dilimi sürüyor", cm.pending_investments(1).size() == 1 and cm.tax_level() == Economy.TAX_LOW)
+	check("yüklemeden sonra vergi kademesi sürüyor", cm.tax_level() == Economy.TAX_LOW)
 	var copy_after: Dictionary = cm.economy.duplicate(true)
 	Economy.advance(copy_after)
 	check("yüklemeden sonra bir tur aynı sonucu verir (çift etki yok)", near(float(copy_after["treasury"]), float(reference["treasury"])))

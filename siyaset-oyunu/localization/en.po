@@ -5357,3 +5357,21 @@ msgstr "A rally wins votes in the province and brings your party closer to its v
 
 msgid "Seçtiğin ilde hedef seçmen gruplarından seçmen kazanırsın; partin bu gruplara yaklaşır."
 msgstr "You win voters from the targeted groups in the chosen province; your party moves closer to them."
+
+msgid "2 · Kime hitap edeceksin? (%d grup)"
+msgstr "2 · Who will you address? (%d groups)"
+
+msgid "İlin isteği"
+msgstr "Province request"
+
+msgid "karşılandı"
+msgstr "met"
+
+msgid "%s yatırımı · devlet hazinesi %s » %s"
+msgstr "%s investment · state treasury %s » %s"
+
+msgid "Hükümet yatırımı — %s getirdi (%s)"
+msgstr "Government investment — brought by %s (%s)"
+
+msgid "Hükümet: seçtiğin ile devlet hazinesinden %s yatırım. İldeki bütün gruplardan seçmen kazanırsın."
+msgstr "Government: a %s investment from the state treasury in the chosen province. You win voters from every group there."

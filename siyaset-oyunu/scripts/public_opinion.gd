@@ -46,8 +46,8 @@ const MITING_FATIGUE_DECAY := 0.6
 
 # --- Yatırım (sadece hükümet partileri) ---------------------------------------
 ## Yatırım partinin siyasi kimliğine (grup yakınlığına) dokunmaz; ildeki BÜTÜN
-## gruplardan seçmen çeker. Economy.INVEST_IMMEDIATE'i hemen, kalanı sonraki
-## dönemlerde gelir.
+## gruplardan seçmen çeker, hemen (bkz. Economy.invest_scale: büyük yatırım
+## orantıdan güçlü).
 ## YATIRIMIN SEÇMEN KARŞILIĞI (0.0.216): 100 milyonluk yatırım ildeki her
 ## grubun INVEST_CONVERT'ü kadarını getirene kazandırır (nüfusla orantılı,
 ## mitingdeki gibi: ildeki grup seçmeni / ülkedeki grup seçmeni × 100).

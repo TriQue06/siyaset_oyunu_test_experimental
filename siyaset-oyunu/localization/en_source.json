@@ -1781,5 +1781,11 @@
 "%s: miting (%s)%s": "%s: rally (%s)%s",
 "%s: miting": "%s: rally",
 "Miting ilde oy kazandırır ve partini ilin seçmen gruplarına yaklaştırır.": "A rally wins votes in the province and brings your party closer to its voter groups.",
-"Seçtiğin ilde hedef seçmen gruplarından seçmen kazanırsın; partin bu gruplara yaklaşır.": "You win voters from the targeted groups in the chosen province; your party moves closer to them."
+"Seçtiğin ilde hedef seçmen gruplarından seçmen kazanırsın; partin bu gruplara yaklaşır.": "You win voters from the targeted groups in the chosen province; your party moves closer to them.",
+"2 · Kime hitap edeceksin? (%d grup)": "2 · Who will you address? (%d groups)",
+"İlin isteği": "Province request",
+"karşılandı": "met",
+"%s yatırımı · devlet hazinesi %s » %s": "%s investment · state treasury %s » %s",
+"Hükümet yatırımı — %s getirdi (%s)": "Government investment — brought by %s (%s)",
+"Hükümet: seçtiğin ile devlet hazinesinden %s yatırım. İldeki bütün gruplardan seçmen kazanırsın.": "Government: a %s investment from the state treasury in the chosen province. You win voters from every group there."
 }

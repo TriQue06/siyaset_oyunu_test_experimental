@@ -20,8 +20,6 @@ const MENU_SIZE := Vector2(320, 430)
 const WIDTH := 320.0
 var panel_width := WIDTH
 const TIER_NAMES := ["KÜÇÜK", "ORTA", "BÜYÜK"]
-const TIER_NOTES := ["daha az etki, paraya göre en verimli", "olağan miting", "en güçlü etki, en pahalı"]
-const INVEST_NOTES := ["küçük yatırım", "olağan yatırım", "büyük yatırım; il tavanına çabuk dayanır"]
 const PAGE_COLORS := {"org": Color("2569CF"), "miting": Color("D93636"), "invest": Color("2E9E52")}
 
 var province_id := ""
@@ -367,7 +365,6 @@ func _build_miting() -> void:
 	if left <= 0:
 		_body.add_child(PopupKit.note(L.t("Bu sıra %d mitingin hepsini yaptın. Sonraki sıranda yeniden miting yapabilirsin.") % CardManager.action_limit(me), UiTheme.RED))
 		return
-	_body.add_child(PopupKit.note(L.t("Miting ilde oy kazandırır ve partini ilin seçmen gruplarına yaklaştırır."), UiTheme.TEXT_MUTED))
 	# 1) BÜTÇE
 	_section(L.t("1 · Bütçe"))
 	var tiers := HBoxContainer.new()
@@ -378,11 +375,9 @@ func _build_miting() -> void:
 			_miting_tier == t, Color("F2132A"), func():
 				_miting_tier = t
 				refresh()))
-	_body.add_child(PopupKit.note(L.t(TIER_NOTES[_miting_tier]), UiTheme.TEXT_MUTED))
 	# 2) HİTAP
 	var slots := CardManager.miting_focus_slots(me, province_id)
-	_section(L.t("2 · Kime hitap edeceksin?"))
-	_body.add_child(PopupKit.note(L.t("%d seçmen grubu seç (zorunlu). Büyük illerde 2, küçük illerde 1 grup hedeflenir.") % slots, UiTheme.TEXT_MUTED))
+	_section(L.t("2 · Kime hitap edeceksin? (%d grup)") % slots)
 	if slots > 0:
 		var grid := GridContainer.new()
 		grid.columns = 2
@@ -410,26 +405,12 @@ func _build_miting() -> void:
 	for group in _focus:
 		names.append(VoterGroups.title(String(group)))
 	_body.add_child(PopupKit.kv(L.t("Hitap"), ", ".join(names) if not names.is_empty() else L.t("seçilmedi")))
-	var gains := _gain_preview(me)
-	if gains != "":
-		_body.add_child(PopupKit.note(L.t("Beklenen hitap: %s") % gains, UiTheme.GREEN))
 	_body.add_child(PopupKit.kv(L.t("Toplam bedel"), GameRules.cost_text(cost), UiTheme.HEAD))
 	var funded := CardManager.can_miting(me, province_id, 0.0, _miting_tier, _smear)
 	var ok := funded and _focus.size() == slots
 	if not funded:
 		_body.add_child(PopupKit.note(L.t("Parti kasası yetmiyor (%s gerekir).") % GameRules.cost_text(cost), UiTheme.RED))
-	elif not ok:
-		_body.add_child(PopupKit.note(L.t("Mitingi düzenlemek için %d seçmen grubu seç.") % slots, UiTheme.RED))
 	_body.add_child(_confirm_button(L.t("MİTİNGİ DÜZENLE · %s") % GameRules.cost_text(cost), ok, func(): _do_miting()))
-
-func _gain_preview(me: int) -> String:
-	var parts: PackedStringArray = []
-	var gains := CardManager.miting_group_gains(me, province_id, _focus, CardManager.miting_tier_mult(_miting_tier))
-	gains.sort_custom(func(a, b): return float(a["gain"]) > float(b["gain"]))
-	for item in gains.slice(0, 3):
-		if float(item["gain"]) > 0.0:
-			parts.append(VoterGroups.title(String(item["group"])))
-	return ", ".join(parts)
 
 ## Miting her zaman parti kasasından (0.0.238).
 func _do_miting() -> void:
@@ -440,8 +421,8 @@ func _do_miting() -> void:
 		_sent_version = -1
 		toast_requested.emit(CardManager.funding_block_reason(me, "miting", 0.0, CardManager.miting_tier_cost(_miting_tier)))
 		return
+	# Bütçe ve hedef gruplar korunur: aynı ayarla art arda miting yapılabilir.
 	CardManager.miting(province_id, 0.0, _focus.duplicate(), _miting_tier, _smear)
-	_reset_miting()
 
 # --- YATIRIM -----------------------------------------------------------------------
 
@@ -457,13 +438,6 @@ func _build_invest() -> void:
 	if left <= 0:
 		_body.add_child(PopupKit.note(L.t("Bu sıra %d yatırımın hepsini yaptın.") % CardManager.action_limit(me), UiTheme.RED))
 		return
-	_body.add_child(PopupKit.note(L.t("Devlet hazinesinden il yatırımı: ildeki bütün seçmen memnun olur, ekonomi canlanır. Partinin hazine kotası bakanlık payına göredir."), UiTheme.TEXT_MUTED))
-	var req := CardManager.invest_request(province_id)
-	if not req.is_empty():
-		if bool(req.get("done", false)):
-			_body.add_child(PopupKit.note(L.t("Bu ilin yatırım isteği bu tur karşılandı."), UiTheme.GREEN))
-		else:
-			_body.add_child(PopupKit.note(L.t("Bu il bu tur %s yatırım istiyor: karşılarsan hükümet onayı artar, karşılanmazsa onay ve bu ildeki oy düşer.") % Economy.money_full(float(req["amount"])), UiTheme.GREEN))
 	_section(L.t("1 · Bütçe"))
 	var tiers := HBoxContainer.new()
 	tiers.add_theme_constant_override("separation", 4)
@@ -473,12 +447,13 @@ func _build_invest() -> void:
 			_invest_tier == t, Color("31C440"), func():
 				_invest_tier = t
 				refresh()))
-	_body.add_child(PopupKit.note(L.t(INVEST_NOTES[_invest_tier]), UiTheme.TEXT_MUTED))
 	_section(L.t("Özet"))
 	var amount := CardManager.invest_tier_cost(_invest_tier)
 	_body.add_child(PopupKit.kv(L.t("İl"), ElectionNightSim.province_name(province_id)))
 	_body.add_child(PopupKit.kv(L.t("Tutar"), Economy.money_full(amount)))
-	_body.add_child(PopupKit.note(L.t("Etkinin bir kısmı hemen, kalanı sonraki %d dönemde gelir; seçimde yalnız gelmiş olan sayılır.") % Economy.INVEST_DELAY_ROUNDS, UiTheme.GREEN))
+	var req := CardManager.invest_request(province_id)
+	if not req.is_empty():
+		_body.add_child(PopupKit.kv(L.t("İlin isteği"), L.t("karşılandı") if bool(req.get("done", false)) else Economy.money_full(float(req["amount"])), UiTheme.GREEN))
 	_body.add_child(PopupKit.kv(L.t("Hazine kotan"), Economy.money_full(CardManager.state_quota(me))))
 	var quota := CardManager.state_quota(me)
 	if quota < amount - 0.001:

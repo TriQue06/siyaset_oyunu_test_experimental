@@ -42,10 +42,17 @@ const TAX_TURN_NATIONAL := [0.06, 0.0, -0.06]
 ## Yatırım DEVLET HAZİNESİNDEN ödenir (+ partiden GameRules.INVEST_FUNDS_COST).
 const INVEST_COST := 100.0
 
-## Yerel etkinin bu payı hemen, kalanı INVEST_DELAY_ROUNDS tur sonunda eşit
-## dilimlerle gelir (yatırım açılışı: tamamlanmadan başarı sayılmaz).
-const INVEST_IMMEDIATE := 0.5
+## Seçmen etkisinin bu payı hemen, kalanı INVEST_DELAY_ROUNDS tur sonunda
+## eşit dilimlerle gelir. 0.0.286: yatırımın tamamı HEMEN gelir (dilim yok).
+const INVEST_IMMEDIATE := 1.0
 const INVEST_DELAY_ROUNDS := 2
+## YATIRIM GÜCÜ: etki = (tutar / INVEST_COST) ^ INVEST_SCALE_POWER; büyük
+## yatırım orantıdan fazla güçlüdür (50 M ≈ 0,44, 100 M = 1, 150 M ≈ 1,63).
+const INVEST_SCALE_POWER := 1.2
+
+## Yatırım tutarının seçmen etkisi ölçeği (bkz. INVEST_SCALE_POWER).
+static func invest_scale(amount: float) -> float:
+	return pow(maxf(0.0, amount) / INVEST_COST, INVEST_SCALE_POWER)
 
 static func start_state() -> Dictionary:
 	return {"tax": START_TAX, "treasury": START_TREASURY, "revenue": 0.0, "prev": {}, "tax_round": 0,

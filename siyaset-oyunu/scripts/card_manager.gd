@@ -2859,11 +2859,11 @@ func investment_shares(investor: int) -> Dictionary:
 
 func _apply_investment(peer_id: int, province_id: String, amount: float = Economy.INVEST_COST) -> void:
 	var investor := party_of(peer_id)
-	var scale := amount / Economy.INVEST_COST
+	var scale := Economy.invest_scale(amount)
 	var shares := investment_shares(investor)
-	# SEÇMEN: yatırım ideolojiye bakmaz; ildeki seçmeni getirene ve makam
-	# sahiplerine çeker. INVEST_IMMEDIATE kadarı hemen, kalanı sonraki
-	# dönemlerde eşit dilimlerle gelir (later: parti -> dilim ölçeği).
+	# SEÇMEN: yatırım ideolojiye bakmaz; ildeki BÜTÜN gruplardan seçmeni
+	# getirene ve makam sahiplerine çeker. INVEST_IMMEDIATE kadarı hemen, kalanı
+	# (varsa) sonraki dönemlerde eşit dilimlerle gelir (later: parti -> dilim ölçeği).
 	var parts := {}
 	var share_total := 0.0
 	for pid in shares.keys():
@@ -2873,13 +2873,13 @@ func _apply_investment(peer_id: int, province_id: String, amount: float = Econom
 		parts[int(pid)] = float(shares[pid]) / maxf(0.0001, share_total)
 		later[pid] = float(parts[int(pid)]) * scale * (1.0 - Economy.INVEST_IMMEDIATE) / float(Economy.INVEST_DELAY_ROUNDS)
 	_vb_invest(province_id, parts, scale * Economy.INVEST_IMMEDIATE)
-	var pending: Array = economy.get("investments", [])
-	pending.append({"province": province_id, "party": investor, "round": round_number,
-		"rounds_left": Economy.INVEST_DELAY_ROUNDS, "amounts": later})
-	economy["investments"] = pending
+	if Economy.INVEST_IMMEDIATE < 1.0:
+		var pending: Array = economy.get("investments", [])
+		pending.append({"province": province_id, "party": investor, "round": round_number,
+			"rounds_left": Economy.INVEST_DELAY_ROUNDS, "amounts": later})
+		economy["investments"] = pending
 	_ease_turmoil(peer_id, PublicOpinion.TURMOIL_EASE_INVEST * minf(1.0, scale))
-	_log_province(province_id, L.t("Hükümet yatırımı — %s getirdi (%s; etkisi %d dönemde tamamlanır)") % [
-		_party_name(peer_id), Economy.money_full(amount), Economy.INVEST_DELAY_ROUNDS])
+	_log_province(province_id, L.t("Hükümet yatırımı — %s getirdi (%s)") % [_party_name(peer_id), Economy.money_full(amount)])
 	_event_message = L.t("%s, %s'a hükümet yatırımı getirdi: %s.") % [_party_name(peer_id),
 		_province_name(province_id), Economy.money_full(amount)]
 
@@ -3283,7 +3283,7 @@ const MITING_STEAL := [1.0, 0.12, 0.03]
 const MITING_DEMOTE := [1.5, 1.2]
 ## Miting kendi seçmenini yükseltir: [1->2, 2->3]; odakta tam, diğer gruplarda üçte bir.
 const MITING_PROMOTE := [0.25, 0.1]
-const INVEST_PULL := 0.10
+const INVEST_PULL := 0.14
 const INVEST_STEAL := [1.0, 0.5, 0.15]
 const INVEST_DEMOTE := [0.3, 0.2]
 ## Ülke çapı (yasa): eski hitap puanı başına grubun bu kadar yüzdesi.

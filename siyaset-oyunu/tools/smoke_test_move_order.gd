@@ -60,7 +60,7 @@ func act(step: Array) -> void:
 func snapshot() -> Dictionary:
 	var s := {}
 	for pid in [A, B, C]:
-		s[pid] = {"nat": cm.national_of(pid), "loc": cm.local_of(P, pid), "turmoil": cm.turmoil_of(pid),
+		s[pid] = {"nat": cm.voter_total(pid), "loc": cm.voter_total(pid, P), "turmoil": cm.turmoil_of(pid),
 			"groups": (pm.parties[pid]["groups"] as Dictionary).duplicate(), "funds": cm.funds_of(pid)}
 	s["rng"] = cm._rng.state
 	return s
@@ -92,8 +92,8 @@ func fmt(r: Dictionary) -> String:
 
 ## 0.0.228 SEÇMEN TABANI: seçmen çalma sıraya bağlıdır (önce gelen kararsızları
 ## alır), tam eşitlik artık beklenmez. Sıra sonucu KÜÇÜK oynatabilir: oy farkı
-## ORDER_VOTE_TOL puandan, vekil farkı ORDER_SEAT_TOL'dan az olmalı; ulusal ve
-## il puanı, karışıklık ve bölünme yine birebir aynı olmalı.
+## ORDER_VOTE_TOL puandan, vekil farkı ORDER_SEAT_TOL'dan az olmalı;
+## karışıklık, kasa ve bölünme birebir aynı.
 const ORDER_VOTE_TOL := 0.5
 const ORDER_SEAT_TOL := 3
 func same(a: Dictionary, b: Dictionary) -> bool:
@@ -104,9 +104,11 @@ func same(a: Dictionary, b: Dictionary) -> bool:
 			return false
 		var da: Dictionary = a["pre"][pid]
 		var db: Dictionary = b["pre"][pid]
-		for k in ["nat", "loc", "turmoil", "funds"]:
+		for k in ["turmoil", "funds"]:
 			if not is_equal_approx(float(da[k]), float(db[k])):
 				return false
+		# 0.0.284: seçmen tabanı sıraya duyarlı (kaset o anki seçmenin bir
+		# kısmını düşürür); ölçüt sandık sonucu (oy ve vekil toleransı).
 	return a.get("split", false) == b.get("split", false)
 
 func diff_line(a: Dictionary, b: Dictionary) -> String:
@@ -150,14 +152,14 @@ func _initialize() -> void:
 			break
 	new_game(777)
 	print("İl: %s  (provokasyon riski A %.2f, B %.2f, C %.2f)" % [P, cm.miting_risk(A, P), cm.miting_risk(B, P), cm.miting_risk(C, P)])
-	print("Sabitler: miting il +%.1f, kaset ulusal −%.1f, karışıklık: kaset +%.1f / miting −%.1f (0'ın altına inmez), puan sınırı ±%.0f, bölünme eşiği %.1f" % [
-		PublicOpinion.MITING_LOCAL, PublicOpinion.REPUTATION_NATIONAL_DAMAGE, PublicOpinion.TURMOIL_REPUTATION,
-		PublicOpinion.TURMOIL_EASE_MITING, PublicOpinion.LIMIT, PublicOpinion.SPLIT_TURMOIL])
+	print("Sabitler: kaset seviye düşürme %%%.0f + ülke geneli −%.1f puan, karışıklık: kaset +%.1f / miting −%.1f (0'ın altına inmez), bölünme eşiği %.1f" % [
+		PublicOpinion.KASET_DEMOTE * 100.0, PublicOpinion.REPUTATION_NATIONAL_DAMAGE, PublicOpinion.TURMOIL_REPUTATION,
+		PublicOpinion.TURMOIL_EASE_MITING, PublicOpinion.SPLIT_TURMOIL])
 
 	print("\n=== 0) KONTROL: aynı senaryo üç kez ===")
 	for i in 3:
 		new_game(777)
-		print("  başlangıç: il profili %s, yorgunluk %s, A emekli %.2f, il puanı %.2f" % [str(cm.province_profile(P)), str(cm.miting_fatigue), float(pm.parties[A]["groups"]["emekli"]), cm.local_of(P, A)])
+		print("  başlangıç: il profili %s, yorgunluk %s, A emekli %.2f, ildeki seçmen %.2f" % [str(cm.province_profile(P)), str(cm.miting_fatigue), float(pm.parties[A]["groups"]["emekli"]), cm.voter_total(A, P)])
 		var k := run("kontrol", [["miting", A], ["kaset", B, A]])
 		print("  sonuç: A emekli %.3f, A oy %.4f, vekil %s" % [float(k["pre"][A]["groups"]["emekli"]), float(k["votes"][A]), str(k["seats"])])
 	print("\n=== 0b) ÇAPRAZ KONTROL: S1, S1', S1, S1' ===")
@@ -218,19 +220,6 @@ func _initialize() -> void:
 	print("  b) A karışıklığı 5,6 (eşik 7,0):  önce miting → %.2f, bölünme %s;  önce kaset → %.2f, bölünme %s" % [
 		t1a["pre"][A]["turmoil"], t1a["split"], t1b["pre"][A]["turmoil"], t1b["split"]])
 	print("     " + diff_line(t1a, t1b))
-	# c) Ulusal puan sınırın yakınında (−8): kaset −4 → −10'a kırpılır.
-	var low := func(): cm.national_support[A] = -8.0
-	var c1 := run("ulusal −8: miting → kaset", [["miting", A], ["kaset", B, A]], low)
-	var c2 := run("ulusal −8: kaset → miting", [["kaset", B, A], ["miting", A]], low)
-	print("  c) A ulusal −8:  önce miting %.2f, önce kaset %.2f  → %s" % [c1["pre"][A]["nat"], c2["pre"][A]["nat"], diff_line(c1, c2)])
-	# d) İl puanı sınırın yakınında (+8): miting +5 → +10'a kırpılır.
-	var high := func():
-		var e: Dictionary = cm.local_support.get(P, {})
-		e[A] = 8.0
-		cm.local_support[P] = e
-	var d1 := run("il +8: miting → kaset", [["miting", A], ["kaset", B, A]], high)
-	var d2 := run("il +8: kaset → miting", [["kaset", B, A], ["miting", A]], high)
-	print("  d) A il puanı +8:  önce miting %.2f, önce kaset %.2f  → %s" % [d1["pre"][A]["loc"], d2["pre"][A]["loc"], diff_line(d1, d2)])
 	# e) Provokasyon riski olan il: zarı hangi miting atıyor?
 	var risky := ""
 	for id in ids:
@@ -263,7 +252,7 @@ func _initialize() -> void:
 	print("\n=== ÖZET ===")
 	var fails := 0
 	for pair in [["S1 / S1'", s1, s1r], ["S2 / S2'", s2, s2r], ["teşkilat / kaset", o1, o2], ["miting+teşkilat / kaset", m1, m2],
-			["karışıklık 0", t0a, t0b], ["eşik", t1a, t1b], ["ulusal −8", c1, c2], ["il +8", d1, d2]]:
+			["karışıklık 0", t0a, t0b], ["eşik", t1a, t1b]]:
 		var ok := same(pair[1], pair[2])
 		if not ok:
 			fails += 1

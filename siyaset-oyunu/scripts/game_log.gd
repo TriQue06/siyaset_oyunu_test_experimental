@@ -60,8 +60,8 @@ static func build() -> String:
 		var g: Dictionary = PartyManager.groups_of(p)
 		for group in VoterGroups.GROUP_IDS:
 			groups.append("%s %.1f" % [group, float(g.get(group, 0.0))])
-		out.append("%s · vekil %d · son oy %%%.2f · ulusal puan %.2f · kasa %.1f · teşkilat %d · grup payı: %s" % [_party(p),
-			int(cm.last_seats.get(p, 0)), float(cm.last_vote_shares.get(p, 0.0)), cm.national_of(p), cm.funds_of(p), cm.org_count(p), ", ".join(groups)])
+		out.append("%s · vekil %d · son oy %%%.2f · gidişat %.2f · kasa %.1f · teşkilat %d · grup payı: %s" % [_party(p),
+			int(cm.last_seats.get(p, 0)), float(cm.last_vote_shares.get(p, 0.0)), cm.vote_trend(p), cm.funds_of(p), cm.org_count(p), ", ".join(groups)])
 	out.append("Hükümet: %s" % str(GovernmentManager.government))
 	out.append("Ekonomi: %s" % str(cm.economy))
 	return "\n".join(out)

@@ -263,10 +263,8 @@ func _columns_header() -> Control:
 func _build_own(me: int) -> void:
 	var level := CardManager.organization_level(province_id, me)
 	_body.add_child(PopupKit.section(L.t("Sen bu ilde")))
-	var power := CardManager.activity_of(province_id, me)
-	_body.add_child(PopupKit.kv(L.t("Yerel güç"), EffectWords.amount(power, "local"), _opinion_color(power)))
+	_body.add_child(PopupKit.kv(L.t("Sana bağlı seçmen"), L.t("%%%s") % L.dec(CardManager.attached_share(me, province_id), 0), UiTheme.HEAD))
 	if level > 0:
-		_body.add_child(PopupKit.kv(L.t("Teşkilat desteği"), EffectWords.amount(CardManager.org_bonus(province_id, me), "local"), UiTheme.GREEN))
 		var risk := CardManager.miting_risk(me, province_id)
 		var color := UiTheme.GREEN if risk < 0.12 else (UiTheme.GOLD_DIM if risk < 0.25 else UiTheme.RED)
 		_body.add_child(PopupKit.kv(L.t("Miting provokasyonu"), EffectWords.risk(risk), color))

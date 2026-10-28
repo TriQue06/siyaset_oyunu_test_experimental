@@ -34,8 +34,12 @@ const LAW_EVERY_ROUNDS := 2
 ## Muhalefetteki bot, hükümete bu mesafeden yakınsa gensoruda çekimser kalır
 ## (mesafe: VoterGroups.party_distance, grup yakınlıkları arasında).
 const CENSURE_LOYALTY_DISTANCE := 1.2
-## Erken seçime EVET demek için gereken ulusal kamuoyu eşiği.
-const EARLY_ELECTION_SUPPORT := 1.0
+## Erken seçime EVET demek için gereken gidişat eşiği (yüzde puanı, bkz. CardManager.vote_trend).
+const EARLY_ELECTION_SUPPORT := 2.0
+## GİDİŞAT (0.0.284): beklenen oy − son seçimdeki oy (yüzde puanı); erken
+## seçim puanına bu ağırlıkla girer.
+const EARLY_TREND_WEIGHT := 0.25
+const EARLY_TREND_CAP := 4.0
 ## Koalisyon ortağı, sandalye payına düşen makam puanının en az bu oranını ister.
 const COALITION_FAIR_SHARE := 0.75
 ## Ortak olacak parti en az bu kadar makam puanı ister (1 bakanlık yetmez).
@@ -258,8 +262,8 @@ static func _choose_parliament(bot: int, stage: String) -> Dictionary:
 				best = {"type": "constitution", "payload": constitution["payload"]}
 				best_score = float(constitution["score"])
 			if CardManager.can_early_election(bot) and not CardManager.is_government_party(bot) \
-					and CardManager.national_of(bot) > EARLY_ELECTION_SUPPORT:
-				var early_score := 1.0 + CardManager.national_of(bot) * 0.8 - GameRules.EARLY_ELECTION_FUNDS_COST * funds_value + _jitter(bot)
+					and CardManager.vote_trend(bot) > EARLY_ELECTION_SUPPORT:
+				var early_score := 1.0 + minf(CardManager.vote_trend(bot), EARLY_TREND_CAP) * EARLY_TREND_WEIGHT - GameRules.EARLY_ELECTION_FUNDS_COST * funds_value + _jitter(bot)
 				if early_score > best_score:
 					best = {"type": "early_election"}
 			if not best.is_empty():
@@ -290,17 +294,23 @@ static func miting_smear(bot: int, province_id: String) -> int:
 	var best_value := 0.6
 	var org_level := CardManager.organization_level(province_id, bot)
 	var seats := float(CardManager.province_seat_count(province_id)) * PublicOpinion.org_action_mult(org_level)
-	var gain := PublicOpinion.propaganda_gain(CardManager.party_strength(province_id, bot))
+	var gain := PublicOpinion.PROPAGANDA_GAIN
 	for target in CardManager.smear_targets(bot, province_id):
 		if is_ally(bot, int(target)):
 			continue
-		var damage := PublicOpinion.propaganda_damage(CardManager.party_strength(province_id, target))
+		var damage := _smear_damage(province_id, int(target))
 		var rival := 0.3 + float(GovernmentManager.seats_of(target)) / _total_seats() * 4.0
 		var value := (gain + damage * 0.6 * rival) * seats / 6.0 * 0.45
 		if value > best_value:
 			best_value = value
 			best = int(target)
 	return best
+
+## Karalamanın hedefe tahmini zararı (puan ölçeğinde): ildeki oyu ×
+## PROPAGANDA_DEMOTE; yarısı (zayıf bağlılar) kararsızlaşır.
+static func _smear_damage(province_id: String, target: int) -> float:
+	var share := float(CardManager.expected_province_shares(province_id).get(CardManager.party_of(target), 0.0))
+	return PublicOpinion.PROPAGANDA_DEMOTE * share * 0.5
 
 ## KARALAMA KARTI (0.0.237, yine ayrı kart): teşkilatlı illerde en değerli
 ## il + rakip; ölçek miting_smear ile aynı.
@@ -313,8 +323,8 @@ static func _eval_propaganda(bot: int) -> Dictionary:
 			continue
 		var org_level := CardManager.organization_level(String(province_id), bot)
 		var seats := float(CardManager.province_seat_count(province_id)) * PublicOpinion.org_action_mult(org_level)
-		var gain := PublicOpinion.propaganda_gain(CardManager.party_strength(province_id, bot))
-		var damage := PublicOpinion.propaganda_damage(CardManager.party_strength(province_id, target))
+		var gain := PublicOpinion.PROPAGANDA_GAIN
+		var damage := _smear_damage(String(province_id), target)
 		var rival := 0.3 + float(GovernmentManager.seats_of(target)) / _total_seats() * 4.0
 		var value := (gain + damage * 0.6 * rival) * seats / 6.0
 		if value > best_value:
@@ -476,7 +486,7 @@ static func _free_alliance_color() -> Color:
 static func _vote_share(pid: int) -> float:
 	if CardManager.last_vote_shares.has(pid):
 		return float(CardManager.last_vote_shares[pid])
-	var expected: Dictionary = CardManager._expected_national(CardManager.election_modifiers(true))
+	var expected: Dictionary = CardManager._expected_national()
 	return float(expected.get(pid, 0.0)) * 100.0
 
 static func _alliance_share(alliance_id: int) -> float:
@@ -567,8 +577,8 @@ static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 
 	# ERKEN SEÇİM: kamuoyu bot lehineyse ve hükümette değilse sandığı ister.
 	if CardManager.can_early_election(bot) and not CardManager.is_government_party(bot):
-		var support := CardManager.national_of(bot)
-		var early_score := 1.0 + support * 0.8 - GameRules.EARLY_ELECTION_FUNDS_COST * funds_value + _jitter(bot)
+		var support := CardManager.vote_trend(bot)
+		var early_score := 1.0 + minf(support, EARLY_TREND_CAP) * EARLY_TREND_WEIGHT - GameRules.EARLY_ELECTION_FUNDS_COST * funds_value + _jitter(bot)
 		if support > EARLY_ELECTION_SUPPORT:
 			candidates.append({"type": "early_election"})
 			if early_score > best_score:
@@ -754,6 +764,8 @@ static func _law_vote_value(voter: int, law_type: String, choice: int, proposer:
 		value += PublicOpinion.APPROVAL_CRISIS_LAW_NO * share * PublicOpinion.APPROVAL_NATIONAL_MAX 			/ PublicOpinion.APPROVAL_NEUTRAL * share * APPROVAL_TURNS
 	return value
 
+## Bir mitingin il etkisinin eski puan ölçeğindeki karşılığı (afet yardımını mitingle kıyaslamak için).
+const MITING_POINTS := 2.5
 ## Yatırım isteğinin bot gözündeki değeri (il değeriyle aynı ölçek: vekil sayısı).
 const REQUEST_VALUE := 12.0
 ## Onay değişiminin bot hesabında kaç turluk ulusal puan sayıldığı.
@@ -1009,7 +1021,7 @@ static func _eval_investment(bot: int) -> Dictionary:
 		# 0.0.269: yatırım yalnız teşkilatlı ilde.
 		if CardManager.organization_level(String(province_id), bot) <= 0 and not requested:
 			continue
-		var room := clampf((PublicOpinion.INVEST_LIMIT - CardManager.local_of(province_id, bot)) / PublicOpinion.INVEST_LOCAL, 0.0, 1.0)
+		var room := 1.0
 		var value := float(CardManager.province_seat_count(province_id)) \
 			* (0.5 + PublicOpinion.appeal_closeness(CardManager.appeal_of(province_id, bot))) * room
 		if requested:
@@ -1041,7 +1053,7 @@ static func eval_aid(bot: int) -> Dictionary:
 	for province_id in provinces:
 		var seats := float(CardManager.province_seat_count(String(province_id)))
 		var closeness := PublicOpinion.appeal_closeness(CardManager.appeal_of(String(province_id), bot))
-		value += minf(gain, PublicOpinion.LIMIT - CardManager.local_of(String(province_id), bot)) / PublicOpinion.MITING_LOCAL * seats / 30.0 * (0.5 + closeness)
+		value += gain / MITING_POINTS * seats / 30.0 * (0.5 + closeness)
 	value += Disaster.national_gain(0.0, party_m + state_m) * 0.5
 	return {"score": value * 1.4 * 1.6 * (1.4 if _election_soon() else 1.0), "party": party_m, "state": state_m}
 
@@ -1300,7 +1312,7 @@ static func _constitution_vote(bot: int, payload: Dictionary = {}) -> int:
 static func _early_election_vote(bot: int) -> int:
 	if CardManager.is_government_party(bot):
 		return GovernmentManager.VOTE_NO
-	var support := CardManager.national_of(bot)
+	var support := CardManager.vote_trend(bot)
 	if support > EARLY_ELECTION_SUPPORT:
 		return GovernmentManager.VOTE_YES
 	if support < -EARLY_ELECTION_SUPPORT:

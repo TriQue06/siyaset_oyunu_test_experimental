@@ -98,7 +98,7 @@ func _play_game(g: int, report: Dictionary) -> void:
 		if cm.round_number != last_round:
 			last_round = cm.round_number
 			econ_rounds.append(_econ_snapshot())
-			round_snapshot = cm.local_support.duplicate(true)
+			round_snapshot = {}
 			for peer_id in gm.government_party_ids():
 				if not stats.has(peer_id):
 					stats[peer_id] = {"actions": {}, "propaganda_received": 0, "gov_rounds": 0}
@@ -223,26 +223,9 @@ func _top_party(seats: Dictionary) -> int:
 
 func _record_election(g: int, round_snapshot: Dictionary, prev_seats: Dictionary, marks: Dictionary) -> Dictionary:
 	var inputs: Dictionary = cm.last_election_inputs
-	var mods: Dictionary = inputs["mods"]
-	var local_mods: Dictionary = mods["local"]
-	var national_mods: Dictionary = mods["national"]
-	var orgs: Dictionary = inputs["organizations"]
 	var seat_counts: Dictionary = cm._province_seat_counts
-
-	# Güç kaynaklarının (mutlak, vekil ağırlıklı) payı.
-	var contrib := {"il_baskanligi": 0.0, "son_tur": 0.0, "onceki_turlar": 0.0, "ulusal": 0.0}
-	for province_id in seat_counts.keys():
-		var n := float(seat_counts[province_id])
-		var here: Dictionary = local_mods.get(province_id, {})
-		var snap: Dictionary = round_snapshot.get(province_id, {})
-		for peer_id in cm.turn_order:
-			var org_part := PublicOpinion.org_activity(int(orgs.get(province_id, {}).get(peer_id, 0)))
-			var local_now := float(here.get(peer_id, 0.0)) - org_part
-			var earlier := float(snap.get(peer_id, 0.0))
-			contrib["il_baskanligi"] += absf(org_part) * n
-			contrib["onceki_turlar"] += absf(earlier) * n
-			contrib["son_tur"] += absf(local_now - earlier) * n
-			contrib["ulusal"] += absf(float(national_mods.get(peer_id, 0.0))) * n
+	# 0.0.284: ayrı güç (kamuoyu / il puanı) katmanı yok; her şey seçmen tabanında.
+	var contrib := {}
 
 	# Şans: aynı girdiler, farklı tohumlar.
 	var base_top := _top_party(cm.last_seats)
@@ -252,7 +235,7 @@ func _record_election(g: int, round_snapshot: Dictionary, prev_seats: Dictionary
 		var rng := RandomNumberGenerator.new()
 		rng.seed = 100000 + g * 100 + s
 		var r := ElectionModel.compute(inputs["groups"], seat_counts, inputs["voters"], float(inputs["threshold"]),
-			rng, mods, inputs.get("alliances", {}))
+			rng, inputs.get("alliances", {}), cm.vb_election_state())
 		if _top_party(r["seats"]) != base_top:
 			top_changes += 1
 		for peer_id in r["seats"].keys():

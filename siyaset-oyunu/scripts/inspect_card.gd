@@ -154,8 +154,7 @@ static func _standing(province_id: String, me: int) -> Control:
 	texts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	texts.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(texts)
-	var power := CardManager.activity_of(province_id, me)
-	var word := EffectWords.amount(power, "local")
+	var word := L.t("seçmenin %%%s'i senin") % L.dec(CardManager.attached_share(me, province_id), 0)
 	var color := UiTheme.GREEN_DARK if closeness >= PublicOpinion.CLOSENESS_NEAR else (Color("C97A12") if closeness >= 0.3 else UiTheme.CRISIS)
 	texts.add_child(_lbl(word.substr(0, 1).to_upper() + word.substr(1), 26, color, true))
 	var near := L.t("çok yakın") if closeness >= 0.75 else (L.t("yakın") if closeness >= PublicOpinion.CLOSENESS_NEAR \

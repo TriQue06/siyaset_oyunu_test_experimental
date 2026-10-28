@@ -174,10 +174,11 @@ func _initialize() -> void:
 	var fine_entry: Array = []
 	cm._resolve_draw(3, cp.PENALTY_CARD_TYPE, fine_entry, PackedStringArray())
 	check("para cezasi kasanin %20'sini siler", is_equal_approx(cm.funds_of(3), 40.0) and is_equal_approx(float(fine_entry[0]["amount"]), 10.0))
-	var national_before: float = cm.national_of(3)
+	cm._add_national(3, 10.0)
+	var national_before: float = cm.voter_total(3)
 	var turmoil_before: float = cm.turmoil.get(cm.party_of(3), 0.0)
 	cm._resolve_draw(3, cp.SELF_TURMOIL_CARD_TYPE, [], PackedStringArray())
-	check("parti ici karisiklik oyuncunun kendisini vurur", cm.national_of(3) < national_before
+	check("parti ici karisiklik oyuncunun kendisini vurur", cm.voter_total(3) < national_before
 		and float(cm.turmoil.get(cm.party_of(3), 0.0)) > turmoil_before)
 	give_turn(3)
 	var limit_before: int = cm.action_limit(3)

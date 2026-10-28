@@ -132,20 +132,24 @@ func _initialize() -> void:
 	cm._finish_round()
 	check("gündem dışı yasa onayı etkilemez", near(cm.approval_value(), before))
 
-	print("=== 4) OYA ETKİSİ ===")
+	print("=== 4) OYA ETKİSİ (seçmen) ===")
 	new_game()
 	cm.approval["value"] = 50.0
-	var neutral1: float = float(cm.election_modifiers()["national"].get(1, 0.0))
+	check("%50 nötr: seçmen etkisi yok", near(cm.approval_national(1), 0.0, 0.001) and near(cm.approval_national(2), 0.0, 0.001))
 	cm.approval["value"] = 100.0
-	var high1: float = float(cm.election_modifiers()["national"].get(1, 0.0))
-	var high2: float = float(cm.election_modifiers()["national"].get(2, 0.0))
-	var neutral2: float = high2 - PublicOpinion.APPROVAL_NATIONAL_MAX * cm.quota_share(2)
-	check("%50 nötr: ek puan yok", near(cm.approval_national(1), 0.0, 0.001) or near(neutral1, high1 - PublicOpinion.APPROVAL_NATIONAL_MAX * cm.quota_share(1), 0.001))
-	check("%100: ortaklara bakanlık payıyla bölünmüş tam bonus",
-		near(high1 - neutral1, PublicOpinion.APPROVAL_NATIONAL_MAX * cm.quota_share(1), 0.001) and near(cm.approval_national(2), PublicOpinion.APPROVAL_NATIONAL_MAX * cm.quota_share(2), 0.001),
-		"%.2f / %.2f (nötr %.2f)" % [high1 - neutral1, cm.approval_national(2), neutral2])
+	check("%100: ortaklara bakanlık payıyla bölünmüş tam etki",
+		near(cm.approval_national(1), PublicOpinion.APPROVAL_NATIONAL_MAX * cm.quota_share(1), 0.001)
+		and near(cm.approval_national(2), PublicOpinion.APPROVAL_NATIONAL_MAX * cm.quota_share(2), 0.001))
+	var v1: float = cm.voter_total(1)
+	var v3: float = cm.voter_total(3)
+	cm._finish_round()
+	check("yüksek onay: tur sonunda hükümet partisi seçmen kazanır", cm.voter_total(1) > v1, "%.1f -> %.1f" % [v1, cm.voter_total(1)])
+	check("muhalefet seçmeni etkilenmez", near(cm.voter_total(3), v3, 0.01))
 	cm.approval["value"] = 20.0
-	check("%50 altı ceza", cm.approval_national(1) < 0.0 and cm.approval_national(2) < 0.0)
+	v1 = cm.voter_total(1)
+	cm.invest_requests = {}
+	cm._finish_round()
+	check("düşük onay: hükümet partisi seçmen kaybeder", cm.voter_total(1) < v1, "%.1f -> %.1f" % [v1, cm.voter_total(1)])
 	check("muhalefet etkilenmez", near(cm.approval_national(3), 0.0, 0.001))
 
 	print("=== 5) YATIRIM İSTEKLERİ ===")
@@ -161,7 +165,7 @@ func _initialize() -> void:
 	var done_id: String = ids[0]
 	var miss_id: String = ids[1]
 	before = cm.approval_value()
-	var local_before: float = cm.local_of(miss_id, 1)
+	var local_before: float = cm.voter_total(1, miss_id)
 	cm._fulfil_invest_request(done_id, float(cm.invest_requests[done_id]["amount"]) - 10.0)
 	check("istenenden az yatırım isteği karşılamaz", not bool(cm.invest_requests[done_id]["done"]))
 	cm._fulfil_invest_request(done_id, 150.0)
@@ -170,8 +174,8 @@ func _initialize() -> void:
 	cm._finish_round()
 	var expected: float = before + PublicOpinion.APPROVAL_REQUEST_DONE + PublicOpinion.APPROVAL_REQUEST_MISSED * float(want - 1)
 	check("tur sonu: karşılanan +, karşılanmayan − (hepsi toplanır)", near(cm.approval_value(), expected), "%.1f -> %.1f (beklenen %.1f)" % [before, cm.approval_value(), expected])
-	check("karşılanmayan ilde hükümet partisi il puanı kaybeder", cm.local_of(miss_id, 1) < local_before - 0.5,
-		"%.2f -> %.2f" % [local_before, cm.local_of(miss_id, 1)])
+	check("karşılanmayan ilde hükümet partisi seçmen kaybeder", cm.voter_total(1, miss_id) < local_before * 0.97,
+		"%.2f -> %.2f" % [local_before, cm.voter_total(1, miss_id)])
 	check("yeni tur için yeni istekler", cm.invest_requests.size() == want and not cm.invest_requests.values().any(func(r): return bool(r["done"])))
 	gm.government = {}
 	gm.main_gov_peer_id = -1

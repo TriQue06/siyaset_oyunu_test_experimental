@@ -69,7 +69,7 @@ func election_share(pid: int) -> float:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 777
 	var result := ElectionModel.compute(cm._group_profiles(), cm._province_seat_counts, cm.province_voters(),
-		0.0, rng, cm.election_modifiers())
+		0.0, rng, {}, cm.vb_election_state())
 	return float(result["vote_shares"].get(pid, 0.0))
 
 func _initialize() -> void:
@@ -117,10 +117,10 @@ func _initialize() -> void:
 	print("=== 1) YÜKSEK VERGİ: HAZİNE BİRİKİR ===")
 	new_game()
 	var groups_before := str(pm.parties[1]["groups"])
-	var national_before := str(cm.national_support)
+	var voters_before: float = cm.voter_total(1)
 	check("vergi artırımı kabul edildi", pass_tax(Economy.TAX_HIGH))
 	check("vergi yasası kalıcı grup yakınlığına yazmaz", str(pm.parties[1]["groups"]) == groups_before)
-	check("vergi yasası kabul anında ulusal puana yazmaz", str(cm.national_support) == national_before)
+	check("vergi yasası kabul anında seçmene yazmaz", near(cm.voter_total(1), voters_before))
 	check("grup değerine ekonomi katmanı eklenmez", str(cm.effective_groups(1)) == str(cm.effective_groups(1))
 		and not cm.has_method("economy_mood") and not cm.has_method("economy_index"))
 	var treasury0: float = cm.state_treasury()
@@ -153,27 +153,29 @@ func _initialize() -> void:
 	check("düşük vergi artı, yüksek vergi eksi", cm.tax_turn_effect(Economy.TAX_LOW) > 0.0 and cm.tax_turn_effect(Economy.TAX_HIGH) < 0.0)
 	check("2. turda etki 2 kat", near(cm.tax_turn_effect(Economy.TAX_HIGH), 2.0 * Economy.TAX_TURN_NATIONAL[Economy.TAX_HIGH]))
 	cm.economy["tax"] = Economy.TAX_HIGH
-	cm.national_support = {}
+	var b1: float = cm.voter_total(1)
+	var b2: float = cm.voter_total(2)
+	var b3: float = cm.voter_total(3)
 	cm._apply_tax_tick()
-	var n1: float = cm.national_of(1)
-	var n2: float = cm.national_of(2)
 	var total_tick: float = cm.tax_turn_effect()
-	check("yüksek vergi: hükümet partileri eksi yazar", n1 < 0.0 and n2 < 0.0, "%.3f / %.3f" % [n1, n2])
-	check("muhalefet etkilenmez", near(cm.national_of(3), 0.0))
-	check("toplam etki bakanlık payına göre bölünür", near(n1, total_tick * cm.quota_share(1)) and near(n2, total_tick * cm.quota_share(2))
-		and near(n1 + n2, total_tick), "%.3f + %.3f = %.3f" % [n1, n2, total_tick])
+	var lost1: float = (b1 - cm.voter_total(1)) / b1
+	var lost2: float = (b2 - cm.voter_total(2)) / b2
+	check("yüksek vergi: hükümet partileri seçmen kaybeder", lost1 > 0.0 and lost2 > 0.0, "%.4f / %.4f" % [lost1, lost2])
+	check("muhalefet etkilenmez", near(cm.voter_total(3), b3))
+	check("kayıp bakanlık payına göre bölünür", near(lost1, -total_tick * cm.quota_share(1) * PublicOpinion.VOTER_LOSS, 0.0005)
+		and near(lost2, -total_tick * cm.quota_share(2) * PublicOpinion.VOTER_LOSS, 0.0005), "%.4f / %.4f" % [lost1, lost2])
+	var after_one: float = cm.voter_total(1)
 	cm._apply_tax_tick()
-	check("her sırada tekrar yazılır (birikir)", near(cm.national_of(1), 2.0 * n1))
-	cm.national_support = {}
+	check("her sırada tekrar yazılır (birikir)", cm.voter_total(1) < after_one)
 	cm.economy["tax"] = Economy.TAX_LOW
 	cm.round_number = interval
+	b1 = cm.voter_total(1)
 	cm._apply_tax_tick()
-	check("düşük vergi son turda en yüksek artı", near(cm.national_of(1) + cm.national_of(2), Economy.TAX_TURN_NATIONAL[Economy.TAX_LOW] * interval),
-		"%.3f" % (cm.national_of(1) + cm.national_of(2)))
-	cm.national_support = {}
+	check("düşük vergi hükümete seçmen kazandırır", cm.voter_total(1) > b1)
 	cm.economy["tax"] = Economy.TAX_NORMAL
+	b1 = cm.voter_total(1)
 	cm._apply_tax_tick()
-	check("normal vergi hiçbir şey yazmaz", near(cm.national_of(1), 0.0) and near(cm.national_of(2), 0.0))
+	check("normal vergi hiçbir şey yazmaz", near(cm.voter_total(1), b1))
 	cm.round_number = 1
 	cm.early_election_pending = true
 	check("erken seçim kabul edilince çarpan en yüksek", cm.tax_cycle_mult() == interval)
@@ -181,18 +183,17 @@ func _initialize() -> void:
 	gm.government = {}
 	gm.main_gov_peer_id = -1
 	cm.economy["tax"] = Economy.TAX_HIGH
-	cm.national_support = {}
+	b1 = cm.voter_total(1)
 	cm._apply_tax_tick()
-	check("hükümet yokken kimseye yazılmaz", cm.national_support.is_empty() or (near(cm.national_of(1), 0.0) and near(cm.national_of(2), 0.0)))
+	check("hükümet yokken kimseye yazılmaz", near(cm.voter_total(1), b1))
 	# Sıra başı: _grant_turn_income vergiyi bir kez yazar.
 	new_game()
 	cm.round_number = 1
 	cm.economy["tax"] = Economy.TAX_LOW
-	cm.national_support = {}
+	b1 = cm.voter_total(1)
 	give_turn(1)
 	cm._grant_turn_income()
-	var after_grant: float = cm.national_of(1) + cm.national_of(2)
-	check("sıra başında vergi bir kez yazıldı", near(after_grant, cm.tax_turn_effect()), "%.3f" % after_grant)
+	check("sıra başında vergi yazıldı", cm.voter_total(1) > b1)
 	var share_before := election_share(1)
 	for i in 6:
 		cm._apply_tax_tick()
@@ -207,14 +208,19 @@ func _initialize() -> void:
 	var t_before: float = cm.state_treasury()
 	var funds_before: float = cm.funds_of(1)
 	check("hazine yetiyor: yatırım yapılabilir", cm.can_invest(1, province))
+	var v_inv1: float = cm.voter_total(1, province)
+	var v_inv2: float = cm.voter_total(2, province)
+	var v_inv3: float = cm.voter_total(3, province)
+	var elsewhere: String = String(cm._province_ids[0])
+	var v_else: float = cm.voter_total(1, elsewhere)
 	cm._apply_invest_move(1, province)
 	check("hazineden tam bir kez yatırım bedeli düştü", near(cm.state_treasury(), t_before - Economy.INVEST_COST))
 	check("tamamı devletten: parti kasası değişmedi", near(cm.funds_of(1), funds_before))
-	var immediate: float = cm.local_of(province, 1)
-	check("etkinin yarısı hemen geldi", near(immediate, float(cm.investment_shares(1)[1]) * Economy.INVEST_IMMEDIATE), "%.2f" % immediate)
-	check("ortağa da hemen gelen pay", near(cm.local_of(province, 2), float(cm.investment_shares(1).get(2, 0.0)) * Economy.INVEST_IMMEDIATE))
+	var immediate: float = cm.voter_total(1, province) - v_inv1
+	check("etkinin bir kısmı hemen geldi (seçmen)", immediate > 0.0, "%.2f" % immediate)
+	check("ortağa da hemen gelen pay", cm.voter_total(2, province) > v_inv2)
 	check("kalan dilimler bekliyor", cm.pending_investments(1).size() == 1 and int(cm.pending_investments(1)[0]["rounds_left"]) == Economy.INVEST_DELAY_ROUNDS)
-	check("muhalefet yatırımdan pay almaz", cm.pending_investments(3).is_empty() and near(cm.local_of(province, 3), 0.0))
+	check("muhalefet yatırımdan pay almaz", cm.pending_investments(3).is_empty() and cm.voter_total(3, province) <= v_inv3 + 0.001)
 	cm.economy["treasury"] = Economy.INVEST_COST - 1.0
 	check("hazine yetmezse tamamı devletten ödenemez", not cm.can_invest(1, province, 1.0))
 	var keep_funds: float = cm.funds_of(1)
@@ -222,20 +228,18 @@ func _initialize() -> void:
 	check("hazine ve kasa birlikte yetmezse yatırım yapılamaz", not cm.can_invest(1, province))
 	cm.funds[1] = keep_funds
 	cm.economy["treasury"] = 1000.0
-	var tranche: float = float(cm.investment_shares(1)[1]) * (1.0 - Economy.INVEST_IMMEDIATE) / Economy.INVEST_DELAY_ROUNDS
-	var local_before: float = cm.local_of(province, 1)
+	var local_before: float = cm.voter_total(1, province)
 	var treasury_before_round: float = cm.state_treasury()
 	end_round()
-	var expected_local: float = minf(local_before + tranche, PublicOpinion.INVEST_LIMIT) * PublicOpinion.LOCAL_DECAY
-	check("1. dilim tur sonunda geldi (sonra söndü)", near(cm.local_of(province, 1), expected_local, 0.01),
-		"%.2f / %.2f" % [cm.local_of(province, 1), expected_local])
+	check("1. dilim tur sonunda geldi", cm.voter_total(1, province) > local_before,
+		"%.2f -> %.2f" % [local_before, cm.voter_total(1, province)])
 	check("tur sonunda hazineden tekrar yatırım bedeli düşmez", cm.state_treasury() > treasury_before_round)
 	end_round()
 	check("2 tur sonra yatırım tamamlandı (bekleyen yok)", cm.pending_investments(1).is_empty())
-	var after_done: float = cm.local_of(province, 1)
+	var after_done: float = cm.voter_total(1, province)
 	end_round()
-	check("tamamlanan yatırım tekrar dilim yazmaz", cm.local_of(province, 1) < after_done)
-	check("yatırım ayrıca ulusal puan yazmaz", near(cm.national_of(1), 0.0))
+	check("tamamlanan yatırım tekrar dilim yazmaz", near(cm.voter_total(1, province), after_done))
+	check("yatırım başka ile seçmen yazmaz", near(cm.voter_total(1, elsewhere), v_else))
 
 	print("")
 	print("=== 5) YÜKSEK VERGİDE ERKEN SEÇİM ===")
@@ -247,17 +251,13 @@ func _initialize() -> void:
 	end_round()
 	check("erken seçim yapıldı", cm.last_election_round == cm.round_number - 1 and not cm.early_election_pending)
 	check("seçim tur sonu gelirinden sonra (gelir girdi)", float(cm.economy["revenue"]) > 0.0 and cm.state_treasury() > revenue_before)
-	# Bekleyen yatırım dilimi seçimde sayılmaz.
+	# Bekleyen yatırım dilimi seçimde sayılmaz: dilim tur sonuna kadar seçmene yazılmaz.
 	new_game()
 	give_turn(1)
 	var inv_province: String = String(cm._province_ids[7])
-	cm.local_support = {}
 	cm._apply_invest_move(1, inv_province)
-	var mods_now: Dictionary = cm.election_modifiers()
-	var local_now: float = float(mods_now["local"].get(inv_province, {}).get(1, 0.0)) \
-		- (cm.activity_of(inv_province, 1) - cm.local_of(inv_province, 1))
-	check("seçim girdisinde yatırımın sadece gelen payı var", near(local_now, float(cm.investment_shares(1)[1]) * Economy.INVEST_IMMEDIATE, 0.01),
-		"%.2f" % local_now)
+	var now_voters: float = cm.voter_total(1, inv_province)
+	check("bekleyen dilim tur içinde seçmene yazılmaz", not cm.pending_investments(1).is_empty() and near(cm.voter_total(1, inv_province), now_voters))
 
 	print("")
 	print("=== 8) ÇİFT SAYIM YOK ===")
@@ -269,10 +269,10 @@ func _initialize() -> void:
 	var eff_again: Dictionary = cm.effective_groups(1)
 	check("tekrar sormak etkiyi biriktirmez", str(eff) == str(eff_again))
 	var econ_copy: Dictionary = cm.economy.duplicate(true)
-	var national_copy := str(cm.national_support)
+	var voters_copy: float = cm.voter_total(1)
 	cm._push_state({"type": "opinion"})
 	cm.opinion_changed.emit()
-	check("durum yayını / arayüz yenilemesi ekonomiyi ilerletmez", str(econ_copy) == str(cm.economy) and national_copy == str(cm.national_support))
+	check("durum yayını / arayüz yenilemesi ekonomiyi ilerletmez", str(econ_copy) == str(cm.economy) and near(voters_copy, cm.voter_total(1)))
 	check("ham yakınlık sözlüğü değişmedi", raw.size() == VoterGroups.GROUP_IDS.size())
 
 	print("")

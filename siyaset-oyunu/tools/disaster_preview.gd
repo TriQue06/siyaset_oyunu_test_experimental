@@ -87,14 +87,14 @@ func _initialize() -> void:
 	var panel = scene._aid_panel
 	var view := Rect2(Vector2.ZERO, root.get_visible_rect().size)
 	check("panel ekrana sığıyor", view.encloses(panel.get_global_rect()), str(panel.get_global_rect()))
-	var before: float = cm.local_of(String(region[0]), me)
+	var before: float = cm.voter_total(me, String(region[0]))
 	panel._party_slider.value = 20.0
 	await _frames(3)
 	_shot("disaster_aid_amount")
 	panel._confirm.pressed.emit()
 	await _frames(20)
-	check("yardım uygulandı", cm.disaster_aid_of(me) == 20.0 and cm.local_of(String(region[0]), me) > before,
-		"%.1f milyon, il %.2f -> %.2f" % [cm.disaster_aid_of(me), before, cm.local_of(String(region[0]), me)])
+	check("yardım uygulandı", cm.disaster_aid_of(me) == 20.0 and cm.voter_total(me, String(region[0])) > before,
+		"%.1f milyon, il %.0f -> %.0f" % [cm.disaster_aid_of(me), before, cm.voter_total(me, String(region[0]))])
 	_shot("disaster_after")
 	# Sağ sütun: sekmeler panelin üstünde kalır, içerik kaydırılabilir.
 	var tabs: Control = scene._side_tabs

@@ -5,9 +5,9 @@ class_name EffectWords
 ## Eşikler oyuncuya hiçbir zaman gösterilmez.
 ##
 ## Ölçekler (etkinin hangi değere uygulandığı):
-##   "national": ulusal destek (kamuoyu) puanı; sınırı ±PublicOpinion.LIMIT.
+##   "national": ülke geneli seçmen etkisi (puan; bkz. PublicOpinion.VOTER_GAIN).
 ##   "group"   : seçmen grubu yakınlığı (0–100) değişimi.
-##   "local"   : bir ildeki yerel güç değişimi.
+##   "local"   : bir ildeki seçmen etkisi (puan).
 
 ## Beş basamak: 0 çok az, 1 hafif, 2 orta, 3 belirgin, 4 güçlü / ağır.
 const SCALES := {

@@ -435,7 +435,7 @@ func _card_effect_text(card_type: String) -> String:
 		return law_description(card_type)
 	if needs_target(card_type):
 		var r: Dictionary = STEAL_RANGES[card_type]
-		var cost_line := L.t("Bedeli: biraz ulusal destek kaybedersin.") if card_type == STEAL_STRONG_CARD_TYPE \
+		var cost_line := L.t("Bedeli: biraz seçmen kaybedersin.") if card_type == STEAL_STRONG_CARD_TYPE \
 			else L.t("Çalınan parti mağduriyetten biraz destek kazanır.")
 		return L.t("Seçtiğin partiden %d–%d vekil çal; aynı seçmen gruplarına hitap ediyorsanız daha çok.\n%s\nSeç, sonra soldaki bir partiye tıkla.") % [
 			int(r["min"]), int(r["max"]), cost_line]
@@ -463,15 +463,14 @@ func _card_effect_text(card_type: String) -> String:
 		CENSURE_CARD_TYPE:
 			return L.t("Hükümeti düşürmek için gensoru ver.\nSeçmek için dokun, tekrar dokun: kullan.")
 		MITING_CARD_TYPE:
-			return L.t("Seçtiğin ilde %s; partin ilin kalabalık seçmen gruplarına yaklaşır. Seçmen sana uzaksa provokasyon riski var.") % \
-				EffectWords.change(PublicOpinion.MITING_LOCAL, "local", L.t("yerel güç"))
+			return L.t("Seçtiğin ilde hedef seçmen gruplarından seçmen kazanırsın; partin bu gruplara yaklaşır. Seçmen sana uzaksa provokasyon riski var.")
 		INVEST_CARD_TYPE:
-			return L.t("Hükümet: seçtiğin ile devlet hazinesinden %s yatırım. İlde %s; etkinin yarısı hemen, kalanı sonraki dönemlerde.") % [
-				Economy.money_full(Economy.INVEST_COST), EffectWords.change(PublicOpinion.INVEST_LOCAL, "local", L.t("yerel güç"))]
+			return L.t("Hükümet: seçtiğin ile devlet hazinesinden %s yatırım. İldeki bütün gruplardan seçmen kazanırsın; etkinin yarısı hemen, kalanı sonraki dönemlerde.") % \
+				Economy.money_full(Economy.INVEST_COST)
 		PROPAGANDA_CARD_TYPE:
 			return L.t("SAKLANABİLİR: miting hazırlarken kullanılır. Mitingin yapıldığı ilde seçtiğin partiyi karalarsın: ona eksi, sana artı. İlde güçlü olan partiye az işler; ayrı miting hakkı harcamaz, bedeli yok.")
 		POPULISM_CARD_TYPE:
-			return L.t("ANINDA ETKİ: çekildiği an başlar. Bu dönem boyunca hamlelerin çok daha etkili, kötü sonuçlar hafifler; dönem sonunda seçim olursa ek ulusal destek.")
+			return L.t("ANINDA ETKİ: çekildiği an başlar. Bu dönem boyunca hamlelerin çok daha etkili, kötü sonuçlar hafifler.")
 		FUNDS_BONUS_CARD_TYPE:
 			return L.t("ANINDA ETKİ: bağış kampanyası, kasana hemen %s girer.") % GameRules.cost_text(GameRules.FUNDS_BONUS_WEAK)
 	return ""

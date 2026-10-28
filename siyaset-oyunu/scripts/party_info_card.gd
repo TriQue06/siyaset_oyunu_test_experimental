@@ -96,8 +96,8 @@ static func build(peer_id: int, my_id: int, on_action: Callable = Callable(), wi
 	stats.add_child(_stat(str(int(CardManager.last_seats.get(pid, 0))) if has_seats else "—", "vekil", UiTheme.TEXT))
 	stats.add_child(_stat(L.t("%%%.1f") % float(CardManager.last_vote_shares.get(pid, 0.0)) if CardManager.last_vote_shares.has(pid) else "—", "oy", UiTheme.TEXT))
 	stats.add_child(_stat(str(GovernmentManager.score_of(peer_id)), "puan", UiTheme.GOLD))
-	var opinion := CardManager.visible_national_of(peer_id)
-	stats.add_child(_stat(EffectWords.standing(opinion), "kamuoyu", ProvincePanel._opinion_color(opinion)))
+	var opinion := CardManager.vote_trend(peer_id)
+	stats.add_child(_stat(EffectWords.standing(opinion), "gidişat", ProvincePanel._opinion_color(opinion)))
 
 	var role := role_text(peer_id)
 	var role_row := HBoxContainer.new()

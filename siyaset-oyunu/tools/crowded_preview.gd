@@ -70,7 +70,7 @@ func _initialize() -> void:
 	cm.organizations = {}
 	var ids: Array = scene.map_holder.get_all_province_ids()
 	for i in ids.size():
-		cm.local_support[ids[i]] = {me: sin(i * 0.7) * 5.0}
+		cm._add_local(ids[i], me, sin(i * 0.7) * 5.0)
 		if i % 3 != 2:
 			cm.organizations[ids[i]] = {me: 1 + i % 3, 102: 1}
 	cm.current_turn_index = 2

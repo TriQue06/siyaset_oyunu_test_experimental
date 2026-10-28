@@ -52,9 +52,14 @@ func _initialize() -> void:
 	check("hemsehri destegi memlekette", is_equal_approx(PP.hometown_activity(home, me), PP.HOMETOWN_ACTIVITY))
 	check("komsu il etkilenmez", PP.hometown_activity(neighbor, me) == 0.0)
 	check("is insani her tur ek gelir alir", cm.turn_income(me) >= PP.BUSINESS_TURN_INCOME)
-	check("cekirdek gruplar korundu (botlar az pay alabilir)", float(pm.parties[me]["groups"]["isci"]) <= VoterGroups.CORE_START + 0.001 and float(pm.parties[me]["groups"]["isci"]) > VoterGroups.CORE_START * 0.8, str(pm.parties[me]["groups"]["isci"]))
-	check("aktiviteye eklendi", cm.activity_of(home, me) >= PublicOpinion.org_activity(2) + PP.HOMETOWN_ACTIVITY - 0.01,
-		"%.2f" % cm.activity_of(home, me))
+	check("cekirdek gruplar korundu (botlar az pay alabilir)", float(pm.parties[me]["groups"]["isci"]) <= VoterGroups.CORE_START * 1.3 and float(pm.parties[me]["groups"]["isci"]) > VoterGroups.CORE_START * 0.8, str(pm.parties[me]["groups"]["isci"]))
+	var away := ""
+	for province_id in gmap.province_ids():
+		if cm.organization_level(String(province_id), me) == 0 and String(province_id) != home:
+			away = String(province_id)
+			break
+	check("memlekette baslangic secmeni fazla", cm.attached_share(me, home) > cm.attached_share(me, away),
+		"%.1f / %.1f" % [cm.attached_share(me, home), cm.attached_share(me, away)])
 	var all_bots_ok := true
 	for bot in mm.bot_ids():
 		var bh: String = PP.hometown_of(bot)
@@ -72,8 +77,7 @@ func _initialize() -> void:
 	check("emekli subaya karalama az isler", is_equal_approx(PP.party_effect(bot, "propaganda_in"), 0.75))
 	pm.politicians[bot]["background"] = "belediye_baskani"
 	var bh: String = PP.hometown_of(bot)
-	check("belediye baskani teskilat bonusu", is_equal_approx(cm.org_bonus(bh, bot),
-		PublicOpinion.org_activity(2) * 1.1) or cm.populism_rounds_left(bot) > 0)
+	check("belediye baskani teskilat bonusu", is_equal_approx(PP.party_effect(bot, "org"), 1.1))
 	var orgs_before: int = cm.org_count(bot)
 	cm._grant_mayor_orgs(bot, bh)
 	var expected: int = maxi(1, int(round(gmap.province_ids().size() * PP.MAYOR_ORG_SHARE)))

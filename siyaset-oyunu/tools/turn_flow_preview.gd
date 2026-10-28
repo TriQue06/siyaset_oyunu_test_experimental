@@ -173,11 +173,11 @@ func _initialize() -> void:
 	for node in picker.find_children("*", "Button", true, false):
 		if (node as Button).text != "İptal" and target_button == null:
 			target_button = node
-	var target_local_before: float = cm.local_of(province, int(cm.smear_targets(me, province)[0]))
+	var target_local_before: float = cm.voter_total(int(cm.smear_targets(me, province)[0]), province)
 	target_button.pressed.emit()
 	await _wait(0.4)
 	check("parti secilince karalama oynandi, kart dustu", cm.my_inventory().count("karalama") == smears_before - 1,
-		"hedef il puani %.2f -> %.2f" % [target_local_before, cm.local_of(province, int(cm.smear_targets(me, province)[0]) if not cm.smear_targets(me, province).is_empty() else -1)])
+		"hedef il secmeni %.0f -> %.0f" % [target_local_before, cm.voter_total(int(cm.smear_targets(me, province)[0]) if not cm.smear_targets(me, province).is_empty() else -1, province)])
 	# Teşkilatsız ile karalama: liste açılmaz.
 	cm.inventories[me] = cm.inventories[me] + ["karalama"]
 	cm._push_state({"type": "timer"})

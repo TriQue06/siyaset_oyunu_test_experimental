@@ -337,10 +337,11 @@ func _initialize() -> void:
 	cm.funds[1] = GameRules.ORG_FUNDS_COST
 	cm.inventories[1] = []
 	check("teskilat kurulabilir", cm.can_build_organization(1, TestProvinces.id("ankara")))
+	var org_voters: float = cm.voter_total(1, TestProvinces.id("ankara"))
 	cm._apply_organization(1, TestProvinces.id("ankara"))
 	check("teskilat kuruldu, para harcandi; para bitti -> sira devretmez", cm.organization_level(TestProvinces.id("ankara"), 1) == 1 		and cm.funds_of(1) == 0 and cm.current_turn_peer_id() == 1)
 	cm.current_turn_index = cm.turn_order.find(1)
-	check("teskilat 1: az oy bonusu + yaklasik anket (sadece kurana)", near(cm.activity_of(TestProvinces.id("ankara"), 1) - cm.local_of(TestProvinces.id("ankara"), 1), PublicOpinion.org_activity(1)) \
+	check("teskilat 1: ilde secmen + yaklasik anket (sadece kurana)", cm.voter_total(1, TestProvinces.id("ankara")) > org_voters \
 		and cm.poll_error(1, TestProvinces.id("ankara")) == GameRules.POLL_ERROR_LOW \
 		and not cm.province_poll(1, TestProvinces.id("ankara")).is_empty() and cm.province_poll(2, TestProvinces.id("ankara")).is_empty())
 	check("para yetmezse kurulamaz", not cm.can_build_organization(1, TestProvinces.id("izmir")))
@@ -349,7 +350,7 @@ func _initialize() -> void:
 		cm._apply_organization(1, TestProvinces.id("izmir"))
 	check("en fazla ORG_MAX_LEVEL (10 + 30 milyon)", cm.organization_level(TestProvinces.id("izmir"), 1) == GameRules.ORG_MAX_LEVEL and cm.funds_of(1) == 50 - GameRules.ORG_FUNDS_COST - GameRules.ORG_UPGRADE_FUNDS_COST,
 		"seviye %d, para %d" % [cm.organization_level(TestProvinces.id("izmir"), 1), cm.funds_of(1)])
-	check("seviye arttikca oy bonusu artar", PublicOpinion.org_activity(1) < PublicOpinion.org_activity(2))
+	check("seviye arttikca secmen kazanci artar", PublicOpinion.org_activity(1) < PublicOpinion.org_activity(2))
 	var poll3: Dictionary = cm.province_poll(1, TestProvinces.id("izmir"))
 	var poll_seats := 0
 	for id in poll3.keys():
@@ -364,10 +365,10 @@ func _initialize() -> void:
 	cm.funds[1] = 1
 	check("para yetmezse miting yapilamaz", not cm.can_miting(1, TestProvinces.id("izmir")))
 	cm.funds[1] = GameRules.MITING_FUNDS_COST + 10
-	var izmir_before: float = cm.local_of(TestProvinces.id("izmir"), 1) + cm.national_of(1)
+	var izmir_before: float = cm.voter_total(1, TestProvinces.id("izmir"))
 	cm._apply_miting_move(1, TestProvinces.id("izmir"))
 	check("miting hamlesi 15 milyon, etki yazildi, para kaldi -> sira devretmedi", cm.funds_of(1) == 10 and cm.current_turn_peer_id() == 1 \
-		and not near(cm.local_of(TestProvinces.id("izmir"), 1) + cm.national_of(1), izmir_before))
+		and not near(cm.voter_total(1, TestProvinces.id("izmir")), izmir_before))
 	cm.inventories[1] = ["bagis_kampanyasi"]
 	cm.funds[1] = GameRules.MITING_FUNDS_COST
 	cm.organizations[TestProvinces.id("konya")] = {1: 1}
@@ -515,12 +516,14 @@ func _initialize() -> void:
 	gm._apply_vote(2, gm.VOTE_YES)
 	gm._apply_vote(3, gm.VOTE_NO)
 	gm.scores = {}
+	var w1: float = cm.voter_total(1)
+	var w2: float = cm.voter_total(2)
 	check("koalisyon kuruldu", gm.has_government() and gm.government_party_ids().size() == 2)
 	check("kucuk ortak cekilebilir, ana parti ve muhalefet cekilemez", gm.can_withdraw(2) and not gm.can_withdraw(1) and not gm.can_withdraw(3))
 	gm._apply_withdraw(2)
 	check("cekilmek puan tablosuna dokunmaz", gm.score_of(2) == 0, str(gm.score_of(2)))
-	check("cekilen ortak ulusal puan kaybetti (kismi)", cm.national_of(2) < 0.0 and cm.national_of(2) >= -2.0, str(cm.national_of(2)))
-	check("kucuk ortak cekilince kalanlar etkilenmez", cm.national_of(1) == 0.0, str(cm.national_of(1)))
+	check("cekilen ortak secmen kaybetti (kismi)", cm.voter_total(2) < w2 and cm.voter_total(2) > w2 * 0.9, "%.0f -> %.0f" % [w2, cm.voter_total(2)])
+	check("kucuk ortak cekilince kalanlar etkilenmez", near(cm.voter_total(1), w1))
 	check("gorevleri ana partiye gecti, hukumet tek basina", gm.government_party_ids() == [1], str(gm.government_party_ids()))
 	check("hukumet cogunlugu kaybetti -> gensoru verilebilir", not gm.has_majority())
 	gm.submit_censure(3)
@@ -543,11 +546,15 @@ func _initialize() -> void:
 	gm._apply_vote(2, gm.VOTE_YES)
 	gm._apply_vote(3, gm.VOTE_NO)
 	gm.scores = {}
-	cm.national_support = {}
+	var b1: float = cm.voter_total(1)
+	var b2: float = cm.voter_total(2)
+	var b3: float = cm.voter_total(3)
 	gm._apply_withdraw(2)
-	check("buyuk ortak cekilince kendi kaybi daha buyuk", cm.national_of(2) <= -1.0, str(cm.national_of(2)))
-	check("buyuk ortak cekilince kalan ortak da kaybeder (daha az)", cm.national_of(1) < 0.0 		and cm.national_of(1) > cm.national_of(2), "%.2f / %.2f" % [cm.national_of(1), cm.national_of(2)])
-	check("muhalefet etkilenmez", cm.national_of(3) == 0.0, str(cm.national_of(3)))
+	var wd1: float = 1.0 - cm.voter_total(1) / b1
+	var wd2: float = 1.0 - cm.voter_total(2) / b2
+	check("buyuk ortak cekilince kendi kaybi daha buyuk", wd2 >= 0.02, "%.3f" % wd2)
+	check("buyuk ortak cekilince kalan ortak da kaybeder (daha az)", wd1 > 0.0 and wd1 < wd2, "%.3f / %.3f" % [wd1, wd2])
+	check("muhalefet etkilenmez", near(cm.voter_total(3), b3))
 
 	print("")
 	print("=== 15) ILLERIN SECMEN PROFILLERI ===")
@@ -699,10 +706,12 @@ func _initialize() -> void:
 	cm.turmoil = {}
 	# Seçim hediyesi anında popülizm olabilir (0.0.231): kaset hasarını büyütmesin.
 	cm.populism.erase(cm.party_of(kaset_player))
-	var nat_before: float = cm.national_of(kaset_target)
+	cm._add_national(kaset_target, 20.0)  # sınanacak bir seçmen tabanı olsun
+	var nat_before: float = cm.voter_total(kaset_target)
 	cm._apply_card_effect(kaset_player, "kaset", kaset_target)
-	check("kaset: hedefin ulusal destegi dustu", near(cm.national_of(kaset_target), nat_before - PublicOpinion.REPUTATION_NATIONAL_DAMAGE),
-		"%.2f -> %.2f" % [nat_before, cm.national_of(kaset_target)])
+	var kaset_loss: float = 1.0 - cm.voter_total(kaset_target) / nat_before
+	check("kaset: hedef secmen kaybeder ama tabani silinmez", kaset_loss > PublicOpinion.REPUTATION_NATIONAL_DAMAGE * PublicOpinion.VOTER_LOSS * 0.99 and kaset_loss < 0.3,
+		"kayip %%%.1f" % (kaset_loss * 100.0))
 	check("kaset: hedefte karisiklik cikar", near(cm.turmoil_of(kaset_target), PublicOpinion.TURMOIL_REPUTATION))
 	cm._apply_card_effect(kaset_player, "isyan", kaset_target)
 	check("ic karisiklik: karisiklik buyur, cekimser zorlamasi yok", near(cm.turmoil_of(kaset_target),
@@ -711,22 +720,22 @@ func _initialize() -> void:
 
 	var thief: int = cm.turn_order[0]
 	var victim: int = cm.turn_order[1]
-	var thief_nat: float = cm.national_of(thief)
-	var victim_nat: float = cm.national_of(victim)
+	cm._add_national(thief, 20.0)
+	var thief_nat: float = cm.voter_total(thief)
+	var victim_nat: float = cm.voter_total(victim)
 	var seats_before: int = int(cm.last_seats[victim])
 	cm._apply_steal(thief, victim, "steal_weak")
 	var moved: int = seats_before - int(cm.last_seats[victim])
-	# NORMAL calma bedelsiz: calanin ulusal puani DEGISMEZ, magdur yine kazanir.
+	# NORMAL calma bedelsiz: calanin secmeni DEGISMEZ, magdur secmen kazanir.
 	check("normal calmada calanin bedeli yok, calinan kazanir", moved > 0 \
-		and is_equal_approx(cm.national_of(thief), thief_nat) and cm.national_of(victim) > victim_nat,
-		"%d vekil, %.2f / %.2f" % [moved, cm.national_of(thief) - thief_nat, cm.national_of(victim) - victim_nat])
+		and near(cm.voter_total(thief), thief_nat) and cm.voter_total(victim) > victim_nat,
+		"%d vekil, %.0f / %.0f" % [moved, cm.voter_total(thief) - thief_nat, cm.voter_total(victim) - victim_nat])
 	# GUCLU calma hala bedel oder.
-	var strong_nat: float = cm.national_of(thief)
+	var strong_nat: float = cm.voter_total(thief)
 	cm._apply_steal(thief, victim, "steal_strong")
-	check("guclu calmada bedel var", cm.national_of(thief) < strong_nat,
-		"%.3f" % (cm.national_of(thief) - strong_nat))
-	check("bedeller kucuk (en fazla 1 puan)", absf(cm.national_of(thief) - thief_nat) <= 1.0 \
-		and absf(cm.national_of(victim) - victim_nat) <= 0.8)
+	check("guclu calmada bedel var", cm.voter_total(thief) < strong_nat,
+		"%.0f" % (cm.voter_total(thief) - strong_nat))
+	check("bedeller kucuk (en fazla %1)", absf(cm.voter_total(thief) / thief_nat - 1.0) <= 0.01)
 
 	print("")
 	print("=== 16) ERKEN SECIM TAKVIMI TAMAMEN KAYAR ===")

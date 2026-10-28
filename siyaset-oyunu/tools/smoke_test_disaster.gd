@@ -111,26 +111,28 @@ func _initialize() -> void:
 		and cm.aid_block_reason(3, 0.0, 20.0).contains("kasa"))
 	check("en az 5 milyon", not cm.can_aid(3, 0.0, 0.0) and not cm.can_aid(3, 3.0, 0.0))
 	check("5 milyon adımı", not cm.can_aid(3, 12.0, 0.0))
-	var groups_before: Dictionary = (pm.parties[3]["groups"] as Dictionary).duplicate()
-	var local_before: float = cm.local_of(String(region[0]), 3)
-	var national_before: float = cm.national_of(3)
+	var before_by: Dictionary = {}
+	for province_id in region:
+		before_by[province_id] = cm.voter_total(3, String(province_id))
+	var outside: String = ""
+	for province_id in cm._province_ids:
+		if not region.has(province_id):
+			outside = String(province_id)
+			break
+	var outside_before: float = cm.voter_total(3, outside)
 	cm._apply_aid_move(3, 40.0, 0.0)
-	var gain: float = cm.local_of(String(region[0]), 3) - local_before
+	var gain: float = cm.voter_total(3, String(region[0])) - float(before_by[region[0]])
 	check("yardım kasadan düşer", is_equal_approx(cm.funds_of(3), 160.0), str(cm.funds_of(3)))
-	check("afetteki her ilde yerel puan hemen artar", gain > 0.5, "+%.2f" % gain)
+	check("afetteki ilde seçmen hemen artar", gain > 0.0, "+%.2f" % gain)
 	var all_up := true
 	for province_id in region:
-		if cm.local_of(String(province_id), 3) <= 0.0:
+		if cm.voter_total(3, String(province_id)) <= float(before_by[province_id]):
 			all_up = false
 	check("bütün afet illerine düşer", all_up)
-	check("ulusal puan da artar", cm.national_of(3) > national_before)
-	check("seçmen grubu yakınlığı değişmez", groups_before == pm.parties[3]["groups"])
-	# Yatırımla kıyas: aynı paraya yatırımdan daha güçlü (yatırım 100 milyon → +5 hemen).
-	var single: float = D.local_gain(0.0, 40.0, 1)
-	check("yardım milyon başına yatırımın hemen gelen etkisinden güçlü (40 milyon yardım)",
-		single / 40.0 > PublicOpinion.INVEST_LOCAL * Economy.INVEST_IMMEDIATE / Economy.INVEST_COST, "%.2f" % single)
+	check("ülke genelinde de seçmen kazanır", cm.voter_total(3, outside) > outside_before)
+	var first_points: float = D.local_gain(0.0, 40.0, region.size())
 	var second: float = D.local_gain(40.0, 80.0, region.size())
-	check("aynı afete ikinci yardım daha az getirir", second < gain, "%.2f < %.2f" % [second, gain])
+	check("aynı afete ikinci yardım daha az getirir", second < first_points, "%.2f < %.2f" % [second, first_points])
 	give_turn(1)
 	var treasury: float = cm.state_treasury()
 	var quota: float = cm.state_quota(1)

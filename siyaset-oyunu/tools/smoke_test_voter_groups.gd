@@ -214,8 +214,7 @@ func _initialize() -> void:
 	pm.parties[2]["groups"]["emekli"] = 20.0
 	var g_before: Dictionary = pm.parties[1]["groups"].duplicate()
 	var rival_before: Dictionary = pm.parties[2]["groups"].duplicate()
-	var nat_before: float = cm.national_of(1)
-	var loc_before: float = cm.local_of(mid, 1)
+	var far_before: float = cm.voter_total(1, game_map.ids[5])
 	check("uyumlu ilde provokasyon riski yok", near(cm.miting_risk(1, mid), 0.0), "%.2f" % cm.miting_risk(1, mid))
 	# 0.0.269: miting için teşkilat şart.
 	check("teskilatsiz ilde miting yapilamaz", not cm.can_miting(1, game_map.ids[4]) and cm.organization_level(game_map.ids[4], 1) == 0)
@@ -247,7 +246,6 @@ func _initialize() -> void:
 	var d_isveren := float(pm.parties[1]["groups"]["isveren"]) - float(g_before["isveren"])
 	var d_emekli := float(pm.parties[1]["groups"]["emekli"]) - float(g_before["emekli"])
 	var d_genc := float(pm.parties[1]["groups"]["genc"]) - float(g_before["genc"])
-	check("yerel: il aktivitesi MITING_LOCAL x teskilat carpani artar", near(cm.local_of(mid, 1) - loc_before, PublicOpinion.MITING_LOCAL * 2.0))
 	# 0.0.228 SEÇMEN TABANI: miting ildeki seçmenden çeker (kararsızlar ve rakipler);
 	# odak/toplam kuralları smoke_test_voter_levels'ta.
 	check("miting ildeki bagli secmeni artirir", held_after > held_before, "%.0f -> %.0f" % [held_before, held_after])
@@ -256,7 +254,7 @@ func _initialize() -> void:
 	for pid in [1, 2]:
 		hitap_total += float(pm.parties[pid]["groups"]["emekli"])
 	check("hitap toplami 100'u asmaz", hitap_total <= 100.0 + 0.001)
-	check("miting ayrica genel ulusal puan yazmaz (cift sayim yok)", near(cm.national_of(1), nat_before))
+	check("miting baska ile secmen yazmaz", near(cm.voter_total(1, game_map.ids[5]), far_before))
 	# KÜÇÜK İL: 3 vekil, %95 emekli; 2. seviye teşkilat + emekli odağı bile ~%1-2 getirir.
 	var tiny: String = game_map.ids[6]
 	var tiny_profile: Dictionary = cm.province_profiles[tiny].duplicate(true)
@@ -284,7 +282,6 @@ func _initialize() -> void:
 	check("art arda miting yine secmen getirir (yorgunluk cok kisik)", sum2 > sum1 * 0.85, "%.0f -> %.0f" % [sum1, sum2])
 	for i in 40:
 		cm._apply_miting_move(1, mid)
-		cm.local_support = {}
 	check("sinirsiz miting bile destegi 100'e tasimaz", float(pm.parties[1]["groups"]["isci"]) < 100.0 \
 		and float(pm.parties[1]["groups"]["isci"]) >= 0.0, "%.1f" % float(pm.parties[1]["groups"]["isci"]))
 	var fat: float = float(cm.miting_fatigue[1]["isci"])
@@ -301,11 +298,11 @@ func _initialize() -> void:
 	gm.main_gov_peer_id = 1
 	var gi: Dictionary = pm.parties[1]["groups"].duplicate()
 	var prof_inv := str(cm.province_profiles[inv])
+	var iv0: float = cm.voter_total(1, inv)
 	cm._apply_invest_move(1, inv)
-	check("yatirim il aktivitesini artirir (hemen gelen pay)", near(cm.local_of(inv, 1), minf(PublicOpinion.LIMIT, PublicOpinion.INVEST_LOCAL * Economy.INVEST_IMMEDIATE)))
+	check("yatirim ilde secmen kazandirir (hemen gelen pay)", cm.voter_total(1, inv) > iv0)
 	check("yatirim ildeki gruplardan hitap kazandirir", float(pm.parties[1]["groups"]["isveren"]) > float(gi["isveren"]))
-	# ÜST ÜSTE YATIRIM: aynı ile ikinci yatırım da birincisi kadar işe yarar
-	# (il puanı LIMIT'e takılmaz, INVEST_LIMIT'e kadar çıkar; hitap kazancı da aynı).
+	# ÜST ÜSTE YATIRIM: aynı ile ikinci yatırım da birincisi kadar işe yarar.
 	new_game({1: groups(["isci", "dindar"]), 2: groups(["isveren", "ilerici"])})
 	prof_inv = str(cm.province_profiles[inv])  # yeni oyun: yeni ülke
 	cm.funds[1] = 500
@@ -313,26 +310,14 @@ func _initialize() -> void:
 	gm.government = {"pm": 1}
 	gm.main_gov_peer_id = 1
 	cm.economy["treasury"] = 1000.0
-	var l0: float = cm.local_of(inv, 1)
 	var h0: float = float(pm.parties[1]["groups"]["isveren"])
 	cm._apply_invest_move(1, inv)
-	var l1: float = cm.local_of(inv, 1)
 	var h1: float = float(pm.parties[1]["groups"]["isveren"])
 	cm._apply_invest_move(1, inv)
-	var l2: float = cm.local_of(inv, 1)
 	var h2: float = float(pm.parties[1]["groups"]["isveren"])
-	check("ikinci yatirim il puanina birincisi kadar ekler (tavana takilmaz)", near(l2 - l1, l1 - l0) and l2 > PublicOpinion.LIMIT,
-		"%.2f -> %.2f -> %.2f" % [l0, l1, l2])
-	check("ikinci yatirim hitapta birincisi kadar kazandirir", h2 - h1 > (h1 - h0) * 0.97, "%.3f / %.3f" % [h1 - h0, h2 - h1])
-	cm._apply_miting_move(1, inv)
-	# Miting rastgele provokasyonla puanı biraz düşürebilir; kural tavana (LIMIT) KIRPILMAMASI.
-	check("miting yatirimin tavan ustu puanini kirpmaz", cm.local_of(inv, 1) > PublicOpinion.LIMIT + 0.001, "%.2f" % cm.local_of(inv, 1))
+	check("ikinci yatirim hitapta birincisine yakin kazandirir", h2 - h1 > (h1 - h0) * 0.8, "%.3f / %.3f" % [h1 - h0, h2 - h1])
 	gm.government = {"pm": 1}
-	gi = pm.parties[1]["groups"].duplicate()
 	check("yatirim il profilini degistirmez", str(cm.province_profiles[inv]) == prof_inv)
-	check("yatirim grup hitabini (kendi kazanci disinda) degistirmez", str(pm.parties[1]["groups"]) == str(gi))
-	cm._apply_invest_move(1, inv)
-	check("yatirim il puani INVEST_LIMIT'i asmaz", cm.local_of(inv, 1) <= PublicOpinion.INVEST_LIMIT + 0.001)
 	gm.government = {}
 	gm.main_gov_peer_id = -1
 

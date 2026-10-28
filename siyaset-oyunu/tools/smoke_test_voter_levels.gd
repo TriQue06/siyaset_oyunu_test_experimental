@@ -234,7 +234,7 @@ func run() -> void:
 	for g in VoterGroups.GROUP_IDS:
 		setc(a, pi, String(g), cm._vb_count(pi, VoterGroups.GROUP_IDS.find(g)) * 0.5, 0.0, 0.0)
 	var st: Dictionary = cm.vb_province_state(province)
-	var shares: Dictionary = ElectionModel.voter_shares(st, cm._vb_parties(), {}, {})
+	var shares: Dictionary = ElectionModel.voter_shares(st, cm._vb_parties(), {})
 	check(float(shares[a]) > 0.5, "ildeki seçmenin yarisi bagli parti ilde ilk sirada", "%.2f" % shares[a])
 
 	print("")

@@ -1431,7 +1431,7 @@ func _refresh_score_table_now() -> void:
 			party_text += L.t(" · üye")
 		names.add_child(_avatar_label(party_text, 10, UiTheme.TEXT_MUTED))
 		line.add_child(_table_value(str(GovernmentManager.score_of(peer_id)), 40.0, UiTheme.HEAD, 13))
-		var national := CardManager.visible_national_of(pid)
+		var national := CardManager.vote_trend(pid)
 		var trend_value := _table_value(EffectWords.arrows(national), 46.0, ProvincePanel._opinion_color(national), 12)
 		trend_value.mouse_filter = Control.MOUSE_FILTER_PASS
 		line.add_child(trend_value)
@@ -2000,7 +2000,7 @@ func _player_row_values(peer_id: int, is_self: bool) -> Array:
 			]
 		2:
 			var now: int = int(CardManager.last_seats.get(CardManager.party_of(peer_id), 0))
-			var national: float = CardManager.visible_national_of(peer_id)
+			var national: float = CardManager.vote_trend(peer_id)
 			return [
 				_table_value(str(now), 46.0, UiTheme.TEXT_MUTED),
 				_table_value(EffectWords.arrows(national), 52.0, ProvincePanel._opinion_color(national)),

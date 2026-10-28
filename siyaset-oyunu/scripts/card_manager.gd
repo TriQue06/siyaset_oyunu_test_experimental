@@ -84,7 +84,7 @@ const PROVINCE_EVENT_LIMIT := 6
 ## kartın gelme olasılığı ağırlığının havuzdaki toplama bölümüdür. İlk seçimden
 ## önce isyan ve vekil çalma havuza girmez, kalanların payı kendiliğinden artar.
 const WEIGHT_PROPAGANDA := 12.0
-const WEIGHT_STEAL_WEAK := 12.0
+const WEIGHT_STEAL_WEAK := 15.0
 const WEIGHT_FUNDS_BONUS := 12.0
 const WEIGHT_FUNDS_BONUS_STRONG := 6.0
 ## Olumsuz / esnek şans kartları (0.0.232).
@@ -94,7 +94,7 @@ const WEIGHT_FLEX := 8.0
 const WEIGHT_POLL := 8.0
 const WEIGHT_CARD_THEFT := 6.0
 const WEIGHT_POPULISM := 12.0
-const WEIGHT_STEAL_STRONG := 6.0
+const WEIGHT_STEAL_STRONG := 9.0
 const WEIGHT_EARLY_ELECTION := 6.0
 const WEIGHT_REPUTATION := 3.0
 const WEIGHT_REBELLION := 18.0
@@ -208,13 +208,8 @@ var last_election_inputs: Dictionary = {}
 
 ## GÜÇ (bkz. PublicOpinion)
 # peer_id -> float
-var national_support: Dictionary = {}
-## Hesap gerçek puanı anında kullanır; gizli hamlenin sunumu tur sonunu bekler.
-var _hidden_national_delta: Dictionary = {}
-var _visible_national_support: Dictionary = {}
 var _secret_news: Array = []
 # province_id -> { peer_id -> float }  — sönen il puanı (aktivitenin bir parçası)
-var local_support: Dictionary = {}
 # province_id -> Array[{"round": int, "text": String}] (en yeni sonda)
 var province_events: Dictionary = {}
 ## İL SEÇMEN PROFİLLERİ (oyun başında üretilir, DEĞİŞMEZ):
@@ -498,13 +493,12 @@ func _apply_instant(peer_id: int, card_type: String, entry: Dictionary = {}) -> 
 ## ANKET KARTININ VERİSİ: şu an seçim olsa ülke geneli oy oranı ve vekil
 ## sayısı, hafif gürültülü (her il POLL_ERROR_HIGH kadar). pid -> {"percent", "seats"}.
 func national_poll_snapshot(peer_id: int) -> Dictionary:
-	var mods := election_modifiers(true)
-	var eligible := projected_eligible(mods)
+	var eligible := projected_eligible()
 	var votes := {}
 	var seats := {}
 	var total := 0.0
 	for province_id in _province_ids:
-		var shares := expected_province_shares(province_id, mods)
+		var shares := expected_province_shares(province_id)
 		var noisy := {}
 		for pid in shares.keys():
 			noisy[pid] = {"percent": float(shares[pid])}
@@ -766,7 +760,7 @@ func party_ids() -> Array:
 ## ittifak biter. Seçim sonuçları çıkınca bütün ittifaklar dağılır (eski ortaklar
 ## former_allies'ta bir dönem durur: botlar onlara daha dostça davranır).
 const ALLIANCE_REQUEST_ROUNDS := 2
-const ALLIANCE_LEAVE_ELECTION_PENALTY := 6.0
+const ALLIANCE_LEAVE_ELECTION_PENALTY := 3.0
 const ALLIANCE_NAME_MAX := 28
 
 func alliance_of(peer_or_party_id: int) -> int:
@@ -1259,8 +1253,8 @@ func approval_value() -> float:
 func approval_delta() -> float:
 	return float(approval.get("delta", 0.0))
 
-## Onayın bu hükümet partisine yazdığı ulusal puan: %50'den uzaklık ×
-## APPROVAL_NATIONAL_MAX, bakanlık payına göre bölünür.
+## Onayın bu hükümet partisine her tur sonunda yazdığı ülke geneli seçmen
+## etkisi (puan): %50'den uzaklık × APPROVAL_NATIONAL_MAX, bakanlık payına göre.
 func approval_national(pid: int) -> float:
 	if not has_approval():
 		return 0.0
@@ -1363,6 +1357,9 @@ func _settle_approval() -> void:
 	while history.size() > PublicOpinion.APPROVAL_HISTORY:
 		history.pop_front()
 	approval = {"value": value, "delta": value - before, "history": history, "pending": []}
+	# Onay %50'nin üstündeyse hükümet ortakları ülke genelinde seçmen kazanır, altındaysa kaybeder.
+	for pid in GovernmentManager.government_party_ids():
+		_add_national(int(pid), approval_national(int(pid)))
 	if not parts.is_empty():
 		_pending_log.append({"text": L.t("Hükümet onayı %%%s (%s): %s.") % [L.dec(value, 0), _signed_points(value - before), ", ".join(parts)],
 			"peer_id": -1, "province": "", "kind": "government"})
@@ -1821,31 +1818,19 @@ func smear_targets(peer_id: int, province_id: String) -> Array:
 
 # --- Güç sorguları ------------------------------------------------------------
 
-func national_of(peer_id: int) -> float:
-	return float(national_support.get(party_of(peer_id), 0.0))
-
-## Yalnız arayüz içindir. Botlar, seçim ve kurallar national_of kullanmayı sürdürür.
-func visible_national_of(peer_id: int) -> float:
+## GİDİŞAT: şimdi seçim olsa beklenen ulusal oy − son seçimdeki oy (yüzde
+## puanı). Seçim yoksa beklenen oy − 0. Botlar erken seçim kararında kullanır.
+func vote_trend(peer_id: int) -> float:
 	var pid := party_of(peer_id)
-	if _is_authority():
-		return float(national_support.get(pid, 0.0)) - float(_hidden_national_delta.get(pid, 0.0))
-	return float(_visible_national_support.get(pid, national_of(pid)))
-
-func _visible_national() -> Dictionary:
-	if not _is_authority():
-		return _visible_national_support.duplicate()
-	var visible := national_support.duplicate()
-	for pid in _hidden_national_delta:
-		if visible.has(pid):
-			visible[pid] = float(visible[pid]) - float(_hidden_national_delta[pid])
-	return visible
+	if last_vote_shares.is_empty():
+		return 0.0
+	return float(_expected_national().get(pid, 0.0)) * 100.0 - float(last_vote_shares.get(pid, 0.0))
 
 func _release_secret_news() -> void:
 	if _secret_news.is_empty():
 		return
 	var news := _secret_news.duplicate(true)
 	_secret_news.clear()
-	_hidden_national_delta.clear()
 	# Sunum sırası oyun RNG'sini ve oyun kurallarını etkilemez.
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
@@ -1856,9 +1841,6 @@ func _release_secret_news() -> void:
 		news[j] = item
 	_push_state({"type": "secret_news", "news": news})
 
-
-func local_of(province_id: String, peer_id: int) -> float:
-	return float(local_support.get(province_id, {}).get(party_of(peer_id), 0.0))
 
 ## İllerin seçmen profilleri (oyun başında üretilir). Oyun kurulmamışsa
 ## (testler, editör) örnek profillere düşer.
@@ -2023,44 +2005,6 @@ func group_closeness(a: int, b: int) -> float:
 func organization_level(province_id: String, peer_id: int) -> int:
 	return int(organizations.get(province_id, {}).get(party_of(peer_id), 0))
 
-## AKTİVİTE yakınlığı: sönen il puanı + teşkilatın kalıcı katkısı.
-func activity_of(province_id: String, peer_id: int) -> float:
-	return local_of(province_id, peer_id) + org_bonus(province_id, peer_id) 		+ PoliticianPresets.hometown_activity(province_id, peer_id)
-
-## Teşkilatın oy bonusu (popülizm sürerken büyür).
-func org_bonus(province_id: String, peer_id: int) -> float:
-	var bonus := PublicOpinion.org_activity(organization_level(province_id, peer_id))
-	bonus *= PoliticianPresets.party_effect(peer_id, "org")
-	if populism_rounds_left(peer_id) > 0:
-		bonus *= PublicOpinion.POPULISM_GOOD_MULT
-	return bonus
-
-## Bir ilde partilerin aktivitesi: peer_id -> puan.
-func activity_entry(province_id: String) -> Dictionary:
-	var entry: Dictionary = local_support.get(province_id, {}).duplicate()
-	var orgs: Dictionary = organizations.get(province_id, {})
-	for peer_id in orgs.keys():
-		entry[peer_id] = float(entry.get(peer_id, 0.0)) + org_bonus(province_id, int(peer_id))
-	# Hemşehri desteği (üyelerin memleketi).
-	for peer_id in party_ids():
-		var home_bonus := PoliticianPresets.hometown_activity(province_id, int(peer_id))
-		if home_bonus > 0.0:
-			entry[peer_id] = float(entry.get(peer_id, 0.0)) + home_bonus
-	return entry
-
-## Tüm iller: province_id -> {peer_id -> aktivite}.
-func activity_map() -> Dictionary:
-	var result := {}
-	for province_id in _province_ids:
-		var entry := activity_entry(province_id)
-		if not entry.is_empty():
-			result[province_id] = entry
-	return result
-
-## Bir partinin bir ildeki gücü (grup uyumu + aktivite).
-func party_strength(province_id: String, peer_id: int) -> float:
-	return PublicOpinion.party_strength(appeal_of(province_id, peer_id), activity_of(province_id, peer_id))
-
 ## Teşkilat anketi (sadece o partinin arayüzü gösterir):
 ##   1. seviye: YAKLAŞIK oy (±%35), 2. seviye: %90 doğrulukla oy (±%10).
 
@@ -2079,9 +2023,8 @@ func province_poll(peer_id: int, province_id: String) -> Dictionary:
 	var error := poll_error(peer_id, province_id)
 	if error < 0.0:
 		return {}
-	var mods := election_modifiers(true)
-	var eligible := projected_eligible(mods)
-	var shares := expected_province_shares(province_id, mods)
+	var eligible := projected_eligible()
+	var shares := expected_province_shares(province_id)
 	var projection := {}
 	for pid in party_ids():
 		projection[pid] = {"percent": float(shares.get(pid, 0.0))}
@@ -2111,14 +2054,12 @@ func _noisy_poll(projection: Dictionary, error: float, seed_text: String, seat_c
 ## Tahminlerde (güç haritası, anket) barajı geçmesi beklenen partiler: gürültüsüz
 ## beklenen ulusal oyu baraj ve üstü olanlar (seçimle aynı kural; kimse
 ## geçemezse herkes).
-func projected_eligible(mods: Dictionary = {}) -> Array:
-	if mods.is_empty():
-		mods = election_modifiers(true)
+func projected_eligible() -> Array:
 	var national := {}
 	var total := 0.0
 	for province_id in _province_ids:
 		var seats := float(province_seat_count(province_id))
-		var shares := expected_province_shares(province_id, mods)
+		var shares := expected_province_shares(province_id)
 		for peer_id in shares.keys():
 			national[peer_id] = float(national.get(peer_id, 0.0)) + float(shares[peer_id]) * seats
 		total += seats
@@ -2130,28 +2071,22 @@ func projected_eligible(mods: Dictionary = {}) -> Array:
 		eligible = party_ids()
 	return eligible
 
-## Gürültüsüz beklenen il payları (peer -> yüzde): seçmen tabanı + kararsızların
-## sandığa giden kısmı kamuoyu ağırlığıyla (bkz. ElectionModel.voter_shares).
-func expected_province_shares(province_id: String, mods: Dictionary) -> Dictionary:
+## Gürültüsüz beklenen il payları (peer -> yüzde): bağlı seçmen + kararsızların
+## sandığa giden kısmı eşit bölünür (bkz. ElectionModel.voter_shares).
+func expected_province_shares(province_id: String) -> Dictionary:
 	_vb_ensure()
 	var parties := _vb_parties()
-	var local_here: Dictionary = (mods["local"] as Dictionary).get(province_id, {})
-	var opinion := {}
-	var noise := {}
-	for pid in parties:
-		opinion[pid] = PublicOpinion.multiplier(float((mods["national"] as Dictionary).get(pid, 0.0)), float(local_here.get(pid, 0.0)))
-		noise[pid] = 1.0
-	var shares := ElectionModel.voter_shares(_vb_province_state(province_id, parties), parties, noise, opinion)
+	var shares := ElectionModel.voter_shares(_vb_province_state(province_id, parties), parties, {})
 	for pid in shares.keys():
 		shares[pid] = float(shares[pid]) * 100.0
 	return shares
 
-## Gürültüsüz beklenen ulusal paylar (il payları bununla karışır). Aynı
-## modifier sözlüğü için önbellekli: bir harita çizimi 67 kez sormasın.
-var _national_cache_key: Dictionary = {}
+## Gürültüsüz beklenen ulusal paylar (toplam 1). Aynı kare içinde önbellekli:
+## bir harita çizimi 67 kez sormasın.
+var _national_cache_frame := -1
 var _national_cache: Dictionary = {}
-func _expected_national(mods: Dictionary) -> Dictionary:
-	if is_same(mods, _national_cache_key):
+func _expected_national() -> Dictionary:
+	if _national_cache_frame == Engine.get_process_frames() and not _national_cache.is_empty():
 		return _national_cache
 	var profiles := {}
 	var seats := {}
@@ -2162,7 +2097,7 @@ func _expected_national(mods: Dictionary) -> Dictionary:
 	var total := 0.0
 	for province_id in _province_ids:
 		var n := float(province_profile(province_id).get("_electorate", province_seat_count(province_id)))
-		var shares := expected_province_shares(province_id, mods)
+		var shares := expected_province_shares(province_id)
 		for peer_id in shares.keys():
 			national[peer_id] = float(national.get(peer_id, 0.0)) + float(shares[peer_id]) / 100.0 * n
 		total += n
@@ -2170,16 +2105,14 @@ func _expected_national(mods: Dictionary) -> Dictionary:
 		for peer_id in national.keys():
 			national[peer_id] = float(national[peer_id]) / total
 	_national_cache = national
-	_national_cache_key = mods
+	_national_cache_frame = Engine.get_process_frames()
 	return _national_cache
 
 ## Şimdi seçim olsa bu ilde: peer_id -> {"percent", "seats"} (gürültüsüz beklenen
 ## oylar, ildeki vekiller D'Hondt ile; baraj yok sayılır). Gözcü raporu için.
 func province_projection(province_id: String) -> Dictionary:
-	var mods := election_modifiers(true)
-	var local_mods: Dictionary = mods["local"]
-	var shares := expected_province_shares(province_id, mods)
-	var alloc := ElectionModel.allocate(shares, projected_eligible(mods), province_seat_count(province_id))
+	var shares := expected_province_shares(province_id)
+	var alloc := ElectionModel.allocate(shares, projected_eligible(), province_seat_count(province_id))
 	var result := {}
 	for peer_id in party_ids():
 		result[peer_id] = {"percent": float(shares.get(peer_id, 0.0)), "seats": int(alloc.get(peer_id, 0))}
@@ -2190,15 +2123,14 @@ func province_projection(province_id: String) -> Dictionary:
 ## "seat_count"}. quotient: ildeki son kazanan D'Hondt bölümü (bir vekile ne
 ## kadar yakın olunduğunu ölçmek için). peer_id = -1: tüm iller, gürültüsüz.
 func projection_all(viewer: int = -1) -> Dictionary:
-	var mods := election_modifiers(true)
-	var eligible := projected_eligible(mods)
+	var eligible := projected_eligible()
 	var result := {}
 	for province_id in _province_ids:
 		var error := poll_error(viewer, province_id) if viewer != -1 else 0.0
 		if error < 0.0:
 			continue
 		var seat_count := province_seat_count(province_id)
-		var shares := expected_province_shares(province_id, mods)
+		var shares := expected_province_shares(province_id)
 		if viewer != -1:
 			var noisy := {}
 			for peer_id in shares.keys():
@@ -2382,11 +2314,7 @@ func init_game() -> void:
 	# Erken seçimle uzamış oyun: lobideki uzunluğa dön.
 	max_rounds_override = 0
 	GameRules.set_max_rounds_override(0)
-	national_support = {}
-	_hidden_national_delta.clear()
-	_visible_national_support.clear()
 	_secret_news.clear()
-	local_support = {}
 	province_events = {}
 	# YENİ ÜLKE: her oyunda rastgele altıgen harita (herkese tam durumla gider).
 	# Lobide tohum girildiyse o ülke, yoksa rastgele (1..999 999 999) bir tohum.
@@ -2407,6 +2335,7 @@ func init_game() -> void:
 	voter_base = {}
 	_vb_ready = false
 	_vb_ensure()
+	_grant_start_voters()
 	credibility = {}
 	for peer_id in MultiplayerManager.players.keys():
 		credibility[peer_id] = CREDIBILITY_START
@@ -2447,6 +2376,17 @@ func _apply_politician_starts() -> void:
 			continue
 		organizations[home] = organizations.get(home, {})
 		organizations[home][peer_id] = PoliticianPresets.HOMETOWN_ORG_LEVEL
+
+## Oyun başı: memleket ve başlangıç teşkilatları (memleket, belediye başkanı)
+## o illerde seçmen olarak yazılır (teşkilat kurmakla aynı kural, bkz. _apply_organization).
+func _grant_start_voters() -> void:
+	for province_id in organizations.keys():
+		for pid in organizations[province_id].keys():
+			_add_local(String(province_id), int(pid), PublicOpinion.org_activity(int(organizations[province_id][pid])) 				* PoliticianPresets.party_effect(int(pid), "org"))
+	for pid in party_ids():
+		var home := PoliticianPresets.hometown_of(int(pid))
+		if home != "" and _province_ids.has(home):
+			_add_local(home, int(pid), PoliticianPresets.HOMETOWN_ACTIVITY)
 
 ## Belediye başkanı: il sayısının MAYOR_ORG_SHARE'i kadar (en az 1) rastgele
 ## ilde 1. seviye teşkilat (memleket ve teşkilatlı iller hariç).
@@ -2503,11 +2443,7 @@ func abandon_game() -> void:
 	GameRules.set_election_anchor(0)
 	max_rounds_override = 0
 	GameRules.set_max_rounds_override(0)
-	national_support = {}
-	_hidden_national_delta.clear()
-	_visible_national_support.clear()
 	_secret_news.clear()
-	local_support = {}
 	province_events = {}
 	province_profiles = {}
 	miting_fatigue = {}
@@ -2660,7 +2596,6 @@ func _apply_play(peer_id: int, hand_index: int, target_peer_id: int = -1, target
 	var anonymous := is_anonymous_card(card_type)
 	if not anonymous:
 		card_played.emit(peer_id, card_type)
-	var before_national := national_of(target_peer_id) if anonymous else 0.0
 	hand.remove_at(hand_index)
 	_event_message = ""
 	var seats_changed_now := _apply_card_effect(peer_id, card_type, target_peer_id, target_province)
@@ -2669,8 +2604,6 @@ func _apply_play(peer_id: int, hand_index: int, target_peer_id: int = -1, target
 	if _event_message != "":
 		event["message"] = _event_message
 	if anonymous:
-		var pid := party_of(target_peer_id)
-		_hidden_national_delta[pid] = float(_hidden_national_delta.get(pid, 0.0)) + national_of(target_peer_id) - before_national
 		event["peer_id"] = target_peer_id
 		event["actor_hidden"] = true
 		_secret_news.append(event)
@@ -2731,7 +2664,11 @@ func _apply_organization(peer_id: int, province_id: String) -> void:
 	organizations[province_id] = entry
 	var verb := L.t("kurdu") if level == 1 else L.t("geliştirdi")
 	_log_province(province_id, L.t("%s teşkilat %s (seviye %d)") % [_party_name(peer_id), verb, level])
-	# Teşkilat parti içini toparlar (oy bonusu activity_of'ta, kalıcı).
+	# TEŞKİLAT SEÇMENİ: kurulunca / geliştirilince ilde seçmen kazanılır
+	# (seviye farkı kadar puan, meslek çarpanıyla; popülizm büyütür).
+	var org_gain := (PublicOpinion.org_activity(level) - PublicOpinion.org_activity(level - 1)) 		* PoliticianPresets.party_effect(peer_id, "org")
+	_add_local(province_id, peer_id, org_gain, true)
+	# Teşkilat parti içini toparlar.
 	_ease_turmoil(peer_id, PublicOpinion.TURMOIL_EASE_ORG)
 	_push_state({"type": "organization", "peer_id": peer_id, "province": province_id,
 		"message": L.t("%s, %s'da teşkilat %s (seviye %d).") % [_actor_name(peer_id), _province_name(province_id), verb, level]})
@@ -2883,10 +2820,7 @@ func _apply_miting(peer_id: int, province_id: String, focus: Array = [], tier_mu
 		_event_message = L.t("%s'da %s mitinginde provokasyon çıktı: parti ilde ve ülke genelinde destek kaybetti.") % [
 			_province_name(province_id), _party_name(peer_id)]
 	else:
-		var org_mult := _miting_mult(peer_id, province_id) * tier_mult
-		# YEREL: ildeki aktivite (söner).
-		_add_local(province_id, peer_id, PublicOpinion.MITING_LOCAL * org_mult, true)
-		# ULUSAL HİTAP: ildeki grupların bir kısmı kazanılır (nüfusla orantılı, kalıcı).
+		# SEÇMEN: ildeki grupların bir kısmı kazanılır (nüfusla orantılı, kalıcı).
 		var moved := _apply_miting_positioning(peer_id, province_id, focus, tier_mult)
 		_log_province(province_id, L.t("%s miting yaptı") % _party_name(peer_id))
 		_ease_turmoil(peer_id, PublicOpinion.TURMOIL_EASE_MITING)
@@ -2934,15 +2868,14 @@ static func _num(value: float) -> String:
 	return String.num(snappedf(value, 0.1), 1).replace(".", ",")
 
 ## Yatırım: getiren parti daha çok, hükümet ortakları daha az kazanır.
-## YEREL MEMNUNİYET: sadece il aktivitesi; grup yakınlığına dokunmaz.
+## İldeki bütün gruplardan seçmen; grup yakınlığına (ideolojiye) dokunmaz.
 ## Popülizm yatırımı büyütmez. Etkinin INVEST_IMMEDIATE'i hemen, kalanı
 ## sonraki INVEST_DELAY_ROUNDS tur sonunda dilim dilim gelir (bekleyen
 ## dilimler economy["investments"]'ta; seçimde sadece gelmiş olan sayılır).
-## Ekonomik yansıması ayrı bir ulusal puan değil: ekonomi ivmesi (bkz. Economy).
-## Yatırımın parti başına toplam il etkisi: INVEST_OWN_SHARE getirene, kalanı
+## Yatırımın parti başına payı (toplam 1): INVEST_OWN_SHARE getirene, kalanı
 ## hükümet partilerine makam puanlarıyla orantılı. Makam puanı yoksa hepsi getirene.
 func investment_shares(investor: int) -> Dictionary:
-	var total := PublicOpinion.INVEST_LOCAL
+	var total := 1.0
 	var shares := {investor: total * PublicOpinion.INVEST_OWN_SHARE}
 	var rest := total - float(shares[investor])
 	var points := {}
@@ -2963,19 +2896,18 @@ func _apply_investment(peer_id: int, province_id: String, amount: float = Econom
 	var investor := party_of(peer_id)
 	var scale := amount / Economy.INVEST_COST
 	var shares := investment_shares(investor)
-	var later := {}
-	for pid in shares.keys():
-		_add_local(province_id, int(pid), float(shares[pid]) * scale * Economy.INVEST_IMMEDIATE, false, PublicOpinion.INVEST_LIMIT)
-		later[pid] = float(shares[pid]) * scale * (1.0 - Economy.INVEST_IMMEDIATE) / float(Economy.INVEST_DELAY_ROUNDS)
-	# SEÇMEN (0.0.228): yatırım ideolojiye bakmaz; ildeki seçmeni getirene ve
-	# makam sahiplerine (il puanı payıyla aynı oranda) çeker.
+	# SEÇMEN: yatırım ideolojiye bakmaz; ildeki seçmeni getirene ve makam
+	# sahiplerine çeker. INVEST_IMMEDIATE kadarı hemen, kalanı sonraki
+	# dönemlerde eşit dilimlerle gelir (later: parti -> dilim ölçeği).
 	var parts := {}
 	var share_total := 0.0
 	for pid in shares.keys():
 		share_total += float(shares[pid])
+	var later := {}
 	for pid in shares.keys():
 		parts[int(pid)] = float(shares[pid]) / maxf(0.0001, share_total)
-	_vb_invest(province_id, parts, scale)
+		later[pid] = float(parts[int(pid)]) * scale * (1.0 - Economy.INVEST_IMMEDIATE) / float(Economy.INVEST_DELAY_ROUNDS)
+	_vb_invest(province_id, parts, scale * Economy.INVEST_IMMEDIATE)
 	var pending: Array = economy.get("investments", [])
 	pending.append({"province": province_id, "party": investor, "round": round_number,
 		"rounds_left": Economy.INVEST_DELAY_ROUNDS, "amounts": later})
@@ -3017,9 +2949,6 @@ func group_vote_estimates(peer_id: int) -> Dictionary:
 	var result := {}
 	if not parties.has(pid):
 		return result
-	var mods := election_modifiers(true)
-	var national_mod: Dictionary = mods["national"]
-	var local_mod: Dictionary = mods["local"]
 	var profiles := province_voters()
 	for group in VoterGroups.GROUP_IDS:
 		var votes := 0.0
@@ -3028,11 +2957,7 @@ func group_vote_estimates(peer_id: int) -> Dictionary:
 			var count := VoterGroups.group_count(profiles[province_id], group)
 			if count <= 0.0:
 				continue
-			var weights := {}
-			var local_here: Dictionary = local_mod.get(province_id, {})
-			for p in parties.keys():
-				weights[p] = PublicOpinion.multiplier(float(national_mod.get(p, 0.0)), float(local_here.get(p, 0.0)))
-			votes += count * float(ElectionModel.shares_in_group(parties, group, weights).get(pid, 0.0))
+			votes += count * float(ElectionModel.shares_in_group(parties, group).get(pid, 0.0))
 			total += count
 		result[group] = votes / total * 100.0 if total > 0.0 else 0.0
 	return result
@@ -3047,7 +2972,7 @@ func _advance_economy() -> String:
 		var amounts: Dictionary = entry.get("amounts", {})
 		for pid in amounts.keys():
 			if PartyManager.parties.has(int(pid)):
-				_add_local(province_id, int(pid), float(amounts[pid]), false, PublicOpinion.INVEST_LIMIT)
+				_vb_invest(province_id, {int(pid): 1.0}, float(amounts[pid]))
 		entry["rounds_left"] = int(entry["rounds_left"]) - 1
 		if int(entry["rounds_left"]) > 0:
 			still.append(entry)
@@ -3057,28 +2982,22 @@ func _advance_economy() -> String:
 	return L.t("Hazineye %s vergi geliri girdi (vergi %s). Hazine: %s.") % [Economy.money_full(float(economy["revenue"])),
 		Economy.tax_title(tax_level()), Economy.money_full(state_treasury())]
 
-## Karalama: hedefe eksi, karalayana artı; ikisi de o ildeki güçleriyle ölçeklenir.
+## KARALAMA: hedefin bu ildeki seçmeninin PROPAGANDA_DEMOTE kadarı bir seviye
+## düşer (en zayıf bağlılar kararsızlaşır); karalayan ilde PROPAGANDA_GAIN kadar
+## seçmen kazanır. Meslek ve teşkilat çarpanları uygulanır.
 func _apply_propaganda(peer_id: int, target_peer_id: int, province_id: String) -> void:
-	var damage := PublicOpinion.propaganda_damage(party_strength(province_id, target_peer_id))
 	# Meslek: atanın karalama gücü × hedefin karalamaya direnci.
 	var profile_mult := PoliticianPresets.effect(peer_id, "propaganda_out") \
 		* PoliticianPresets.party_effect(target_peer_id, "propaganda_in")
-	damage *= profile_mult
-	if populism_rounds_left(peer_id) > 0:
-		damage *= PublicOpinion.POPULISM_GOOD_MULT
 	var org_mult := PublicOpinion.org_action_mult(organization_level(province_id, peer_id))
-	damage *= org_mult
-	var gain := PublicOpinion.propaganda_gain(party_strength(province_id, peer_id)) * org_mult
-	# Taban: karalama il puanını PROPAGANDA_FLOOR'un altına itemez.
-	var current := local_of(province_id, target_peer_id)
-	damage = clampf(damage, 0.0, maxf(0.0, current - PublicOpinion.PROPAGANDA_FLOOR))
-	_add_local(province_id, target_peer_id, -damage)
-	_add_local(province_id, peer_id, gain, true)
-	# 0.0.228: karalama hedefin bu ildeki seçmenini bir seviye düşürür; profil
-	# çarpanı 1'in altındaysa (ör. emekli subay) o oranda daha azını.
-	_vb_scandal(target_peer_id, province_id, minf(1.0, profile_mult))
-	_log_province(province_id, L.t("%s, %s karşıtı kampanya yaptı (%s, %s)") % [
-		_party_name(peer_id), _party_name(target_peer_id), EffectWords.change(-damage, "local", L.t("yerel güç")), L.t("karşılığında kazanç") if gain > 0.0 else L.t("kazanç yok")])
+	var demote := clampf(PublicOpinion.PROPAGANDA_DEMOTE * profile_mult * org_mult \
+		* (PublicOpinion.POPULISM_GOOD_MULT if populism_rounds_left(peer_id) > 0 else 1.0), 0.0, 1.0)
+	var before := float(vb_province_state(province_id)["attached"].get(party_of(target_peer_id), 0.0))
+	_vb_scandal(target_peer_id, province_id, demote)
+	var lost := before - float(vb_province_state(province_id)["attached"].get(party_of(target_peer_id), 0.0))
+	_add_local(province_id, peer_id, PublicOpinion.PROPAGANDA_GAIN * org_mult, true)
+	_log_province(province_id, L.t("%s, %s karşıtı kampanya yaptı (%s ildeki seçmeninin %%%s'ini kaybetti)") % [
+		_party_name(peer_id), _party_name(target_peer_id), _party_name(target_peer_id), L.dec(lost / maxf(before, 0.0001) * 100.0, 0)])
 	_event_message = L.t("%s, %s'da %s karşıtı karalama kampanyası yaptı.") % [
 		_actor_name(peer_id), _province_name(province_id), _party_name(target_peer_id)]
 
@@ -3159,7 +3078,7 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 		for pid in crisis_parties:
 			_add_national(int(pid), PublicOpinion.CRISIS_RESPONSE_NATIONAL)
 			names.append(_party_name(int(pid)))
-		notes += L.t(" Krize yanıt verdi (ulusal destek): %s.") % ", ".join(names)
+		notes += L.t(" Krize yanıt verdi (seçmen kazandı): %s.") % ", ".join(names)
 	if passed:
 		notes += L.t(" %s +%d puan.") % [_actor_name(proposer), law_pass_score(proposer_in_gov)]
 		_ease_turmoil(proposer_party, PublicOpinion.TURMOIL_EASE_LAW)
@@ -3281,37 +3200,79 @@ func _own_effect(peer_id: int, amount: float) -> float:
 		return amount
 	return amount * (PublicOpinion.POPULISM_GOOD_MULT if amount > 0.0 else PublicOpinion.POPULISM_BAD_MULT)
 
-## Başka bir sistemin (ör. GovernmentManager) ulusal puan uygulaması için.
+## Başka bir sistemin (ör. GovernmentManager) ülke geneli seçmen etkisi için.
 func add_national_points(peer_id: int, amount: float) -> void:
 	_add_national(peer_id, amount)
 
-## own=true: parti bu etkiyi KENDİ hamlesiyle aldı (popülizm uygulanır).
+## ÜLKE GENELİ SEÇMEN ETKİSİ (bkz. _shift_voters). own=true: parti bu etkiyi
+## KENDİ hamlesiyle aldı (popülizm uygulanır).
 func _add_national(peer_id: int, amount: float, own: bool = false) -> void:
-	if own:
-		amount = _own_effect(peer_id, amount)
-	if amount == 0.0 or peer_id == -1:
-		return
-	peer_id = party_of(peer_id)
-	national_support[peer_id] = PublicOpinion.clamp_points(national_of(peer_id) + amount)
+	_shift_voters(peer_id, "", amount, own)
 
-## cap: bu hamlenin il puanını çıkarabileceği en yüksek değer (yatırım
-## INVEST_LIMIT, diğerleri LIMIT). Tavanın üstündeki puan kırpılmaz: miting
-## yatırımın biriktirdiği fazlayı silmez, sadece üstüne ekleyemez.
-func _add_local(province_id: String, peer_id: int, amount: float, own: bool = false, cap: float = PublicOpinion.LIMIT) -> void:
+## Partinin bağlı seçmeni (province_id "" = bütün iller). Testler ve botlar için.
+func voter_total(peer_id: int, province_id: String = "") -> float:
+	_vb_ensure()
+	var pid := party_of(peer_id)
+	if not voter_base.has(pid):
+		return 0.0
+	var arr: PackedFloat32Array = voter_base[pid]
+	var total := 0.0
+	for pi in _province_ids.size():
+		if province_id != "" and String(_province_ids[pi]) != province_id:
+			continue
+		for gi in VB_GROUPS:
+			total += _vb_cell(arr, pi, gi)
+	return total
+
+## İldeki seçmenin yüzde kaçı bu partiye bağlı (0..100). Partinin kendi
+## bildiği değer (anket değil): il panelinde gösterilir.
+func attached_share(peer_id: int, province_id: String) -> float:
+	_vb_ensure()
+	var pi := _province_ids.find(province_id)
+	if pi < 0:
+		return 0.0
+	var total := 0.0
+	for gi in VB_GROUPS:
+		total += _vb_count(pi, gi)
+	return voter_total(peer_id, province_id) / total * 100.0 if total > 0.0 else 0.0
+
+## Bir ildeki bütün gruplarda seçmen etkisi (bkz. _shift_voters).
+func _add_local(province_id: String, peer_id: int, amount: float, own: bool = false) -> void:
+	_shift_voters(peer_id, province_id, amount, own)
+
+## OY KAZANMA / KAYBETME (0.0.284, tek kural): oy = seçmen. Bütün etkiler
+## partinin seçmen tabanını değiştirir; ayrı bir kamuoyu puanı yoktur.
+##   puan > 0: her (il, grup) hücresinde grubun seçmeninin puan × VOTER_GAIN
+##             kadarı kararsızlardan partiye 1. seviyeden bağlanır (kararsız
+##             yetmezse yettiği kadar).
+##   puan < 0: partinin her hücredeki seçmeninin |puan| × VOTER_LOSS kadarı
+##             kararsızlara döner; önce en zayıf bağlılar (1. seviye) gider.
+## province_id "" = bütün iller.
+func _shift_voters(peer_id: int, province_id: String, points: float, own: bool = false) -> void:
 	if own:
-		amount = _own_effect(peer_id, amount)
-	if amount == 0.0 or peer_id == -1:
+		points = _own_effect(peer_id, points)
+	if is_zero_approx(points) or peer_id == -1:
 		return
-	peer_id = party_of(peer_id)
-	var entry: Dictionary = local_support.get(province_id, {})
-	var current := float(entry.get(peer_id, 0.0))
-	var value := current + amount
-	if amount > 0.0:
-		value = minf(value, maxf(cap, current))
-	else:
-		value = maxf(value, minf(-PublicOpinion.LIMIT, current))
-	entry[peer_id] = value
-	local_support[province_id] = entry
+	_vb_ensure()
+	var pid := party_of(peer_id)
+	if not voter_base.has(pid):
+		return
+	for pi in _province_ids.size():
+		if province_id != "" and String(_province_ids[pi]) != province_id:
+			continue
+		for gi in VB_GROUPS:
+			var arr: PackedFloat32Array = voter_base[pid]
+			var i := _vb_i(pi, gi, 0)
+			if points > 0.0:
+				arr[i] += minf(_vb_count(pi, gi) * points * PublicOpinion.VOTER_GAIN, _vb_undecided(pi, gi))
+			else:
+				var lose := (arr[i] + arr[i + 1] + arr[i + 2]) * minf(1.0, -points * PublicOpinion.VOTER_LOSS)
+				for level in VB_LEVELS:
+					var take := minf(arr[i + level], lose)
+					arr[i + level] -= take
+					lose -= take
+			voter_base[pid] = arr
+	_vb_sync_groups(pid)
 
 func _log_province(province_id: String, text: String) -> void:
 	var events: Array = province_events.get(province_id, [])
@@ -3939,7 +3900,6 @@ func _split_party(parent: int) -> void:
 	# parti ilk seçimine kadar oy oranı göstermez.
 	if passed_threshold.has(parent):
 		passed_threshold.append(splinter)
-	national_support[splinter] = national_of(parent)
 	_add_national(parent, PublicOpinion.SPLIT_NATIONAL_DAMAGE)
 	for province_id in organizations.keys():
 		var entry: Dictionary = organizations[province_id]
@@ -3980,13 +3940,6 @@ func _merge_splinter(splinter: int) -> void:
 		if level > int(entry.get(parent, 0)):
 			entry[parent] = level
 		entry.erase(splinter)
-	for province_id in local_support.keys():
-		var entry: Dictionary = local_support[province_id]
-		if entry.has(splinter):
-			entry[parent] = PublicOpinion.clamp_points(float(entry.get(parent, 0.0)) + float(entry[splinter]))
-			entry.erase(splinter)
-	_add_national(parent, maxf(0.0, national_of(splinter)) * 0.5)
-	national_support.erase(splinter)
 	var hand: Array = inventories.get(parent, [])
 	for card in inventories.get(splinter, []):
 		if hand.size() < MAX_HAND_SIZE:
@@ -4016,22 +3969,6 @@ func _merge_splinter(splinter: int) -> void:
 ## (İl başkanlıkları sönmez.)
 func _decay_opinion() -> void:
 	_decay_group_effects(round_number)
-	for peer_id in national_support.keys():
-		var value: float = national_of(peer_id) * PublicOpinion.NATIONAL_DECAY
-		if absf(value) < 0.05:
-			national_support.erase(peer_id)
-		else:
-			national_support[peer_id] = value
-	for province_id in local_support.keys():
-		var entry: Dictionary = local_support[province_id]
-		for peer_id in entry.keys():
-			var value: float = float(entry[peer_id]) * PublicOpinion.LOCAL_DECAY
-			if absf(value) < 0.05:
-				entry.erase(peer_id)
-			else:
-				entry[peer_id] = value
-		if entry.is_empty():
-			local_support.erase(province_id)
 
 ## from_peer'un vekillerinden amount kadarını (rastgele seçim çevrelerinden ve
 ## ulusal listeden) to_peer'a taşır; il bazlı ve ulusal toplamlar birlikte
@@ -4114,8 +4051,9 @@ func _apply_reputation(peer_id: int, target_peer_id: int) -> void:
 	damage *= PoliticianPresets.effect(peer_id, "reputation_out")
 	_add_turmoil(target_peer_id, PublicOpinion.TURMOIL_REPUTATION)
 	_add_national(target_peer_id, -damage)
-	# 0.0.228: kaset partinin BÜTÜN seçmenini bir seviye düşürür.
-	_vb_scandal(target_peer_id)
+	# 0.0.284: kaset bütün illerde seçmenin KASET_DEMOTE kadarını bir seviye
+	# düşürür (eskiden hepsini: ikinci kaset tabanı siliyordu).
+	_vb_scandal(target_peer_id, "", PublicOpinion.KASET_DEMOTE)
 	# ANONİM: kaseti kimin sızdırdığı hiçbir yerde gösterilmez.
 	_event_message = L.t("%s hakkında kaset sızdı: %s, parti içinde karışıklık.") % [
 		_party_name(target_peer_id), EffectWords.change(-damage)]
@@ -4402,35 +4340,23 @@ func _finish_round() -> void:
 		_push_state({"type": "round"})
 	_schedule_agenda()
 
-## Seçimde kullanılacak güç çarpanları:
-##   ulusal : ulusal puan + İKTİDAR DENGESİ + POPÜLİZM + VEKİL MOMENTUMU (seçimden bu
-##            yana vekil çalarak büyüyen parti artıyla girer)
-##   il     : aktivite (il puanı + il başkanlığı)
-func election_modifiers(public_view: bool = false) -> Dictionary:
-	var national := _visible_national() if public_view else national_support.duplicate()
-	for peer_id in GovernmentManager.government_party_ids():
-		national[peer_id] = float(national.get(peer_id, 0.0)) + PublicOpinion.GOVERNMENT_FATIGUE + approval_national(int(peer_id))
-	# Popülizm sürerken seçim: seçmen vaatleri hatırlar.
-	for peer_id in party_ids():
-		if populism_rounds_left(peer_id) > 0:
-			national[peer_id] = float(national.get(peer_id, 0.0)) + PublicOpinion.POPULISM_ELECTION_NATIONAL
-	return {"national": national, "local": activity_map()}
-
+## SEÇİM (0.0.284): sandıkta yalnız seçmen tabanı sayılır (bkz. ElectionModel):
+## bağlı seçmen partisine, kararsızların sandığa gidenleri partilere eşit.
+## Ayrı bir kamuoyu / il puanı çarpanı yoktur.
 func _hold_election(finished_round: int, early: bool) -> void:
-	var mods := election_modifiers()
 	var groups := _group_profiles().duplicate(true)
 	# Denge analizi (tools/balance_sim.gd) için seçimin girdileri; ağda gönderilmez.
 	last_election_inputs = {
-		"mods": mods, "groups": groups, "voters": province_voters(),
+		"groups": groups, "voters": province_voters(),
 		"threshold": MultiplayerManager.election_threshold,
 		"alliances": alliance_membership() if alliances_enabled else {},
 		"gov_ids": GovernmentManager.government_party_ids(), "organizations": organizations.duplicate(true),
 		"seats_before": last_seats.duplicate(),
 	}
 	var result := ElectionModel.compute(groups, _province_seat_counts, province_voters(),
-		MultiplayerManager.election_threshold, _election_rng(finished_round), mods, alliance_membership() if alliances_enabled else {},
+		MultiplayerManager.election_threshold, _election_rng(finished_round), alliance_membership() if alliances_enabled else {},
 		vb_election_state())
-	_add_independent_seats(result, groups, mods)
+	_add_independent_seats(result, groups)
 	# Fesihten kalan Bağımsızlar bloğu seçimle dağılır (aşağıda sonuçlar yazılınca).
 	if PartyManager.parties.has(PartyManager.BLOC_ID):
 		PartyManager.parties.erase(PartyManager.BLOC_ID)
@@ -4497,11 +4423,10 @@ func alliance_membership() -> Dictionary:
 ## partisinden bir sandalye alır. Az bir miting bile yetebilir (hemşehri desteği).
 const INDEPENDENT_QUOTA_FACTOR := 0.6
 
-func _add_independent_seats(result: Dictionary, groups: Dictionary, mods: Dictionary) -> void:
+func _add_independent_seats(result: Dictionary, groups: Dictionary) -> void:
 	var province_results: Dictionary = result["province_results"]
 	var seats: Dictionary = result["seats"]
 	var vote_shares: Dictionary = result["vote_shares"]
-	var local_mods: Dictionary = mods["local"]
 	var total_seats := 0
 	for province_id in _province_ids:
 		total_seats += province_seat_count(province_id)
@@ -4513,7 +4438,7 @@ func _add_independent_seats(result: Dictionary, groups: Dictionary, mods: Dictio
 			continue
 		var field := groups.duplicate()
 		field[pid] = effective_groups(pid)
-		var shares := ElectionModel.expected_shares(field, province_profile(home), mods["national"], local_mods.get(home, {}))
+		var shares := ElectionModel.expected_shares(field, province_profile(home))
 		var share := float(shares.get(pid, 0.0))
 		var seats_here := province_seat_count(home)
 		var entry: Dictionary = province_results[home]
@@ -4646,13 +4571,10 @@ func remove_player(peer_id: int) -> void:
 	national_list.erase(peer_id)
 	last_vote_shares.erase(peer_id)
 	passed_threshold.erase(peer_id)
-	national_support.erase(peer_id)
 	turmoil.erase(peer_id)
 	splinters.erase(peer_id)
 	for province_id in last_province_results.keys():
 		last_province_results[province_id].erase(peer_id)
-	for province_id in local_support.keys():
-		local_support[province_id].erase(peer_id)
 	for province_id in organizations.keys():
 		organizations[province_id].erase(peer_id)
 
@@ -4698,8 +4620,6 @@ func remove_player(peer_id: int) -> void:
 const FOUND_PARTY_COST := 80
 const DISSOLVE_CREDIBILITY := 8.0
 const DISSOLVE_BLOC_SHARE := 0.5
-## Fesihte partinin ulusal puanının siyasetçiye (kişisel popülerlik) kalan payı.
-const DISSOLVE_NATIONAL_KEEP := 0.5
 ## Bağımsız ya da üye mitingi güvenilirlik kazandırır.
 const MITING_CREDIBILITY := 3.0
 ## Yeni parti: güvenilirliğin her FOUND_ORG_PER_CREDIBILITY puanı için miting
@@ -4709,10 +4629,9 @@ const FOUND_ORG_MAX := 4
 ## ESKİ PARTİDEN TEŞKİLAT GEÇİŞİ: partisinden istifa eden ya da partisini
 ## feshedip bağımsız kalan siyasetçi yeni parti kurunca eski partisinin
 ## teşkilatlarının bir kısmı (seviyeleriyle) yeni partiye geçer:
-##   pay = 0,5 + süre + başarı + ulusal destek + güvenilirlik (%10..%90)
+##   pay = 0,5 + süre + başarı + güvenilirlik (%10..%90)
 ##   süre       : +0,2 − 0,05 × ayrılıştan beri geçen tur (en az −0,25)
 ##   başarı     : siyasetçinin puanı / 100 (en fazla +0,25)
-##   ulusal     : ulusal destek × 0,04 (−0,2..+0,2)
 ##   güvenilirlik: (güvenilirlik − 50) / 500 (−0,1..+0,1)
 ## Eski parti sürüyorsa teşkilatlar ondan KOPAR (taşınır); feshedildiyse
 ## dağılan teşkilatlar yeniden toplanır.
@@ -4722,8 +4641,6 @@ const FORMER_ORG_PER_ROUND := 0.05
 const FORMER_ORG_TIME_MIN := -0.25
 const FORMER_ORG_SCORE_DIV := 100.0
 const FORMER_ORG_SCORE_MAX := 0.25
-const FORMER_ORG_NATIONAL := 0.04
-const FORMER_ORG_NATIONAL_MAX := 0.2
 const FORMER_ORG_MIN := 0.1
 const FORMER_ORG_MAX := 0.9
 ## Bağımsız siyasetçi -> {"party": eski parti, "name": adı, "round": ayrıldığı
@@ -4754,7 +4671,6 @@ func former_org_share(peer_id: int) -> float:
 	var share := FORMER_ORG_BASE
 	share += maxf(FORMER_ORG_TIME_MIN, FORMER_ORG_FRESH - FORMER_ORG_PER_ROUND * rounds)
 	share += clampf(float(GovernmentManager.score_of(peer_id)) / FORMER_ORG_SCORE_DIV, 0.0, FORMER_ORG_SCORE_MAX)
-	share += clampf(national_of(peer_id) * FORMER_ORG_NATIONAL, -FORMER_ORG_NATIONAL_MAX, FORMER_ORG_NATIONAL_MAX)
 	share += clampf((credibility_of(peer_id) - 50.0) / 500.0, -0.1, 0.1)
 	return clampf(share, FORMER_ORG_MIN, FORMER_ORG_MAX)
 
@@ -4896,9 +4812,6 @@ func _apply_dissolve(peer_id: int) -> void:
 			dissolved_orgs[province_id] = int(organizations[province_id][pid])
 		organizations[province_id].erase(pid)
 	_remember_former_party(peer_id, pid, dissolved_orgs)
-	for province_id in local_support.keys():
-		local_support[province_id].erase(pid)
-	national_support[pid] = national_of(pid) * DISSOLVE_NATIONAL_KEEP
 	populism.erase(pid)
 	turmoil.erase(pid)
 	party_congress.erase(pid)
@@ -4922,7 +4835,6 @@ func _apply_resign(peer_id: int) -> void:
 	_remember_former_party(peer_id, pid)
 	PartyManager.parties[pid].erase("deputy")
 	_make_independent(peer_id, groups)
-	national_support[peer_id] = 0.0
 	PartyManager.broadcast()
 	_push_state({"type": "party_change", "peer_id": peer_id, "message":
 		L.t("%s, %s'den istifa etti ve bağımsız devam ediyor.") % [PoliticianPresets.display_name(peer_id), party_name]}, true)
@@ -5003,7 +4915,7 @@ func _maybe_add_temporary_party() -> void:
 	inventories[bot] = []
 	funds[bot] = float(GameRules.FUNDS_PER_ROUND)
 	credibility[bot] = CREDIBILITY_START
-	national_support[bot] = TEMP_PARTY_NATIONAL
+	_add_national(bot, TEMP_PARTY_NATIONAL)
 	_pending_log.append({"text": L.t("YENİ PARTİ: %s, %s'yi kurdu.") % [PoliticianPresets.display_name(bot), _party_name(bot)],
 		"peer_id": bot, "province": "", "kind": "party_change"})
 
@@ -5044,12 +4956,12 @@ func _dissolve_temporary_party(pid: int) -> void:
 				temp_orgs[province_id] = int(organizations[province_id][pid])
 		_remember_former_party(deputy, pid, temp_orgs)
 		_make_independent(deputy, PartyManager.groups_of(pid).duplicate())
-	for table in [national_support, _hidden_national_delta, _visible_national_support, populism, turmoil, law_rounds, congress_rounds,
+	for table in [populism, turmoil, law_rounds, congress_rounds,
 			miting_fatigue, election_groups,
 			national_list, last_seats, election_seats, last_vote_shares, previous_vote_shares, inventories, funds, credibility]:
 		table.erase(pid)
 	passed_threshold.erase(pid)
-	for nested in [last_province_results, local_support, organizations]:
+	for nested in [last_province_results, organizations]:
 		for province_id in nested.keys():
 			nested[province_id].erase(pid)
 	var idx := turn_order.find(pid)
@@ -5121,11 +5033,11 @@ func _apply_found(peer_id: int, data: Dictionary) -> void:
 	info["groups"] = PartyManager.groups_of(peer_id).duplicate()
 	PartyManager.parties[peer_id] = info
 	party_congress[peer_id] = {"elections": 0, "share": float(last_vote_shares.get(peer_id, 0.0))}
-	# Miting yapılan (yerel desteği en yüksek) illerde teşkilat.
+	# Seçmeni en çok olan (miting yapılan) illerde teşkilat.
 	var count := mini(FOUND_ORG_MAX, int(credibility_of(peer_id) / FOUND_ORG_PER_CREDIBILITY))
 	var ranked: Array = []
 	for province_id in _province_ids:
-		var points := float(local_support.get(province_id, {}).get(peer_id, 0.0))
+		var points := float(vb_province_state(province_id)["attached"].get(peer_id, 0.0))
 		if points > 0.0:
 			ranked.append([points, province_id])
 	ranked.sort_custom(func(a, b): return float(a[0]) > float(b[0]))
@@ -5547,7 +5459,7 @@ func _rekey_party(old_id: int, new_id: int, new_member: int) -> void:
 		var others: Array = former_allies[pid]
 		if others.has(old_id):
 			others[others.find(old_id)] = new_id
-	for table in [national_support, _hidden_national_delta, _visible_national_support, populism, turmoil, law_rounds, congress_rounds,
+	for table in [populism, turmoil, law_rounds, congress_rounds,
 			miting_fatigue, election_groups,
 			national_list, last_seats, election_seats, last_vote_shares, previous_vote_shares, party_congress]:
 		if table.has(old_id):
@@ -5556,7 +5468,7 @@ func _rekey_party(old_id: int, new_id: int, new_member: int) -> void:
 	var t := passed_threshold.find(old_id)
 	if t != -1:
 		passed_threshold[t] = new_id
-	for nested in [last_province_results, local_support, organizations]:
+	for nested in [last_province_results, organizations]:
 		for province_id in nested.keys():
 			var entry: Dictionary = nested[province_id]
 			if entry.has(old_id):
@@ -5624,9 +5536,6 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"election_anchor": election_anchor,
 		"max_rounds_override": max_rounds_override,
 		"passed": passed_threshold,
-		"national": national_support,
-		"visible_national": _visible_national(),
-		"local": local_support,
 		"events": province_events,
 		"organizations": organizations,
 		"province_profiles": province_profiles,
@@ -5668,8 +5577,8 @@ func _prune_alliances() -> void:
 		if not members.has(int(alliance.get("leader", -1))):
 			var best: int = members[0]
 			for pid in members:
-				var score := float(last_seats.get(pid, 0)) * 1000.0 + national_of(pid)
-				if score > float(last_seats.get(best, 0)) * 1000.0 + national_of(best):
+				var score := float(last_seats.get(pid, 0)) * 1000.0 + float(last_vote_shares.get(pid, 0.0))
+				if score > float(last_seats.get(best, 0)) * 1000.0 + float(last_vote_shares.get(best, 0.0)):
 					best = pid
 			alliance["leader"] = best
 		alliances[alliance_id] = alliance
@@ -5742,9 +5651,6 @@ func _apply_state(state: Dictionary) -> void:
 	# Takvim çıpası her istemcide aynı olmalı (erken seçim sonrası).
 	GameRules.set_election_anchor(election_anchor)
 	passed_threshold = state["passed"]
-	national_support = state["national"]
-	_visible_national_support = state.get("visible_national", national_support).duplicate()
-	local_support = state["local"]
 	province_events = state["events"]
 	organizations = state.get("organizations", {})
 	miting_fatigue = state.get("miting_fatigue", {})

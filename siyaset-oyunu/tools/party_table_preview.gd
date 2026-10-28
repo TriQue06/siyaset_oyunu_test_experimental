@@ -44,7 +44,7 @@ func _initialize() -> void:
 	cm.last_seats = {ids[0]: 128, ids[1]: 110, ids[2]: 96, ids[3]: 92, ids[4]: 74}
 	cm.election_seats = cm.last_seats.duplicate()
 	cm.passed_threshold = ids.duplicate()
-	cm.national_support = {ids[0]: 2.4, ids[1]: -1.1, ids[2]: 0.6, ids[3]: -3.2, ids[4]: 0.0}
+	cm.last_vote_shares = {ids[0]: 22.0, ids[1]: 24.0, ids[2]: 18.0, ids[3]: 21.0, ids[4]: 15.0}
 	gm.scores = {ids[0]: 20, ids[1]: 7, ids[2]: 2, ids[3]: 0, ids[4]: 0}
 
 	var scene: Node = (load("res://scenes/GameScreen.tscn") as PackedScene).instantiate()

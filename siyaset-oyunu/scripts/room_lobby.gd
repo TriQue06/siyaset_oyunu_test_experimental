@@ -538,6 +538,13 @@ func _footer_text() -> String:
 
 ## Harita önizlemesi: Türkiye ya da tohumlu rastgele harita çizilir; tohumsuz
 ## rastgele haritada yer tutucu görünür (her oyunda başka ülke).
+var _preview_thread: Thread
+var _preview_job_key := ""
+
+func _exit_tree() -> void:
+	if _preview_thread != null:
+		_preview_thread.wait_to_finish()
+
 func _update_map_preview() -> void:
 	var settings: Dictionary = MultiplayerManager.world_settings
 	var turkey: bool = String(settings["map_mode"]) != "random"
@@ -550,8 +557,30 @@ func _update_map_preview() -> void:
 	var key := "%s|%s|%s|%s" % [settings["map_mode"], MultiplayerManager.map_seed, settings["province_scale"], settings["province_seats"]]
 	if key == _shown_map_key and _map != null:
 		return
+	if turkey:
+		GameMap.generate_new(int(MultiplayerManager.map_seed) if has_seed else 1)
+	else:
+		if _preview_thread == null:
+			var seed_value := int(MultiplayerManager.map_seed)
+			var scale_value := float(settings["province_scale"])
+			var seats_value := int(settings["province_seats"])
+			_preview_job_key = key
+			_preview_thread = Thread.new()
+			_preview_thread.start(func() -> Dictionary:
+				var generated := CountryGenerator.generate(seed_value, scale_value, seats_value)
+				return {"data": generated, "geometry": CountryGenerator.geometry(generated)})
+			_map_timer.start(0.05)
+			return
+		if _preview_thread.is_alive():
+			_map_timer.start(0.05)
+			return
+		var result: Dictionary = _preview_thread.wait_to_finish()
+		_preview_thread = null
+		if key != _preview_job_key:
+			_map_timer.start(0.05)
+			return
+		GameMap.set_data(result["data"], result["geometry"])
 	_shown_map_key = key
-	GameMap.generate_new(int(MultiplayerManager.map_seed) if has_seed else 1)
 	if _map == null:
 		_map = MAP_SCENE.instantiate()
 		_map_clip.add_child(_map)

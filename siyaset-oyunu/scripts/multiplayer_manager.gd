@@ -319,7 +319,7 @@ func is_standalone_preview() -> bool:
 ## ÇEVRİM DIŞI MOD: röle sunucusu, oda kodu ve katılma yok. Ağ peer'i hiç
 ## kurulmaz; oyun tamamen bu cihazda döner (CardManager._is_local_only()
 ## zaten room_code == "" olduğunda yerel çalışır). Sadece bot eklenebilir.
-func start_offline(player_name: String) -> void:
+func start_offline(player_name: String, notify: bool = true) -> void:
 	_reset_state()
 	offline_mode = true
 	local_player_name = player_name if player_name != "" else L.t("Oyuncu")
@@ -343,7 +343,8 @@ func start_offline(player_name: String) -> void:
 	owner_id = multiplayer.get_unique_id()
 	players[owner_id] = {"name": local_player_name}
 	player_list_updated.emit()
-	room_created.emit("")
+	if notify:
+		room_created.emit("")
 
 ## Röle sunucusu üzerinden bir oda kurar (bu oyuncu host + lobi sahibi olur).
 ## Sonuç asenkrondur: başarılı olursa room_created(code), olmazsa

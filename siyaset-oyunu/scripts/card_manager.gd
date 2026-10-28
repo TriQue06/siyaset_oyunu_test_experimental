@@ -853,7 +853,7 @@ func _apply_create_alliance(peer_id: int, alliance_name: String, color: Color) -
 	var pid := party_of(peer_id)
 	alliances[next_id] = {"name": name, "color": color, "leader": pid, "members": [pid]}
 	_drop_requests_of_party(pid)
-	var message := L.t("%s ittifakı kuruldu; %s ittifakın lideri oldu.") % [name, _party_name(peer_id)]
+	var message := L.t("%s kuruldu; lideri %s oldu.") % [name, _party_name(peer_id)]
 	_push_state({"type": "alliance_created", "peer_id": peer_id, "alliance_id": next_id, "message": message})
 
 func _apply_invite_alliance_party(peer_id: int, alliance_id: int, party_id: int) -> void:
@@ -866,7 +866,7 @@ func _apply_invite_alliance_party(peer_id: int, alliance_id: int, party_id: int)
 	voters.erase(party_of(peer_id))
 	var rid := _open_alliance_request(alliance_id, party_id, "invite", voters)
 	_push_state({"type": "alliance_invited", "peer_id": peer_id, "alliance_id": alliance_id, "target": party_id, "request": rid,
-		"message": L.t("%s, %s ittifakına davet edildi.") % [_party_name(party_id), String(alliances[alliance_id]["name"])]})
+		"message": L.t("%s, “%s” grubuna davet edildi.") % [_party_name(party_id), String(alliances[alliance_id]["name"])]})
 
 func _apply_request_alliance(peer_id: int, alliance_id: int) -> void:
 	if not can_manage_alliance(peer_id) or not alliances.has(alliance_id) or alliance_of(peer_id) >= 0 \
@@ -876,7 +876,7 @@ func _apply_request_alliance(peer_id: int, alliance_id: int) -> void:
 	var rid := _open_alliance_request(alliance_id, pid, "request", (alliances[alliance_id]["members"] as Array).duplicate())
 	alliance_requests[rid]["accepted"] = true
 	_push_state({"type": "alliance_requested", "peer_id": peer_id, "alliance_id": alliance_id, "request": rid,
-		"message": L.t("%s, %s ittifakına katılmak istiyor; bütün üyelerin onayı bekleniyor.") % [_party_name(peer_id), String(alliances[alliance_id]["name"])]})
+		"message": L.t("%s, “%s” grubuna katılmak istiyor; bütün üyelerin onayı bekleniyor.") % [_party_name(peer_id), String(alliances[alliance_id]["name"])]})
 
 func _open_alliance_request(alliance_id: int, party_id: int, kind: String, voters: Array) -> int:
 	_next_alliance_request += 1
@@ -932,7 +932,7 @@ func _resolve_alliance_request(request_id: int, refused_by: int = -1) -> void:
 		alliances[alliance_id]["refused"] = refusals
 		var who := refused_by if refused_by != -1 else pid
 		_push_state({"type": "alliance_refused", "peer_id": who, "alliance_id": alliance_id, "target": pid,
-			"message": L.t("%s ile %s ittifakı arasındaki başvuru reddedildi (%s).") % [_party_name(pid), alliance_name, _party_name(who)]})
+			"message": L.t("%s ile %s arasındaki başvuru reddedildi (%s).") % [_party_name(pid), alliance_name, _party_name(who)]})
 		return
 	var all_voted := true
 	for voter in voters:
@@ -947,7 +947,7 @@ func _resolve_alliance_request(request_id: int, refused_by: int = -1) -> void:
 	alliances[alliance_id]["members"] = updated
 	_drop_requests_of_party(pid)
 	_push_state({"type": "alliance_joined", "peer_id": pid, "alliance_id": alliance_id,
-		"message": L.t("%s, %s ittifakına katıldı.") % [_party_name(pid), alliance_name]})
+		"message": L.t("%s, “%s” grubuna katıldı.") % [_party_name(pid), alliance_name]})
 
 func _drop_requests_of_party(pid: int) -> void:
 	for rid in alliance_requests.keys():
@@ -960,7 +960,7 @@ func _expire_alliance_requests() -> void:
 		var req: Dictionary = alliance_requests[rid]
 		if round_number - int(req.get("round", round_number)) >= ALLIANCE_REQUEST_ROUNDS:
 			alliance_requests.erase(rid)
-			_pending_log.append({"text": L.t("%s ile %s ittifakı arasındaki başvuru yanıtsız kaldığı için düştü.") % [
+			_pending_log.append({"text": L.t("%s ile %s arasındaki başvuru yanıtsız kaldığı için düştü.") % [
 				_party_name(int(req["party"])), String(alliances.get(int(req["alliance"]), {}).get("name", "?"))],
 				"peer_id": int(req["party"]), "province": "", "kind": "alliance"})
 
@@ -975,13 +975,13 @@ func _apply_leave_alliance(peer_id: int) -> void:
 	members.erase(pid)
 	alliance["members"] = members
 	alliances[alliance_id] = alliance
-	var message := L.t("%s, %s ittifakından ayrıldı.") % [_party_name(peer_id), alliance_name]
+	var message := L.t("%s, “%s” grubundan ayrıldı.") % [_party_name(peer_id), alliance_name]
 	if members.size() <= 1:
 		alliances.erase(alliance_id)
 		message += " " + L.t("Tek parti kaldı; ittifak sona erdi.")
 	if election_this_round():
 		_add_national(pid, -ALLIANCE_LEAVE_ELECTION_PENALTY)
-		message = L.t("%s seçim arifesinde %s ittifakından ayrıldı; seçmen bunu affetmedi.") % [_party_name(peer_id), alliance_name]
+		message = L.t("%s seçim arifesinde “%s” grubundan ayrıldı; seçmen bunu affetmedi.") % [_party_name(peer_id), alliance_name]
 	_push_state({"type": "alliance_left", "peer_id": peer_id, "alliance_id": alliance_id, "message": message})
 
 ## GERGİNLİK (0.0.227): ortağının meclis önergesine HAYIR diyen parti ittifakta
@@ -999,7 +999,7 @@ func note_alliance_vote(voter: int, proposer: int, vote_no: bool) -> void:
 	grievance[victim] = int(grievance.get(victim, 0)) + 1
 	alliance["grievance"] = grievance
 	alliances[alliance_id] = alliance
-	_pending_log.append({"text": L.t("%s, ortağı %s tarafından verilen önergeye HAYIR dedi; %s ittifakında gerginlik var.") % [
+	_pending_log.append({"text": L.t("%s, ortağı %s tarafından verilen önergeye HAYIR dedi; “%s” grubunda gerginlik var.") % [
 		_party_name(voter), _party_name(proposer), String(alliance.get("name", ""))], "peer_id": voter, "province": "", "kind": "alliance"})
 
 ## Bu parti ile bu ittifak arasındaki başvuru son 2 turda reddedildi mi?
@@ -5531,7 +5531,7 @@ func _prune_alliances() -> void:
 				members.append(int(pid))
 		if members.size() <= 1 and (alliance.get("members", []) as Array).size() > 1:
 			alliances.erase(alliance_id)
-			_pending_log.append({"text": L.t("%s ittifakında tek parti kaldı; ittifak sona erdi.") % String(alliance.get("name", "")),
+			_pending_log.append({"text": L.t("“%s” grubunda tek parti kaldı; ittifak sona erdi.") % String(alliance.get("name", "")),
 				"peer_id": -1, "province": "", "kind": "alliance"})
 			continue
 		if members.is_empty():

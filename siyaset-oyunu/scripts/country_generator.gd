@@ -52,7 +52,15 @@ const WIGGLE := 2.4
 const FINE_WIGGLE := 0.75
 const VOTERS_PER_SEAT := 100000
 
+static var _generation_mutex := Mutex.new()
+
 static func generate(seed_value: int, province_scale: float = 1.0, seat_total: int = 300) -> Dictionary:
+	_generation_mutex.lock()
+	var result := _generate(seed_value, province_scale, seat_total)
+	_generation_mutex.unlock()
+	return result
+
+static func _generate(seed_value: int, province_scale: float = 1.0, seat_total: int = 300) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value
 	var points := _points(rng)
@@ -657,6 +665,12 @@ static func _names(points: PackedVector2Array, labels: PackedInt32Array, count: 
 ##   centers  : Array[Vector2] il -> en geniş yerin ortası (vekil noktaları)
 ##   points, labels, cell_tris: nokta sorgusu için (bkz. GameMap.province_at)
 static func geometry(map_data: Dictionary) -> Dictionary:
+	_generation_mutex.lock()
+	var result := _geometry(map_data)
+	_generation_mutex.unlock()
+	return result
+
+static func _geometry(map_data: Dictionary) -> Dictionary:
 	var flat: Array = map_data["points"]
 	var points := PackedVector2Array()
 	points.resize(flat.size() / 2)

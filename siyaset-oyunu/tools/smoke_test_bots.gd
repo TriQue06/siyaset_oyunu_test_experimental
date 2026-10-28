@@ -207,7 +207,9 @@ func _initialize() -> void:
 	fair[gp2.POST_DEPUTY_PM] = ids[1]
 	fair["ministry_health"] = ids[1]
 	gm.proposal_assignments = fair
-	check("basbakan yardimciligi + bakanlik kabul", brain.choose_vote(ids[1]) == gm.VOTE_YES)
+	check("uzak ideolojide ayni makam teklifi yetmez", brain.choose_vote(ids[1]) == gm.VOTE_NO)
+	pm.parties[ids[1]]["groups"] = (pm.parties[human]["groups"] as Dictionary).duplicate()
+	check("yakin ideolojide basbakan yardimciligi + bakanlik kabul", brain.choose_vote(ids[1]) == gm.VOTE_YES)
 	gm.proposal_assignments = {}
 
 	print("")

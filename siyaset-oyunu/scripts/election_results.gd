@@ -432,7 +432,7 @@ func _alliance_label(peer_id) -> String:
 	var national: Dictionary = _sample.get("national", {})
 	for pid in CardManager.last_election_alliances[aid].get("members", []):
 		total += float(national.get(pid, national.get(int(pid), 0.0)))
-	return L.t("%s ittifakı %%%.1f") % [String(CardManager.last_election_alliances[aid].get("name", "")), total]
+	return L.t("%s %%%.1f") % [String(CardManager.last_election_alliances[aid].get("name", "")), total]
 
 func _alliance_color(peer_id) -> Color:
 	var aid := int(CardManager.election_alliance_membership().get(int(peer_id), 0))
@@ -744,7 +744,7 @@ func _alliance_paper_line() -> String:
 		for pid in alliance.get("members", []):
 			votes += float(CardManager.last_vote_shares.get(int(pid), 0.0))
 			seats += int(CardManager.last_seats.get(int(pid), 0))
-		parts.append([seats, L.t("%s ittifakı %s · %d vekil") % [String(alliance.get("name", "")), L.pct(votes), seats]])
+		parts.append([seats, L.t("%s %s · %d vekil") % [String(alliance.get("name", "")), L.pct(votes), seats]])
 	if parts.is_empty():
 		return ""
 	parts.sort_custom(func(a, b): return int(a[0]) > int(b[0]))

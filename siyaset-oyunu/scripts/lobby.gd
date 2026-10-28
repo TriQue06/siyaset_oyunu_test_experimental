@@ -183,6 +183,7 @@ func _build_card() -> void:
 	# KAYITLI OYUN: elle kayıt ya da otomatik kayıt varsa en yenisinden devam.
 	var slot := _latest_save()
 	if slot != "":
+		ResourceLoader.load_threaded_request("res://scenes/GameScreen.tscn")
 		var info := SaveGame.summary(slot)
 		var resume := _button(L.t("Kayıtlı Oyuna Devam Et"), UiTheme.BLUE.darkened(0.2), 42.0)
 		resume.pressed.connect(func():

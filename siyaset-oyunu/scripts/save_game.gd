@@ -138,7 +138,11 @@ static func load_game(tree: SceneTree, slot: String = MANUAL_SLOT) -> String:
 	if data.has("error"):
 		return String(data["error"])
 	apply(data)
-	tree.change_scene_to_file("res://scenes/GameScreen.tscn")
+	var scene_path := "res://scenes/GameScreen.tscn"
+	if ResourceLoader.load_threaded_get_status(scene_path) == ResourceLoader.THREAD_LOAD_LOADED:
+		tree.change_scene_to_packed(ResourceLoader.load_threaded_get(scene_path))
+	else:
+		tree.change_scene_to_file(scene_path)
 	return ""
 
 ## Doğrulanmış kayıt verisini yöneticilere uygular (sahne değiştirmez; testler
@@ -146,7 +150,7 @@ static func load_game(tree: SceneTree, slot: String = MANUAL_SLOT) -> String:
 static func apply(data: Dictionary) -> void:
 	var mm := MultiplayerManager
 	var saved_mm: Dictionary = data["mm"]
-	mm.start_offline(String(saved_mm.get("local_player_name", L.t("Oyuncu"))))
+	mm.start_offline(String(saved_mm.get("local_player_name", L.t("Oyuncu"))), false)
 	mm.players = saved_mm["players"]
 	mm.owner_id = int(saved_mm.get("owner_id", mm.owner_id))
 	mm.election_threshold = float(saved_mm.get("election_threshold", mm.election_threshold))

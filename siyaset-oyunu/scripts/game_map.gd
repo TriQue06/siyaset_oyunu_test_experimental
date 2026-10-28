@@ -79,8 +79,8 @@ func is_country() -> bool:
 func is_turkey() -> bool:
 	return PRESET_FILES.has(String(data.get("preset", "")))
 
-func set_data(new_data: Dictionary) -> void:
-	if new_data.is_empty():
+func set_data(new_data: Dictionary, prepared: Dictionary = {}) -> void:
+	if new_data == data or new_data.is_empty():
 		return
 	var full := new_data
 	if new_data.has("preset") and not new_data.has("cells"):
@@ -118,14 +118,14 @@ func set_data(new_data: Dictionary) -> void:
 		_seats[id] = int(region["seats"])
 		_coastal[id] = bool(region.get("coastal", false))
 	if is_country_map:
-		_derive_country(full)
+		_derive_country(full, prepared)
 	else:
 		_derive()
 	map_changed.emit()
 
 ## Ülke haritası: çizim geometrisi, komşuluk, merkezler ve il sorgusu kovaları.
-func _derive_country(full: Dictionary) -> void:
-	country = CountryGenerator.geometry(full)
+func _derive_country(full: Dictionary, prepared: Dictionary = {}) -> void:
+	country = prepared if not prepared.is_empty() else CountryGenerator.geometry(full)
 	_neighbors.clear()
 	_region_cells.clear()
 	_centers.clear()

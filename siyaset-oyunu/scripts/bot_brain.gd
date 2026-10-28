@@ -347,10 +347,13 @@ static func alliance_answer(bot: int, request_id: int) -> bool:
 	var alliance_id := int(req["alliance"])
 	var threshold := MultiplayerManager.election_threshold
 	if String(req["kind"]) == "invite" and int(req["party"]) == pid:
+		if _alliance_distance(bot, alliance_id) >= ALLIANCE_PARTNER_DISTANCE:
+			return false
 		var own_share := _vote_share(pid)
 		var struggling := threshold > 0.0 and own_share < threshold + 2.0
 		var helps := threshold > 0.0 and own_share + _alliance_share(alliance_id) >= threshold
-		return struggling or (helps and randf() < 0.65) or (CardManager.were_allies(pid, int(req["party"])) and randf() < 0.5)
+		var affinity := clampf(1.0 - _alliance_distance(bot, alliance_id) / ALLIANCE_PARTNER_DISTANCE, 0.0, 1.0)
+		return (struggling and randf() < lerpf(0.4, 0.98, affinity)) or (helps and randf() < lerpf(0.25, 0.85, affinity))
 	var candidate := int(req["party"])
 	var pooled := _alliance_share(alliance_id)
 	# 0.0.254: seçmeni uzak partiyi onaylamaz; ittifak 3 partiyi geçmez (ortak
@@ -360,15 +363,24 @@ static func alliance_answer(bot: int, request_id: int) -> bool:
 	var size: int = (CardManager.alliances.get(alliance_id, {}).get("members", []) as Array).size()
 	if size >= ALLIANCE_MAX_BOT_SIZE and (threshold <= 0.0 or pooled >= threshold):
 		return false
-	var chance := 0.6
+	var chance := lerpf(0.9, 0.35, clampf(_distance(bot, candidate) / ALLIANCE_PARTNER_DISTANCE, 0.0, 1.0))
 	if threshold > 0.0 and pooled < threshold:
-		chance = 0.9
+		chance = minf(0.98, chance + 0.15)
 	if CardManager.were_allies(pid, candidate):
 		chance += 0.15
 	return randf() < chance
 
 ## Bot kendi sırasında katılma isteği gönderir mi? (Barajda zorlanıyor ve ortak
 ## oy barajı aşıyorsa.) İttifak kimliği ya da -1.
+static func _alliance_distance(bot: int, alliance_id: int) -> float:
+	var total := 0.0
+	var count := 0
+	for member in CardManager.alliances.get(alliance_id, {}).get("members", []):
+		if int(member) != CardManager.party_of(bot):
+			total += _distance(bot, int(member))
+			count += 1
+	return total / maxf(1.0, count)
+
 static func choose_alliance_request(bot: int) -> int:
 	if not CardManager.can_manage_alliance(bot) or CardManager.alliance_of(bot) >= 0:
 		return -1
@@ -385,7 +397,11 @@ static func choose_alliance_request(bot: int) -> int:
 		if CardManager.recently_refused(int(alliance_id), pid):
 			continue
 		var combined := own_share + _alliance_share(int(alliance_id))
-		if combined >= threshold and combined > best_share:
+		var distance := _alliance_distance(bot, int(alliance_id))
+		if distance >= ALLIANCE_PARTNER_DISTANCE:
+			continue
+		combined -= distance * 5.0
+		if own_share + _alliance_share(int(alliance_id)) >= threshold and (best_id == -1 or combined > best_share):
 			best_id = int(alliance_id)
 			best_share = combined
 	return best_id
@@ -1339,6 +1355,7 @@ static func _coalition_offer_vote(bot: int) -> int:
 	# Eski ittifak ortağının hükümetine daha az makamla da girer.
 	if CardManager.were_allies(bot, GovernmentManager.proposal_peer_id) or CardManager.are_allies(bot, GovernmentManager.proposal_peer_id):
 		required = maxf(float(COALITION_MIN_POINTS), required * 0.75)
+	required *= 1.0 + minf(0.35, _distance(bot, GovernmentManager.proposal_peer_id) * 0.2)
 	if float(offered) + 0.01 < required:
 		return GovernmentManager.VOTE_NO
 	return GovernmentManager.VOTE_YES
@@ -1406,25 +1423,22 @@ static func build_government(bot: int) -> Dictionary:
 			candidates.append(int(pid))
 	var bloc := _bloc_solidarity()
 	candidates.sort_custom(func(a, b):
+		if not is_equal_approx(_distance(bot, a), _distance(bot, b)):
+			return _distance(bot, a) < _distance(bot, b)
 		if is_ally(bot, a) != is_ally(bot, b):
 			return is_ally(bot, a)
 		# Blok dayanışmasında önce diğer botlar ortak seçilir.
 		if bloc and MultiplayerManager.is_bot(a) != MultiplayerManager.is_bot(b):
 			return MultiplayerManager.is_bot(a)
 		return _friend_distance(bot, a) < _friend_distance(bot, b))
-	var shift := GovernmentManager.attempts_used % maxi(1, candidates.size())
-	candidates = candidates.slice(shift) + candidates.slice(0, shift)
-	# Döndürme blok dayanışmasını bozmasın: blok varken botlar yine önde kalır
-	# (yoksa teklif hakkı el değiştirdikçe insan oyuncu koalisyona sızabiliyordu).
-	if bloc:
-		var bots: Array = []
-		var others: Array = []
-		for peer_id in candidates:
-			if MultiplayerManager.is_bot(peer_id):
-				bots.append(peer_id)
-			else:
-				others.append(peer_id)
-		candidates = bots + others
+	var similar := 0
+	for candidate in candidates:
+		if _distance(bot, candidate) <= _distance(bot, candidates[0]) + 0.25:
+			similar += 1
+		else:
+			break
+	var shift := GovernmentManager.attempts_used % maxi(1, similar)
+	candidates = candidates.slice(shift, similar) + candidates.slice(0, shift) + candidates.slice(similar)
 
 	var partners: Array = []
 	var seats := GovernmentManager.seats_of(bot)
@@ -1450,7 +1464,7 @@ static func build_government(bot: int) -> Dictionary:
 	var given := {}
 	for peer_id in partners:
 		var share := float(GovernmentManager.seats_of(peer_id)) / maxf(1.0, float(seats))
-		required[peer_id] = maxf(float(COALITION_MIN_POINTS), float(total_points) * share * COALITION_FAIR_SHARE)
+		required[peer_id] = maxf(float(COALITION_MIN_POINTS), float(total_points) * share * COALITION_FAIR_SHARE) * (1.0 + minf(0.35, _distance(bot, peer_id) * 0.2))
 		given[peer_id] = 0
 	var posts: Array = []
 	for post in GovernmentPresets.POSTS:

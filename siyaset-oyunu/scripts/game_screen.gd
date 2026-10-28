@@ -4757,11 +4757,11 @@ func _alliance_decision_row(rid: int) -> Control:
 	var me_target := int(req.get("party", -1)) == CardManager.party_of(multiplayer.get_unique_id())
 	var text := ""
 	if me_target:
-		text = L.t("%s ittifakı seni davet ediyor. Katılman için diğer üyelerin de onayı gerekir.") % String(alliance.get("name", "?"))
+		text = L.t("%s seni davet ediyor. Katılman için diğer üyelerin de onayı gerekir.") % String(alliance.get("name", "?"))
 	elif String(req.get("kind", "")) == "invite":
-		text = L.t("Lider %s partisini %s ittifakına davet etti. Onayın gerekiyor.") % [_fx_party_name(int(req["party"])), String(alliance.get("name", "?"))]
+		text = L.t("Lider %s partisini “%s” grubuna davet etti. Onayın gerekiyor.") % [_fx_party_name(int(req["party"])), String(alliance.get("name", "?"))]
 	else:
-		text = L.t("%s, %s ittifakına katılmak istiyor. Onayın gerekiyor.") % [_fx_party_name(int(req["party"])), String(alliance.get("name", "?"))]
+		text = L.t("%s, “%s” grubuna katılmak istiyor. Onayın gerekiyor.") % [_fx_party_name(int(req["party"])), String(alliance.get("name", "?"))]
 	box.add_child(PopupKit.note(text, UiTheme.HEAD, ALLIANCE_WIDTH - 24.0))
 	# İdeoloji önizlemesi: katılan partinin hitabı nasıl değişir (bana davetse benim).
 	var preview := CardManager.alliance_preview_text(int(req.get("party", -1)), int(req.get("alliance", -1)))

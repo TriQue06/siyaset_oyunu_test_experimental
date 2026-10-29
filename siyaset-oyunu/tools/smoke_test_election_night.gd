@@ -31,6 +31,19 @@ func _initialize() -> void:
 
 	print("--- sayım ---")
 	_check(float(sim.sample(0.0)["counted"]) == 0.0, "başta hiç sandık açık değil")
+	for moment in [0.0, 0.1, 3.0, 7.0, 20.0, 40.0]:
+		var frame: Dictionary = sim.sample(moment)
+		var assigned := 0
+		for n in frame["seats"].values():
+			assigned += int(n)
+		_check(assigned == sim.total_seats, "meclis her karede tam dağıtılır: %.1f" % moment)
+	var all_started := true
+	for id in sim.province_ids:
+		all_started = all_started and sim.progress(id, 0.1) > 0.0
+	_check(all_started, "bütün iller eşzamanlı saymaya başlar")
+	var fast: Dictionary = sim.sample(0.48 / 18.0 * 45.0 * sim.SETTLE)
+	var slow: Dictionary = sim.sample(3.0 / 18.0 * 45.0 * sim.SETTLE)
+	_check(absf(float(fast["counted"]) - 15) < 0.01 and absf(float(slow["counted"]) - 17) < 0.01, "ilk hızlı dalga yüzde 15, sakin bölüm yüzde 17")
 	var prev := -1.0
 	var monotonic := true
 	var sums_ok := true

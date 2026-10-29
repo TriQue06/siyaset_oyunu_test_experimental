@@ -1,30 +1,15 @@
 class_name ElectionNightSim
 extends RefCounted
-## Seçim gecesi CANLI SAYIM simülasyonu — sadece GÖRSEL. Seçimin kesin sonucu
-## host'ta zaten hesaplanmış durumda (CardManager.last_*); bu sınıf o sonuca
-## "gitgelli" bir yoldan varan ara kareler üretir:
-##   - İller sırayla açılır (küçük iller önce, büyükler genelde sonda).
-##   - Açılan bir ilin sayımı hemen bitmez: her ilin kendi sayım oranı (0..1)
-##     vardır. Oran 1'e ulaşana kadar o ilin oy payları kesin sonucun etrafında
-##     dalgalanır ve ilk sandıkların yanlılığını taşır; oran arttıkça sapma
-##     söner, 1'de pay tam olarak kesin sonuçtur. Yani yeni iller açılırken
-##     önceden açılmış iller de değişmeye devam eder.
-##   - Ulusal oran, açılan sandıkların (vekil sayısı × sayım oranı) ağırlıklı
-##     ortalamasıdır; baraj ve D'Hondt her karede o anki oranlarla uygulanır
-##     (baraj gerilimi ve sandalye kaymaları buradan doğar).
-##   - Tüm iller süresinin SETTLE oranında %100 olur; son karede sonuç kesin
-##     sonuçla birebir aynıdır.
-## Aynı tohum her istemcide aynı geceyi üretir (deterministik).
-
-const OPEN_START := 0.02
-const OPEN_END := 0.72
-const COUNT_MIN := 0.14
-const COUNT_MAX := 0.26
-const SETTLE := 0.95
-## Sayım başında payların oransal dalgalanma ve ilk-sandık yanlılığı genliği.
-const WOBBLE := 0.28
-const BIAS := 0.32
-
+## Yalnız görsel sayım: bütün iller aynı anda başlar; küçük iller erken biter.
+## Hızlı sandık dalgaları arasında yaklaşık üç saniyelik sakin bölümler vardır.
+## Meclis ilk kareden itibaren tam dağıtılır; kesin host sonucu değiştirilmez.
+const SETTLE := 18.0 / 19.5
+const WOBBLE := 0.8
+const BIAS := 1.0
+const COUNT_KEYS := [Vector2(0, 0), Vector2(0.48, 0.15), Vector2(3, 0.17), Vector2(3.48, 0.40), Vector2(6, 0.43), Vector2(6.48, 0.65), Vector2(9, 0.68), Vector2(9.48, 0.84), Vector2(12, 0.87), Vector2(12.48, 0.97), Vector2(15, 0.98), Vector2(18, 1)]
+var _progress_time := -1.0
+var _progress_cache: Dictionary = {}
+var _party_phase: Dictionary = {}
 
 var duration: float = 45.0
 var threshold: float = 0.0
@@ -57,6 +42,12 @@ var alliances: Dictionary = {}
 func setup(province_results: Dictionary, vote_shares: Dictionary, seats: Dictionary, passed: Array,
 		threshold_percent: float, seed_value: int, duration_seconds: float, alliance_membership: Dictionary = {}) -> void:
 	_allocation_cache.clear()
+	_window.clear()
+	_bias.clear()
+	_wave.clear()
+	_progress_time = -1.0
+	_progress_cache.clear()
+	_party_phase.clear()
 	alliances = alliance_membership
 	duration = maxf(1.0, duration_seconds)
 	threshold = threshold_percent
@@ -90,7 +81,7 @@ func setup(province_results: Dictionary, vote_shares: Dictionary, seats: Diction
 		_list_seats[peer_id] = maxi(0, int(seats.get(peer_id, 0)) - from_provinces)
 	# Ulusal liste sayımın sonunda dağıtılır (kesin sonuçta görünür).
 	if not province_results.is_empty():
-		total_seats += ElectionModel.NATIONAL_LIST_SEATS
+		total_seats += int(_list_seats.values().reduce(func(a, b): return int(a) + int(b), 0))
 	peer_ids = ids.keys()
 	peer_ids.sort()
 
@@ -102,13 +93,12 @@ func setup(province_results: Dictionary, vote_shares: Dictionary, seats: Diction
 	keys.sort_custom(func(a, b): return float(weight[a]) < float(weight[b]))
 	province_ids = keys
 
+	for peer_id in peer_ids:
+		_party_phase[peer_id] = rng.randf_range(0.0, TAU)
 	var count := province_ids.size()
 	for i in count:
 		var province_id: String = province_ids[i]
-		var start: float = OPEN_START + (OPEN_END - OPEN_START) * (float(i) / float(maxi(1, count - 1)))
-		start = clampf(start + rng.randf_range(-0.015, 0.015), 0.0, OPEN_END)
-		var length: float = rng.randf_range(COUNT_MIN, COUNT_MAX) + float(province_seats[province_id]) / 24.0 * 0.06
-		_window[province_id] = Vector2(start, minf(start + length, SETTLE))
+		_window[province_id] = Vector2(0, SETTLE)
 		var bias := {}
 		var wave := {}
 		for peer_id in peer_ids:
@@ -120,14 +110,33 @@ func setup(province_results: Dictionary, vote_shares: Dictionary, seats: Diction
 
 ## İlin t anındaki sayım oranı: 0 = açılmadı, 1 = sandıkların tamamı açıldı.
 func progress(province_id: String, t: float) -> float:
-	var w: Vector2 = _window.get(province_id, Vector2.ZERO)
-	var r := t / duration
-	if r >= w.y:
-		return 1.0
-	if r <= w.x:
-		return 0.0
-	var u := (r - w.x) / maxf(0.0001, w.y - w.x)
-	return 1.0 - pow(1.0 - u, 2.2)  # önce hızlı, sona doğru yavaş
+	if t != _progress_time:
+		_progress_time = t
+		_progress_cache.clear()
+		var clock := clampf(t / (duration * SETTLE), 0.0, 1.0) * 18.0
+		var opened := 1.0
+		for i in range(1, COUNT_KEYS.size()):
+			if clock <= COUNT_KEYS[i].x:
+				var a: Vector2 = COUNT_KEYS[i - 1]
+				var b: Vector2 = COUNT_KEYS[i]
+				opened = lerpf(a.y, b.y, (clock - a.x) / (b.x - a.x))
+				break
+		var lo := 0.0
+		var hi := 7.0
+		for step in 30:
+			var mid := (lo + hi) * 0.5
+			var total := 0.0
+			for id in province_ids:
+				var n := float(province_seats[id])
+				total += minf(1.0, mid * (0.15 + 12.0 / pow(maxf(1, n), 1.2))) * n
+			if total / maxf(1, _province_total) < opened:
+				lo = mid
+			else:
+				hi = mid
+		for id in province_ids:
+			var n := float(province_seats[id])
+			_progress_cache[id] = 1.0 if clock >= 18 else (0.0 if clock <= 0 else minf(1, (lo + hi) * 0.5 * (0.15 + 12.0 / pow(maxf(1, n), 1.2))))
+	return float(_progress_cache.get(province_id, 0.0))
 
 ## İlin t anındaki oy payları (peer_id -> yüzde, toplam 100).
 func province_shares(province_id: String, t: float, c: float) -> Dictionary:
@@ -143,8 +152,10 @@ func province_shares(province_id: String, t: float, c: float) -> Dictionary:
 	var total := 0.0
 	for peer_id in peer_ids:
 		var p: Array = wave[peer_id]
-		var w: float = 0.6 * sin(t * float(p[0]) + float(p[1])) + 0.4 * sin(t * float(p[2]) + float(p[3]))
-		var v: float = _final_percent(entry, peer_id) * maxf(0.05, 1.0 + k * (BIAS * float(bias[peer_id]) + WOBBLE * w))
+		var phase := float(_party_phase[peer_id])
+		var clock := t / (duration * SETTLE) * 18.0
+		var w: float = sin(c * 8.0 + phase) + 0.25 * sin(clock * 0.55 + float(p[1]))
+		var v: float = _final_percent(entry, peer_id) * exp(k * (BIAS * float(bias[peer_id]) + WOBBLE * w))
 		out[peer_id] = v
 		total += v
 	if total > 0.0:
@@ -163,7 +174,7 @@ func _final_percent(entry: Dictionary, peer_id) -> float:
 ##   "seats":     peer_id -> açılan illerden kazanılan vekil
 ##   "provinces": province_id -> {"c", "shares", "seats"}
 func sample(t: float) -> Dictionary:
-	if t >= duration:
+	if t >= duration * SETTLE or province_ids.is_empty():
 		return final_sample()
 	var national := {}
 	for peer_id in peer_ids:
@@ -172,11 +183,8 @@ func sample(t: float) -> Dictionary:
 	var weight := 0.0
 	for province_id in province_ids:
 		var c := progress(province_id, t)
-		if c <= 0.0:
-			provinces[province_id] = {"c": 0.0, "shares": {}, "seats": {}}
-			continue
 		var shares := province_shares(province_id, t, c)
-		var w: float = float(province_seats[province_id]) * c
+		var w: float = float(province_seats[province_id]) * maxf(0.000001, c)
 		weight += w
 		for peer_id in peer_ids:
 			national[peer_id] = float(national[peer_id]) + float(shares[peer_id]) * w
@@ -186,6 +194,8 @@ func sample(t: float) -> Dictionary:
 		var totals := {}
 		for peer_id in peer_ids:
 			national[peer_id] = float(national[peer_id]) / weight
+			var settle := clampf((weight / maxf(1, _province_total) - 0.85) / 0.15, 0, 1)
+			national[peer_id] = lerpf(float(national[peer_id]), float(_final_shares.get(peer_id, 0)), settle)
 			var aid := int(alliances.get(peer_id, 0))
 			if aid != 0:
 				totals[aid] = float(totals.get(aid, 0.0)) + float(national[peer_id])
@@ -201,8 +211,6 @@ func sample(t: float) -> Dictionary:
 		seats[peer_id] = 0
 	for province_id in province_ids:
 		var p: Dictionary = provinces[province_id]
-		if float(p["c"]) <= 0.0:
-			continue
 		var alloc: Dictionary
 		var cached: Dictionary = _allocation_cache.get(province_id, {})
 		if not cached.is_empty() and cached["method"] == ElectionModel.seat_method and cached["count"] == province_seats[province_id] and cached["eligible"] == eligible and cached["shares"] == p["shares"]:
@@ -214,11 +222,14 @@ func sample(t: float) -> Dictionary:
 		p["seats"] = alloc
 		for peer_id in alloc.keys():
 			seats[peer_id] = int(seats[peer_id]) + int(alloc[peer_id])
-	if weight >= float(_province_total) - 0.001:
-		for peer_id in _list_seats.keys():
-			seats[peer_id] = int(seats.get(peer_id, 0)) + int(_list_seats[peer_id])
+	var list_total := 0
+	for n in _list_seats.values():
+		list_total += int(n)
+	var live_list := ElectionModel.allocate(national, eligible, list_total)
+	for peer_id in live_list:
+		seats[peer_id] = int(seats.get(peer_id, 0)) + int(live_list[peer_id])
 	return {
-		"counted": weight / float(maxi(1, _province_total)) * 100.0,
+		"counted": 0.0 if t <= 0 else weight / float(maxi(1, _province_total)) * 100.0,
 		"national": national, "eligible": eligible, "seats": seats, "provinces": provinces,
 	}
 

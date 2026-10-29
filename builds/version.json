@@ -1,13 +1,13 @@
 {
-  "version": "0.0.288",
-  "date": "28.10.2026",
+  "version": "0.0.289",
+  "date": "29.10.2026",
   "apk": {
     "url": "https://raw.githubusercontent.com/TriQue06/siyaset_oyunu_test_experimental/main/builds/SiyasetOyunu.apk",
-    "size": 47142885
+    "size": 47147162
   },
   "exe": {
     "url": "https://raw.githubusercontent.com/TriQue06/siyaset_oyunu_test_experimental/main/builds/SiyasetOyunu-Windows.zip",
-    "size": 56364539,
+    "size": 56368466,
     "zip": true
   }
 }

@@ -5375,3 +5375,12 @@ msgstr "Government: a %s investment from the state treasury in the chosen provin
 
 msgid "Bu kaydın harita biçimi artık desteklenmiyor. Yeni bir oyun başlatın."
 msgstr "This save uses a map format that is no longer supported. Start a new game."
+
+msgid "Ülke sandık başında"
+msgstr "The country votes"
+
+msgid "Ülke geneli"
+msgstr "Nationwide"
+
+msgid "SEÇİM GECESİ"
+msgstr "ELECTION NIGHT"

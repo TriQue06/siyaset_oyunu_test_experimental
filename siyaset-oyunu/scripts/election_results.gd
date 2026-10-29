@@ -1,21 +1,6 @@
 extends Control
-## SEÇİM GECESİ: haber kanalı tarzı canlı sayım yayını. Seçim yapılınca
-## (CardManager.election_completed) GameScreen'den buraya geçilir.
-##   - Solda harita: iller sandıkları açıldıkça öndeki partinin rengine boyanır,
-##     sayımı sürenler soluk kalır; il üstündeki vekil kareleri canlı değişir.
-##   - Sağda oy oranları (baraj çizgili, sıralaması canlı değişen çubuklar) ve
-##     sandalyeleri dolan meclis diyagramı.
-##   - Üstte CANLI etiketi, yayın saati ve açılan sandık oranı; altta SON DAKİKA
-##     bandı ve kayan haber yazısı.
-## Sayımın kendisi ElectionNightSim'de; her karede yeniden hesaplanıp çizilir
-## (haritanın mesh renkleri güncellenir, bkz. province_map.gd). Süre bitince
-## kesin sonuç bir süre ekranda kalır, sonuç gazetesi (EventFx) BU ekranda
-## oynar, sonra GameScreen'e dönülür (0.0.180; ATLA / 2× kaldırıldı).
-## STÜDYO KAMERALARI (0.0.180): harita, oy oranları ve meclis üç pencerede;
-## sayımın her çeyreğinde büyük pencereye sırayla biri geçer (TV flaşıyla),
-## diğer ikisi sağda küçük kalır. Sayım bitince klasik düzene oturur.
-## Host hükümet kurma süresine bu yayının süresini ekler (bkz.
-## CardManager._hold_election).
+## Sabit seçim masası: harita, hover edilen il, en büyük üç il, oylar ve meclis.
+## Sayım yalnız gösterimdir; gazete ve sonraki oyun aşaması kesin host sonucunu kullanır.
 
 const DURATION := GameRules.ELECTION_NIGHT_SECONDS
 const HOLD_AFTER := GameRules.ELECTION_NIGHT_HOLD
@@ -106,6 +91,13 @@ var _frames: Array = []          # [harita, oylar, meclis] pencere çerçeveleri
 var _pane_now: Array = []        # ekrandaki (yumuşatılmış) pencere dikdörtgenleri
 var _content := Rect2()
 var _camera := -1
+var _canvas: Control
+var _province_cards: Array = []
+var _largest_provinces: Array = []
+var _hovered_province := ""
+var _map_sea: Panel
+var _meclis_count: Label
+var _threshold_label: Label
 var _cam_flash: ColorRect
 var _event_fx: EventFx
 var _paper_started := false
@@ -153,10 +145,16 @@ func _process(delta: float) -> void:
 	if not _finished:
 		_t = minf(_t + delta, DURATION)
 	# Her karede: sayım, harita ve meclis kare hızında akar.
-	_refresh()
-	_refresh_map()
+	_refresh_left -= delta
+	_map_refresh_left -= delta
+	if _refresh_left <= 0.0:
+		_refresh_left = REFRESH_INTERVAL
+		_refresh()
+	if _map_refresh_left <= 0.0:
+		_map_refresh_left = 0.18
+		_refresh_map()
 	_animate(delta)
-	_update_camera(delta)
+
 	if _finished and not _leaving:
 		_hold_left -= delta
 		if _hold_left <= 0.0 and not _paper_started:
@@ -173,7 +171,7 @@ func _refresh() -> void:
 	var counted: float = float(_sample["counted"])
 	_counted.text = L.t("AÇILAN SANDIK  %%%.1f") % counted
 	_progress_fill.size = Vector2(_progress_bg.size.x * counted / 100.0, _progress_bg.size.y)
-	var minutes := 21 * 60 + int(_t / DURATION * 300.0)
+	var minutes := 19 * 60 + int(minf(1.0, _t / (DURATION * ElectionNightSim.SETTLE)) * 300.0)
 	_clock.text = "%02d:%02d" % [(minutes / 60) % 24, minutes % 60]
 
 	var national: Dictionary = _sample["national"]
@@ -203,6 +201,7 @@ func _refresh() -> void:
 		}
 	_bars.counted = counted
 	_refresh_parliament()
+	_refresh_province_cards()
 	_detect_events()
 	if _t >= DURATION and not _finished:
 		_finish()
@@ -222,57 +221,22 @@ func _refresh_parliament() -> void:
 	_last_parliament_key = key
 	entries.append({"seats": maxi(0, _sim.total_seats - assigned), "color": UNCOUNTED})
 	_parliament.set_results(entries)
-	_majority_label.text = L.t("Salt çoğunluk %d  ·  Vekil %d/%d") % [
-		_sim.total_seats / 2 + 1, assigned, _sim.total_seats]
+	_parliament._count_plate.hide()
+	_meclis_count.text = "%d / %d" % [assigned, _sim.total_seats]
+	_refresh_province_cards()
 
 func _refresh_map() -> void:
 	if _map == null or _sample.is_empty():
 		return
-	var provinces: Dictionary = _sample["provinces"]
 	var colors := {}
-	var markers := {}
-	var key := ""
-	for province_id in provinces.keys():
-		var p: Dictionary = provinces[province_id]
-		var c := float(p["c"])
-		if c <= 0.0:
-			colors[province_id] = UNCOUNTED
-			continue
-		var seats: Dictionary = p["seats"]
-		var shares: Dictionary = p["shares"]
-		var winner = _province_winner(seats, shares)
-		var color: Color = _party_color(winner).lerp(UNCOUNTED, (1.0 - c) * 0.6)
-		colors[province_id] = color
-		var ids: Array = seats.keys()
-		ids.sort_custom(func(a, b): return int(seats[a]) > int(seats[b]))
-		var seat_colors: Array = []
-		for peer_id in ids:
-			for i in int(seats[peer_id]):
-				seat_colors.append(_party_color(peer_id))
-			key += "%s%d" % [str(peer_id), int(seats[peer_id])]
-		markers[province_id] = seat_colors
-		key += "%s;" % province_id
-	# İl renkleri her karede (sadece küçük palet dokusu güncellenir); vekil
-	# kareleri sadece dağılım değişince yeniden kurulur.
-	_map.set_province_colors(colors)
-	if key == _last_map_key:
-		return
-	_last_map_key = key
-	var seat_markers = _map.get_node_or_null("SeatMarkers")
-	if seat_markers != null:
-		seat_markers.set_all(markers)
+	for id in _sample["provinces"]:
+		var p: Dictionary = _sample["provinces"][id]
+		var winner = _top_peer(p["shares"])
+		colors[id] = UNCOUNTED if float(p["c"]) <= 0 else _party_color(winner).lerp(UNCOUNTED, (1.0 - float(p["c"])) * 0.6)
+	_map.replace_province_colors(colors)
 
-func _province_winner(seats: Dictionary, shares: Dictionary):
-	var winner = -1
-	for peer_id in shares.keys():
-		if winner == -1:
-			winner = peer_id
-			continue
-		var s := int(seats.get(peer_id, 0))
-		var ws := int(seats.get(winner, 0))
-		if s > ws or (s == ws and float(shares[peer_id]) > float(shares[winner])):
-			winner = peer_id
-	return winner
+func _province_winner(_seats: Dictionary, shares: Dictionary):
+	return _top_peer(shares)
 
 func _animate(delta: float) -> void:
 	_blink += delta
@@ -293,7 +257,7 @@ func _animate(delta: float) -> void:
 		rows.append({
 			"name": _party_name(peer_id), "leader": _leader_name(peer_id), "color": _party_color(peer_id),
 			"icon": _party_icon(peer_id),
-			"percent": d["percent"], "rank": d["rank"], "seats": target["seats"], "below": target["below"],
+			"percent": d["percent"], "rank": target["rank"], "seats": target["seats"], "below": target["below"],
 			"trend": trend, "alliance": _alliance_label(peer_id), "alliance_color": _alliance_color(peer_id),
 		})
 	_bars.rows = rows
@@ -310,16 +274,8 @@ func _animate(delta: float) -> void:
 		_layout_flash()
 		_flash.modulate.a = 0.0
 		_flash_left = FLASH_SECONDS if not _finished else HOLD_AFTER + 5.0
-	var target_alpha := 1.0 if _flash_left > 0.35 else 0.0
+	var target_alpha := 1.0 if _flash_text.text != "" else 0.0
 	_flash.modulate.a = move_toward(_flash.modulate.a, target_alpha, delta * 5.0)
-
-	# Kayan haber yazısı
-	_ticker_x -= TICKER_SPEED * delta
-	if _ticker_x < -_ticker_label.get_combined_minimum_size().x:
-		_ticker_label.text = _ticker_text()
-		_ticker_label.reset_size()
-		_ticker_x = _ticker_clip.size.x
-	_ticker_label.position = Vector2(_ticker_x, (_ticker_clip.size.y - _ticker_label.get_combined_minimum_size().y) * 0.5)
 
 func _push_flash(tag: String, text: String) -> void:
 	_flash_queue.append([tag, text])
@@ -391,7 +347,8 @@ func _finish() -> void:
 	if winner != -1:
 		_push_flash(L.t("SONUÇ"), L.t("Tüm sandıklar açıldı. Kesin olmayan sonuçlara göre birinci parti: %s  (%%%.1f · %d vekil)") % [
 			_party_name(winner), float(national[winner]), int(_sample["seats"].get(winner, 0))])
-	_final_stamp.visible = true
+	_final_stamp.visible = false
+	_live_label.text = L.t("SONUÇ")
 	_ticker_label.text = _ticker_text()
 
 func _ticker_text() -> String:
@@ -456,20 +413,23 @@ func _party_color(peer_id) -> Color:
 # --- Arayüz kurulumu ---------------------------------------------------------------
 
 func _build_ui() -> void:
-	add_child(TableSurface.felt())
+	_canvas = Control.new()
+	_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_canvas)
+	_canvas.add_child(TableSurface.felt())
 
 	for i in 3:
 		var frame := Panel.new()
 		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		add_child(frame)
+		_canvas.add_child(frame)
 		_frames.append(frame)
 	_style_frames(-1)
 
 	_map = (load("res://scenes/Map.tscn") as PackedScene).instantiate()
-	add_child(_map)
+	_canvas.add_child(_map)
 
 	_top_bar = TableSurface.wood("band")
-	add_child(_top_bar)
+	_canvas.add_child(_top_bar)
 	_live_badge = _panel(RED)
 	_top_bar.add_child(_live_badge)
 	_live_label = _label(L.t("CANLI"), 20, Color.WHITE)
@@ -477,7 +437,7 @@ func _build_ui() -> void:
 	_live_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_live_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_live_badge.add_child(_live_label)
-	_title = _label(L.t("SEÇİM GECESİ  ·  ÖZEL YAYIN"), 26, Color.WHITE)
+	_title = _label(L.t("SEÇİM GECESİ"), 26, Color.WHITE)
 	_top_bar.add_child(_title)
 	_subtitle = _label("%s  ·  %s" % [GameRules.election_label(CardManager.last_election_round).to_upper(),
 		L.t("ERKEN SEÇİM") if CardManager.last_election_was_early else L.t("GENEL SEÇİM")], 14, UiTheme.WOOD_TEXT_MUTED)
@@ -492,35 +452,38 @@ func _build_ui() -> void:
 	_progress_bg = ColorRect.new()
 	_progress_bg.color = UiTheme.SLOT
 	_progress_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_progress_bg)
+	_canvas.add_child(_progress_bg)
 	_progress_fill = ColorRect.new()
 	_progress_fill.color = GOLD
 	_progress_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_progress_bg.add_child(_progress_fill)
 
-	_section_map = _label(L.t("SANDIK HARİTASI"), 15, TEXT_DIM)
-	add_child(_section_map)
-	_section_votes = _label(L.t("OY ORANLARI"), 15, TEXT_DIM)
-	add_child(_section_votes)
+	_section_map = _label(L.t("Ülke sandık başında"), 15, TEXT_DIM)
+	_canvas.add_child(_section_map)
+	_section_votes = _label(L.t("Ülke geneli"), 15, TEXT_DIM)
+	_canvas.add_child(_section_votes)
+	_threshold_label = _label(L.t("BARAJ %%%s") % String.num(MultiplayerManager.election_threshold, 1), 11, UiTheme.TEXT_MUTED)
+	_threshold_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_canvas.add_child(_threshold_label)
 	_bars = LiveBars.new()
 	_bars.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_bars)
-	_section_parliament = _label(L.t("MECLİS DAĞILIMI"), 15, TEXT_DIM)
-	add_child(_section_parliament)
+	_canvas.add_child(_bars)
+	_section_parliament = _label(L.t("Meclis"), 15, TEXT_DIM)
+	_canvas.add_child(_section_parliament)
 	_parliament = ParliamentDiagram.new()
 	_parliament.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_parliament)
+	_canvas.add_child(_parliament)
 	_majority_label = _label("", 12, UiTheme.TEXT_MUTED)
 	_majority_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	add_child(_majority_label)
+	_canvas.add_child(_majority_label)
 
 	_final_stamp = _label(L.t("KESİN OLMAYAN SONUÇLAR"), 22, UiTheme.RED_DARK)
 	_final_stamp.visible = false
-	add_child(_final_stamp)
+	_canvas.add_child(_final_stamp)
 
-	_flash = _panel(UiTheme.GOLD)
+	_flash = _panel(UiTheme.PANEL_DARK)
 	_flash.modulate.a = 0.0
-	add_child(_flash)
+	_canvas.add_child(_flash)
 	var flash_tag_bg := _panel(RED)
 	flash_tag_bg.name = L.t("TagBg")
 	_flash.add_child(flash_tag_bg)
@@ -539,10 +502,10 @@ func _build_ui() -> void:
 	_cam_flash = ColorRect.new()
 	_cam_flash.color = Color(1, 1, 1, 0)
 	_cam_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_cam_flash)
+	_canvas.add_child(_cam_flash)
 
 	_ticker_bg = TableSurface.wood("desk")
-	add_child(_ticker_bg)
+	_canvas.add_child(_ticker_bg)
 	_ticker_tag = _panel(RED)
 	_ticker_bg.add_child(_ticker_tag)
 	var ticker_tag_label := _label(L.t("SON DAKİKA"), 18, Color.WHITE)
@@ -558,158 +521,127 @@ func _build_ui() -> void:
 	_ticker_clip.add_child(_ticker_label)
 
 
+	_subtitle.hide()
+	_majority_label.hide()
+	_ticker_bg.hide()
+	_cam_flash.hide()
+	_map_sea = Panel.new()
+	_map_sea.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sea_style := UiSkin.flat(Color("93d2d7"), 10)
+	sea_style.border_color = UiTheme.TEAL
+	sea_style.set_border_width_all(2)
+	_map_sea.add_theme_stylebox_override("panel", sea_style)
+	_canvas.add_child(_map_sea)
+	_canvas.move_child(_map_sea, _map.get_index())
+	_map.draw_sea = false
+	_map.get_node("SeatMarkers").hide()
+	_meclis_count = _label("", 28, UiTheme.TEAL)
+	_meclis_count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_canvas.add_child(_meclis_count)
+	_map.province_hovered.connect(_on_province_hovered)
+	_map.province_clicked.connect(_on_province_hovered)
+	_largest_provinces = _sim.province_ids.duplicate()
+	var electorate: Dictionary = GameMap.electorate_counts()
+	_largest_provinces.sort_custom(func(a, b):
+		if int(_sim.province_seats[a]) != int(_sim.province_seats[b]):
+			return int(_sim.province_seats[a]) > int(_sim.province_seats[b])
+		if int(electorate.get(a, 0)) != int(electorate.get(b, 0)):
+			return int(electorate.get(a, 0)) > int(electorate.get(b, 0))
+		return String(a) < String(b))
+	_largest_provinces = _largest_provinces.slice(0, 3)
+	_hovered_province = String(_sim.province_ids[0]) if not _sim.province_ids.is_empty() else ""
+	for i in 4:
+		var card := ProvinceCard.new()
+		card.wide = i == 0
+		card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_canvas.add_child(card)
+		_province_cards.append(card)
+
+func _style_frames(_big: int) -> void:
+	for frame in _frames:
+		frame.add_theme_stylebox_override("panel", UiSkin.board())
+
 func _layout() -> void:
-	var s := get_viewport_rect().size
-	var margin := 16.0
-	var top_h := 72.0
-	var bottom_h := 52.0
-
-	_top_bar.position = Vector2.ZERO
-	_top_bar.size = Vector2(s.x, top_h)
-	_live_badge.position = Vector2(margin, 16)
-	_live_badge.size = Vector2(118, 40)
-	_title.position = Vector2(margin + 134, 8)
-	_subtitle.position = Vector2(margin + 136, 42)
-	var menu_reserved := 130.0  # sağ üstteki Menü butonu (SettingsOverlay)
-	_clock.position = Vector2(s.x - margin - menu_reserved - 110, 10)
-	_clock.size = Vector2(110, 50)
-	_counted.position = Vector2(s.x - margin - menu_reserved - 470, 19)
-	_counted.size = Vector2(340, 34)
-	# Başlık sayaca kadar kalan yere sığsın (İngilizce başlık daha uzun).
-	var title_room := _counted.position.x - _title.position.x - 16.0
-	var title_font := _title.get_theme_font("font")
-	var title_size := 26
-	while title_size > 14 and title_font.get_string_size(_title.text, HORIZONTAL_ALIGNMENT_LEFT, -1, title_size).x > title_room:
-		title_size -= 1
-	_title.add_theme_font_size_override("font_size", title_size)
-	_progress_bg.position = Vector2(0, top_h)
-	_progress_bg.size = Vector2(s.x, 6)
-
-	var content_top := top_h + 6.0 + margin
-	var content_bottom := s.y - bottom_h - margin
-	var flash_h := 60.0
-	_content = Rect2(margin, content_top, s.x - margin * 2.0, content_bottom - content_top - flash_h - margin)
-	_flash.position = Vector2(margin, content_bottom - flash_h)
-	_flash.size = Vector2(s.x - margin * 2.0, flash_h)
+	var screen := get_viewport_rect().size
+	var factor := minf(screen.x / 1440.0, screen.y / 810.0)
+	_canvas.scale = Vector2.ONE * factor
+	_canvas.position = (screen - Vector2(1440, 810) * factor) * 0.5
+	_canvas.size = Vector2(1440, 810)
+	_top_bar.position = Vector2(24, 22)
+	_top_bar.size = Vector2(1392, 68)
+	_live_badge.position = Vector2(18, 16)
+	_live_badge.size = Vector2(80, 36)
+	_title.position = Vector2(112, 15)
+	_title.add_theme_font_size_override("font_size", 28)
+	_counted.position = Vector2(830, 18)
+	_counted.size = Vector2(330, 34)
+	_clock.position = Vector2(1175, 17)
+	_clock.size = Vector2(92, 34)
+	_clock.add_theme_font_size_override("font_size", 24)
+	_progress_bg.position = Vector2(1010, 73)
+	_progress_bg.size = Vector2(160, 5)
+	var rects := [Rect2(24, 110, 801, 610), Rect2(843, 110, 573, 300), Rect2(843, 428, 573, 292)]
+	for i in 3:
+		_frames[i].position = rects[i].position
+		_frames[i].size = rects[i].size
+	_map_frame = Rect2(42, 158, 765, 360)
+	_map_sea.position = _map_frame.position
+	_map_sea.size = _map_frame.size
+	var native := GameMap.map_size()
+	var fit := minf((_map_frame.size.x - 20) / native.x, (_map_frame.size.y - 20) / native.y)
+	_map.scale = Vector2.ONE * fit
+	_map.position = _map_frame.position + (_map_frame.size - native * fit) * 0.5
+	_section_map.position = Vector2(42, 125)
+	_section_votes.position = Vector2(861, 125)
+	_threshold_label.position = Vector2(1300, 128)
+	_threshold_label.size = Vector2(96, 22)
+	_section_parliament.position = Vector2(861, 443)
+	for label in [_section_map, _section_votes, _section_parliament]:
+		label.add_theme_font_size_override("font_size", 20)
+	_bars.position = Vector2(861, 157)
+	_bars.size = Vector2(537, 235)
+	_parliament.position = Vector2(861, 475)
+	_parliament.size = Vector2(537, 226)
+	_meclis_count.position = Vector2(1000, 664)
+	_meclis_count.size = Vector2(260, 40)
+	_province_cards[0].position = Vector2(42, 529)
+	_province_cards[0].size = Vector2(765, 66)
+	for i in 3:
+		_province_cards[i + 1].position = Vector2(42 + i * 258, 605)
+		_province_cards[i + 1].size = Vector2(249, 96)
+	_flash.position = Vector2(24, 738)
+	_flash.size = Vector2(1392, 50)
 	_layout_flash()
-	_cam_flash.position = _content.position
-	_cam_flash.size = _content.size
-	_pane_now = _pane_targets()
-	_apply_panes()
 
-	_ticker_bg.position = Vector2(0, s.y - bottom_h)
-	_ticker_bg.size = Vector2(s.x, bottom_h)
-	_ticker_tag.position = Vector2.ZERO
-	_ticker_tag.size = Vector2(170, bottom_h)
-	_ticker_clip.position = Vector2(182, 0)
-	_ticker_clip.size = Vector2(s.x - 182, bottom_h)
-	_last_parliament_key = ""
-	if not _sample.is_empty():
-		_refresh_parliament()
-
-# --- Stüdyo kameraları -----------------------------------------------------------
-
-## Pencere sırası: 0 harita, 1 oy oranları, 2 meclis.
-## Sayımın çeyreklerinde büyük pencere: harita → oylar → meclis → harita.
-func _camera_index() -> int:
-	if _finished:
-		return 3
-	return [0, 1, 2, 0][mini(3, int(_t / DURATION * 4.0))]
-
-func _pane_targets() -> Array:
-	var c := _content
-	var gap := 12.0
-	if _camera_index() == 3:
-		# Sonuç: harita solda, oylar ve meclis sağda (klasik düzen).
-		var left_w := c.size.x * 0.55
-		var right := Rect2(c.position.x + left_w + gap, c.position.y, c.size.x - left_w - gap, c.size.y)
-		var half := (right.size.y - gap) * 0.5
-		return [Rect2(c.position, Vector2(left_w, c.size.y)),
-			Rect2(right.position, Vector2(right.size.x, half)),
-			Rect2(right.position + Vector2(0, half + gap), Vector2(right.size.x, half))]
-	var big_w := c.size.x * 0.55
-	var small_x := c.position.x + big_w + gap
-	var small_w := c.size.x - big_w - gap
-	var small_h := (c.size.y - gap) * 0.5
-	var big := _camera_index()
-	var rects := [Rect2(), Rect2(), Rect2()]
-	rects[big] = Rect2(c.position, Vector2(big_w, c.size.y))
-	var slot := 0
-	for i in 3:
-		if i == big:
-			continue
-		rects[i] = Rect2(small_x, c.position.y + slot * (small_h + gap), small_w, small_h)
-		slot += 1
-	return rects
-
-func _update_camera(delta: float) -> void:
-	if _pane_now.size() < 3:
+func _on_province_hovered(id: String) -> void:
+	if id == "" or not _sim.province_seats.has(id):
 		return
-	var cam := _camera_index()
-	if cam != _camera:
-		if _camera != -1:
-			_cam_flash.color.a = 0.6
-		_camera = cam
-		_style_frames(cam)
-	_cam_flash.color.a = move_toward(_cam_flash.color.a, 0.0, delta * 2.4)
-	var targets := _pane_targets()
-	var k := 1.0 - exp(-9.0 * delta)
-	var moving := false
-	for i in 3:
-		var now: Rect2 = _pane_now[i]
-		var to: Rect2 = targets[i]
-		if now.position.distance_to(to.position) + now.size.distance_to(to.size) < 0.6:
-			if now != to:
-				_pane_now[i] = to
-				moving = true
-			continue
-		_pane_now[i] = Rect2(now.position.lerp(to.position, k), now.size.lerp(to.size, k))
-		moving = true
-	if moving:
-		_apply_panes()
+	_hovered_province = id
+	_refresh_province_cards()
 
-func _style_frames(big: int) -> void:
-	for i in _frames.size():
-		# Karton pano: büyük pencere hardal kenarlı.
-		var box := UiSkin.board(UiTheme.PANEL, GOLD if i == big else UiTheme.TEAL)
-		(_frames[i] as Panel).add_theme_stylebox_override("panel", box)
-
-## Pencere dikdörtgenlerini ekrana uygular (pencere başlığı + içerik).
-func _apply_panes() -> void:
-	if _pane_now.size() < 3:
+func _refresh_province_cards() -> void:
+	if _sample.is_empty():
 		return
-	var pad := 10.0
-	var head := 26.0
-	for i in 3:
-		var r: Rect2 = _pane_now[i]
-		_frames[i].position = r.position.round()
-		_frames[i].size = r.size.round()
-	# Harita
-	var mr: Rect2 = _pane_now[0]
-	_map_frame = Rect2(mr.position + Vector2(pad, pad + head), mr.size - Vector2(pad * 2.0, pad * 2.0 + head))
-	if GameMap.map_size().x > 0:
-		var native: Vector2 = GameMap.map_size()
-		var fit: float = minf(_map_frame.size.x / native.x, _map_frame.size.y / native.y)
-		_map.scale = Vector2(fit, fit)
-		_map.position = _map_frame.position + (_map_frame.size - native * fit) * 0.5
-		var seat_markers = _map.get_node_or_null("SeatMarkers")
-		if seat_markers != null:
-			seat_markers.queue_redraw()
-	_section_map.position = mr.position + Vector2(pad, 3)
-	_section_map.visible = not _finished
-	_final_stamp.position = mr.position + Vector2(pad, 0)
-	# Oy oranları
-	var br: Rect2 = _pane_now[1]
-	_section_votes.position = br.position + Vector2(pad, 3)
-	_bars.position = (br.position + Vector2(pad, pad + head)).round()
-	_bars.size = (br.size - Vector2(pad * 2.0, pad * 2.0 + head + 12.0)).round()
-	# Meclis
-	var pr: Rect2 = _pane_now[2]
-	_section_parliament.position = pr.position + Vector2(pad, 3)
-	_majority_label.position = pr.position + Vector2(pad + 150, 4)
-	_majority_label.size = Vector2(maxf(0.0, pr.size.x - pad * 2.0 - 150), 24)
-	_parliament.position = (pr.position + Vector2(pad, pad + head)).round()
-	_parliament.size = (pr.size - Vector2(pad * 2.0, pad * 2.0 + head)).round()
+	var shown := [_hovered_province] + _largest_provinces
+	for i in _province_cards.size():
+		var card: ProvinceCard = _province_cards[i]
+		card.visible = i < shown.size() and String(shown[i]) != ""
+		if not card.visible:
+			continue
+		var id := String(shown[i])
+		var p: Dictionary = _sample["provinces"].get(id, {})
+		var shares: Dictionary = p.get("shares", {})
+		var order: Array = shares.keys()
+		order.sort_custom(func(a, b): return float(shares[a]) > float(shares[b]) if shares[a] != shares[b] else int(a) < int(b))
+		var entries: Array = []
+		for pid in order:
+			entries.append({"name": _party_name(pid), "color": _party_color(pid), "percent": shares[pid], "seats": int(p.get("seats", {}).get(pid, 0))})
+		card.province_id = id
+		card.title = GameMap.name_of(id)
+		card.entries = entries
+		card.seats = int(_sim.province_seats[id])
+		card.counted = float(p.get("c", 0))
+		card.queue_redraw()
 
 ## Sonuç gazetesi seçim ekranında oynar; bitince (ya da animasyonlar
 ## kapalıysa hemen) oyun ekranına dönülür.
@@ -784,76 +716,82 @@ func _label(text: String, font_size: int, color: Color, outline: bool = false) -
 ## baraj kesik kırmızı çizgiyle gösterilir.
 class LiveBars extends Control:
 	var rows: Array = []
-	var threshold: float = 0.0
-	var counted: float = 0.0
+	var threshold := 0.0
+	var counted := 0.0
+	var _card := UiSkin.card()
 
 	func _draw() -> void:
-		if rows.is_empty():
-			return
-		# Rakamlar ve parti adları monospace: yayın grafiği havası (bkz. UiTheme).
-		var font: Font = UiTheme.mono()
-		var n := rows.size()
-		var row_h: float = minf(60.0, size.y / float(n))
-		var h: float = row_h - 8.0
-		var name_w: float = minf(250.0, size.x * 0.36)
-		var value_w := 104.0
-		var bar_x := name_w + 24.0
-		var bar_w: float = maxf(40.0, size.x - bar_x - value_w - 10.0)
-		var max_percent := 0.0
+		var font := UiTheme.mono()
+		var rh := size.y / maxf(1, rows.size())
+		var fs := clampi(int(rh * 0.42), 12, 17)
 		for r in rows:
-			max_percent = maxf(max_percent, float(r["percent"]))
-		var scale: float = maxf(25.0, max_percent * 1.12)
-		var name_size: int = clampi(int(h * 0.36), 11, 19)
-		for r in rows:
-			var y: float = float(r["rank"]) * row_h
+			var y := float(r["rank"]) * rh
 			var color: Color = r["color"]
-			var below: bool = bool(r["below"])
-			var alpha := 0.45 if below else 1.0
-			# Parti rozeti: renkli kare + logo.
-			var badge: float = minf(h, 44.0)
-			var stripe: Color = r.get("alliance_color", Color.TRANSPARENT)
-			if stripe.a > 0.0:
-				draw_rect(Rect2(0, y + 2, 5, h), Color(stripe, alpha))
-			var badge_rect := Rect2(9 if stripe.a > 0.0 else 0, y + 2 + (h - badge) * 0.5, badge, badge)
-			draw_rect(badge_rect, Color(color, alpha))
+			var alpha := 0.5 if r["below"] else 1.0
+			draw_style_box(_card, Rect2(0, y, size.x, rh - 4))
+			var radius := minf(15, rh * 0.3)
+			var center := Vector2(21, y + rh * 0.45)
+			draw_circle(center + Vector2(0, 2), radius, color.darkened(0.3))
+			draw_circle(center, radius, Color(color, alpha))
 			var icon: Texture2D = r.get("icon")
 			if icon != null:
-				draw_texture_rect(icon, badge_rect.grow(-badge * 0.14), false, Color(1, 1, 1, alpha))
-			var text_x := badge_rect.end.x + 8.0
-			draw_string(font, Vector2(text_x, y + h * 0.5 + 2), String(r["name"]), HORIZONTAL_ALIGNMENT_LEFT,
-				name_w - text_x, name_size, Color(UiTheme.TEXT, alpha))
-			var sub_line := String(r["leader"])
-			var sub_color := Color(UiTheme.TEXT_MUTED, alpha)
-			if String(r.get("alliance", "")) != "":
-				sub_line = String(r["alliance"])
-				sub_color = Color(stripe.darkened(0.3), alpha)
-			draw_string(font, Vector2(text_x, y + h * 0.5 + 4 + name_size * 0.8), sub_line, HORIZONTAL_ALIGNMENT_LEFT,
-				name_w - text_x, maxi(9, name_size - 6), sub_color)
-			var trend := float(r.get("trend", 0.0))
-			if absf(trend) > 0.08:
-				var cx := bar_x - 10.0
-				var cy := y + 2 + h * 0.5
-				var a := minf(7.0, h * 0.3)
-				var up := trend > 0.0
-				var base_y := cy + (a * 0.6 if up else -a * 0.6)
-				var tip_y := cy + (-a * 0.7 if up else a * 0.7)
-				draw_colored_polygon(PackedVector2Array([Vector2(cx - a, base_y), Vector2(cx + a, base_y), Vector2(cx, tip_y)]),
-					Color(UiTheme.GREEN if up else UiTheme.RED, alpha))
-			draw_rect(Rect2(bar_x, y + 2, bar_w, h), Color(UiTheme.SLOT, alpha))
-			var fill: float = bar_w * clampf(float(r["percent"]) / scale, 0.0, 1.0)
-			draw_rect(Rect2(bar_x, y + 2, fill, h), Color(color, alpha))
-			draw_rect(Rect2(bar_x, y + 2, fill, maxf(2.0, h * 0.12)), Color(UiTheme.TEXT, 0.25 * alpha))
-			draw_string(font, Vector2(size.x - value_w, y + h * 0.5 + 4), L.t("%%%.1f") % float(r["percent"]),
-				HORIZONTAL_ALIGNMENT_RIGHT, value_w, clampi(int(h * 0.45), 12, 24), Color(UiTheme.TEXT, alpha))
-			var sub := L.t("BARAJ ALTI") if below else L.t("%d vekil") % int(r["seats"])
-			draw_string(font, Vector2(size.x - value_w, y + h * 0.5 + 6 + name_size * 0.8), sub,
-				HORIZONTAL_ALIGNMENT_RIGHT, value_w, maxi(9, name_size - 6),
-				UiTheme.RED if below else UiTheme.TEXT_MUTED)
-		if threshold > 0.0:
-			var tx: float = bar_x + bar_w * clampf(threshold / scale, 0.0, 1.0)
-			var yy := 0.0
-			while yy < row_h * n:
-				draw_line(Vector2(tx, yy), Vector2(tx, minf(yy + 6.0, row_h * n)), UiTheme.RED, 3.0)
-				yy += 11.0
-			draw_string(font, Vector2(tx + 4, row_h * n + 12), L.t("BARAJ %%%s") % String.num(threshold, 1),
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UiTheme.RED)
+				draw_texture_rect(icon, Rect2(center - Vector2.ONE * radius * 0.65, Vector2.ONE * radius * 1.3), false, Color(1, 1, 1, alpha))
+			draw_string(font, Vector2(45, y + rh * 0.43), String(r["name"]), HORIZONTAL_ALIGNMENT_LEFT, size.x - 195, fs, Color(UiTheme.TEXT, alpha))
+			var bar := Rect2(45, y + rh * 0.62, size.x - 195, maxf(4, rh * 0.12))
+			draw_style_box(UiSkin.flat(UiTheme.SLOT, 4), bar)
+			bar.size.x *= clampf(float(r["percent"]) / 50, 0, 1)
+			if bar.size.x > 0:
+				draw_style_box(UiSkin.flat(Color(color, alpha), 4), bar)
+			if threshold > 0:
+				var bx := 45 + (size.x - 195) * clampf(threshold / 50.0, 0, 1)
+				draw_line(Vector2(bx, y + rh * 0.62 - 3), Vector2(bx, y + rh * 0.74 + 3), Color(UiTheme.RED, 0.5), 1)
+			draw_string(font, Vector2(size.x - 142, y + rh * 0.6), L.pct(float(r["percent"])), HORIZONTAL_ALIGNMENT_RIGHT, 83, fs + 5, Color(UiTheme.TEXT, alpha))
+			draw_string(font, Vector2(size.x - 50, y + rh * 0.6), str(r["seats"]), HORIZONTAL_ALIGNMENT_CENTER, 43, fs + 3, Color(UiTheme.TEAL, alpha))
+
+class ProvinceCard extends Control:
+	var province_id := ""
+	var title := ""
+	var entries: Array = []
+	var seats := 0
+	var counted := 0.0
+	var wide := false
+	var _card := UiSkin.card()
+
+	func _draw() -> void:
+		draw_style_box(_card, Rect2(Vector2.ZERO, size))
+		var font := UiTheme.mono()
+		var body := UiTheme.body()
+		draw_string(font, Vector2(10, 24 if wide else 20), title, HORIZONTAL_ALIGNMENT_LEFT, 150 if wide else size.x - 62, 19 if wide else 16, UiTheme.TEAL)
+		if entries.is_empty():
+			return
+		if wide:
+			draw_string(body, Vector2(10, 44), L.t("%d vekil") % seats + " · " + L.pct(counted * 100), HORIZONTAL_ALIGNMENT_LEFT, 145, 10, UiTheme.TEXT_MUTED)
+			var bar := Rect2(155, 19, size.x - 250, 6)
+			draw_style_box(UiSkin.flat(UiTheme.SLOT, 4), bar)
+			bar.size.x *= counted
+			if bar.size.x > 0:
+				draw_style_box(UiSkin.flat(UiTheme.TEAL, 4), bar)
+			for i in mini(3, entries.size()):
+				var e: Dictionary = entries[i]
+				draw_string(font, Vector2(155 + i * 145, 44), String(e["name"]) + " " + L.pct(float(e["percent"])), HORIZONTAL_ALIGNMENT_LEFT, 140, 11, e["color"])
+			var slot := 0
+			var columns := 10
+			var rows := maxi(1, ceili(float(seats) / columns))
+			var spacing := minf(7, 48.0 / rows)
+			for e in entries:
+				for j in int(e["seats"]):
+					draw_circle(Vector2(size.x - 83 + (slot % columns) * 7, 12 + (slot / columns) * spacing), minf(2.7, spacing * 0.4), e["color"])
+					slot += 1
+		else:
+			draw_string(body, Vector2(size.x - 61, 20), L.t("%d vekil") % seats, HORIZONTAL_ALIGNMENT_RIGHT, 50, 10, UiTheme.TEXT_MUTED)
+			for i in mini(2, entries.size()):
+				var e: Dictionary = entries[i]
+				var y := 40 + i * 17
+				draw_string(font, Vector2(10, y), String(e["name"]), HORIZONTAL_ALIGNMENT_LEFT, size.x - 80, 12 if i == 0 else 10, e["color"])
+				draw_string(font, Vector2(size.x - 68, y), L.pct(float(e["percent"])), HORIZONTAL_ALIGNMENT_RIGHT, 58, 12 if i == 0 else 10, UiTheme.TEXT)
+			var bar := Rect2(10, 68, size.x - 20, 5)
+			draw_style_box(UiSkin.flat(UiTheme.SLOT, 3), bar)
+			bar.size.x *= counted
+			if bar.size.x > 0:
+				draw_style_box(UiSkin.flat(UiTheme.TEAL, 3), bar)
+			draw_string(body, Vector2(size.x - 65, 87), L.pct(counted * 100), HORIZONTAL_ALIGNMENT_RIGHT, 55, 9, UiTheme.TEXT_MUTED)

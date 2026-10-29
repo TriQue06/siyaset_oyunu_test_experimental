@@ -28,7 +28,12 @@ static func draw_portrait(target: Control, value: Dictionary, area: Rect2) -> vo
 			_draw_eyes(target, face, String(id), origin, factor)
 			continue
 		var rect := AvatarCatalog.layer_rect(String(id), face)
-		target.draw_texture_rect(AvatarCatalog.texture(String(id)), Rect2(origin + rect.position * factor, rect.size * factor), false)
+		var texture := AvatarCatalog.texture(String(id))
+		if category in ["hair", "beard"]:
+			# Subtle contact shade below the original layer; source colors stay untouched.
+			for shift in [Vector2(-2, 3), Vector2(2, 4), Vector2(0, 6)]:
+				target.draw_texture_rect(texture, Rect2(origin + (rect.position + shift) * factor, rect.size * factor), false, Color(0.12, 0.08, 0.05, 0.045))
+		target.draw_texture_rect(texture, Rect2(origin + rect.position * factor, rect.size * factor), false)
 
 static func _draw_eyes(target: Control, face: String, iris: String, origin: Vector2, factor: float) -> void:
 	var info: Dictionary = AvatarCatalog.data().faces[face]
@@ -43,8 +48,8 @@ static func _draw_eyes(target: Control, face: String, iris: String, origin: Vect
 			var angle := TAU * float(step) / 32.0
 			var p := center + Vector2(cos(angle) * width * 0.5, sin(angle) * height * 0.5)
 			points.append(origin + p * factor)
-			uv.append((p - center) / 116.0 + Vector2(0.5, 0.5))
+			uv.append((p - center) / 92.0 + Vector2(0.5, 0.5))
 		# The supplied iris is a ring with a transparent pupil opening.
 		# A dark backing under that opening leaves all source PNG colors intact.
-		target.draw_circle(origin + center * factor, 14.0 * factor, Color("17100C"))
+		target.draw_circle(origin + center * factor, 11.0 * factor, Color("17100C"))
 		target.draw_polygon(points, PackedColorArray([Color.WHITE]), uv, AvatarCatalog.texture(iris))

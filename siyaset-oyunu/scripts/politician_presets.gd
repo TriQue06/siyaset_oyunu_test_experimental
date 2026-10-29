@@ -199,13 +199,16 @@ static func random_background(rng: RandomNumberGenerator = null) -> String:
 
 ## portrait: portre kimliği ("<paket>:<ad>"); biçimi bozuksa boş kalır.
 static func make(first_name: String, surname: String, background_id: String, hometown: String,
-		gender: String = "m", portrait: String = "") -> Dictionary:
+		gender: String = "m", portrait: String = "", appearance: Variant = null) -> Dictionary:
 	first_name = first_name.strip_edges()
 	surname = surname.strip_edges()
-	return {"gender": gender if GENDERS.has(gender) else "m", "first_name": first_name, "surname": surname,
+	var result := {"gender": gender if GENDERS.has(gender) else "m", "first_name": first_name, "surname": surname,
 		"name": ("%s %s" % [first_name, surname]).left(NAME_MAX_LENGTH),
 		"background": background_id,
 		"hometown": hometown, "portrait": clean_portrait(portrait)}
+	if appearance is Dictionary and not appearance.is_empty():
+		result["appearance"] = AvatarCatalog.clean(appearance, String(result.gender))
+	return result
 
 ## Portre kimliği "<paket>:<ad>" biçiminde mi? Değilse "" (ağdan gelen veri de buradan geçer).
 static func clean_portrait(portrait: String) -> String:

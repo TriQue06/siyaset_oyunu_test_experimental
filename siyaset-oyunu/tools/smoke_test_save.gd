@@ -84,6 +84,11 @@ func _initialize() -> void:
 		var id: int = mm.BOT_ID_BASE - i
 		mm.players[id] = {"name": "Bot %d" % i, "bot": true}
 		pm.add_bot_party(id)
+		var politician: Dictionary = pm.politicians[id].duplicate(true)
+		var look := AvatarCatalog.clean({}, String(politician.gender))
+		look.hair = AvatarCatalog.options("hair", String(politician.gender))[0]
+		politician["appearance"] = look
+		pm.set_politician_host(id, politician)
 	cm.init_game()
 	mm.stage = mm.Stage.IN_GAME
 	_play(6)
@@ -94,6 +99,7 @@ func _initialize() -> void:
 	var before: Dictionary = cm._pack_state(true).duplicate(true)
 	var gm_before: Dictionary = gm._pack_state().duplicate(true)
 	var parties_before: Dictionary = pm.parties.duplicate(true)
+	var politicians_before: Dictionary = pm.politicians.duplicate(true)
 	var turmoil_before: Dictionary = cm.turmoil.duplicate(true)
 	var rng_before: int = cm._rng.state
 	_play(4)
@@ -120,6 +126,7 @@ func _initialize() -> void:
 			gm_same = false
 	check("hükümet durumu ve puanlar geri geldi", gm_same)
 	check("partiler (seçmen grupları dahil) geri geldi", str(parties_before) == str(pm.parties))
+	check("siyasetçi avatar seçimleri geri geldi", politicians_before == pm.politicians)
 	check("parti içi karışıklık geri geldi", str(turmoil_before) == str(cm.turmoil))
 	check("rastgele sayı üreteci durumu geri geldi", cm._rng.state == rng_before)
 	check("aşama oyun içi, çevrim dışı", mm.stage == mm.Stage.IN_GAME and mm.offline_mode)

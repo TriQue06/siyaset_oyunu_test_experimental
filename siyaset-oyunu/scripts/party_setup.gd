@@ -46,6 +46,8 @@ var _name_lang: String = "en" if L.is_en() else "tr"
 var _background_id: String = ""
 var _hometown: String = ""
 var _portrait: String = ""
+var _appearance: Dictionary = {}
+var _avatar_editor: AvatarEditor
 var _party_name: String = ""
 var _icon_index: int = 0
 var _bg_color: Color = PartyPresets.COLORS[0]
@@ -107,6 +109,7 @@ func _ready() -> void:
 		GameMap.generate_new(GameMap.DEFAULT_SEED)
 	_core = VoterGroups.random_core()
 	_restore_own()
+	_appearance = AvatarCatalog.clean(_appearance, _gender)
 	_build_ui()
 	_load_fields()
 	MultiplayerManager.party_setup_finished.connect(_on_party_setup_finished)
@@ -147,9 +150,10 @@ func _politician_from(data: Dictionary) -> void:
 		_background_id = ""
 	_hometown = String(data.get("hometown", ""))
 	_portrait = String(data.get("portrait", ""))
+	_appearance = AvatarCatalog.clean(data.get("appearance", {}), _gender)
 
 func _draft_politician() -> Dictionary:
-	return PoliticianPresets.make(_first_name, _surname, _background_id, _hometown, _gender, _portrait)
+	return PoliticianPresets.make(_first_name, _surname, _background_id, _hometown, _gender, _portrait, _appearance)
 
 func _editing_bot() -> bool:
 	return _edit_target != -1 and _edit_target != multiplayer.get_unique_id()
@@ -302,6 +306,13 @@ func _build_politician_page() -> Control:
 		gb.pressed.connect(_on_gender_pressed.bind(g))
 		gender_row.add_child(gb)
 		_gender_buttons[g] = gb
+
+	var profile_button := Button.new()
+	profile_button.text = L.t("Siyasetçi Profili")
+	profile_button.custom_minimum_size = Vector2(0, 52)
+	UiSkin.skin_color_button(profile_button, UiTheme.GOLD)
+	profile_button.pressed.connect(_open_avatar_editor)
+	page.add_child(profile_button)
 
 	page.add_child(PopupKit.section(L.t("Ad ve soyad"), L.t("zarla değiştir ya da kendin yaz")))
 	var name_row := HBoxContainer.new()
@@ -937,6 +948,7 @@ func _on_gender_pressed(gender: String) -> void:
 	if gender == _gender:
 		return
 	_gender = gender
+	_appearance = AvatarCatalog.clean(_appearance, _gender)
 	_reroll_name(true, false)
 
 ## Klasik düğme dokusu, cinsiyet renginde: seçili tam renk, diğeri koyu ve sönük.
@@ -995,6 +1007,8 @@ func _on_province_hovered(province_id: String) -> void:
 ## (ya da tamamlanınca, oda listesinde görünsün diye) gönderilir.
 func _politician_changed() -> void:
 	var data := _draft_politician()
+	if not _editing_bot():
+		PartyManager.my_politician = data.duplicate(true)
 	if PoliticianPresets.is_valid(data) and _hometown != "":
 		if _editing_bot():
 			PartyManager.set_bot_politician(_edit_target, data)
@@ -1113,7 +1127,7 @@ func _on_parties_updated() -> void:
 
 func _own_snapshot() -> Dictionary:
 	return {"gender": _gender, "first_name": _first_name, "surname": _surname, "lang": _name_lang,
-		"background": _background_id, "hometown": _hometown, "portrait": _portrait,
+		"background": _background_id, "hometown": _hometown, "portrait": _portrait, "appearance": _appearance.duplicate(true),
 		"party": _party_name, "icon": _icon_index, "color": _bg_color, "core": _core.duplicate(),
 		"step": _step, "visited": _visited.duplicate()}
 
@@ -1162,3 +1176,17 @@ func _load_fields() -> void:
 
 func _on_party_setup_finished() -> void:
 	SceneTransition.fade_to_scene("res://scenes/GameScreen.tscn")
+
+# Visual profile is part of the draft, including before profession/home are chosen.
+func _open_avatar_editor() -> void:
+	if (_is_locked and not _editing_bot()) or is_instance_valid(_avatar_editor):
+		return
+	_avatar_editor = AvatarEditor.new()
+	_avatar_editor.set_appearance(_appearance)
+	_avatar_editor.appearance_changed.connect(_on_appearance_changed)
+	add_child(_avatar_editor)
+
+func _on_appearance_changed(value: Dictionary) -> void:
+	_appearance = value.duplicate(true)
+	_gender = String(value.gender)
+	_politician_changed()

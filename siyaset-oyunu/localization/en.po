@@ -5384,3 +5384,123 @@ msgstr "Nationwide"
 
 msgid "SEÇİM GECESİ"
 msgstr "ELECTION NIGHT"
+
+msgid "Siyasetçi Profili"
+msgstr "Politician Profile"
+
+msgid "Yüz"
+msgstr "Face"
+
+msgid "Saç"
+msgstr "Hair"
+
+msgid "Kaş"
+msgstr "Eyebrows"
+
+msgid "Göz irisi"
+msgstr "Iris"
+
+msgid "Bıyık"
+msgstr "Moustache"
+
+msgid "Sakal"
+msgstr "Beard"
+
+msgid "Köşeli"
+msgstr "Angular"
+
+msgid "İnce"
+msgstr "Slim"
+
+msgid "Geniş"
+msgstr "Broad"
+
+msgid "Yuvarlak"
+msgstr "Round"
+
+msgid "Oval"
+msgstr "Oval"
+
+msgid "Kısa dağınık"
+msgstr "Short tousled"
+
+msgid "Yan ayrım"
+msgstr "Side part"
+
+msgid "Kısa"
+msgstr "Short"
+
+msgid "Kıvırcık"
+msgstr "Curly"
+
+msgid "Dağınık"
+msgstr "Tousled"
+
+msgid "Seyrek"
+msgstr "Thinning"
+
+msgid "Hareketli"
+msgstr "Textured"
+
+msgid "Geri taralı"
+msgstr "Swept back"
+
+msgid "Kısa bukle"
+msgstr "Short curls"
+
+msgid "Katmanlı"
+msgstr "Layered"
+
+msgid "Uzun dalgalı"
+msgstr "Long waves"
+
+msgid "Topuz"
+msgstr "Bun"
+
+msgid "Kısa dalgalı"
+msgstr "Short waves"
+
+msgid "Gür bukle"
+msgstr "Full curls"
+
+msgid "Bob"
+msgstr "Bob"
+
+msgid "Kavisli"
+msgstr "Arched"
+
+msgid "Kalın"
+msgstr "Thick"
+
+msgid "Yumuşak kavis"
+msgstr "Soft arch"
+
+msgid "Gür"
+msgstr "Full"
+
+msgid "Düz"
+msgstr "Straight"
+
+msgid "Gidon"
+msgstr "Handlebar"
+
+msgid "Klasik"
+msgstr "Classic"
+
+msgid "Kısa yuvarlak"
+msgstr "Rounded"
+
+msgid "Keçi sakalı"
+msgstr "Goatee"
+
+msgid "Kirli sakal"
+msgstr "Stubble"
+
+msgid "Uzun"
+msgstr "Long"
+
+msgid "Dolgun"
+msgstr "Full beard"
+
+msgid "Kahverengi"
+msgstr "Brown"

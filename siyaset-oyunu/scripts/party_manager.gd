@@ -643,7 +643,7 @@ func set_politician_host(peer_id: int, data: Dictionary) -> void:
 func _apply_politician(peer_id: int, data: Dictionary) -> void:
 	politicians[peer_id] = PoliticianPresets.make(String(data.get("first_name", "")),
 		String(data.get("surname", "")), String(data.get("background", "")), String(data.get("hometown", "")),
-		String(data.get("gender", "m")), String(data.get("portrait", "")))
+		String(data.get("gender", "m")), String(data.get("portrait", "")), data.get("appearance"))
 	if MultiplayerManager.room_code != "" and MultiplayerManager.is_host:
 		_broadcast_parties()
 	parties_updated.emit()

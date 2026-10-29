@@ -8,6 +8,7 @@ extends Control
 var _data: Dictionary = {}
 var _color: Color = UiTheme.PANEL_LIGHT
 var _texture: Texture2D
+var _appearance: Dictionary = {}
 
 static func make(data: Dictionary, color: Color, side: float) -> PoliticianPortrait:
 	var portrait := PoliticianPortrait.new()
@@ -21,6 +22,8 @@ static func make(data: Dictionary, color: Color, side: float) -> PoliticianPortr
 
 func set_politician(data: Dictionary, color: Color) -> void:
 	_data = data
+	var selected: Variant = data.get("appearance")
+	_appearance = AvatarCatalog.clean(selected, String(data.get("gender", "m"))) if selected is Dictionary and not selected.is_empty() else {}
 	_color = color
 	_texture = ContentPacks.portrait_texture(String(data.get("portrait", "")))
 	queue_redraw()
@@ -29,6 +32,9 @@ func _draw() -> void:
 	# Boyut ne olursa olsun KARE çizilir (ortalanmış).
 	var side_len := minf(size.x, size.y)
 	var rect := Rect2((size - Vector2(side_len, side_len)) * 0.5, Vector2(side_len, side_len))
+	if not _appearance.is_empty():
+		AvatarPortrait.draw_portrait(self, _appearance, rect)
+		return
 	if _texture != null:
 		# Kare kırp (ortadan, üstten biraz yukarıda: yüz kadrajda kalsın).
 		var tex_size := _texture.get_size()

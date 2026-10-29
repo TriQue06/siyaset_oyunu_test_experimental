@@ -1,0 +1,986 @@
+{
+  "canvas": [
+    1254,
+    1550
+  ],
+  "assets": {
+    "face_00": {
+      "category": "face",
+      "gender": "m",
+      "label": "Köşeli",
+      "file": "face_00.png",
+      "source": "Bald Stoic Avatar Portrait.png",
+      "offset": [
+        0,
+        180
+      ],
+      "scale": [
+        1,
+        1
+      ],
+      "rotation": 0
+    },
+    "face_01": {
+      "category": "face",
+      "gender": "m",
+      "label": "İnce",
+      "file": "face_01.png",
+      "source": "Beyaz Gözlü Kel Karakter Portresi.png",
+      "offset": [
+        0,
+        180
+      ],
+      "scale": [
+        1,
+        1
+      ],
+      "rotation": 0
+    },
+    "face_10": {
+      "category": "face",
+      "gender": "m",
+      "label": "Geniş",
+      "file": "face_10.png",
+      "source": "Kel ve Boş Bakışlı Karakter Portresi.png",
+      "offset": [
+        0,
+        180
+      ],
+      "scale": [
+        1,
+        1
+      ],
+      "rotation": 0
+    },
+    "face_11": {
+      "category": "face",
+      "gender": "m",
+      "label": "Yuvarlak",
+      "file": "face_11.png",
+      "source": "Kel ve Boş Gözlü Avatar Portresi.png",
+      "offset": [
+        0,
+        180
+      ],
+      "scale": [
+        1,
+        1
+      ],
+      "rotation": 0
+    },
+    "face_36": {
+      "category": "face",
+      "gender": "m",
+      "label": "Oval",
+      "file": "face_36.png",
+      "source": "Şeffaf Arka Planda Kel Avatar Portresi.png",
+      "offset": [
+        0,
+        180
+      ],
+      "scale": [
+        1,
+        1
+      ],
+      "rotation": 0
+    },
+    "face_12": {
+      "category": "face",
+      "gender": "f",
+      "label": "Oval",
+      "file": "face_12.png",
+      "source": "Kelimesiz Cel-Shading Karakter Portresi.png",
+      "offset": [
+        0,
+        180
+      ],
+      "scale": [
+        1,
+        1
+      ],
+      "rotation": 0
+    },
+    "face_13": {
+      "category": "face",
+      "gender": "f",
+      "label": "Yuvarlak",
+      "file": "face_13.png",
+      "source": "Kelníksiz Beyaz Gözlü Portre.png",
+      "offset": [
+        0,
+        180
+      ],
+      "scale": [
+        1,
+        1
+      ],
+      "rotation": 0
+    },
+    "face_37": {
+      "category": "face",
+      "gender": "f",
+      "label": "İnce",
+      "file": "face_37.png",
+      "source": "Şeffaf Arka Planda Kel Yüz Portresi.png",
+      "offset": [
+        0,
+        180
+      ],
+      "scale": [
+        1,
+        1
+      ],
+      "rotation": 0
+    },
+    "hair_08": {
+      "category": "hair",
+      "gender": "m",
+      "label": "Kısa dağınık",
+      "file": "hair_08.png",
+      "source": "Kahverengi Erkek Saç Varlığı.png",
+      "offset": [
+        94,
+        40
+      ],
+      "scale": [
+        0.85,
+        0.85
+      ],
+      "rotation": 0
+    },
+    "hair_16": {
+      "category": "hair",
+      "gender": "m",
+      "label": "Yan ayrım",
+      "file": "hair_16.png",
+      "source": "Klasik Kahverengi Yan Ayrım Saç Modeli.png",
+      "offset": [
+        75,
+        24
+      ],
+      "scale": [
+        0.88,
+        0.88
+      ],
+      "rotation": 0
+    },
+    "hair_18": {
+      "category": "hair",
+      "gender": "m",
+      "label": "Kısa",
+      "file": "hair_18.png",
+      "source": "Kısa Kahverengi Erkek Saç Tasarımı.png",
+      "offset": [
+        81,
+        50
+      ],
+      "scale": [
+        0.87,
+        0.87
+      ],
+      "rotation": 0
+    },
+    "hair_19": {
+      "category": "hair",
+      "gender": "m",
+      "label": "Kıvırcık",
+      "file": "hair_19.png",
+      "source": "Kıvırcık Koyu Kahverengi Saç Asset’i.png",
+      "offset": [
+        75,
+        10
+      ],
+      "scale": [
+        0.88,
+        0.88
+      ],
+      "rotation": 0
+    },
+    "hair_20": {
+      "category": "hair",
+      "gender": "m",
+      "label": "Dağınık",
+      "file": "hair_20.png",
+      "source": "Modern Kahverengi Dağınık Saç Katmanı.png",
+      "offset": [
+        70,
+        32
+      ],
+      "scale": [
+        0.88,
+        0.88
+      ],
+      "rotation": 0
+    },
+    "hair_23": {
+      "category": "hair",
+      "gender": "m",
+      "label": "Seyrek",
+      "file": "hair_23.png",
+      "source": "Seyrek Kahverengi Erkek Saç Katmanı.png",
+      "offset": [
+        75,
+        8
+      ],
+      "scale": [
+        0.88,
+        0.88
+      ],
+      "rotation": 0
+    },
+    "hair_30": {
+      "category": "hair",
+      "gender": "m",
+      "label": "Hareketli",
+      "file": "hair_30.png",
+      "source": "Şeffaf Arka Planda Dağınık Kahverengi Saç.png",
+      "offset": [
+        65,
+        30
+      ],
+      "scale": [
+        0.88,
+        0.88
+      ],
+      "rotation": 0
+    },
+    "hair_39": {
+      "category": "hair",
+      "gender": "m",
+      "label": "Geri taralı",
+      "file": "hair_39.png",
+      "source": "Şeffaf Arka Planlı Kestane Saç Modeli.png",
+      "offset": [
+        70,
+        -10
+      ],
+      "scale": [
+        0.88,
+        0.88
+      ],
+      "rotation": 0
+    },
+    "hair_06": {
+      "category": "hair",
+      "gender": "f",
+      "label": "Kısa bukle",
+      "file": "hair_06.png",
+      "source": "Hacimli Kıvırcık Kahverengi Saç Katmanı.png",
+      "offset": [
+        100,
+        25
+      ],
+      "scale": [
+        0.84,
+        0.84
+      ],
+      "rotation": 0
+    },
+    "hair_09": {
+      "category": "hair",
+      "gender": "f",
+      "label": "Katmanlı",
+      "file": "hair_09.png",
+      "source": "Katmanlı Kestane Dalgalı Saç Overlay.png",
+      "offset": [
+        0,
+        70
+      ],
+      "scale": [
+        1,
+        1.13
+      ],
+      "rotation": 0
+    },
+    "hair_24": {
+      "category": "hair",
+      "gender": "f",
+      "label": "Uzun dalgalı",
+      "file": "hair_24.png",
+      "source": "Uzun Dalgalı Esmer Saç Parçası.png",
+      "offset": [
+        -145,
+        65
+      ],
+      "scale": [
+        1.22,
+        1.12
+      ],
+      "rotation": 0
+    },
+    "hair_26": {
+      "category": "hair",
+      "gender": "f",
+      "label": "Topuz",
+      "file": "hair_26.png",
+      "source": "Zarif Kahverengi Alçak Topuz Saç.png",
+      "offset": [
+        -10,
+        95
+      ],
+      "scale": [
+        1.02,
+        1.05
+      ],
+      "rotation": 0
+    },
+    "hair_29": {
+      "category": "hair",
+      "gender": "f",
+      "label": "Kısa dalgalı",
+      "file": "hair_29.png",
+      "source": "Şeffaf Arka Planda Dalgalı Kahverengi Saç.png",
+      "offset": [
+        62,
+        15
+      ],
+      "scale": [
+        0.9,
+        0.9
+      ],
+      "rotation": 0
+    },
+    "hair_33": {
+      "category": "hair",
+      "gender": "f",
+      "label": "Gür bukle",
+      "file": "hair_33.png",
+      "source": "Şeffaf Arka Planda Gür Kahverengi Bukleler.png",
+      "offset": [
+        -20,
+        40
+      ],
+      "scale": [
+        1.03,
+        1.18
+      ],
+      "rotation": 0
+    },
+    "hair_34": {
+      "category": "hair",
+      "gender": "f",
+      "label": "Bob",
+      "file": "hair_34.png",
+      "source": "Şeffaf Arka Planda Kahverengi Bob Saç.png",
+      "offset": [
+        -15,
+        0
+      ],
+      "scale": [
+        1.02,
+        1.2
+      ],
+      "rotation": 0
+    },
+    "brow_04": {
+      "category": "eyebrows",
+      "gender": "f",
+      "label": "Kavisli",
+      "file": "brow_04.png",
+      "source": "Gerçekçi Kahverengi Kaş Çifti.png",
+      "offset": [
+        300,
+        370
+      ],
+      "scale": [
+        0.52,
+        0.48
+      ],
+      "rotation": 0
+    },
+    "brow_05": {
+      "category": "eyebrows",
+      "gender": "m",
+      "label": "Kalın",
+      "file": "brow_05.png",
+      "source": "Gerçekçi Çift Kahverengi Kaş.png",
+      "offset": [
+        295,
+        353
+      ],
+      "scale": [
+        0.53,
+        0.5
+      ],
+      "rotation": 0
+    },
+    "brow_22": {
+      "category": "eyebrows",
+      "gender": "f",
+      "label": "Yumuşak kavis",
+      "file": "brow_22.png",
+      "source": "Realistyczne brązowe brwi na przezroczystym tle.png",
+      "offset": [
+        300,
+        370
+      ],
+      "scale": [
+        0.52,
+        0.48
+      ],
+      "rotation": 0
+    },
+    "brow_25": {
+      "category": "eyebrows",
+      "gender": "m",
+      "label": "Gür",
+      "file": "brow_25.png",
+      "source": "Yalnız Kaş Çifti.png",
+      "offset": [
+        295,
+        353
+      ],
+      "scale": [
+        0.53,
+        0.5
+      ],
+      "rotation": 0
+    },
+    "brow_28": {
+      "category": "eyebrows",
+      "gender": "f",
+      "label": "İnce",
+      "file": "brow_28.png",
+      "source": "Zarif Kahverengi Kaş Çifti.png",
+      "offset": [
+        300,
+        367
+      ],
+      "scale": [
+        0.52,
+        0.48
+      ],
+      "rotation": 0
+    },
+    "brow_35": {
+      "category": "eyebrows",
+      "gender": "m",
+      "label": "Düz",
+      "file": "brow_35.png",
+      "source": "Şeffaf Arka Planda Kahverengi Kaşlar.png",
+      "offset": [
+        295,
+        353
+      ],
+      "scale": [
+        0.53,
+        0.5
+      ],
+      "rotation": 0
+    },
+    "moustache_14": {
+      "category": "moustache",
+      "gender": "m",
+      "label": "Gür",
+      "file": "moustache_14.png",
+      "source": "Klasik Gür ve Kahverengi Bıyık.png",
+      "offset": [
+        420,
+        858
+      ],
+      "scale": [
+        0.33,
+        0.28
+      ],
+      "rotation": 0
+    },
+    "moustache_15": {
+      "category": "moustache",
+      "gender": "m",
+      "label": "Gidon",
+      "file": "moustache_15.png",
+      "source": "Klasik Kahverengi Gidon Bıyığı.png",
+      "offset": [
+        362,
+        925
+      ],
+      "scale": [
+        0.3,
+        0.25
+      ],
+      "rotation": 0
+    },
+    "moustache_17": {
+      "category": "moustache",
+      "gender": "m",
+      "label": "Klasik",
+      "file": "moustache_17.png",
+      "source": "Klasik Yoğun Kahverengi Bıyık.png",
+      "offset": [
+        390,
+        855
+      ],
+      "scale": [
+        0.38,
+        0.28
+      ],
+      "rotation": 0
+    },
+    "moustache_27": {
+      "category": "moustache",
+      "gender": "m",
+      "label": "İnce",
+      "file": "moustache_27.png",
+      "source": "Zarif Kahverengi Bıyık İllüstrasyonu.png",
+      "offset": [
+        342,
+        832
+      ],
+      "scale": [
+        0.45,
+        0.33
+      ],
+      "rotation": 0
+    },
+    "moustache_31": {
+      "category": "moustache",
+      "gender": "m",
+      "label": "Düz",
+      "file": "moustache_31.png",
+      "source": "Şeffaf Arka Planda Gerçekçi Kahverengi Bıyık.png",
+      "offset": [
+        375,
+        838
+      ],
+      "scale": [
+        0.4,
+        0.3
+      ],
+      "rotation": 0
+    },
+    "beard_02": {
+      "category": "beard",
+      "gender": "m",
+      "label": "Kısa yuvarlak",
+      "file": "beard_02.png",
+      "source": "Bıyıksız Gerçekçi Kahverengi Sakal.png",
+      "offset": [
+        220,
+        480
+      ],
+      "scale": [
+        0.65,
+        0.8
+      ],
+      "rotation": 0
+    },
+    "beard_07": {
+      "category": "beard",
+      "gender": "m",
+      "label": "Keçi sakalı",
+      "file": "beard_07.png",
+      "source": "Kahverengi Detaylı Keçi Sakalı Asset’i.png",
+      "offset": [
+        130,
+        635
+      ],
+      "scale": [
+        0.8,
+        0.64
+      ],
+      "rotation": 0
+    },
+    "beard_21": {
+      "category": "beard",
+      "gender": "m",
+      "label": "Kirli sakal",
+      "file": "beard_21.png",
+      "source": "Moustachez Kısa Sakal Katmanı.png",
+      "offset": [
+        220,
+        478
+      ],
+      "scale": [
+        0.65,
+        0.8
+      ],
+      "rotation": 0
+    },
+    "beard_32": {
+      "category": "beard",
+      "gender": "m",
+      "label": "Uzun",
+      "file": "beard_32.png",
+      "source": "Şeffaf Arka Planda Gerçekçi Kahverengi Sakal.png",
+      "offset": [
+        218,
+        690
+      ],
+      "scale": [
+        0.65,
+        0.65
+      ],
+      "rotation": 0
+    },
+    "beard_38": {
+      "category": "beard",
+      "gender": "m",
+      "label": "Dolgun",
+      "file": "beard_38.png",
+      "source": "Şeffaf Arka Planda Stilize Kahverengi Sakal.png",
+      "offset": [
+        226,
+        545
+      ],
+      "scale": [
+        0.64,
+        0.75
+      ],
+      "rotation": 0
+    },
+    "iris_03": {
+      "category": "iris",
+      "gender": "both",
+      "label": "Kahverengi",
+      "file": "iris_03.png",
+      "source": "Detaylı Kahverengi İris Halkası.png",
+      "offset": [
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1
+      ],
+      "rotation": 0
+    }
+  },
+  "faces": {
+    "face_00": {
+      "eyes": [
+        [
+          458,
+          741
+        ],
+        [
+          795,
+          742
+        ]
+      ],
+      "eye_size": [
+        135,
+        57
+      ],
+      "corrections": {
+        "beard": [
+          0,
+          0,
+          1,
+          1
+        ],
+        "moustache": [
+          0,
+          0,
+          1,
+          1
+        ],
+        "eyebrows": [
+          0,
+          1,
+          1.0,
+          1
+        ],
+        "hair": [
+          0,
+          0,
+          1,
+          1
+        ]
+      }
+    },
+    "face_01": {
+      "eyes": [
+        [
+          475,
+          722
+        ],
+        [
+          778,
+          722
+        ]
+      ],
+      "eye_size": [
+        135,
+        57
+      ],
+      "corrections": {
+        "beard": [
+          0,
+          0,
+          0.89,
+          0.98
+        ],
+        "moustache": [
+          0,
+          0,
+          0.89,
+          1
+        ],
+        "eyebrows": [
+          0,
+          -18,
+          0.8991097922848664,
+          1
+        ],
+        "hair": [
+          0,
+          0,
+          0.89,
+          1
+        ]
+      }
+    },
+    "face_10": {
+      "eyes": [
+        [
+          457,
+          740
+        ],
+        [
+          795,
+          740
+        ]
+      ],
+      "eye_size": [
+        135,
+        57
+      ],
+      "corrections": {
+        "beard": [
+          0,
+          0,
+          1.04,
+          1
+        ],
+        "moustache": [
+          0,
+          0,
+          1.04,
+          1
+        ],
+        "eyebrows": [
+          0,
+          0,
+          1.002967359050445,
+          1
+        ],
+        "hair": [
+          0,
+          0,
+          1.04,
+          1
+        ]
+      }
+    },
+    "face_11": {
+      "eyes": [
+        [
+          458,
+          744
+        ],
+        [
+          795,
+          742
+        ]
+      ],
+      "eye_size": [
+        135,
+        57
+      ],
+      "corrections": {
+        "beard": [
+          0,
+          0,
+          1.06,
+          1.02
+        ],
+        "moustache": [
+          0,
+          0,
+          1.06,
+          1
+        ],
+        "eyebrows": [
+          0,
+          4,
+          1.0,
+          1
+        ],
+        "hair": [
+          0,
+          0,
+          1.06,
+          1
+        ]
+      }
+    },
+    "face_36": {
+      "eyes": [
+        [
+          465,
+          739
+        ],
+        [
+          790,
+          738
+        ]
+      ],
+      "eye_size": [
+        135,
+        57
+      ],
+      "corrections": {
+        "beard": [
+          0,
+          0,
+          0.94,
+          0.96
+        ],
+        "moustache": [
+          0,
+          -6,
+          0.94,
+          1
+        ],
+        "eyebrows": [
+          0,
+          -1,
+          0.9643916913946587,
+          1
+        ],
+        "hair": [
+          0,
+          0,
+          0.94,
+          1
+        ]
+      }
+    },
+    "face_12": {
+      "eyes": [
+        [
+          460,
+          758
+        ],
+        [
+          790,
+          758
+        ]
+      ],
+      "eye_size": [
+        140,
+        57
+      ],
+      "corrections": {
+        "beard": [
+          0,
+          0,
+          0.98,
+          1
+        ],
+        "moustache": [
+          0,
+          0,
+          0.98,
+          1
+        ],
+        "eyebrows": [
+          0,
+          18,
+          0.9792284866468842,
+          1
+        ],
+        "hair": [
+          0,
+          0,
+          1,
+          1
+        ]
+      }
+    },
+    "face_13": {
+      "eyes": [
+        [
+          456,
+          765
+        ],
+        [
+          796,
+          767
+        ]
+      ],
+      "eye_size": [
+        140,
+        57
+      ],
+      "corrections": {
+        "beard": [
+          0,
+          0,
+          1.04,
+          1
+        ],
+        "moustache": [
+          0,
+          0,
+          1.04,
+          1
+        ],
+        "eyebrows": [
+          0,
+          25,
+          1.0089020771513353,
+          1
+        ],
+        "hair": [
+          0,
+          0,
+          1,
+          1
+        ]
+      }
+    },
+    "face_37": {
+      "eyes": [
+        [
+          466,
+          760
+        ],
+        [
+          788,
+          760
+        ]
+      ],
+      "eye_size": [
+        140,
+        57
+      ],
+      "corrections": {
+        "beard": [
+          0,
+          0,
+          0.96,
+          1
+        ],
+        "moustache": [
+          0,
+          0,
+          0.96,
+          1
+        ],
+        "eyebrows": [
+          0,
+          20,
+          0.9554896142433235,
+          1
+        ],
+        "hair": [
+          0,
+          0,
+          1,
+          1
+        ]
+      }
+    }
+  }
+}

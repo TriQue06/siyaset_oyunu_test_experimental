@@ -40,6 +40,13 @@ static func texture(id: String) -> Texture2D:
 		_textures[id] = load(ROOT + String(data().assets[id].file))
 	return _textures[id]
 
+static func contact_shadow(face: String, id: String) -> Texture2D:
+	var key := face + "__" + id
+	if not _textures.has(key):
+		var path := ROOT + "contact_shadows/" + key + ".png"
+		_textures[key] = load(path) if ResourceLoader.exists(path) else null
+	return _textures[key]
+
 static func layer_rect(id: String, face: String) -> Rect2:
 	var item: Dictionary = data().assets[id]
 	var tex := texture(id)

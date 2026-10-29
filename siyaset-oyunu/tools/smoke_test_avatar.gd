@@ -42,6 +42,12 @@ func _initialize() -> void:
 						visible += 1
 			check(face + " eye %d stays inside white and remains visible" % eye_index, bounded and visible > 1500)
 		check(face + " reuses cached eye layers", AvatarEyes.layers(face, "iris_03")[0].texture == layers[0].texture)
+	for face: String in AvatarCatalog.data().faces:
+		var gender: String = AvatarCatalog.data().assets[face].gender
+		for category: String in ["hair", "beard", "moustache"]:
+			for asset: String in AvatarCatalog.options(category, gender):
+				var shadow := AvatarCatalog.contact_shadow(face, asset)
+				check(face + "/" + asset + " has a cached face-specific shadow", shadow != null and shadow == AvatarCatalog.contact_shadow(face, asset))
 	var bad := AvatarCatalog.clean({"face": "../../invalid", "hair": "hair_24", "beard": "beard_02", "unexpected": 1}, "f")
 	check("gender compatibility and safe identifiers", bad.face == "face_12" and bad.hair == "hair_24" and bad.beard == null and not bad.has("unexpected"))
 	var scene = load("res://scenes/PartySetup.tscn").instantiate()

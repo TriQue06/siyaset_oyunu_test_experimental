@@ -30,9 +30,11 @@ static func draw_portrait(target: Control, value: Dictionary, area: Rect2) -> vo
 		var rect := AvatarCatalog.layer_rect(String(id), face)
 		var texture := AvatarCatalog.texture(String(id))
 		if category in ["hair", "beard", "moustache"]:
-			# Subtle contact shade below the original layer; source colors stay untouched.
-			for shift in [Vector2(-3, 4), Vector2(3, 5), Vector2(0, 8)]:
-				target.draw_texture_rect(texture, Rect2(origin + (rect.position + shift) * factor, rect.size * factor), false, Color(0.12, 0.08, 0.05, 0.075))
+			# Soft projection follows the selected layer, clipped to this face's
+			# alpha silhouette. The original colored PNG is drawn over it unchanged.
+			var shadow := AvatarCatalog.contact_shadow(face, String(id))
+			if shadow != null:
+				target.draw_texture_rect(shadow, Rect2(origin, Vector2(1254, 1550) * factor), false)
 		target.draw_texture_rect(texture, Rect2(origin + rect.position * factor, rect.size * factor), false)
 
 static func _draw_eyes(target: Control, face: String, iris: String, origin: Vector2, factor: float) -> void:

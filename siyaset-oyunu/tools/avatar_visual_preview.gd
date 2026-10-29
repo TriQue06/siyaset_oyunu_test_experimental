@@ -38,6 +38,15 @@ func _initialize() -> void:
 				value.moustache = AvatarCatalog.options("moustache", gender)[i % 5]
 			samples.append(["%s / %s" % [value.face, value.hair], value])
 		groups.append([gender + "_combinations", samples])
+	# Review every female hairstyle on every supplied female face.
+	for face in AvatarCatalog.options("face", "f"):
+		var samples: Array = []
+		for hair in AvatarCatalog.options("hair", "f"):
+			var value := AvatarCatalog.clean({}, "f")
+			value.face = face
+			value.hair = hair
+			samples.append([hair + " / " + face, value])
+		groups.append(["female_hair_" + face, samples])
 	for group in groups:
 		var nodes: Array = []
 		for i in group[1].size():

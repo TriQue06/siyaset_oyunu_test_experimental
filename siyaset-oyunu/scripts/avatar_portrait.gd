@@ -29,10 +29,10 @@ static func draw_portrait(target: Control, value: Dictionary, area: Rect2) -> vo
 			continue
 		var rect := AvatarCatalog.layer_rect(String(id), face)
 		var texture := AvatarCatalog.texture(String(id))
-		if category in ["hair", "beard"]:
+		if category in ["hair", "beard", "moustache"]:
 			# Subtle contact shade below the original layer; source colors stay untouched.
-			for shift in [Vector2(-2, 3), Vector2(2, 4), Vector2(0, 6)]:
-				target.draw_texture_rect(texture, Rect2(origin + (rect.position + shift) * factor, rect.size * factor), false, Color(0.12, 0.08, 0.05, 0.045))
+			for shift in [Vector2(-3, 4), Vector2(3, 5), Vector2(0, 8)]:
+				target.draw_texture_rect(texture, Rect2(origin + (rect.position + shift) * factor, rect.size * factor), false, Color(0.12, 0.08, 0.05, 0.075))
 		target.draw_texture_rect(texture, Rect2(origin + rect.position * factor, rect.size * factor), false)
 
 static func _draw_eyes(target: Control, face: String, iris: String, origin: Vector2, factor: float) -> void:

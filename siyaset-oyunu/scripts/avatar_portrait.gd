@@ -36,21 +36,6 @@ static func draw_portrait(target: Control, value: Dictionary, area: Rect2) -> vo
 		target.draw_texture_rect(texture, Rect2(origin + rect.position * factor, rect.size * factor), false)
 
 static func _draw_eyes(target: Control, face: String, iris: String, origin: Vector2, factor: float) -> void:
-	var info: Dictionary = AvatarCatalog.data().faces[face]
-	for eye: Array in info.eyes:
-		var center := Vector2(eye[0], eye[1])
-		var width: float = info.eye_size[0]
-		var height: float = info.eye_size[1]
-		var iris_span: float = info.get("iris_span", 92.0)
-		var points := PackedVector2Array()
-		var uv := PackedVector2Array()
-		# Almond-shaped clip stays inside the original white eye area.
-		for step in 32:
-			var angle := TAU * float(step) / 32.0
-			var p := center + Vector2(cos(angle) * width * 0.5, sin(angle) * height * 0.5)
-			points.append(origin + p * factor)
-			uv.append((p - center) / iris_span + Vector2(0.5, 0.5))
-		# The supplied iris is a ring with a transparent pupil opening.
-		# A dark backing under that opening leaves all source PNG colors intact.
-		target.draw_circle(origin + center * factor, iris_span * (11.0 / 92.0) * factor, Color("17100C"))
-		target.draw_polygon(points, PackedColorArray([Color.WHITE]), uv, AvatarCatalog.texture(iris))
+	for layer: Dictionary in AvatarEyes.layers(face, iris):
+		var rect: Rect2 = layer.rect
+		target.draw_texture_rect(layer.texture, Rect2(origin + rect.position * factor, rect.size * factor), false)

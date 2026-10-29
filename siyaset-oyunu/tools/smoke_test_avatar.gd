@@ -24,6 +24,24 @@ func _initialize() -> void:
 	pm.politicians = {}
 	pm.my_politician = {}
 	check("all 40 supplied pieces catalogued", AvatarCatalog.data().assets.size() == 40)
+	for face: String in AvatarCatalog.data().faces:
+		var layers := AvatarEyes.layers(face, "iris_03")
+		check(face + " has two separately masked eyes", layers.size() == 2)
+		var definitions: Array = AvatarCatalog.data().faces[face].eye_masks
+		for eye_index in layers.size():
+			var pixels: Image = layers[eye_index].texture.get_image()
+			var mask: Image = load(AvatarCatalog.ROOT + String(definitions[eye_index].file)).get_image()
+			var bounded := true
+			var visible := 0
+			for y in pixels.get_height():
+				for x in pixels.get_width():
+					var a := pixels.get_pixel(x, y).a
+					if a > mask.get_pixel(x, y).a + 0.005:
+						bounded = false
+					if a > 0.5:
+						visible += 1
+			check(face + " eye %d stays inside white and remains visible" % eye_index, bounded and visible > 1500)
+		check(face + " reuses cached eye layers", AvatarEyes.layers(face, "iris_03")[0].texture == layers[0].texture)
 	var bad := AvatarCatalog.clean({"face": "../../invalid", "hair": "hair_24", "beard": "beard_02", "unexpected": 1}, "f")
 	check("gender compatibility and safe identifiers", bad.face == "face_12" and bad.hair == "hair_24" and bad.beard == null and not bad.has("unexpected"))
 	var scene = load("res://scenes/PartySetup.tscn").instantiate()

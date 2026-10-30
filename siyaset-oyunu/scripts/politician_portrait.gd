@@ -25,6 +25,9 @@ func set_politician(data: Dictionary, color: Color) -> void:
 	_data = data
 	var selected: Variant = data.get("appearance")
 	_appearance = AvatarCatalog.clean(selected, String(data.get("gender", "m"))) if selected is Dictionary and not selected.is_empty() else {}
+	# 0.0.302: avatarı ve portresi olmayan siyasetçi (bot) adına bağlı bir yüzle çizilir.
+	if _appearance.is_empty() and String(data.get("portrait", "")) == "" and String(data.get("name", "")) != "":
+		_appearance = AvatarCatalog.random(String(data.get("gender", "m")), hash(String(data.get("name", ""))))
 	_color = color
 	_texture = ContentPacks.portrait_texture(String(data.get("portrait", "")))
 	if not _appearance.is_empty():

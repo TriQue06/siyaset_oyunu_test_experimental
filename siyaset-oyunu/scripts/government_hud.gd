@@ -57,7 +57,59 @@ static func _badge(peer_id: int) -> Control:
 ## "Başbakan [logo] Parti  ·  Yrd. [logo]" — TEK SATIR.
 ## Dar sol panelde iki parti adı yan yana sığmıyor, ikisi de kırpılıyordu;
 ## bu yüzden yardımcının partisi sadece LOGOSUYLA gösterilir (adı ipucunda).
+## 0.0.302 (avatar konsepti A): Başbakan ve Yardımcısı yan yana iki kartta,
+## genel başkanlarının avatarıyla (parti logosu madalyonun köşesinde).
 static func _leadership_row(pm: int, deputy: int) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	row.add_child(_post_card(L.t("Başbakan"), pm))
+	row.add_child(_post_card(L.t("Başbakan Yrd."), deputy))
+	return row
+
+static func _post_card(title: String, pid: int) -> Control:
+	var card := PanelContainer.new()
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := BoardBox.new()
+	style.fill = Color("fffaf0")
+	style.set_radius(13)
+	style.rings = [[0.0, 1.5, Color("e3d5b0")]]
+	style.lips = [[3.0, Color("c9b689")]]
+	style.content_margin_top = 7
+	style.content_margin_bottom = 7
+	style.content_margin_left = 4
+	style.content_margin_right = 4
+	card.add_theme_stylebox_override("panel", style)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 4)
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(box)
+	var key := _label(title.to_upper(), 9, DIM_COLOR)
+	key.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(key)
+	if pid == -1:
+		var none := _label("—", 16)
+		none.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(none)
+		return card
+	var medal := AvatarMedal.make(PoliticianPresets.of(pid), PartyManager.data_of(pid), 46.0)
+	medal.tooltip_text = party_name_of(pid)
+	box.add_child(medal)
+	var person := _label(leader_name_of(pid), 11)
+	person.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	person.clip_text = true
+	person.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	box.add_child(person)
+	var party := _label(party_name_of(pid), 9, DIM_COLOR)
+	party.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	party.clip_text = true
+	party.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	box.add_child(party)
+	return card
+
+## Eski tek satırlık başkan / yardımcı satırı (kullanılmıyor, önizlemeler için).
+static func _leadership_row_compact(pm: int, deputy: int) -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
 	var pm_label := _label(L.t("Başbakan"), UiTheme.fs(16), DIM_COLOR)

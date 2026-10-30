@@ -1067,9 +1067,9 @@ func _refresh_band_turn() -> void:
 		return
 	var data := PartyManager.data_of(CardManager.party_of(peer_id))
 	var color: Color = data.get("bg_color", UiTheme.GOLD)
-	var side := UiTheme.d(44)
-	var badge := PartyBadge.build(PartyManager.data_of(peer_id), Vector2(side, side), BADGE_ICON_PIXEL_SIZE)
-	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var side := UiTheme.d(48)
+	# 0.0.302: sırası gelen siyasetçinin avatarı (parti logosu köşede).
+	var badge := AvatarMedal.make(PoliticianPresets.of(peer_id), data, side)
 	_band_turn_row.add_child(badge)
 	var texts := VBoxContainer.new()
 	texts.add_theme_constant_override("separation", int(UiTheme.d(4)))
@@ -1479,6 +1479,8 @@ func _refresh_score_table_now() -> void:
 		row.add_child(line)
 		var rank := _table_value(str(i + 1), 16.0, UiTheme.TEXT_DIM, 11)
 		line.add_child(rank)
+		# 0.0.302: siyasetçinin avatarı (parti logosu köşede).
+		line.add_child(AvatarMedal.make(PoliticianPresets.of(peer_id), party, 26.0))
 		var names := VBoxContainer.new()
 		names.add_theme_constant_override("separation", -3)
 		names.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -2192,10 +2194,9 @@ func _build_plaque(pid: int, width: float) -> Control:
 	row.add_theme_constant_override("separation", int(UiTheme.d(12)))
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(row)
-	# BÜYÜK LOGO.
-	var badge := PartyBadge.build(party, Vector2(PLAQUE_BADGE, PLAQUE_BADGE), BADGE_ICON_PIXEL_SIZE)
-	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	# 0.0.302 (avatar konsepti A): logonun yerine genel başkanın avatarı,
+	# parti logosu madalyonun sağ altında.
+	var badge := AvatarMedal.make(PoliticianPresets.of(pid), party, PLAQUE_BADGE * 1.15)
 	row.add_child(badge)
 	var stack := VBoxContainer.new()
 	stack.add_theme_constant_override("separation", 0)

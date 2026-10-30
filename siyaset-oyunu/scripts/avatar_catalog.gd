@@ -36,6 +36,30 @@ static func clean(value: Variant, gender: String) -> Dictionary:
 	result.merge(AvatarColors.clean(source, gender))
 	return result
 
+## RASTGELE GÖRÜNÜM (0.0.302): avatarı seçilmemiş siyasetçiye (bot, bölünen
+## partinin lideri) seed'e bağlı bir görünüm. Aynı seed hep aynı yüzü verir:
+## her cihaz aynı yüzü çizer, ağdan ek veri gitmez.
+static func random(gender: String, seed_value: int) -> Dictionary:
+	gender = "f" if gender == "f" else "m"
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value
+	var result := {"gender": gender}
+	for category: String in CATEGORIES:
+		var choices := options(category, gender)
+		if choices.is_empty():
+			result[category] = null
+		elif category in ["moustache", "beard"] and rng.randf() < 0.45:
+			result[category] = null
+		else:
+			result[category] = choices[rng.randi() % choices.size()]
+	for field: String in AvatarColors.FIELDS:
+		var palette := AvatarColors.palette(field, gender)
+		result[field] = String(palette[rng.randi() % palette.size()][0])
+	# Sakal ve bıyık saçla aynı renkte.
+	for field in ["eyebrow_color", "beard_color", "moustache_color"]:
+		result[field] = result["hair_color"]
+	return clean(result, gender)
+
 static func texture(id: String) -> Texture2D:
 	if not _textures.has(id):
 		_textures[id] = load(ROOT + String(data().assets[id].file))

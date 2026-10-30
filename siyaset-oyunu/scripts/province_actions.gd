@@ -527,8 +527,10 @@ func _build_miting() -> void:
 	counter.add_theme_constant_override("separation", 4)
 	counter.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	counter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# 0.0.302: dolu kutucuk seçilen grubun renginde.
 	for i in slots:
-		counter.add_child(_pip(12, 4, i < _focus.size(), C_MUS, C_MUS2))
+		var group_color := VoterGroups.color(String(_focus[i])) if i < _focus.size() else C_MUS
+		counter.add_child(_pip(12, 4, i < _focus.size(), group_color, group_color.lerp(Color.BLACK, 0.4)))
 	_sec(L.t("Hedef grup"), counter)
 	if slots > 0:
 		var grid := GridContainer.new()

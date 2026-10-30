@@ -9,6 +9,7 @@ var _data: Dictionary = {}
 var _color: Color = UiTheme.PANEL_LIGHT
 var _texture: Texture2D
 var _appearance: Dictionary = {}
+var _avatar: AvatarPortrait
 
 static func make(data: Dictionary, color: Color, side: float) -> PoliticianPortrait:
 	var portrait := PoliticianPortrait.new()
@@ -26,14 +27,29 @@ func set_politician(data: Dictionary, color: Color) -> void:
 	_appearance = AvatarCatalog.clean(selected, String(data.get("gender", "m"))) if selected is Dictionary and not selected.is_empty() else {}
 	_color = color
 	_texture = ContentPacks.portrait_texture(String(data.get("portrait", "")))
+	if not _appearance.is_empty():
+		if not is_instance_valid(_avatar):
+			_avatar = AvatarPortrait.new()
+			add_child(_avatar)
+			resized.connect(_layout_avatar)
+		_avatar.set_appearance(_appearance)
+		_avatar.show()
+		_layout_avatar()
+	elif is_instance_valid(_avatar):
+		_avatar.hide()
 	queue_redraw()
+
+func _layout_avatar() -> void:
+	if not is_instance_valid(_avatar): return
+	var side := minf(size.x, size.y)
+	_avatar.position = (size - Vector2.ONE * side) * 0.5
+	_avatar.size = Vector2.ONE * side
 
 func _draw() -> void:
 	# Boyut ne olursa olsun KARE çizilir (ortalanmış).
 	var side_len := minf(size.x, size.y)
 	var rect := Rect2((size - Vector2(side_len, side_len)) * 0.5, Vector2(side_len, side_len))
 	if not _appearance.is_empty():
-		AvatarPortrait.draw_portrait(self, _appearance, rect)
 		return
 	if _texture != null:
 		# Kare kırp (ortadan, üstten biraz yukarıda: yüz kadrajda kalsın).

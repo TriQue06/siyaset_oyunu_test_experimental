@@ -33,6 +33,7 @@ static func clean(value: Variant, gender: String) -> Dictionary:
 			result[category] = null
 		else:
 			result[category] = choices[0]
+	result.merge(AvatarColors.clean(source, gender))
 	return result
 
 static func texture(id: String) -> Texture2D:
@@ -57,4 +58,8 @@ static func layer_rect(id: String, face: String) -> Rect2:
 	offset.x = 627.0 + (offset.x - 627.0) * float(correction[2]) + float(correction[0])
 	offset.y = 180.0 + (offset.y - 180.0) * float(correction[3]) + float(correction[1])
 	extent *= Vector2(correction[2], correction[3])
+	var fit: Array = data().faces[face].get("asset_corrections", {}).get(id, [0, 0, 1, 1])
+	offset.x = 627.0 + (offset.x - 627.0) * float(fit[2]) + float(fit[0])
+	offset.y = 180.0 + (offset.y - 180.0) * float(fit[3]) + float(fit[1])
+	extent *= Vector2(fit[2], fit[3])
 	return Rect2(offset, extent)

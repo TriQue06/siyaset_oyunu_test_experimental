@@ -5504,3 +5504,150 @@ msgstr "Full beard"
 
 msgid "Kahverengi"
 msgstr "Brown"
+
+msgid "Ten rengi"
+msgstr "Skin tone"
+
+msgid "Dudak rengi"
+msgstr "Lip color"
+
+msgid "Koyu siyah"
+msgstr "Jet black"
+
+msgid "Yumuşak siyah"
+msgstr "Soft black"
+
+msgid "Çok koyu kahve"
+msgstr "Very dark brown"
+
+msgid "Koyu kahve"
+msgstr "Dark brown"
+
+msgid "Açık kahve"
+msgstr "Light brown"
+
+msgid "Kestane"
+msgstr "Chestnut"
+
+msgid "Kızıl kahve"
+msgstr "Auburn"
+
+msgid "Bakır"
+msgstr "Copper"
+
+msgid "Koyu sarı"
+msgstr "Dark blond"
+
+msgid "Altın sarısı"
+msgstr "Golden blond"
+
+msgid "Açık sarı"
+msgstr "Light blond"
+
+msgid "Platin"
+msgstr "Platinum"
+
+msgid "Gri"
+msgstr "Gray"
+
+msgid "Gümüş"
+msgstr "Silver"
+
+msgid "Beyaz"
+msgstr "White"
+
+msgid "Gece mavisi"
+msgstr "Midnight blue"
+
+msgid "Çok açık"
+msgstr "Very light"
+
+msgid "Açık"
+msgstr "Light"
+
+msgid "Açık buğday"
+msgstr "Light-medium"
+
+msgid "Buğday"
+msgstr "Medium"
+
+msgid "Esmer"
+msgstr "Tan"
+
+msgid "Koyu"
+msgstr "Dark"
+
+msgid "Çok koyu"
+msgstr "Very dark"
+
+msgid "Doğal"
+msgstr "Natural"
+
+msgid "Açık doğal"
+msgstr "Pale neutral"
+
+msgid "Doğal pembe"
+msgstr "Natural pink"
+
+msgid "Sıcak doğal"
+msgstr "Warm natural"
+
+msgid "Gül kahvesi"
+msgstr "Rose brown"
+
+msgid "Doğal kahve"
+msgstr "Natural brown"
+
+msgid "Doğal nude"
+msgstr "Natural nude"
+
+msgid "Yumuşak pembe"
+msgstr "Soft pink"
+
+msgid "Sıcak pembe"
+msgstr "Warm pink"
+
+msgid "Gül"
+msgstr "Rose"
+
+msgid "Gül kurusu"
+msgstr "Dusty rose"
+
+msgid "Şeftali"
+msgstr "Peach"
+
+msgid "Mercan"
+msgstr "Coral"
+
+msgid "Leylak"
+msgstr "Mauve"
+
+msgid "Klasik kırmızı"
+msgstr "Classic red"
+
+msgid "Koyu kırmızı"
+msgstr "Deep red"
+
+msgid "Bordo"
+msgstr "Wine"
+
+msgid "Koyu nude"
+msgstr "Deep nude"
+
+msgid "Kehribar"
+msgstr "Amber"
+
+msgid "Ela"
+msgstr "Hazel"
+
+msgid "Yeşil"
+msgstr "Green"
+
+msgid "Gri yeşil"
+msgstr "Gray-green"
+
+msgid "Mavi"
+msgstr "Blue"
+
+msgid "Açık mavi"
+msgstr "Light blue"

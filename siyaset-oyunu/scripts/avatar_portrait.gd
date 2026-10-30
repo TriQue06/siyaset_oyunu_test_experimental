@@ -1,43 +1,52 @@
 class_name AvatarPortrait
 extends Control
-## Composes unmodified textures in one shared coordinate space. No per-frame work.
+## The original calibrated composition, with per-layer GPU color mapping.
+## No per-frame CPU work, pixel scanning, or geometry changes.
 var appearance: Dictionary = {}
+var _layers: Array[TextureRect] = []
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	resized.connect(_layout)
+	_layout()
 
 func set_appearance(value: Dictionary) -> void:
 	appearance = AvatarCatalog.clean(value, String(value.get("gender", "m")))
-	queue_redraw()
-
-func _draw() -> void:
-	if appearance.is_empty():
-		return
-	draw_portrait(self, appearance, Rect2(Vector2.ZERO, size))
-
-static func draw_portrait(target: Control, value: Dictionary, area: Rect2) -> void:
-	var factor := minf(area.size.x / 1254.0, area.size.y / 1550.0)
-	var origin := area.position + (area.size - Vector2(1254, 1550) * factor) * 0.5
-	var face := String(value.face)
+	for layer in _layers:
+		remove_child(layer)
+		layer.queue_free()
+	_layers.clear()
+	var face := String(appearance.face)
 	for category: String in ["face", "iris", "eyebrows", "beard", "moustache", "hair"]:
-		var id: Variant = value.get(category)
-		if id == null:
-			continue
+		var id: Variant = appearance.get(category)
+		if id == null: continue
+		var mat := AvatarColors.material_for(String(id), category, appearance)
 		if category == "iris":
-			_draw_eyes(target, face, String(id), origin, factor)
+			for eye: Dictionary in AvatarEyes.layers(face, String(id)):
+				_add_layer(eye.texture, eye.rect, mat)
 			continue
-		var rect := AvatarCatalog.layer_rect(String(id), face)
-		var texture := AvatarCatalog.texture(String(id))
 		if category in ["hair", "beard", "moustache"]:
-			# Soft projection follows the selected layer, clipped to this face's
-			# alpha silhouette. The original colored PNG is drawn over it unchanged.
 			var shadow := AvatarCatalog.contact_shadow(face, String(id))
 			if shadow != null:
-				target.draw_texture_rect(shadow, Rect2(origin, Vector2(1254, 1550) * factor), false)
-		target.draw_texture_rect(texture, Rect2(origin + rect.position * factor, rect.size * factor), false)
+				_add_layer(shadow, Rect2(0, 0, 1254, 1550), null)
+		_add_layer(AvatarCatalog.texture(String(id)), AvatarCatalog.layer_rect(String(id), face), mat)
+	_layout()
 
-static func _draw_eyes(target: Control, face: String, iris: String, origin: Vector2, factor: float) -> void:
-	for layer: Dictionary in AvatarEyes.layers(face, iris):
-		var rect: Rect2 = layer.rect
-		target.draw_texture_rect(layer.texture, Rect2(origin + rect.position * factor, rect.size * factor), false)
+func _add_layer(texture: Texture2D, rect: Rect2, mat: Material) -> void:
+	var layer := TextureRect.new()
+	layer.texture = texture
+	layer.material = mat
+	layer.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.set_meta("portrait_rect", rect)
+	add_child(layer)
+	_layers.append(layer)
+
+func _layout() -> void:
+	var factor := minf(size.x / 1254.0, size.y / 1550.0)
+	var origin := (size - Vector2(1254, 1550) * factor) * 0.5
+	for layer in _layers:
+		var rect: Rect2 = layer.get_meta("portrait_rect")
+		layer.position = origin + rect.position * factor
+		layer.size = rect.size * factor

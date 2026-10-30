@@ -48,6 +48,9 @@ def build():
    correction=face['corrections'].get(category,[0,0,1,1])
    sx,sy=asset['scale'];ox,oy=asset['offset'];cx,cy,wx,hy=correction
    ox=627+(ox-627)*wx+cx;oy=180+(oy-180)*hy+cy
+   fx,fy,fw,fh=face.get('asset_corrections',{}).get(id,[0,0,1,1])
+   ox=627+(ox-627)*fw+fx;oy=180+(oy-180)*fh+fy
+   wx*=fw;hy*=fh
    source=Image.open(ROOT/asset['file']).convert('RGBA')
    alpha=hair_coverage(source).resize((round(source.width*sx*wx*SCALE),round(source.height*sy*hy*SCALE)),Image.Resampling.LANCZOS)
    silhouette=Image.new('L',SIZE);silhouette.paste(alpha,(round(ox*SCALE),round(oy*SCALE)))
@@ -60,7 +63,10 @@ def build():
    assert visible.getextrema()[1]>=18,(face_id,id,'shadow hidden by layer')
    assert ImageChops.multiply(opacity,mask.point(lambda a:255 if a==0 else 0)).getextrema()[1]==0,(face_id,id,'shadow outside face')
    shadow=Image.new('RGBA',SIZE,(38,25,19,0));shadow.putalpha(opacity)
-   shadow.save(out/(face_id+'__'+id+'.png'),optimize=True);count+=1
+   destination=out/(face_id+'__'+id+'.png')
+   temporary=destination.with_suffix('.tmp.png')
+   shadow.save(temporary,optimize=True)
+   temporary.replace(destination);count+=1
  print(f'{count} face-clipped shadow layers generated')
 if __name__=='__main__':
  verify_coverage()

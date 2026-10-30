@@ -11,6 +11,7 @@ var _tabs: HFlowContainer
 var _grid: GridContainer
 var _genders: Dictionary = {}
 var _scroll: ScrollContainer
+var _palettes: VBoxContainer
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -62,6 +63,9 @@ func _ready() -> void:
 	_tabs.add_theme_constant_override("h_separation", 8)
 	_tabs.add_theme_constant_override("v_separation", 8)
 	controls.add_child(_tabs)
+	_palettes = VBoxContainer.new()
+	_palettes.add_theme_constant_override("separation", 6)
+	controls.add_child(_palettes)
 	_scroll = ScrollContainer.new()
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -124,6 +128,7 @@ func _refresh() -> void:
 		UiSkin.skin_color_button(tab, UiTheme.GOLD if category == _category else UiTheme.PANEL_LIGHT)
 		tab.pressed.connect(_choose_category.bind(category))
 		_tabs.add_child(tab)
+	_refresh_palettes()
 	_clear(_grid)
 	var choices: Array = []
 	choices.append_array(AvatarCatalog.options(_category, appearance.gender))
@@ -164,3 +169,36 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
 		get_viewport().set_input_as_handled()
 		queue_free()
+
+func _select_color(field: String, id: String) -> void:
+	appearance[field] = id
+	_refresh()
+	appearance_changed.emit(appearance.duplicate(true))
+
+func _refresh_palettes() -> void:
+	_clear(_palettes)
+	var fields: Array = ["skin_color", "lip_color"] if _category == "face" else ["eyebrow_color" if _category == "eyebrows" else _category + "_color"]
+	for field: String in fields:
+		var title := "Ten rengi" if field == "skin_color" else ("Dudak rengi" if field == "lip_color" else "Renk")
+		var selected := AvatarColors.preset(field, appearance)
+		_palettes.add_child(UiTheme.mono_label(L.t(title) + " · " + L.t(selected[1]), 14, UiTheme.TEXT))
+		var row := HFlowContainer.new()
+		row.add_theme_constant_override("h_separation", 6)
+		row.add_theme_constant_override("v_separation", 6)
+		_palettes.add_child(row)
+		for option: Array in AvatarColors.palette(field, appearance.gender):
+			var button := Button.new()
+			button.custom_minimum_size = Vector2(32, 32)
+			button.tooltip_text = L.t(option[1])
+			var active: bool = appearance.get(field) == option[0]
+			var color := Color(option[3])
+			var style := UiSkin.card(color, UiTheme.GOLD if active else UiTheme.EDGE, UiTheme.EDGE_DARK)
+			if active:
+				style.rings = [[0.0, UiTheme.d(3), UiTheme.GOLD]]
+				button.text = "✓"
+				button.add_theme_color_override("font_color", Color.WHITE if color.get_luminance() < 0.45 else UiTheme.INK)
+			button.add_theme_stylebox_override("normal", style)
+			button.add_theme_stylebox_override("pressed", style)
+			button.add_theme_stylebox_override("hover", UiSkin.card(color.lightened(0.08), UiTheme.GOLD, UiTheme.EDGE_DARK))
+			button.pressed.connect(_select_color.bind(field, option[0]))
+			row.add_child(button)

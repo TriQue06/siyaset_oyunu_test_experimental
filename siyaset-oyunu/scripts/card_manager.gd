@@ -3908,7 +3908,7 @@ func _split_party(parent: int) -> void:
 	PartyManager.add_splinter_party(splinter, parent, _splinter_name(parent_name))
 	var home := String(_province_ids[_rng.randi() % _province_ids.size()]) if not _province_ids.is_empty() else ""
 	PartyManager.set_politician_host(splinter, PoliticianPresets.make(bot_name["first_name"], bot_name["surname"],
-		PoliticianPresets.random_background(), home, bot_name["gender"]))
+		PoliticianPresets.random_background(), home, bot_name["gender"], "", AvatarCatalog.random(bot_name["gender"], _rng.randi())))
 	turn_order.append(splinter)
 	# Ayrılan parti sırada (ve soldaki listede) ana partinin hemen altında.
 	var anchor := parent
@@ -5322,7 +5322,8 @@ func _run_congress(pid: int, kind: String, requester: int = -1) -> void:
 	else:
 		var person: Dictionary = winner["_person"]
 		var new_politician := PoliticianPresets.make(person["first_name"], person["surname"], String(winner["_background"]),
-			String(_province_ids[_rng.randi() % _province_ids.size()]) if not _province_ids.is_empty() else "", person["gender"])
+			String(_province_ids[_rng.randi() % _province_ids.size()]) if not _province_ids.is_empty() else "", person["gender"],
+			"", AvatarCatalog.random(person["gender"], _rng.randi()))
 		if MultiplayerManager.is_bot(old_leader):
 			# Bot başkan değişti: aynı bot yeni bir siyasetçi olur.
 			PartyManager.set_politician_host(old_leader, new_politician)

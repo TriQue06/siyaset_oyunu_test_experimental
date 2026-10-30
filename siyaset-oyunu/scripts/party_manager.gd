@@ -304,7 +304,8 @@ func auto_ready_away(peer_id: int) -> void:
 		var homes := GameMap.province_ids()
 		var person := PoliticianPresets.random_name(PoliticianPresets.used_surnames(peer_id))
 		politicians[peer_id] = PoliticianPresets.make(person["first_name"], person["surname"],
-			PoliticianPresets.random_background(), String(homes[randi() % homes.size()]) if not homes.is_empty() else "", person["gender"])
+			PoliticianPresets.random_background(), String(homes[randi() % homes.size()]) if not homes.is_empty() else "", person["gender"],
+			"", AvatarCatalog.random(person["gender"], randi()))
 	_broadcast_parties()
 	parties_updated.emit()
 
@@ -328,8 +329,10 @@ func add_bot_party(peer_id: int) -> void:
 	var background := PoliticianPresets.random_background()
 	var homes := GameMap.province_ids()
 	var bot_name := PoliticianPresets.random_name(PoliticianPresets.used_surnames(peer_id))
+	# 0.0.303: bot kendine rastgele bir avatar üretir (ağda siyasetçiyle gider).
 	politicians[peer_id] = PoliticianPresets.make(bot_name["first_name"], bot_name["surname"],
-		background, String(homes[randi() % homes.size()]) if not homes.is_empty() else "", bot_name["gender"])
+		background, String(homes[randi() % homes.size()]) if not homes.is_empty() else "", bot_name["gender"],
+		"", AvatarCatalog.random(bot_name["gender"], randi()))
 	_assign_new_bot_color(peer_id)
 	if MultiplayerManager.room_code != "":
 		_broadcast_parties()
@@ -574,7 +577,7 @@ func _randomize_bot_politician(bot_id: int) -> void:
 	var homes := GameMap.province_ids()
 	var home := String(homes[randi() % homes.size()]) if not homes.is_empty() else ""
 	_apply_politician(bot_id, PoliticianPresets.make(bot_name["first_name"], bot_name["surname"],
-		PoliticianPresets.random_background(), home, bot_name["gender"]))
+		PoliticianPresets.random_background(), home, bot_name["gender"], "", AvatarCatalog.random(bot_name["gender"], randi())))
 
 ## Oda sahibi: botun siyasetçisinin adını ve soyadını değiştirir (geçmiş,
 ## memleket ve cinsiyet korunur). Ad oyuncu profilindeki kurallarla temizlenir.

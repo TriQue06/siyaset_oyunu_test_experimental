@@ -1964,5 +1964,7 @@
 "Oy oranları, tur tur": "Vote shares, round by round",
 "%d. SEÇİM": "ELECTION %d",
 "%d puan": "%d points",
-"Baştan izle": "Watch again"
+"Baştan izle": "Watch again",
+"Oy oranları, sıra sıra": "Vote shares, turn by turn",
+"%d. tur · %s": "Round %d · %s"
 }

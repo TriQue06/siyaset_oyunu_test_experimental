@@ -5900,3 +5900,9 @@ msgstr "ELECTION %d"
 
 msgid "Baştan izle"
 msgstr "Watch again"
+
+msgid "Oy oranları, sıra sıra"
+msgstr "Vote shares, turn by turn"
+
+msgid "%d. tur · %s"
+msgstr "Round %d · %s"

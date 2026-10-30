@@ -4129,6 +4129,7 @@ func steal_range(peer_id: int, target_peer_id: int, card_type: String) -> Dictio
 
 ## Sırayı bir sonrakine devreder; index başa sardıysa (tur bitti) true döner.
 func _advance_turn() -> bool:
+	record_turn_snapshot(current_turn_peer_id())
 	var size: int = maxi(1, turn_order.size())
 	var wrapped: bool = (current_turn_index + 1) >= size
 	current_turn_index = (current_turn_index + 1) % size
@@ -4366,7 +4367,31 @@ func _record_vote_shares(round_value: int, shares: Dictionary, election: bool) -
 	if election and not (game_stats["elections"] as Array).has(round_value):
 		(game_stats["elections"] as Array).append(round_value)
 
-func record_axis_positions() -> void:
+## SIRA ANLIK GÖRÜNTÜSÜ (0.0.306): her oyuncunun sırası bitince partilerin oy
+## oranı ve eksen konumu kaydedilir (oyun sonu grafiği ve yolculuk sıra sıra
+## oynar). game_stats["steps"]: [[adım, tur, sırası biten parti]].
+func record_turn_snapshot(actor: int) -> void:
+	if not _is_authority():
+		return
+	if game_stats.is_empty():
+		game_stats = {"parties": {}, "deeds": [], "shares": {}, "elections": []}
+	var step := int(game_stats.get("step", 0)) + 1
+	game_stats["step"] = step
+	var steps: Array = game_stats.get("steps", [])
+	steps.append([step, round_number, party_of(actor) if actor != -1 else -1])
+	game_stats["steps"] = steps
+	record_axis_positions(step)
+	# Önbellek aynı karede kalır; kayıt her sırada taze değer okusun.
+	_national_cache_frame = -1
+	var expected := _expected_national()
+	var percent := {}
+	for pid in expected.keys():
+		percent[pid] = float(expected[pid]) * 100.0
+	_record_vote_shares(step, percent, false)
+
+func record_axis_positions(step: int = -1) -> void:
+	if step < 0:
+		step = int(game_stats.get("step", 0))
 	for pid in party_ids():
 		var party: Dictionary = PartyManager.data_of(int(pid))
 		if party.is_empty() or PartyManager.is_independent(int(pid)):
@@ -4378,21 +4403,15 @@ func record_axis_positions() -> void:
 		entry["icon_color"] = party.get("icon_color", Color.WHITE)
 		var p := VoterGroups.axis_position(party.get("groups", {}))
 		var path: Array = entry["path"]
-		if not path.is_empty() and int(path[path.size() - 1][0]) == round_number:
+		if not path.is_empty() and int(path[path.size() - 1][0]) == step:
 			path.pop_back()
-		path.append([round_number, snappedf(p.x, 0.001), snappedf(p.y, 0.001)])
+		path.append([step, snappedf(p.x, 0.001), snappedf(p.y, 0.001)])
 		entry["path"] = path
 		axis_history[int(pid)] = entry
 
 func _finish_round() -> void:
 	_round_end_pending = false
 	_release_secret_news()
-	record_axis_positions()
-	var expected := _expected_national()
-	var percent := {}
-	for pid in expected.keys():
-		percent[pid] = float(expected[pid]) * 100.0
-	_record_vote_shares(round_number, percent, false)
 	# Makam puanları TUR SONUNDA DEĞİL, hükümet kurulduğu anda yazılır
 	# (bkz. GovernmentManager.award_formation_scores).
 	var finished_round := round_number
@@ -4499,7 +4518,17 @@ func _hold_election(finished_round: int, early: bool) -> void:
 	_update_credibility(last_vote_shares, result["vote_shares"])
 	previous_vote_shares = last_vote_shares.duplicate()
 	last_vote_shares = result["vote_shares"]
-	_record_vote_shares(finished_round, last_vote_shares, true)
+	# Seçim: gerçek sonuç ayrı tutulur (grafik çizgisi tahmini oranla kesintisiz
+	# akar; sonuç seçim etiketinde görünür).
+	if _is_authority():
+		if game_stats.is_empty():
+			game_stats = {"parties": {}, "deeds": [], "shares": {}, "elections": []}
+		var step := int(game_stats.get("step", 0))
+		if not (game_stats["elections"] as Array).has(step):
+			(game_stats["elections"] as Array).append(step)
+		var results: Dictionary = game_stats.get("election_results", {})
+		results[step] = last_vote_shares.duplicate()
+		game_stats["election_results"] = results
 	last_seats = result["seats"]
 	last_province_results = result["province_results"]
 	passed_threshold = result["passed_threshold"]
@@ -4603,7 +4632,6 @@ func _finish_final_election() -> void:
 		_end_game(L.t("%d dönem tamamlandı. Son seçimden sonra hükümet kurulamadı.") % GameRules.MAX_ROUNDS)
 
 func _end_game(reason: String) -> void:
-	record_axis_positions()
 	game_finished = true
 	game_end_reason = reason
 	final_ranking = []

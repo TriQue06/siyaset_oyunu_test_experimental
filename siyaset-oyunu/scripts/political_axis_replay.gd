@@ -16,7 +16,8 @@ var embedded := false
 
 const MAP := 440.0
 const MARGIN := 40.0
-const STEP_SECONDS := 0.7
+## 0.0.306: her adım bir oyuncunun SIRASI; yumuşak ve görece yavaş.
+const STEP_SECONDS := 1.0
 const PAWN := 34.0
 const C_TEAL := Color("1f6e70")
 const C_MUTED := Color("7a7166")
@@ -33,6 +34,7 @@ var _legend: VBoxContainer
 var _round_label: Label
 var _timer := 0.0
 var _playing := true
+var _step_seconds := STEP_SECONDS
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -140,6 +142,8 @@ func _load_history() -> void:
 				"icon_color": entry.get("icon_color", Color.WHITE)}})
 	_rounds = rounds.keys()
 	_rounds.sort()
+	# Toplam ~40 sn: adım başına 0,45–1 sn (çok oyunculu uzun oyunda kısalır).
+	_step_seconds = clampf(40.0 / maxf(1.0, float(_rounds.size())), 0.45, STEP_SECONDS)
 
 ## Partinin bu tura kadarki son konumu (henüz yoksa null).
 static func _position_at(path: Array, round_value: int) -> Variant:
@@ -156,7 +160,7 @@ func _process(delta: float) -> void:
 	if not _playing or _rounds.is_empty():
 		return
 	_timer += delta
-	if _timer >= STEP_SECONDS:
+	if _timer >= _step_seconds:
 		_timer = 0.0
 		if _index + 1 < _rounds.size():
 			_index += 1
@@ -177,7 +181,18 @@ func _show_step(i: int, animate: bool) -> void:
 					finished.emit())
 		return
 	var round_value := int(_rounds[i])
-	_round_label.text = L.t("%d. tur") % round_value
+	# Adım: [adım, tur, sırası biten parti] (game_stats.steps).
+	var actor := -1
+	var turn_no := round_value
+	for s in CardManager.game_stats.get("steps", []):
+		if int(s[0]) == round_value:
+			turn_no = int(s[1])
+			actor = int(s[2])
+	var actor_name := ""
+	for p in _parties:
+		if int(p["pid"]) == actor:
+			actor_name = String(p["name"])
+	_round_label.text = (L.t("%d. tur · %s") % [turn_no, actor_name]) if actor_name != "" else L.t("%d. tur") % turn_no
 	for p in _parties:
 		var pawn: Control = _pawns[p["pid"]]
 		var pos: Variant = _position_at(p["path"], round_value)
@@ -199,10 +214,11 @@ func _show_step(i: int, animate: bool) -> void:
 			_bubble(from + Vector2(randf_range(-8, 8), randf_range(-6, 6)), p["color"], 0.08 * k)
 		_trail(p).append(target + Vector2(PAWN, PAWN) * 0.5)
 		var tw := create_tween().set_parallel(true)
-		tw.tween_property(pawn, "position", target, STEP_SECONDS * 0.8).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw.tween_property(pawn, "position", target, _step_seconds * 0.9).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		var pop := create_tween()
-		pop.tween_property(pawn, "scale", Vector2(1.25, 1.25), STEP_SECONDS * 0.3).set_trans(Tween.TRANS_SINE)
-		pop.tween_property(pawn, "scale", Vector2.ONE, STEP_SECONDS * 0.4).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+		var grow := 1.22 if int(p["pid"]) == actor else 1.06
+		pop.tween_property(pawn, "scale", Vector2(grow, grow), _step_seconds * 0.45).set_trans(Tween.TRANS_SINE)
+		pop.tween_property(pawn, "scale", Vector2.ONE, _step_seconds * 0.45).set_trans(Tween.TRANS_SINE)
 	_map.queue_redraw()
 	_refresh_legend(round_value)
 

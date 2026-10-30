@@ -11,7 +11,7 @@ extends Control
 ##   4. SEÇİM GRAFİĞİ (4A): tur tur oy oranı çizgileri; logo merkezi çizginin
 ##      ucunda; seçim turunda beyaz flaş, seçim çizgisi, rozet ve yüzdeler.
 ##   5. PUAN SIRALAMASI (5A Kürsü): basamaklar yükselir, avatarlar iner, taç ve konfeti.
-## Sağ alttaki SONRAKİ ile sahne atlanır. Veriler: CardManager.game_stats,
+## Herkes bütün sahneleri izler (atlama yok). Veriler: CardManager.game_stats,
 ## axis_history, final_ranking (her istemci kendi ekranında oynatır).
 
 const C_RED := Color("d93636")
@@ -41,7 +41,6 @@ var _stage_index := -1
 var _stage: Control
 var _old_stages: Array = []
 var _layer: Control
-var _skip: Button
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -55,19 +54,7 @@ func _ready() -> void:
 	_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_layer)
-	_skip = Button.new()
-	_skip.text = L.t("SONRAKİ ›")
-	_skip.focus_mode = Control.FOCUS_NONE
-	UiSkin.skin_color_button(_skip, UiTheme.TEAL)
-	# Sağ altta (sağ üstte oyunun Menü düğmesi var).
-	_skip.custom_minimum_size = Vector2(150, 42)
-	_skip.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-	_skip.offset_left = -170
-	_skip.offset_top = -62
-	_skip.offset_right = -20
-	_skip.offset_bottom = -20
-	_skip.pressed.connect(_next)
-	add_child(_skip)
+	# 0.0.306: SONRAKİ düğmesi yok; herkes bütün sahneleri izler.
 	modulate.a = 0.0
 	create_tween().tween_property(self, "modulate:a", 1.0, 0.6)
 	_next.call_deferred()
@@ -94,7 +81,6 @@ func _next() -> void:
 			_stage = _ChartStage.new()
 		4:
 			_stage = _PodiumStage.new()
-			_skip.hide()
 		_:
 			return
 	_stage.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -118,7 +104,6 @@ func restart() -> void:
 		_stage.queue_free()
 		_stage = null
 	_stage_index = -1
-	_skip.show()
 	_next()
 
 # --- Ortak yardımcılar ------------------------------------------------------------
@@ -673,73 +658,113 @@ class _RevealStage extends Control:
 class _ChartStage extends Control:
 	signal done
 	var cancelled := false
-	const STEP := 0.38
+	## 0.0.306: grafik SIRA SIRA kaydedilir ve sürekli, yumuşak (köşesiz) akar.
+	## Toplam süre adım sayısına göre bu aralıkta kalır.
+	const MIN_SECONDS := 22.0
+	const MAX_SECONDS := 50.0
+	const ELECTION_PAUSE := 1.6
 	const PAWN := 34.0
-	var _series: Array = []      # [{pid, color, points: [[tur, %]]}]
-	var _rounds: Array = []
+	var _series: Array = []      # [{pid, color, values: [% her adımda]}]
+	var _steps: Array = []
 	var _elections: Array = []
-	var _shown := 0               # çizilen tur sayısı
-	var _revealed: Array = []     # gösterilmiş seçim turları
+	var _revealed: Array = []
 	var _pawns: Dictionary = {}
 	var _min := 0.0
 	var _max := 40.0
+	var _p := 0.0                 # akan konum (adım indeksi, kesirli)
+	var _speed := 1.0             # adım / sn
 	var _pause := 0.0
-	var _timer := 0.0
 	var _finished := false
+	var _grid := 5.0
 
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var shares: Dictionary = CardManager.game_stats.get("shares", {})
 		_elections = CardManager.game_stats.get("elections", []).duplicate()
-		var rounds := {}
+		var steps := {}
+		for pid in shares.keys():
+			for point in shares[pid]:
+				steps[int(point[0])] = true
+		_steps = steps.keys()
+		_steps.sort()
 		var lo := INF
 		var hi := -INF
 		for pid in shares.keys():
-			var list: Array = shares[pid]
-			if list.is_empty():
+			var by_step := {}
+			for point in shares[pid]:
+				by_step[int(point[0])] = float(point[1])
+			# Eksik adımlar bir öncekiyle (parti sonradan kurulduysa ilk değerle) dolar.
+			var values: Array = []
+			var last: Variant = null
+			for s in _steps:
+				if by_step.has(s):
+					last = by_step[s]
+				values.append(last)
+			var first: Variant = null
+			var start := 0
+			for v in values:
+				if v != null:
+					first = v
+					break
+				start += 1
+			if first == null:
 				continue
+			for k in values.size():
+				if values[k] == null:
+					values[k] = first
+				lo = minf(lo, float(values[k]))
+				hi = maxf(hi, float(values[k]))
 			var data := EndgameSequence.party_data(int(pid))
-			_series.append({"pid": int(pid), "color": data.get("bg_color", Color.GRAY), "points": list})
-			for point in list:
-				rounds[int(point[0])] = true
-				lo = minf(lo, float(point[1]))
-				hi = maxf(hi, float(point[1]))
+			# start: partinin ilk kaydı (sonradan kurulan parti oradan çizilir).
+			_series.append({"pid": int(pid), "color": data.get("bg_color", Color.GRAY), "values": values, "start": start})
 			var pawn := PartyBadge.build(data, Vector2(PAWN, PAWN), 64)
 			pawn.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			pawn.hide()
 			add_child(pawn)
 			_pawns[int(pid)] = pawn
-		_rounds = rounds.keys()
-		_rounds.sort()
+		# Dar aralık: küçük artış ve azalışlar da okunur.
 		if lo != INF:
-			_min = maxf(0.0, floorf((lo - 3.0) / 5.0) * 5.0)
-			_max = ceilf((hi + 3.0) / 5.0) * 5.0
+			_min = maxf(0.0, floorf(lo - 1.0))
+			_max = ceilf(hi + 1.0)
+			_grid = maxf(1.0, roundf((_max - _min) / 6.0))
+		var total := clampf(float(_steps.size()) * 0.4, MIN_SECONDS, MAX_SECONDS)
+		_speed = maxf(1.0, float(_steps.size() - 1)) / total
 
 	func _plot() -> Rect2:
-		var m := Vector2(90, 90)
-		return Rect2(m, size - m - Vector2(150, 70))
+		var m := Vector2(90, 100)
+		return Rect2(m, size - m - Vector2(150, 80))
 
-	func _x(round_value: int) -> float:
+	func _x(index: float) -> float:
 		var r := _plot()
-		if _rounds.size() <= 1:
-			return r.position.x
-		var i := _rounds.find(round_value)
-		return r.position.x + r.size.x * float(i) / float(_rounds.size() - 1)
+		return r.position.x + r.size.x * index / maxf(1.0, float(_steps.size() - 1))
 
 	func _y(value: float) -> float:
 		var r := _plot()
 		return r.position.y + r.size.y * (1.0 - (value - _min) / maxf(1.0, _max - _min))
 
-	func _value_at(points: Array, round_value: int) -> Variant:
-		for point in points:
-			if int(point[0]) == round_value:
-				return float(point[1])
-		return null
+	func _point(values: Array, k: int) -> Vector2:
+		k = clampi(k, 0, values.size() - 1)
+		return Vector2(_x(float(k)), _y(float(values[k])))
+
+	## Catmull-Rom: köşesiz eğri; i..i+1 arasında t (0..1).
+	func _curve(values: Array, i: int, t: float) -> Vector2:
+		var p0 := _point(values, i - 1)
+		var p1 := _point(values, i)
+		var p2 := _point(values, i + 1)
+		var p3 := _point(values, i + 2)
+		var t2 := t * t
+		var t3 := t2 * t
+		return 0.5 * ((2.0 * p1) + (-p0 + p2) * t + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2 + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t3)
+
+	func _at(values: Array, p: float) -> Vector2:
+		if values.size() < 2:
+			return _point(values, 0)
+		var i := clampi(int(floor(p)), 0, values.size() - 2)
+		return _curve(values, i, clampf(p - float(i), 0.0, 1.0))
 
 	func _process(delta: float) -> void:
 		if cancelled or _finished:
 			return
-		if _rounds.is_empty():
+		if _steps.is_empty():
 			_finished = true
 			get_tree().create_timer(1.5).timeout.connect(func():
 				if not cancelled:
@@ -748,74 +773,77 @@ class _ChartStage extends Control:
 		if _pause > 0.0:
 			_pause -= delta
 			return
-		_timer += delta
-		if _timer < STEP:
-			return
-		_timer = 0.0
-		if _shown >= _rounds.size():
-			_finished = true
-			get_tree().create_timer(2.5).timeout.connect(func():
-				if not cancelled:
-					done.emit())
-			return
-		_shown += 1
-		var round_value := int(_rounds[_shown - 1])
-		_place_pawns(round_value)
-		if _elections.has(round_value):
-			_revealed.append(round_value)
-			_pause = 1.3
-			EndgameSequence.flash(self, 0.95, 0.42)
-			EndgameSequence.shake(self, 12.0)
-			AudioManager.play("censure_open")
-		queue_redraw()
-
-	## Logonun MERKEZİ çizginin son ucunda.
-	func _place_pawns(round_value: int) -> void:
+		var before := _p
+		_p = minf(_p + delta * _speed, float(_steps.size() - 1))
+		# Seçim adımına varıldı: dur, flaş, seçim çizgisi ve yüzdeler.
+		for k in range(int(ceil(before)), int(floor(_p)) + 1):
+			if k < 0 or k >= _steps.size():
+				continue
+			var step := int(_steps[k])
+			if _elections.has(step) and not _revealed.has(step):
+				_revealed.append(step)
+				_p = float(k)
+				_pause = ELECTION_PAUSE
+				EndgameSequence.flash(self, 0.85, 0.45)
+				EndgameSequence.shake(self, 10.0)
+				AudioManager.play("censure_open")
+				break
+		# Logonun MERKEZİ çizginin son ucunda.
 		for s in _series:
 			var pawn: Control = _pawns[s["pid"]]
-			var last: Variant = null
-			var last_round := -1
-			for point in s["points"]:
-				if int(point[0]) <= round_value:
-					last = float(point[1])
-					last_round = int(point[0])
-			if last == null:
-				continue
-			var target := Vector2(_x(last_round), _y(last)) - Vector2(PAWN, PAWN) * 0.5
-			if not pawn.visible:
-				pawn.position = target
-				pawn.show()
-			else:
-				create_tween().tween_property(pawn, "position", target, STEP * 0.95)
+			pawn.visible = _p >= float(s["start"])
+			pawn.position = _at(s["values"], _p) - Vector2(PAWN, PAWN) * 0.5
+		queue_redraw()
+		if _p >= float(_steps.size() - 1) and _pause <= 0.0:
+			_finished = true
+			get_tree().create_timer(3.0).timeout.connect(func():
+				if not cancelled:
+					done.emit())
 
 	func _draw() -> void:
 		draw_rect(Rect2(Vector2.ZERO, size), Color("efe2c0"))
 		var font := UiTheme.mono(true)
 		var body := UiTheme.mono_regular()
-		draw_string(font, Vector2(90, 56), L.t("Oy oranları, tur tur"), HORIZONTAL_ALIGNMENT_LEFT, -1, 26, EndgameSequence.C_INK)
+		draw_string(font, Vector2(90, 56), L.t("Oy oranları, sıra sıra"), HORIZONTAL_ALIGNMENT_LEFT, -1, 26, EndgameSequence.C_INK)
 		var r := _plot()
 		var v := _min
 		while v <= _max + 0.01:
 			var y := _y(v)
 			draw_line(Vector2(r.position.x, y), Vector2(r.end.x, y), Color(0.12, 0.43, 0.44, 0.15), 1.0)
 			draw_string(body, Vector2(r.position.x - 52, y + 5), "%%%d" % int(v), HORIZONTAL_ALIGNMENT_RIGHT, 40, 13, EndgameSequence.C_MUTED)
-			v += 5.0
+			v += _grid
+		# Tur başları: alt eksende küçük işaret ve tur numarası.
+		var turns := {}
+		for s in CardManager.game_stats.get("steps", []):
+			turns[int(s[0])] = int(s[1])
+		var last_round := -1
+		for k in _steps.size():
+			var turn_no := int(turns.get(int(_steps[k]), -1))
+			if turn_no != last_round and turn_no > 0:
+				last_round = turn_no
+				var x := _x(float(k))
+				draw_line(Vector2(x, r.end.y), Vector2(x, r.end.y + 6), EndgameSequence.C_MUTED, 1.0)
+				draw_string(body, Vector2(x - 10, r.end.y + 22), str(turn_no), HORIZONTAL_ALIGNMENT_CENTER, 20, 11, EndgameSequence.C_MUTED)
 		# Seçimler: çizgilerin ve logoların ARKASINDA.
-		for round_value in _revealed:
-			var x := _x(int(round_value))
+		for step in _revealed:
+			var k := _steps.find(step)
+			var x := _x(float(k))
 			draw_line(Vector2(x, r.position.y - 20), Vector2(x, r.end.y), Color(EndgameSequence.C_GOLD, 0.9), 4.0)
-			var label := L.t("%d. SEÇİM") % (_elections.find(round_value) + 1)
+			var label := L.t("%d. SEÇİM") % (_elections.find(step) + 1)
 			var w := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x + 20
-			var rect := Rect2(Vector2(x - w * 0.5, r.position.y - 46), Vector2(w, 28))
+			var rect := Rect2(Vector2(x - w * 0.5, r.position.y - 50), Vector2(w, 28))
 			draw_rect(Rect2(rect.position + Vector2(0, 4), rect.size), EndgameSequence.C_GOLD_DARK)
 			draw_rect(rect, EndgameSequence.C_GOLD)
 			draw_string(font, rect.position + Vector2(10, 20), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("4a3203"))
-			# Yüzdeler: logonun sağında, birbirine binerse aşağı itilir.
+			# Etikette seçimin GERÇEK sonucu; konum çizgideki noktaya göre.
+			var results: Dictionary = CardManager.game_stats.get("election_results", {}).get(step, {})
 			var items: Array = []
 			for s in _series:
-				var value: Variant = _value_at(s["points"], int(round_value))
-				if value != null:
-					items.append([_y(value), value, s["color"]])
+				if k < int(s["start"]):
+					continue
+				var value: float = s["values"][k]
+				var shown := float(results.get(s["pid"], value))
+				items.append([_y(value), shown, s["color"]])
 			items.sort_custom(func(a, b): return a[0] < b[0])
 			var last_y := -INF
 			for item in items:
@@ -825,14 +853,24 @@ class _ChartStage extends Control:
 				var tw := body.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
 				draw_rect(Rect2(Vector2(x + PAWN * 0.5 + 6, ly - 12), Vector2(tw + 8, 22)), Color(0.97, 0.93, 0.85, 0.85))
 				draw_string(body, Vector2(x + PAWN * 0.5 + 10, ly + 5), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, item[2])
-		# Çizgiler.
+		# Köşesiz çizgiler: tamamlanan aralıklar + akan son parça.
 		for s in _series:
+			var values: Array = s["values"]
+			if values.size() < 2:
+				continue
 			var pts := PackedVector2Array()
-			for i in _shown:
-				var round_value := int(_rounds[i])
-				var value: Variant = _value_at(s["points"], round_value)
-				if value != null:
-					pts.append(Vector2(_x(round_value), _y(value)))
+			var full := int(floor(_p))
+			for i in range(int(s["start"]), mini(full, values.size() - 1)):
+				for n in 10:
+					pts.append(_curve(values, i, float(n) / 10.0))
+			if full < int(s["start"]):
+				continue
+			if full < values.size() - 1:
+				var frac := _p - float(full)
+				for n in 11:
+					pts.append(_curve(values, full, frac * float(n) / 10.0))
+			else:
+				pts.append(_point(values, values.size() - 1))
 			if pts.size() >= 2:
 				draw_polyline(pts, s["color"], 5.0, true)
 

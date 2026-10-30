@@ -252,7 +252,8 @@ static func group_grid(on_pick: Callable, available: Callable = func(_group: Str
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 6)
 	grid.add_theme_constant_override("v_separation", 6)
-	for group in VoterGroups.GROUP_IDS:
+	# Karşıt gruplar üst üste (0.0.301).
+	for group in VoterGroups.stacked_order(2):
 		var button := Button.new()
 		button.focus_mode = Control.FOCUS_NONE
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL

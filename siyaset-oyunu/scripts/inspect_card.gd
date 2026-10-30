@@ -433,7 +433,7 @@ static func _tokens(values: Dictionary, rings: Dictionary) -> Control:
 	grid.add_theme_constant_override("h_separation", int(d(6)))
 	grid.add_theme_constant_override("v_separation", int(d(8)))
 	grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	for group in VoterGroups.GROUP_IDS:
+	for group in VoterGroups.stacked_order(4):
 		var col := VBoxContainer.new()
 		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		col.add_theme_constant_override("separation", int(d(3)))

@@ -100,6 +100,17 @@ func _initialize() -> void:
 	check("kart cekildi", not cm.needs_turn_draw(1) and not draws.is_empty(), str(draws))
 	cm._apply_draw(1)
 	check("ayni sirada ikinci cekim yok", cm.turn_draws(1) == draws)
+	# 0.0.301: ücretli EK kart (sırada bir kez, 20 M).
+	var hold_funds: float = cm.funds_of(1)
+	var hold_hand: Array = (cm.inventories.get(1, []) as Array).duplicate()
+	cm.funds[1] = 25.0
+	check("ek kart cekilebilir", cm.can_extra_draw(1), cm.extra_draw_block_reason(1))
+	cm._apply_extra_draw(1)
+	check("ek kart 20 M", is_equal_approx(cm.funds_of(1), 5.0), str(cm.funds_of(1)))
+	cm.funds[1] = 100.0
+	check("ek kart sirada bir kez", not cm.can_extra_draw(1))
+	cm.funds[1] = hold_funds
+	cm.inventories[1] = hold_hand
 	# Yeniden bağlanma: durum paketlenip geri uygulanınca çekim hakkı geri gelmez.
 	cm._apply_state(cm._pack_state(true))
 	check("yeniden baglanma cift cekim saglamaz", not cm.needs_turn_draw(1))

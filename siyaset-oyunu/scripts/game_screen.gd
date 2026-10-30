@@ -213,7 +213,7 @@ var _layer_buttons: Array = []
 var _layer_legend: Control
 ## Seçmen katmanında gösterilen grup ve grup seçici düğmeler.
 var _map_group: String = "isci"
-var _group_picker: HBoxContainer
+var _group_picker: GridContainer
 var _game_over_overlay: Control
 ## Sol paneldeki canlı olay logu ve harita odak animasyonu.
 var _event_log: EventLogPanel
@@ -662,6 +662,47 @@ static func _section_label(text: String) -> Label:
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return label
 
+## EK KART ÇEK (0.0.301): ELİM başlığının sağında küçük altın düğme; sırada
+## ücretsiz çekimden sonra bir kez, ücretli.
+var _extra_draw_button: Button
+
+func _place_extra_draw_button() -> void:
+	if _extra_draw_button == null:
+		_extra_draw_button = Button.new()
+		_extra_draw_button.focus_mode = Control.FOCUS_NONE
+		_extra_draw_button.add_theme_font_override("font", UiTheme.mono(true))
+		_extra_draw_button.add_theme_font_size_override("font_size", UiTheme.fs(15))
+		UiSkin.skin_color_button(_extra_draw_button, UiTheme.GOLD_DIM)
+		for key in ["font_color", "font_hover_color", "font_pressed_color"]:
+			_extra_draw_button.add_theme_color_override(key, UiTheme.ON_COLOR)
+		_extra_draw_button.pressed.connect(func():
+			var reason := CardManager.extra_draw_block_reason(multiplayer.get_unique_id())
+			if reason != "":
+				_show_toast(reason)
+				return
+			CardManager.extra_draw())
+		add_child(_extra_draw_button)
+	var label := _desk_labels["hand"] as Label
+	label.reset_size()
+	_extra_draw_button.text = L.t("KART ÇEK · %s") % GameRules.cost_text(CardManager.EXTRA_DRAW_COST)
+	_extra_draw_button.reset_size()
+	_extra_draw_button.position = label.position + Vector2(label.size.x + UiTheme.d(14),
+		(label.size.y - _extra_draw_button.size.y) * 0.5)
+	_refresh_extra_draw_button()
+
+func _refresh_extra_draw_button() -> void:
+	if _extra_draw_button == null:
+		return
+	var me := multiplayer.get_unique_id()
+	# Yalnız kendi sıramda ve ücretsiz çekimden sonra görünür; şartı yoksa sönük.
+	_extra_draw_button.visible = CardManager.current_turn_peer_id() == me and not CardManager.needs_turn_draw(me) \
+		and not CardManager.is_party_member(me) and not bool(CardManager._flow_value(me, "extra_draw", false))
+	_extra_draw_button.modulate.a = 1.0 if CardManager.can_extra_draw(me) else 0.55
+	var label := _desk_labels.get("hand") as Label
+	if label != null:
+		label.reset_size()
+		_extra_draw_button.position.x = label.position.x + label.size.x + UiTheme.d(14)
+
 ## Masanın bölüm başlıkları: ELİM · HAMLELER · SIRA.
 func _place_desk_labels() -> void:
 	for key in ["hand", "actions", "turn"]:
@@ -684,6 +725,7 @@ func _place_desk_labels() -> void:
 		add_child(hint)
 		_desk_labels["hint"] = hint
 	(_desk_labels["hand"] as Label).position = _r(Rect2(16, 546, 0, 0)).position
+	_place_extra_draw_button()
 	(_desk_labels["actions"] as Label).position = _r(Rect2(536, 546, 0, 0)).position
 	(_desk_labels["turn"] as Label).position = _r(Rect2(1112, 546, 0, 0)).position
 	# 0.0.260: sıra göstergesi yalnız üst bantta (para levhasının üstünde yok).
@@ -703,6 +745,7 @@ func _refresh_desk_labels() -> void:
 	if _desk_labels.is_empty():
 		return
 	(_desk_labels["hand"] as Label).text = L.t("ELİM · %d KART") % CardManager.my_inventory().size()
+	_refresh_extra_draw_button()
 	var peer_id := CardManager.current_turn_peer_id()
 	var turn_text := ""
 	if peer_id == multiplayer.get_unique_id():
@@ -2130,8 +2173,8 @@ func _build_plaque(pid: int, width: float) -> Control:
 	# hafif gölge. Sırası gelen partide kenar hardal.
 	var style := UiSkin.card(UiTheme.PANEL_DARK, color.lerp(UiTheme.PANEL_DARK, 0.55), color.lerp(UiTheme.CARD_LIP, 0.55))
 	if is_turn:
-		style.rings = [[0.0, UiTheme.d(3), UiTheme.GOLD]]
-		style.lips = [[UiTheme.d(4), UiTheme.GOLD_DIM]]
+		# 0.0.301 (konsept B): açık krem zemin; çevrede altın + parti renginde iki yılan.
+		style.fill = Color("fff6dc")
 	style.shadow_color = Color(0, 0, 0, 0.12)
 	style.shadow_offset = Vector2(0, UiTheme.d(6))
 	style.shadow_size = UiTheme.d(6)
@@ -2140,6 +2183,11 @@ func _build_plaque(pid: int, width: float) -> Control:
 	style.content_margin_top = UiTheme.d(8)
 	style.content_margin_bottom = UiTheme.d(8)
 	card.add_theme_stylebox_override("panel", style)
+	if is_turn:
+		var snake := TurnSnake.new()
+		snake.party_color = color
+		snake.outset = Vector4(style.content_margin_left, style.content_margin_top, style.content_margin_right, style.content_margin_bottom)
+		card.add_child(snake)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", int(UiTheme.d(12)))
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -3205,7 +3253,7 @@ func _fill_focus_panel() -> void:
 	grid.add_theme_constant_override("v_separation", 4)
 	_focus_box.add_child(grid)
 	var profile := CardManager.province_profile(province_id)
-	for group in VoterGroups.GROUP_IDS:
+	for group in VoterGroups.stacked_order(2):
 		grid.add_child(_focus_group_button(group, VoterGroups.share(profile, group), slots))
 	_focus_box.add_child(PopupKit.note(L.t("Beklenen hitap:%s") % _miting_group_preview(me, province_id, _miting_focus).trim_prefix(L.t(" · hitap:")), UiTheme.GREEN, 380))
 	var buttons := HBoxContainer.new()
@@ -5547,11 +5595,14 @@ func _build_layer_bar() -> void:
 	_layer_legend.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_layer_legend)
 	# Seçmen katmanı: 8 grup simgesi (katman açıkken düğmelerin altında).
-	_group_picker = HBoxContainer.new()
-	_group_picker.add_theme_constant_override("separation", 6)
+	# 0.0.301: dört sütun, karşıt grup altta.
+	_group_picker = GridContainer.new()
+	_group_picker.columns = 4
+	_group_picker.add_theme_constant_override("h_separation", 6)
+	_group_picker.add_theme_constant_override("v_separation", 6)
 	_group_picker.z_index = 6
 	add_child(_group_picker)
-	for group in VoterGroups.GROUP_IDS:
+	for group in VoterGroups.stacked_order(4):
 		# Kare düğme: yalnız grup simgesi (seçili olan grubun renginde).
 		var pick := Button.new()
 		pick.focus_mode = Control.FOCUS_NONE

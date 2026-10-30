@@ -236,10 +236,13 @@ static func _group_chart(votes: Dictionary, levels: Dictionary = {}) -> Control:
 	var top := 1.0
 	for group in VoterGroups.GROUP_IDS:
 		top = maxf(top, float(votes.get(group, 0.0)))
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 3)
+	# 0.0.301: dört sütun, karşıt grup altta (iki sıra).
+	var row := GridContainer.new()
+	row.columns = 4
+	row.add_theme_constant_override("h_separation", 3)
+	row.add_theme_constant_override("v_separation", 4)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	for group in VoterGroups.GROUP_IDS:
+	for group in VoterGroups.stacked_order(4):
 		var value := float(votes.get(group, 0.0))
 		var col := VBoxContainer.new()
 		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL

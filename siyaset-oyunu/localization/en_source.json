@@ -1895,5 +1895,19 @@
 "Onayla": "Confirm",
 "Tur geliri": "Round revenue",
 "%s yılda": "every %s yr",
-"aynı": "same"
+"aynı": "same",
+"Önce bu sıranın kartını çek.": "Draw this turn's card first.",
+"Bu sıra ek kartını çektin.": "You already drew your extra card this turn.",
+"Elin dolu.": "Your hand is full.",
+"Kartları partinin genel başkanı çeker.": "The party leader draws the cards.",
+"KART ÇEK · %s": "DRAW CARD · %s",
+"bu sıra %d/%d": "this turn %d/%d",
+"GELİŞTİR": "UPGRADE",
+"Şu an teşkilat kurulamaz.": "You can't build an organization right now.",
+"Miting boyu": "Rally size",
+"Hedef grup": "Target group",
+"MİTİNG YAP": "HOLD RALLY",
+"Bu sıra %d mitingin hepsini yaptın.": "You've held all %d rallies this turn.",
+"Yatırım boyu": "Investment size",
+"YATIRIM YAP": "INVEST"
 }

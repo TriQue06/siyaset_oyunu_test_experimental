@@ -36,6 +36,20 @@ const PAIRS := {
 }
 const PAIR_IDS := ["emek", "kusak", "inanc", "yonetim"]
 
+## KARŞIT GRUPLAR ÜST ÜSTE (0.0.301): columns sütunlu ızgarada grupların
+## sırası. Her sütunda bir çift durur, çiftin ilk grubu üstte, karşıtı hemen
+## altında (4 sütun: üst sıra İşçi, Öğrenci, Muhafazakâr, Bölgeselci; alt sıra
+## karşıtları). 2 sütunda iki çift yan yana, karşıtları altlarında.
+static func stacked_order(columns: int = 4) -> Array:
+	var order: Array = []
+	var per_row := maxi(1, columns)
+	for start in range(0, PAIR_IDS.size(), per_row):
+		var chunk := PAIR_IDS.slice(start, start + per_row)
+		for side in 2:
+			for pair in chunk:
+				order.append(PAIRS[pair][side])
+	return order
+
 ## icon: VoterGroupIcon'un çizdiği simge adı.
 ## law_backlash: grup yasası kabul edilince karşıt gruptaki kaybın kazanca oranı
 ## (0.0.268: hepsi 1 — zıt grup kaybı birebir).

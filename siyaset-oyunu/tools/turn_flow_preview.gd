@@ -137,12 +137,12 @@ func _initialize() -> void:
 	check("il paneli acildi", scene._province_actions.visible)
 	scene._province_actions.tab = "miting"
 	scene._province_actions._smear = -1
+	scene._province_actions._focus = VoterGroups.stacked_order(4).slice(0, cm.miting_focus_slots(me, province))
 	scene._province_actions.refresh()
 	await _wait(0.3)
 	_shot("tf_10_miting")
 	check("karalama secenegi kart eldeyken gorunur", cm.smear_targets(me, province).size() > 0)
 	check("il paneli ekrana sigiyor", _inside(scene._province_actions), str(scene._province_actions.get_global_rect()))
-	scene._province_actions._scroll.scroll_vertical = 2000
 	await _wait(0.2)
 	_shot("tf_11_miting_summary")
 	var before: float = cm.funds_of(me)

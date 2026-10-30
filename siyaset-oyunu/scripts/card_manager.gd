@@ -437,6 +437,58 @@ func _apply_draw(peer_id: int, automatic: bool = false) -> void:
 		event["message"] = " ".join(messages)
 	_push_state(event)
 
+## EK ŞANS KARTI (0.0.301): ücretsiz çekimden (ya da ATLA'dan) sonra sırada
+## bir kez daha, EXTRA_DRAW_COST karşılığında kart çekilebilir.
+const EXTRA_DRAW_COST := 20.0
+
+func can_extra_draw(peer_id: int) -> bool:
+	return extra_draw_block_reason(peer_id) == ""
+
+## Ek çekim neden yapılamıyor ("" = yapılabilir).
+func extra_draw_block_reason(peer_id: int) -> String:
+	if peer_id != current_turn_peer_id() or is_turn_blocked() or game_finished:
+		return L.t("Sıra sende değil.")
+	if is_party_member(peer_id):
+		return L.t("Kartları partinin genel başkanı çeker.")
+	if needs_turn_draw(peer_id):
+		return L.t("Önce bu sıranın kartını çek.")
+	if bool(_flow_value(peer_id, "extra_draw", false)):
+		return L.t("Bu sıra ek kartını çektin.")
+	if (inventories.get(peer_id, []) as Array).size() >= MAX_HAND_SIZE:
+		return L.t("Elin dolu.")
+	if funds_of(peer_id) < EXTRA_DRAW_COST:
+		return L.t("Parti kasası yetmiyor (%s gerekir).") % GameRules.cost_text(EXTRA_DRAW_COST)
+	return ""
+
+func extra_draw() -> void:
+	var me := multiplayer.get_unique_id()
+	if not can_extra_draw(me):
+		return
+	if _is_authority():
+		_apply_extra_draw(me)
+	else:
+		_request_extra_draw.rpc_id(1)
+
+@rpc("any_peer", "reliable")
+func _request_extra_draw() -> void:
+	if MultiplayerManager.is_host:
+		_apply_extra_draw(multiplayer.get_remote_sender_id())
+
+func _apply_extra_draw(peer_id: int) -> void:
+	if not can_extra_draw(peer_id):
+		return
+	_note_main_action(peer_id)
+	funds[peer_id] = funds_of(peer_id) - EXTRA_DRAW_COST
+	_flow_for(peer_id)["extra_draw"] = true
+	var draws: Array = []
+	var messages: PackedStringArray = []
+	_resolve_draw(peer_id, CardPresets.weighted_pick(_draw_weights(peer_id), _rng), draws, messages)
+	_turn_time_left += DRAW_GRACE_SECONDS
+	var event := {"type": "draw", "peer_id": peer_id, "draws": draws, "extra": true}
+	if not messages.is_empty():
+		event["message"] = " ".join(messages)
+	_push_state(event)
+
 ## Çekilen kartı sınıfına göre işler: anında kart uygulanır, saklanabilir kart ele girer.
 func _resolve_draw(peer_id: int, card_type: String, draws: Array, messages: PackedStringArray) -> void:
 	if not is_instant_card(card_type):

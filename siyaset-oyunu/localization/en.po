@@ -5696,3 +5696,45 @@ msgstr "every %s yr"
 
 msgid "aynı"
 msgstr "same"
+
+msgid "Önce bu sıranın kartını çek."
+msgstr "Draw this turn's card first."
+
+msgid "Bu sıra ek kartını çektin."
+msgstr "You already drew your extra card this turn."
+
+msgid "Elin dolu."
+msgstr "Your hand is full."
+
+msgid "Kartları partinin genel başkanı çeker."
+msgstr "The party leader draws the cards."
+
+msgid "KART ÇEK · %s"
+msgstr "DRAW CARD · %s"
+
+msgid "bu sıra %d/%d"
+msgstr "this turn %d/%d"
+
+msgid "GELİŞTİR"
+msgstr "UPGRADE"
+
+msgid "Şu an teşkilat kurulamaz."
+msgstr "You can't build an organization right now."
+
+msgid "Miting boyu"
+msgstr "Rally size"
+
+msgid "Hedef grup"
+msgstr "Target group"
+
+msgid "MİTİNG YAP"
+msgstr "HOLD RALLY"
+
+msgid "Bu sıra %d mitingin hepsini yaptın."
+msgstr "You've held all %d rallies this turn."
+
+msgid "Yatırım boyu"
+msgstr "Investment size"
+
+msgid "YATIRIM YAP"
+msgstr "INVEST"

@@ -626,7 +626,7 @@ func _build_core_buttons() -> void:
 	for child in _core_grid.get_children():
 		_core_grid.remove_child(child)
 		child.queue_free()
-	for group in VoterGroups.GROUP_IDS:
+	for group in VoterGroups.stacked_order(_core_grid.columns):
 		_core_grid.add_child(_core_button(String(group)))
 
 func _core_button(group: String) -> Button:

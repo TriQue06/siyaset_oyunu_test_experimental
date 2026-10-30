@@ -31,7 +31,7 @@ func _draw() -> void:
 	var r := side * 0.5
 	var ink := Color.WHITE
 	if bare:
-		ink = VoterGroups.color(group)
+		ink = ink_override if ink_override.a > 0.0 else VoterGroups.color(group)
 		draw_symbol(self, VoterGroups.icon(group), c, r * 0.9, ink)
 		return
 	if ink_override.a > 0.0:

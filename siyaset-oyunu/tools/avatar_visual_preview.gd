@@ -55,6 +55,14 @@ func _initialize() -> void:
 			value.beard = beard
 			samples.append([beard + " / " + face, value])
 		groups.append(["beards_" + face, samples])
+	for face in AvatarCatalog.options("face", "m"):
+		var samples: Array = []
+		for moustache in AvatarCatalog.options("moustache", "m"):
+			var value := AvatarCatalog.clean({}, "m")
+			value.face = face
+			value.moustache = moustache
+			samples.append([moustache + " / " + face, value])
+		groups.append(["moustaches_" + face, samples])
 	for group in groups:
 		var nodes: Array = []
 		for i in group[1].size():

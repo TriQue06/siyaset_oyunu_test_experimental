@@ -292,22 +292,6 @@
       ],
       "rotation": 0
     },
-    "hair_24": {
-      "category": "hair",
-      "gender": "f",
-      "label": "Uzun dalgalı",
-      "file": "hair_24.png",
-      "source": "Uzun Dalgalı Esmer Saç Parçası.png",
-      "offset": [
-        -210,
-        155
-      ],
-      "scale": [
-        1.32,
-        1.12
-      ],
-      "rotation": 0
-    },
     "hair_26": {
       "category": "hair",
       "gender": "f",
@@ -337,22 +321,6 @@
       "scale": [
         0.91,
         0.88
-      ],
-      "rotation": 0
-    },
-    "hair_33": {
-      "category": "hair",
-      "gender": "f",
-      "label": "Gür bukle",
-      "file": "hair_33.png",
-      "source": "Şeffaf Arka Planda Gür Kahverengi Bukleler.png",
-      "offset": [
-        -128,
-        100
-      ],
-      "scale": [
-        1.18,
-        1.15
       ],
       "rotation": 0
     },
@@ -475,12 +443,12 @@
       "file": "moustache_14.png",
       "source": "Klasik Gür ve Kahverengi Bıyık.png",
       "offset": [
-        395.16,
-        805.8
+        353.429,
+        761.403
       ],
       "scale": [
-        0.3696,
-        0.308
+        0.43613,
+        0.4004
       ],
       "rotation": 0
     },
@@ -491,12 +459,12 @@
       "file": "moustache_15.png",
       "source": "Klasik Kahverengi Gidon Bıyığı.png",
       "offset": [
-        330.2,
-        879.5
+        276.776,
+        856.21
       ],
       "scale": [
-        0.336,
-        0.275
+        0.39648,
+        0.3575
       ],
       "rotation": 0
     },
@@ -507,12 +475,12 @@
       "file": "moustache_17.png",
       "source": "Klasik Yoğun Kahverengi Bıyık.png",
       "offset": [
-        361.56,
-        802.5
+        313.781,
+        758.796
       ],
       "scale": [
-        0.4256,
-        0.308
+        0.50221,
+        0.4004
       ],
       "rotation": 0
     },
@@ -523,12 +491,12 @@
       "file": "moustache_27.png",
       "source": "Zarif Kahverengi Bıyık İllüstrasyonu.png",
       "offset": [
-        307.8,
-        777.2
+        250.344,
+        464.666
       ],
       "scale": [
-        0.504,
-        0.363
+        0.59472,
+        0.88172
       ],
       "rotation": 0
     },
@@ -539,12 +507,12 @@
       "file": "moustache_31.png",
       "source": "Şeffaf Arka Planda Gerçekçi Kahverengi Bıyık.png",
       "offset": [
-        344.76,
-        783.8
+        293.957,
+        635.466
       ],
       "scale": [
-        0.448,
-        0.33
+        0.52864,
+        0.57746
       ],
       "rotation": 0
     },

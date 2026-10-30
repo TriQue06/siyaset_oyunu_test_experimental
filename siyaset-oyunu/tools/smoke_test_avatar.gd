@@ -23,7 +23,7 @@ func _initialize() -> void:
 	pm.parties = {}
 	pm.politicians = {}
 	pm.my_politician = {}
-	check("all 40 supplied pieces catalogued", AvatarCatalog.data().assets.size() == 40)
+	check("38 enabled avatar pieces catalogued", AvatarCatalog.data().assets.size() == 38)
 	for face: String in AvatarCatalog.data().faces:
 		var layers := AvatarEyes.layers(face, "iris_03")
 		check(face + " has two separately masked eyes", layers.size() == 2)
@@ -53,8 +53,9 @@ func _initialize() -> void:
 	check("legacy appearances receive original colors", legacy.skin_color == "natural" and legacy.hair_color == "brown" and legacy.lip_color == "natural")
 	var invalid := AvatarCatalog.clean({"skin_color": "../../invalid", "hair_color": 5, "lip_color": "wine"}, "m")
 	check("colors validate IDs and gender lip palette", invalid.skin_color == "natural" and invalid.hair_color == "brown" and invalid.lip_color == "natural")
-	var bad := AvatarCatalog.clean({"face": "../../invalid", "hair": "hair_24", "beard": "beard_02", "unexpected": 1}, "f")
-	check("gender compatibility and safe identifiers", bad.face == "face_12" and bad.hair == "hair_24" and bad.beard == null and not bad.has("unexpected"))
+	check("removed hairstyles cannot be selected", AvatarCatalog.clean({"hair": "hair_24"}, "f").hair == null and AvatarCatalog.clean({"hair": "hair_33"}, "f").hair == null)
+	var bad := AvatarCatalog.clean({"face": "../../invalid", "hair": "hair_26", "beard": "beard_02", "unexpected": 1}, "f")
+	check("gender compatibility and safe identifiers", bad.face == "face_12" and bad.hair == "hair_26" and bad.beard == null and not bad.has("unexpected"))
 	if "--english" in OS.get_cmdline_user_args(): TranslationServer.set_locale("en")
 	var scene = load("res://scenes/PartySetup.tscn").instantiate()
 	root.add_child(scene)

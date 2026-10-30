@@ -722,6 +722,10 @@ func _resolve_proposal() -> void:
 	var kind := proposal_kind
 	var proposer := proposal_peer_id
 	var totals := vote_seat_totals()
+	# 0.0.305: oyun sonu "Hayır Cephesi" ünvanı için HAYIR oyları sayılır.
+	for voter in votes.keys():
+		if normalize_vote(votes[voter]) == VOTE_NO:
+			CardManager.stat_add(int(voter), "no_votes")
 
 	if kind == KIND_LAW:
 		# Çekimserler sayılmaz; EVET'in payı yasa geçiş oranını aşmalı (anayasayla değişir).
@@ -814,6 +818,10 @@ func _resolve_proposal() -> void:
 			last_resolution_reason = L.t("%s hükümeti güvenoyu aldı.") % _party_name(main_gov_peer_id)
 			CardManager.start_approval()
 			CardManager.grant_government_funds(government_party_ids())
+			# Koalisyon Kelebeği: birden fazla partili hükümette yer alan her parti.
+			if government_party_ids().size() > 1:
+				for pid in government_party_ids():
+					CardManager.stat_add(int(pid), "coalitions")
 			# Makam puanları TEK SEFER, hükümetin kurulduğu anda yazılır.
 			award_formation_scores()
 		else:

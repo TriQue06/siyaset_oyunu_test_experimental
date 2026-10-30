@@ -5816,3 +5816,87 @@ msgstr "conservative"
 
 msgid "ilerici"
 msgstr "progressive"
+
+msgid "SONRAKİ ›"
+msgstr "NEXT ›"
+
+msgid "Meydanların Sultanı"
+msgstr "Sultan of the Squares"
+
+msgid "Oyun boyunca en çok miting yapan."
+msgstr "Held the most rallies in the game."
+
+msgid "Müteahhit"
+msgstr "The Contractor"
+
+msgid "Devlet hazinesinden en çok yatırım yapan."
+msgstr "Invested the most from the state treasury."
+
+msgid "Yasa Fabrikası"
+msgstr "Law Factory"
+
+msgid "Mecliste en çok yasa geçiren."
+msgstr "Passed the most laws in parliament."
+
+msgid "Hayır Cephesi"
+msgstr "The No Front"
+
+msgid "Mecliste en çok HAYIR diyen."
+msgstr "Voted NO the most in parliament."
+
+msgid "Hükümet Avcısı"
+msgstr "Government Hunter"
+
+msgid "En çok gensoru veren."
+msgstr "Filed the most censure motions."
+
+msgid "Koalisyon Kelebeği"
+msgstr "Coalition Butterfly"
+
+msgid "En sık koalisyonlarda yer alan."
+msgstr "Took part in coalitions most often."
+
+msgid "Dönek"
+msgstr "The Turncoat"
+
+msgid "Politik eksende en uzun yolu kateden."
+msgstr "Travelled the longest path on the political axis."
+
+msgid "Omurga"
+msgstr "The Spine"
+
+msgid "Politik eksende en az yol kateden."
+msgstr "Moved the least on the political axis."
+
+msgid "Kara Kedi"
+msgstr "Black Cat"
+
+msgid "En çok olumsuzluk yaşayan: para cezası, kaset, iç karışıklık, karalanma."
+msgstr "Suffered the most misfortune: fines, tapes, unrest, smears."
+
+msgid "Afet Kahramanı"
+msgstr "Disaster Hero"
+
+msgid "Afetlere en çok yardım eden."
+msgstr "Gave the most disaster aid."
+
+msgid "PERDE ARKASI"
+msgstr "BEHIND THE CURTAIN"
+
+msgid "KASET"
+msgstr "TAPE"
+
+msgid "hedef"
+msgstr "target"
+
+msgid "Temiz çıktı. Ya da çok iyi saklandı."
+msgstr "Came out clean. Or hid it very well."
+
+msgid "Oy oranları, tur tur"
+msgstr "Vote shares, round by round"
+
+msgid "%d. SEÇİM"
+msgstr "ELECTION %d"
+
+msgid "Baştan izle"
+msgstr "Watch again"

@@ -3,7 +3,7 @@ extends Control
 ## SIRA VURGUSU (0.0.301, konsept B "Altın ve parti rengi, iki yılan", bkz.
 ## konseptler/il_menusu_ve_sira_konseptleri.html): sırası gelen partinin
 ## plaketinin çevresinde iki yılan aynı yönde kovalar — biri altın, biri parti
-## renginde — ve sağ üstte küçük altın "SIRA" etiketi durur.
+## renginde. (0.0.305: "SIRA" etiketi kaldırıldı.)
 ## Plaketin (PanelContainer) içine eklenir; çizim içerik payı kadar dışarı taşar
 ## (outset: sol, üst, sağ, alt). Faz saatten okunur: plaket yeniden kurulsa da
 ## yılanlar yerinden sıçramaz.
@@ -92,7 +92,7 @@ func _draw() -> void:
 		var base := phase + float(k) * (DASH + GAP)
 		_draw_dash(base, DASH, UiTheme.GOLD)
 		_draw_dash(base + OFFSET, DASH, party_color)
-	_draw_tag()
+	# 0.0.305: "SIRA" etiketi kalktı; yılan animasyonu yeterli.
 
 ## Sağ üstte altın "SIRA" etiketi (konsept .tag), kartın üst kenarında.
 func _draw_tag() -> void:

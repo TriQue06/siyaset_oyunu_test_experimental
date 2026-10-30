@@ -514,11 +514,13 @@ func _apply_instant(peer_id: int, card_type: String, entry: Dictionary = {}) -> 
 			populism[party_of(peer_id)] = round_number + GameRules.POPULISM_ROUNDS
 			return L.t("%s popülizme başladı: bu dönem hamleleri daha etkili.") % _party_name(peer_id)
 		CardPresets.PENALTY_CARD_TYPE:
+			stat_add(peer_id, "bad")
 			var fine := maxf(0.0, funds_of(peer_id)) * CardPresets.PENALTY_SHARE
 			funds[peer_id] = funds_of(peer_id) - fine
 			entry["amount"] = fine
 			return L.t("%s para cezasına çarptırıldı (−%s).") % [_party_name(peer_id), GameRules.cost_text(fine)]
 		CardPresets.SELF_TURMOIL_CARD_TYPE:
+			stat_add(peer_id, "bad")
 			# İÇ KARIŞIKLIK kartının etkisi, oyuncunun kendi partisinde.
 			_add_national(peer_id, -PublicOpinion.REBELLION_NATIONAL_DAMAGE)
 			_add_turmoil(peer_id, PublicOpinion.TURMOIL_REBELLION)
@@ -1487,6 +1489,7 @@ func _apply_aid_move(peer_id: int, party_m: float, state_m: float) -> void:
 		_spend_quota(peer_id, state_m)
 		economy["treasury"] = before - state_m
 	var pid := party_of(peer_id)
+	stat_add(peer_id, "aid", total)
 	var aid_map: Dictionary = active.get("aid", {})
 	var prev := float(aid_map.get(pid, 0.0))
 	aid_map[pid] = prev + total
@@ -2315,6 +2318,7 @@ func init_game() -> void:
 	election_groups = {}
 	former_parties = {}
 	axis_history = {}
+	game_stats = {}
 	economy = Economy.start_state()
 	disaster = {}
 	_pending_disaster_fx = {}
@@ -2718,6 +2722,7 @@ func _apply_invest_move(peer_id: int, province_id: String, state: float = 1.0, t
 func _apply_censure_move(peer_id: int) -> void:
 	if not can_censure(peer_id):
 		return
+	stat_add(peer_id, "censures")
 	_note_main_action(peer_id)
 	_parl_close(peer_id, "censure")
 	funds[peer_id] = funds_of(peer_id) - GameRules.CENSURE_FUNDS_COST
@@ -2776,6 +2781,8 @@ func _apply_card_effect(peer_id: int, card_type: String, target_peer_id: int = -
 		CardPresets.REPUTATION_CARD_TYPE:
 			_apply_reputation(peer_id, target_peer_id)
 		CardPresets.REBELLION_CARD_TYPE:
+			stat_add(target_peer_id, "bad")
+			_stat_deed("isyan", peer_id, target_peer_id)
 			# İÇ KARIŞIKLIK: ulusal destek düşer, partide (gizli) karışıklık büyür.
 			_add_national(target_peer_id, -PublicOpinion.REBELLION_NATIONAL_DAMAGE)
 			_add_turmoil(target_peer_id, PublicOpinion.TURMOIL_REBELLION)
@@ -2837,6 +2844,7 @@ func _province_name(province_id: String) -> String:
 ## Miting: ildeki grupların bir kısmı seçmen olarak kazanılır (nüfusla
 ## orantılı, kalıcı). 0.0.285: provokasyon riski kalktı, miting hep işler.
 func _apply_miting(peer_id: int, province_id: String, focus: Array = [], tier_mult: float = 1.0) -> void:
+	stat_add(peer_id, "mitings")
 	var moved := _apply_miting_positioning(peer_id, province_id, focus, tier_mult)
 	_log_province(province_id, L.t("%s miting yaptı") % _party_name(peer_id))
 	_ease_turmoil(peer_id, PublicOpinion.TURMOIL_EASE_MITING)
@@ -2909,6 +2917,7 @@ func investment_shares(investor: int) -> Dictionary:
 	return shares
 
 func _apply_investment(peer_id: int, province_id: String, amount: float = Economy.INVEST_COST) -> void:
+	stat_add(peer_id, "invest", amount)
 	var investor := party_of(peer_id)
 	var scale := Economy.invest_scale(amount)
 	var shares := investment_shares(investor)
@@ -3002,6 +3011,7 @@ func _advance_economy() -> String:
 ## düşer (en zayıf bağlılar kararsızlaşır); karalayan ilde PROPAGANDA_GAIN kadar
 ## seçmen kazanır. Meslek ve teşkilat çarpanları uygulanır.
 func _apply_propaganda(peer_id: int, target_peer_id: int, province_id: String) -> void:
+	stat_add(target_peer_id, "bad")
 	# Meslek: atanın karalama gücü × hedefin karalamaya direnci.
 	var profile_mult := PoliticianPresets.effect(peer_id, "propaganda_out") \
 		* PoliticianPresets.party_effect(target_peer_id, "propaganda_in")
@@ -3026,6 +3036,8 @@ func _apply_propaganda(peer_id: int, target_peer_id: int, province_id: String) -
 func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed: bool, gov_ids: Array) -> void:
 	if not _is_authority():
 		return
+	if passed:
+		stat_add(proposer, "laws")
 	if CardPresets.is_tax_law(law_type):
 		_apply_tax_result(proposer, CardPresets.tax_law_level(law_type), passed)
 		return
@@ -4075,6 +4087,8 @@ func _apply_steal(peer_id: int, target_peer_id: int, card_type: String) -> bool:
 ## Kaset / itibar suikastı: hedefin ULUSAL desteği doğrudan düşer. Popülizm
 ## süren saldırgan için hasar daha büyüktür (kendi hamlesinin iyi sonucu).
 func _apply_reputation(peer_id: int, target_peer_id: int) -> void:
+	stat_add(target_peer_id, "bad")
+	_stat_deed("kaset", peer_id, target_peer_id)
 	var damage := PublicOpinion.REPUTATION_NATIONAL_DAMAGE
 	if populism_rounds_left(peer_id) > 0:
 		damage *= PublicOpinion.POPULISM_GOOD_MULT
@@ -4290,6 +4304,68 @@ func next_election_round() -> int:
 ## "icon_color", "path": [[tur, x, y], ...]}; dağılan partinin yolu kalır.
 var axis_history: Dictionary = {}
 
+## OYUN SONU İSTATİSTİKLERİ (0.0.305): ünvanlar, perde arkası ve seçim grafiği
+## için oyun boyunca tutulan sayaçlar. Host yazar, durumla birlikte yayılır.
+##   parties: pid -> {name, bg_color, icon_index, icon_color, leader,
+##     mitings, invest, laws, no_votes, censures, coalitions, bad, aid}
+##   deeds: [[tur, "kaset" | "isyan", yapan pid, hedef pid]] (yalnız oyun sonunda gösterilir)
+##   shares: pid -> [[tur, oy %]] (tur sonu tahmini; seçim turunda gerçek sonuç)
+##   elections: seçim yapılan turlar
+var game_stats: Dictionary = {}
+
+func _stats_party(pid: int) -> Dictionary:
+	if game_stats.is_empty():
+		game_stats = {"parties": {}, "deeds": [], "shares": {}, "elections": []}
+	var parties: Dictionary = game_stats["parties"]
+	var entry: Dictionary = parties.get(pid, {"mitings": 0, "invest": 0.0, "laws": 0, "no_votes": 0, "censures": 0,
+		"coalitions": 0, "bad": 0, "aid": 0.0})
+	var party: Dictionary = PartyManager.data_of(pid)
+	if not party.is_empty():
+		entry["name"] = String(party.get("name", "?"))
+		entry["bg_color"] = party.get("bg_color", Color.GRAY)
+		entry["icon_index"] = int(party.get("icon_index", 0))
+		entry["icon_color"] = party.get("icon_color", Color.WHITE)
+		entry["leader"] = PoliticianPresets.display_name(pid)
+	parties[pid] = entry
+	return entry
+
+## Partinin sayacına ekler (peer_id üye de olabilir: partisine yazılır).
+func stat_add(peer_id: int, key: String, amount: float = 1.0) -> void:
+	if not _is_authority() or peer_id == -1:
+		return
+	var pid := party_of(peer_id)
+	if PartyManager.is_independent(pid) or not PartyManager.parties.has(pid):
+		return
+	var entry := _stats_party(pid)
+	entry[key] = entry.get(key, 0) + amount
+
+## Kaset / iç karışıklık: oyun sonundaki "perde arkası" için gizlice kaydedilir.
+func _stat_deed(kind: String, actor: int, target: int) -> void:
+	if not _is_authority():
+		return
+	_stats_party(party_of(actor))
+	_stats_party(party_of(target))
+	(game_stats["deeds"] as Array).append([round_number, kind, party_of(actor), party_of(target)])
+
+## Tur sonu: partilerin tahmini oy oranı (seçim turunda gerçek sonuç yazılır).
+func _record_vote_shares(round_value: int, shares: Dictionary, election: bool) -> void:
+	if not _is_authority():
+		return
+	if game_stats.is_empty():
+		game_stats = {"parties": {}, "deeds": [], "shares": {}, "elections": []}
+	var all: Dictionary = game_stats["shares"]
+	for pid in shares.keys():
+		if not PartyManager.parties.has(int(pid)) or PartyManager.is_independent(int(pid)):
+			continue
+		_stats_party(int(pid))
+		var list: Array = all.get(int(pid), [])
+		if not list.is_empty() and int(list[list.size() - 1][0]) == round_value:
+			list.pop_back()
+		list.append([round_value, snappedf(float(shares[pid]), 0.01)])
+		all[int(pid)] = list
+	if election and not (game_stats["elections"] as Array).has(round_value):
+		(game_stats["elections"] as Array).append(round_value)
+
 func record_axis_positions() -> void:
 	for pid in party_ids():
 		var party: Dictionary = PartyManager.data_of(int(pid))
@@ -4312,6 +4388,11 @@ func _finish_round() -> void:
 	_round_end_pending = false
 	_release_secret_news()
 	record_axis_positions()
+	var expected := _expected_national()
+	var percent := {}
+	for pid in expected.keys():
+		percent[pid] = float(expected[pid]) * 100.0
+	_record_vote_shares(round_number, percent, false)
 	# Makam puanları TUR SONUNDA DEĞİL, hükümet kurulduğu anda yazılır
 	# (bkz. GovernmentManager.award_formation_scores).
 	var finished_round := round_number
@@ -4418,6 +4499,7 @@ func _hold_election(finished_round: int, early: bool) -> void:
 	_update_credibility(last_vote_shares, result["vote_shares"])
 	previous_vote_shares = last_vote_shares.duplicate()
 	last_vote_shares = result["vote_shares"]
+	_record_vote_shares(finished_round, last_vote_shares, true)
 	last_seats = result["seats"]
 	last_province_results = result["province_results"]
 	passed_threshold = result["passed_threshold"]
@@ -5579,6 +5661,7 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"crisis": crisis,
 		"polls": polls,
 		"axis_history": axis_history,
+		"game_stats": game_stats,
 		"national_list": national_list,
 		"round": round_number,
 		"turn_time_left": _turn_time_left,
@@ -5691,6 +5774,7 @@ func _apply_state(state: Dictionary) -> void:
 	crisis = state.get("crisis", {})
 	polls = state.get("polls", {})
 	axis_history = state.get("axis_history", {})
+	game_stats = state.get("game_stats", {})
 	national_list = state.get("national_list", {})
 	round_number = int(state["round"])
 	_turn_deadline_ms = Time.get_ticks_msec() + int(float(state["turn_time_left"]) * 1000.0)

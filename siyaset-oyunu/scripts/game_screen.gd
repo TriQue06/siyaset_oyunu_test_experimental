@@ -1576,9 +1576,10 @@ func _on_game_over() -> void:
 	_refresh_score_panel()
 	if _game_over_overlay != null and is_instance_valid(_game_over_overlay):
 		return
-	_game_over_overlay = GameOverOverlay.new()
+	# 0.0.305: oyun bittiği an jenerik müziği başlar ve oyun sonu sahneleri
+	# (ünvanlar, siyasi yolculuk, perde arkası, seçim grafiği, kürsü) oynar.
+	_game_over_overlay = EndgameSequence.new()
 	add_child(_game_over_overlay)
-	# Puan tablosu geldiği an jenerik müziği başlar.
 	AudioManager.play_music("credits")
 
 func _on_proposal_resolved(accepted: bool, kind: String, proposer_id: int) -> void:

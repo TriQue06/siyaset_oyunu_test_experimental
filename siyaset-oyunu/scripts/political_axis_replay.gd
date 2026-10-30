@@ -8,6 +8,11 @@ extends Control
 ## Sağda partiler ve bulundukları bölge. Veri: CardManager.axis_history.
 
 signal closed
+## Oyun sonu sahne dizisinde (EndgameSequence) oynatma bitince.
+signal finished
+
+## Sahne dizisinin içinde: kendi zemini ve düğmeleri yok, bitince finished.
+var embedded := false
 
 const MAP := 440.0
 const MARGIN := 40.0
@@ -33,10 +38,11 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	z_index = 160
-	var shade := ColorRect.new()
-	shade.color = Color(UiTheme.FELT_DARK, 0.94)
-	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(shade)
+	if not embedded:
+		var shade := ColorRect.new()
+		shade.color = Color(UiTheme.FELT_DARK, 0.94)
+		shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		add_child(shade)
 	_load_history()
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -96,6 +102,7 @@ func _ready() -> void:
 	side.add_child(_legend)
 	var buttons := HBoxContainer.new()
 	buttons.add_theme_constant_override("separation", 8)
+	buttons.visible = not embedded
 	side.add_child(buttons)
 	var again := Button.new()
 	again.text = L.t("Yeniden oynat")
@@ -156,10 +163,18 @@ func _process(delta: float) -> void:
 			_show_step(_index, true)
 		else:
 			_playing = false
+			if embedded:
+				get_tree().create_timer(2.0).timeout.connect(func():
+					if is_instance_valid(self):
+						finished.emit())
 
 func _show_step(i: int, animate: bool) -> void:
 	if _rounds.is_empty():
 		_round_label.text = L.t("kayıt yok")
+		if embedded:
+			get_tree().create_timer(1.5).timeout.connect(func():
+				if is_instance_valid(self):
+					finished.emit())
 		return
 	var round_value := int(_rounds[i])
 	_round_label.text = L.t("%d. tur") % round_value

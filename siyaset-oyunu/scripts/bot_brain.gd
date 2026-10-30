@@ -852,6 +852,9 @@ static func _evaluate(bot: int, card_type: String) -> Dictionary:
 		CardPresets.FUNDS_BONUS_CARD_TYPE, CardPresets.FUNDS_BONUS_STRONG_CARD_TYPE:
 			# Kasası azken, yapacak başka şey yokken kullanılır.
 			return {"score": 0.9 if CardManager.funds_of(bot) < GameRules.MITING_FUNDS_COST else 0.3, "peer": -1, "province": ""}
+		CardPresets.POLL_CARD_TYPE:
+			# Bilgi kartı: botun işine yaramaz ama eli tıkamasın.
+			return {"score": 0.2, "peer": -1, "province": ""}
 		CardPresets.CARD_THEFT_CARD_TYPE:
 			return _eval_card_theft(bot)
 		CardPresets.PROPAGANDA_CARD_TYPE:
@@ -1423,16 +1426,19 @@ static func build_government(bot: int) -> Dictionary:
 			candidates.append(int(pid))
 	var bloc := _bloc_solidarity()
 	candidates.sort_custom(func(a, b):
+		# Blok dayanışmasında önce diğer botlar ortak seçilir (ideolojiden önce:
+		# yoksa insan oyuncu blok koalisyonuna sızabiliyordu).
+		if bloc and MultiplayerManager.is_bot(a) != MultiplayerManager.is_bot(b):
+			return MultiplayerManager.is_bot(a)
 		if not is_equal_approx(_distance(bot, a), _distance(bot, b)):
 			return _distance(bot, a) < _distance(bot, b)
 		if is_ally(bot, a) != is_ally(bot, b):
 			return is_ally(bot, a)
-		# Blok dayanışmasında önce diğer botlar ortak seçilir.
-		if bloc and MultiplayerManager.is_bot(a) != MultiplayerManager.is_bot(b):
-			return MultiplayerManager.is_bot(a)
 		return _friend_distance(bot, a) < _friend_distance(bot, b))
 	var similar := 0
 	for candidate in candidates:
+		if bloc and MultiplayerManager.is_bot(candidate) != MultiplayerManager.is_bot(candidates[0]):
+			break
 		if _distance(bot, candidate) <= _distance(bot, candidates[0]) + 0.25:
 			similar += 1
 		else:

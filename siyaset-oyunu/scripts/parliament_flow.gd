@@ -30,6 +30,9 @@ var _tab := ""
 var _law_page := false
 var _shown_key := ""
 var _dim: ColorRect
+## 0.0.300: MECLİS düğmesi hiç sönmez. Yapılacak iş yokken (ya da sıra başkasındayken)
+## pencere yine açılır; sekmeler ve seçenekler sönük, yalnız görüntülenir.
+var _view_only := false
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -70,6 +73,7 @@ func open_flow() -> void:
 	engaged = true
 	_tab = ""
 	_law_page = false
+	_view_only = not CardManager.can_act() or not _any_open(multiplayer.get_unique_id())
 	_shown_key = ""
 	refresh()
 
@@ -107,24 +111,29 @@ func refresh() -> void:
 	if not engaged:
 		hide()
 		return
-	if not CardManager.can_act():
+	if CardManager.is_turn_blocked() or (not _view_only and not CardManager.can_act()):
 		# Oylama / hükümet kurma sürüyor ya da sıra bitti.
 		hide()
 		_law_page = false
 		if CardManager.current_turn_peer_id() != me:
 			engaged = false
 		return
-	if not _any_open(me):
+	if CardManager.can_act() and _any_open(me):
+		_view_only = false
+	if not _view_only and not _any_open(me):
 		engaged = false
 		_law_page = false
 		hide()
 		toast_requested.emit(L.t("Meclis işleri bu tur için tamam."))
 		return
 	# Açık sekme kapandıysa (hamle yapıldı) ilk kullanılabilir sekmeye geçilir.
-	if _tab == "" or not CardManager.parliament_stage_available(me, _tab):
+	if _view_only:
+		_law_page = false
+		_tab = "law"
+	elif _tab == "" or not CardManager.parliament_stage_available(me, _tab):
 		_law_page = false
 		_tab = _first_open(me)
-	var key := "%s|%s|%d|%s" % [_tab, _law_page, CardManager.round_number,
+	var key := "%s|%s|%s|%d|%d|%s" % [_tab, _law_page, _view_only, CardManager.current_turn_peer_id(), CardManager.round_number,
 		",".join(PackedStringArray(CardManager.parliament_closed_stages(me)))]
 	key += "|%s|%s|%s" % [CardManager.can_propose_law(me), CardManager.can_propose_constitution(me), CardManager.can_early_election(me)]
 	var was_visible := visible
@@ -167,7 +176,7 @@ func _build() -> void:
 		button.add_theme_font_override("font", UiTheme.mono(true))
 		button.add_theme_font_size_override("font_size", 14)
 		button.text = L.t(STAGE_TITLES[id]) + ("" if done else "")
-		button.disabled = done or not available
+		button.disabled = _view_only or done or not available
 		var selected := id == _tab
 		var color := UiTheme.GOLD if selected else (UiTheme.GREEN_DARK if done else UiTheme.PANEL_LIGHT)
 		UiSkin.skin_color_button(button, color)
@@ -284,18 +293,17 @@ static func explain_label(text: String, color: Color = UiTheme.TEXT) -> Label:
 
 func _build_law() -> void:
 	var me := multiplayer.get_unique_id()
-	_explain(L.t("Meclise bir teklif getir; teklif oylanır. Sunduğunda yasa sekmesi bu tur kapanır."))
-	var group_ok := CardManager.can_propose_law(me) and not CardManager.has_proposed_law_this_round(me, "group") and CardManager.has_seats(me)
+	_explain(L.t("Meclise bir teklif getir; teklif oylanır. Her yasa türü turda bir kez sunulur."))
+	var group_ok := not _view_only and CardManager.can_propose_law(me) and not CardManager.has_proposed_law_this_round(me, "group") and CardManager.has_seats(me)
 	_content.add_child(_option(L.t("GRUP YASASI"), L.t("Bir seçmen grubu için yasa: o grup sana ısınır, karşıtı soğur. Geçerse puan."),
 		group_ok, func(): open_law_page(0)))
-	if CardManager.is_government_party(me):
-		_content.add_child(_option(L.t("VERGİ YASASI"), L.t("Hükümet olarak vergi kademesini değiştir: hazineyi ve seçmenin ruh hâlini etkiler."),
-			CardManager.tax_law_block_reason(me) == "", func(): open_law_page(1)))
+	_content.add_child(_option(L.t("VERGİ YASASI"), L.t("Vergi kademesini değiştir: hazineyi ve seçmenin ruh hâlini etkiler."),
+		not _view_only and CardManager.tax_law_block_reason(me) == "", func(): open_law_page(1)))
 	_content.add_child(_option(L.t("ANAYASA DEĞİŞİKLİĞİ"), L.t("Baraj, seçim sıklığı, sayım yöntemi ve ittifak kuralı. Üçte iki çoğunluk gerekir."),
-		CardManager.can_propose_constitution(me), func(): open_law_page(2)))
+		not _view_only and CardManager.can_propose_constitution(me), func(): open_law_page(2)))
 	if not CardManager.is_government_party(me) or CardManager.can_early_election(me):
 		_content.add_child(_option(L.t("ERKEN SEÇİM ÖNERGESİ"), L.t("Kabul edilirse bu dönemin sonunda sandık kurulur."),
-			CardManager.can_early_election(me), func(): CardManager.early_election()))
+			not _view_only and CardManager.can_early_election(me), func(): CardManager.early_election()))
 
 ## Yasa sekmesindeki bir seçenek: ad ve günlük dille sonucu.
 func _option(title: String, text: String, available: bool, action: Callable) -> Control:

@@ -101,12 +101,11 @@ func _initialize() -> void:
 	check("aynı kademeye yasa sunulamaz", not cm.can_propose_tax_law(1, Economy.TAX_NORMAL))
 	check("yasa hakkı boşken yasa butonu açık", cm.can_propose_law(1))
 	give_turn(3)
-	check("muhalefet vergi yasası sunamaz", not cm.can_propose_tax_law(3, Economy.TAX_LOW)
-		and cm.tax_law_block_reason(3, Economy.TAX_LOW).contains("hükümet"))
+	check("0.0.300: muhalefet de vergi yasası sunabilir", cm.can_propose_tax_law(3, Economy.TAX_LOW))
 	gm.government = {}
 	gm.main_gov_peer_id = -1
 	give_turn(1)
-	check("hükümet yokken kimse vergi değiştiremez", not cm.can_propose_tax_law(1, Economy.TAX_HIGH))
+	check("0.0.300: hükümet yokken de vergi yasası sunulabilir", cm.can_propose_tax_law(1, Economy.TAX_HIGH))
 	new_game()
 	var rejected := pass_tax(Economy.TAX_HIGH, -1, -1)
 	check("reddedilen vergi yasası kademeyi değiştirmez", not rejected and cm.tax_level() == Economy.TAX_NORMAL)

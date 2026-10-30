@@ -214,7 +214,8 @@ func _initialize() -> void:
 	check("yasa sunulabilir", cm.can_propose_law(2, cp.law_type("isci")))
 	cm._apply_law(2, cp.law_type("isci"))
 	check("yasa oylamasi acildi", gm.phase == gm.Phase.VOTING)
-	check("teklif sunulunca yasa sekmesi bu sira kapandi", cm.parliament_closed_stages(2).has("law") and not cm.can_propose_constitution(2))
+	check("0.0.300: grup yasasindan sonra yasa sekmesi acik kalir, grup yasasi ikinci kez yok",
+		not cm.parliament_closed_stages(2).has("law") and cm.has_proposed_law_this_round(2, "group"))
 	finish_vote(gm.VOTE_NO)
 	check("oylama bitti, sira hala bende", cm.current_turn_peer_id() == 2 and not cm.is_turn_blocked())
 	var stage_after_law: String = cm.parliament_stage(2)

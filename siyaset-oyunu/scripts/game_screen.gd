@@ -1076,6 +1076,9 @@ func _refresh_band_turn() -> void:
 ## yuvada; oylama sürerken büyür, teklif metni ve EVET/ÇEKİMSER/HAYIR görünür (bkz. _parl_slot). Oylama başlayınca Hükümet sekmesi kendiliğinden açılır.
 var _parl_slot: Control
 var _was_voting := false
+## 0.0.300: meclis (zemin + diyagram) bu kırpıcının içinde. Hükümet sekmesi
+## kaydırılınca meclis sol kaydırma alanının dışına (üstteki panele) taşmaz.
+var _parl_clip: Control
 
 ## OYLAMA KAMERASI (0.0.213): meclis oylaması sürerken harita ile meclis
 ## diyagramı yer değiştirir (seçim gecesi kamerası gibi: pencereler üstel
@@ -1100,8 +1103,14 @@ func _place_parliament_badge() -> void:
 		_parl_bg = Panel.new()
 		_parl_bg.add_theme_stylebox_override("panel", UiSkin.card())
 		_parl_bg.mouse_filter = Control.MOUSE_FILTER_STOP
-		add_child(_parl_bg)
-		move_child(_parl_bg, bottom_area.get_index())
+		_parl_clip = Control.new()
+		_parl_clip.name = "ParliamentClip"
+		_parl_clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_parl_clip.clip_contents = true
+		add_child(_parl_clip)
+		move_child(_parl_clip, bottom_area.get_index())
+		_parl_clip.add_child(_parl_bg)
+		bottom_area.reparent(_parl_clip, false)
 		var vbox := bottom_area.get_node_or_null("ChamberSplit/ParliamentChamber/ParliamentVBox") as VBoxContainer
 		if vbox != null:
 			_parl_title = _section_label(L.t("MECLİS · %d") % CardManager.TOTAL_SEATS)
@@ -1130,9 +1139,8 @@ func _place_parliament_badge() -> void:
 			split.offset_bottom = 0
 	# Meclis sağ panelin ÜSTÜNDE olmalı (sahne ağacında sonra gelmeli): yoksa
 	# panel tıklamaları yutuyor, EVET/HAYIR düğmelerine basılamıyordu.
-	if _parl_bg.get_index() < left_panel.get_index():
-		move_child(_parl_bg, left_panel.get_index())
-		move_child(bottom_area, _parl_bg.get_index() + 1)
+	if _parl_clip.get_index() < left_panel.get_index():
+		move_child(_parl_clip, left_panel.get_index())
 	bottom_area.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	bottom_area.z_index = 4
 	_parl_bg.z_index = 3
@@ -1167,7 +1175,15 @@ func _sync_parliament_to_slot() -> void:
 	bottom_area.visible = shown
 	if not shown:
 		return
+	# Yuvadayken kaydırma alanına kırpılır; oylama kamerasında ekranın tamamı.
+	var clip_rect := Rect2(Vector2.ZERO, get_viewport_rect().size)
+	var scroll := _parl_slot.get_parent().get_parent() as Control if _parl_slot != null else null
+	if not _swap_engaged and scroll is ScrollContainer:
+		clip_rect = scroll.get_global_rect()
+	if _parl_clip.position != clip_rect.position or _parl_clip.size != clip_rect.size:
+		_set_rect(_parl_clip, clip_rect)
 	var rect := _swap_parl_rect if _swap_engaged else _parl_slot.get_global_rect()
+	rect.position -= clip_rect.position
 	if _parl_bg.position != rect.position or _parl_bg.size != rect.size:
 		_set_rect(_parl_bg, rect)
 		bottom_area.position = rect.position
@@ -1255,6 +1271,9 @@ func _ensure_swap_fx() -> void:
 		box.bg_color = Color(0, 0, 0, 0)
 		box.set_border_width_all(3)
 		box.border_color = UiTheme.GOLD
+		# 0.0.300: ana haritanın kenarı gibi yuvarlak köşe.
+		box.set_corner_radius_all(int(UiTheme.d(14)))
+		box.anti_aliasing = true
 		_swap_frame.add_theme_stylebox_override("panel", box)
 		_swap_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_swap_frame.z_index = 7
@@ -4066,9 +4085,123 @@ func _refresh_proposer_chip() -> void:
 	if not law.is_empty():
 		_fill_corner_chip(_law_group_chip, VoterGroupIcon.make(String(law["group"]), 22.0), String(law["group_title"]))
 	_proposer_stack.reset_size()
+	_refresh_change_stack()
 
 var _proposer_stack: VBoxContainer
 var _law_group_chip: PanelContainer
+
+## DEĞİŞİKLİK DETAYI (0.0.300): vergi ya da anayasa oylamasında meclis
+## diyagramının SAĞ ÜST köşesinde, soldaki parti ve grup kartlarıyla aynı
+## oyuk kartlarda: başlık kartı ve her değişen kural için "eski » yeni" kartı.
+var _change_stack: VBoxContainer
+var _change_key := ""
+
+func _refresh_change_stack() -> void:
+	if _change_stack == null:
+		_change_stack = VBoxContainer.new()
+		_change_stack.add_theme_constant_override("separation", 4)
+		_change_stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		parliament_diagram.add_child(_change_stack)
+		# Sağ üst köşeye bağlı, sola doğru büyür (diyagram boyu değişse de yerinde).
+		_change_stack.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+		_change_stack.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+		_change_stack.offset_right = -6.0
+		_change_stack.offset_top = 6.0
+	var rows := _proposal_change_rows()
+	_change_stack.visible = not rows.is_empty()
+	if rows.is_empty():
+		_change_key = ""
+		return
+	var key := str(rows)
+	if key != _change_key:
+		_change_key = key
+		for child in _change_stack.get_children():
+			_change_stack.remove_child(child)
+			child.queue_free()
+		for row in rows:
+			_change_stack.add_child(_change_chip(row))
+	_place_change_stack()
+	_place_change_stack.call_deferred()
+
+func _place_change_stack() -> void:
+	if _change_stack == null:
+		return
+	var size := _change_stack.get_combined_minimum_size()
+	_change_stack.offset_left = _change_stack.offset_right - size.x
+	_change_stack.offset_bottom = _change_stack.offset_top + size.y
+
+## [başlık, eski, yeni] satırları; ilk satır yalnız başlık ([başlık]).
+func _proposal_change_rows() -> Array:
+	if not GovernmentManager.is_voting():
+		return []
+	var rows: Array = []
+	if GovernmentManager.proposal_kind == GovernmentManager.KIND_LAW and CardPresets.is_tax_law(GovernmentManager.proposal_law):
+		var old := CardManager.tax_level()
+		var level := CardPresets.tax_law_level(GovernmentManager.proposal_law)
+		rows.append([L.t("VERGİ YASASI")])
+		rows.append([L.t("Vergi"), Economy.tax_title(old), Economy.tax_title(level)])
+		rows.append([L.t("Tur geliri"), Economy.money_full(CardManager.expected_revenue(old)), Economy.money_full(CardManager.expected_revenue(level))])
+	elif GovernmentManager.proposal_kind == GovernmentManager.KIND_CONSTITUTION:
+		var payload := GovernmentManager.proposal_assignments
+		rows.append([L.t("ANAYASA")])
+		var threshold := MultiplayerManager.snap_threshold(float(payload.get("threshold", MultiplayerManager.election_threshold)))
+		if not is_equal_approx(threshold, MultiplayerManager.election_threshold):
+			rows.append([L.t("Baraj"), "%%%s" % L.dec(MultiplayerManager.election_threshold, 1), "%%%s" % L.dec(threshold, 1)])
+		var interval := GameRules.snap_interval(float(payload.get("interval", MultiplayerManager.election_interval)))
+		if not is_equal_approx(interval, MultiplayerManager.election_interval):
+			rows.append([L.t("Seçim"), L.t("%s yılda") % GameRules.years_text(MultiplayerManager.election_interval),
+				L.t("%s yılda") % GameRules.years_text(interval)])
+		var method := String(payload.get("seat_method", MultiplayerManager.seat_method))
+		if method != MultiplayerManager.seat_method:
+			rows.append([L.t("Sayım"), ElectionModel.method_title(MultiplayerManager.seat_method), ElectionModel.method_title(method)])
+		var alliances := bool(payload.get("alliances_enabled", CardManager.alliances_enabled))
+		if alliances != CardManager.alliances_enabled:
+			rows.append([L.t("İttifak"), L.t("açık") if CardManager.alliances_enabled else L.t("kapalı"), L.t("açık") if alliances else L.t("kapalı")])
+		if rows.size() == 1:
+			rows.append([L.t("Kurallar"), L.t("aynı"), L.t("aynı")])
+	return rows
+
+func _change_chip(row: Array) -> PanelContainer:
+	var chip := _corner_chip()
+	var line := chip.get_child(0) as HBoxContainer
+	if row.size() == 1:
+		var title := Label.new()
+		title.text = String(row[0])
+		title.add_theme_font_override("font", UiTheme.mono(true))
+		title.add_theme_font_size_override("font_size", 11)
+		title.add_theme_color_override("font_color", UiTheme.HEAD)
+		title.custom_minimum_size = Vector2(0, 22)
+		title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		line.add_child(title)
+		return chip
+	var key := Label.new()
+	key.text = String(row[0])
+	key.add_theme_font_override("font", UiTheme.mono_regular())
+	key.add_theme_font_size_override("font_size", 10)
+	key.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
+	key.custom_minimum_size = Vector2(0, 22)
+	key.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	line.add_child(key)
+	var old := Label.new()
+	old.text = String(row[1])
+	old.add_theme_font_size_override("font_size", 11)
+	old.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
+	old.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	line.add_child(old)
+	var arrow := Label.new()
+	arrow.text = "»"
+	arrow.add_theme_font_size_override("font_size", 11)
+	arrow.add_theme_color_override("font_color", UiTheme.GOLD_DIM)
+	arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	line.add_child(arrow)
+	var new := Label.new()
+	new.text = String(row[2])
+	new.add_theme_font_override("font", UiTheme.mono(true))
+	new.add_theme_font_size_override("font_size", 11)
+	new.add_theme_color_override("font_color", UiTheme.TEXT)
+	new.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	line.add_child(new)
+	return chip
 
 func _corner_chip() -> PanelContainer:
 	var chip := PanelContainer.new()
@@ -5964,7 +6097,8 @@ func _refresh_parliament_button() -> void:
 	else:
 		sub = L.t("bu tur yapılacak iş yok")
 	var live := stage != ""
-	UiSkin.skin_action_button(_parl_button, ACTION_COLOR_LAW, live)
+	# 0.0.300: MECLİS düğmesi hiç sönmez; iş yoksa pencere sönük sekmelerle açılır.
+	UiSkin.skin_action_button(_parl_button, ACTION_COLOR_LAW, true)
 	_set_action_text(_parl_button, L.t("MECLİS"), sub)
 	if live and _parl_pulse == null:
 		_parl_pulse = create_tween().set_loops()
@@ -5976,14 +6110,10 @@ func _refresh_parliament_button() -> void:
 		_parl_button.modulate = Color.WHITE
 
 func _on_parliament_button_pressed() -> void:
-	var me := multiplayer.get_unique_id()
-	if not CardManager.can_act():
-		_show_toast(L.t("Sıran değil."))
+	if CardManager.is_turn_blocked():
+		_show_toast(L.t("Mecliste oylama sürüyor."))
 		return
 	if _turn_intro != null and _turn_intro.is_busy():
-		return
-	if CardManager.parliament_stage(me) == "":
-		_show_toast(_parl_button.text.get_slice("\n", 1).capitalize())
 		return
 	if _province_actions.visible:
 		_province_actions.close()

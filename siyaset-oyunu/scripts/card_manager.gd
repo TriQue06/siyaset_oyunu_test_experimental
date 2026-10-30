@@ -323,7 +323,7 @@ var _skip_stage_gate := false
 static func is_instant_card(card_type: String) -> bool:
 	return card_type in [CardPresets.POPULISM_CARD_TYPE, CardPresets.FUNDS_BONUS_CARD_TYPE,
 		CardPresets.FUNDS_BONUS_STRONG_CARD_TYPE, CardPresets.PENALTY_CARD_TYPE,
-		CardPresets.SELF_TURMOIL_CARD_TYPE, CardPresets.FLEX_CARD_TYPE, CardPresets.POLL_CARD_TYPE]
+		CardPresets.SELF_TURMOIL_CARD_TYPE, CardPresets.FLEX_CARD_TYPE]
 
 ## Olumsuz şans kartı mı? (Sunumda kırmızı.)
 static func is_negative_card(card_type: String) -> bool:
@@ -475,9 +475,6 @@ func _apply_instant(peer_id: int, card_type: String, entry: Dictionary = {}) -> 
 			if int(turn_flow.get("peer", -1)) == peer_id:
 				turn_flow["flex"] = true
 			return L.t("%s esnek hareket kartı çekti: bu sıra miting ve yatırım sınırı iki katı.") % _party_name(peer_id)
-		CardPresets.POLL_CARD_TYPE:
-			polls[peer_id] = {"round": round_number, "parties": national_poll_snapshot(peer_id)}
-			return L.t("%s ülke geneli bir anket yaptırdı.") % _party_name(peer_id)
 		CardPresets.FUNDS_BONUS_CARD_TYPE:
 			var weak_gain := funds_bonus_amount(peer_id, false)
 			funds[peer_id] = funds_of(peer_id) + weak_gain
@@ -1131,7 +1128,7 @@ func can_propose_law(peer_id: int, law_type: String = "") -> bool:
 	# İlk seçime kadar meclis yok: yasa yapılamaz (saf propaganda dönemi).
 	return not last_seats.is_empty() and GovernmentManager.can_submit_law()
 
-## VERGİ YASASI: sadece HÜKÜMET partileri sunar; gündem şartı yok ama
+## VERGİ YASASI: 0.0.300'den beri HERKES sunar; gündem şartı yok ama
 ## partinin dönemlik yasa hakkını kullanır ve meclis oylamasından geçer.
 ## level verilirse (≥ 0) o kademe şu ankinden farklı olmalı.
 func can_propose_tax_law(peer_id: int, level: int = -1) -> bool:
@@ -1141,8 +1138,6 @@ func can_propose_tax_law(peer_id: int, level: int = -1) -> bool:
 func tax_law_block_reason(peer_id: int, level: int = -1) -> String:
 	if last_seats.is_empty():
 		return L.t("İlk seçime kadar meclis yok: vergi değiştirilemez.")
-	if not is_government_party(peer_id):
-		return L.t("Vergi yasasını sadece hükümet partileri sunabilir.")
 	if is_party_member(peer_id):
 		return L.t("Yasayı partinin genel başkanı sunar.")
 	if not has_seats(peer_id):
@@ -1195,7 +1190,6 @@ func _apply_constitution_proposal(peer_id: int, payload: Dictionary) -> void:
 		return
 	_event_message = ""
 	_note_main_action(peer_id)
-	_parl_close(peer_id, "law")
 	if not GovernmentManager.submit_constitution(peer_id, payload):
 		return
 	constitution_rounds[party_of(peer_id)] = round_number
@@ -1620,7 +1614,6 @@ func _apply_early_election_move(peer_id: int) -> void:
 	if not can_early_election(peer_id):
 		return
 	_note_main_action(peer_id)
-	_parl_close(peer_id, "law")
 	funds[peer_id] = funds_of(peer_id) - GameRules.EARLY_ELECTION_FUNDS_COST
 	early_requests[party_of(peer_id)] = round_number
 	_push_state({"type": "early_election", "peer_id": peer_id,
@@ -2615,7 +2608,8 @@ func _apply_law(peer_id: int, law_type: String) -> void:
 	_note_main_action(peer_id)
 	if not GovernmentManager.submit_law(peer_id, law_type):
 		return
-	_parl_close(peer_id, "law")  # yasa sekmesi bu sıra kapanır
+	# 0.0.300: yasa sekmesi kapanmaz; her yasa türü (grup, vergi, anayasa,
+	# erken seçim) turda birer kez sunulur.
 	funds[peer_id] = funds_of(peer_id) - law_funds_cost(peer_id, law_type)
 	if CardPresets.is_tax_law(law_type):
 		tax_rounds[party_of(peer_id)] = round_number
@@ -2752,6 +2746,10 @@ func _apply_card_effect(peer_id: int, card_type: String, target_peer_id: int = -
 			_event_message = L.t("%s bağış kampanyası yaptı (+%s).") % [_party_name(peer_id), GameRules.cost_text(weak_gain)]
 		CardPresets.PROPAGANDA_CARD_TYPE:
 			_apply_propaganda(peer_id, target_peer_id, target_province)
+		CardPresets.POLL_CARD_TYPE:
+			# 0.0.300: anket elde bekler, oyuncu istediği an kullanır.
+			polls[peer_id] = {"round": round_number, "parties": national_poll_snapshot(peer_id)}
+			_event_message = L.t("%s ülke geneli bir anket yaptırdı.") % _party_name(peer_id)
 	return false
 
 func _party_name(peer_id: int) -> String:
@@ -3259,9 +3257,13 @@ func _log_province(province_id: String, text: String) -> void:
 ##             baskı seviye düşürür). Kendi seçmenini de bir üst seviyeye
 ##             taşır (odakta daha çok).
 ##   YATIRIM : ideolojiye bakmaz; daha çok çeker ve 2./3. seviyeyi daha kolay çalar.
-##   ZIT GRUP: bir gruba kazanılan her seçmenin yarısı kadar, zıt gruptaki
-##             kendi seçmenin bir seviye düşer. İki zıt grupta aynı ilde aynı
-##             anda 3. seviye tutulamaz (yeni 3. seviye diğerini 2'ye indirir).
+##   ZIT GRUP: "5 KAZAN 3 KAYBET" (0.0.300, istisnasız): bir gruba kazanılan
+##             her 5 seçmene karşılık AYNI İLDE zıt gruptaki kendi seçmeninden 3
+##             kişi kararsızlara döner (önce en zayıf bağlılar). O ilde zıt
+##             grupta seçmenin yoksa kayıp da yoktur. Miting, yasa ve yasaya
+##             HAYIR (zıt grubun yasası gibi) bu kuralla işler; yatırım bütün
+##             gruplardan kazandırır, bu kurala girmez. İki zıt grupta aynı
+##             ilde aynı anda 3. seviye tutulamaz (yeni 3. seviye diğerini 2'ye indirir).
 ##   KASET   : hedef partinin bütün seçmeni bir seviye düşer (ilahiyatçı: yarısı);
 ##   KARALAMA: aynısı yalnız hedef ilde.
 ##   YASA    : ülke genelinde grubun seçmeninden çeker ve kendi
@@ -3291,11 +3293,11 @@ const NATIONAL_PULL_MULT := 1.5
 const NATIONAL_STEAL := [1.0, 0.1, 0.02]
 const NATIONAL_DEMOTE := [0.4, 0.1]
 const NATIONAL_PROMOTE := [0.15, 0.05]
-## ZIT GRUP KAYBI (0.0.268): bir gruba kazanılan her seçmen için zıt gruptaki
-## kendi seçmeninden BİREBİR aynı sayıda seçmen bir seviye düşer (5 işveren →
-## 5 işçi). İstisna yok: kriz, teşkilat ya da il büyüklüğü oranı değiştirmez.
-## (Eskiden 0,8; krizin grubunda 0,4; teşkilat ve il büyüklüğüyle de ölçekleniyordu.)
-const OPPOSITE_LOSS := 1.0
+## ZIT GRUP KAYBI — "5 KAZAN 3 KAYBET" (0.0.300): bir gruba kazanılan her 5
+## seçmen için aynı ildeki zıt gruptaki kendi seçmeninden 3'ü partiyi bırakır
+## (kararsızlaşır). İstisna yok: kriz, teşkilat ya da il büyüklüğü oranı
+## değiştirmez. (0.0.268–0.0.299: birebir, seçmen yalnız bir seviye düşüyordu.)
+const OPPOSITE_LOSS := 3.0 / 5.0
 ## Teşkilat kendi seçmeninin seviye düşüşünü bu oranda azaltır (seviye 0, 1, 2).
 const VB_ORG_SHIELD := [0.0, 0.3, 0.55]
 ## İL BÜYÜKLÜĞÜ (0.0.232): seviye ATLAMA hızı ilin vekil sayısıyla TERS, seviye
@@ -3532,12 +3534,22 @@ func _vb_promote(pid: int, pi: int, gi: int, r1: float, r2: float) -> void:
 func _vb_opposite(gi: int) -> int:
 	return VoterGroups.GROUP_IDS.find(VoterGroups.opposite(String(VoterGroups.GROUP_IDS[gi])))
 
-## Kazanılan seçmen kadar zıt gruptaki kendi seçmeni bir seviye düşer
-## (OPPOSITE_LOSS = 1: birebir). Teşkilat kalkanı ve il büyüklüğü uygulanmaz.
+## 5 KAZAN 3 KAYBET: kazanılan seçmenin OPPOSITE_LOSS'u kadar, AYNI İLDEKİ
+## zıt gruptaki kendi seçmeni partiyi bırakır (önce 1. seviye, sonra 2., 3.).
+## Zıt grupta o ilde seçmen yoksa kayıp yok. Teşkilat kalkanı ve il büyüklüğü
+## uygulanmaz.
 func _vb_opposite_loss(pid: int, pi: int, gi: int, gained: float) -> void:
 	var oi := _vb_opposite(gi)
-	if oi >= 0:
-		_vb_demote_own(pid, pi, oi, gained * OPPOSITE_LOSS, false)
+	if oi < 0 or gained <= 0.0 or not voter_base.has(pid):
+		return
+	var arr: PackedFloat32Array = voter_base[pid]
+	var i := _vb_i(pi, oi, 0)
+	var lose := gained * OPPOSITE_LOSS
+	for level in VB_LEVELS:
+		var take := minf(arr[i + level], lose)
+		arr[i + level] -= take
+		lose -= take
+	voter_base[pid] = arr
 
 ## MİTİNG. mult: teşkilat × geçmiş × popülizm. Dönüş: grup -> çekilen seçmen.
 func _vb_miting(pid: int, province_id: String, focus: Array, mult: float) -> Dictionary:

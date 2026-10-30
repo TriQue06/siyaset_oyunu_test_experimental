@@ -88,7 +88,7 @@ func _initialize() -> void:
 	gm._apply_vote(1, false)   # 100 hayir  => 100 < 195, gecmeli
 	check("hukumet KURULDU", gm.has_government())
 	check("hukumete HAYIR diyene puan cezasi yok (istikrar kaldirildi)", gm.score_of(1) == 0, str(gm.score_of(1)))
-	check("makam puani kurulusta yazildi", gm.score_of(2) == 31 and gm.score_of(3) == 5, "%d / %d" % [gm.score_of(2), gm.score_of(3)])
+	check("makam puani kurulusta yazildi", gm.score_of(2) == 10 and gm.score_of(3) == 2, "%d / %d" % [gm.score_of(2), gm.score_of(3)])
 	check("ana iktidar partisi = basbakanligi tutan", gm.main_gov_peer_id == 2, str(gm.main_gov_peer_id))
 	check("faz GOVERNING", gm.phase == gm.Phase.GOVERNING)
 	check("hukumet partileri [2,3]", gm.government_party_ids().has(2) and gm.government_party_ids().has(3),
@@ -96,14 +96,14 @@ func _initialize() -> void:
 	check("salt cogunluk VAR (290/390)", gm.has_majority(), "%d/%d" % [gm.government_seats(), gm.total_seats()])
 
 	print("")
-	print("=== 4) PUANLAR (bakanlik+3, byrd+5, basbakan+10) ===")
-	# 2: basbakanlik(10) + 7 bakanlik(21) = 31 ; 3: basbakan yrd (5)
-	check("2 tur puani 31", gm.round_points_of(2) == 31 and GovernmentPresets.POSTS.size() == 9, str(gm.round_points_of(2)))
-	check("3 tur puani 5", gm.round_points_of(3) == 5, str(gm.round_points_of(3)))
+	print("=== 4) PUANLAR (bakanlik+1, byrd+2, basbakan+3) ===")
+	# 2: basbakanlik(3) + 7 bakanlik(7) = 10 ; 3: basbakan yrd (2)
+	check("2 tur puani 10", gm.round_points_of(2) == 10 and GovernmentPresets.POSTS.size() == 9, str(gm.round_points_of(2)))
+	check("3 tur puani 2", gm.round_points_of(3) == 2, str(gm.round_points_of(3)))
 	# Makam puani hukumet KURULURKEN tek sefer yazildi; tur sonlari eklemez.
 	var before_2: int = gm.score_of(2)
 	var before_3: int = gm.score_of(3)
-	check("kurulusta tek sefer yazildi", before_2 == 31 and before_3 == 5, "%d / %d" % [before_2, before_3])
+	check("kurulusta tek sefer yazildi", before_2 == 10 and before_3 == 2, "%d / %d" % [before_2, before_3])
 	cm._finish_round()
 	cm._finish_round()
 	check("tur sonlari puan EKLEMEZ", gm.score_of(2) == before_2 and gm.score_of(3) == before_3,
@@ -178,7 +178,7 @@ func _initialize() -> void:
 	check("hukumet DUSTU", not gm.has_government())
 	check("yeniden kurma asamasi basladi", gm.phase == gm.Phase.FORMING)
 	check("gorev en buyuk partide (1)", gm.mandate_peer_id() == 1, str(gm.mandate_peer_id()))
-	check("puanlar KORUNDU", gm.score_of(2) == 31, str(gm.score_of(2)))
+	check("puanlar KORUNDU", gm.score_of(2) == 10, str(gm.score_of(2)))
 
 	print("")
 	print("=== 8) 3 TEKLIF HAKKI BITINCE SIRA DEVREDER ===")

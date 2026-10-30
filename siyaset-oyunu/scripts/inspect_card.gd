@@ -42,15 +42,16 @@ static func fill_province(box: VBoxContainer, province_id: String, on_close: Cal
 		chips.append([L.t("Lider %s") % GovernmentHud.party_name_of(leader), band_color])
 	box.add_child(_chip_row(chips))
 
-	box.add_child(_section(L.t("Sandık")))
-	box.add_child(_province_ballot(province_id, me, results))
-
+	# 0.0.300: seçmen grupları anketin (sandık) üstünde.
 	box.add_child(_section(L.t("Seçmen grupları"), L.t("ilin nüfusu")))
 	var profile := CardManager.province_profile(province_id)
 	var shares := {}
 	for group in VoterGroups.GROUP_IDS:
 		shares[group] = VoterGroups.share(profile, group) * 100.0
 	box.add_child(_tokens(shares, shares))
+
+	box.add_child(_section(L.t("Sandık")))
+	box.add_child(_province_ballot(province_id, me, results))
 
 	if PartyManager.parties.has(CardManager.party_of(me)):
 		box.add_child(_section(L.t("Bu ilde sen")))

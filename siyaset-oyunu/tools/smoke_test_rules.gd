@@ -324,7 +324,7 @@ func _initialize() -> void:
 	check("yasa bedava, meclis oylamasi acildi, sira devretmedi", cm.funds_of(1) == 10 - GameRules.LAW_FUNDS_COST and gm.phase == gm.Phase.VOTING 		and cm.current_turn_peer_id() == 1)
 	for id in [1, 2, 3]:
 		gm._apply_vote(id, gm.VOTE_ABSTAIN)
-	check("turda ikinci yasa yok", not cm.can_propose_law(1))
+	check("turda ikinci grup yasasi yok", not cm.can_propose_law(1, cp.law_type("isci")))
 	cm.last_seats = {}
 	var funds1: int = cm.funds_of(1)
 

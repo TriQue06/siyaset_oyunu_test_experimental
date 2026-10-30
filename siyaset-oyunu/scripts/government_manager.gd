@@ -523,6 +523,50 @@ func _request_withdraw() -> void:
 		return
 	_apply_withdraw(multiplayer.get_remote_sender_id())
 
+## BAŞBAKAN HÜKÜMETİ DAĞITIR (0.0.300): ana iktidar partisinin genel başkanı
+## koalisyonu dağıtıp hükümetten ayrılabilir. Hükümet düşer, kurma aşaması
+## baştan başlar; dağıtan parti çekilen ortak gibi ulusal puan kaybeder.
+func can_dissolve_government(peer_id: int) -> bool:
+	return phase == Phase.GOVERNING and PartyManager.is_leader(peer_id) and peer_id == main_gov_peer_id
+
+func dissolve_government() -> void:
+	if _is_authority():
+		_apply_dissolve_government(multiplayer.get_unique_id())
+	else:
+		_request_dissolve_government.rpc_id(1)
+
+func _apply_dissolve_government(peer_id: int) -> void:
+	if not can_dissolve_government(peer_id):
+		return
+	var posts := 0
+	for post_id in government.keys():
+		if int(government[post_id]) == peer_id:
+			posts += 1
+	var penalty := PublicOpinion.withdraw_national(posts)
+	CardManager.add_national_points(peer_id, penalty)
+	var coalition := government_party_ids().size() > 1
+	abandoned = false
+	government.clear()
+	main_gov_peer_id = -1
+	_build_mandate_order()
+	mandate_index = 0
+	attempts_used = 0
+	_clear_proposal()
+	_set_phase(Phase.FORMING if not mandate_order.is_empty() else Phase.IDLE)
+	var text := (L.t("%s koalisyonu dağıttı: hükümet düştü, yeni hükümet kurulacak (%s).") if coalition
+		else L.t("%s hükümetten ayrıldı: hükümet düştü, yeni hükümet kurulacak (%s).")) % [_party_name(peer_id), EffectWords.change(penalty)]
+	last_resolution_reason = text
+	_push_state()
+	if not _is_local_only():
+		_notify_coalition.rpc(text)
+	coalition_changed.emit(text)
+
+@rpc("any_peer", "reliable")
+func _request_dissolve_government() -> void:
+	if not MultiplayerManager.is_host:
+		return
+	_apply_dissolve_government(multiplayer.get_remote_sender_id())
+
 @rpc("authority", "reliable")
 func _notify_coalition(text: String) -> void:
 	coalition_changed.emit(text)

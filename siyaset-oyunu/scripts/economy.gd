@@ -29,7 +29,7 @@ const START_TAX := TAX_NORMAL
 const START_TREASURY := 200.0
 ## Tur sonu vergi geliri (milyon ¤), kademeye göre (0.0.259: ekonomi
 ## göstergesi kalktı, gelir sabit).
-const TAX_REVENUE := [70.0, 100.0, 140.0]
+const TAX_REVENUE := [75.0, 125.0, 175.0]
 
 # --- Vergi ve seçmen (0.0.259) ------------------------------------------------------
 ## Her SIRADA (her oyuncunun sırası başında) hükümete yazılan ulusal puan:

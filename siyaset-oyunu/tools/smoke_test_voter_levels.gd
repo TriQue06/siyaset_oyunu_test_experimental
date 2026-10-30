@@ -107,45 +107,39 @@ func run() -> void:
 	var after_mit := total(b, pi, "emekli")
 	check(after_inv < after_mit, "yatirim 2. seviyeyi mitingten kolay calar", "yatirim %.0f, miting %.0f" % [after_inv, after_mit])
 
-	print("=== zit grup ===")
+	print("=== zit grup (5 kazan 3 kaybet) ===")
 	clear_all()
 	setc(a, pi, "isci", count * 0.2, count * 0.2, 0.0)
-	var isci_before := cell(a, pi, "isci")
+	var far_pi: int = (pi + 1) % cm._province_ids.size()
+	setc(a, far_pi, "isci", count * 0.2, count * 0.2, 0.0)
+	var other_before := total(a, far_pi, "isci")
+	var isci_before := total(a, pi, "isci")
 	var got: float = cm._vb_pull(a, pi, VoterGroups.GROUP_IDS.find("isveren"), count * 0.1, cm.MITING_STEAL, cm.MITING_DEMOTE)
 	cm._vb_opposite_loss(a, pi, VoterGroups.GROUP_IDS.find("isveren"), got)
-	var isci_after := cell(a, pi, "isci")
-	# 0.0.268: seviye toplamı (1×L1 + 2×L2 + 3×L3) kazancın BİREBİR aynısı kadar
-	# azalır; il büyüklüğü, teşkilat ve kriz oranı değiştirmez.
-	var score_before := float(isci_before[0]) + 2.0 * float(isci_before[1]) + 3.0 * float(isci_before[2])
-	var score_after := float(isci_after[0]) + 2.0 * float(isci_after[1]) + 3.0 * float(isci_after[2])
-	check(got > 0.0 and absf((score_before - score_after) - got) < got * 0.01,
-		"isverene kazanc kadar iscide seviye duser (birebir)", "kazanc %.0f, dusus %.0f" % [got, score_before - score_after])
-	check(is_equal_approx(5.0 * cm.OPPOSITE_LOSS, 5.0), "5 isveren kazanilirsa 5 isci kaybedilir")
-	# Siyasi kriz isverenin: kayıp yine birebir (istisna yok).
+	var lost := isci_before - total(a, pi, "isci")
+	check(got > 0.0 and absf(lost - got * 0.6) < got * 0.01, "5 isveren kazanilirsa ayni ilde 3 isci kaybedilir",
+		"kazanc %.0f, kayip %.0f" % [got, lost])
+	check(absf(total(a, far_pi, "isci") - other_before) < 0.001, "baska ildeki isci secmeni etkilenmez")
+	var left := cell(a, pi, "isci")
+	check(float(left[1]) > count * 0.2 - 0.001, "once en zayif bagli (1. seviye) gider", "%.0f / %.0f" % [left[0], left[1]])
+	# O ilde zıt grupta seçmen yoksa kayıp yok: 5 kazanılır, hiç kaybedilmez.
+	clear_all()
+	got = cm._vb_pull(a, pi, VoterGroups.GROUP_IDS.find("isveren"), count * 0.1, cm.MITING_STEAL, cm.MITING_DEMOTE)
+	cm._vb_opposite_loss(a, pi, VoterGroups.GROUP_IDS.find("isveren"), got)
+	check(got > 0.0 and total(a, pi, "isci") < 0.001 and total(a, pi, "isveren") > got - 0.001, "zit grupta secmen yoksa kayip yok")
+	# Siyasi kriz ve teşkilat oranı değiştirmez (istisna yok).
 	clear_all()
 	setc(a, pi, "isci", count * 0.2, count * 0.2, 0.0)
 	cm.agenda = {"type": "kriz_isveren", "until": cm.round_number + 1}
-	isci_before = cell(a, pi, "isci")
-	got = cm._vb_pull(a, pi, VoterGroups.GROUP_IDS.find("isveren"), count * 0.1, cm.MITING_STEAL, cm.MITING_DEMOTE)
-	cm._vb_opposite_loss(a, pi, VoterGroups.GROUP_IDS.find("isveren"), got)
-	isci_after = cell(a, pi, "isci")
-	score_before = float(isci_before[0]) + 2.0 * float(isci_before[1]) + 3.0 * float(isci_before[2])
-	score_after = float(isci_after[0]) + 2.0 * float(isci_after[1]) + 3.0 * float(isci_after[2])
-	check(got > 0.0 and absf((score_before - score_after) - got) < got * 0.01,
-		"krizde de zit gruptan kayip birebir", "kazanc %.0f, dusus %.0f" % [got, score_before - score_after])
-	# Teşkilatlı ilde de kayıp birebir (kalkan zıt grup kaybına uygulanmaz).
-	clear_all()
-	cm.agenda = {}
 	var prov := String(cm._province_ids[pi])
 	var org_before = cm.organizations.get(prov, {}).duplicate()
 	cm.organizations[prov] = {a: 2}
-	setc(a, pi, "isveren", count * 0.2, count * 0.2, 0.0)
-	var isv_before := cell(a, pi, "isveren")
-	got = cm._vb_pull(a, pi, VoterGroups.GROUP_IDS.find("isci"), count * 0.1, cm.MITING_STEAL, cm.MITING_DEMOTE)
-	cm._vb_opposite_loss(a, pi, VoterGroups.GROUP_IDS.find("isci"), got)
-	var isv_after := cell(a, pi, "isveren")
-	var drop_full := (float(isv_before[0]) + 2.0 * float(isv_before[1])) - (float(isv_after[0]) + 2.0 * float(isv_after[1]))
-	check(absf(drop_full - got) < got * 0.01, "teskilatli ilde de kayip birebir", "kazanc %.0f, dusus %.0f" % [got, drop_full])
+	isci_before = total(a, pi, "isci")
+	got = cm._vb_pull(a, pi, VoterGroups.GROUP_IDS.find("isveren"), count * 0.1, cm.MITING_STEAL, cm.MITING_DEMOTE)
+	cm._vb_opposite_loss(a, pi, VoterGroups.GROUP_IDS.find("isveren"), got)
+	lost = isci_before - total(a, pi, "isci")
+	check(absf(lost - got * 0.6) < got * 0.01, "krizde ve teskilatli ilde de 5'e 3", "kazanc %.0f, kayip %.0f" % [got, lost])
+	cm.agenda = {}
 	cm.organizations[prov] = org_before
 
 	print("=== miting odagi ===")

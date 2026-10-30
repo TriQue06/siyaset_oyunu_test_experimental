@@ -471,8 +471,8 @@ func _initialize() -> void:
 	new_game({1: groups(["isveren", "dindar"]), 2: groups(["isci", "ilerici"])})
 	check("tur basina para 30 (hukumet 40)", GameRules.FUNDS_PER_ROUND == 30 and GameRules.FUNDS_PER_ROUND_GOVERNMENT == 40)
 	check("yasa gecirmek +5 puan", cm.law_pass_score(false) == 5 and cm.law_pass_score(true) == 5)
-	check("bakanlik +3, yardimcilik +5, basbakanlik +10", GovernmentPresets.MINISTRY_POINTS == 3 \
-		and GovernmentPresets.DEPUTY_PM_POINTS == 5 and GovernmentPresets.PM_POINTS == 10)
+	check("bakanlik +1, yardimcilik +2, basbakanlik +3", GovernmentPresets.MINISTRY_POINTS == 1 \
+		and GovernmentPresets.DEPUTY_PM_POINTS == 2 and GovernmentPresets.PM_POINTS == 3)
 	cm.funds[1] = 0.0
 	cm._apply_card_effect(1, "bagis_kampanyasi_guclu")
 	check("guclu bagis kampanyasi +60", near(cm.funds_of(1), cm.funds_bonus_amount(1, true)) and GameRules.FUNDS_BONUS_STRONG == 60)

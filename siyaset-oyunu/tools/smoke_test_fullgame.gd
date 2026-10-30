@@ -156,9 +156,8 @@ func _initialize() -> void:
 	check("anayasa sonrasi kalan secim sayisi korunur, son secim yeni araliga oturur (7 secim: 20..92)",
 		GameRules.MAX_ROUNDS == 92 and cm.remaining_elections() == 7, "son %d kalan %d" % [GameRules.MAX_ROUNDS, cm.remaining_elections()])
 	check("ayni donemde ikinci yasa hakki yok", not cm.can_propose_constitution(1))
-	# 0.0.246: yasa sekmesi sırada tek teklif; grup yasası ayrı dönemlik hak
-	# olarak kalır (sonraki sırasında sunabilir).
-	check("anayasa sunulunca yasa sekmesi bu sira kapandi", not cm.can_propose_law(1, cp.law_type("isci")))
+	# 0.0.300: yasa sekmesi kapanmaz; her yasa türü turda birer kez.
+	check("anayasadan sonra ayni turda grup yasasi hala sunulabilir", not cm.parliament_closed_stages(1).has("law"))
 	cm._start_turn_flow(1)
 	check("ayni donemde sonraki sirasinda grup yasasini sunabilir", cm.can_propose_law(1, cp.law_type("isci")),
 		"grup %s vergi %s anayasa %s" % [cm.has_proposed_law_this_round(1, "group"), cm.has_proposed_law_this_round(1, "tax"), cm.has_proposed_law_this_round(1, "constitution")])

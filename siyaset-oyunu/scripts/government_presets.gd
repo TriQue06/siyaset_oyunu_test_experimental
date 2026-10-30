@@ -9,10 +9,11 @@ extends Node
 const POST_PM := "pm"
 const POST_DEPUTY_PM := "deputy_pm"
 
-## İKTİDAR ASIL ÖDÜL: makam puanları yasa/gensoru puanlarının çok üstünde.
-const PM_POINTS := 10
-const DEPUTY_PM_POINTS := 5
-const MINISTRY_POINTS := 3
+## MAKAM PUANLARI (0.0.300): bakanlık 1, yardımcılık 2, başbakanlık 3; geçen
+## yasa 5 puan (GameRules.LAW_PASS_SCORE).
+const PM_POINTS := 3
+const DEPUTY_PM_POINTS := 2
+const MINISTRY_POINTS := 1
 
 ## Koalisyondan çekilmenin PUAN cezası yok: etki sadece ulusal puanda
 ## (bkz. PublicOpinion.WITHDRAW_NATIONAL_*).

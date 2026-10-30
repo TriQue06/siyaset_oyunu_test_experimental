@@ -5651,3 +5651,48 @@ msgstr "Blue"
 
 msgid "Açık mavi"
 msgstr "Light blue"
+
+msgid "Meclise bir teklif getir; teklif oylanır. Her yasa türü turda bir kez sunulur."
+msgstr "Bring a proposal to parliament; it is put to a vote. Each type of law can be proposed once per round."
+
+msgid "Vergi kademesini değiştir: hazineyi ve seçmenin ruh hâlini etkiler."
+msgstr "Change the tax level: it affects the treasury and the voters' mood."
+
+msgid "Mecliste oylama sürüyor."
+msgstr "A vote is under way in parliament."
+
+msgid "Ülke geneli anket: kullandığın an partilerin oy oranlarını yalnız sen görürsün; partilere dokunup \"Son anket\"e bak. Seçime kadar kalır.\nSeçmek için dokun, tekrar dokun: kullan."
+msgstr "Nationwide poll: when you use it, only you see the parties' vote shares; tap a party and check \"Last poll\". It lasts until the election.\nTap to select, tap again to use."
+
+msgid "%s koalisyonu dağıttı: hükümet düştü, yeni hükümet kurulacak (%s)."
+msgstr "%s dissolved the coalition: the government fell and a new one will be formed (%s)."
+
+msgid "%s hükümetten ayrıldı: hükümet düştü, yeni hükümet kurulacak (%s)."
+msgstr "%s left the government: the government fell and a new one will be formed (%s)."
+
+msgid "Görevlerin başbakanın partisine geçer. Ortağın yalnız kalıp düşerse −%d puan alır."
+msgstr "Your posts pass to the prime minister's party. If your partner is left alone and falls, it loses %d points."
+
+msgid "Koalisyonu Dağıt"
+msgstr "Dissolve Coalition"
+
+msgid "Hükümetten Ayrıl"
+msgstr "Leave Government"
+
+msgid "Hükümet düşer ve yeni hükümet kurulur."
+msgstr "The government falls and a new one is formed."
+
+msgid "%s: emin misin?"
+msgstr "%s: are you sure?"
+
+msgid "Onayla"
+msgstr "Confirm"
+
+msgid "Tur geliri"
+msgstr "Round revenue"
+
+msgid "%s yılda"
+msgstr "every %s yr"
+
+msgid "aynı"
+msgstr "same"

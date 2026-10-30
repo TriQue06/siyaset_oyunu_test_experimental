@@ -35,8 +35,9 @@ const MARGIN_CELLS := 3
 const LAND_FRACTION := 0.5
 ## Kırpılan haritada karanın çevresinde kalan deniz payı.
 const CROP_PAD := SPACING * 2.5
-## Varsayılan il sayısı (province_scale 1).
-const PROVINCES := 46
+## Varsayılan il sayısı (province_scale 1); her 0.25 ölçek adımı 15 il.
+const PROVINCES := 50
+const PROVINCE_STEP := 60.0
 const MIN_PROVINCE_CELLS := 20
 ## Bu kadar hücreden büyük ada kendi ilidir; daha küçükleri en yakın ile bağlanır.
 const MIN_ISLAND_CELLS := 160
@@ -69,9 +70,23 @@ static func _generate(seed_value: int, province_scale: float = 1.0, seat_total: 
 	var open_sea := _open_sea(points, land, topo)
 	# 0.0.269: her il sayısı ayarında ortalama 5 il daha az; 0.0.276: bir il daha az.
 	# 0.0.279: ölçek ÇARPAN (Fazla 1.25 = daha çok il); önceden bölüyordu, ters çalışıyordu.
-	var count := maxi(6, int(roundf(PROVINCES * maxf(0.25, province_scale))) - 6)
-	var labels := _grow(points, topo, land, open_sea, count, rng)
-	count = _compact(labels, points)
+	# 0.0.300: az 35, orta 50, çok 65 il (ölçek 0.75 / 1.0 / 1.25).
+	var count := maxi(6, int(roundf(PROVINCES + (province_scale - 1.0) * PROVINCE_STEP)))
+	# Büyüme bazı illeri yutabilir: sayı tutmazsa fark kadar düzeltilmiş
+	# tohumla yeniden büyütülür (en çok 5 deneme); hedefe en yakın sonuç kalır.
+	var target := count
+	var labels := PackedInt32Array()
+	var best := -1
+	for attempt in 5:
+		var trial := _grow(points, topo, land, open_sea, count, rng)
+		var got := _compact(trial, points)
+		if best == -1 or absi(got - target) < absi(best - target):
+			best = got
+			labels = trial
+		if got == target:
+			break
+		count = maxi(6, count + target - got)
+	count = best
 	var coastal := _coastal(labels, topo, count, open_sea)
 	var population := _population(points, topo, labels, count, rng)
 	var seats := ProvinceLayout.allocate_seats(population, seat_total)

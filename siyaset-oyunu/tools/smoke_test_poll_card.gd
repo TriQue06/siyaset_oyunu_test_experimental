@@ -1,6 +1,6 @@
 extends SceneTree
-## ANKET KARTI (0.0.272): ilk turda ve seçimden sonraki ilk turda desteye
-## girmez; çekilince yalnız çekenin anketi dolar; seçimde sıfırlanır.
+## ANKET KARTI (0.0.300): ilk turda ve seçimden sonraki ilk turda desteye
+## girmez; ele girer, oynanınca yalnız oynayanın anketi dolar; seçimde sıfırlanır.
 
 var fails := 0
 
@@ -33,15 +33,15 @@ func _initialize() -> void:
 	check("secimden sonraki ilk turda girmez", not cm._draw_weights(me).has("anket"))
 	cm.round_number = 5
 	check("bir tur sonra yine girer", cm._draw_weights(me).has("anket"))
-	var entry := {}
-	cm._apply_instant(me, "anket", entry)
+	check("ele giren kart (aninda degil)", not cm.is_instant_card("anket"))
+	check("hedefsiz oynanir", cm.can_play_card(me, "anket"))
+	cm._apply_card_effect(me, "anket")
 	var poll: Dictionary = cm.my_poll(me)
 	var total := 0.0
 	for pid in poll.get("parties", {}).keys():
 		total += float(poll["parties"][pid]["percent"])
 	check("anket cekenin: oy oranlari toplam ~%100", absf(total - 100.0) < 1.0, "%.1f" % total)
 	check("baskasinin anketi yok", cm.my_poll(int(mm.bot_ids()[0])).is_empty())
-	check("aninda etkili kart", cm.is_instant_card("anket"))
 	cm._hold_election(5, false)
 	check("secimde anket sifirlanir", cm.my_poll(me).is_empty())
 	print("=== %s ===" % ("HEPSİ GEÇTİ" if fails == 0 else "%d HATA" % fails))

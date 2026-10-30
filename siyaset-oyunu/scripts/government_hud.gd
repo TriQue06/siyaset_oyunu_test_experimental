@@ -10,6 +10,9 @@ const BADGE_ICON_PIXEL_SIZE := 48
 const TITLE_COLOR := UiTheme.TEXT_MUTED
 const DIM_COLOR := UiTheme.TEXT_MUTED
 
+## Hükümet panelinde açık onay satırı ("" / "withdraw" / "dissolve").
+static var _confirming := ""
+
 static func party_name_of(peer_id: int) -> String:
 	return PartyManager.data_of(peer_id).get("name", "?")
 
@@ -18,6 +21,7 @@ static func leader_name_of(peer_id: int) -> String:
 
 static func _clear(box: Container) -> void:
 	for child in box.get_children():
+		box.remove_child(child)
 		child.queue_free()
 
 ## Konsept .gov: anahtar Nunito 800 (soluk), değer Siyaset Display (koyu).
@@ -136,20 +140,64 @@ static func fill_government_panel(box: VBoxContainer) -> void:
 	_fill_cabinet(box, GovernmentManager.government)
 
 	var me := box.multiplayer.get_unique_id()
+	# 0.0.300: ortak "Koalisyondan Çekil", başbakan "Koalisyonu Dağıt" /
+	# "Hükümetten Ayrıl". Basınca onay satırı açılır: Onayla ya da Vazgeç.
+	var kind := ""
+	var title := ""
+	var warning := ""
 	if GovernmentManager.can_withdraw(me):
-		var withdraw := Button.new()
-		UiSkin.skin_button(withdraw)
-		withdraw.text = L.t("Koalisyondan Çekil")
-		withdraw.add_theme_font_size_override("font_size", 12)
-		UiSkin.set_side_icon(withdraw, "koalisyondan_cekil", 16)
-		withdraw.pressed.connect(func():
-			if bool(withdraw.get_meta("armed", false)):
-				GovernmentManager.withdraw_from_coalition()
-			else:
-				withdraw.set_meta("armed", true)
-				withdraw.text = L.t("Emin misin? Tekrar dokun (ortağın yalnız düşerse −%d)") % GovernmentPresets.ABANDONED_FALL_PENALTY
-		)
-		box.add_child(withdraw)
+		kind = "withdraw"
+		title = L.t("Koalisyondan Çekil")
+		warning = L.t("Görevlerin başbakanın partisine geçer. Ortağın yalnız kalıp düşerse −%d puan alır.") % GovernmentPresets.ABANDONED_FALL_PENALTY
+	elif GovernmentManager.can_dissolve_government(me):
+		kind = "dissolve"
+		var coalition := GovernmentManager.government_party_ids().size() > 1
+		title = L.t("Koalisyonu Dağıt") if coalition else L.t("Hükümetten Ayrıl")
+		warning = L.t("Hükümet düşer ve yeni hükümet kurulur.")
+	if kind == "":
+		_confirming = ""
+		return
+	if _confirming != kind:
+		_confirming = ""
+		var leave := Button.new()
+		UiSkin.skin_button(leave)
+		leave.text = title
+		leave.add_theme_font_size_override("font_size", 12)
+		UiSkin.set_side_icon(leave, "koalisyondan_cekil", 16)
+		leave.pressed.connect(func():
+			_confirming = kind
+			fill_government_panel.call_deferred(box))
+		box.add_child(leave)
+		return
+	box.add_child(_label(L.t("%s: emin misin?") % title, 12))
+	var hint := _label(warning, 11, DIM_COLOR)
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.custom_minimum_size = Vector2(150, 0)
+	box.add_child(hint)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	var cancel := Button.new()
+	UiSkin.skin_button(cancel)
+	cancel.text = L.t("Vazgeç")
+	cancel.add_theme_font_size_override("font_size", 12)
+	cancel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cancel.pressed.connect(func():
+		_confirming = ""
+		fill_government_panel.call_deferred(box))
+	row.add_child(cancel)
+	var confirm := Button.new()
+	UiSkin.skin_color_button(confirm, UiTheme.RED_DARK)
+	confirm.text = L.t("Onayla")
+	confirm.add_theme_font_size_override("font_size", 12)
+	confirm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	confirm.pressed.connect(func():
+		_confirming = ""
+		if kind == "withdraw":
+			GovernmentManager.withdraw_from_coalition()
+		else:
+			GovernmentManager.dissolve_government())
+	row.add_child(confirm)
+	box.add_child(row)
 
 ## government: post_id -> peer_id
 static func _fill_cabinet(box: VBoxContainer, government: Dictionary) -> void:

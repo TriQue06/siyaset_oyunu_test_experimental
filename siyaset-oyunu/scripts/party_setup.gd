@@ -1182,6 +1182,9 @@ func _open_avatar_editor() -> void:
 	if (_is_locked and not _editing_bot()) or is_instance_valid(_avatar_editor):
 		return
 	_avatar_editor = AvatarEditor.new()
+	# 0.0.304: stüdyo parti renginde, plakada siyasetçi ve parti.
+	_avatar_editor.context = {"name": ("%s %s" % [_first_name, _surname]).strip_edges(), "party": _party_name, "color": _bg_color,
+		"party_data": {"name": _party_name, "icon_index": _icon_index, "icon_color": ICON_COLOR, "bg_color": _bg_color}}
 	_avatar_editor.set_appearance(_appearance)
 	_avatar_editor.appearance_changed.connect(_on_appearance_changed)
 	add_child(_avatar_editor)

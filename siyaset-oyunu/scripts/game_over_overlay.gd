@@ -13,6 +13,15 @@ const GOLD := UiTheme.GOLD
 const DIM := UiTheme.TEXT_MUTED
 
 var _reveal: Array = []  # sırayla beliren düğümler
+## Sıralama bittikten bu kadar sonra siyasi yolculuk kendiliğinden açılır.
+const JOURNEY_DELAY := 3.0
+var _journey: PoliticalAxisReplay
+
+func _open_journey() -> void:
+	if is_instance_valid(_journey) or CardManager.axis_history.is_empty():
+		return
+	_journey = PoliticalAxisReplay.new()
+	add_child(_journey)
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -66,6 +75,17 @@ func _ready() -> void:
 		vbox.add_child(row)
 		_reveal.append(row)
 
+	# 0.0.304: SİYASİ YOLCULUK (politik eksen) — sıralamadan sonra kendiliğinden
+	# açılır ("jenerik sonrası"), bu düğmeyle yeniden izlenir.
+	var journey := Button.new()
+	journey.text = L.t("Siyasi Yolculuk")
+	journey.custom_minimum_size = Vector2(220, 44)
+	journey.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	UiSkin.skin_color_button(journey, UiTheme.TEAL)
+	journey.pressed.connect(_open_journey)
+	vbox.add_child(journey)
+	_reveal.append(journey)
+
 	var button := Button.new()
 	button.text = L.t("Ana Menüye Dön")
 	button.custom_minimum_size = Vector2(220, 44)
@@ -87,6 +107,8 @@ func _play_intro(backdrop: ColorRect) -> void:
 	for node in _reveal:
 		tween.tween_property(node, "modulate:a", 1.0, ROW_FADE_SECONDS)
 		tween.tween_interval(ROW_DELAY)
+	tween.tween_interval(JOURNEY_DELAY)
+	tween.tween_callback(_open_journey)
 
 func _ranking_row(index: int, entry: Dictionary, is_me: bool) -> Control:
 	var color: Color = entry.get("color", Color(0.5, 0.5, 0.5))

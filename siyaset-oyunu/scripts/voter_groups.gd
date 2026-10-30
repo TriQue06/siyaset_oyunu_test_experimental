@@ -36,6 +36,32 @@ const PAIRS := {
 }
 const PAIR_IDS := ["emek", "kusak", "inanc", "yonetim"]
 
+## POLİTİK EKSEN (0.0.304): partinin seçmen hitabından iki eksenli konum.
+## x: ekonomik sol (-1, İşçi) – sağ (+1, İşveren); y: İlerici (-1) –
+## Muhafazakâr (+1). Diğer gruplar ek yön verir: Öğrenci sol alta, Emekli
+## sola, Bölgeselci aşağı, Milliyetçi yukarı çeker.
+const AXIS_DIRS := {
+	"isci": Vector2(-1, 0), "isveren": Vector2(1, 0), "dindar": Vector2(0, 1), "ilerici": Vector2(0, -1),
+	"genc": Vector2(-0.6, -0.6), "emekli": Vector2(-0.7, 0), "ozerkci": Vector2(0, -0.6), "milliyetci": Vector2(0, 0.6),
+}
+## Konumun yayılımı: grup paylarındaki küçük farklar haritada okunur olsun.
+const AXIS_SPREAD := 2.0
+
+## groups: grup -> hitap (0..100). Bütün gruplara eşit hitap merkezdir (0, 0).
+static func axis_position(groups: Dictionary) -> Vector2:
+	var total := 0.0
+	var sum := Vector2.ZERO
+	var mean := Vector2.ZERO
+	for group in GROUP_IDS:
+		var w := maxf(0.0, float(groups.get(group, 0.0)))
+		total += w
+		sum += AXIS_DIRS[group] * w
+		mean += AXIS_DIRS[group]
+	if total <= 0.0:
+		return Vector2.ZERO
+	var p := (sum / total - mean / float(GROUP_IDS.size())) * AXIS_SPREAD
+	return Vector2(clampf(p.x, -1.0, 1.0), clampf(p.y, -1.0, 1.0))
+
 ## KARŞIT GRUPLAR ÜST ÜSTE (0.0.301): columns sütunlu ızgarada grupların
 ## sırası. Her sütunda bir çift durur, çiftin ilk grubu üstte, karşıtı hemen
 ## altında (4 sütun: üst sıra İşçi, Öğrenci, Muhafazakâr, Bölgeselci; alt sıra

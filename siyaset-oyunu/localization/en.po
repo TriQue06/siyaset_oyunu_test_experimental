@@ -5738,3 +5738,81 @@ msgstr "Investment size"
 
 msgid "YATIRIM YAP"
 msgstr "INVEST"
+
+msgid "Göz"
+msgstr "Eyes"
+
+msgid "Şekil"
+msgstr "Shape"
+
+msgid "%d seçenek · rengini aşağıdan seç"
+msgstr "%d options · pick a color below"
+
+msgid "Geri al"
+msgstr "Undo"
+
+msgid "Tamam"
+msgstr "Done"
+
+msgid "Siyasetçin"
+msgstr "Your politician"
+
+msgid "Genel Başkan"
+msgstr "Party Leader"
+
+msgid "Yüz rengi"
+msgstr "Face color"
+
+msgid "Saç rengi"
+msgstr "Hair color"
+
+msgid "Kaş rengi"
+msgstr "Brow color"
+
+msgid "Göz rengi"
+msgstr "Eye color"
+
+msgid "Bıyık rengi"
+msgstr "Moustache color"
+
+msgid "Sakal rengi"
+msgstr "Beard color"
+
+msgid "Siyasi yolculuk"
+msgstr "Political journey"
+
+msgid "Siyasi Yolculuk"
+msgstr "Political Journey"
+
+msgid "%d. tur"
+msgstr "Round %d"
+
+msgid "kayıt yok"
+msgstr "no record"
+
+msgid "Yeniden oynat"
+msgstr "Replay"
+
+msgid "MUHAFAZAKÂR SOL"
+msgstr "CONSERVATIVE LEFT"
+
+msgid "MUHAFAZAKÂR SAĞ"
+msgstr "CONSERVATIVE RIGHT"
+
+msgid "İLERİCİ SOL"
+msgstr "PROGRESSIVE LEFT"
+
+msgid "İLERİCİ SAĞ"
+msgstr "PROGRESSIVE RIGHT"
+
+msgid "sağ"
+msgstr "right"
+
+msgid "sol"
+msgstr "left"
+
+msgid "muhafazakâr"
+msgstr "conservative"
+
+msgid "ilerici"
+msgstr "progressive"

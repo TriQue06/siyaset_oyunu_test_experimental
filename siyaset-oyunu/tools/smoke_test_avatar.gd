@@ -86,7 +86,7 @@ func _initialize() -> void:
 	editor._select_color("hair_color", "copper")
 	editor._choose_category("face")
 	await frames()
-	check("female has no beard or moustache tabs", editor._tabs.get_child_count() == 4 and editor.appearance.beard == null and editor.appearance.moustache == null)
+	check("female has no beard or moustache tabs", editor._rail.get_child_count() == 4 and editor.appearance.beard == null and editor.appearance.moustache == null)
 	check("female face and eyebrows compatible", editor.appearance.face == "face_12" and editor.appearance.eyebrows == "brow_04")
 	await shot("editor_female")
 	editor._select_gender("m")

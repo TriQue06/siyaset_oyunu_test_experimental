@@ -2314,6 +2314,7 @@ func init_game() -> void:
 	miting_fatigue = {}
 	election_groups = {}
 	former_parties = {}
+	axis_history = {}
 	economy = Economy.start_state()
 	disaster = {}
 	_pending_disaster_fx = {}
@@ -4283,9 +4284,34 @@ func next_election_round() -> int:
 		return round_number
 	return GameRules.next_election_round(round_number)
 
+## POLİTİK EKSEN GEÇMİŞİ (0.0.304): her tur sonunda partilerin eksendeki
+## konumu (bkz. VoterGroups.axis_position). Oyun sonunda jenerik sonrası
+## sahnede logolar bu yolda kayar. pid -> {"name", "bg_color", "icon_index",
+## "icon_color", "path": [[tur, x, y], ...]}; dağılan partinin yolu kalır.
+var axis_history: Dictionary = {}
+
+func record_axis_positions() -> void:
+	for pid in party_ids():
+		var party: Dictionary = PartyManager.data_of(int(pid))
+		if party.is_empty() or PartyManager.is_independent(int(pid)):
+			continue
+		var entry: Dictionary = axis_history.get(int(pid), {"path": []})
+		entry["name"] = String(party.get("name", "?"))
+		entry["bg_color"] = party.get("bg_color", Color.GRAY)
+		entry["icon_index"] = int(party.get("icon_index", 0))
+		entry["icon_color"] = party.get("icon_color", Color.WHITE)
+		var p := VoterGroups.axis_position(party.get("groups", {}))
+		var path: Array = entry["path"]
+		if not path.is_empty() and int(path[path.size() - 1][0]) == round_number:
+			path.pop_back()
+		path.append([round_number, snappedf(p.x, 0.001), snappedf(p.y, 0.001)])
+		entry["path"] = path
+		axis_history[int(pid)] = entry
+
 func _finish_round() -> void:
 	_round_end_pending = false
 	_release_secret_news()
+	record_axis_positions()
 	# Makam puanları TUR SONUNDA DEĞİL, hükümet kurulduğu anda yazılır
 	# (bkz. GovernmentManager.award_formation_scores).
 	var finished_round := round_number
@@ -4495,6 +4521,7 @@ func _finish_final_election() -> void:
 		_end_game(L.t("%d dönem tamamlandı. Son seçimden sonra hükümet kurulamadı.") % GameRules.MAX_ROUNDS)
 
 func _end_game(reason: String) -> void:
+	record_axis_positions()
 	game_finished = true
 	game_end_reason = reason
 	final_ranking = []
@@ -5551,6 +5578,7 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"agenda": agenda,
 		"crisis": crisis,
 		"polls": polls,
+		"axis_history": axis_history,
 		"national_list": national_list,
 		"round": round_number,
 		"turn_time_left": _turn_time_left,
@@ -5662,6 +5690,7 @@ func _apply_state(state: Dictionary) -> void:
 	agenda = state.get("agenda", {})
 	crisis = state.get("crisis", {})
 	polls = state.get("polls", {})
+	axis_history = state.get("axis_history", {})
 	national_list = state.get("national_list", {})
 	round_number = int(state["round"])
 	_turn_deadline_ms = Time.get_ticks_msec() + int(float(state["turn_time_left"]) * 1000.0)

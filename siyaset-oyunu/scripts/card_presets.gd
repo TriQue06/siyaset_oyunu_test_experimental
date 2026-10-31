@@ -155,7 +155,7 @@ var _card_textures: Dictionary = {}
 ## CardFace yerine bu görsel kartı kaplar; kenar çizgisi görselin ortalama rengi.
 const FULL_ART_PATH := "res://assets/cards/art/card_%s.png"
 ## Kendi tam görseli olmayan yeni kartlar akraba kartın görselini kullanır.
-const FULL_ART_ALIAS := {"parti_ici_karisiklik": "isyan", "esnek_hareket": "bonus_kart", "para_cezasi": "kart_calma"}
+const FULL_ART_ALIAS := {"parti_ici_karisiklik": "isyan", "para_cezasi": "kart_calma"}
 var _full_art: Dictionary = {}
 var _art_edge: Dictionary = {}
 

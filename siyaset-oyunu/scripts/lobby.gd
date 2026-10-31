@@ -182,9 +182,16 @@ func _build_card() -> void:
 	# KAYITLI OYUN: elle kayıt ya da otomatik kayıt varsa en yenisinden devam.
 	var slot := _latest_save()
 	if slot != "":
-		ResourceLoader.load_threaded_request("res://scenes/GameScreen.tscn")
 		var info := SaveGame.summary(slot)
 		var resume := _button(L.t("Kayıtlı Oyuna Devam Et"), UiTheme.BLUE.darkened(0.2), 42.0)
+		# 0.0.312: oyun ekranı menü açılınca değil, bu düğmenin üstüne gelince
+		# arka planda yüklenir. Önceden yükleme sürerken "Botlarla Oyna" ya da
+		# "Oda Kur" basılırsa oda sahnesi onu bekliyor, oyun 1-2 sn donuyordu.
+		var preload_game := func():
+			if ResourceLoader.load_threaded_get_status("res://scenes/GameScreen.tscn") == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+				ResourceLoader.load_threaded_request("res://scenes/GameScreen.tscn")
+		resume.mouse_entered.connect(preload_game)
+		resume.focus_entered.connect(preload_game)
 		resume.pressed.connect(func():
 			resume.disabled = true
 			var err := SaveGame.load_game(get_tree(), slot)

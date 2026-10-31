@@ -16,8 +16,9 @@ const GAP := 0.28
 ## İkinci yılanın kayması (konsept: -25).
 const OFFSET := 0.25
 const WIDTH := 4.0
-## Yılanlar plaketin kenarından bu kadar dışarıda (konsept: inset -5 px, rect 2,5).
-const OUT := 2.5
+## Yılanın plaket kenarına uzaklığı. 0.0.309: negatif, yani çizgi plaketin
+## kenar şeridinin üstünde, içeride kalır; liste panelinin dışına taşmaz.
+const OUT := -WIDTH * 0.5 - 0.5
 const RADIUS := 16.0
 
 var party_color := Color.WHITE

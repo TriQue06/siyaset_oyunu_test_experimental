@@ -5872,7 +5872,7 @@ func _set_map_layer(layer: int, animate: bool = true) -> void:
 			_queued_layer = layer
 		return
 	var direction := 1.0 if layer > _map_layer else -1.0
-	var snapshot: Image = null
+	var snapshot: Texture2D = null
 	if animate and _map_clip != null and DisplayServer.get_name() != "headless":
 		# Anlık görüntüde katman butonları ve açıklama olmasın (onlar kaymaz):
 		# bir kare gizlenip çizim bitince yakalanır.
@@ -5890,13 +5890,17 @@ func _set_map_layer(layer: int, animate: bool = true) -> void:
 		_layer_switching = false
 		if not is_inside_tree():
 			return
-		var full := get_viewport().get_texture().get_image()
-		if full != null:
-			var to_pixels := get_viewport().get_final_transform()
-			var pixel_rect := Rect2i((to_pixels * Rect2(_map_clip.global_position, _map_clip.size)).abs())
-			pixel_rect = pixel_rect.intersection(Rect2i(Vector2i.ZERO, full.get_size()))
-			if pixel_rect.has_area():
-				snapshot = full.get_region(pixel_rect)
+		var to_pixels := get_viewport().get_final_transform()
+		var pixel_rect := Rect2i((to_pixels * Rect2(_map_clip.global_position, _map_clip.size)).abs())
+		# 0.0.311: görüntü ekran kartında kopyalanır; GPU'dan okuma 40-130 ms
+		# takılma yapıyordu. RenderingDevice yoksa (web) eski yol.
+		snapshot = _gpu_snapshot(pixel_rect)
+		if snapshot == null:
+			var full := get_viewport().get_texture().get_image()
+			if full != null:
+				pixel_rect = pixel_rect.intersection(Rect2i(Vector2i.ZERO, full.get_size()))
+				if pixel_rect.has_area():
+					snapshot = ImageTexture.create_from_image(full.get_region(pixel_rect))
 	_map_layer = layer
 	_apply_map_layer_colors()
 	_refresh_layer_bar()
@@ -5907,7 +5911,8 @@ func _set_map_layer(layer: int, animate: bool = true) -> void:
 	# Kayma mesafesi desen hücresinin katı: denizin dalgaları haritayla birlikte
 	# kayarken anlık görüntüdeki dalgalarla hep çakışık kalır.
 	var width := ceilf(_map_clip.size.x / TableSurface.Sea.CELL_W) * TableSurface.Sea.CELL_W
-	_map_snapshot.texture = ImageTexture.create_from_image(snapshot)
+	_free_snapshot()
+	_map_snapshot.texture = snapshot
 	_map_snapshot.position = Vector2.ZERO
 	_map_snapshot.size = _map_clip.size
 	_map_snapshot.show()
@@ -5937,7 +5942,7 @@ func _set_map_layer(layer: int, animate: bool = true) -> void:
 			sea.scroll = -shift, 0.0, 1.0, MAP_SLIDE_DURATION)
 	_map_slide_tween.tween_callback(func():
 		_map_snapshot.hide()
-		_map_snapshot.texture = null
+		_free_snapshot()
 		if sea != null:
 			sea.scroll = 0.0
 		map_holder.position = home)
@@ -5945,6 +5950,43 @@ func _set_map_layer(layer: int, animate: bool = true) -> void:
 		var queued := _queued_layer
 		_queued_layer = -1
 		_set_map_layer(queued)
+
+## Görüntünün bir bölgesini ekran kartında yeni bir dokuya kopyalar.
+func _gpu_snapshot(pixel_rect: Rect2i) -> Texture2D:
+	var rd := RenderingServer.get_rendering_device()
+	if rd == null:
+		return null
+	var src := RenderingServer.texture_get_rd_texture(get_viewport().get_texture().get_rid())
+	if not src.is_valid():
+		return null
+	var src_format := rd.texture_get_format(src)
+	pixel_rect = pixel_rect.intersection(Rect2i(0, 0, src_format.width, src_format.height))
+	if not pixel_rect.has_area():
+		return null
+	var format := RDTextureFormat.new()
+	format.format = src_format.format
+	format.width = pixel_rect.size.x
+	format.height = pixel_rect.size.y
+	format.usage_bits = RenderingDevice.TEXTURE_USAGE_SAMPLING_BIT | RenderingDevice.TEXTURE_USAGE_CAN_COPY_TO_BIT
+	var copy := rd.texture_create(format, RDTextureView.new())
+	if not copy.is_valid():
+		return null
+	if rd.texture_copy(src, copy, Vector3(pixel_rect.position.x, pixel_rect.position.y, 0), Vector3.ZERO,
+			Vector3(pixel_rect.size.x, pixel_rect.size.y, 1), 0, 0, 0, 0) != OK:
+		rd.free_rid(copy)
+		return null
+	var texture := Texture2DRD.new()
+	texture.texture_rd_rid = copy
+	return texture
+
+## Kayma bitince anlık görüntünün GPU dokusunu bırakır.
+func _free_snapshot() -> void:
+	var texture := _map_snapshot.texture as Texture2DRD
+	_map_snapshot.texture = null
+	if texture != null and texture.texture_rd_rid.is_valid():
+		var rid := texture.texture_rd_rid
+		texture.texture_rd_rid = RID()
+		RenderingServer.get_rendering_device().free_rid(rid)
 
 func _begin_org_view() -> void:
 	_org_view_token += 1

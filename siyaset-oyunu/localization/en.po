@@ -720,9 +720,6 @@ msgstr " %d terms until the election: it fades before then."
 msgid " Yalnız kalan %s −%d puan."
 msgstr " %s, left alone, −%d points."
 
-msgid " Yeni baraj %%%s, seçimler %d yılda bir, sayım: %s."
-msgstr " New threshold %s%%, elections every %d years, counting: %s."
-
 msgid " ve %d ilde birinci"
 msgstr " and first in %d provinces"
 
@@ -5906,3 +5903,9 @@ msgstr "Vote shares, turn by turn"
 
 msgid "%d. tur · %s"
 msgstr "Round %d · %s"
+
+msgid "Saniyedeki en fazla kare sayısı; düşük değer pil ve ısı kazandırır."
+msgstr "Maximum frames per second; a lower value saves battery and heat."
+
+msgid "ANAYASA DEĞİŞİKLİĞİ oylanıyor — %s getirdi · baraj %%%s, seçimler %s yılda bir, sayım: %s%s\nEVET %d / gereken %d (2/3) · %s kaldı%s"
+msgstr "CONSTITUTIONAL AMENDMENT vote — brought by %s · threshold %s%%, elections every %s years, counting: %s%s\nYES %d / needed %d (2/3) · %s left%s"

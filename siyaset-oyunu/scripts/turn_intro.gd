@@ -435,6 +435,8 @@ func _centered_label(text: String, size: int, color: Color) -> Label:
 ## Kartın etki metni: hafif açık zeminli, kenarlıklı bir çerçevede.
 func _framed_text(text: String, accent: Color) -> Control:
 	var margin := MarginContainer.new()
+	# Metin çerçevesi kartın kalan boyunu doldurur: altta boş krem şerit kalmaz.
+	margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	margin.add_theme_constant_override("margin_left", 0)
 	margin.add_theme_constant_override("margin_right", 0)
 	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -447,6 +449,8 @@ func _framed_text(text: String, accent: Color) -> Control:
 	var label := PopupKit.note(text, UiTheme.TEXT, CARD_SIZE.x - 48.0)
 	label.add_theme_font_size_override("font_size", 12)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	frame.add_child(label)
 	return margin
 

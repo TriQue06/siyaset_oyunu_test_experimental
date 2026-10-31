@@ -343,7 +343,13 @@ func _finish() -> void:
 	_flash_queue.clear()
 	_flash_left = 0.0
 	var national: Dictionary = _sample["national"]
+	# Birinci parti gazetedeki gibi VEKİL sayısına göre (eşitlikte oy oranı):
+	# şeritte oyda, gazetede vekilde birinci olan iki ayrı parti görünmesin.
+	var seats: Dictionary = _sample.get("seats", {})
 	var winner = _top_peer(national)
+	for peer_id in seats.keys():
+		if winner == -1 or int(seats[peer_id]) > int(seats.get(winner, 0)) 				or (int(seats[peer_id]) == int(seats.get(winner, 0)) and float(national.get(peer_id, 0.0)) > float(national.get(winner, 0.0))):
+			winner = peer_id
 	if winner != -1:
 		_push_flash(L.t("SONUÇ"), L.t("Tüm sandıklar açıldı. Kesin olmayan sonuçlara göre birinci parti: %s  (%%%.1f · %d vekil)") % [
 			_party_name(winner), float(national[winner]), int(_sample["seats"].get(winner, 0))])

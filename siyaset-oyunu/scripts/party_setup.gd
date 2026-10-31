@@ -109,6 +109,9 @@ func _ready() -> void:
 		GameMap.generate_new(GameMap.DEFAULT_SEED)
 	_core = VoterGroups.random_core()
 	_restore_own()
+	# Yeni siyasetçi kel ve hep aynı yüzle başlamasın: rastgele bir görünüm.
+	if _appearance.is_empty():
+		_appearance = AvatarCatalog.random(_gender, randi())
 	_appearance = AvatarCatalog.clean(_appearance, _gender)
 	_build_ui()
 	_load_fields()
@@ -637,7 +640,10 @@ func _core_button(group: String) -> Button:
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.custom_minimum_size = Vector2(0, 58)
 	button.button_pressed = selected
-	UiSkin.skin_color_button(button, VoterGroups.color(group).darkened(0.25) if selected else UiTheme.PANEL_LIGHT)
+	var face := VoterGroups.color(group).darkened(0.25) if selected else UiTheme.PANEL_LIGHT
+	UiSkin.skin_color_button(button, face)
+	# Seçili kart grup renginde: yazılar o zeminde okunur renkte.
+	var ink := UiSkin.text_on(face) if selected else UiTheme.TEXT
 	var row := HBoxContainer.new()
 	row.set_anchors_preset(Control.PRESET_FULL_RECT)
 	row.offset_left = 10
@@ -654,16 +660,16 @@ func _core_button(group: String) -> Button:
 	texts.add_theme_constant_override("separation", 0)
 	texts.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(texts)
-	var t := UiTheme.mono_label(VoterGroups.title(group), 15, UiTheme.TEXT, true)
+	var t := UiTheme.mono_label(VoterGroups.title(group), 15, ink, true)
 	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	texts.add_child(t)
 	var blurb := UiTheme.mono_label(String(VoterGroups.data(group).get("blurb", "")), 11,
-		UiTheme.TEXT if selected else UiTheme.TEXT_MUTED)
+		ink if selected else UiTheme.TEXT_MUTED)
 	blurb.clip_text = true
 	blurb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	texts.add_child(blurb)
 	if selected:
-		var mark := UiTheme.mono_label(L.t("SEÇİLİ"), 11, UiTheme.HEAD, true)
+		var mark := UiTheme.mono_label(L.t("SEÇİLİ"), 11, ink, true)
 		mark.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(mark)
@@ -688,10 +694,15 @@ func _build_side() -> Control:
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	room_body.add_child(scroll)
+	# Sağda kaydırma çubuğu payı: HAZIR yazısı çubuğun altında kalmasın.
+	var pad := MarginContainer.new()
+	pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pad.add_theme_constant_override("margin_right", 14)
+	scroll.add_child(pad)
 	_players_list = VBoxContainer.new()
 	_players_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_players_list.add_theme_constant_override("separation", 6)
-	scroll.add_child(_players_list)
+	pad.add_child(_players_list)
 	return side
 
 ## ADAY KARTI: düzenlenen siyasetçi ve partisi, anlık.
@@ -801,9 +812,11 @@ func _refresh_players() -> void:
 		var player_label := PopupKit.label(player_name + (L.t(" (sen)") if int(peer_id) == my_id else "") \
 			+ (L.t(" · bot") if MultiplayerManager.is_bot(peer_id) else ""), 12, UiTheme.TEXT_MUTED)
 		player_label.clip_text = true
+		player_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		texts.add_child(player_label)
 		var party_label := UiTheme.mono_label(String(party.get("name", L.t("parti kuruyor…"))), 15, UiTheme.TEXT, true)
 		party_label.clip_text = true
+		party_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		texts.add_child(party_label)
 		if not politician.is_empty():
 			var bits: Array = [String(politician.get("name", ""))]
@@ -811,6 +824,7 @@ func _refresh_players() -> void:
 				bits.append(PoliticianPresets.title(String(politician["background"])))
 			var leader := PopupKit.label(" · ".join(bits), 11, UiTheme.HEAD)
 			leader.clip_text = true
+			leader.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 			texts.add_child(leader)
 		row.add_child(texts)
 		# Oda sahibi botları düzenleyebilir; düzenlenen satır vurgulu.
@@ -948,7 +962,8 @@ func _on_gender_pressed(gender: String) -> void:
 	if gender == _gender:
 		return
 	_gender = gender
-	_appearance = AvatarCatalog.clean(_appearance, _gender)
+	# Cinsiyete özgü parçalar (saç, sakal) değişir: o cinsiyetten rastgele bir görünüm.
+	_appearance = AvatarCatalog.random(_gender, randi())
 	_reroll_name(true, false)
 
 ## Klasik düğme dokusu, cinsiyet renginde: seçili tam renk, diğeri koyu ve sönük.

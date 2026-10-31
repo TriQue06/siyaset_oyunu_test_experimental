@@ -730,7 +730,8 @@ class _ChartStage extends Control:
 		_speed = maxf(1.0, float(_steps.size() - 1)) / total
 
 	func _plot() -> Rect2:
-		var m := Vector2(90, 100)
+		# Üst pay: seçim rozetleri sağ üstteki Menü düğmesinin altında kalsın.
+		var m := Vector2(90, 124)
 		return Rect2(m, size - m - Vector2(150, 80))
 
 	func _x(index: float) -> float:
@@ -824,7 +825,9 @@ class _ChartStage extends Control:
 				var x := _x(float(k))
 				draw_line(Vector2(x, r.end.y), Vector2(x, r.end.y + 6), EndgameSequence.C_MUTED, 1.0)
 				draw_string(body, Vector2(x - 10, r.end.y + 22), str(turn_no), HORIZONTAL_ALIGNMENT_CENTER, 20, 11, EndgameSequence.C_MUTED)
-		# Seçimler: çizgilerin ve logoların ARKASINDA.
+		# Seçimler: çizgi ve rozet çizgilerin ARKASINDA; yüzde etiketleri en
+		# üstte (çizgiler etiketlerin üstünden geçip okunmaz hâle getirmesin).
+		var tags: Array = []
 		for step in _revealed:
 			var k := _steps.find(step)
 			var x := _x(float(k))
@@ -849,10 +852,7 @@ class _ChartStage extends Control:
 			for item in items:
 				var ly: float = maxf(float(item[0]), last_y + 22.0)
 				last_y = ly
-				var text := "%%%s" % L.dec(float(item[1]), 1)
-				var tw := body.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
-				draw_rect(Rect2(Vector2(x + PAWN * 0.5 + 6, ly - 12), Vector2(tw + 8, 22)), Color(0.97, 0.93, 0.85, 0.85))
-				draw_string(body, Vector2(x + PAWN * 0.5 + 10, ly + 5), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, item[2])
+				tags.append([x, ly, "%%%s" % L.dec(float(item[1]), 1), item[2]])
 		# Köşesiz çizgiler: tamamlanan aralıklar + akan son parça.
 		for s in _series:
 			var values: Array = s["values"]
@@ -873,6 +873,10 @@ class _ChartStage extends Control:
 				pts.append(_point(values, values.size() - 1))
 			if pts.size() >= 2:
 				draw_polyline(pts, s["color"], 5.0, true)
+		for tag in tags:
+			var tw := body.get_string_size(String(tag[2]), HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
+			draw_rect(Rect2(Vector2(float(tag[0]) + PAWN * 0.5 + 6, float(tag[1]) - 12), Vector2(tw + 8, 22)), Color(0.97, 0.93, 0.85, 0.92))
+			draw_string(body, Vector2(float(tag[0]) + PAWN * 0.5 + 10, float(tag[1]) + 5), String(tag[2]), HORIZONTAL_ALIGNMENT_LEFT, -1, 17, tag[3])
 
 # --- 5. PUAN SIRALAMASI (Kürsü) -----------------------------------------------------
 

@@ -411,10 +411,10 @@ static func proposal_status_text(my_id: int) -> String:
 			if GovernmentManager.proposal_kind == GovernmentManager.KIND_CONSTITUTION:
 				var payload := GovernmentManager.proposal_assignments
 				var method := String(payload.get("seat_method", MultiplayerManager.seat_method))
-				return "ANAYASA DEĞİŞİKLİĞİ oylanıyor — %s getirdi · baraj %%%s, seçimler %d yılda bir, sayım: %s%s
-EVET %d / gereken %d (2/3) · %s kaldı%s" % [
+				return L.t("ANAYASA DEĞİŞİKLİĞİ oylanıyor — %s getirdi · baraj %%%s, seçimler %s yılda bir, sayım: %s%s\nEVET %d / gereken %d (2/3) · %s kaldı%s") % [
 					party_name_of(GovernmentManager.proposal_peer_id),
-					String.num(float(payload.get("threshold", 0.0)), 1), int(payload.get("interval", 0)),
+					String.num(float(payload.get("threshold", 0.0)), 1),
+					GameRules.years_text(float(payload.get("interval", MultiplayerManager.election_interval))),
 					ElectionModel.method_title(method),
 					L.t(" (değişmiyor)") if method == MultiplayerManager.seat_method else L.t(" (şu an: %s)") % ElectionModel.method_title(MultiplayerManager.seat_method),
 					totals_now.x, GovernmentManager.constitution_threshold_seats(), time_text, mine,

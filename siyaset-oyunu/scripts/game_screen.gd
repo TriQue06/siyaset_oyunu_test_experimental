@@ -1256,6 +1256,8 @@ func _update_vote_swap(delta: float) -> void:
 		_swap_parl_rect = _swap_home_parl
 	if want != _vote_swapped:
 		_vote_swapped = want
+		if parliament_diagram != null:
+			_refresh_change_stack()
 		_ensure_swap_fx()
 		_swap_flash.color.a = 0.6
 	if _swap_flash != null:
@@ -3059,6 +3061,11 @@ func _input(event: InputEvent) -> void:
 		var scroll := _hover_info_scroll_target(event.position)
 		if scroll == null:
 			return
+		# İnceleme paneli bu yönde kayamıyorsa (kısa ya da uçta) tekerlek
+		# alttaki listeye kalır: parti listesi de tekerlekle kaydırılabilsin.
+		if event.button_index != MOUSE_BUTTON_MIDDLE and not _hover_info_can_scroll(scroll,
+				event.button_index == MOUSE_BUTTON_WHEEL_UP):
+			return
 		if event.button_index == MOUSE_BUTTON_MIDDLE:
 			_hover_info_drag_scroll = scroll
 		elif event.pressed:
@@ -3075,8 +3082,18 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
 		_hover_info_drag_scroll = null
 
-func _hover_info_scroll_valid(scroll: ScrollContainer) -> bool:
-	return is_instance_valid(scroll) and not scroll.is_queued_for_deletion() and scroll.is_visible_in_tree()
+func _hover_info_can_scroll(scroll: ScrollContainer, up: bool) -> bool:
+	var bar := scroll.get_v_scroll_bar()
+	# Yerleşim henüz bitmediyse (sayfa 0) inceleme paneline bırak.
+	if bar.page <= 0.0:
+		return true
+	if up:
+		return bar.value > bar.min_value + 0.5
+	return bar.value < bar.max_value - bar.page - 0.5
+
+## Tipsiz parametre: beklerken (await) silinen kaydırma alanı da güvenle sorulur.
+func _hover_info_scroll_valid(scroll: Variant) -> bool:
+	return is_instance_valid(scroll) and scroll is ScrollContainer and not scroll.is_queued_for_deletion() 		and scroll.is_visible_in_tree()
 
 func _hover_info_scroll_target(mouse: Vector2 = Vector2.INF) -> ScrollContainer:
 	if _window_mode() or not is_visible_in_tree() or _leaving_for_results or _layer_switching \
@@ -3101,15 +3118,16 @@ func _hover_info_scroll_target(mouse: Vector2 = Vector2.INF) -> ScrollContainer:
 		return _province_panel._scroll
 	return null
 
-func _scroll_hover_info(scroll: ScrollContainer, amount: float, wheel_factor: float = 0.0) -> void:
-	if not _hover_info_scroll_valid(scroll):
+func _scroll_hover_info(target: ScrollContainer, amount: float, wheel_factor: float = 0.0) -> void:
+	if not _hover_info_scroll_valid(target):
 		return
+	var scroll: Variant = target
 	# A wheel event may open the inspector before its first layout is complete.
-	if scroll.get_v_scroll_bar().page <= 0.0:
+	if target.get_v_scroll_bar().page <= 0.0:
 		await get_tree().process_frame
 		if not _hover_info_scroll_valid(scroll):
 			return
-	var bar := scroll.get_v_scroll_bar()
+	var bar: VScrollBar = (scroll as ScrollContainer).get_v_scroll_bar()
 	if wheel_factor != 0.0:
 		var step := bar.custom_step if bar.custom_step > 0.0 else maxf(1.0, bar.page / 8.0)
 		amount = step * wheel_factor
@@ -4157,7 +4175,8 @@ func _refresh_change_stack() -> void:
 		_change_stack.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 		_change_stack.offset_right = -6.0
 		_change_stack.offset_top = 6.0
-	var rows := _proposal_change_rows()
+	# Yalnız büyük oylama görünümünde: sağ sütundaki küçük diyagramın üstünü örtmesin.
+	var rows := _proposal_change_rows() if _vote_swapped else []
 	_change_stack.visible = not rows.is_empty()
 	if rows.is_empty():
 		_change_key = ""

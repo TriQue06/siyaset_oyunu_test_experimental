@@ -335,7 +335,7 @@ func _build_category(key: String, box: VBoxContainer) -> void:
 		"display":
 			_row(box, "Ekran modu", "F11 ile de değiştirebilirsin.", _segments(["Pencereli", "Tam ekran"], GameSettings.display_mode, GameSettings.set_display_mode, true))
 			var index := FPS_OPTIONS.find(GameSettings.fps_limit)
-			_row(box, "FPS sınırı", "Ekran modu ve performans tercihleri.", _range(maxi(index, 0), 0, 7, 1, func(v): return L.t("Sınırsız") if FPS_OPTIONS[int(v)] == 0 else str(FPS_OPTIONS[int(v)]) + " FPS", func(v): GameSettings.set_fps_limit(FPS_OPTIONS[int(v)])))
+			_row(box, "FPS sınırı", "Saniyedeki en fazla kare sayısı; düşük değer pil ve ısı kazandırır.", _range(maxi(index, 0), 0, 7, 1, func(v): return L.t("Sınırsız") if FPS_OPTIONS[int(v)] == 0 else str(FPS_OPTIONS[int(v)]) + " FPS", func(v): GameSettings.set_fps_limit(FPS_OPTIONS[int(v)])))
 			_row(box, "Dikey eşitleme", "Görüntü yırtılmasını azaltır.", _toggle(GameSettings.vsync_enabled, GameSettings.set_vsync_enabled))
 		"sound":
 			for entry in [["master", "Ana ses", "Tüm seslerin genel seviyesi."], ["music", "Müzik", "Oyun ve seçim gecesi müzikleri."], ["sfx", "Efektler", "Butonlar, kartlar ve oylama sesleri."]]:

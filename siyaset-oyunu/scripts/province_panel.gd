@@ -91,7 +91,7 @@ func _rebuild() -> void:
 	if embedded_mode:
 		# 0.0.272: sağ panelde OYUN KARTI (bkz. InspectCard); şerit de kayar.
 		add_theme_stylebox_override("panel", StyleBoxEmpty.new())
-		_scroll = ScrollContainer.new()
+		_scroll = SmoothScrollContainer.new()
 		_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		add_child(_scroll)
 		# Sağda kaydırma çubuğuna yer: içerik çubuğun altında kalmasın.
@@ -117,7 +117,7 @@ func _rebuild() -> void:
 			closed.emit())
 	root.add_child(head)
 
-	_scroll = ScrollContainer.new()
+	_scroll = SmoothScrollContainer.new()
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(_scroll)

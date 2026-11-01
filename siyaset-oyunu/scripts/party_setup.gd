@@ -1,10 +1,10 @@
 extends Control
 ## PARTİ KURMA SİHİRBAZI (0.0.230) — eski "Siyasetçini Oluştur" ve "Partini Kur"
-## ekranları TEK ekranda, beş adımda:
+## ekranları TEK ekranda, dört adımda (0.0.319: memleket adımı kalktı):
 ##   1 Siyasetçi (cinsiyet, ad, soyad, isim dili) · 2 Meslek ·
-##   3 Memleket (harita) · 4 Parti kimliği (ad, logo, renk) · 5 Seçmen (2 çekirdek grup)
+##   3 Parti kimliği (ad, logo, renk) · 4 Seçmen (2 çekirdek grup)
 ## Adımlar sırayla gelir ama üstteki adım şeridinden istenen adıma atlanabilir.
-## Sağda hep görünen ADAY KARTI (portre, meslek, memleket, parti) ve
+## Sağda hep görünen ADAY KARTI (portre, meslek, parti) ve
 ## ODA listesi (herkesin partisi, hazır durumu; oda sahibine bot düzenleme).
 ## Hazır olmak için her adım tamam olmalı; "Hazırım" siyasetçiyi ve partiyi
 ## birlikte gönderir (set_my_politician + set_party_and_ready). Herkes hazır
@@ -13,14 +13,9 @@ extends Control
 ## partisini düzenler (her değişiklik anında gider); "Ben" ile kendine dönülür.
 ## Arayüz tamamen kodla kurulur (sahne sadece kök düğüm).
 
-const MAP_SCENE := preload("res://scenes/Map.tscn")
-const STEP_COUNT := 5
-const STEP_TITLES := ["Siyasetçi", "Meslek", "Memleket", "Parti kimliği", "Seçmen"]
-const STEP_HINTS := ["Kim olduğunu seç: adın ve soyadın.",
-	"Meslek oyun boyunca sana bir avantaj verir.",
-	"Haritadan bir il seç: memleketinde güçlü bir teşkilatla başlarsın.",
-	"Partinin adı, logosu ve rengi.",
-	"Partinin dayanacağı iki çekirdek seçmen grubunu seç."]
+const STEP_COUNT := 4
+## 0.0.319: başlıkların altındaki açıklama metinleri kalktı.
+const STEP_TITLES := ["Siyasetçi", "Meslek", "Parti kimliği", "Seçmen"]
 const SIDE_WIDTH := 350.0
 const PORTRAIT_SIZE := 76.0
 const LOGO_SIZE := 38.0
@@ -29,8 +24,6 @@ const ICON_BUTTON_SIZE := 34.0
 const SWATCH_SIZE := 28.0
 const GRID_ICON_PIXEL_SIZE := 64
 const PREVIEW_ICON_PIXEL_SIZE := 256
-const MAP_PADDING := 10.0
-const HOME_COLOR := Color("FFC93C")
 ## Parti ikonları her zaman beyaz; beyaz zemin seçilemez.
 const ICON_COLOR := Color.WHITE
 ## Cinsiyet düğmeleri: erkek mavi, kadın pembe.
@@ -44,7 +37,6 @@ var _surname: String = ""
 ## Rastgele isimlerin dili; oyun diliyle başlar.
 var _name_lang: String = "en" if L.is_en() else "tr"
 var _background_id: String = ""
-var _hometown: String = ""
 var _portrait: String = ""
 var _appearance: Dictionary = {}
 var _avatar_editor: AvatarEditor
@@ -60,14 +52,12 @@ var _is_locked: bool = false
 var _edit_target: int = -1
 var _own_backup: Dictionary = {}
 var _hovered_profile: String = ""
-var _hovered_province: String = ""
 
 # --- Düğümler ---------------------------------------------------------------------
 var _title: Label
 var _ready_count: Label
 var _step_buttons: Array = []
 var _step_title: Label
-var _step_hint: Label
 var _pages: Array = []
 var _blocker: Control
 var _back_button: Button
@@ -82,19 +72,14 @@ var _bot_random_button: Button
 # 2 meslek / kişilik
 var _profession_cards: Dictionary = {}
 var _detail_box: HBoxContainer
-# 3 memleket
-var _map_clip: Control
-var _map: Node2D
-var _home_title: Label
-var _home_body: Label
-# 4 parti kimliği
+# 3 parti kimliği
 var _name_edit: LineEdit
 var _name_hint: Label
 ## Logo önizlemesi (3B pul; renk / logo değişince yeniden kurulur).
 var _preview_holder: CenterContainer
 var _icon_grid: GridContainer
 var _color_row: HFlowContainer
-# 5 seçmen
+# 4 seçmen
 var _core_grid: GridContainer
 # sağ sütun
 var _card_box: VBoxContainer
@@ -102,7 +87,6 @@ var _players_list: VBoxContainer
 
 func _ready() -> void:
 	theme = load("res://assets/ui/main_theme.tres")
-	# Harita tıklamaları _unhandled_input ile gelir: kök düğüm yutmasın.
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if GameMap.province_ids().is_empty():
 		# Tek başına çalıştırılan sahne (oyun yok): örnek bir harita kur.
@@ -153,12 +137,11 @@ func _politician_from(data: Dictionary) -> void:
 	_background_id = String(data.get("background", ""))
 	if not PoliticianPresets.is_valid_background(_background_id):
 		_background_id = ""
-	_hometown = String(data.get("hometown", ""))
 	_portrait = String(data.get("portrait", ""))
 	_appearance = AvatarCatalog.clean(data.get("appearance", {}), _gender)
 
 func _draft_politician() -> Dictionary:
-	return PoliticianPresets.make(_first_name, _surname, _background_id, _hometown, _gender, _portrait, _appearance)
+	return PoliticianPresets.make(_first_name, _surname, _background_id, _gender, _portrait, _appearance)
 
 func _editing_bot() -> bool:
 	return _edit_target != -1 and _edit_target != multiplayer.get_unique_id()
@@ -175,7 +158,6 @@ func _build_ui() -> void:
 	add_child(top)
 	_title = UiTheme.mono_label(L.t("YENİ BİR PARTİ"), 26, UiTheme.WOOD_TEXT, true)
 	top.add_child(_title)
-	top.add_child(PopupKit.label(L.t("Siyasetçini yarat, partini kur, seçmenini seç."), 13, UiTheme.WOOD_TEXT_MUTED))
 	# Sağ üstte Menü düğmesi var: hazır sayısı onun solunda.
 	_ready_count = UiTheme.mono_label("", 16, UiTheme.WOOD_TEXT_MUTED, true)
 	_ready_count.anchor_left = 1.0
@@ -226,20 +208,16 @@ func _build_step_panel() -> Control:
 	var built := _panel(0, UiTheme.GOLD)
 	var panel: PanelContainer = built[0]
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	# Harita tıklamaları _unhandled_input ile gelir: paneller yutmasın.
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var body: VBoxContainer = built[1]
 	_step_title = UiTheme.mono_label("", 20, UiTheme.TEXT, true)
 	body.add_child(_step_title)
-	_step_hint = PopupKit.note("", UiTheme.TEXT_MUTED)
-	body.add_child(_step_hint)
 	body.add_child(UiTheme.rule())
 
 	var stack := Control.new()
 	stack.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	body.add_child(stack)
-	for page in [_build_politician_page(), _build_profile_page(), _build_home_page(),
+	for page in [_build_politician_page(), _build_profile_page(),
 			_build_identity_page(), _build_voters_page()]:
 		page.set_anchors_preset(Control.PRESET_FULL_RECT)
 		stack.add_child(page)
@@ -286,7 +264,7 @@ func _page() -> VBoxContainer:
 	return page
 
 func _scroll_page() -> Array:
-	var scroll := ScrollContainer.new()
+	var scroll := SmoothScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	var page := _page()
 	page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -474,44 +452,7 @@ func _appeal_row(appeal: Array) -> Control:
 		row.add_child(PopupKit.chip(VoterGroups.title(String(group)), VoterGroups.color(String(group))))
 	return row
 
-# --- 3 · Memleket ------------------------------------------------------------------
-
-func _build_home_page() -> Control:
-	var page := _page()
-	_map_clip = Control.new()
-	_map_clip.clip_contents = true
-	_map_clip.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_map_clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	page.add_child(_map_clip)
-	_map = MAP_SCENE.instantiate()
-	_map_clip.add_child(_map)
-	var markers := _map.get_node_or_null("SeatMarkers")
-	if markers != null:
-		markers.visible = false
-	_map.province_clicked.connect(_on_province_clicked)
-	_map.province_hovered.connect(_on_province_hovered)
-	_map_clip.resized.connect(_fit_map)
-	GameMap.map_changed.connect(_fit_map)
-	_home_title = UiTheme.mono_label("", 17, UiTheme.TEXT, true)
-	_home_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	page.add_child(_home_title)
-	_home_body = PopupKit.note("", UiTheme.TEXT_MUTED)
-	page.add_child(_home_body)
-	return page
-
-## Haritayı kutuya sığdır ve ortala.
-func _fit_map() -> void:
-	if _map == null or _map_clip == null:
-		return
-	var native := GameMap.map_size()
-	var space := _map_clip.size - Vector2(MAP_PADDING, MAP_PADDING) * 2.0
-	if native.x <= 0.0 or native.y <= 0.0 or space.x <= 0.0 or space.y <= 0.0:
-		return
-	var s := minf(space.x / native.x, space.y / native.y)
-	_map.scale = Vector2(s, s)
-	_map.position = (_map_clip.size - native * s) * 0.5
-
-# --- 4 · Parti kimliği -------------------------------------------------------------
+# --- 3 · Parti kimliği -------------------------------------------------------------
 
 func _build_identity_page() -> Control:
 	var built := _scroll_page()
@@ -697,7 +638,7 @@ func _build_side() -> Control:
 	side.add_child(room[0])
 	var room_body: VBoxContainer = room[1]
 	room_body.add_child(PopupKit.section(L.t("Oda")))
-	var scroll := ScrollContainer.new()
+	var scroll := SmoothScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	room_body.add_child(scroll)
@@ -738,8 +679,6 @@ func _refresh_card() -> void:
 	if PoliticianPresets.PROFESSIONS_ENABLED:
 		chips.add_child(PopupKit.chip(PoliticianPresets.title(_background_id) if _background_id != "" else L.t("meslek ?"),
 			UiTheme.GOLD if _background_id != "" else UiTheme.TEXT_DIM))
-	who.add_child(PopupKit.note(L.t("Memleket: %s") % GameMap.name_of(_hometown) if _hometown != "" else L.t("Memleket seçilmedi"),
-		UiTheme.TEXT_MUTED))
 	var perks: Array = []
 	if _background_id != "" and PoliticianPresets.PROFESSIONS_ENABLED:
 		perks.append(String(PoliticianPresets.background(_background_id).get("perk", "")))
@@ -899,9 +838,6 @@ func _show_step(index: int) -> void:
 	for i in _pages.size():
 		(_pages[i] as Control).visible = i == _step
 	_step_title.text = "%d · %s" % [_step_number(_step), L.t(STEP_TITLES[_step])]
-	_step_hint.text = L.t(STEP_HINTS[_step])
-	if _step == 2:
-		_fit_map.call_deferred()
 	_refresh()
 
 ## Adım tamam mı? (Seçmen adımı her zaman geçerli bir çiftle gelir: görülünce tamam.)
@@ -909,9 +845,8 @@ func _step_done(index: int) -> bool:
 	match index:
 		0: return _first_name != "" and _surname != ""
 		1: return _background_id != "" or not PoliticianPresets.PROFESSIONS_ENABLED
-		2: return _hometown != ""
-		3: return PartyManager.is_valid_name(_party_name)
-		4: return VoterGroups.is_valid_core(_core) and (_visited.has(4) or _editing_bot())
+		2: return PartyManager.is_valid_name(_party_name)
+		3: return VoterGroups.is_valid_core(_core) and (_visited.has(3) or _editing_bot())
 	return false
 
 func _missing_steps() -> Array:
@@ -937,8 +872,6 @@ func _refresh() -> void:
 	_bot_random_button.visible = _editing_bot()
 	_mark_cards(_profession_cards, _background_id)
 	_refresh_detail()
-	_paint_map()
-	_refresh_home_info()
 	_refresh_identity()
 	_build_core_buttons()
 	_refresh_card()
@@ -1052,23 +985,13 @@ func _on_background_pressed(id: String) -> void:
 	_background_id = id
 	_politician_changed()
 
-func _on_province_clicked(province_id: String) -> void:
-	if _is_locked and not _editing_bot():
-		return
-	_hometown = province_id
-	_politician_changed()
-
-func _on_province_hovered(province_id: String) -> void:
-	_hovered_province = province_id
-	_refresh_home_info()
-
 ## Bot düzenlenirken siyasetçi anında gider; kendi siyasetçim hazır olunca
 ## (ya da tamamlanınca, oda listesinde görünsün diye) gönderilir.
 func _politician_changed() -> void:
 	var data := _draft_politician()
 	if not _editing_bot():
 		PartyManager.my_politician = data.duplicate(true)
-	if PoliticianPresets.is_valid(data) and _hometown != "":
+	if PoliticianPresets.is_valid(data):
 		if _editing_bot():
 			PartyManager.set_bot_politician(_edit_target, data)
 		else:
@@ -1095,21 +1018,6 @@ func _mark_cards(cards: Dictionary, selected: String) -> void:
 		var card: Button = cards[id]
 		card.button_pressed = id == selected
 		_style_choice(card, id == selected)
-
-func _paint_map() -> void:
-	_map.clear_overlay()
-	if _hometown != "":
-		_map.set_province_colors({_hometown: HOME_COLOR})
-
-func _refresh_home_info() -> void:
-	var id := _hovered_province if _hovered_province != "" else _hometown
-	if id == "":
-		_home_title.text = L.t("Bir il seç")
-		_home_body.text = L.t("Haritada bir ile tıkla: orası senin memleketin olur.")
-		return
-	_home_title.text = GameMap.name_of(id) + (L.t("  · memleket") if id == _hometown else "")
-	_home_body.text = L.t("Memleketinde güçlü bir teşkilatla başlarsın; hemşehrilerin sana sahip çıkar.") \
-		if id == _hometown else L.t("Seçmek için tıkla.")
 
 # --- Etkileşim: parti ----------------------------------------------------------------
 
@@ -1183,7 +1091,7 @@ func _on_parties_updated() -> void:
 
 func _own_snapshot() -> Dictionary:
 	return {"gender": _gender, "first_name": _first_name, "surname": _surname, "lang": _name_lang,
-		"background": _background_id, "hometown": _hometown, "portrait": _portrait, "appearance": _appearance.duplicate(true),
+		"background": _background_id, "portrait": _portrait, "appearance": _appearance.duplicate(true),
 		"party": _party_name, "icon": _icon_index, "color": _bg_color, "core": _core.duplicate(),
 		"step": _step, "visited": _visited.duplicate()}
 

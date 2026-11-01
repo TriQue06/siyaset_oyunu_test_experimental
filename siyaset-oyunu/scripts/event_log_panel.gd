@@ -28,7 +28,7 @@ func _ready() -> void:
 	style.set_border_width_all(1)
 	style.set_content_margin_all(4)
 	UiSkin.apply_style(self, "panel", style)
-	_scroll = ScrollContainer.new()
+	_scroll = SmoothScrollContainer.new()
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	add_child(_scroll)

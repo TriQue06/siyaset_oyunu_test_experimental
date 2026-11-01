@@ -920,8 +920,8 @@ static func _attack_target(bot: int) -> int:
 ## MİTİNG YERİ (0.0.228): bot KALE kurar. İlin değeri vekil sayısıyla değil,
 ## partinin çekirdek gruplarının o ildeki YOĞUNLUĞUYLA ölçülür (büyük şehir
 ## kendiliğinden kazanmaz): çekirdek grup payı + diğer grupların küçük katkısı −
-## çekirdeğin zıt gruplarının payı (zıt grupta seviye kaybı). Teşkilatı ya da
-## memleketi olan il, kaleyi büyütmek için daha değerli; partinin ilde zaten
+## çekirdeğin zıt gruplarının payı (zıt grupta seviye kaybı). Teşkilatı olan
+## il, kaleyi büyütmek için daha değerli; partinin ilde zaten
 ## çok seçmeni varsa getiri azalır. Vekil sayısı çok hafif (0,15 kuvvet) girer;
 ## uyum, en uygun ile oranla 4. kuvvetten girer: ideolojisinin yoğun olduğu
 ## iller açıkça öne çıkar.
@@ -930,7 +930,6 @@ static func _eval_miting(bot: int) -> Dictionary:
 	var best_focus: Array = []
 	var best_value := -INF
 	var core: Array = PartyManager.data_of(CardManager.party_of(bot)).get("core", [])
-	var home := PoliticianPresets.hometown_of(bot)
 	var best_fit := 0.0001
 	var fits := {}
 	for province_id in _seats().keys():
@@ -946,7 +945,7 @@ static func _eval_miting(bot: int) -> Dictionary:
 		var seats := float(CardManager.province_seat_count(province_id))
 		var fit: float = fits[province_id]
 		var held := _province_hold(bot, String(province_id))
-		var stronghold := 1.0 + 0.35 * float(org_level) + (0.4 if String(province_id) == home else 0.0)
+		var stronghold := 1.0 + 0.35 * float(org_level)
 		var value := pow(fit / best_fit, 4.0) * org_mult * stronghold * pow(maxf(1.0, seats), 0.15) / (1.0 + held * 4.0) * 0.6
 		value += _jitter(bot, 0.05)  # zayıf bot yanlış ilde miting yapar
 		if value > best_value:

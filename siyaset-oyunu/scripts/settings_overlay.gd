@@ -122,14 +122,14 @@ func _build_menu() -> void:
 	_nav_panel = _surface(UiTheme.PANEL)
 	_nav_panel.custom_minimum_size.x = 217
 	body.add_child(_nav_panel)
-	var nav_scroll := ScrollContainer.new()
+	var nav_scroll := SmoothScrollContainer.new()
 	nav_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_margin(_nav_panel, 14, 20).add_child(nav_scroll)
 	var nav := VBoxContainer.new()
 	nav.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	nav.add_theme_constant_override("separation", 8)
 	nav_scroll.add_child(nav)
-	_content_scroll = ScrollContainer.new()
+	_content_scroll = SmoothScrollContainer.new()
 	_content_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_content_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_content_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO

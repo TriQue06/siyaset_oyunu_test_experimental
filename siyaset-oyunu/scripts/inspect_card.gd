@@ -216,9 +216,6 @@ static func fill_party(box: VBoxContainer, peer_id: int, on_close: Callable) -> 
 		var alliance: Dictionary = CardManager.alliances[alliance_id]
 		chips.append([String(alliance.get("name", "")), alliance.get("color", UiTheme.BLUE)])
 	chips.append([L.t("%d puan") % GovernmentManager.score_of(peer_id), UiTheme.GOLD_DIM])
-	var hometown := String(PoliticianPresets.of(leader_id).get("hometown", ""))
-	if hometown != "":
-		chips.append([ElectionNightSim.province_name(hometown), UiTheme.TEAL])
 	box.add_child(_chip_row(chips))
 
 	box.add_child(_section(L.t("Sandık"), L.t("ülke geneli")))

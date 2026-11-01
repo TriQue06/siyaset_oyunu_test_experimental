@@ -46,8 +46,8 @@ static func build() -> String:
 	for pid in cm.party_ids():
 		var data: Dictionary = PartyManager.data_of(int(pid))
 		var politician: Dictionary = PoliticianPresets.of(int(pid))
-		out.append("%s · meslek %s · memleket %s · çekirdek %s" % [_party(int(pid)),
-			String(politician.get("background", "-")), GameMap.name_of(String(politician.get("hometown", ""))),
+		out.append("%s · meslek %s · çekirdek %s" % [_party(int(pid)),
+			String(politician.get("background", "-")),
 			", ".join(PackedStringArray(data.get("core", [])))])
 	out.append("")
 	out.append("--- OLAYLAR ---")

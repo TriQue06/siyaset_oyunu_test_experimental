@@ -38,8 +38,7 @@ func _initialize() -> void:
 	mm.start_game()
 	check("harita oyun baslarken kuruldu", mm.game_map_seed != 0 and not gmap.province_ids().is_empty())
 	var map_before: Array = gmap.province_ids().duplicate()
-	var home := String(gmap.province_ids()[0])
-	pm.set_my_politician(PP.make("Ayla", "Gökyelken", "is_insani", home, "f"))
+	pm.set_my_politician(PP.make("Ayla", "Gökyelken", "is_insani", "f"))
 	var core: Array = ["isci", "ilerici"]
 	pm.set_party_and_ready("Yeni Yol", 3, Color.WHITE, Color("F20C1F"), core, true)
 	var me: int = mm.owner_id
@@ -47,33 +46,22 @@ func _initialize() -> void:
 	check("oyun ayni haritada", gmap.province_ids() == map_before)
 	check("siyasetci parti verisinde korundu", PP.background_of(me) == "is_insani",
 		str(pm.politicians.get(me, {})))
-	check("memlekette 2. seviye teskilat", cm.organization_level(home, me) == PP.HOMETOWN_ORG_LEVEL)
-	# Sıra oyunda ilk bendeyse ilk tur geliri memleket teşkilatı kurulmadan
+	# 0.0.319: memleket kalktı; oyuna hiç teşkilatsız başlanır.
+	check("memleket yok: baslangicta teskilat yok", cm.org_count(me) == 0 and not pm.politicians[me].has("hometown"))
+	# Sıra oyunda ilk bendeyse ilk tur geliri teşkilat kurulmadan
 	# verilir (teşkilat geliri yok): iki durum da geçerli.
 	var first_income: float = cm.turn_income(me) - cm.org_income(me) if cm.current_turn_peer_id() == me else 0.0
 	var base: float = GameRules.FUNDS_START + PP.BUSINESS_START_FUNDS
 	pcheck("is insani ek parayla basladi", is_equal_approx(cm.funds_of(me), base + first_income)
 		or is_equal_approx(cm.funds_of(me), base + cm.turn_income(me)),
 		str(cm.funds_of(me)))
-	var neighbor := String(gmap.neighbors().get(home, [""])[0])
-	check("hemsehri destegi memlekette", is_equal_approx(PP.hometown_activity(home, me), PP.HOMETOWN_ACTIVITY))
-	check("komsu il etkilenmez", PP.hometown_activity(neighbor, me) == 0.0)
 	pcheck("is insani her tur ek gelir alir", cm.turn_income(me) >= PP.BUSINESS_TURN_INCOME)
 	check("cekirdek gruplar korundu (botlar az pay alabilir)", float(pm.parties[me]["groups"]["isci"]) <= VoterGroups.CORE_START * 1.3 and float(pm.parties[me]["groups"]["isci"]) > VoterGroups.CORE_START * 0.8, str(pm.parties[me]["groups"]["isci"]))
-	var away := ""
-	for province_id in gmap.province_ids():
-		if cm.organization_level(String(province_id), me) == 0 and String(province_id) != home:
-			away = String(province_id)
-			break
-	check("memlekette baslangic secmeni fazla", cm.attached_share(me, home) > cm.attached_share(me, away),
-		"%.1f / %.1f" % [cm.attached_share(me, home), cm.attached_share(me, away)])
 	var all_bots_ok := true
 	for bot in mm.bot_ids():
-		var bh: String = PP.hometown_of(bot)
-		if bh == "" or cm.organization_level(bh, bot) != PP.HOMETOWN_ORG_LEVEL \
-				or not PP.is_valid_background(PP.background_of(bot)):
+		if cm.org_count(bot) != 0 or not PP.is_valid_background(PP.background_of(bot)):
 			all_bots_ok = false
-	check("botlarin da siyasetcisi, memleketi ve meslegi var", all_bots_ok)
+	check("botlarin da siyasetcisi ve meslegi var, teskilatsiz baslar", all_bots_ok)
 
 	# Geçmiş avantajları.
 	var bot: int = mm.bot_ids()[0]
@@ -83,10 +71,9 @@ func _initialize() -> void:
 	pcheck("emekli subay karisikligi az biriktirir", is_equal_approx(cm.turmoil_of(bot), 0.75))
 	pcheck("emekli subaya karalama az isler", is_equal_approx(PP.party_effect(bot, "propaganda_in"), 0.75))
 	pm.politicians[bot]["background"] = "belediye_baskani"
-	var bh: String = PP.hometown_of(bot)
 	pcheck("belediye baskani teskilat bonusu", is_equal_approx(PP.party_effect(bot, "org"), 1.1))
 	var orgs_before: int = cm.org_count(bot)
-	cm._grant_mayor_orgs(bot, bh)
+	cm._grant_mayor_orgs(bot)
 	var expected: int = maxi(1, int(round(gmap.province_ids().size() * PP.MAYOR_ORG_SHARE)))
 	check("belediye baskani rastgele illerde teskilat alir", cm.org_count(bot) - orgs_before == expected,
 		"%d -> %d (beklenen +%d)" % [orgs_before, cm.org_count(bot), expected])
@@ -104,8 +91,8 @@ func _initialize() -> void:
 	if not PP.PROFESSIONS_ENABLED:
 		check("meslekler kapalı: çarpanlar nötr", is_equal_approx(PP.effect(bot, "miting"), 1.0)
 			and is_equal_approx(PP.party_effect(bot, "steal_in"), 1.0) and is_equal_approx(PP.group_appeal(bot, "genc"), 1.0)
-			and PP.title("hukukcu") == "" and PP.is_valid(PP.make("A", "B", "", home)))
-	check("kisilik alani yok", not PP.make("A", "B", "hukukcu", home).has("trait"))
+			and PP.title("hukukcu") == "" and PP.is_valid(PP.make("A", "B", "")))
+	check("kisilik alani yok", not PP.make("A", "B", "hukukcu").has("trait"))
 
 	# Rastgele isim ve güvenilirlik.
 	var all_ok := true
@@ -141,7 +128,7 @@ func _initialize() -> void:
 	check("Yilmaz soyadi cikabilir", yilmaz)
 	check("Karabulut gecerli", not PP.is_banned_surname("Karabulut"))
 	check("Bayraktar, Soylu, Albayrak yasakli", PP.is_banned_surname("Bayraktar") and PP.is_banned_surname("Soylu") and PP.is_banned_surname("Albayrak"))
-	check("elle yazilan gercek soyad kabul edilir (kara liste yalniz rastgelede)", PP.is_valid(PP.make("Ali", "Erdoğan", "sendikaci", home)))
+	check("elle yazilan gercek soyad kabul edilir (kara liste yalniz rastgelede)", PP.is_valid(PP.make("Ali", "Erdoğan", "sendikaci")))
 	check("rastgele soyad kullanilani vermez", not PP.random_surname(["Gökyelken"]).is_empty())
 	var bot_surnames := {}
 	for b in mm.bot_ids():
@@ -166,7 +153,7 @@ func _initialize() -> void:
 	check("Ingilizce ad ve soyad uretilir, gercek siyasetci soyadi yok", en_ok)
 	check("yabanci siyasetci soyadi kara listede (rastgele uretimde)", PP.is_banned_surname("Trump"))
 	# 0.0.223: elle yazilan ad kara listeye takilmaz.
-	check("elle yazilan kara liste soyadi gecerli", PP.is_valid(PP.make("Ahmet", "Soylu", String(PP.BACKGROUND_ORDER[0]), "b01")))
+	check("elle yazilan kara liste soyadi gecerli", PP.is_valid(PP.make("Ahmet", "Soylu", String(PP.BACKGROUND_ORDER[0]))))
 
 	print("")
 	print("=== %s ===" % ("TUM TESTLER GECTI" if _failed == 0 else "%d TEST BASARISIZ" % _failed))

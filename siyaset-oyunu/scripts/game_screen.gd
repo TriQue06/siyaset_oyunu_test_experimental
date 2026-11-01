@@ -1400,7 +1400,7 @@ func _ensure_board() -> void:
 	add_child(_board_bg)
 	move_child(_board_bg, 1)
 	var box := player_panel_list.get_parent() as VBoxContainer
-	_board_scroll = ScrollContainer.new()
+	_board_scroll = SmoothScrollContainer.new()
 	_board_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_board_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	box.add_child(_board_scroll)
@@ -1408,7 +1408,7 @@ func _ensure_board() -> void:
 	box.remove_child(player_panel_list)
 	player_panel_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_board_scroll.add_child(player_panel_list)
-	_score_scroll = ScrollContainer.new()
+	_score_scroll = SmoothScrollContainer.new()
 	_score_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_score_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_score_scroll.hide()
@@ -3109,6 +3109,10 @@ func _scroll_hover_info(target: ScrollContainer, amount: float, wheel_factor: fl
 	if wheel_factor != 0.0:
 		var step := bar.custom_step if bar.custom_step > 0.0 else maxf(1.0, bar.page / 8.0)
 		amount = step * wheel_factor
+		# 0.0.319: tekerlek inceleme panelini de yumuşak kaydırır.
+		if scroll is SmoothScrollContainer:
+			(scroll as SmoothScrollContainer).smooth_scroll_by(SmoothScrollContainer.WHEEL_STEP * wheel_factor)
+			return
 	bar.value = clampf(bar.value + amount, bar.min_value, maxf(bar.min_value, bar.max_value - bar.page))
 
 func _update_live_province(mouse: Vector2 = Vector2.INF) -> void:
@@ -3927,7 +3931,7 @@ func _show_tooltip_for(peer_id: int) -> void:
 			keep_scroll = _profile_scroll.scroll_vertical
 		_profile_scroll.queue_free()
 	_profile_scroll_peer = peer_id
-	_profile_scroll = ScrollContainer.new()
+	_profile_scroll = SmoothScrollContainer.new()
 	_profile_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_left_dock.add_child(_profile_scroll)
 	_fit_profile_scroll()
@@ -4658,7 +4662,7 @@ func _build_alliance_panel() -> void:
 	_alliance_list = VBoxContainer.new()
 	_alliance_list.add_theme_constant_override("separation", 8)
 	_alliance_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var scroll := ScrollContainer.new()
+	var scroll := SmoothScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.custom_minimum_size = Vector2(ALLIANCE_WIDTH, 300)
 	scroll.add_child(_alliance_list)
@@ -5719,7 +5723,8 @@ func _apply_map_layer_colors() -> void:
 	var mine: Color = PartyManager.data_of(me).get("bg_color", Color(0.5, 0.5, 0.5))
 	mine.a = 1.0
 	var colors := {}
-	map_holder.set_dark_borders(false)
+	# Teşkilat katmanında teşkilatsız iller beyaz: krem sınırlar görünmez (0.0.319).
+	map_holder.set_dark_borders(_map_layer == MapLayer.ORGANIZATION)
 	if _map_layer == MapLayer.SEATS:
 		colors = _seat_layer_colors.duplicate()
 	else:
@@ -5982,7 +5987,7 @@ func _show_party_picker(title: String, targets: Array, selected: Callable) -> vo
 	heading.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	heading.custom_minimum_size.x = row_width
 	box.add_child(heading)
-	var scroll := ScrollContainer.new()
+	var scroll := SmoothScrollContainer.new()
 	var rows_height := targets.size() * PICKER_ROW + maxf(0.0, targets.size() - 1) * 6.0
 	scroll.custom_minimum_size = Vector2(row_width, minf(rows_height, PICKER_ROW * 6.0 + 30.0))
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -6025,8 +6030,11 @@ func _show_party_picker(title: String, targets: Array, selected: Callable) -> vo
 	add_child(_party_picker)
 	_place_party_picker.call_deferred()
 
+## 0.0.319: opak karışım. Yarı saydam boyayınca haritanın altındaki (aşağı
+## kaydırılmış) karton kalınlığı katmanı illerin içinden görünüyor, renk
+## birkaç piksel kaymış gibi duruyordu.
 func _map_tint(color: Color, strength: float) -> Color:
-	return Color(color, clampf(strength, 0.0, 1.0))
+	return MAP_BLANK_COLOR.lerp(Color(color, 1.0), clampf(strength, 0.0, 1.0))
 
 func _set_action_available(button: Button, available: bool) -> void:
 	button.modulate = Color.WHITE

@@ -8,7 +8,8 @@ extends ScrollContainer
 ##   - Fare tekerleği artık ani zıplama yerine hedefe doğru yumuşak (eased)
 ##     kayar.
 ## Herhangi bir ScrollContainer'a bu script'i atamak yeterli, başka kurulum
-## gerekmez.
+## gerekmez. 0.0.319: oyundaki bütün kaydırmalı menüler bunu kullanır; uçta
+## ya da kayacak içerik yokken tekerlek dışarıdaki kaydırmaya kalır.
 
 const FRICTION := 7.0             # yüksek = momentum daha çabuk söner
 const MIN_VELOCITY := 6.0         # bu hızın altında momentum durdurulur
@@ -69,14 +70,11 @@ func _on_gui_input(event: InputEvent) -> void:
 		else:
 			_dragging = false
 		accept_event()
-	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
-		_wheel_active = true
-		_wheel_target.y = clampf(_wheel_target.y - WHEEL_STEP, 0.0, _get_max_scroll().y)
-		accept_event()
-	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-		_wheel_active = true
-		_wheel_target.y = clampf(_wheel_target.y + WHEEL_STEP, 0.0, _get_max_scroll().y)
-		accept_event()
+	elif event is InputEventMouseButton and event.pressed 			and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+		var factor: float = event.factor if event.factor > 0.0 else 1.0
+		var dir := -1.0 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0
+		if smooth_scroll_by(dir * WHEEL_STEP * factor):
+			accept_event()
 	elif event is InputEventMouseMotion and _dragging:
 		var motion := event as InputEventMouseMotion
 		var delta: Vector2 = motion.global_position - _last_drag_pos
@@ -91,6 +89,19 @@ func _on_gui_input(event: InputEvent) -> void:
 		var target_velocity: Vector2 = -delta / dt
 		_velocity = _velocity.lerp(target_velocity, minf(1.0, VELOCITY_SMOOTHING * dt))
 		accept_event()
+
+## Dikey yumuşak kaydırma (tekerlek ya da dışarıdan, ör. fareyle inceleme).
+## Bu yönde kayacak yer yoksa false döner (olay dışarıya kalsın).
+func smooth_scroll_by(amount: float) -> bool:
+	var max_y := _get_max_scroll().y
+	if not _wheel_active:
+		_wheel_target = Vector2(scroll_horizontal, scroll_vertical)
+	if max_y <= 0.0 or (amount < 0.0 and _wheel_target.y <= 0.0) or (amount > 0.0 and _wheel_target.y >= max_y):
+		return false
+	_velocity = Vector2.ZERO
+	_wheel_active = true
+	_wheel_target.y = clampf(_wheel_target.y + amount, 0.0, max_y)
+	return true
 
 func _process(delta: float) -> void:
 	var max_scroll := _get_max_scroll()

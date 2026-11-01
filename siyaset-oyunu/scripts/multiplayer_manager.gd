@@ -791,8 +791,7 @@ func _close_room(reason: String) -> void:
 ## Sadece host çağırır: parti verilerini sıfırlayıp herkesi oyuna başlatır.
 func _broadcast_game_start() -> void:
 	stage = Stage.PARTY_SETUP
-	# HARİTA ŞİMDİ KURULUR: siyasetçi profilinde memleket haritadan seçildiği
-	# için ülke parti kurulumundan önce belli olmalı. Lobide tohum girildiyse o,
+	# HARİTA ŞİMDİ KURULUR: ülke parti kurulumundan önce belli olur. Lobide tohum girildiyse o,
 	# yoksa rastgele; herkes aynı tohumla aynı haritayı üretir.
 	game_map_seed = int(map_seed) if map_seed != "" else randi_range(1, 999999999)
 	GameMap.generate_new(game_map_seed)

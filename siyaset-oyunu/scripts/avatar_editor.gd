@@ -201,7 +201,7 @@ func _build_panel(parent: Control) -> void:
 	_genders.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	head.add_child(_genders)
 	col.add_child(_sec(L.t("Şekil")))
-	_scroll = ScrollContainer.new()
+	_scroll = SmoothScrollContainer.new()
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	col.add_child(_scroll)

@@ -2191,7 +2191,7 @@ func projection_all(viewer: int = -1) -> Dictionary:
 	return result
 
 ## Ülke genelinde yarışan partilerin seçimdeki grup yakınlıkları.
-## BAĞIMSIZLAR dahil değil: sadece memleketlerinde aday olurlar
+## BAĞIMSIZLAR dahil değil: sadece en güçlü oldukları ilde aday olurlar
 ## (bkz. _add_independent_seats).
 func _group_profiles() -> Dictionary:
 	var result := {}
@@ -2383,47 +2383,30 @@ func init_game() -> void:
 		MultiplayerManager._sync_seat_method.rpc(MultiplayerManager.seat_method)
 	_push_state({"type": "full"}, true)
 
-## SİYASETÇİ PROFİLİ (bkz. PoliticianPresets): memlekette bedava teşkilat,
-## iş insanı ek para, belediye başkanı rastgele illerde teşkilat alır.
-## Memleketi bu haritada olmayan (ör. test tohumu farklı) siyasetçiye rastgele
-## bir il verilir.
+## SİYASETÇİ PROFİLİ (bkz. PoliticianPresets): iş insanı ek para, belediye
+## başkanı rastgele illerde teşkilat alır. (Memleket 0.0.319'da kalktı.)
 func _apply_politician_starts() -> void:
 	for peer_id in MultiplayerManager.players.keys():
-		var data: Dictionary = PoliticianPresets.of(peer_id)
-		if data.is_empty():
+		if PoliticianPresets.of(peer_id).is_empty():
 			continue
-		var home := String(data.get("hometown", ""))
-		if not _province_ids.has(home) and not _province_ids.is_empty():
-			home = String(_province_ids[_rng.randi() % _province_ids.size()])
-			var fixed := data.duplicate()
-			fixed["hometown"] = home
-			PartyManager.set_politician_host(peer_id, fixed)
 		if PoliticianPresets.has_background(peer_id, "is_insani"):
 			funds[peer_id] = funds_of(peer_id) + PoliticianPresets.BUSINESS_START_FUNDS
 		if PoliticianPresets.has_background(peer_id, "belediye_baskani"):
-			_grant_mayor_orgs(peer_id, home)
-		if home == "":
-			continue
-		organizations[home] = organizations.get(home, {})
-		organizations[home][peer_id] = PoliticianPresets.HOMETOWN_ORG_LEVEL
+			_grant_mayor_orgs(peer_id)
 
-## Oyun başı: memleket ve başlangıç teşkilatları (memleket, belediye başkanı)
-## o illerde seçmen olarak yazılır (teşkilat kurmakla aynı kural, bkz. _apply_organization).
+## Oyun başı: başlangıç teşkilatları (belediye başkanı) o illerde seçmen
+## olarak yazılır (teşkilat kurmakla aynı kural, bkz. _apply_organization).
 func _grant_start_voters() -> void:
 	for province_id in organizations.keys():
 		for pid in organizations[province_id].keys():
 			_add_local(String(province_id), int(pid), PublicOpinion.org_activity(int(organizations[province_id][pid])) 				* PoliticianPresets.party_effect(int(pid), "org"))
-	for pid in party_ids():
-		var home := PoliticianPresets.hometown_of(int(pid))
-		if home != "" and _province_ids.has(home):
-			_add_local(home, int(pid), PoliticianPresets.HOMETOWN_ACTIVITY)
 
 ## Belediye başkanı: il sayısının MAYOR_ORG_SHARE'i kadar (en az 1) rastgele
-## ilde 1. seviye teşkilat (memleket ve teşkilatlı iller hariç).
-func _grant_mayor_orgs(peer_id: int, home: String) -> void:
+## ilde 1. seviye teşkilat (teşkilatlı iller hariç).
+func _grant_mayor_orgs(peer_id: int) -> void:
 	var pool: Array = []
 	for province_id in _province_ids:
-		if String(province_id) != home and organization_level(String(province_id), peer_id) <= 0:
+		if organization_level(String(province_id), peer_id) <= 0:
 			pool.append(String(province_id))
 	var count := mini(pool.size(), maxi(1, int(round(_province_ids.size() * PoliticianPresets.MAYOR_ORG_SHARE))))
 	for i in count:
@@ -3461,21 +3444,20 @@ func _vb_ensure() -> void:
 
 ## Partinin tabanını eski hitap değerinden kurar: her ilde grubun hitap kadarı
 ## (kararsızlar yetmezse yettiği kadar). ÇEKİRDEK gruplarının seçmeni 3.
-## seviyeden (0.0.316), diğerleri 1. seviyeden başlar; memleketinde bir
-## seviye daha yüksek. (Hepsi 1. seviye olsaydı tek kaset tabanı silerdi.)
+## seviyeden (0.0.316), diğerleri 1. seviyeden başlar. (Hepsi 1. seviye
+## olsaydı tek kaset tabanı silerdi.)
 func _vb_init_party(pid: int) -> void:
 	var arr := PackedFloat32Array()
 	arr.resize(_province_ids.size() * VB_GROUPS * VB_LEVELS)
 	voter_base[pid] = arr
 	var groups := PartyManager.groups_of(pid)
 	var core: Array = PartyManager.data_of(pid).get("core", [])
-	var home := PoliticianPresets.hometown_of(pid)
 	for pi in _province_ids.size():
 		for gi in VB_GROUPS:
 			var group := String(VoterGroups.GROUP_IDS[gi])
 			var want := _vb_count(pi, gi) * clampf(float(groups.get(group, 0.0)) / 100.0, 0.0, 1.0)
 			var take := minf(want, _vb_undecided(pi, gi))
-			var level := (2 if core.has(group) else 0) + (1 if String(_province_ids[pi]) == home else 0)
+			var level := 2 if core.has(group) else 0
 			arr[_vb_i(pi, gi, mini(level, VB_LEVELS - 1))] += take
 			voter_base[pid] = arr
 	_vb_sync_groups(pid)
@@ -3928,9 +3910,8 @@ func _split_party(parent: int) -> void:
 	var bot_name := PoliticianPresets.random_name(PoliticianPresets.used_surnames())
 	var splinter := MultiplayerManager.add_splinter_bot("%s %s" % [bot_name["first_name"], bot_name["surname"]])
 	PartyManager.add_splinter_party(splinter, parent, _splinter_name(parent_name))
-	var home := String(_province_ids[_rng.randi() % _province_ids.size()]) if not _province_ids.is_empty() else ""
 	PartyManager.set_politician_host(splinter, PoliticianPresets.make(bot_name["first_name"], bot_name["surname"],
-		PoliticianPresets.random_background(), home, bot_name["gender"], "", AvatarCatalog.random(bot_name["gender"], _rng.randi())))
+		PoliticianPresets.random_background(), bot_name["gender"], "", AvatarCatalog.random(bot_name["gender"], _rng.randi())))
 	turn_order.append(splinter)
 	# Ayrılan parti sırada (ve soldaki listede) ana partinin hemen altında.
 	var anchor := parent
@@ -4591,10 +4572,11 @@ func alliance_membership() -> Dictionary:
 			membership[int(pid)] = int(alliance_id)
 	return membership
 
-## BAĞIMSIZ ADAY: sadece memleketinde yarışır, en fazla 1 sandalye kazanır.
-## O ildeki payı (diğer partilerle birlikte hesaplanır) ilin bir vekillik
-## kotasının INDEPENDENT_QUOTA_FACTOR'ünü geçerse, ilin en çok vekil çıkaran
-## partisinden bir sandalye alır. Az bir miting bile yetebilir (hemşehri desteği).
+## BAĞIMSIZ ADAY: sadece TEK ilde, en yüksek payı aldığı ilde yarışır (0.0.319:
+## memleket kalktı), en fazla 1 sandalye kazanır. O ildeki payı (diğer
+## partilerle birlikte hesaplanır) ilin bir vekillik kotasının
+## INDEPENDENT_QUOTA_FACTOR'ünü geçerse, ilin en çok vekil çıkaran partisinden
+## bir sandalye alır.
 const INDEPENDENT_QUOTA_FACTOR := 0.6
 
 func _add_independent_seats(result: Dictionary, groups: Dictionary) -> void:
@@ -4607,13 +4589,19 @@ func _add_independent_seats(result: Dictionary, groups: Dictionary) -> void:
 	for pid in party_ids():
 		if not PartyManager.is_independent(pid):
 			continue
-		var home := PoliticianPresets.hometown_of(pid)
-		if not province_results.has(home):
-			continue
 		var field := groups.duplicate()
 		field[pid] = effective_groups(pid)
-		var shares := ElectionModel.expected_shares(field, province_profile(home))
-		var share := float(shares.get(pid, 0.0))
+		var home := ""
+		var share := -1.0
+		for province_id in _province_ids:
+			if not province_results.has(province_id):
+				continue
+			var here := float(ElectionModel.expected_shares(field, province_profile(province_id)).get(pid, 0.0))
+			if here > share:
+				share = here
+				home = String(province_id)
+		if home == "":
+			continue
 		var seats_here := province_seat_count(home)
 		var entry: Dictionary = province_results[home]
 		var won := 0
@@ -5083,11 +5071,6 @@ func _maybe_add_temporary_party() -> void:
 	PartyManager.add_bot_party(bot)
 	PartyManager.parties[bot]["temporary"] = true
 	PartyManager.parties[bot]["temp_elections"] = 0
-	var home := PoliticianPresets.hometown_of(bot)
-	if not _province_ids.has(home) and not _province_ids.is_empty():
-		var fixed := PoliticianPresets.of(bot).duplicate()
-		fixed["hometown"] = String(_province_ids[_rng.randi() % _province_ids.size()])
-		PartyManager.set_politician_host(bot, fixed)
 	PartyManager.broadcast()
 	turn_order.append(bot)
 	inventories[bot] = []
@@ -5472,7 +5455,7 @@ func _run_congress(pid: int, kind: String, requester: int = -1) -> void:
 	else:
 		var person: Dictionary = winner["_person"]
 		var new_politician := PoliticianPresets.make(person["first_name"], person["surname"], String(winner["_background"]),
-			String(_province_ids[_rng.randi() % _province_ids.size()]) if not _province_ids.is_empty() else "", person["gender"],
+			person["gender"],
 			"", AvatarCatalog.random(person["gender"], _rng.randi()))
 		if MultiplayerManager.is_bot(old_leader):
 			# Bot başkan değişti: aynı bot yeni bir siyasetçi olur.

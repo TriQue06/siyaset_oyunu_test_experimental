@@ -5,6 +5,7 @@
 [ext_resource type="PackedScene" uid="uid://c8m1q2r3s4t5u" path="res://scenes/Map.tscn" id="3"]
 [ext_resource type="Script" path="res://scripts/parliament_diagram.gd" id="4"]
 [ext_resource type="Script" path="res://scripts/vote_share_panel.gd" id="5"]
+[ext_resource type="Script" uid="uid://b0s8i0bj1nqrh" path="res://scripts/smooth_scroll_container.gd" id="ss1"]
 
 [node name="GameScreen" type="Control" unique_id=958546920]
 layout_mode = 3
@@ -204,6 +205,7 @@ theme_override_constants/margin_bottom = 14
 
 [node name="LeftScroll" type="ScrollContainer" parent="LeftPanel/LeftMargin" unique_id=3821004499]
 layout_mode = 2
+script = ExtResource("ss1")
 horizontal_scroll_mode = 0
 vertical_scroll_mode = 3
 

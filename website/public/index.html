@@ -3,259 +3,225 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>PROJE: SİYASET OYUNU</title>
-<meta name="description" content="Türkiye haritasında ya da rastgele bir ülkede parti kur, seçmen gruplarını kazan, afetlerde yardıma koş, seçim gecesini izle, hükümeti kur. Android ve Windows için ücretsiz indir.">
-<meta property="og:title" content="PROJE: SİYASET OYUNU">
-<meta property="og:description" content="81 il, 600 vekil, 8 seçmen grubu. Parti kur, seçim kazan, hükümeti kur. Android ve Windows için indir.">
+<title>Siyaset Oyunu</title>
+<meta name="description" content="Masaya otur: partini kur, seçmen gruplarını kazan, afetlerde yardıma koş, seçim gecesini izle, hükümeti kur. Botlarla tek başına ya da 8 kişiye kadar çevrim içi. Windows için ücretsiz indir.">
+<meta property="og:title" content="Siyaset Oyunu">
+<meta property="og:description" content="Parti kur, seçim kazan, hükümeti kur. Botlarla ya da 8 kişiye kadar çevrim içi. Windows için ücretsiz.">
 <meta property="og:image" content="/img/oyun.webp">
-<meta name="theme-color" content="#181430">
+<meta name="theme-color" content="#a8693a">
 <link rel="icon" href="/img/icon.svg" type="image/svg+xml">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="preload" href="/fonts/SiyasetDisplay-Regular.ttf" as="font" type="font/ttf" crossorigin>
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+<div class="table" aria-hidden="true"></div>
 
 <header class="band" id="top">
-  <a class="live" href="#top" aria-label="Başa dön"><span class="dot"></span>CANLI</a>
-  <span class="band-title"><span class="proj">PROJE:</span> SİYASET OYUNU</span>
-  <span class="band-sub" id="band-version">Android · Windows</span>
-  <nav class="band-nav" aria-label="Bölümler">
+  <a class="brand" href="#top" aria-label="Başa dön">
+    <svg class="puck" viewBox="0 0 48 48" aria-hidden="true">
+      <circle cx="24" cy="27" r="20" fill="#8f1f1f"/>
+      <circle cx="24" cy="23" r="20" fill="#d93636"/>
+      <circle cx="24" cy="23" r="20" fill="url(#pg)"/>
+      <path d="M24 11l3.3 7.6 8.2.7-6.2 5.4 1.9 8-7.2-4.3-7.2 4.3 1.9-8-6.2-5.4 8.2-.7z" fill="#fff"/>
+      <defs><radialGradient id="pg" cx=".35" cy=".3" r=".7"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>
+    </svg>
+    <b>Siyaset Oyunu</b>
+  </a>
+  <nav aria-label="Bölümler">
     <a href="#oyun">Oyun</a>
-    <a href="#turkiye">Türkiye</a>
+    <a href="#secim">Seçim</a>
+    <a href="#meclis">Meclis</a>
     <a href="#afetler">Afetler</a>
-    <a href="#kartlar">Kartlar</a>
     <a href="#indir">İndir</a>
   </nav>
+  <span class="ver" id="band-version">Windows</span>
 </header>
 
 <main>
   <section class="hero">
-    <canvas class="hero-map" id="hero-map" aria-hidden="true"></canvas>
-    <div class="hero-inner">
-      <p class="eyebrow">&gt; ÖZEL YAYIN · 2000'DEN BUGÜNE</p>
-      <h1 class="title"><span class="proj-stamp">PROJE:</span><span>SİYASET</span><span class="gold">OYUNU</span></h1>
-      <p class="lead">Arkadaşlarınla ya da botlarla birer siyasetçi ol, partini kur, 81 ilde seçmen gruplarının gönlünü kazan. Afet vurduğunda yardıma koş, seçim gecesinde sandıklar açılırken nefesini tut, mecliste koalisyon pazarlığına otur.</p>
-
-      <div class="downloads" id="indir">
-        <a class="dl dl-android" id="dl-apk" href="https://raw.githubusercontent.com/TriQue06/siyaset_oyunu_test_experimental/main/builds/SiyasetOyunu.apk">
-          <svg class="dl-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm0 3v13h10V5H7Zm4 14.5h2v1h-2v-1Z"/></svg>
-          <span class="dl-text">
-            <span class="dl-main">ANDROID İÇİN İNDİR</span>
-            <span class="dl-meta" id="meta-apk">APK</span>
-          </span>
+    <div class="wrap">
+      <div>
+        <h1>Masaya otur.<br><span class="gold">Ülkeyi kazan.</span></h1>
+        <p class="lead">Bir siyasetçi ol, partini kur ve her oyunda yeniden çizilen bir ülkede seçmenin gönlünü kazan. Miting yap, teşkilat kur, kartını oyna; seçim gecesi sandıklar açılırken nefesini tut, sonra mecliste koalisyon pazarlığına otur.</p>
+        <div class="chips">
+          <span class="chip">Botlarla tek başına</span>
+          <span class="chip">8 kişiye kadar çevrim içi</span>
+          <span class="chip">Türkçe · English</span>
+        </div>
+        <a class="dl gold dl-exe" id="indir" href="https://raw.githubusercontent.com/TriQue06/siyaset_oyunu_test_experimental/main/builds/SiyasetOyunu-Windows.zip">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5 10 4.5v7H3zm8-1.1L21 3v8.5H11zM3 12.5h7v7l-7-1zm8 0h10V21l-10-1.4z"/></svg>
+          <span class="t"><span class="main">Windows için indir</span><span class="meta" data-meta="exe">Ücretsiz · zip</span></span>
         </a>
-        <a class="dl dl-windows" id="dl-exe" href="https://raw.githubusercontent.com/TriQue06/siyaset_oyunu_test_experimental/main/builds/SiyasetOyunu-Windows.zip">
-          <svg class="dl-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-7v2h3v2H7v-2h3v-2H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm1 2v9h16V6H4Z"/></svg>
-          <span class="dl-text">
-            <span class="dl-main">WINDOWS İÇİN İNDİR</span>
-            <span class="dl-meta" id="meta-exe">EXE · zip</span>
-          </span>
-        </a>
+        <p class="dl-note">Zip'i bir klasöre çıkar, SiyasetOyunu.exe'yi çalıştır.</p>
       </div>
-      <p class="dl-note" id="dl-note">Ücretsiz · Türkçe ve İngilizce · Botlarla tek başına ya da 8 kişiye kadar çevrim içi</p>
-    </div>
-    <canvas class="hero-parl" id="hero-parl" aria-hidden="true"></canvas>
-  </section>
-
-  <div class="ticker" aria-hidden="true">
-    <span class="ticker-tag">SON DAKİKA</span>
-    <div class="ticker-track">
-      <span>Deprem: 3 ilde yıkım, partiler yardım için yarışıyor · Meclis erken seçim önergesini kabul etti · Kaset skandalı siyaseti sarstı · Anayasa değişti: baraj düştü · Emekliler mitinge akın etti · Gensoru reddedildi: hükümet ayakta · Hazineye vergi geliri girdi · </span>
-      <span>Deprem: 3 ilde yıkım, partiler yardım için yarışıyor · Meclis erken seçim önergesini kabul etti · Kaset skandalı siyaseti sarstı · Anayasa değişti: baraj düştü · Emekliler mitinge akın etti · Gensoru reddedildi: hükümet ayakta · Hazineye vergi geliri girdi · </span>
-    </div>
-  </div>
-
-  <section class="stats" aria-label="Oyun bir bakışta">
-    <div class="stat" data-reveal="pop"><span class="stat-n" data-count="81">81</span><span class="stat-l">il, gerçek Türkiye haritası</span></div>
-    <div class="stat" data-reveal="pop"><span class="stat-n" data-count="600">600</span><span class="stat-l">gerçek dağılımlı vekil</span></div>
-    <div class="stat" data-reveal="pop"><span class="stat-n" data-count="8">8</span><span class="stat-l">seçmen grubu</span></div>
-    <div class="stat" data-reveal="pop"><span class="stat-n" data-count="5">5</span><span class="stat-l">afet türü</span></div>
-  </section>
-
-  <div id="oyun" class="features">
-
-    <article class="feature" data-reveal="left">
-      <figure class="shot"><img src="/img/oyun.webp" alt="Oyun ekranı: solda partiler, ortada altıgen Türkiye haritası ve vekil noktaları, sağda meclis, ekonomi ve hükümet, altta kartlar ve hamleler" loading="lazy" width="1600" height="900"></figure>
-      <div class="copy">
-        <p class="kicker">&gt; HABER STÜDYOSU</p>
-        <h2>Ülke senin haritan</h2>
-        <p>Sıra sana gelince saha, meclis, parti ve siyaset sekmelerinden hamleni seç: miting yap, teşkilat kur, yatırım götür, yasa sun ya da elindeki kartı oyna. Her hamle haritada ve canlı olay akışında karşılık bulur.</p>
-        <ul class="ticks"><li>Miting, teşkilat, yatırım, afet yardımı, yasa, gensoru, erken seçim</li><li>Vekiller, teşkilat, güç ve seçmen katmanları</li><li>Ekonomi, hazine ve hükümet bir bakışta</li></ul>
-      </div>
-    </article>
-
-    <article class="feature flip" id="turkiye" data-reveal="right">
-      <figure class="shot"><img src="/img/turkiye.webp" alt="Altıgen Türkiye haritası: fare İstanbul'un üstündeyken yalnız İstanbul'un 96 vekil noktası görünüyor" loading="lazy" width="1600" height="900"></figure>
-      <div class="copy">
-        <p class="kicker">&gt; YENİ · TÜRKİYE HARİTASI</p>
-        <h2>81 il, 600 vekil</h2>
-        <p>Lobide haritayı seç: her oyunda yeniden üretilen rastgele bir ülke ya da gerçek il sınırlarından altıgenlere dökülmüş Türkiye. Türkiye haritasında her ilin vekil sayısı güncel dağılımla sabittir; istersen üstüne ulusal liste ekleyebilirsin.</p>
-        <ul class="ticks"><li>İstanbul, Ankara, İzmir gibi kalabalık illerin vekilleri üstüne gelince açılır</li><li>Rastgele haritada il sayısı, vekil sayısı ve harita tohumu senin elinde</li></ul>
-      </div>
-    </article>
-
-    <article class="feature" data-reveal="left">
-      <figure class="shot"><img src="/img/secmen.webp" alt="Seçmen katmanı: İşçiler ve Sendikalar grubunun illere göre yoğunluğu" loading="lazy" width="1600" height="900"></figure>
-      <div class="copy">
-        <p class="kicker">&gt; SEÇMEN GRUPLARI</p>
-        <h2>Kime hitap ediyorsun?</h2>
-        <p>Seçmen dört ayrımda sekiz gruba bölünür: işçi ve işveren, genç ve emekli, dindar ve ilerici, özerkçi ve milliyetçi. Her ilin dağılımı farklıdır. Bir grubun gözüne girdiğinde oyları başka partilerden ve kararsızlardan sana kayar.</p>
-        <ul class="ticks"><li>Seçmen haritası grubun hangi illerde güçlü olduğunu gösterir</li><li>Parti panelinde her gruptaki oy payın ve hitabın</li></ul>
-      </div>
-    </article>
-
-    <article class="feature flip" data-reveal="right">
-      <figure class="shot"><img src="/img/miting.webp" alt="Miting odağı paneli: teşkilat seviyesine göre seçilen seçmen grupları" loading="lazy" width="1600" height="900"></figure>
-      <div class="copy">
-        <p class="kicker">&gt; MEYDANLAR</p>
-        <h2>Mitingi istediğin kadar yap</h2>
-        <p>Miting için teşkilat şart değil, ama teşkilat mitingi büyütür. Teşkilat seviyen kadar seçmen grubunu odak seçersin; meydan o grupların sesini daha çok duyar. Etki ilin nüfusuyla ölçeklenir.</p>
-      </div>
-    </article>
-
-    <article class="feature" data-reveal="left">
-      <figure class="shot"><img src="/img/secim.webp" alt="Seçim gecesi: sayım sürerken boyanan harita, oy oranları ve dolan meclis" loading="lazy" width="1600" height="900"></figure>
-      <div class="copy">
-        <p class="kicker red">&gt; SEÇİM GECESİ · ÖZEL YAYIN</p>
-        <h2>Sandıklar açılıyor</h2>
-        <p>Seçim gecesi canlı yayın gibi akar: iller sayıldıkça haritaya renk gelir, oy oranları yarışır, meclis koltuk koltuk dolar. Baraj çizgisinin altında kalmamak için son sandığa kadar beklersin.</p>
-      </div>
-    </article>
-
-    <article class="feature flip" data-reveal="right">
-      <figure class="shot"><img src="/img/oylama.webp" alt="Meclis oylaması: harita ile meclis diyagramı yer değiştirmiş, vekiller oy veriyor" loading="lazy" width="1600" height="900"></figure>
-      <div class="copy">
-        <p class="kicker">&gt; GENEL KURUL</p>
-        <h2>Oylamada kamera meclise döner</h2>
-        <p>Yasa, gensoru, erken seçim ya da anayasa oylaması açıldığında meclis diyagramı ekranın ortasına gelir. EVET, ÇEKİMSER, HAYIR: her parti oyunu verir, sonuç sandalye sandalye belli olur.</p>
-      </div>
-    </article>
-
-    <article class="feature" data-reveal="left">
-      <figure class="shot"><img src="/img/yasa.webp" alt="Yasa teklifi paneli: grup yasası, vergi ve anayasa sekmeleri" loading="lazy" width="1600" height="900"></figure>
-      <div class="copy">
-        <p class="kicker">&gt; YASAMA</p>
-        <h2>Grup yasası, vergi, anayasa</h2>
-        <p>Bir seçmen grubuna yasa çıkar, vergi kademesini değiştir ya da anayasayı yeniden yaz. Anayasa değişikliği üçte iki çoğunluk ister ama oyunun kurallarını oynarken değiştirir: seçim barajı, seçim aralığı, sayım yöntemi, ittifaklar.</p>
-        <ul class="ticks"><li>D'Hondt, Hare kotası ya da kazanan hepsini alır</li><li>Kabul edilmese de sunulan yasa gruba mesaj verir</li></ul>
-      </div>
-    </article>
-
-    <article class="feature flip" data-reveal="right">
-      <figure class="shot"><img src="/img/hukumet.webp" alt="Hükümet kurma ekranı: ortaklar ve makam dağılımı" loading="lazy" width="1600" height="900"></figure>
-      <div class="copy">
-        <p class="kicker">&gt; KOALİSYON MASASI</p>
-        <h2>Hükümeti sen kur</h2>
-        <p>En çok vekili çıkaran görev alır ama çoğunluk her zaman tek başına gelmez. Ortak seç, Başbakanlıktan bakanlıklara makamları dağıt, sonra meclisten güvenoyu iste. Makamlar devlet hazinesinden pay ve oyun sonu puanı demektir.</p>
-      </div>
-    </article>
-
-    <article class="feature" data-reveal="left">
-      <figure class="shot"><img src="/img/ekonomi.webp" alt="Vergi politikası paneli: kademelerin hazineye ve seçmene etkisi" loading="lazy" width="1600" height="900"></figure>
-      <div class="copy">
-        <p class="kicker">&gt; HAZİNE VE KASA</p>
-        <h2>Para el değiştirir</h2>
-        <p>Ekonomi, enflasyon ve işsizlik her tur değişir. Vergiyi artırırsan hazine dolar ama seçmen kızar. İktidardaysan illere yatırım götürürsün; yatırım hem ili hem oradaki seçmen gruplarını kazandırır; devletin parasını partin için harcamak ise soruşturma kapısını açar.</p>
-      </div>
-    </article>
-  </div>
-
-  <section class="disasters" id="afetler" aria-labelledby="afet-baslik">
-    <p class="kicker red center">&gt; YENİ · AFET MASASI</p>
-    <h2 id="afet-baslik" class="center">Ülke sarsıldığında kim yanında?</h2>
-    <p class="center narrow">Doğa da siyasete karışır. Sel, heyelan ve çığ tek bir ili, orman yangını ve deprem birkaç komşu ili birden vurur; haber gazete manşetiyle gelir. Yardım tutarını sen belirlersin: muhalefet parti kasasından, hükümet devlet hazinesinden de öder. Yardım bölgede hemen karşılık bulur.</p>
-    <div class="afet-row" data-reveal="fan">
-      <figure><img src="/img/afet/deprem.webp" alt="Deprem" loading="lazy" width="384" height="522"><figcaption>DEPREM</figcaption></figure>
-      <figure><img src="/img/afet/sel.webp" alt="Sel" loading="lazy" width="384" height="522"><figcaption>SEL</figcaption></figure>
-      <figure><img src="/img/afet/yangin.webp" alt="Orman yangını" loading="lazy" width="384" height="522"><figcaption>YANGIN</figcaption></figure>
-      <figure><img src="/img/afet/heyelan.webp" alt="Heyelan" loading="lazy" width="384" height="522"><figcaption>HEYELAN</figcaption></figure>
-      <figure><img src="/img/afet/cig.webp" alt="Çığ" loading="lazy" width="384" height="522"><figcaption>ÇIĞ</figcaption></figure>
-    </div>
-    <div class="duo">
-      <figure class="shot" data-reveal="left"><img src="/img/afet.webp" alt="Afet gazetesi: Deprem, 3 ilde yıkım manşeti" loading="lazy" width="1600" height="900"></figure>
-      <figure class="shot" data-reveal="right"><img src="/img/afet_yardim.webp" alt="Afet yardımı paneli: yardımın parti kasası ve devlet hazinesinden karşılanması" loading="lazy" width="1600" height="900"></figure>
+      <figure class="panel hero-shot" data-reveal>
+        <span class="pin l"></span><span class="pin r"></span>
+        <img src="/img/oyun.webp" alt="Oyun ekranı: solda partiler, ortada deniz içinde ülke haritası ve vekil pulları, sağda meclis, bütçe ve hükümet, altta el kartları ve hamleler" width="1920" height="1080">
+      </figure>
     </div>
   </section>
 
-  <div class="features">
-    <article class="feature flip" data-reveal="toss">
-      <figure class="shot"><img src="/img/gazete.webp" alt="Olay gazetesi: Siyaseti sarsan kaset manşeti oyun ekranının ortasına düşmüş" loading="lazy" width="1600" height="900"></figure>
-      <div class="copy">
-        <p class="kicker red">&gt; SON DAKİKA</p>
-        <h2>Manşetlere taşınan anlar</h2>
-        <p>Kaset skandalı, partide çatlak, gensoruyla düşen hükümet... Büyük olaylar ekrana fırlatılan bir gazete manşetiyle gelir. Rakibini karalarken kendi adının manşete çıkmamasına dikkat et.</p>
+  <section class="wrap stats" aria-label="Oyun bir bakışta">
+    <div class="box stat" data-reveal><span class="n" data-count="8">8</span><span class="l">oyuncuya kadar masa</span></div>
+    <div class="box stat" data-reveal><span class="n" data-count="8">8</span><span class="l">seçmen grubu</span></div>
+    <div class="box stat" data-reveal><span class="n" data-count="3">3</span><span class="l">sayım yöntemi</span></div>
+    <div class="box stat" data-reveal><span class="n" data-count="5">5</span><span class="l">afet türü</span></div>
+  </section>
+
+  <section class="section wrap" id="oyun">
+    <div class="section-head">
+      <p class="kicker">Oyun</p>
+      <h2>Her tur bir hamle</h2>
+      <p>Sıra sana gelince kartını çek, haritada bir ile dokun ve hamleni seç. Her hamle haritada, partilerin çubuklarında ve olay akışında karşılık bulur.</p>
+    </div>
+
+    <article class="feature" data-reveal>
+      <figure class="panel shot"><img src="/img/oyun.webp" alt="Oyun masası: partiler, harita, meclis, bütçe ve hamle düğmeleri" loading="lazy" width="1920" height="1080"></figure>
+      <div class="paper copy">
+        <p class="kicker">Oyun masası</p>
+        <h3>Ülke senin haritan</h3>
+        <p>Her oyunda yeni bir ülke üretilir: kıyıları, gölleri, illeri ve her ilin kendine has seçmeni. Haritanın katmanları arasında geç: vekiller, teşkilatların, gücün ve seçmen gruplarının yoğunluğu.</p>
+        <ul class="ticks"><li>Teşkilat, miting ve yatırım: haritada bir ile dokun</li><li>KART ÇEK ve MECLİS hamle alanında yan yana</li><li>Bütçe, vergi ve hükümet hep gözünün önünde</li></ul>
       </div>
     </article>
 
-    <article class="feature" data-reveal="left">
-      <figure class="shot"><img src="/img/siyasetci.webp" alt="Siyasetçi profili: kökeni seç, Türkiye haritasında memleketini işaretle" loading="lazy" width="1600" height="900"></figure>
-      <div class="copy">
-        <p class="kicker">&gt; SİYASETÇİNİ YARAT</p>
-        <h2>Nereden geliyorsun?</h2>
-        <p>Önce siyasetçini yarat: adını, kökenini ve memleketini seç. Sendikacı mı, iş insanı mı, akademisyen mi, belediye başkanı mı? Geçmişin sana belli gruplarda ve memleketinde avantaj sağlar.</p>
+    <article class="feature flip" data-reveal>
+      <figure class="panel shot"><img src="/img/teskilat.webp" alt="Teşkilat katmanı: teşkilat kurulan iller parti renginde, seviye arttıkça koyulaşıyor" loading="lazy" width="1920" height="1080"></figure>
+      <div class="paper copy">
+        <p class="kicker">Saha</p>
+        <h3>Teşkilat kur, meydanları doldur</h3>
+        <p>Teşkilat ilde kalıcı oy, anket ve yerel bağış getirir; seviyesi arttıkça mitingde daha çok seçmen grubuna seslenirsin. Nereye kuracağını iyi seç: her yeni teşkilat biraz daha pahalıdır.</p>
+        <ul class="ticks"><li>Teşkilat katmanında hangi ilde ne kadar güçlü olduğun bir bakışta</li><li>Güç katmanı: şimdi seçim olsa her ilde durumun</li></ul>
       </div>
     </article>
 
-    <article class="feature flip" data-reveal="right">
-      <figure class="shot"><img src="/img/parti.webp" alt="Parti kurma ekranı: parti adı, ikon, renk ve çekirdek seçmen grupları" loading="lazy" width="1600" height="900"></figure>
-      <div class="copy">
-        <p class="kicker">&gt; PARTİNİ KUR</p>
-        <h2>Her oyun yeni bir parti</h2>
-        <p>Adını koy, ikonunu ve rengini seç, iki çekirdek seçmen grubunu belirle. Çekirdek gruplarda daha önde başlar, onlarda daha hızlı büyürsün. Oda kurucusu botların parti adlarını ve liderlerini de düzenleyebilir.</p>
+    <article class="feature" data-reveal>
+      <figure class="panel shot"><img src="/img/secmen.webp" alt="Seçmen katmanı: seçilen grubun illere göre yoğunluğu" loading="lazy" width="1920" height="1080"></figure>
+      <div class="paper copy">
+        <p class="kicker">Seçmen grupları</p>
+        <h3>Kime sesleniyorsun?</h3>
+        <p>Seçmen dört ayrımda sekiz gruba bölünür: işçi ve işveren, genç ve emekli, dindar ve ilerici, özerkçi ve milliyetçi. Partini kurarken iki çekirdek grup seçersin; birine yaklaşırken karşıtından uzaklaşırsın.</p>
       </div>
     </article>
-  </div>
 
-  <section class="more" aria-labelledby="daha-baslik">
-    <p class="kicker center">&gt; DAHA FAZLASI</p>
-    <h2 id="daha-baslik" class="center">Gündem hiç durmuyor</h2>
-    <div class="grid" data-reveal="pop">
-      <div class="tile"><h3>Kongre gecesi</h3><p>Genel başkanlık ömür boyu değil. Delegeler oy verir; kaybedersen partinde üye olarak sıranı beklersin.</p></div>
-      <div class="tile"><h3>Gensoru ve erken seçim</h3><p>Muhalefet hükümeti düşürmeye ya da sandığı öne çekmeye çalışır; seçim takvimi buna göre kayar.</p></div>
-      <div class="tile"><h3>İttifaklar</h3><p>Anayasa izin veriyorsa partiler ittifak kurup barajı birlikte aşar.</p></div>
-      <div class="tile"><h3>Partiler bölünür</h3><p>İç karışıklık büyürse parti ikiye ayrılır; ayrılanlar zamanla geri dönebilir.</p></div>
-      <div class="tile"><h3>Botlar ve çevrimdışı oyun</h3><p>İnternet olmadan botlara karşı oyna, oyunu kaydet, kaldığın yerden devam et. ESC ile oyun durur.</p></div>
-      <div class="tile"><h3>Oda kuralları</h3><p>Baraj, seçim aralığı ve sayısı, tur süresi, oylama süresi, rastgele yeni partiler: hepsi lobide.</p></div>
+    <article class="feature flip" data-reveal>
+      <figure class="panel shot"><img src="/img/parti.webp" alt="Parti kurma ekranı: parti adı, logo ve renk seçimi, sağda aday kartı ve oda listesi" loading="lazy" width="1920" height="1080"></figure>
+      <div class="paper copy">
+        <p class="kicker">Partini kur</p>
+        <h3>Her oyun yeni bir parti</h3>
+        <p>Siyasetçini yarat, partinin adını koy, logosunu ve rengini seç, iki çekirdek seçmen grubunu belirle. Oda sahibi botların partilerini de aynı ekrandan düzenleyebilir.</p>
+      </div>
+    </article>
+
+    <article class="feature" data-reveal>
+      <figure class="panel shot"><img src="/img/lobi.webp" alt="Oda lobisi: oyuncular ve botlar, ülke önizlemesi ve oyun kuralları" loading="lazy" width="1920" height="1080"></figure>
+      <div class="paper copy">
+        <p class="kicker">Oda</p>
+        <h3>Kuralları sen koy</h3>
+        <p>Odayı kur, kodu arkadaşlarına ver, boş koltuklara bot oturt. Ülkenin büyüklüğü, meclisin sandalye sayısı, baraj, seçim aralığı ve sayısı, tur süresi: hepsi lobide.</p>
+        <ul class="ticks"><li>Çevrim dışı oyunda yalnız botlarla</li><li>Aynı tohumla aynı ülke yeniden kurulur</li></ul>
+      </div>
+    </article>
+  </section>
+
+  <section class="section wrap" id="secim">
+    <div class="section-head">
+      <p class="kicker">Seçim gecesi</p>
+      <h2>Sandıklar açılıyor</h2>
+      <p>Seçim gecesi canlı yayın gibi akar: iller sayıldıkça haritaya renk gelir, oy oranları yarışır, meclis sandalye sandalye dolar.</p>
+    </div>
+    <article class="feature" data-reveal>
+      <figure class="panel shot"><img src="/img/secim.webp" alt="Seçim gecesi: sayım sürerken boyanan harita ve oy oranları" loading="lazy" width="1920" height="1080"></figure>
+      <div class="paper copy">
+        <p class="kicker">Özel yayın</p>
+        <h3>Baraj çizgisinde son sandık</h3>
+        <p>D'Hondt, Hare kotası ya da kazanan hepsini alır: sayım yöntemi, baraj ve seçim aralığı lobide seçilir, oyun sırasında anayasayla değişebilir. Gecenin sonunda gazete manşeti kazananı ilan eder.</p>
+      </div>
+    </article>
+    <article class="feature flip" data-reveal>
+      <figure class="panel shot"><img src="/img/gazete.webp" alt="Seçim gecesi biter: sandıktan çıkan meclis gazete manşetinde" loading="lazy" width="1920" height="1080"></figure>
+      <div class="paper copy">
+        <p class="kicker red">Son dakika</p>
+        <h3>Manşetlere taşınan anlar</h3>
+        <p>Kaset skandalı, partide çatlak, gensoruyla düşen hükümet... Büyük olaylar masaya fırlatılan bir gazeteyle gelir. Rakibini karalarken kendi adının manşete çıkmamasına dikkat et.</p>
+      </div>
+    </article>
+  </section>
+
+  <section class="section wrap" id="meclis">
+    <div class="section-head">
+      <p class="kicker">Meclis</p>
+      <h2>Çoğunluk tek başına gelmez</h2>
+      <p>En çok vekili çıkaran görev alır. Ortak seç, makamları dağıt, güvenoyu iste; sonra yasalar, gensorular ve erken seçim önergeleriyle ayakta kal.</p>
+    </div>
+    <article class="feature" data-reveal>
+      <figure class="panel shot"><img src="/img/hukumet.webp" alt="Hükümet kurma: ortaklar ve makam dağılımı" loading="lazy" width="1920" height="1080"></figure>
+      <div class="paper copy">
+        <p class="kicker">Koalisyon masası</p>
+        <h3>Hükümeti sen kur</h3>
+        <p>Başbakanlıktan bakanlıklara makamları ortaklarınla paylaş. Makamlar devlet hazinesinden pay ve oyun sonu puanı demektir; iktidardaysan illere yatırım götürürsün.</p>
+      </div>
+    </article>
+    <article class="feature flip" data-reveal>
+      <figure class="panel shot"><img src="/img/oylama.webp" alt="Meclis oylaması: meclis diyagramı ekranın ortasında, partiler oy veriyor" loading="lazy" width="1920" height="1080"></figure>
+      <div class="paper copy">
+        <p class="kicker">Genel kurul</p>
+        <h3>Oylamada kamera meclise döner</h3>
+        <p>Yasa, vergi, gensoru, erken seçim ya da anayasa: oylama açıldığında meclis ekranın ortasına gelir. EVET, ÇEKİMSER, HAYIR; sonuç sandalye sandalye belli olur.</p>
+        <ul class="ticks"><li>Grup yasası, vergi kademesi ve anayasa değişikliği</li><li>Kabul edilmese de sunulan yasa gruba mesaj verir</li></ul>
+      </div>
+    </article>
+  </section>
+
+  <section class="section wrap" id="afetler">
+    <div class="section-head">
+      <p class="kicker red">Afet masası</p>
+      <h2>Ülke sarsıldığında kim yanında?</h2>
+      <p>Sel, heyelan ve çığ tek bir ili; orman yangını ve deprem birkaç komşu ili birden vurur. Yardım tutarını sen belirlersin: muhalefet parti kasasından, hükümet devlet hazinesinden de öder.</p>
+    </div>
+    <div class="disasters" data-reveal>
+      <figure class="paper" style="--r:-3deg"><img src="/img/afet/deprem.webp" alt="Deprem" loading="lazy" width="336" height="456"><figcaption>Deprem</figcaption></figure>
+      <figure class="paper" style="--r:2deg"><img src="/img/afet/sel.webp" alt="Sel" loading="lazy" width="336" height="456"><figcaption>Sel</figcaption></figure>
+      <figure class="paper" style="--r:-1deg"><img src="/img/afet/yangin.webp" alt="Orman yangını" loading="lazy" width="336" height="456"><figcaption>Yangın</figcaption></figure>
+      <figure class="paper" style="--r:3deg"><img src="/img/afet/heyelan.webp" alt="Heyelan" loading="lazy" width="336" height="456"><figcaption>Heyelan</figcaption></figure>
+      <figure class="paper" style="--r:-2deg"><img src="/img/afet/cig.webp" alt="Çığ" loading="lazy" width="336" height="456"><figcaption>Çığ</figcaption></figure>
+    </div>
+    <div class="duo" data-reveal>
+      <figure class="panel shot"><img src="/img/afet.webp" alt="Afet gazetesi: deprem manşeti" loading="lazy" width="1920" height="1080"></figure>
+      <figure class="panel shot"><img src="/img/afet_yardim.webp" alt="Afet yardımı paneli" loading="lazy" width="1920" height="1080"></figure>
     </div>
   </section>
 
-  <section class="cards" id="kartlar" aria-labelledby="kartlar-baslik">
-    <p class="kicker center">&gt; ELİNDEKİ KOZLAR</p>
-    <h2 id="kartlar-baslik" class="center">Kartını oyna, dengeleri değiştir</h2>
-    <p class="center narrow">Karalama, kaset, iç karışıklık, vekil transferi, bağış kampanyası... Her kartın bir bedeli ve bir hedefi var. İşine yaramayan kartı bozdurursan bedelinin yarısı kasana döner.</p>
-    <div class="fan" data-reveal="fan">
-      <img src="/img/cards/kaset.webp" alt="Kaset kartı" loading="lazy" width="384" height="576">
-      <img src="/img/cards/karalama.webp" alt="Karalama kartı" loading="lazy" width="384" height="576">
-      <img src="/img/cards/vekil_guclu.webp" alt="Güçlü vekil çalma kartı" loading="lazy" width="384" height="576">
-      <img src="/img/cards/populizm.webp" alt="Popülizm bonusu kartı" loading="lazy" width="384" height="576">
-      <img src="/img/cards/bagis.webp" alt="Bağış kampanyası kartı" loading="lazy" width="384" height="576">
-      <img src="/img/cards/bagis_kampanyasi_guclu.webp" alt="Büyük bağış kampanyası kartı" loading="lazy" width="384" height="576">
-      <img src="/img/cards/isyan.webp" alt="İç karışıklık kartı" loading="lazy" width="384" height="576">
-      <img src="/img/cards/bonus_kart.webp" alt="Bonus kart" loading="lazy" width="384" height="576">
-      <img src="/img/cards/kart_calma.webp" alt="Kart çalma kartı" loading="lazy" width="384" height="576">
+  <section class="section wrap">
+    <div class="section-head">
+      <p class="kicker">Daha fazlası</p>
+      <h2>Gündem hiç durmuyor</h2>
+    </div>
+    <div class="tiles">
+      <div class="box tile" data-reveal><h3><i style="--c:#f2b632"></i>Kongre gecesi</h3><p>Genel başkanlık ömür boyu değil. Delegeler oy verir; kaybedersen partinde üye olarak sıranı beklersin.</p></div>
+      <div class="box tile" data-reveal><h3><i style="--c:#d93636"></i>Gensoru ve erken seçim</h3><p>Muhalefet hükümeti düşürmeye ya da sandığı öne çekmeye çalışır; seçim takvimi buna göre kayar.</p></div>
+      <div class="box tile" data-reveal><h3><i style="--c:#2b6fd9"></i>İttifaklar</h3><p>Anayasa izin veriyorsa partiler ittifak kurup barajı birlikte aşar.</p></div>
+      <div class="box tile" data-reveal><h3><i style="--c:#7b4fd6"></i>Partiler bölünür</h3><p>İç karışıklık büyürse parti ikiye ayrılır; ayrılan siyasetçi bağımsız kalabilir ya da yeni parti kurabilir.</p></div>
+      <div class="box tile" data-reveal><h3><i style="--c:#2fa866"></i>Botlar ve kayıt</h3><p>İnternet olmadan botlara karşı oyna, oyunu kaydet, kaldığın yerden devam et.</p></div>
+      <div class="box tile" data-reveal><h3><i style="--c:#1f6e70"></i>Oyun sonu</h3><p>Son seçimin ardından ünvanlar dağıtılır, partilerin yolculuğu ve grafikleri gösterilir, kürsüye çıkılır.</p></div>
     </div>
   </section>
 
-  <section class="final" data-reveal="pop">
+  <section class="panel final" data-reveal>
+    <svg class="parl" id="parl" viewBox="0 0 520 270" role="img" aria-label="Dolan meclis"></svg>
     <h2>Meclis toplanıyor. <span class="gold">Yerini al.</span></h2>
-    <div class="downloads">
-      <a class="dl dl-android" href="https://raw.githubusercontent.com/TriQue06/siyaset_oyunu_test_experimental/main/builds/SiyasetOyunu.apk" data-mirror="apk">
-        <span class="dl-text"><span class="dl-main">ANDROID · APK</span><span class="dl-meta" data-meta="apk">&nbsp;</span></span>
-      </a>
-      <a class="dl dl-windows" href="https://raw.githubusercontent.com/TriQue06/siyaset_oyunu_test_experimental/main/builds/SiyasetOyunu-Windows.zip" data-mirror="exe">
-        <span class="dl-text"><span class="dl-main">WINDOWS · EXE</span><span class="dl-meta" data-meta="exe">&nbsp;</span></span>
-      </a>
-    </div>
-    <p class="dl-note small">Android'de kurulum için "bilinmeyen kaynaklardan yükleme" iznini açman gerekebilir. Windows sürümü zip içinde gelir: klasöre çıkarıp SiyasetOyunu.exe'yi çalıştır; SmartScreen uyarısında "Ek bilgi → Yine de çalıştır" seçilir.</p>
+    <a class="dl dl-exe" href="https://raw.githubusercontent.com/TriQue06/siyaset_oyunu_test_experimental/main/builds/SiyasetOyunu-Windows.zip">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5 10 4.5v7H3zm8-1.1L21 3v8.5H11zM3 12.5h7v7l-7-1zm8 0h10V21l-10-1.4z"/></svg>
+      <span class="t"><span class="main">Windows için indir</span><span class="meta" data-meta="exe">Ücretsiz · zip</span></span>
+    </a>
+    <p class="dl-note">Windows sürümü zip içinde gelir: bir klasöre çıkarıp SiyasetOyunu.exe'yi çalıştır. SmartScreen uyarısında "Ek bilgi" ve ardından "Yine de çalıştır" seçilir.</p>
   </section>
 </main>
 
-<footer class="foot">
-  <span>PROJE: SİYASET OYUNU</span>
+<footer>
+  <b>Siyaset Oyunu</b>
   <span id="foot-version"></span>
-  <a href="#top">Başa dön ↑</a>
+  <a href="#top">Başa dön</a>
 </footer>
 
 <script src="/app.js"></script>

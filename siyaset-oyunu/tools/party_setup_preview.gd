@@ -1,6 +1,6 @@
 extends SceneTree
-## Parti kurma sihirbazı önizlemesi + testi: beş adım, aday kartı, renk kilidi,
-## memleket tıklaması (gerçek fare olayıyla), hazır akışı, oda sahibinin bot
+## Parti kurma sihirbazı önizlemesi + testi: dört adım, aday kartı, renk kilidi,
+## hazır akışı, oda sahibinin bot
 ## düzenlemesi. Ekran görüntüleri user:// içine party_setup_<adım>.png.
 ##   godot --resolution 1600x900 --path . --script res://tools/party_setup_preview.gd
 
@@ -54,28 +54,13 @@ func _initialize() -> void:
 	check("meslek adimi tamam", scene._step_done(1))
 	_shot("2_meslek")
 
-	scene._show_step(2)
-	await _frames(4)
-	var target := String(gmap.province_ids()[3])
-	var pos: Vector2 = scene._map.get_global_transform() * gmap.center_of(target)
-	var move := InputEventMouseMotion.new()
-	move.position = pos
-	move.global_position = pos
-	root.push_input(move, true)
-	for pressed in [true, false]:
-		var ev := InputEventMouseButton.new()
-		ev.button_index = MOUSE_BUTTON_LEFT
-		ev.pressed = pressed
-		ev.position = pos
-		ev.global_position = pos
-		root.push_input(ev, true)
-		await process_frame
-	check("memleket gercek tiklamayla secildi", scene._hometown == target, "%s / %s" % [target, scene._hometown])
-	check("siyasetci tamamlaninca gonderildi", pm.politicians.has(me) and pm.politicians[me]["background"] == "gazeteci" and pm.politicians[me]["hometown"] == target)
+	check("memleket adimi yok", not scene.STEP_TITLES.has("Memleket") and scene.STEP_COUNT == 4)
+	check("siyasetci tamamlaninca gonderildi", pm.politicians.has(me) and pm.politicians[me]["background"] == "gazeteci" and not pm.politicians[me].has("hometown"))
 	check("portre alani var (bos)", pm.politicians.get(me, {}).get("portrait", "x") == "")
-	_shot("3_memleket")
+	check("adim aciklamasi yok", scene.get("_step_hint") == null)
 
-	scene._show_step(3)
+
+	scene._show_step(2)
 	scene._name_edit.text = "Deneme"
 	scene._on_party_name_changed("Deneme")
 	await _frames(3)
@@ -91,15 +76,17 @@ func _initialize() -> void:
 	scene._on_icon_selected(6)
 	await _frames(3)
 	check("logo secildi", int(pm.parties[me]["icon_index"]) == 6)
-	_shot("4_kimlik")
+	_shot("3_kimlik")
 
-	check("secmen adimi gorulmeden hazir olunamaz", not scene._step_done(4))
-	scene._show_step(4)
+	check("secmen adimi gorulmeden hazir olunamaz", not scene._step_done(3))
+	scene._show_step(3)
+	# Rastgele çekirdekte "genc" varsa basmak onu çıkarırdı: tek gruptan başla.
+	scene._core = ["isci"]
 	scene._on_core_pressed("genc")
 	await _frames(3)
 	check("cekirdek gecerli ve partide", VoterGroups.is_valid_core(pm.parties[me]["core"]) and pm.parties[me]["core"].has("genc"))
 	check("her adim tamam", scene._missing_steps().is_empty(), str(scene._missing_steps()))
-	_shot("5_secmen")
+	_shot("4_secmen")
 
 	# Oda sahibi bot düzenler.
 	var my_before: Dictionary = pm.parties[me].duplicate()
@@ -111,13 +98,11 @@ func _initialize() -> void:
 	scene._on_party_name_changed("Robotlar")
 	scene._on_icon_selected(3)
 	scene._on_background_pressed("hukukcu")
-	var bot_home := String(gmap.province_ids()[5])
-	scene._on_province_clicked(bot_home)
 	await _frames(3)
 	var bot_party: Dictionary = pm.parties[edited_bot]
 	check("oda sahibi botun adini ve logosunu degistirdi", bot_party["name"] == "Robotlar" and int(bot_party["icon_index"]) == 3, str(bot_party))
 	var bot_pol: Dictionary = pm.politicians[edited_bot]
-	check("oda sahibi botun meslegini, memleketini degistirdi", bot_pol["background"] == "hukukcu" and bot_pol["hometown"] == bot_home, str(bot_pol))
+	check("oda sahibi botun meslegini degistirdi", bot_pol["background"] == "hukukcu", str(bot_pol))
 	check("kendi partim degismedi", pm.parties[me]["name"] == my_before["name"] and int(pm.parties[me]["icon_index"]) == int(my_before["icon_index"]))
 	_shot("bot")
 	var changed := 0
@@ -133,14 +118,12 @@ func _initialize() -> void:
 	scene._start_editing(-1)
 	await _frames(3)
 	check("kendime donunce taslak geri geldi", scene._party_name == "Deneme" and scene._background_id == "gazeteci"
-		and scene._name_edit.text == "Deneme" and scene._step == 4)
+		and scene._name_edit.text == "Deneme" and scene._step == 3)
 
 	# Hazır: siyasetçi + parti birlikte; kilitliyken içerik kapalı.
 	scene._on_next_pressed()
 	await _frames(3)
 	check("hazir oldum", pm.is_ready(me) and scene._is_locked and scene._blocker.visible)
-	scene._on_province_clicked(String(gmap.province_ids()[0]))
-	check("kilitliyken memleket degismez", scene._hometown == target)
 	_shot("hazir")
 	scene._on_next_pressed()
 	await _frames(2)
@@ -153,7 +136,7 @@ func _initialize() -> void:
 	root.add_child(again)
 	await _frames(4)
 	check("yeniden acilinca secimler yerinde", again._background_id == "gazeteci"
-		and again._hometown == target and again._party_name == "Deneme")
+		and again._party_name == "Deneme")
 	mm.owner_id = 77
 	check("oda sahibi olmayan bot partisini degistiremez", (func():
 		pm.set_bot_party(edited_bot, "Hacker", 0, colors[1]); return pm.parties[edited_bot]["name"] == "Robotlar").call())

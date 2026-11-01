@@ -1,8 +1,11 @@
-Copyright © 2017 IBM Corp. with Reserved Font Name "Plex"
+Siyaset Display, Lilita One (c) Juan Montoreano temel alinarak uretildi; Turkce harfler (I nokta, S/s cengel, G/g kisa) eklendi (tools/patch_display_font.py). Kisa isareti Paytone One (OFL) fontundan.
+
+Copyright (c) 2011 Juan Montoreano (juan@remolacha.biz), 
+with Reserved Font Name Lilita
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:
-https://openfontlicense.org
+http://scripts.sil.org/OFL
 
 
 -----------------------------------------------------------

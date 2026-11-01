@@ -6,9 +6,7 @@ extends RefCounted
 ##     parti kurulumunda seçilir). Her meslek EFFECTS çarpanları ve bazılarında
 ##     özel başlangıç (iş insanı parası, belediye başkanı teşkilatları) verir.
 ##     Kayıtta alan adı geriye uyum için "background".
-##   - MEMLEKET: haritadan seçilen il. Oyuna orada 2. seviye teşkilatla
-##     başlanır ve memlekette kalıcı "hemşehri" desteği vardır (il aktivitesi;
-##     ilin seçmen profili değişmez). Komşu iller ETKİLENMEZ.
+##   - MEMLEKET 0.0.319'da oyundan tamamen kalktı.
 ## ETKİ ANAHTARLARI (çarpan, yoksa 1):
 ##   HAMLEYİ YAPAN siyasetçiye bakar (effect): miting,
 ##     law (grup yasası), propaganda_out (attığın karalama), reputation_out (attığın kaset).
@@ -18,7 +16,7 @@ extends RefCounted
 ##   appeal: o gruplarda kazanç (yasa, miting) APPEAL_MULT kat.
 ## ARAYÜZ METİNLERİ SAYI İÇERMEZ (özet anlatım); sayılar sadece burada.
 ## Veri PartyManager.politicians[peer] içinde durur (partiden bağımsız) =
-##   {"gender", "first_name", "surname", "name" (ad + soyad), "background", "hometown",
+##   {"gender", "first_name", "surname", "name" (ad + soyad), "background",
 ##    "portrait" (portre kimliği, "" = yok; bkz. ContentPacks / PoliticianPortrait)}
 ## İSİM TAMAMEN RASTGELE (elle yazılmaz): random_name(). SOYAD ileride çok
 ## yerde kullanılacak (bkz. surname_of). Soyadlar uydurma kök + ekten üretilir;
@@ -76,12 +74,6 @@ const BUSINESS_TURN_INCOME := 2.5
 ## Belediye başkanı: il sayısının bu oranı kadar rastgele ilde (en az 1) teşkilat.
 const MAYOR_ORG_SHARE := 0.1
 const MAYOR_ORG_LEVEL := 1
-
-# --- Memleket -----------------------------------------------------------------
-## Oyun başında memlekette bedava kurulan teşkilat seviyesi.
-const HOMETOWN_ORG_LEVEL := 2
-## Kalıcı hemşehri desteği (aktivite puanı, sönmez): sadece memleket.
-const HOMETOWN_ACTIVITY := 4.0
 
 # --- Rastgele isim ----------------------------------------------------------------
 ## CİNSİYET oyuncu tarafından seçilir ("m" erkek / "f" kadın); ad o cinsiyetin
@@ -206,14 +198,13 @@ static func random_background(rng: RandomNumberGenerator = null) -> String:
 	return String(BACKGROUND_ORDER[index])
 
 ## portrait: portre kimliği ("<paket>:<ad>"); biçimi bozuksa boş kalır.
-static func make(first_name: String, surname: String, background_id: String, hometown: String,
+static func make(first_name: String, surname: String, background_id: String,
 		gender: String = "m", portrait: String = "", appearance: Variant = null) -> Dictionary:
 	first_name = first_name.strip_edges()
 	surname = surname.strip_edges()
 	var result := {"gender": gender if GENDERS.has(gender) else "m", "first_name": first_name, "surname": surname,
 		"name": ("%s %s" % [first_name, surname]).left(NAME_MAX_LENGTH),
-		"background": background_id,
-		"hometown": hometown, "portrait": clean_portrait(portrait)}
+		"background": background_id, "portrait": clean_portrait(portrait)}
 	if appearance is Dictionary and not appearance.is_empty():
 		result["appearance"] = AvatarCatalog.clean(appearance, String(result.gender))
 	return result
@@ -359,9 +350,6 @@ static func display_name(peer_id: int) -> String:
 static func background_of(peer_id: int) -> String:
 	return String(of(peer_id).get("background", ""))
 
-static func hometown_of(peer_id: int) -> String:
-	return String(of(peer_id).get("hometown", ""))
-
 static func portrait_of(peer_id: int) -> String:
 	return String(of(peer_id).get("portrait", ""))
 
@@ -407,12 +395,3 @@ static func group_appeal(party_or_peer: int, group: String) -> float:
 		if (BACKGROUNDS.get(background_of(int(member)), {}).get("appeal", []) as Array).has(group):
 			return APPEAL_MULT
 	return 1.0
-
-## Hemşehri desteği: sadece memleket (komşu iller etkilenmez). Partide iki
-## siyasetçi varsa ikisinin memleketi de sayılır.
-static func hometown_activity(province_id: String, party_or_peer: int) -> float:
-	for member in PartyManager.members_of(PartyManager.party_of(party_or_peer)):
-		var home := hometown_of(int(member))
-		if home != "" and home == province_id:
-			return HOMETOWN_ACTIVITY
-	return 0.0

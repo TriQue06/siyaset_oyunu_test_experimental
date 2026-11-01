@@ -39,9 +39,9 @@ func _ready() -> void:
 	body.add_child(PopupKit.header(L.t("YENİ PARTİ KUR") if not leaving else L.t("AYRIL VE PARTİ KUR"),
 		L.t("Bedel: %s · seçmen gruplarındaki desteğin aynen devam eder") % GameRules.cost_text(cost), null, queue_free))
 	if leaving:
-		body.add_child(PopupKit.note(L.t("Katkına göre (biraz da şansla) vekillerin, teşkilatların ve desteğin bir kısmını götürürsün; memleketindeki teşkilat seninle gelir. Seçime yaklaştıkça ayrılık iki partiye de daha çok oy kaybettirir."), UiTheme.TEXT_MUTED))
+		body.add_child(PopupKit.note(L.t("Katkına göre (biraz da şansla) vekillerin, teşkilatların ve desteğin bir kısmını götürürsün. Seçime yaklaştıkça ayrılık iki partiye de daha çok oy kaybettirir."), UiTheme.TEXT_MUTED))
 	else:
-		body.add_child(PopupKit.note(L.t("Bağımsızken topladığın destek yeni partine geçer; memleketinden kazandığın sandalye de partinin olur."), UiTheme.TEXT_MUTED))
+		body.add_child(PopupKit.note(L.t("Bağımsızken topladığın destek yeni partine geçer; kazandığın sandalye de partinin olur."), UiTheme.TEXT_MUTED))
 
 	var top := HBoxContainer.new()
 	top.add_theme_constant_override("separation", 12)

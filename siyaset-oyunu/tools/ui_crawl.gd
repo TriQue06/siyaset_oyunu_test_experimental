@@ -422,23 +422,11 @@ func stage_setup() -> void:
 		shot("setup_step%d" % (step + 2))
 		overflow_check(root, "setup%d" % (step + 2))
 		await scroll_all(s, "setup%d" % (step + 2))
-		# Adıma özgü: meslek kartı, il, logo/renk, seçmen grupları.
+		# Adıma özgü: meslek kartı, logo/renk, seçmen grupları.
 		await explore(s, "setup%d" % (step + 2), ["İleri", "Geri", "Hazır", "Düzenle", "Ben", "İptal", "· ", "Profili", "Menü"], 10)
 	shot("setup_last")
-	# Eksikleri tamamla: memleket (haritadan il), parti adı; sonra Hazırım.
-	await click(find_button(s, "3 · Memleket"), "memleket sekmesi")
-	await _wait(0.5)
-	var map: Node = s.get("_map")
-	if map != null:
-		var gm: Node = root.get_node("GameMap")
-		var ids: Array = map.get_all_province_ids()
-		var pid: String = ids[ids.size() / 2]
-		await click_at((map as CanvasItem).get_global_transform_with_canvas() * gm.center_of(pid))
-		await _wait(0.5)
-		shot("setup_home_picked")
-	else:
-		note("YOK", "parti kurma haritası bulunamadı")
-	await click(find_button(s, "4 · Parti"), "kimlik sekmesi")
+	# Eksikleri tamamla: parti adı; sonra Hazırım (0.0.319: memleket kalktı).
+	await click(find_button(s, "· Parti"), "kimlik sekmesi")
 	await _wait(0.4)
 	var edit: LineEdit = s.get("_name_edit")
 	await click(edit, "parti adı")

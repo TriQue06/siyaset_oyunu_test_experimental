@@ -12,24 +12,24 @@ const ICON_NATIVE_SIZE := 24.0  # kaynak SVG'lerin viewBox boyutu (24dp)
 
 # Parti (arka plan) renkleri. İkon rengi her zaman beyazdır.
 const COLORS: Array[Color] = [
-	Color("F2132A"), # kırmızı
-	Color("FA6E66"), # somon kırmızısı
-	Color("F27E1F"), # turuncu
+	Color("F2D31F"), # sarı
 	Color("F0A824"), # sarı-turuncu
-	Color("FAD028"), # sarı
-	Color("9DC94B"), # limon sarısı
-	Color("31C440"), # yeşil
-	Color("3FB586"), # su yeşili
-	Color("27DBDB"), # turkuaz
-	Color("83B7EB"), # açık mavi
-	Color("22A9D6"), # mavi
-	Color("2569CF"), # koyu mavi
-	Color("244FB3"), # lacivert
-	Color("7647CC"), # indigo
-	Color("AB39DB"), # mor
-	Color("E041D8"), # eflatun
-	Color("F04391"), # fuşya
-	Color("A6325A"), # bordo
+	Color("F2741F"), # turuncu
+	Color("F2132A"), # kırmızı
+	Color("A63260"), # bordo
+	Color("F23F87"), # fuşya
+	Color("E340D3"), # eflatun
+	Color("B435DE"), # mor
+	Color("7C43D1"), # indigo
+	Color("2B4BAB"), # lacivert
+	Color("209FE3"), # mavi
+	Color("27D2DB"), # turkuaz
+	Color("A3C94B"), # limon sarısı
+	Color("40C754"), # yeşil
+	Color("34A37C"), # su yeşili
+	Color("C7724E"), # kahverengi
+	Color("A9B0B8"), # açık gri
+	Color("474E54"), # koyu gri
 ]
 
 ## İkon dosyaları DÜZ .svg: her görüntüleyici/editör açabilsin diye. Godot

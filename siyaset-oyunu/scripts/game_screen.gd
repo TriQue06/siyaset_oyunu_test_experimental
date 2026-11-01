@@ -99,11 +99,6 @@ const BADGE_ICON_PIXEL_SIZE := 64
 ## Kartlar kart barında TAMAMEN görünür: eskiden 2 kat büyüktüler ve yarıları
 ## ekranın altından taşıyordu.
 const CARD_DISPLAY_SCALE := 4.0 / 3.0
-## Kart üstündeki bant/rozet ölçüleri 2 kat büyük karta göre yazılmıştı;
-## hepsi bu oranla küçülüyor ki kartla orantılı kalsınlar.
-const CARD_TITLE_SIZE := 10
-const CARD_TITLE_MIN_SIZE := 8
-const CARD_ART_RATIO := CARD_DISPLAY_SCALE / 2.0
 const CARD_DISPLAY_SIZE := Vector2(72, 96) * CARD_DISPLAY_SCALE
 const CARD_LIFT := -14.0
 const CARD_HOVER_LIFT_SPEED := 12.0
@@ -2380,7 +2375,7 @@ func _refresh_hand_interactivity() -> void:
 		if not is_instance_valid(holder):
 			continue
 		holder.modulate.a = 1.0 if interactive else 0.55
-		for child in holder.find_children("*", "TextureRect", true, false):
+		for child in holder.find_children("*", "Control", true, false):
 			if child.get_meta("is_click_target", false):
 				child.mouse_filter = Control.MOUSE_FILTER_STOP
 
@@ -2488,102 +2483,15 @@ func _build_hand_card(card_type: String, hand_index: int) -> Control:
 	holder.set_meta("lift_current", 0.0)
 	holder.set_meta("hand_index", hand_index)
 
-	var shadow := TextureRect.new()
-	shadow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	shadow.texture = CardPresets.get_card_texture(card_type)
-	shadow.size = CARD_DISPLAY_SIZE
-	shadow.position = SHADOW_OFFSET
-	shadow.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	shadow.modulate = SHADOW_COLOR
-	holder.add_child(shadow)
-
-	var card := TextureRect.new()
-	card.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	card.texture = CardPresets.get_card_texture(card_type)
+	# 0.0.322 KOLEKSİYON KARTI (konsept D): altın çerçeve, türün renginde
+	# taşlar, simge pulu ve kurdele (bkz. CollectorCard). Elde düz bir sıra.
+	holder.add_child(CollectorCard.make(card_type, CARD_DISPLAY_SIZE))
+	# Tıklama yüzeyi kartın tamamı (görünmez).
+	var card := Control.new()
 	card.size = CARD_DISPLAY_SIZE
-	card.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	card.set_meta("is_click_target", true)
 	holder.add_child(card)
-
-	# TAM GÖRSELLİ KART: görsel kartı kaplar (2:3 görsel 3:4 karta kırpılır),
-	# ad alttaki karartmada, bedel sol üstte, kenar görselin ortalama renginde.
-	if CardPresets.has_full_art(card_type):
-		for art: TextureRect in [card, shadow]:
-			art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-			art.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-		# KONSEPT KARTI (.card): krem kart, içte kartın renginde ince çizgi,
-		# altında kalınlık ve gölge; görsel üstte yuvarlak köşeli pencerede,
-		# adı altta koyu yazıyla. Elde hafif yelpaze açısı.
-		holder.remove_child(shadow)
-		shadow.queue_free()
-		var edge_color := CardPresets.art_edge_color(card_type)
-		var face_box := BoardBox.new()
-		face_box.fill = UiTheme.PANEL_DARK
-		face_box.set_radius(UiTheme.d(12))
-		face_box.rings = [[UiTheme.d(5), UiTheme.d(2), edge_color]]
-		face_box.lips = [[UiTheme.d(4), Color("D8CAA6")]]
-		face_box.shadow_color = Color(0, 0, 0, 0.4)
-		face_box.shadow_offset = Vector2(0, UiTheme.d(10))
-		face_box.shadow_size = UiTheme.d(9)
-		var face_panel := Panel.new()
-		face_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		face_panel.size = CARD_DISPLAY_SIZE
-		face_panel.add_theme_stylebox_override("panel", face_box)
-		holder.add_child(face_panel)
-		holder.move_child(face_panel, 0)
-		var art_rect := Rect2(Vector2(UiTheme.d(12), UiTheme.d(12)),
-			CARD_DISPLAY_SIZE - Vector2(UiTheme.d(24), UiTheme.d(66)))
-		var clip := Panel.new()
-		clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		clip.position = art_rect.position
-		clip.size = art_rect.size
-		clip.add_theme_stylebox_override("panel", UiSkin.flat(UiTheme.INK, int(UiTheme.d(6))))
-		clip.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
-		face_panel.add_child(clip)
-		var art := TextureRect.new()
-		art.texture = card.texture
-		art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-		art.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-		art.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		clip.add_child(art)
-		var title := Label.new()
-		title.text = CardPresets.card_short_title(card_type)
-		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		title.autowrap_mode = TextServer.AUTOWRAP_WORD
-		title.add_theme_font_override("font", UiTheme.mono(true))
-		title.add_theme_font_size_override("font_size", _hand_title_font_size(CARD_DISPLAY_SIZE.x - UiTheme.d(20)))
-		title.add_theme_constant_override("line_spacing", -2)
-		title.add_theme_color_override("font_color", UiTheme.INK)
-		title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		title.position = Vector2(UiTheme.d(8), art_rect.end.y + UiTheme.d(2))
-		title.size = Vector2(CARD_DISPLAY_SIZE.x - UiTheme.d(16), CARD_DISPLAY_SIZE.y - art_rect.end.y - UiTheme.d(8))
-		face_panel.add_child(title)
-		# Tıklama yüzeyi kartın tamamı (görselsiz, görünmez).
-		card.texture = null
-		card.self_modulate = Color(1, 1, 1, 0)
-		holder.move_child(card, -1)
-		var fan := [-4.0, 3.0, -2.0, 2.5, -3.0, 2.0, -1.5, 3.5]
-		holder.pivot_offset = CARD_DISPLAY_SIZE * Vector2(0.5, 1.0)
-		holder.rotation_degrees = fan[hand_index % fan.size()]
-		_wire_hand_card(wrapper, holder, card, card_type, hand_index)
-		return wrapper
-
-	# KART YÜZÜ: türün renginde zemin + büyük simge (gövdenin sol yarısında:
-	# kartlar üst üste binince de görünür).
-	var face := CardFace.new()
-	face.card_type = card_type
-	face.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	face.position = Vector2(4.0, 56.0 * CARD_ART_RATIO)
-	face.size = Vector2(CARD_DISPLAY_SIZE.x - 8.0, CARD_DISPLAY_SIZE.y - 56.0 * CARD_ART_RATIO - 4.0)
-	holder.add_child(face)
-	# Kartın ne olduğu her kartta görselin üstündeki bantta yazar.
-	# Kartlar üst üste biniyorsa başlık sola yaslanır (görünen şeritte okunur).
-	holder.add_child(_card_title_banner(card_type, CardManager.my_inventory().size() * CARD_DISPLAY_SIZE.x > _r(R_HAND).size.x))
 	_wire_hand_card(wrapper, holder, card, card_type, hand_index)
 	return wrapper
 
@@ -2628,96 +2536,6 @@ func _wire_hand_card(wrapper: Control, holder: Control, card: Control, card_type
 
 	wrapper.add_child(holder)
 	_hand_holders.append(holder)
-
-## Tam görselli kartın adı: alttaki koyu geçişin üstünde, iki satıra kadar.
-## Kartlar üst üste binince sola yaslanır (görünen şeritte okunur).
-func _card_art_title(card_type: String, crowded: bool) -> Control:
-	var box := Control.new()
-	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var height := CARD_DISPLAY_SIZE.y * 0.42
-	box.position = Vector2(0.0, CARD_DISPLAY_SIZE.y - height)
-	box.size = Vector2(CARD_DISPLAY_SIZE.x, height)
-	var shade := TextureRect.new()
-	var grad := Gradient.new()
-	grad.set_color(0, Color(0.03, 0.02, 0.08, 0.0))
-	grad.set_color(1, Color(0.03, 0.02, 0.08, 0.92))
-	grad.add_point(0.5, Color(0.03, 0.02, 0.08, 0.75))
-	var tex := GradientTexture2D.new()
-	tex.gradient = grad
-	tex.fill_from = Vector2(0, 0)
-	tex.fill_to = Vector2(0, 1)
-	tex.width = 4
-	tex.height = 64
-	shade.texture = tex
-	shade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	shade.stretch_mode = TextureRect.STRETCH_SCALE
-	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
-	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(shade)
-	var title := Label.new()
-	title.text = CardPresets.card_short_title(card_type)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if crowded else HORIZONTAL_ALIGNMENT_CENTER
-	title.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-	title.autowrap_mode = TextServer.AUTOWRAP_WORD
-	# AYNI BOYUT: eldeki bütün kartların adları tek bir yazı boyutunda; boyut,
-	# eldeki en uzun sözcük görünen şeride sığana kadar küçülür (kısaltılmaz).
-	var room := CARD_DISPLAY_SIZE.x - 10.0
-	if crowded:
-		# Kalabalık elde komşu kart sağ yanı örter: görünen şerit kadar yer var.
-		var count := maxi(2, CardManager.my_inventory().size())
-		var step := (_r(R_HAND).size.x - CARD_DISPLAY_SIZE.x) / float(count - 1)
-		room = clampf(step, 30.0, CARD_DISPLAY_SIZE.x) - 8.0
-	var font_size := _hand_title_font_size(room)
-	title.add_theme_font_override("font", _card_title_font())
-	title.add_theme_font_size_override("font_size", font_size)
-	title.add_theme_constant_override("line_spacing", -2)
-	title.add_theme_color_override("font_color", Color.WHITE)
-	title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
-	title.add_theme_constant_override("outline_size", 3)
-	title.set_anchors_preset(Control.PRESET_FULL_RECT)
-	title.offset_left = 5.0
-	# Satır kaydırma görünen alana göre yapılsın (kalabalık elde dar şerit).
-	title.offset_right = -maxf(5.0, CARD_DISPLAY_SIZE.x - 5.0 - room)
-	title.offset_bottom = -4.0
-	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(title)
-	return box
-
-## Eldeki tam görselli kartların ortak ad boyutu (en uzun sözcük sığar).
-func _hand_title_font_size(room: float) -> int:
-	var font := _card_title_font()
-	var longest := 0.0
-	for card_type in CardManager.my_inventory():
-		if not CardPresets.has_full_art(card_type):
-			continue
-		for word in CardPresets.card_short_title(card_type).split(" "):
-			longest = maxf(longest, font.get_string_size(word, HORIZONTAL_ALIGNMENT_LEFT, -1, CARD_TITLE_SIZE).x)
-	if longest <= room or longest <= 0.0:
-		return CARD_TITLE_SIZE
-	return maxi(CARD_TITLE_MIN_SIZE, int(floor(CARD_TITLE_SIZE * room / longest)))
-
-## Kart adı yazı tipi: oyunun başlık fontu (IBM Plex Mono Bold).
-func _card_title_font() -> Font:
-	return UiTheme.mono(true)
-
-const CARD_RADIUS := 10
-## Tam görselli kartın kenar çizgisi.
-func _card_art_edge(color: Color) -> Control:
-	var edge := Panel.new()
-	edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	edge.position = Vector2.ZERO
-	edge.size = CARD_DISPLAY_SIZE
-	# Krem kart kenarı, içte görselin renginde ince çizgi hissi için kalın kenar.
-	var style := UiSkin.ring(UiTheme.PANEL_DARK, 4, CARD_RADIUS)
-	style.border_width_bottom = 6
-	edge.add_theme_stylebox_override("panel", style)
-	var inner := Panel.new()
-	inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	inner.position = Vector2(4, 4)
-	inner.size = CARD_DISPLAY_SIZE - Vector2(8, 10)
-	inner.add_theme_stylebox_override("panel", UiSkin.ring(Color(color, 0.9), 2, CARD_RADIUS - 4))
-	edge.add_child(inner)
-	return edge
 
 ## TEK DOKUNUŞ (hover yok, tablette de çalışır):
 ##   - karta dokunmak onu SEÇER: kalkar (üst üste binen kartların önüne çıkar),
@@ -2783,26 +2601,6 @@ func _deselect_hand_card() -> void:
 		if is_instance_valid(holder):
 			holder.set_meta("lift_target", 0.0)
 			holder.z_index = 0
-
-## Kart görselinin üstündeki isim bandı.
-func _card_title_banner(card_type: String, crowded: bool = false) -> Control:
-	var banner := PanelContainer.new()
-	banner.position = Vector2(6.0 * CARD_ART_RATIO, 8.0 * CARD_ART_RATIO)
-	banner.size = Vector2(CARD_DISPLAY_SIZE.x - 12.0 * CARD_ART_RATIO, 44.0 * CARD_ART_RATIO)
-	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := UiSkin.board()
-	style.set_content_margin_all(4)
-	UiSkin.apply_style(banner, "panel", style)
-	var title := Label.new()
-	title.text = CardPresets.card_short_title(card_type)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if crowded else HORIZONTAL_ALIGNMENT_CENTER
-	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	title.add_theme_font_size_override("font_size", int(roundf(14.0 * CARD_ART_RATIO)))
-	title.add_theme_color_override("font_color", Color.WHITE)
-	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	banner.add_child(title)
-	return banner
 
 ## OTOMATİK KAYIT: çevrim dışı oyunda her yeni dönemin başında (tur akışı
 ## engellenmemişken) bir kez. Elle kayıttan ayrı yuvaya yazılır.
@@ -2874,7 +2672,7 @@ func _valid_party_target(peer_id: int) -> bool:
 ## Miting / yatırım: haritadan il seçilmesi beklenir (bkz. _on_province_clicked).
 # --- KARALAMA SÜRÜKLEME (0.0.237): kart bir ile bırakılır, parti listesi açılır ---
 var _smear_drag_index := -1
-var _smear_ghost: TextureRect
+var _smear_ghost: Control
 
 func _start_smear_drag(hand_index: int, card_type: String, holder: Control) -> void:
 	_deselect_hand_card()
@@ -2882,11 +2680,7 @@ func _start_smear_drag(hand_index: int, card_type: String, holder: Control) -> v
 	_smear_drag_index = hand_index
 	if holder != null:
 		holder.modulate.a = 0.35
-	_smear_ghost = TextureRect.new()
-	_smear_ghost.texture = CardPresets.get_card_texture(card_type)
-	_smear_ghost.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_smear_ghost.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_smear_ghost.size = CARD_DISPLAY_SIZE * 0.6
+	_smear_ghost = CollectorCard.make(card_type, CARD_DISPLAY_SIZE * 0.6)
 	_smear_ghost.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_smear_ghost.z_index = 150
 	add_child(_smear_ghost)
@@ -3502,13 +3296,7 @@ func _on_card_drawn(peer_id: int, card_type: String) -> void:
 	_play_draw_animation(card_type, old_hand_size)
 
 func _play_draw_animation(card_type: String, old_hand_size: int) -> void:
-	var flying := TextureRect.new()
-	flying.texture = CardPresets.get_card_texture(card_type)
-	flying.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	if CardPresets.has_full_art(card_type):
-		flying.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		flying.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-		flying.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	var flying := CollectorCard.make(card_type, CARD_DISPLAY_SIZE)
 	flying.z_index = 100
 	flying.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	flying.modulate.a = 0.0
@@ -3566,13 +3354,7 @@ func _avatar_global_position(peer_id: int, out_size: Vector2) -> Vector2:
 	return get_viewport_rect().size / 2.0 - out_size / 2.0
 
 func _play_card_animation(card_type: String, origin_pos: Vector2, origin_size: Vector2) -> void:
-	var flying := TextureRect.new()
-	flying.texture = CardPresets.get_card_texture(card_type)
-	flying.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	if CardPresets.has_full_art(card_type):
-		flying.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		flying.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-		flying.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	var flying := CollectorCard.make(card_type, CARD_DISPLAY_SIZE)
 	flying.z_index = 100
 	flying.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	flying.size = origin_size

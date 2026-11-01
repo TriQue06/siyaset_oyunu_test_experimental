@@ -68,7 +68,7 @@ static func draw_emblem(canvas: CanvasItem, card_type: String, c: Vector2, s: fl
 			canvas.draw_circle(c + Vector2(s * 0.4, -s * 0.13), s * 0.18, ink)
 			canvas.draw_colored_polygon(PackedVector2Array([c + Vector2(-s * 0.55, s * 0.62), c + Vector2(-s * 0.4, s * 0.32),
 				c + Vector2(s * 0.4, s * 0.32), c + Vector2(s * 0.55, s * 0.62)]), dark)
-		"isyan":
+		"isyan", "parti_ici_karisiklik":
 			# Şimşek: parti içindeki çatlak.
 			canvas.draw_colored_polygon(PackedVector2Array([c + Vector2(s * 0.15, -s), c + Vector2(-s * 0.55, s * 0.1),
 				c + Vector2(-s * 0.05, s * 0.1), c + Vector2(-s * 0.25, s), c + Vector2(s * 0.55, -s * 0.15),
@@ -97,6 +97,17 @@ static func draw_emblem(canvas: CanvasItem, card_type: String, c: Vector2, s: fl
 			canvas.draw_line(c + Vector2(s * 0.03, s * 0.15), c + Vector2(s * 0.03, -s * 0.15) + Vector2(0, -s * 0.0), dark, w, true)
 			canvas.draw_line(c + Vector2(-s * 0.15, 0), c + Vector2(s * 0.21, 0), dark, w, true)
 			canvas.draw_line(c + Vector2(s * 0.03, -s * 0.18), c + Vector2(s * 0.03, s * 0.18), dark, w, true)
+		"para_cezasi":
+			# Para + eksi: kasadan silinen para.
+			canvas.draw_circle(c + Vector2(-s * 0.15, 0), s * 0.75, ink)
+			canvas.draw_circle(c + Vector2(-s * 0.15, 0), s * 0.45, dark)
+			canvas.draw_rect(Rect2(c + Vector2(s * 0.25, -s * 0.95), Vector2(s * 0.8, s * 0.32)), ink, true)
+		"anket":
+			# Çubuk grafik.
+			for i in 3:
+				var hh: float = s * [0.9, 1.5, 1.1][i]
+				canvas.draw_rect(Rect2(c + Vector2(-s * 0.85 + float(i) * s * 0.6, s * 0.75 - hh), Vector2(s * 0.42, hh)), ink, true)
+			canvas.draw_line(c + Vector2(-s, s * 0.85), c + Vector2(s, s * 0.85), ink, w, true)
 		"kart_calma":
 			# Kart + kapan el oku.
 			canvas.draw_rect(Rect2(c + Vector2(-s * 0.2, -s * 0.75), Vector2(s * 0.95, s * 1.3)), ink, true)

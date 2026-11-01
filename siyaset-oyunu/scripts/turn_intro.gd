@@ -12,10 +12,14 @@ extends Control
 signal finished
 
 const CARD_SIZE := Vector2(250, 380)
-const REVEAL_IN := 0.35
-const REVEAL_OUT := 0.35
-## Kart açıldıktan sonra ekranda kalma süresi (giriş animasyonu dahil ~1,5 sn).
-const CARD_HOLD := 1.15
+## 0.0.322: sade ve hızlı açılış — kart hafifçe büyüyerek belirir, kısa
+## durur, ele küçülerek kayar (ya da söner). Dönme, zıplama yok.
+const REVEAL_IN := 0.16
+const REVEAL_OUT := 0.2
+## Kart açıldıktan sonra ekranda kalma süresi.
+const CARD_HOLD := 1.0
+## Ortaya gelen koleksiyon kartının boyu (bkz. CollectorCard).
+const REVEAL_CARD_SIZE := Vector2(250, 370)
 ## Tam ekran sunumların arka planı hafif kararır.
 const DIM_ALPHA := 0.45
 
@@ -282,20 +286,15 @@ func _reveal_next() -> void:
 	face.size = face_size
 	var center := ((view - face_size) * 0.5).round()
 	skip.modulate.a = 0.0
-	face.position = center + Vector2(0, 90)
+	face.position = center
 	face.pivot_offset = face_size * 0.5
-	# Masadan kalkıp dönerek açılır: yan dönük (dar) başlar, yüzü çevrilir.
-	face.scale = Vector2(0.05, 0.6)
-	face.rotation = -0.18
+	face.scale = Vector2(0.9, 0.9)
 	face.modulate.a = 0.0
 	AudioManager.play("card_drawn")
 	var tw := _tween()
 	tw.set_parallel(true)
-	tw.tween_property(face, "position", center, REVEAL_IN).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_property(face, "scale:y", 1.0, REVEAL_IN).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_property(face, "scale:x", 1.0, REVEAL_IN * 1.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_property(face, "rotation", 0.0, REVEAL_IN)
-	tw.tween_property(face, "modulate:a", 1.0, REVEAL_IN * 0.6)
+	tw.tween_property(face, "scale", Vector2.ONE, REVEAL_IN).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(face, "modulate:a", 1.0, REVEAL_IN)
 	tw.tween_property(skip, "modulate:a", 1.0, REVEAL_IN)
 	var token := _reveal_token
 	tw.chain().tween_interval(CARD_HOLD)
@@ -312,12 +311,11 @@ func _dismiss_card(face: Control, skip: Control, result: String, token: int) -> 
 	if result == "hand":
 		var target := hand_rect.call() as Rect2
 		var dest := target.position + target.size * 0.5 - face.size * 0.5
-		tw.tween_property(face, "position", dest, REVEAL_OUT).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
-		tw.tween_property(face, "scale", Vector2(0.35, 0.35), REVEAL_OUT)
-		tw.tween_property(face, "modulate:a", 0.0, REVEAL_OUT)
+		tw.tween_property(face, "position", dest, REVEAL_OUT).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tw.tween_property(face, "scale", Vector2(0.35, 0.35), REVEAL_OUT).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tw.tween_property(face, "modulate:a", 0.0, REVEAL_OUT).set_delay(REVEAL_OUT * 0.5)
 	else:
-		tw.tween_property(face, "scale", Vector2(1.25, 1.25), REVEAL_OUT).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-		tw.tween_property(face, "modulate:a", 0.0, REVEAL_OUT)
+		tw.tween_property(face, "modulate:a", 0.0, REVEAL_OUT * 0.75)
 	tw.chain().tween_callback(func():
 		# Sahne bu arada temizlendiyse (yeni çekim, kapanış) eski zincir devam etmez.
 		if token != _reveal_token:
@@ -345,6 +343,27 @@ func _card_face(entry: Dictionary) -> Control:
 	var result := String(entry.get("result", ""))
 	var style_info := _card_style(card, result)
 	var accent: Color = style_info[0]
+	# 0.0.322 KOLEKSİYON KARTI (konsept D) + altında ne olduğunu söyleyen etiket.
+	if card != "":
+		var column := VBoxContainer.new()
+		column.alignment = BoxContainer.ALIGNMENT_CENTER
+		column.add_theme_constant_override("separation", 14)
+		column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		column.add_child(CollectorCard.make(card, REVEAL_CARD_SIZE, true))
+		var chip := PanelContainer.new()
+		var chip_style := UiSkin.flat(accent.darkened(0.15), int(UiTheme.d(10)))
+		chip_style.content_margin_left = 14
+		chip_style.content_margin_right = 14
+		chip_style.content_margin_top = 6
+		chip_style.content_margin_bottom = 6
+		chip.add_theme_stylebox_override("panel", chip_style)
+		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		chip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		chip.add_child(_centered_label(String(style_info[1]), 14, UiTheme.ON_COLOR))
+		column.add_child(chip)
+		if entry.has("amount"):
+			column.add_child(_centered_label(L.t("Silinen: %s") % GameRules.cost_text(float(entry["amount"])), 16, UiTheme.RED.lightened(0.3)))
+		return column
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = CARD_SIZE
 	panel.size = CARD_SIZE

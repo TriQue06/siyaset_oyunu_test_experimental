@@ -47,14 +47,18 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_t += delta
-	if CardManager.has_approval() and not CardManager.invest_requests.is_empty():
+	if _visible_to_me() and not CardManager.invest_requests.is_empty():
 		queue_redraw()
 	elif not _done_at.is_empty():
 		_done_at.clear()
 		queue_redraw()
 
+## Yalnız hükümet partileri görür (bkz. CardManager.sees_invest_requests).
+func _visible_to_me() -> bool:
+	return CardManager.sees_invest_requests(multiplayer.get_unique_id())
+
 func _draw() -> void:
-	if not CardManager.has_approval():
+	if not _visible_to_me():
 		return
 	var turns := CardManager.request_turns()
 	var left := turns.x

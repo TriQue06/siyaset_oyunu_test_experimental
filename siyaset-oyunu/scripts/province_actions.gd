@@ -591,7 +591,7 @@ func _build_invest() -> void:
 	_body.add_child(_segment("invest", _invest_tier, costs, func(t: int):
 		_invest_tier = t
 		refresh()))
-	var req := CardManager.invest_request(province_id)
+	var req := CardManager.invest_request(province_id) if CardManager.sees_invest_requests(me) else {}
 	if not req.is_empty():
 		_sec(L.t("İlin isteği"))
 		var done := bool(req.get("done", false))

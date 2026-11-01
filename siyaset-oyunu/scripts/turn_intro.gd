@@ -482,7 +482,7 @@ func _show_aid(disaster_id: int) -> void:
 	head.add_child(row)
 	var art := TextureRect.new()
 	art.texture = Disaster.art(kind)
-	art.custom_minimum_size = Vector2(120, 80)
+	art.custom_minimum_size = Vector2(110, 70)
 	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	art.clip_contents = true
@@ -496,8 +496,7 @@ func _show_aid(disaster_id: int) -> void:
 	var names: Array = []
 	for province_id in active.get("provinces", []):
 		names.append(ElectionNightSim.province_name(String(province_id)))
-	texts.add_child(PopupKit.note(L.t("Etkilenen iller: %s") % ", ".join(PackedStringArray(names)), UiTheme.TEXT, 300))
-	texts.add_child(PopupKit.note(L.t("Bölgeye yardım götürürsen oradaki seçmen seni hatırlar."), UiTheme.TEXT_MUTED, 300))
+	texts.add_child(PopupKit.note(", ".join(PackedStringArray(names)), UiTheme.TEXT, 300))
 	_aid_panel = AidPanel.new()
 	_aid_panel.z_index = 0
 	box.add_child(_aid_panel)
@@ -510,8 +509,6 @@ func _show_aid(disaster_id: int) -> void:
 	_aid_panel.cancelled.connect(func():
 		CardManager.skip_aid()
 		_close())
-	texts.add_child(PopupKit.note(L.t("Şimdilik atlarsan bu tur içinde YARDIM hamlesiyle istediğin kadar yardım edebilirsin."),
-		UiTheme.HEAD, 300))
 	box.reset_size()
 	var size := box.get_combined_minimum_size()
 	var final_pos := (get_viewport_rect().size - size) * 0.5

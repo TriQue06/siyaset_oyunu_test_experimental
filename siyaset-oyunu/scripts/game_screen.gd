@@ -876,6 +876,8 @@ var _band_crisis_title: RichTextLabel
 var _band_crisis_text: Label
 ## Krizin seçmen grubu simgesi (kutunun solunda).
 var _band_crisis_icon: VoterGroupIcon
+## Afetin resmi (afet turunda simgenin yerine).
+var _band_disaster_art: TextureRect
 var _timer_bar_bg: ColorRect
 var _timer_bar: ColorRect
 
@@ -909,6 +911,16 @@ func _place_date_chip(_map_rect: Rect2) -> void:
 		# 0.0.268: sıra kutusundaki parti logosu gibi grubun renginde 3B pul.
 		_band_crisis_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		crisis_row.add_child(_band_crisis_icon)
+		# 0.0.321: afet turunda aynı kutu afetin resmini gösterir.
+		_band_disaster_art = TextureRect.new()
+		_band_disaster_art.custom_minimum_size = Vector2(UiTheme.d(44), UiTheme.d(44))
+		_band_disaster_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		_band_disaster_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		_band_disaster_art.clip_contents = true
+		_band_disaster_art.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		_band_disaster_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_band_disaster_art.hide()
+		crisis_row.add_child(_band_disaster_art)
 		var crisis_texts := VBoxContainer.new()
 		crisis_texts.alignment = BoxContainer.ALIGNMENT_CENTER
 		crisis_texts.add_theme_constant_override("separation", int(UiTheme.d(4)))
@@ -999,12 +1011,25 @@ func _refresh_band_date() -> void:
 ## KRİZ (kırmızı) ya da sadece GÜNDEM (altın) bantta; ikisi de yoksa gizli.
 ## SİYASİ KRİZ KUTUSU (0.0.259): kırmızı çerçeve, solda krizin seçmen grubu
 ## simgesi, başlık "KRİZ · ..." ve tek satır etki. Kriz yoksa gizli.
+## 0.0.321: AFET de aynı kutuda (bir turda ya kriz ya afet ya da hiçbiri).
 func _refresh_band_crisis() -> void:
 	if _band_crisis == null:
 		return
 	var agenda := CardManager.agenda_type()
-	_band_crisis.visible = agenda != ""
+	var active := CardManager.active_disaster()
+	_band_crisis.visible = agenda != "" or not active.is_empty()
 	if not _band_crisis.visible:
+		return
+	_band_disaster_art.visible = agenda == ""
+	_band_crisis_icon.visible = agenda != ""
+	if agenda == "":
+		var kind := String(active.get("kind", ""))
+		_band_disaster_art.texture = Disaster.art(kind)
+		var names: Array = []
+		for province_id in active.get("provinces", []):
+			names.append(ElectionNightSim.province_name(String(province_id)))
+		_band_crisis_title.text = "[color=#%s]%s[/color] · %s" % [UiTheme.CRISIS.to_html(false), L.t("AFET"), Disaster.title(kind)]
+		_band_crisis_text.text = ", ".join(PackedStringArray(names))
 		return
 	var data := CardPresets.agenda_data(agenda)
 	_band_crisis_icon.set_group(String(data.get("group", "")))
@@ -4939,6 +4964,7 @@ func _close_law_page() -> void:
 ## Haritadaki afet işareti ve açık yardım paneli güncel durumla eşlenir.
 func _refresh_disaster() -> void:
 	var active := CardManager.active_disaster()
+	_refresh_band_crisis()
 	if map_holder != null and map_holder.has_method("set_disaster"):
 		map_holder.set_disaster(active.get("provinces", []), String(active.get("kind", "")))
 	if _aid_panel != null and _aid_panel.visible:

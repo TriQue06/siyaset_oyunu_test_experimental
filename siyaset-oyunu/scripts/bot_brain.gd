@@ -388,7 +388,7 @@ static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 			best = {"type": "law", "law": law["law"]}
 			best_score = float(law["score"]) - law_cost * funds_value + law_noise
 
-	# VERGİ YASASI (sadece başbakanın partisi): aynı yasa hakkını kullanır.
+	# VERGİ YASASI (hükümette başbakanın partisi, muhalefette indirim): aynı yasa hakkını kullanır.
 	var tax := _best_tax_law(bot)
 	if not tax.is_empty():
 		var tax_score := float(tax["score"]) - GameRules.LAW_FUNDS_COST * funds_value + _jitter(bot)
@@ -504,17 +504,16 @@ static func _best_law(bot: int) -> Dictionary:
 	return best
 
 ## VERGİ SEZGİLERİ (oyuncuyla aynı kurallar ve aynı görünür bilgi: hazine,
-## vergi kademesi, seçim takvimi). Az ve anlaşılır kural:
-##   - Seçime TAX_CUT_LEAD turdan az kaldıysa vergi yüksek kalmaz (indirimin
-##     etkisi yavaş gelir: erken indirmek gerekir); hazine bolsa düşüğe iner.
-##   - Seçim uzaksa ve hazine yatırıma yetmiyorsa vergi artırılır (para biriktir).
-##   - Hazine çok dolduysa yüksek vergi normale iner; düşük vergi hazineyi
-##     eritiyorsa normale döner.
+## vergi kademesi, seçim takvimi). Az ve anlaşılır kural (0.0.321):
+##   - HÜKÜMET: seçimden hemen sonra, sonraki seçime vakit varken vergiyi
+##     YÜKSEK ister (vergi etkisi seçime yaklaştıkça büyür, erken dönemde ucuz).
+##     Seçime TAX_CUT_LEAD turdan az kaldıysa vergi yüksek kalmaz; hazine
+##     bolsa düşüğe iner.
+##   - MUHALEFET: genel olarak DÜŞÜK vergi ister; indirim yasası sunar
+##     (sunmak düşük vergi etkisini sunana yaşatır), artırıma HAYIR, indirime EVET.
 const TAX_CUT_LEAD := 2
 const TAX_LAW_SCORE := 2.2
-const TAX_LOW_TREASURY := 2.0   # × yatırım bedeli
-const TAX_RICH_TREASURY := 6.0
-const TAX_CUT_TREASURY := 3.0
+const TAX_CUT_TREASURY := 3.0   # × yatırım bedeli
 
 ## Bu turun sonunda seçim varsa 0; seçim yoksa 99.
 static func _rounds_to_election() -> int:
@@ -523,7 +522,11 @@ static func _rounds_to_election() -> int:
 	var next := GameRules.next_election_round(CardManager.round_number)
 	return 99 if next == -1 else next - CardManager.round_number
 
-static func _desired_tax() -> int:
+## İstenen vergi kademesi. bot verilmezse (-1) ya da hükümetteyse hükümet
+## sezgisi; muhalefetse hep DÜŞÜK.
+static func _desired_tax(bot: int = -1) -> int:
+	if bot != -1 and not CardManager.is_government_party(bot):
+		return Economy.TAX_LOW
 	var current := CardManager.tax_level()
 	var treasury := CardManager.state_treasury()
 	var cost := Economy.INVEST_COST
@@ -533,39 +536,43 @@ static func _desired_tax() -> int:
 		if current == Economy.TAX_NORMAL and treasury >= cost * TAX_CUT_TREASURY and _rounds_to_election() >= 1:
 			return Economy.TAX_LOW
 		return current
-	if treasury < cost * TAX_LOW_TREASURY:
-		return mini(Economy.TAX_HIGH, current + 1)
-	if current == Economy.TAX_HIGH and treasury > cost * TAX_RICH_TREASURY:
-		return Economy.TAX_NORMAL
-	if current == Economy.TAX_LOW and treasury < cost * TAX_CUT_TREASURY:
-		return Economy.TAX_NORMAL
-	return current
+	return Economy.TAX_HIGH
 
-## Başbakanın partisi bot ise vergi kademesini sezgiye göre değiştirmeyi önerir.
+## Vergi kademesini sezgiye göre değiştirmeyi önerir: hükümette yalnız
+## başbakanın partisi (geçme ihtimali varsa); muhalefet indirim önerir (geçmese
+## de sunmak düşük vergi etkisini sunana yaşatır).
 static func _best_tax_law(bot: int) -> Dictionary:
-	if CardManager.party_of(bot) != GovernmentManager.main_gov_peer_id or not CardManager.can_propose_tax_law(bot):
+	if not CardManager.can_propose_tax_law(bot):
 		return {}
-	var level := _desired_tax()
-	if level == CardManager.tax_level():
+	var in_gov := CardManager.is_government_party(bot)
+	if in_gov and CardManager.party_of(bot) != GovernmentManager.main_gov_peer_id:
 		return {}
+	var level := _desired_tax(bot)
+	var current := CardManager.tax_level()
+	if level == current:
+		return {}
+	# Kademe adım adım değişir (yüksek -> normal -> düşük).
+	level = current + signi(level - current)
 	var law_type := CardPresets.tax_law_type(level)
-	if _law_pass_chance(bot, law_type) < 0.5:
+	if in_gov and _law_pass_chance(bot, law_type) < 0.5:
 		return {}
 	return {"law": law_type, "score": TAX_LAW_SCORE}
 
-## Vergi yasasına oy: hükümet (genelde) destekler; ortak seçime yakın vergi
-## artırımına destek vermez (sonucunu o da taşır). Muhalefet artırıma HAYIR,
-## seçime yakın indirime HAYIR (iktidara kazanç bırakmaz), yoksa çekimser.
+## Vergi yasasına oy: hükümet kendi yasasını destekler; ortak seçime yakın
+## vergi artırımına destek vermez. Diğer durumlarda bot, yasa istediği kademeye
+## doğruysa EVET, değilse HAYIR (muhalefet: indirime EVET, artırıma HAYIR).
 static func _tax_law_vote(voter: int, law_type: String, proposer: int, gov_ids: Array) -> int:
-	var raising := CardPresets.tax_law_level(law_type) > CardManager.tax_level()
+	var level := CardPresets.tax_law_level(law_type)
+	var current := CardManager.tax_level()
+	var raising := level > current
 	var soon := _rounds_to_election() <= TAX_CUT_LEAD
-	if gov_ids.has(voter):
+	var voter_gov := gov_ids.has(CardManager.party_of(voter))
+	if voter_gov and gov_ids.has(CardManager.party_of(proposer)):
 		if raising and soon and voter != proposer:
 			return GovernmentManager.VOTE_ABSTAIN
-		return GovernmentManager.VOTE_YES if gov_ids.has(proposer) else GovernmentManager.VOTE_NO
-	if raising:
-		return GovernmentManager.VOTE_NO
-	return GovernmentManager.VOTE_NO if _rounds_to_election() <= TAX_CUT_LEAD + 1 else GovernmentManager.VOTE_ABSTAIN
+		return GovernmentManager.VOTE_YES
+	var want := Economy.TAX_LOW if not voter_gov else _desired_tax()
+	return GovernmentManager.VOTE_YES if (want - current) * (level - current) > 0 else GovernmentManager.VOTE_NO
 
 ## Botun son sunduğu yasalar: aynı yasayı (ve karşıt grubun yasasını) üst üste sunmasın.
 static var _recent_laws: Dictionary = {}
@@ -1278,8 +1285,17 @@ static func _censure_vote(bot: int) -> int:
 # --- Hükümet kurma -------------------------------------------------------------
 
 ## Seçmen grupları en yakın partilerle salt çoğunluğa ulaşana kadar koalisyon;
-## bakanlıklar sandalyeyle orantılı. Reddedilince sonraki teklifte aday sırası
-## kaydırılır (aynı teklifi tekrar tekrar sunmasın).
+## bakanlıklar sandalyeyle orantılı. REDDEDİLİNCE (0.0.321) aynı teklif tekrar
+## sunulmaz: reddeden parti aday sırasında geriye düşer (her ret
+## COALITION_REFUSAL_DISTANCE kadar uzak sayılır), yine de ortak olarak
+## seçilirse her ret için COALITION_REFUSAL_POINTS makam puanı fazla ayrılır
+## (açığı en büyük ortak önce makam aldığı için reddeden öne geçer).
+const COALITION_REFUSAL_DISTANCE := 0.75
+const COALITION_REFUSAL_POINTS := 2.0
+
+static func _refusals(bot: int, partner: int) -> int:
+	return GovernmentManager.coalition_refusals_of(CardManager.party_of(bot), partner)
+
 static func build_government(bot: int) -> Dictionary:
 	var total := GovernmentManager.total_seats()
 	# Ortak adayları PARTİLER (bağımsızlar hükümete giremez), kardeş parti önce.
@@ -1293,19 +1309,11 @@ static func build_government(bot: int) -> Dictionary:
 		# yoksa insan oyuncu blok koalisyonuna sızabiliyordu).
 		if bloc and MultiplayerManager.is_bot(a) != MultiplayerManager.is_bot(b):
 			return MultiplayerManager.is_bot(a)
-		if not is_equal_approx(_distance(bot, a), _distance(bot, b)):
-			return _distance(bot, a) < _distance(bot, b)
+		var da := _distance(bot, a) + _refusals(bot, a) * COALITION_REFUSAL_DISTANCE
+		var db := _distance(bot, b) + _refusals(bot, b) * COALITION_REFUSAL_DISTANCE
+		if not is_equal_approx(da, db):
+			return da < db
 		return is_ally(bot, a) and not is_ally(bot, b))
-	var similar := 0
-	for candidate in candidates:
-		if bloc and MultiplayerManager.is_bot(candidate) != MultiplayerManager.is_bot(candidates[0]):
-			break
-		if _distance(bot, candidate) <= _distance(bot, candidates[0]) + 0.25:
-			similar += 1
-		else:
-			break
-	var shift := GovernmentManager.attempts_used % maxi(1, similar)
-	candidates = candidates.slice(shift, similar) + candidates.slice(0, shift) + candidates.slice(similar)
 
 	var partners: Array = []
 	var seats := GovernmentManager.seats_of(bot)
@@ -1331,7 +1339,8 @@ static func build_government(bot: int) -> Dictionary:
 	var given := {}
 	for peer_id in partners:
 		var share := float(GovernmentManager.seats_of(peer_id)) / maxf(1.0, float(seats))
-		required[peer_id] = maxf(float(COALITION_MIN_POINTS), float(total_points) * share * COALITION_FAIR_SHARE) * (1.0 + minf(0.35, _distance(bot, peer_id) * 0.2))
+		required[peer_id] = maxf(float(COALITION_MIN_POINTS), float(total_points) * share * COALITION_FAIR_SHARE) * (1.0 + minf(0.35, _distance(bot, peer_id) * 0.2)) \
+			+ COALITION_REFUSAL_POINTS * _refusals(bot, int(peer_id))
 		given[peer_id] = 0
 	var posts: Array = []
 	for post in GovernmentPresets.POSTS:

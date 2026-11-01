@@ -2,8 +2,8 @@ extends CanvasLayer
 ## HTML Konsept A'nın ölçüleri, kategorileri ve satır düzeni.
 ## 0.0.320: ESC (ya da sağ üstteki Menü) önce DURAKLATMA MENÜSÜNÜ açar: arka
 ## plan kararır, üst üste GERİ DÖN · AYARLAR · OYUNDAN ÇIK. AYARLAR bu gelişmiş
-## ayarlar ekranını açar; ayarlardayken ESC duraklatma menüsüne, oradayken ESC
-## oyuna döner. Ayarlarda açıklama metinleri yok.
+## ayarlar ekranını açar; ayarlarda ESC ya da sağ alttaki OYUNA DÖN, duraklatma
+## menüsündeyken ESC oyuna döner (0.0.321). Ayarlarda açıklama metinleri yok.
 const FPS_OPTIONS := [30, 48, 60, 120, 144, 165, 240, 0]
 const CATEGORIES := [["game", "Oyun menüsü"], ["display", "Görüntü"], ["sound", "Ses"], ["play", "Oynanış"], ["language", "Dil"]]
 const PAUSE_BUTTON_SIZE := Vector2(380, 72)
@@ -26,8 +26,6 @@ var _seed_copy: Button
 var _save_button: Button
 var _tutorial_button: Button
 var _leave_armed := false
-var _reset_armed := false
-var _reset_button: Button
 var _display_buttons: Array[Button] = []
 var _rows: Array[BoxContainer] = []
 var _nav_panel: PanelContainer
@@ -123,7 +121,6 @@ func _build_menu() -> void:
 	_status = _label("", 12, UiTheme.WOOD_TEXT)
 	_status.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	heading.add_child(_status)
-	heading.add_child(_button("GERİ · ESC", _back_to_pause, "gold"))
 	var body := HBoxContainer.new()
 	body.add_theme_constant_override("separation", 3)
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -203,8 +200,8 @@ func _build_menu() -> void:
 	_notice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	footer_row.add_child(_notice)
-	_reset_button = _button("AYARLARI SIFIRLA", _on_reset_pressed)
-	footer_row.add_child(_reset_button)
+	# 0.0.321: sağ altta OYUNA DÖN (ESC ile aynı: her şeyi kapatıp oyuna döner).
+	footer_row.add_child(_button("OYUNA DÖN", close_menu, "gold"))
 	_select_category(_category)
 	_adapt_layout()
 
@@ -379,9 +376,7 @@ func _scene_path() -> String:
 
 func open_menu() -> void:
 	_leave_armed = false
-	_reset_armed = false
 	_leave_button.text = L.t("OYUNDAN AYRIL")
-	_reset_button.text = L.t("AYARLARI SIFIRLA")
 	_notice.text = ""
 	var path := _scene_path()
 	var in_game := path in ["res://scenes/GameScreen.tscn", "res://scenes/GovernmentFormation.tscn", "res://scenes/ElectionResults.tscn"]
@@ -394,7 +389,7 @@ func open_menu() -> void:
 	_select_category("game")
 	_pause.hide()
 	panel.show()
-	# Ayarlar başlığındaki GERİ düğmesinin üstüne binmesin.
+	# Ayarlar ekranında sağ üstte hiçbir düğme olmaz (0.0.321).
 	open_settings_button.hide()
 	_sync_pause()
 
@@ -465,9 +460,6 @@ func open_pause() -> void:
 	open_settings_button.show()
 	_sync_pause()
 
-func _back_to_pause() -> void:
-	open_pause()
-
 ## Ana menüde oyun kapanır; başka her yerde oyundan (odadan) ayrılınır.
 ## İki aşamalı: ilk basış onay ister.
 func _on_quit_pressed() -> void:
@@ -488,8 +480,8 @@ func _on_menu_button_pressed() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
-		if panel.visible: open_pause()
-		elif _pause.visible: close_menu()
+		# Ayarlarda ya da duraklatma menüsünde ESC oyuna döner (OYUNA DÖN ile aynı).
+		if panel.visible or _pause.visible: close_menu()
 		else: open_pause()
 		get_viewport().set_input_as_handled()
 	elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F11:
@@ -517,23 +509,6 @@ func _on_leave_pressed() -> void:
 		return
 	close_menu()
 	MultiplayerManager.leave_game()
-
-func _on_reset_pressed() -> void:
-	if not _reset_armed:
-		_reset_armed = true
-		_reset_button.text = L.t("TEKRAR BAS · SIFIRLA")
-		_notice.text = L.t("Kişisel ayarların varsayılan değerlerine dönecek.")
-		return
-	GameSettings.set_fps_limit(GameSettings.DEFAULT_FPS_LIMIT)
-	GameSettings.set_vsync_enabled(GameSettings.DEFAULT_VSYNC)
-	GameSettings.set_display_mode(GameSettings.DEFAULT_DISPLAY_MODE)
-	GameSettings.set_volume("master", GameSettings.DEFAULT_MASTER_VOLUME)
-	GameSettings.set_volume("music", GameSettings.DEFAULT_MUSIC_VOLUME)
-	GameSettings.set_volume("sfx", GameSettings.DEFAULT_SFX_VOLUME)
-	GameSettings.set_province_view(GameSettings.DEFAULT_PROVINCE_VIEW)
-	GameSettings.set_event_fx(true)
-	GameSettings.set_streamer_mode(GameSettings.DEFAULT_STREAMER_MODE)
-	_rebuild.call_deferred(_category)
 
 func _rebuild(category: String) -> void:
 	for child in panel.get_children():

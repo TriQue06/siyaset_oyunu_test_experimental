@@ -5798,3 +5798,15 @@ msgstr "PRESS AGAIN · QUIT"
 
 msgid "GERİ · ESC"
 msgstr "BACK · ESC"
+
+msgid "TUTAR"
+msgstr "AMOUNT"
+
+msgid "Bölgede +%s oy · Ülke genelinde +%s"
+msgstr "Region +%s votes · Nationwide +%s"
+
+msgid "OYUNA DÖN"
+msgstr "BACK TO GAME"
+
+msgid "AFET"
+msgstr "DISASTER"

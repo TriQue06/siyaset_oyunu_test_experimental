@@ -1928,5 +1928,9 @@
 "AYARLAR": "SETTINGS",
 "OYUNDAN ÇIK": "QUIT GAME",
 "TEKRAR BAS · ÇIK": "PRESS AGAIN · QUIT",
-"GERİ · ESC": "BACK · ESC"
+"GERİ · ESC": "BACK · ESC",
+"TUTAR": "AMOUNT",
+"Bölgede +%s oy · Ülke genelinde +%s": "Region +%s votes · Nationwide +%s",
+"OYUNA DÖN": "BACK TO GAME",
+"AFET": "DISASTER"
 }

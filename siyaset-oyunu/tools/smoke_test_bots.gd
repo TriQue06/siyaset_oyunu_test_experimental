@@ -170,6 +170,30 @@ func _initialize() -> void:
 	for post in plan.keys():
 		partners[plan[post]] = true
 	check("gensoru sonrasi blok lideri ortak olarak botlari secer", not partners.has(human), str(partners.keys()))
+	# 0.0.321: reddeden ortağa aynı teklif tekrar sunulmaz (başka ortak ya da daha çok makam).
+	var post_pts := {}
+	for post in load("res://scripts/government_presets.gd").POSTS:
+		post_pts[String(post["id"])] = int(post["points"])
+	var first_partners: Array = []
+	var first_points := {}
+	for post in plan.keys():
+		var p := int(plan[post])
+		if p != ids[1]:
+			if not first_partners.has(p):
+				first_partners.append(p)
+			first_points[p] = int(first_points.get(p, 0)) + int(post_pts[String(post)])
+	if not first_partners.is_empty():
+		var refuser: int = first_partners[0]
+		gm.coalition_refusals = {}
+		gm.note_coalition_refusal(cm.party_of(ids[1]), refuser)
+		var plan2: Dictionary = brain.build_government(ids[1])
+		var refuser_points := 0
+		for post in plan2.keys():
+			if int(plan2[post]) == refuser:
+				refuser_points += int(post_pts[String(post)])
+		check("reddedilen teklif aynen tekrarlanmaz", str(plan2) != str(plan)
+			and (refuser_points == 0 or refuser_points > int(first_points[refuser])), "%s -> %s" % [str(first_points), refuser_points])
+		gm.coalition_refusals = {}
 	mm.players[human]["bot"] = true
 
 	print("")

@@ -629,6 +629,7 @@ func _initialize() -> void:
 	for rr in range(1, 20):
 		cm.round_number = rr
 		cm.last_seats = {} if rr <= GameRules.FIRST_ELECTION_ROUND else {1: 150, 2: 140, 3: 110}
+		cm._crisis_due = true
 		cm._schedule_agenda()
 		calendar[rr] = cm.agenda_type()
 	var no_early := true
@@ -640,7 +641,11 @@ func _initialize() -> void:
 	for rr in range(9, 20):
 		if calendar[rr] == "":
 			pattern_ok = false
-	check("ilk secimden sonra her tur gundem", pattern_ok, str(calendar))
+	check("kriz zari tutunca ilk secimden sonra kriz", pattern_ok, str(calendar))
+	cm.round_number = 12
+	cm._crisis_due = false
+	cm._schedule_agenda()
+	check("kriz zari tutmazsa kriz yok (0.0.321)", cm.agenda_type() == "")
 	var pairs_ok := true
 	for rr in range(9, 19):
 		if cp.agenda_data(calendar[rr])["pair"] == cp.agenda_data(calendar[rr + 1])["pair"]:
@@ -823,15 +828,25 @@ func _initialize() -> void:
 			others_ok = false
 	check("tur geliri yeni siradaki ilk oyuncuya, digerlerine yalniz secim parasi",
 		cm.funds_of(first) - float(income_before[first]) > float(GameRules.ELECTION_FUNDS_BONUS) + 0.01 and others_ok)
-	# Seçimden sonraki ikinci turdan itibaren afet çıkabilir (zorla: borç ve son tur değil).
-	var disasters := 0
-	for trial in 40:
-		cm.disaster = {"term_count": 0}
+	# TUR OLAYI (0.0.321): 1/3 hiçbiri, 1/3 afet, 1/3 kriz; ikisi birden olmaz.
+	var counts := {"none": 0, "disaster": 0, "crisis": 0}
+	var both := false
+	for trial in 900:
+		cm.disaster = {}
 		cm.round_number = 9
-		cm._roll_disaster()
-		if cm.has_disaster():
-			disasters += 1
-	check("sonraki turlarda afet cikabilir", disasters > 0, str(disasters))
+		cm._roll_round_event(false)
+		if cm.has_disaster() and cm._crisis_due:
+			both = true
+		counts["disaster" if cm.has_disaster() else ("crisis" if cm._crisis_due else "none")] += 1
+	check("tur olayi ~1/3 hicbiri, ~1/3 afet, ~1/3 kriz", counts["none"] > 240 and counts["disaster"] > 240 and counts["crisis"] > 240, str(counts))
+	check("afet ve kriz ayni turda olmaz", not both)
+	var post_disaster := false
+	for trial in 200:
+		cm.disaster = {}
+		cm._roll_round_event(true)
+		post_disaster = post_disaster or cm.has_disaster()
+	check("secimden sonraki tur afetsiz", not post_disaster)
+	cm.disaster = {}
 
 	print("")
 	if fails == 0:

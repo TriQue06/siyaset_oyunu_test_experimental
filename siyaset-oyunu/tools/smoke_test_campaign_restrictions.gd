@@ -20,8 +20,8 @@ func run() -> void:
 	gm.phase = gm.Phase.IDLE
 	var province: String = cm._province_ids[0]
 	check(cm.start_disaster("deprem", [province]).is_empty(), "campaign disaster cannot start")
-	cm.disaster["owed"] = true
-	cm._roll_disaster()
+	for i in 30:
+		cm._roll_round_event(false)
 	check(not cm.has_disaster(), "campaign random disaster blocked")
 	var screen = load("res://scenes/GameScreen.tscn").instantiate()
 	root.add_child(screen)

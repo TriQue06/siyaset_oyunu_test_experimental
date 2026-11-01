@@ -99,6 +99,7 @@ func _initialize() -> void:
 	check("afet: muhalefet daha çok yardım etti, düşer", near(cm.approval_value(), mid + PublicOpinion.APPROVAL_DISASTER_LESS))
 	mid = cm.approval_value()
 	cm.invest_requests = {}
+	cm.disaster["active"] = {}  # tur olayı zarı afet çıkarmış olabilir
 	cm._finish_round()
 	check("olaysız tur: değişmez, fark 0", near(cm.approval_value(), mid) and near(cm.approval_delta(), 0.0))
 

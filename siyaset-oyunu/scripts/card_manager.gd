@@ -208,8 +208,7 @@ var funds: Dictionary = {}
 ## endeksi, yatırım ivmesi, DEVLET HAZİNESİ, bekleyen yatırım dilimleri.
 var economy: Dictionary = Economy.start_state()
 ## AFET (bkz. Disaster): {"active": {} ya da {"id", "kind", "provinces",
-## "round", "aid": {parti: toplam milyon ¤}}, "term_count": bu seçim
-## döneminde çıkan afet, "owed": önceki dönemde hiç çıkmadı (garanti),
+## "round", "aid": {parti: toplam milyon ¤}},
 ## "next_id"}.
 var disaster: Dictionary = {}
 ## HÜKÜMET ONAYI (bkz. PublicOpinion.APPROVAL_*): {"value", "delta", "history",
@@ -220,6 +219,11 @@ var approval: Dictionary = {}
 var invest_requests: Dictionary = {}
 ## Tur başında çıkan afetin gazete bilgisi (sonraki _push_state olaya ekler).
 var _pending_disaster_fx: Dictionary = {}
+## TUR OLAYI (0.0.321, host): her tur başında tek zar — 1/3 hiçbir şey, 1/3
+## AFET, 1/3 SİYASİ KRİZ (bir seçmen grubunu hedefler). İkisi aynı turda olmaz.
+## Seçimden hemen sonraki tur afetsizdir (seçim gecesi haberleri arasında
+## kayboluyordu): o tur yarı yarıya kriz ya da hiçbir şey.
+var _crisis_due := false
 ## Tur sonu ekonomi olayı: bir sonraki durum yayınına iliştirilir.
 var _pending_econ: Dictionary = {}
 
@@ -973,6 +977,11 @@ func start_approval() -> void:
 func invest_request(province_id: String) -> Dictionary:
 	return invest_requests.get(province_id, {})
 
+## Yatırım isteklerini yalnız HÜKÜMET partileri görür (0.0.321): muhalefet ve
+## koalisyondan düşen parti haritada ve il menüsünde görmez.
+func sees_invest_requests(peer_id: int) -> bool:
+	return has_approval() and is_government_party(peer_id)
+
 ## İsteğin süresi: oynama sırasında kalan sıra sayısı (bu sıra dahil) / tur
 ## başındaki sıra sayısı. Haritadaki pasta bu kadar dilimden oluşur.
 func request_turns() -> Vector2i:
@@ -1170,18 +1179,16 @@ func _apply_aid_move(peer_id: int, party_m: float, state_m: float) -> void:
 			"party_cost": party_m, "before": before, "after": state_treasury()}
 	_push_state(event)
 
-## Tur başı (host): afet zarı. Dönemde en fazla TERM_MAX; önceki dönem hiç
-## çıkmadıysa bu dönemin son turunda hâlâ yoksa kesin çıkar.
-func _roll_disaster() -> void:
-	if last_election_round <= 0:
-		return
-	var count := int(disaster.get("term_count", 0))
-	if count >= Disaster.TERM_MAX:
-		return
-	var forced: bool = bool(disaster.get("owed", false)) and count == 0 and GameRules.is_election_round(round_number)
-	if not forced and _rng.randf() >= Disaster.round_chance():
-		return
-	start_disaster(Disaster.pick_kind(_rng))
+## Tur başı (host): TUR OLAYI zarı (bkz. _crisis_due). Kriz, _schedule_agenda'da açılır.
+func _roll_round_event(after_election: bool) -> void:
+	_crisis_due = false
+	var roll := _rng.randi_range(0, 2)
+	if after_election and roll == 1:
+		roll = 0 if _rng.randf() < 0.5 else 2
+	if roll == 1 and last_election_round > 0:
+		start_disaster(Disaster.pick_kind(_rng))
+	elif roll == 2:
+		_crisis_due = true
 
 ## Afeti başlatır (testler de doğrudan çağırır). Dönüş: etkilenen iller.
 func start_disaster(kind: String, provinces: Array = []) -> Array:
@@ -1193,8 +1200,6 @@ func start_disaster(kind: String, provinces: Array = []) -> Array:
 		return []
 	var id := int(disaster.get("next_id", 1))
 	disaster["next_id"] = id + 1
-	disaster["term_count"] = int(disaster.get("term_count", 0)) + 1
-	disaster["owed"] = false
 	disaster["active"] = {"id": id, "kind": kind, "provinces": provinces, "round": round_number, "aid": {}}
 	var names: Array = []
 	for province_id in provinces:
@@ -1237,12 +1242,6 @@ func _end_disaster() -> void:
 			_approval_add(L.t("Afet yardımı"), PublicOpinion.APPROVAL_DISASTER_MORE)
 		elif gov_aid < opp_aid or gov_aid <= 0.0:
 			_approval_add(L.t("Afet yardımı yetersiz"), PublicOpinion.APPROVAL_DISASTER_LESS)
-
-## Yeni seçim dönemi: sayaç sıfırlanır; biten dönemde hiç afet çıkmadıysa
-## yenisinde en az bir tane garanti.
-func _disaster_new_term() -> void:
-	disaster["owed"] = int(disaster.get("term_count", 0)) == 0
-	disaster["term_count"] = 0
 
 ## Yatırım hamlesi: sadece hükümet partileri; tamamı DEVLET HAZİNESİNDEN
 ## (partinin bu dönemki hazine kotası yetmezse yapılamaz).
@@ -2645,6 +2644,7 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 	if passed:
 		stat_add(proposer, "laws")
 	if CardPresets.is_tax_law(law_type):
+		_apply_tax_stance(proposer, CardPresets.tax_law_level(law_type), votes)
 		_apply_tax_result(proposer, CardPresets.tax_law_level(law_type), passed)
 		return
 	var law := CardPresets.law_data(law_type)
@@ -2720,6 +2720,36 @@ func apply_law_result(proposer: int, law_type: String, votes: Dictionary, passed
 		law["title"], L.t("KABUL EDİLDİ") if passed else L.t("reddedildi"), _party_name(proposer), law["group_title"],
 		"" if passed else L.t(" (vaat olarak, az)"), VoterGroups.title(opposite), notes]})
 
+## VERGİ YASASI TUTUMU (0.0.321): yasa geçse de geçmese de, SUNAN parti o
+## kademenin vergi etkisini TAX_PROPOSER_TURNS sıra hükümetteymiş gibi (tek
+## başına iktidar sayılır) hemen yaşar. EVET diyenler aynı etkiyi
+## TAX_VOTER_TURNS sıra, HAYIR diyenler ters kademenin (yüksek <-> düşük)
+## etkisini TAX_VOTER_TURNS sıra yaşar. Çekimser etkilenmez. Ulusal puandır;
+## seçime yaklaştıkça büyür (tax_cycle_mult).
+const TAX_PROPOSER_TURNS := 3
+const TAX_VOTER_TURNS := 1
+
+func tax_stance_effect(peer_id: int, level: int, turns: int) -> float:
+	return tax_turn_effect(level) * float(turns) * PoliticianPresets.party_effect(party_of(peer_id), "tax_mood")
+
+func _apply_tax_stance(proposer: int, level: int, votes: Dictionary) -> void:
+	var proposer_party := party_of(proposer)
+	_add_national(proposer_party, tax_stance_effect(proposer_party, level, TAX_PROPOSER_TURNS))
+	var mirror := Economy.TAX_HIGH - level
+	var party_votes := _party_vote_shares(votes)
+	for pid in party_votes.keys():
+		if int(pid) == proposer_party:
+			continue
+		var amount := 0.0
+		for vote in party_votes[pid]:
+			match int(vote["choice"]):
+				GovernmentManager.VOTE_YES:
+					amount += tax_stance_effect(int(pid), level, TAX_VOTER_TURNS) * float(vote["weight"])
+				GovernmentManager.VOTE_NO:
+					amount += tax_stance_effect(int(pid), mirror, TAX_VOTER_TURNS) * float(vote["weight"])
+		if amount != 0.0:
+			_add_national(int(pid), amount)
+
 ## VERGİ YASASI sonucu. Kabul: kademe değişir; gelir bir sonraki tur sonundan
 ## itibaren yeni kademeyle, seçmen etkisi bir sonraki sıradan itibaren
 ## (_apply_tax_tick: her sırada hükümete, seçime yaklaştıkça artarak).
@@ -2789,7 +2819,7 @@ func law_on_agenda(law_type: String) -> bool:
 ## AGENDA_ROUNDS tur gündem (her tur farklı çift), AGENDA_GAP tur ara.
 func _schedule_agenda() -> void:
 	var k := round_number - (GameRules.FIRST_ELECTION_ROUND + 1)
-	if k < 0 or last_seats.is_empty():
+	if k < 0 or last_seats.is_empty() or not _crisis_due:
 		agenda = {}
 		return
 	var pos := k % (GameRules.AGENDA_ROUNDS + GameRules.AGENDA_GAP)
@@ -4046,13 +4076,11 @@ func _finish_round() -> void:
 		or GameRules.is_election_round(finished_round) \
 		or (not last_seats.is_empty() and not GovernmentManager.has_government()
 			and GovernmentManager.phase == GovernmentManager.Phase.IDLE)
-	if will_elect:
-		_disaster_new_term()
-	# Seçimden hemen sonraki ilk tur AFETSİZ (0.0.188): seçim gecesi, hükümet
-	# kurma ve sonuç gazetesi arasında afet haberi kayboluyordu; o turda yalnız
-	# gündem olur. Afet ancak seçimden sonraki ikinci turdan itibaren çıkar.
-	if finished_round < GameRules.MAX_ROUNDS and not will_elect:
-		_roll_disaster()
+	# TUR OLAYI: hiçbiri / afet / kriz (bkz. _roll_round_event).
+	if finished_round < GameRules.MAX_ROUNDS:
+		_roll_round_event(will_elect)
+	else:
+		_crisis_due = false
 
 	var scheduled := GameRules.is_election_round(finished_round)
 	var no_government := not last_seats.is_empty() \

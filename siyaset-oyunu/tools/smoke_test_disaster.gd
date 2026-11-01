@@ -152,51 +152,17 @@ func _initialize() -> void:
 	print("=== 4) TUR SONU VE DÖNEM ===")
 	cm._end_disaster()
 	check("tur bitince afet sona erer", not cm.has_disaster())
-	# Dönem sınırı: 2 afetten sonra zar atılmaz.
-	cm.disaster["term_count"] = 2
-	var spawned := false
-	for i in 50:
-		cm._roll_disaster()
+	# Sıklık (0.0.321): tur başına 1/3 afet; afet varken kriz yok.
+	var hits := 0
+	var with_crisis := false
+	for i in 600:
+		cm.disaster = {}
+		cm._roll_round_event(false)
 		if cm.has_disaster():
-			spawned = true
-			break
-	check("dönemde en fazla 2 afet", not spawned)
-	# Afetsiz dönem → sonraki dönem garanti (son turda kesin).
-	cm.disaster = {"term_count": 0}
-	cm._disaster_new_term()
-	check("afetsiz dönemden sonra borç", bool(cm.disaster.get("owed", false)))
-	var last_round := 1
-	while not GameRules.is_election_round(last_round):
-		last_round += 1
-	cm.round_number = last_round
-	var old_chance: float = D.ROUND_CHANCE
-	cm._rng.seed = 7
-	# Şans ne olursa olsun son turda çıkar: 30 kez dene, hepsi çıkmalı.
-	var forced_ok := true
-	for i in 30:
-		cm.disaster = {"term_count": 0, "owed": true}
-		cm._roll_disaster()
-		if not cm.has_disaster():
-			forced_ok = false
-	check("garanti: dönemin son turunda afet kesin çıkar", forced_ok)
-	cm.disaster = {"term_count": 1, "owed": false}
-	cm._disaster_new_term()
-	check("afetli dönemden sonra borç yok", not bool(cm.disaster.get("owed", true)))
-	# Sıklık: 4 turluk 2000 dönemde ortalama ~1, hiçbiri 2'yi aşmaz.
-	var total := 0
-	var over := false
-	var sim := RandomNumberGenerator.new()
-	sim.seed = 99
-	for term in 2000:
-		var n := 0
-		for r in 4:
-			if n < D.TERM_MAX and sim.randf() < D.ROUND_CHANCE:
-				n += 1
-		total += n
-		over = over or n > D.TERM_MAX
-	check("dönem başına ortalama ~1 afet (4 turluk dönem)", total / 2000.0 > 0.7 and total / 2000.0 < 1.2, "%.2f" % (total / 2000.0))
-	check("hiçbir dönem 2'yi aşmaz", not over)
-	print("  (ROUND_CHANCE %.2f)" % old_chance)
+			hits += 1
+			with_crisis = with_crisis or cm._crisis_due
+	check("tur başına ~1/3 afet", hits > 160 and hits < 240, str(hits))
+	check("afet turunda kriz yok", not with_crisis)
 
 	print("=== 5) BOT ===")
 	new_game()

@@ -5,9 +5,8 @@ class_name Disaster
 ##   - Türler ve büyüklükleri: SEL, TOPRAK KAYMASI, ÇIĞ tek il; ORMAN YANGINI
 ##     küçük bölge (2-3 komşu il); DEPREM geniş bölge (3-5 komşu il).
 ##   - Afet bir TUR sürer: tur başında çıkar, tur bitince sona erer.
-##   - Sıklık: tur başına round_chance() (dönem uzunluğuna göre, ortalama ~1); bir seçim döneminde en fazla TERM_MAX.
-##     Bir dönem hiç afet olmadıysa sonraki dönemde en az bir tane garanti
-##     (dönemin son turuna kadar çıkmadıysa o tur kesin çıkar).
+##   - Sıklık (0.0.321): tur olayı zarı (CardManager._roll_round_event) —
+##     1/3 hiçbir şey, 1/3 afet, 1/3 siyasi kriz; afet ve kriz aynı turda olmaz.
 ##   - YARDIM GÖTÜR hamlesi: tutarı oyuncu belirler (en az AID_MIN, AID_STEP
 ##     adımlarla). Hükümet partileri devlet hazinesinden (kotası kadar) ve/veya
 ##     parti kasasından, diğerleri sadece kasadan öder. Etki yatırımdan çok
@@ -20,10 +19,6 @@ const KIND_WEIGHTS := {"sel": 3, "heyelan": 2, "cig": 1, "yangin": 2, "deprem": 
 ## [en az, en çok] il.
 const SIZES := {"sel": [1, 1], "heyelan": [1, 1], "cig": [1, 1], "yangin": [2, 3], "deprem": [3, 5]}
 
-## Varsayılan 4 turluk dönemde tur başına olasılık (dönem başına ~1 afet).
-const ROUND_CHANCE := 0.25
-const TERM_MAX := 2
-
 const AID_MIN := 5.0
 const AID_STEP := 5.0
 ## İl başına yerel puan = AID_LOCAL_K × √(o ile düşen milyon ¤).
@@ -31,12 +26,6 @@ const AID_STEP := 5.0
 const AID_LOCAL_K := 1.5
 ## Ulusal puan = AID_NATIONAL_K × √(toplam milyon ¤).
 const AID_NATIONAL_K := 0.2
-
-## Seçim aralığı uzunsa (anayasa) tur başına olasılık düşer: dönemde ~1.
-## Seçimden hemen sonraki tur afetsiz (0.0.188): zar dönemin kalan turlarına
-## (aralık − 1) yayılır, ortalama yine ~1.
-static func round_chance() -> float:
-	return clampf(1.0 / float(maxi(1, GameRules.ELECTION_INTERVAL - 1)), 0.06, 0.6)
 
 static func title(kind: String) -> String:
 	match kind:

@@ -81,6 +81,10 @@ var phase: int = Phase.IDLE
 var mandate_order: Array = []
 var mandate_index: int = 0
 var attempts_used: int = 0
+## KOALİSYON REDDİ HAFIZASI (0.0.321): bu hükümet kurma sürecinde kimin kimin
+## teklifini kaç kez reddettiği: {kuran parti: {ortak parti: sayı}}. Botlar
+## aynı teklifi tekrar sunmasın (bkz. BotBrain.build_government).
+var coalition_refusals: Dictionary = {}
 
 # --- Aktif meclis teklifi ---
 var proposal_kind: String = ""
@@ -354,6 +358,7 @@ func start_formation(extra_seconds: float = 0.0) -> void:
 	_build_mandate_order()
 	mandate_index = 0
 	attempts_used = 0
+	coalition_refusals = {}
 	_clear_proposal()
 	last_resolution_reason = ""
 	abandoned = false
@@ -839,6 +844,7 @@ func _resolve_proposal() -> void:
 			_build_mandate_order()
 			mandate_index = 0
 			attempts_used = 0
+			coalition_refusals = {}
 			_clear_proposal()
 			_set_phase(Phase.FORMING if not mandate_order.is_empty() else Phase.IDLE)
 			last_resolution_reason = L.t("Gensoru kabul edildi, hükümet düştü.") + fall_note
@@ -856,11 +862,21 @@ func _resolve_proposal() -> void:
 
 ## 1. aşama (koalisyon görüşmesi) bitti: ortakların hepsi EVET dediyse teklif
 ## meclis oylamasına geçer; biri bile EVET demezse teklif hakkı yanar.
+func note_coalition_refusal(founder: int, partner: int) -> void:
+	var refusals: Dictionary = coalition_refusals.get(founder, {})
+	refusals[partner] = int(refusals.get(partner, 0)) + 1
+	coalition_refusals[founder] = refusals
+
+## Bu partinin, kuranın tekliflerini bu süreçte kaç kez reddettiği.
+func coalition_refusals_of(founder: int, partner: int) -> int:
+	return int((coalition_refusals.get(founder, {}) as Dictionary).get(partner, 0))
+
 func _resolve_coalition_stage() -> void:
 	var proposer := proposal_peer_id
 	for member in eligible_voter_ids():
 		if int(votes.get(member, VOTE_ABSTAIN)) != VOTE_YES:
 			var partner := PartyManager.party_of(int(member))
+			note_coalition_refusal(PartyManager.party_of(proposer), partner)
 			last_resolution_reason = L.t("Koalisyon görüşmesi başarısız: %s ortak olmayı kabul etmedi%s.") % [_party_name(partner),
 				"" if int(member) == partner else L.t(" (genel başkan yardımcısı HAYIR dedi)")]
 			_fail_attempt()
@@ -1040,6 +1056,7 @@ func _pack_state() -> Dictionary:
 		"mandate_order": mandate_order,
 		"mandate_index": mandate_index,
 		"attempts_used": attempts_used,
+		"coalition_refusals": coalition_refusals,
 		"proposal_kind": proposal_kind,
 		"proposal_peer_id": proposal_peer_id,
 		"proposal_assignments": proposal_assignments,
@@ -1103,6 +1120,14 @@ func _sync_state(state: Dictionary) -> void:
 	mandate_order = state["mandate_order"]
 	mandate_index = int(state["mandate_index"])
 	attempts_used = int(state["attempts_used"])
+	coalition_refusals = {}
+	# JSON kaydında anahtarlar metne döner: geri sayıya çevrilir.
+	var refusals: Dictionary = state.get("coalition_refusals", {})
+	for founder in refusals.keys():
+		var inner := {}
+		for partner in (refusals[founder] as Dictionary).keys():
+			inner[int(partner)] = int(refusals[founder][partner])
+		coalition_refusals[int(founder)] = inner
 	proposal_kind = str(state["proposal_kind"])
 	proposal_peer_id = int(state["proposal_peer_id"])
 	proposal_assignments = state["proposal_assignments"]

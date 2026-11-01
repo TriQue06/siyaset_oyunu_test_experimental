@@ -115,11 +115,14 @@ func _initialize() -> void:
 	print("")
 	print("=== 1) YÜKSEK VERGİ: HAZİNE BİRİKİR ===")
 	new_game()
-	var groups_before := str(pm.parties[1]["groups"])
 	var voters_before: float = cm.voter_total(1)
 	check("vergi artırımı kabul edildi", pass_tax(Economy.TAX_HIGH))
-	check("vergi yasası kalıcı grup yakınlığına yazmaz", str(pm.parties[1]["groups"]) == groups_before)
-	check("vergi yasası kabul anında seçmene yazmaz", near(cm.voter_total(1), voters_before))
+	check("0.0.321: yüksek vergi sunan, etkisini hemen yaşar (seçmen kaybeder)", cm.voter_total(1) < voters_before,
+		"%.0f -> %.0f" % [voters_before, cm.voter_total(1)])
+	# Sunan 3 sıra, EVET diyen 1 sıra, HAYIR diyen ters kademeyi 1 sıra yaşar.
+	check("vergi tutumu: sunan 3 sıra, oy veren 1 sıra", near(cm.tax_stance_effect(1, Economy.TAX_HIGH, cm.TAX_PROPOSER_TURNS),
+		cm.tax_stance_effect(1, Economy.TAX_HIGH, 1) * 3.0) and cm.tax_stance_effect(1, Economy.TAX_HIGH, 1) < 0.0
+		and cm.tax_stance_effect(2, Economy.TAX_LOW, cm.TAX_VOTER_TURNS) > 0.0 and cm.tax_stance_effect(2, Economy.TAX_HIGH, cm.TAX_VOTER_TURNS) < 0.0)
 	check("grup değerine ekonomi katmanı eklenmez", str(cm.effective_groups(1)) == str(cm.effective_groups(1))
 		and not cm.has_method("economy_mood") and not cm.has_method("economy_index"))
 	var treasury0: float = cm.state_treasury()

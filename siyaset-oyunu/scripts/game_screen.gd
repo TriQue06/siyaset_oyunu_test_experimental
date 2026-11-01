@@ -269,6 +269,7 @@ const ACTION_COLOR_CENSURE := Color("A6325A")   # bordo
 const ACTION_COLOR_EARLY := Color("F0A824")     # sarı-turuncu
 const ACTION_COLOR_CONGRESS := Color("AB39DB")  # mor
 const ACTION_COLOR_ALLIANCE := Color("F08A24")  # turuncu (konsept)
+const ACTION_COLOR_DRAW := Color("D99A1E")      # altın (KART ÇEK, 0.0.317)
 const ACTION_COLOR_PASS := UiTheme.TEAL         # deniz yeşili (konsept TURU BİTİR)
 const VOTE_COLOR_YES := Color("31C440")         # yeşil
 const VOTE_COLOR_ABSTAIN := Color("FAD028")     # sarı
@@ -658,46 +659,37 @@ static func _section_label(text: String) -> Label:
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return label
 
-## EK KART ÇEK (0.0.301): ELİM başlığının sağında küçük altın düğme; sırada
-## ücretsiz çekimden sonra bir kez, ücretli.
+## EK KART ÇEK (0.0.301): sırada ücretsiz çekimden sonra bir kez, ücretli.
+## 0.0.317: hamle alanında, MECLİS'in solunda yarım genişlik hamle düğmesi;
+## hep görünür, yapılamıyorsa sönük ve basınca nedeni yazar.
 var _extra_draw_button: Button
 
-func _place_extra_draw_button() -> void:
-	if _extra_draw_button == null:
-		_extra_draw_button = Button.new()
-		_extra_draw_button.focus_mode = Control.FOCUS_NONE
-		_extra_draw_button.add_theme_font_override("font", UiTheme.mono(true))
-		_extra_draw_button.add_theme_font_size_override("font_size", UiTheme.fs(15))
-		UiSkin.skin_color_button(_extra_draw_button, UiTheme.GOLD_DIM)
-		for key in ["font_color", "font_hover_color", "font_pressed_color"]:
-			_extra_draw_button.add_theme_color_override(key, UiTheme.ON_COLOR)
-		_extra_draw_button.pressed.connect(func():
-			var reason := CardManager.extra_draw_block_reason(multiplayer.get_unique_id())
-			if reason != "":
-				_show_toast(reason)
-				return
-			CardManager.extra_draw())
-		add_child(_extra_draw_button)
-	var label := _desk_labels["hand"] as Label
-	label.reset_size()
-	_extra_draw_button.text = L.t("KART ÇEK · %s") % GameRules.cost_text(CardManager.EXTRA_DRAW_COST)
-	_extra_draw_button.reset_size()
-	_extra_draw_button.position = label.position + Vector2(label.size.x + UiTheme.d(14),
-		(label.size.y - _extra_draw_button.size.y) * 0.5)
-	_refresh_extra_draw_button()
+func _build_extra_draw_button() -> Button:
+	var button := Button.new()
+	button.focus_mode = Control.FOCUS_NONE
+	button.custom_minimum_size = Vector2(0, ACTION_BUTTON_HEIGHT)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.clip_text = true
+	button.set_meta("action_color", ACTION_COLOR_DRAW)
+	button.add_theme_font_override("font", UiTheme.mono(true))
+	button.add_theme_font_size_override("font_size", ACTION_FONT_SIZE)
+	button.pressed.connect(func():
+		var reason := CardManager.extra_draw_block_reason(multiplayer.get_unique_id())
+		if reason != "":
+			_show_toast(reason)
+			return
+		CardManager.extra_draw())
+	return button
 
 func _refresh_extra_draw_button() -> void:
 	if _extra_draw_button == null:
 		return
 	var me := multiplayer.get_unique_id()
-	# Yalnız kendi sıramda ve ücretsiz çekimden sonra görünür; şartı yoksa sönük.
-	_extra_draw_button.visible = CardManager.current_turn_peer_id() == me and not CardManager.needs_turn_draw(me) \
-		and not CardManager.is_party_member(me) and not bool(CardManager._flow_value(me, "extra_draw", false))
-	_extra_draw_button.modulate.a = 1.0 if CardManager.can_extra_draw(me) else 0.55
-	var label := _desk_labels.get("hand") as Label
-	if label != null:
-		label.reset_size()
-		_extra_draw_button.position.x = label.position.x + label.size.x + UiTheme.d(14)
+	var sub := GameRules.cost_text(CardManager.EXTRA_DRAW_COST)
+	if CardManager.current_turn_peer_id() == me and bool(CardManager._flow_value(me, "extra_draw", false)):
+		sub = L.t("bu sıra çektin")
+	_set_action_available(_extra_draw_button, CardManager.can_extra_draw(me))
+	_set_action_text(_extra_draw_button, L.t("KART ÇEK"), sub)
 
 ## Masanın bölüm başlıkları: ELİM · HAMLELER · SIRA.
 func _place_desk_labels() -> void:
@@ -721,7 +713,6 @@ func _place_desk_labels() -> void:
 		add_child(hint)
 		_desk_labels["hint"] = hint
 	(_desk_labels["hand"] as Label).position = _r(Rect2(16, 546, 0, 0)).position
-	_place_extra_draw_button()
 	(_desk_labels["actions"] as Label).position = _r(Rect2(536, 546, 0, 0)).position
 	(_desk_labels["turn"] as Label).position = _r(Rect2(1112, 546, 0, 0)).position
 	# 0.0.260: sıra göstergesi yalnız üst bantta (para levhasının üstünde yok).
@@ -2178,6 +2169,7 @@ func _build_plaque(pid: int, width: float) -> Control:
 	if is_turn:
 		var snake := TurnSnake.new()
 		snake.party_color = color
+		snake.radius = style.radius_tl
 		snake.outset = Vector4(style.content_margin_left, style.content_margin_top, style.content_margin_right, style.content_margin_bottom)
 		card.add_child(snake)
 	var row := HBoxContainer.new()
@@ -3825,8 +3817,6 @@ func _toggle_profile(peer_id: int) -> void:
 func _on_party_action(kind: String, peer_id: int) -> void:
 	_hide_profile()
 	match kind:
-		"dissolve":
-			CardManager.dissolve_party()
 		"congress":
 			CardManager.request_congress()
 		"resign":
@@ -4398,7 +4388,13 @@ func _build_action_buttons() -> void:
 	_parl_button.add_theme_font_override("font", UiTheme.mono(true))
 	_parl_button.add_theme_font_size_override("font_size", ACTION_FONT_SIZE)
 	_parl_button.pressed.connect(_on_parliament_button_pressed)
-	actions_vbox.add_child(_parl_button)
+	# 0.0.317: üst sıra yarı yarıya: solda KART ÇEK, sağda MECLİS.
+	var top_row := HBoxContainer.new()
+	top_row.add_theme_constant_override("separation", ACTION_BUTTON_GAP)
+	actions_vbox.add_child(top_row)
+	_extra_draw_button = _build_extra_draw_button()
+	top_row.add_child(_extra_draw_button)
+	top_row.add_child(_parl_button)
 	_action_grid = GridContainer.new()
 	_action_grid.columns = 3
 	_action_grid.add_theme_constant_override("h_separation", ACTION_BUTTON_GAP)
@@ -4565,6 +4561,7 @@ func _refresh_action_buttons() -> void:
 	if _alliance_panel != null and _alliance_panel.visible:
 		_refresh_alliance_panel()
 	_refresh_parliament_button()
+	_refresh_extra_draw_button()
 
 func _build_agenda_banner() -> void:
 	_agenda_banner = PanelContainer.new()

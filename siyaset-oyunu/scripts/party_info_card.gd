@@ -113,7 +113,7 @@ static func build(peer_id: int, my_id: int, on_action: Callable = Callable(), wi
 	return card
 
 ## PARTİ İŞLEMLERİ (bkz. CardManager "Parti siyaseti"). Sadece kendi kartında:
-## genel başkan: kongreye git, partiyi feshet; üye: kongre iste, istifa et;
+## genel başkan: kongreye git (0.0.317: fesih kalktı); üye: kongre iste, istifa et;
 ## bağımsız: yeni parti kur. Sırası gelmeyen ya da kasası yetmeyen için düğme
 ## sönük durur; neden yapılamadığı not olarak yazar.
 static func _actions(peer_id: int, my_id: int, on_action: Callable) -> Control:
@@ -143,7 +143,6 @@ static func _actions(peer_id: int, my_id: int, on_action: Callable) -> Control:
 	else:
 		if CardManager.congress_enabled:
 			list.append([L.t("Kongreye Git · %s") % GameRules.cost_text(CardManager.CONGRESS_COST), "congress", CardManager.can_hold_congress(my_id), false])
-		list.append([L.t("Partiyi Feshet"), "dissolve", CardManager.can_dissolve(my_id), true])
 		if CardManager.congress_enabled:
 			var left := CardManager.CONGRESS_MAX_ELECTIONS - CardManager.elections_since_congress(pid)
 			notes.append(L.t("Zorunlu kongreye %s. Partideki gücün %s: güçlüysen rakip az çıkar.") % [
@@ -166,7 +165,7 @@ static func _actions(peer_id: int, my_id: int, on_action: Callable) -> Control:
 		button.disabled = not bool(entry[2])
 		any_disabled = any_disabled or button.disabled
 		var kind := String(entry[1])
-		if kind == "dissolve" or kind == "leave":
+		if kind == "leave":
 			UiSkin.skin_color_button(button, UiTheme.RED_DARK)
 		else:
 			UiSkin.skin_button(button)

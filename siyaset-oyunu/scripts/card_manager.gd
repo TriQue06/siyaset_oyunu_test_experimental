@@ -4792,6 +4792,7 @@ func remove_player(peer_id: int) -> void:
 ## gidebilir. Adaylar ve sonuç önceden hesaplanır, herkesin ekranında seçim
 ## gecesi tarzında oynatılır.
 const FOUND_PARTY_COST := 80
+const DISSOLVE_ENABLED := false
 const DISSOLVE_CREDIBILITY := 8.0
 const DISSOLVE_BLOC_SHARE := 0.5
 ## Bağımsız ya da üye mitingi güvenilirlik kazandırır.
@@ -4827,6 +4828,9 @@ func is_party_member(peer_id: int) -> bool:
 	return PartyManager.is_deputy(peer_id)
 
 func can_dissolve(peer_id: int) -> bool:
+	# 0.0.317: parti feshi oyundan kalktı (kod geçici partiler için duruyor).
+	if not DISSOLVE_ENABLED:
+		return false
 	return can_choose_main_action(peer_id) and PartyManager.is_leader(peer_id) and not PartyManager.is_independent(peer_id) \
 		and PartyManager.deputy_of(peer_id) == -1
 

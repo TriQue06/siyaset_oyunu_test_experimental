@@ -5939,3 +5939,6 @@ msgstr "Your treasury quota and party funds together are not enough."
 
 msgid "Seçtiğin gruplarda %%%d sadık (3. seviye) seçmenle başlarsın, diğerlerinde %%%d. Zıt iki grup da seçilebilir."
 msgstr "You start with %%%d loyal (level 3) voters in the groups you pick, %%%d in the others. Opposite groups can be picked together."
+
+msgid "bu sıra çektin"
+msgstr "drawn this turn"

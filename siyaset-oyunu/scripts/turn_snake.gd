@@ -18,10 +18,14 @@ const OFFSET := 0.25
 const WIDTH := 4.0
 ## Yılanın plaket kenarına uzaklığı. 0.0.309: negatif, yani çizgi plaketin
 ## kenar şeridinin üstünde, içeride kalır; liste panelinin dışına taşmaz.
-const OUT := -WIDTH * 0.5 - 0.5
+## 0.0.317: çizginin dış kenarı tam kartın kenarında.
+const OUT := -WIDTH * 0.5
 const RADIUS := 16.0
 
 var party_color := Color.WHITE
+## Kartın köşe yarıçapı (0.0.317: plaketin kutusundan gelir; yılan kartın
+## şeklini birebir izler).
+var radius := RADIUS
 ## Plaketin içerik payları (sol, üst, sağ, alt): çizim plaketin kenarına oturur.
 var outset := Vector4.ZERO
 var _path := PackedVector2Array()
@@ -46,7 +50,8 @@ func _build_path() -> void:
 	var rect := _frame_rect()
 	_path_size = size
 	_path = PackedVector2Array()
-	var r := minf(RADIUS, minf(rect.size.x, rect.size.y) * 0.5)
+	# Çizgi kenardan -OUT içeride: köşe yarıçapı da o kadar küçülür (eş merkezli).
+	var r := clampf(radius + OUT, 0.0, minf(rect.size.x, rect.size.y) * 0.5)
 	var corners := [
 		[rect.position + Vector2(rect.size.x - r, r), -PI * 0.5],
 		[rect.end - Vector2(r, r), 0.0],

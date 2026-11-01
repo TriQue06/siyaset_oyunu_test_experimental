@@ -4,8 +4,10 @@ extends Control
 ## konseptler/politik_eksen_konseptleri.html): oyun sonunda partilerin
 ## politik eksendeki yolu tur tur oynatılır. Kareli pano dört renkli bölgeye
 ## ayrılır (köşelerde bölge adları), eksen uçlarında grup pulları; parti
-## logoları baloncuk animasyonuyla kayar, arkalarında solan noktalı iz kalır.
-## Sağda partiler ve bulundukları bölge. Veri: CardManager.axis_history.
+## logoları kayar, arkalarında solan iz kalır. Sağda partiler ve bulundukları
+## bölge. Veri: CardManager.axis_history.
+## 0.0.314: oy grafiğiyle aynı oynatma: tek bir akan konum (kesirli adım),
+## köşesiz (Catmull-Rom) yollar, durmadan ve daha kısa sürede.
 
 signal closed
 ## Oyun sonu sahne dizisinde (EndgameSequence) oynatma bitince.
@@ -16,8 +18,12 @@ var embedded := false
 
 const MAP := 440.0
 const MARGIN := 40.0
-## 0.0.306: her adım bir oyuncunun SIRASI; yumuşak ve görece yavaş.
-const STEP_SECONDS := 1.0
+## Toplam oynatma süresi adım sayısına göre bu aralıkta kalır (adım başına 0,25 sn).
+const MIN_SECONDS := 8.0
+const MAX_SECONDS := 16.0
+## İz: son kaç adım görünür (eskisi solar) ve adım başına örnek sayısı.
+const TRAIL_STEPS := 8.0
+const TRAIL_SAMPLES := 6
 const PAWN := 34.0
 const C_TEAL := Color("1f6e70")
 const C_MUTED := Color("7a7166")
@@ -25,16 +31,17 @@ const C_INK := Color("2d2a26")
 const QUADS := [[Color("e8f3e8"), "MUHAFAZAKÂR SOL"], [Color("e6eef8"), "MUHAFAZAKÂR SAĞ"],
 	[Color("fbe9ee"), "İLERİCİ SOL"], [Color("f3eafa"), "İLERİCİ SAĞ"]]
 
-var _parties: Array = []        # [{pid, name, color, data, path: [[round, Vector2]]}]
+var _parties: Array = []        # [{pid, name, color, data, path: [[round, Vector2]], values: [Vector2 her adımda], start}]
 var _rounds: Array = []
-var _index := 0
 var _map: _Map
 var _pawns: Dictionary = {}     # pid -> Control
 var _legend: VBoxContainer
+var _legend_rows: Dictionary = {}   # pid -> {"card", "where", "move"}
 var _round_label: Label
-var _timer := 0.0
+var _p := 0.0                   # akan konum (adım indeksi, kesirli)
+var _speed := 1.0               # adım / sn
+var _shown_step := -1
 var _playing := true
-var _step_seconds := STEP_SECONDS
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -111,10 +118,9 @@ func _ready() -> void:
 	again.focus_mode = Control.FOCUS_NONE
 	UiSkin.skin_button(again)
 	again.pressed.connect(func():
-		_index = 0
-		_map.trails.clear()
-		_playing = true
-		_show_step(0, false))
+		_p = 0.0
+		_shown_step = -1
+		_playing = true)
 	buttons.add_child(again)
 	var close := Button.new()
 	close.text = L.t("Kapat")
@@ -124,7 +130,14 @@ func _ready() -> void:
 		closed.emit()
 		queue_free())
 	buttons.add_child(close)
-	_show_step.call_deferred(0, false)
+	_build_legend()
+	if _rounds.is_empty():
+		_round_label.text = L.t("kayıt yok")
+		_playing = false
+		if embedded:
+			get_tree().create_timer(1.5).timeout.connect(func():
+				if is_instance_valid(self):
+					finished.emit())
 
 func _load_history() -> void:
 	var rounds := {}
@@ -142,8 +155,25 @@ func _load_history() -> void:
 				"icon_color": entry.get("icon_color", Color.WHITE)}})
 	_rounds = rounds.keys()
 	_rounds.sort()
-	# Toplam ~40 sn: adım başına 0,45–1 sn (çok oyunculu uzun oyunda kısalır).
-	_step_seconds = clampf(40.0 / maxf(1.0, float(_rounds.size())), 0.45, STEP_SECONDS)
+	# Her adımda konum: eksik adım bir öncekiyle dolar; start = ilk kayıt.
+	for p in _parties:
+		var values: Array = []
+		var start := -1
+		for k in _rounds.size():
+			var pos: Variant = _position_at(p["path"], int(_rounds[k]))
+			if pos == null:
+				values.append(null)
+				continue
+			if start < 0:
+				start = k
+			values.append(pos)
+		for k in values.size():
+			if values[k] == null:
+				values[k] = values[maxi(start, 0)]
+		p["values"] = values
+		p["start"] = maxi(start, 0)
+	var total := clampf(float(_rounds.size()) * 0.25, MIN_SECONDS, MAX_SECONDS)
+	_speed = maxf(1.0, float(_rounds.size() - 1)) / total
 
 ## Partinin bu tura kadarki son konumu (henüz yoksa null).
 static func _position_at(path: Array, round_value: int) -> Variant:
@@ -156,30 +186,48 @@ static func _position_at(path: Array, round_value: int) -> Variant:
 func _to_map(p: Vector2) -> Vector2:
 	return Vector2(MARGIN, MARGIN) + Vector2((p.x + 1.0) * 0.5, (1.0 - p.y) * 0.5) * MAP
 
+## Catmull-Rom: köşesiz yol; i..i+1 arasında t (0..1), eksen koordinatında.
+static func _curve(values: Array, i: int, t: float) -> Vector2:
+	var n := values.size()
+	var p0: Vector2 = values[clampi(i - 1, 0, n - 1)]
+	var p1: Vector2 = values[clampi(i, 0, n - 1)]
+	var p2: Vector2 = values[clampi(i + 1, 0, n - 1)]
+	var p3: Vector2 = values[clampi(i + 2, 0, n - 1)]
+	var t2 := t * t
+	var t3 := t2 * t
+	var v := 0.5 * ((2.0 * p1) + (-p0 + p2) * t + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2 + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t3)
+	return v.clamp(Vector2(-1, -1), Vector2(1, 1))
+
+## Partinin p anındaki konumu (harita koordinatında).
+func _map_at(values: Array, p: float) -> Vector2:
+	if values.size() < 2:
+		return _to_map(values[0])
+	var i := clampi(int(floor(p)), 0, values.size() - 2)
+	return _to_map(_curve(values, i, clampf(p - float(i), 0.0, 1.0)))
+
 func _process(delta: float) -> void:
-	if not _playing or _rounds.is_empty():
+	if _rounds.is_empty():
 		return
-	_timer += delta
-	if _timer >= _step_seconds:
-		_timer = 0.0
-		if _index + 1 < _rounds.size():
-			_index += 1
-			_show_step(_index, true)
-		else:
+	if _playing:
+		_p = minf(_p + delta * _speed, float(_rounds.size() - 1))
+		if _p >= float(_rounds.size() - 1):
 			_playing = false
 			if embedded:
 				get_tree().create_timer(2.0).timeout.connect(func():
 					if is_instance_valid(self):
 						finished.emit())
+	for p in _parties:
+		var pawn: Control = _pawns[p["pid"]]
+		pawn.visible = _p >= float(p["start"])
+		pawn.position = _map_at(p["values"], _p) - Vector2(PAWN, PAWN) * 0.5
+	var step := int(floor(_p))
+	if step != _shown_step:
+		_shown_step = step
+		_show_step(step)
+	_map.queue_redraw()
 
-func _show_step(i: int, animate: bool) -> void:
-	if _rounds.is_empty():
-		_round_label.text = L.t("kayıt yok")
-		if embedded:
-			get_tree().create_timer(1.5).timeout.connect(func():
-				if is_instance_valid(self):
-					finished.emit())
-		return
+## Tur yazısı ve sağdaki partiler (adım değişince).
+func _show_step(i: int) -> void:
 	var round_value := int(_rounds[i])
 	# Adım: [adım, tur, sırası biten parti] (game_stats.steps).
 	var actor := -1
@@ -193,62 +241,20 @@ func _show_step(i: int, animate: bool) -> void:
 		if int(p["pid"]) == actor:
 			actor_name = String(p["name"])
 	_round_label.text = (L.t("%d. tur · %s") % [turn_no, actor_name]) if actor_name != "" else L.t("%d. tur") % turn_no
+	_refresh_legend(i)
+
+## İz: son TRAIL_STEPS adımın yolu, eskisi solarak (harita koordinatında örnekler).
+func trail_points(p: Dictionary) -> Array:
+	var from := maxf(float(p["start"]), _p - TRAIL_STEPS)
+	var points: Array = []
+	var count := maxi(1, int(ceil((_p - from) * TRAIL_SAMPLES)))
+	for k in count + 1:
+		var t := lerpf(from, _p, float(k) / float(count))
+		points.append(_map_at(p["values"], t))
+	return points
+
+func _build_legend() -> void:
 	for p in _parties:
-		var pawn: Control = _pawns[p["pid"]]
-		var pos: Variant = _position_at(p["path"], round_value)
-		if pos == null:
-			pawn.hide()
-			continue
-		var target := _to_map(pos) - Vector2(PAWN, PAWN) * 0.5
-		var was_hidden := not pawn.visible
-		pawn.show()
-		if was_hidden or not animate:
-			pawn.position = target
-			_trail(p).append(_to_map(pos))
-			continue
-		var from := pawn.position + Vector2(PAWN, PAWN) * 0.5
-		if from.distance_to(target + Vector2(PAWN, PAWN) * 0.5) < 1.0:
-			continue
-		# Baloncuk: eski yerde parti renginde baloncuklar yükselip söner.
-		for k in 4:
-			_bubble(from + Vector2(randf_range(-8, 8), randf_range(-6, 6)), p["color"], 0.08 * k)
-		_trail(p).append(target + Vector2(PAWN, PAWN) * 0.5)
-		var tw := create_tween().set_parallel(true)
-		tw.tween_property(pawn, "position", target, _step_seconds * 0.9).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		var pop := create_tween()
-		var grow := 1.22 if int(p["pid"]) == actor else 1.06
-		pop.tween_property(pawn, "scale", Vector2(grow, grow), _step_seconds * 0.45).set_trans(Tween.TRANS_SINE)
-		pop.tween_property(pawn, "scale", Vector2.ONE, _step_seconds * 0.45).set_trans(Tween.TRANS_SINE)
-	_map.queue_redraw()
-	_refresh_legend(round_value)
-
-## Partinin izi (harita koordinatında noktalar).
-func _trail(p: Dictionary) -> Array:
-	if not _map.trails.has(p["pid"]):
-		_map.trails[p["pid"]] = {"color": p["color"], "points": []}
-	return _map.trails[p["pid"]]["points"]
-
-func _bubble(at: Vector2, color: Color, delay: float) -> void:
-	var b := _Bubble.new()
-	b.color = color
-	b.radius = randf_range(4.0, 8.0)
-	b.position = at
-	b.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_map.add_child(b)
-	_map.move_child(b, 0)
-	var tw := b.create_tween().set_parallel(true)
-	tw.tween_property(b, "position", at + Vector2(randf_range(-12, 12), -randf_range(26, 44)), 0.9).set_delay(delay).set_ease(Tween.EASE_OUT)
-	tw.tween_property(b, "modulate:a", 0.0, 0.9).set_delay(delay)
-	tw.chain().tween_callback(b.queue_free)
-
-func _refresh_legend(round_value: int) -> void:
-	for child in _legend.get_children():
-		_legend.remove_child(child)
-		child.queue_free()
-	for p in _parties:
-		var pos: Variant = _position_at(p["path"], round_value)
-		if pos == null:
-			continue
 		var card := PanelContainer.new()
 		var box := BoardBox.new()
 		box.fill = Color("fffaf0")
@@ -257,6 +263,7 @@ func _refresh_legend(round_value: int) -> void:
 		box.lips = [[3.0, Color("c9b689")]]
 		box.set_content_margin_all(7)
 		card.add_theme_stylebox_override("panel", box)
+		card.hide()
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 9)
 		card.add_child(row)
@@ -267,22 +274,34 @@ func _refresh_legend(round_value: int) -> void:
 		texts.add_theme_constant_override("separation", 1)
 		row.add_child(texts)
 		texts.add_child(_text(String(p["name"]), true, 15, C_INK))
-		var v: Vector2 = pos
-		texts.add_child(_text("%s %s" % [L.t("Muhafazakâr") if v.y >= 0.0 else L.t("İlerici"), L.t("sağ") if v.x >= 0.0 else L.t("sol")], false, 11, C_MUTED))
-		# Bu turki kayma (konsept: "↑ muhafazakâr").
-		var prev: Variant = _position_at(p["path"], round_value - 1)
-		var move := "—"
-		if prev != null:
-			var d: Vector2 = v - (prev as Vector2)
-			if d.length() >= 0.02:
-				move = ("↑ " + L.t("muhafazakâr") if d.y > 0.0 else "↓ " + L.t("ilerici")) if absf(d.y) > absf(d.x) 					else ("→ " + L.t("sağ") if d.x > 0.0 else "← " + L.t("sol"))
+		var where := _text("", false, 11, C_MUTED)
+		texts.add_child(where)
 		var spacer := Control.new()
 		spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(spacer)
-		var move_label := _text(move, false, 12, C_MUTED)
+		var move_label := _text("", false, 12, C_MUTED)
 		move_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(move_label)
 		_legend.add_child(card)
+		_legend_rows[p["pid"]] = {"card": card, "where": where, "move": move_label}
+
+func _refresh_legend(i: int) -> void:
+	for p in _parties:
+		var row: Dictionary = _legend_rows[p["pid"]]
+		var shown := i >= int(p["start"])
+		(row["card"] as Control).visible = shown
+		if not shown:
+			continue
+		var v: Vector2 = p["values"][i]
+		(row["where"] as Label).text = "%s %s" % [L.t("Muhafazakâr") if v.y >= 0.0 else L.t("İlerici"), L.t("sağ") if v.x >= 0.0 else L.t("sol")]
+		# Bu adımdaki kayma (konsept: "↑ muhafazakâr").
+		var move := "—"
+		if i > int(p["start"]):
+			var d: Vector2 = v - (p["values"][i - 1] as Vector2)
+			if d.length() >= 0.02:
+				move = ("↑ " + L.t("muhafazakâr") if d.y > 0.0 else "↓ " + L.t("ilerici")) if absf(d.y) > absf(d.x) \
+					else ("→ " + L.t("sağ") if d.x > 0.0 else "← " + L.t("sol"))
+		(row["move"] as Label).text = move
 
 static func _text(text: String, display: bool, size_px: int, color: Color) -> Label:
 	var label := Label.new()
@@ -293,18 +312,9 @@ static func _text(text: String, display: bool, size_px: int, color: Color) -> La
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return label
 
-class _Bubble extends Control:
-	var color := Color.WHITE
-	var radius := 6.0
-	func _draw() -> void:
-		draw_circle(Vector2.ZERO, radius, Color(color, 0.55), true, -1.0, true)
-		draw_arc(Vector2.ZERO, radius, 0.0, TAU, 24, Color(color.lightened(0.4), 0.9), 1.5, true)
-		draw_circle(Vector2(-radius * 0.35, -radius * 0.35), radius * 0.25, Color(1, 1, 1, 0.7), true, -1.0, true)
-
 ## Kareli pano, dört bölge, eksenler ve noktalı izler.
 class _Map extends Control:
 	var replay: PoliticalAxisReplay
-	var trails: Dictionary = {}   # pid -> {"color", "points": [konum]}
 	func _draw() -> void:
 		var m := PoliticalAxisReplay.MARGIN
 		var s := PoliticalAxisReplay.MAP
@@ -335,15 +345,13 @@ class _Map extends Control:
 		frame.set_border_width_all(3)
 		frame.set_corner_radius_all(6)
 		draw_style_box(frame, Rect2(Vector2(m, m), Vector2(s, s)))
-		# İzler: eskiden yeniye solan noktalı çizgi ve noktalar (son 6 adım).
-		for pid in trails:
-			var color: Color = trails[pid]["color"]
-			var pts: Array = trails[pid]["points"]
-			var start := maxi(0, pts.size() - 7)
-			var n := pts.size() - start
-			for i in range(start, pts.size()):
-				var k := float(i - start + 1) / float(n)
-				if i + 1 < pts.size():
-					draw_dashed_line(pts[i], pts[i + 1], Color(color, 0.25 + 0.6 * k), 3.0, 4.0)
-				if i < pts.size() - 1:
-					draw_circle(pts[i], 4.0, Color(color, 0.2 + 0.5 * k), true, -1.0, true)
+		# İzler: oy grafiği gibi kesintisiz çizgi, eski ucu solarak.
+		for p in replay._parties:
+			if replay._p < float(p["start"]):
+				continue
+			var color: Color = p["color"]
+			var pts: Array = replay.trail_points(p)
+			var n := pts.size()
+			for i in n - 1:
+				var k := float(i + 1) / float(n)
+				draw_line(pts[i], pts[i + 1], Color(color, 0.1 + 0.75 * k), 3.0, true)

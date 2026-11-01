@@ -61,6 +61,8 @@ var _focus: Array = []
 ## Karalama kararı: -1 = sakla (karalama ayrı kart, bkz. 0.0.237).
 var _smear := -1
 var _invest_tier := CardManager.DEFAULT_TIER
+## Yatırımda devletin payı (0..1); -1: varsayılan (kotanın izin verdiği en çok).
+var _invest_share := -1.0
 var _sent_version := -1
 var _body: VBoxContainer
 ## İLERİ ile dönülecek sayfa (GERİ'ye basınca dolar, yeni sayfa açınca silinir).
@@ -108,6 +110,7 @@ func open(p_province: String) -> void:
 	if p_province != province_id:
 		_reset_miting()
 		_invest_tier = CardManager.DEFAULT_TIER
+		_invest_share = -1.0
 	if fresh:
 		tab = ""
 		_forward_page = ""
@@ -595,20 +598,50 @@ func _build_invest() -> void:
 		var amount_label := _text(L.t("karşılandı") if done else Economy.money_full(float(req["amount"])), _font_display(), 18,
 			C_GO if done else C_INK)
 		_body.add_child(amount_label)
-	_body.add_child(_spacer())
+	# KİMDEN ÖDENİR (0.0.314): devlet hazinesi ile parti kasası arasında
+	# kaydırıcı; varsayılan en çok devlet payı, sola çekince kasan da katılır.
 	var amount := CardManager.invest_tier_cost(_invest_tier)
-	var ok := CardManager.can_invest(me, province_id, 1.0, _invest_tier)
+	var r := CardManager.funding_range(me, "invest", amount)
+	var lo := float(r["min"])
+	var hi := float(r["max"])
+	var share := clampf(float(r["default"]) if _invest_share < 0.0 else _invest_share, minf(lo, hi), hi)
+	_sec(L.t("Kimden ödenir"))
+	var sides := HBoxContainer.new()
+	sides.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_body.add_child(sides)
+	var party_label := _text("", _font_display(), 13, FundingSlider.PARTY_COLOR)
+	party_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sides.add_child(party_label)
+	var state_label := _text("", _font_display(), 13, FundingSlider.STATE_COLOR.darkened(0.25))
+	state_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	sides.add_child(state_label)
+	var show_split := func(value: float):
+		var split := Economy.split_cost(amount, value)
+		party_label.text = L.t("KASAN %s") % Economy.money_full(float(split["party"]))
+		state_label.text = L.t("DEVLET %s") % Economy.money_full(float(split["state"]))
+	show_split.call(share)
+	var slider := FundingSlider.new()
+	slider.setup(share, lo, hi)
+	slider.share_changed.connect(func(value: float):
+		_invest_share = value
+		show_split.call(value))
+	_body.add_child(slider)
+	_body.add_child(_spacer())
+	var ok := CardManager.can_invest(me, province_id, share, _invest_tier)
 	_body.add_child(_big(L.t("YATIRIM YAP"), Economy.money_full(amount), C_GO, 50, not ok, func():
+		var pay := slider.share
 		if CardManager.invest_count(me) >= CardManager.action_limit(me):
 			toast_requested.emit(L.t("Bu sıra %d yatırımın hepsini yaptın.") % CardManager.action_limit(me))
 			return
-		if not CardManager.can_invest(me, province_id, 1.0, _invest_tier):
-			var reason := CardManager.funding_block_reason(me, "invest", 1.0, amount)
+		if not CardManager.can_invest(me, province_id, pay, _invest_tier):
+			var reason := CardManager.funding_block_reason(me, "invest", pay, amount)
+			if reason == "" and lo > hi:
+				reason = L.t("Hazine kotan ve kasan birlikte yetmiyor.")
 			toast_requested.emit(reason if reason != "" else L.t("Sıra sende değil."))
 			return
 		if not _first_send():
 			return
-		CardManager.invest(province_id, 1.0, _invest_tier)))
+		CardManager.invest(province_id, pay, _invest_tier)))
 
 ## Aynı durum sürümünde ikinci onay gönderilmez (çift tık, çift ücret yok).
 func _first_send() -> bool:

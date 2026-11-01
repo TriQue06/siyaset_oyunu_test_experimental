@@ -361,7 +361,7 @@ func _initialize() -> void:
 		"%.1f" % (treasury_before - cm.state_treasury()))
 	var funds_mid: float = cm.funds_of(1)
 	var treasury_mid: float = cm.state_treasury()
-	check("0.0.238: yatirim kasadan odenemez", not cm.can_invest(1, province, 0.0, 2))
+	check("0.0.314: yatirim kasadan da odenebilir (kasa yetiyorsa)", cm.can_invest(1, province, 0.0, 2) == (funds_mid >= 150.0 - 0.001))
 	cm._apply_invest_move(1, province, 1.0, 2)
 	check("buyuk yatirim 150 milyon (hazineden, kasa degismez)", is_equal_approx(treasury_mid - cm.state_treasury(), 150.0)
 		and is_equal_approx(funds_mid, cm.funds_of(1)) and cm.invest_count(1) == 2)

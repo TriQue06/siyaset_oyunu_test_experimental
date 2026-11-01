@@ -7,6 +7,13 @@ var _failed := 0
 ## Autoload'lardan sonra yüklenir (sınıf autoload adlarını kullanıyor).
 var PP
 
+## Meslek etkisi kontrolü: meslekler kapalıyken (0.0.314) atlanır.
+func pcheck(label: String, ok: bool, detail: String = "") -> void:
+	if not PP.PROFESSIONS_ENABLED:
+		print("  [ATLA]  %s (meslekler kapalı)" % label)
+		return
+	check(label, ok, detail)
+
 func check(label: String, ok: bool, detail: String = "") -> void:
 	if not ok:
 		_failed += 1
@@ -45,13 +52,13 @@ func _initialize() -> void:
 	# verilir (teşkilat geliri yok): iki durum da geçerli.
 	var first_income: float = cm.turn_income(me) - cm.org_income(me) if cm.current_turn_peer_id() == me else 0.0
 	var base: float = GameRules.FUNDS_START + PP.BUSINESS_START_FUNDS
-	check("is insani ek parayla basladi", is_equal_approx(cm.funds_of(me), base + first_income)
+	pcheck("is insani ek parayla basladi", is_equal_approx(cm.funds_of(me), base + first_income)
 		or is_equal_approx(cm.funds_of(me), base + cm.turn_income(me)),
 		str(cm.funds_of(me)))
 	var neighbor := String(gmap.neighbors().get(home, [""])[0])
 	check("hemsehri destegi memlekette", is_equal_approx(PP.hometown_activity(home, me), PP.HOMETOWN_ACTIVITY))
 	check("komsu il etkilenmez", PP.hometown_activity(neighbor, me) == 0.0)
-	check("is insani her tur ek gelir alir", cm.turn_income(me) >= PP.BUSINESS_TURN_INCOME)
+	pcheck("is insani her tur ek gelir alir", cm.turn_income(me) >= PP.BUSINESS_TURN_INCOME)
 	check("cekirdek gruplar korundu (botlar az pay alabilir)", float(pm.parties[me]["groups"]["isci"]) <= VoterGroups.CORE_START * 1.3 and float(pm.parties[me]["groups"]["isci"]) > VoterGroups.CORE_START * 0.8, str(pm.parties[me]["groups"]["isci"]))
 	var away := ""
 	for province_id in gmap.province_ids():
@@ -73,27 +80,31 @@ func _initialize() -> void:
 	cm.turmoil.erase(bot)
 	pm.politicians[bot]["background"] = "emekli_subay"
 	cm._add_turmoil(bot, 1.0)
-	check("emekli subay karisikligi az biriktirir", is_equal_approx(cm.turmoil_of(bot), 0.75))
-	check("emekli subaya karalama az isler", is_equal_approx(PP.party_effect(bot, "propaganda_in"), 0.75))
+	pcheck("emekli subay karisikligi az biriktirir", is_equal_approx(cm.turmoil_of(bot), 0.75))
+	pcheck("emekli subaya karalama az isler", is_equal_approx(PP.party_effect(bot, "propaganda_in"), 0.75))
 	pm.politicians[bot]["background"] = "belediye_baskani"
 	var bh: String = PP.hometown_of(bot)
-	check("belediye baskani teskilat bonusu", is_equal_approx(PP.party_effect(bot, "org"), 1.1))
+	pcheck("belediye baskani teskilat bonusu", is_equal_approx(PP.party_effect(bot, "org"), 1.1))
 	var orgs_before: int = cm.org_count(bot)
 	cm._grant_mayor_orgs(bot, bh)
 	var expected: int = maxi(1, int(round(gmap.province_ids().size() * PP.MAYOR_ORG_SHARE)))
 	check("belediye baskani rastgele illerde teskilat alir", cm.org_count(bot) - orgs_before == expected,
 		"%d -> %d (beklenen +%d)" % [orgs_before, cm.org_count(bot), expected])
 	pm.politicians[bot]["background"] = "sendikaci"
-	check("sendikaci miting carpani", is_equal_approx(PP.effect(bot, "miting"), 1.25))
-	check("sendikaci iscilere hitap", is_equal_approx(PP.group_appeal(bot, "isci"), 1.1) and is_equal_approx(PP.group_appeal(bot, "isveren"), 1.0))
+	pcheck("sendikaci miting carpani", is_equal_approx(PP.effect(bot, "miting"), 1.25))
+	pcheck("sendikaci iscilere hitap", is_equal_approx(PP.group_appeal(bot, "isci"), 1.1) and is_equal_approx(PP.group_appeal(bot, "isveren"), 1.0))
 	pm.politicians[bot]["background"] = "aktivist"
-	check("aktivist: miting guclu, yasa zayif", is_equal_approx(PP.effect(bot, "miting"), 1.25)
+	pcheck("aktivist: miting guclu, yasa zayif", is_equal_approx(PP.effect(bot, "miting"), 1.25)
 		and is_equal_approx(PP.effect(bot, "law"), 0.75))
-	check("aktivist genclere ve ilericilere hitap", is_equal_approx(PP.group_appeal(bot, "genc"), 1.1) and is_equal_approx(PP.group_appeal(bot, "ilerici"), 1.1))
+	pcheck("aktivist genclere ve ilericilere hitap", is_equal_approx(PP.group_appeal(bot, "genc"), 1.1) and is_equal_approx(PP.group_appeal(bot, "ilerici"), 1.1))
 	pm.politicians[bot]["background"] = "gazeteci"
-	check("gazeteci kaset ve karalama", is_equal_approx(PP.effect(bot, "reputation_out"), 1.25) and is_equal_approx(PP.effect(bot, "propaganda_out"), 1.25))
+	pcheck("gazeteci kaset ve karalama", is_equal_approx(PP.effect(bot, "reputation_out"), 1.25) and is_equal_approx(PP.effect(bot, "propaganda_out"), 1.25))
 	pm.politicians[bot]["background"] = "hukukcu"
-	check("hukukcu vekil calmaya direnir", is_equal_approx(PP.party_effect(bot, "steal_in"), 0.75))
+	pcheck("hukukcu vekil calmaya direnir", is_equal_approx(PP.party_effect(bot, "steal_in"), 0.75))
+	if not PP.PROFESSIONS_ENABLED:
+		check("meslekler kapalı: çarpanlar nötr", is_equal_approx(PP.effect(bot, "miting"), 1.0)
+			and is_equal_approx(PP.party_effect(bot, "steal_in"), 1.0) and is_equal_approx(PP.group_appeal(bot, "genc"), 1.0)
+			and PP.title("hukukcu") == "" and PP.is_valid(PP.make("A", "B", "", home)))
 	check("kisilik alani yok", not PP.make("A", "B", "hukukcu", home).has("trait"))
 
 	# Rastgele isim ve güvenilirlik.

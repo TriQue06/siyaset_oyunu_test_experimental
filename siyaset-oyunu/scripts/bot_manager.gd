@@ -140,7 +140,9 @@ static func do_action(bot: int) -> Dictionary:
 				action.get("focus", []), tier, smear)
 		"invest":
 			var invest_tier := int(action.get("tier", CardManager.DEFAULT_TIER))
-			CardManager._apply_invest_move(bot, String(action["province"]), 1.0, invest_tier)
+			# Önce kotanın izin verdiği en yüksek devlet payı; kalanı kasadan.
+			var share := float(CardManager.funding_range(bot, "invest", CardManager.invest_tier_cost(invest_tier))["default"])
+			CardManager._apply_invest_move(bot, String(action["province"]), share, invest_tier)
 		"parl_pass":
 			CardManager._apply_parl_pass(bot, String(action["stage"]))
 		"aid":

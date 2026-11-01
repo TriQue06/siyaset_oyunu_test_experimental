@@ -25,6 +25,12 @@ extends RefCounted
 ## gerçek siyasetçi soyadları BANNED_SURNAMES ile ayrıca engellenir.
 ## (bkz. PartyManager.set_my_politician).
 
+## MESLEKLER GEÇİCİ OLARAK KAPALI (0.0.314): ileride yenilenecek. Kapalıyken
+## sihirbazda meslek adımı yok, hiçbir yerde gösterilmez ve etkisi yoktur
+## (çarpanlar 1, iş insanı / belediye başkanı başlangıçları yok). Veri yapısı
+## (kayıtlardaki "background") korunur.
+const PROFESSIONS_ENABLED := false
+
 ## Meslek -> {title, tag (kartta kısa etiket), blurb, perk, effects, appeal}. Sıra ekranda da bu sıra.
 const BACKGROUNDS := {
 	"sendikaci": {"title": "Sendikacı", "tag": "Miting ve işçiler",
@@ -191,6 +197,8 @@ static func background(id: String) -> Dictionary:
 	return L.tr_dict(BACKGROUNDS.get(id, {}))
 
 static func title(id: String) -> String:
+	if not PROFESSIONS_ENABLED:
+		return ""
 	return L.t(String(BACKGROUNDS.get(id, {}).get("title", "")))
 
 static func random_background(rng: RandomNumberGenerator = null) -> String:
@@ -222,7 +230,7 @@ static func clean_portrait(portrait: String) -> String:
 ## Kara liste (BANNED_SURNAMES) yalnız RASTGELE üretimde uygulanır (0.0.223):
 ## oyuncu elle istediği adı yazabilir, kendisi ya da botlar için.
 static func is_valid(data: Dictionary) -> bool:
-	return is_valid_background(String(data.get("background", ""))) \
+	return (not PROFESSIONS_ENABLED or is_valid_background(String(data.get("background", "")))) \
 		and String(data.get("first_name", "")) != "" and String(data.get("surname", "")) != ""
 
 ## ELLE YAZILAN İSİM: her kelimenin baş harfi büyük, gerisi küçük (Türkçe
@@ -364,7 +372,7 @@ static func initials(data: Dictionary) -> String:
 	return (first.left(1) + last.left(1)) if first != "" or last != "" else "?"
 
 static func has_background(peer_id: int, id: String) -> bool:
-	return background_of(peer_id) == id
+	return PROFESSIONS_ENABLED and background_of(peer_id) == id
 
 ## PARTİ DÜZEYİ meslek: partinin herhangi bir üyesinde bu meslek var mı?
 static func party_has_background(party_or_peer: int, id: String) -> bool:
@@ -375,10 +383,14 @@ static func party_has_background(party_or_peer: int, id: String) -> bool:
 
 ## HAMLEYİ YAPAN siyasetçinin meslek çarpanı (bkz. etki anahtarları).
 static func effect(peer_id: int, key: String) -> float:
+	if not PROFESSIONS_ENABLED:
+		return 1.0
 	return float(BACKGROUNDS.get(background_of(peer_id), {}).get("effects", {}).get(key, 1.0))
 
 ## PARTİNİN çarpanı: üyelerdeki her farklı meslek bir kez sayılır.
 static func party_effect(party_or_peer: int, key: String) -> float:
+	if not PROFESSIONS_ENABLED:
+		return 1.0
 	var backgrounds := {}
 	for member in PartyManager.members_of(PartyManager.party_of(party_or_peer)):
 		backgrounds[background_of(int(member))] = true
@@ -389,6 +401,8 @@ static func party_effect(party_or_peer: int, key: String) -> float:
 
 ## Partinin bu gruba hitap çarpanı (bir üyenin mesleği o gruba hitap ediyorsa).
 static func group_appeal(party_or_peer: int, group: String) -> float:
+	if not PROFESSIONS_ENABLED:
+		return 1.0
 	for member in PartyManager.members_of(PartyManager.party_of(party_or_peer)):
 		if (BACKGROUNDS.get(background_of(int(member)), {}).get("appeal", []) as Array).has(group):
 			return APPEAL_MULT

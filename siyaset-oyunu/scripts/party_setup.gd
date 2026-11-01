@@ -262,7 +262,7 @@ func _build_step_panel() -> Control:
 	_back_button.text = L.t("Geri")
 	_back_button.focus_mode = Control.FOCUS_NONE
 	_back_button.custom_minimum_size = Vector2(130, 44)
-	_back_button.pressed.connect(func(): _show_step(_step - 1))
+	_back_button.pressed.connect(func(): _show_step(_neighbor_step(_step, -1)))
 	nav.add_child(_back_button)
 	_status = PopupKit.note("", UiTheme.TEXT_MUTED)
 	_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -622,9 +622,9 @@ func _build_voters_page() -> Control:
 	page.add_child(PopupKit.note(L.t("Aynı çiftten iki grup birlikte seçilemez (ör. işçi ve işveren)."), UiTheme.TEXT_DIM))
 	return built[0]
 
-## SEKİZ SEÇMEN GRUBU (çiftler yan yana): 2 çekirdek grup. Aynı çiftten ikisi
-## seçilemez: çiftin öbür tarafına basmak seçimi oraya taşır; 2 seçiliyken
-## üçüncüye basmak en eski seçimi bırakır.
+## SEKİZ SEÇMEN GRUBU (çiftler yan yana): 2 çekirdek grup. Mitingte grup
+## seçmekle aynı (0.0.314): seçiliye basınca kalkar, yer varsa eklenir; 2 grup
+## seçiliyken ya da zıttı seçiliyken diğer kartlar soluk ve basılamaz.
 func _build_core_buttons() -> void:
 	for child in _core_grid.get_children():
 		_core_grid.remove_child(child)
@@ -641,6 +641,10 @@ func _core_button(group: String) -> Button:
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.custom_minimum_size = Vector2(0, 58)
 	button.button_pressed = selected
+	var blocked := not selected and (_core.size() >= VoterGroups.CORE_COUNT or _core.has(VoterGroups.opposite(group)))
+	button.disabled = blocked
+	if blocked:
+		button.modulate.a = 0.5
 	var face := VoterGroups.color(group).darkened(0.25) if selected else UiTheme.PANEL_LIGHT
 	UiSkin.skin_color_button(button, face)
 	# Seçili kart grup renginde: yazılar o zeminde okunur renkte.
@@ -728,12 +732,13 @@ func _refresh_card() -> void:
 	chips.add_theme_constant_override("h_separation", 4)
 	chips.add_theme_constant_override("v_separation", 4)
 	who.add_child(chips)
-	chips.add_child(PopupKit.chip(PoliticianPresets.title(_background_id) if _background_id != "" else L.t("meslek ?"),
-		UiTheme.GOLD if _background_id != "" else UiTheme.TEXT_DIM))
+	if PoliticianPresets.PROFESSIONS_ENABLED:
+		chips.add_child(PopupKit.chip(PoliticianPresets.title(_background_id) if _background_id != "" else L.t("meslek ?"),
+			UiTheme.GOLD if _background_id != "" else UiTheme.TEXT_DIM))
 	who.add_child(PopupKit.note(L.t("Memleket: %s") % GameMap.name_of(_hometown) if _hometown != "" else L.t("Memleket seçilmedi"),
 		UiTheme.TEXT_MUTED))
 	var perks: Array = []
-	if _background_id != "":
+	if _background_id != "" and PoliticianPresets.PROFESSIONS_ENABLED:
 		perks.append(String(PoliticianPresets.background(_background_id).get("perk", "")))
 	if not perks.is_empty():
 		_card_box.add_child(PopupKit.note("• " + "\n• ".join(perks), UiTheme.GREEN))
@@ -832,7 +837,7 @@ func _refresh_players() -> void:
 		texts.add_child(party_label)
 		if not politician.is_empty():
 			var bits: Array = [String(politician.get("name", ""))]
-			if PoliticianPresets.is_valid_background(String(politician.get("background", ""))):
+			if PoliticianPresets.title(String(politician.get("background", ""))) != "":
 				bits.append(PoliticianPresets.title(String(politician["background"])))
 			var leader := PopupKit.label(" · ".join(bits), 11, UiTheme.HEAD)
 			leader.clip_text = true
@@ -862,12 +867,35 @@ func _refresh_players() -> void:
 
 # --- Adımlar -----------------------------------------------------------------------
 
+## Meslek adımı meslekler kapalıyken atlanır (bkz. PoliticianPresets.PROFESSIONS_ENABLED).
+func _step_enabled(index: int) -> bool:
+	return index != 1 or PoliticianPresets.PROFESSIONS_ENABLED
+
+## Görünen sıra numarası (atlanan adım sayılmaz).
+func _step_number(index: int) -> int:
+	var n := 0
+	for i in index + 1:
+		if _step_enabled(i):
+			n += 1
+	return n
+
+## Yöndeki ilk açık adım (yoksa aynı adım).
+func _neighbor_step(index: int, dir: int) -> int:
+	var i := index + dir
+	while i >= 0 and i < STEP_COUNT:
+		if _step_enabled(i):
+			return i
+		i += dir
+	return index
+
 func _show_step(index: int) -> void:
 	_step = clampi(index, 0, STEP_COUNT - 1)
+	if not _step_enabled(_step):
+		_step = _neighbor_step(_step, 1)
 	_visited[_step] = true
 	for i in _pages.size():
 		(_pages[i] as Control).visible = i == _step
-	_step_title.text = "%d · %s" % [_step + 1, L.t(STEP_TITLES[_step])]
+	_step_title.text = "%d · %s" % [_step_number(_step), L.t(STEP_TITLES[_step])]
 	_step_hint.text = L.t(STEP_HINTS[_step])
 	if _step == 2:
 		_fit_map.call_deferred()
@@ -877,7 +905,7 @@ func _show_step(index: int) -> void:
 func _step_done(index: int) -> bool:
 	match index:
 		0: return _first_name != "" and _surname != ""
-		1: return _background_id != ""
+		1: return _background_id != "" or not PoliticianPresets.PROFESSIONS_ENABLED
 		2: return _hometown != ""
 		3: return PartyManager.is_valid_name(_party_name)
 		4: return VoterGroups.is_valid_core(_core) and (_visited.has(4) or _editing_bot())
@@ -894,7 +922,8 @@ func _refresh() -> void:
 	for i in _step_buttons.size():
 		var b: Button = _step_buttons[i]
 		var done := _step_done(i)
-		b.text = "%d · %s%s" % [i + 1, L.t(STEP_TITLES[i]), "" if done else ""]
+		b.visible = _step_enabled(i)
+		b.text = "%d · %s%s" % [_step_number(i), L.t(STEP_TITLES[i]), "" if done else ""]
 		var color := UiTheme.GOLD if i == _step else (UiTheme.GREEN_DARK if done else UiTheme.PANEL_LIGHT)
 		UiSkin.skin_color_button(b, color)
 		var font_color := UiSkin.text_on(color)
@@ -916,7 +945,7 @@ func _refresh() -> void:
 func _refresh_nav() -> void:
 	_blocker.visible = _is_locked and not _editing_bot()
 	_back_button.disabled = _step == 0
-	var last := _step == STEP_COUNT - 1
+	var last := _neighbor_step(_step, 1) == _step
 	var missing := _missing_steps()
 	if _editing_bot():
 		_next_button.text = L.t("İleri") if not last else L.t("Kendi partine dön")
@@ -941,17 +970,17 @@ func _refresh_nav() -> void:
 		_status.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
 
 func _on_next_pressed() -> void:
-	var last := _step == STEP_COUNT - 1
+	var last := _neighbor_step(_step, 1) == _step
 	if _editing_bot():
 		if last:
 			_start_editing(-1)
 		else:
-			_show_step(_step + 1)
+			_show_step(_neighbor_step(_step, 1))
 		return
 	if _is_locked or last:
 		_on_ready_pressed()
 	else:
-		_show_step(_step + 1)
+		_show_step(_neighbor_step(_step, 1))
 
 ## Hazır / iptal: siyasetçi ve parti hazır bayrağıyla birlikte gider (tek
 ## RPC: host "hazır"ı partinin son hâlinden önce görmesin).
@@ -1110,14 +1139,11 @@ func _on_color_selected(index: int) -> void:
 
 func _on_core_pressed(group: String) -> void:
 	if _core.has(group):
-		return  # her zaman 2 grup seçili kalır: başka birine basarak değiştir
-	var other := VoterGroups.opposite(group)
-	if _core.has(other):
-		_core[_core.find(other)] = group
-	else:
+		_core.erase(group)
+	elif _core.size() < VoterGroups.CORE_COUNT and not _core.has(VoterGroups.opposite(group)):
 		_core.append(group)
-		while _core.size() > VoterGroups.CORE_COUNT:
-			_core.pop_front()
+	else:
+		return
 	_push_party()
 	_refresh()
 

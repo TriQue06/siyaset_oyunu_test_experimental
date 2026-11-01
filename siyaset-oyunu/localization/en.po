@@ -5924,3 +5924,15 @@ msgstr "Politicians' points and their parties' seats"
 
 msgid "etkisiz"
 msgstr "neutral"
+
+msgid "Kimden ödenir"
+msgstr "Who pays"
+
+msgid "KASAN %s"
+msgstr "YOURS %s"
+
+msgid "DEVLET %s"
+msgstr "STATE %s"
+
+msgid "Hazine kotan ve kasan birlikte yetmiyor."
+msgstr "Your treasury quota and party funds together are not enough."

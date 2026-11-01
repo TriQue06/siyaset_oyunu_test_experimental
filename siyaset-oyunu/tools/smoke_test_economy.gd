@@ -303,8 +303,8 @@ func _initialize() -> void:
 	check("kota bitince devlet payı 0", near(float(cm.funding_range(1, "invest")["max"]), 0.0))
 	# 0.0.231: sırada en fazla 3 yatırım; kota denemesi yeni sırada sürer.
 	cm._start_turn_flow(1)
-	check("kota bitince yatırım yapılamaz (0.0.238: kasadan tamamlama yok)", not cm.can_invest(1, String(cm._province_ids[0]), 0.0)
-		and not cm.can_invest(1, String(cm._province_ids[0]), 1.0))
+	check("kota bitince devlet payı verilemez, yalnız kasa öder (0.0.314)", not cm.can_invest(1, String(cm._province_ids[0]), 1.0)
+		and cm.can_invest(1, String(cm._province_ids[0]), 0.0) == (cm.funds_of(1) >= Economy.INVEST_COST - 0.001))
 	give_turn(2)
 	cm.funds[2] = 0.0
 	var dep_quota: float = cm.state_quota(2)
@@ -393,9 +393,10 @@ func _initialize() -> void:
 	cm.funds[1] = 100.0
 	cm.economy["treasury"] = 1000.0
 	var r: Dictionary = cm.funding_range(1, "invest")
-	check("yatırım: tamamı devletten (paylaşım seçimi yok)", near(float(r["min"]), 1.0) and near(float(r["max"]), 1.0), str(r))
-	check("yatırımın kasadan ödenen kısmı reddedilir", not cm.can_invest(1, String(cm._province_ids[1]), 0.5)
-		and not cm.can_invest(1, String(cm._province_ids[1]), 0.0))
+	check("yatırım: varsayılan tamamı devletten, kasa da katılabilir (0.0.314)", near(float(r["default"]), 1.0)
+		and near(float(r["max"]), 1.0) and near(float(r["min"]), 0.0), str(r))
+	check("yatırımın bir kısmı ya da tamamı kasadan ödenebilir", cm.can_invest(1, String(cm._province_ids[1]), 0.5)
+		and cm.can_invest(1, String(cm._province_ids[1]), 0.0))
 	cm.economy["treasury"] = 40.0
 	check("kota yatırıma yetmezse yatırım yapılamaz", not cm.can_invest(1, String(cm._province_ids[1]), 1.0)
 		and cm.funding_block_reason(1, "invest", 1.0).to_lower().contains("hazine"), cm.funding_block_reason(1, "invest", 1.0))

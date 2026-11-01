@@ -1594,18 +1594,25 @@ func can_invest(peer_id: int, province_id: String = "", state: float = -1.0, tie
 
 # --- Finansman paylaşımı ------------------------------------------------------
 
-## Hamlenin finansmanı (0.0.238 sadeleştirme): MİTİNG her zaman parti
-## kasasından, YATIRIM her zaman devlet hazinesinden (partinin hazine kotası,
-## bakanlık payına göre); paylaşım seçimi yok. {"kind", "total", "min", "max"
-## (devlet payı; ikisi eşit), "default", "state_allowed"}. min > max ise
-## ödenemez.
+## Hamlenin finansmanı: MİTİNG her zaman parti kasasından. YATIRIM (0.0.314)
+## devlet hazinesi (partinin hazine kotası, bakanlık payına göre) ile parti
+## kasası arasında bölünebilir; varsayılan: kotanın izin verdiği en yüksek
+## devlet payı. {"kind", "total", "min", "max" (devlet payı), "default",
+## "state_allowed"}. min > max ise ödenemez.
 func funding_range(peer_id: int, kind: String, total: float = -1.0) -> Dictionary:
 	if total <= 0.0:
 		total = Economy.INVEST_COST if kind == "invest" else float(GameRules.MITING_FUNDS_COST)
 	if kind == "invest":
 		var state_allowed := is_government_party(peer_id) and not is_party_member(peer_id) and not PartyManager.is_independent(peer_id)
-		var ok := state_allowed and state_quota(peer_id) >= total - 0.001
-		return {"kind": kind, "total": total, "min": 1.0, "max": 1.0 if ok else 0.0, "default": 1.0, "state_allowed": state_allowed}
+		if not state_allowed:
+			return {"kind": kind, "total": total, "min": 1.0, "max": 0.0, "default": 1.0, "state_allowed": false}
+		# Devlet payı kotayı aşamaz (aşağı yuvarlanır); kalan parti kasasından
+		# ödenir, kasanın yetmediği kadar devlet payı şart (yukarı yuvarlanır).
+		var step := Economy.FUND_STEP
+		var hi := floorf(minf(1.0, state_quota(peer_id) / total) / step + 0.001) * step
+		var lo := ceilf(maxf(0.0, 1.0 - funds_of(peer_id) / total) / step - 0.001) * step
+		return {"kind": kind, "total": total, "min": clampf(lo, 0.0, 1.0), "max": clampf(hi, 0.0, 1.0),
+			"default": clampf(hi, 0.0, 1.0), "state_allowed": true}
 	var affordable := funds_of(peer_id) >= total - 0.001
 	return {"kind": kind, "total": total, "min": 0.0 if affordable else 1.0, "max": 0.0, "default": 0.0, "state_allowed": false}
 

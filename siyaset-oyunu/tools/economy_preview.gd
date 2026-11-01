@@ -127,6 +127,16 @@ func _initialize() -> void:
 	await create_timer(1.2).timeout
 	check("yatırımdan sonra hazine kutusu güncel", (panel._tiles["treasury"]["value"] as Label).text == Economy.money_full(before - Economy.INVEST_COST))
 
+	# Yatırım sayfası: devlet / kasa kaydırıcısı (0.0.314).
+	scene._open_province_actions(province)
+	scene._province_actions.open_page("invest")
+	await _frames(8)
+	_shot("econ_invest_page")
+	var funding: Dictionary = cm.funding_range(me, "invest", Economy.INVEST_COST)
+	check("yatırım varsayılanı en çok devlet payı", is_equal_approx(float(funding["default"]), float(funding["max"])), str(funding))
+	check("yatırım paneli ekrana sığıyor", _inside(scene._province_actions), str(scene._province_actions.get_global_rect()))
+	scene._province_actions.close()
+
 	# Sandık öncesi özeti (erken seçim kararı).
 	cm.early_election_pending = true
 	cm._push_state({"type": "opinion"})

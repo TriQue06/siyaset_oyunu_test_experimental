@@ -1971,5 +1971,9 @@
 "Seçmene %s": "Voters: %s",
 "/ dönem": "/ term",
 "Siyasetçilerin puanı ve partilerinin vekil sayısı": "Politicians' points and their parties' seats",
-"etkisiz": "neutral"
+"etkisiz": "neutral",
+"Kimden ödenir": "Who pays",
+"KASAN %s": "YOURS %s",
+"DEVLET %s": "STATE %s",
+"Hazine kotan ve kasan birlikte yetmiyor.": "Your treasury quota and party funds together are not enough."
 }

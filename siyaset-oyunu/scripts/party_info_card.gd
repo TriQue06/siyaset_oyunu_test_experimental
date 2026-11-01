@@ -58,10 +58,10 @@ static func build(peer_id: int, my_id: int, on_action: Callable = Callable(), wi
 	# GENEL BAŞKANIN PROFİLİ: eski mesleği (ve memleketi).
 	var leader_id := CardManager.party_of(peer_id) if not independent else peer_id
 	var job := PoliticianPresets.title(PoliticianPresets.background_of(leader_id))
-	if job != "":
+	if not PartyManager.politicians.get(leader_id, {}).is_empty():
 		var hometown := String(PoliticianPresets.of(leader_id).get("hometown", ""))
 		var who := L.t("Bağımsız siyasetçi") if independent else L.t("Genel başkan %s") % PoliticianPresets.display_name(leader_id)
-		var line := L.t("%s · eski meslek: %s") % [who, job]
+		var line := L.t("%s · eski meslek: %s") % [who, job] if job != "" else who
 		if hometown != "":
 			line += L.t(" · memleket: %s") % ElectionNightSim.province_name(hometown)
 		var note := PopupKit.note(line, color.lightened(0.45), _text_width())

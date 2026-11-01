@@ -106,7 +106,6 @@ static func do_action(bot: int) -> Dictionary:
 	var laws_before := [CardManager.has_proposed_law_this_round(bot, "group"), CardManager.has_proposed_law_this_round(bot, "tax"), CardManager.has_proposed_law_this_round(bot, "constitution")]
 	var blocked_before := CardManager.is_turn_blocked()
 	var closed_before := CardManager.parliament_closed_stages(bot).size()
-	var mitings_before := CardManager.miting_count(bot)
 	match String(action["type"]):
 		"law":
 			CardManager._apply_law(bot, String(action["law"]))
@@ -154,7 +153,7 @@ static func do_action(bot: int) -> Dictionary:
 		or CardManager.inventories.get(bot, []).size() != hand_before \
 		or [CardManager.has_proposed_law_this_round(bot, "group"), CardManager.has_proposed_law_this_round(bot, "tax"), CardManager.has_proposed_law_this_round(bot, "constitution")] != laws_before \
 		or CardManager.is_turn_blocked() != blocked_before \
-		or CardManager.parliament_closed_stages(bot).size() != closed_before or CardManager.miting_count(bot) != mitings_before
+		or CardManager.parliament_closed_stages(bot).size() != closed_before
 	return action if applied else {}
 
 func _handle_votes(now: float) -> void:

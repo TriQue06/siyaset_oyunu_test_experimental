@@ -134,11 +134,6 @@ func _initialize() -> void:
 		await create_timer(0.4).timeout
 		root.get_texture().get_image().save_png("%s/popup_party.png" % OS.get_user_data_dir())
 		scene._toggle_profile(cmq.turn_order[2])
-		if scene.hand_container.get_child_count() > 0:
-			scene._show_card_info(String(cmq.my_inventory()[0]), scene.hand_container.get_child(0))
-			await create_timer(0.3).timeout
-			root.get_texture().get_image().save_png("%s/popup_card.png" % OS.get_user_data_dir())
-			scene._card_info.hide()
 		scene._show_toast("Bu ilde teşkilatın yok. Önce teşkilatlanmalısın.")
 		await create_timer(0.3).timeout
 		root.get_texture().get_image().save_png("%s/popup_toast.png" % OS.get_user_data_dir())

@@ -82,7 +82,6 @@ const CARD_BAR_PADDING := 8.0
 ## Kartın barda görünen ÜST kısmı. Kalanı ekranın altında bekler; fare
 ## üstüne gelince (ya da dokunulup seçilince) kart bu kadar yukarı kalkıp
 ## tamamen görünür.
-const CARD_PEEK_HEIGHT := 72.0 * 4.0 / 3.0 * 4.0 / 3.0
 ## Haritanın altındaki katman düğmelerine (Vekiller/Teşkilat/Güç) ayrılan yer.
 const LAYER_BAR_RESERVE := 40.0
 const AVATAR_SEPARATION := 6.0
@@ -232,7 +231,6 @@ var _profile_scroll_peer: int = -1
 ## Hedef seçme modundayken üstte görünen yönerge ("... sağ tık: iptal").
 var _target_hint: Label
 ## Eldeki bir kartın üstüne gelince çıkan açıklama kutusu.
-var _card_info: PanelContainer
 var _abstain_button: Button
 ## Sürüklenen kart (el içindeki sırası; -1 = sürükleme yok) ve imleci izleyen kopyası.
 ## Sürükleme sırasında el yeniden kurulmak istendi mi (bırakınca kurulur).
@@ -404,7 +402,6 @@ func _ready() -> void:
 	_build_waiting_overlay()
 	_build_event_log()
 	_build_target_hint()
-	_build_card_info()
 	_build_action_buttons()
 	_build_player_tabs()
 	# Çöp kutusu destenin yanına otursun (yerleşim butonlar kurulduktan sonra).
@@ -2389,8 +2386,6 @@ func _rebuild_hand() -> void:
 	# El değişti: bekleyen hedef seçimi artık yanlış karta işaret edebilir.
 	_cancel_targeting()
 	_selected_hand_index = -1
-	if _card_info != null:
-		_card_info.hide()
 	var hand := CardManager.my_inventory()
 	if _hand_built and hand == _built_hand and _built_hand_locale == TranslationServer.get_locale():
 		_fit_hand_width(hand.size())
@@ -2506,7 +2501,11 @@ func _wire_hand_card(wrapper: Control, holder: Control, card: Control, card_type
 	card.set_meta("press_pos", Vector2.ZERO)
 	card.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-			if event.pressed:
+			if event.pressed and event.double_click:
+				# ÇİFT TIK (0.0.323): hedefsiz kart (popülizm, anket) oynanır.
+				card.set_meta("pressed", false)
+				_on_hand_card_double_clicked(hand_index)
+			elif event.pressed:
 				card.set_meta("pressed", true)
 				card.set_meta("press_pos", event.position)
 			elif card.get_meta("pressed", false):
@@ -2548,15 +2547,6 @@ func _on_hand_card_clicked(hand_index: int) -> void:
 	if hand_index < 0 or hand_index >= hand.size():
 		return
 	if _selected_hand_index == hand_index:
-		var selected_type: String = hand[hand_index]
-		# Bonus kart (hedefsiz): seçiliyken tekrar dokunmak kullanır.
-		if CardPresets.is_self_card(selected_type) and CardManager.can_act():
-			_deselect_hand_card()
-			if CardManager.can_play_card(multiplayer.get_unique_id(), selected_type):
-				CardManager.play_card(hand_index)
-			else:
-				_show_toast(_unplayable_reason(selected_type))
-			return
 		_deselect_hand_card()
 		return
 	_cancel_targeting()
@@ -2578,8 +2568,23 @@ func _on_hand_card_clicked(hand_index: int) -> void:
 			return
 		_begin_province_targeting(hand_index)
 		return
-	if CardPresets.is_self_card(card_type):
-		_set_target_hint(L.t("%s: kullanmak için karta tekrar dokun  ·  Başka yere dokun: vazgeç") % CardPresets.card_title(card_type))
+
+## Hedefsiz kart çift tıkla oynanır; tek tık yalnız seçer, başka yere
+## tıklamak geri alır.
+func _on_hand_card_double_clicked(hand_index: int) -> void:
+	var hand := CardManager.my_inventory()
+	if hand_index < 0 or hand_index >= hand.size():
+		return
+	var card_type: String = hand[hand_index]
+	if not CardPresets.is_self_card(card_type):
+		return
+	_deselect_hand_card()
+	if not CardManager.can_act():
+		return
+	if CardManager.can_play_card(multiplayer.get_unique_id(), card_type):
+		CardManager.play_card(hand_index)
+	else:
+		_show_toast(_unplayable_reason(card_type))
 
 func _select_hand_card(hand_index: int) -> void:
 	_selected_hand_index = hand_index
@@ -2589,14 +2594,10 @@ func _select_hand_card(hand_index: int) -> void:
 		var selected: bool = int(holder.get_meta("hand_index", -1)) == hand_index
 		holder.set_meta("lift_target", CARD_LIFT if selected else 0.0)
 		holder.z_index = 5 if selected else 0
-		if selected:
-			_show_card_info(String(CardManager.my_inventory()[hand_index]), holder)
 
 func _deselect_hand_card() -> void:
 	_selected_hand_index = -1
 	_cancel_targeting()
-	if _card_info != null:
-		_card_info.hide()
 	for holder in _hand_holders:
 		if is_instance_valid(holder):
 			holder.set_meta("lift_target", 0.0)
@@ -2820,6 +2821,11 @@ var _hover_info_drag_scroll: ScrollContainer
 ## can consume the wheel. Direct scrolling over the inspector stays native.
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
+		# Seçili hedefsiz kart varken elin dışına tıklamak seçimi geri alır.
+		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed and _selected_hand_index != -1 				and not hand_container.get_global_rect().has_point(event.position):
+			var hand := CardManager.my_inventory()
+			if _selected_hand_index < hand.size() and CardPresets.is_self_card(String(hand[_selected_hand_index])):
+				_deselect_hand_card()
 		if event.button_index == MOUSE_BUTTON_MIDDLE and not event.pressed:
 			if _hover_info_drag_scroll != null:
 				_hover_info_drag_scroll = null
@@ -3212,53 +3218,6 @@ func _set_target_hint(text: String) -> void:
 	var viewport_size := get_viewport_rect().size
 	_target_hint.position = Vector2(LEFT_PANEL_WIDTH, TOP_STRIP_HEIGHT + 4.0)
 	_target_hint.size = Vector2(viewport_size.x - LEFT_PANEL_WIDTH - RIGHT_COLUMN_WIDTH, 24.0 * (text.count("\n") + 1))
-
-func _build_card_info() -> void:
-	_card_info = PanelContainer.new()
-	_card_info.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_card_info.z_index = 110
-	_card_info.hide()
-	add_child(_card_info)
-
-## Hover edilen kartın hemen üstünde adını ve ne yaptığını gösterir.
-func _show_card_info(card_type: String, holder: Control) -> void:
-	for child in _card_info.get_children():
-		_card_info.remove_child(child)
-		child.queue_free()
-	# Açıklama satırlarını ayır: etki (tek paragraf), nasıl kullanılır, bedel.
-	var effect: PackedStringArray = []
-	var usage: PackedStringArray = []
-	for line in CardPresets.card_description(card_type).split("\n", false):
-		var lower := line.to_lower()
-		if line.begins_with("Bedel:"):
-			continue
-		if "sürükle" in lower or "dokun" in lower:
-			usage.append(line.strip_edges())
-		else:
-			effect.append(line.strip_edges())
-	var accent := UiTheme.RED if CardPresets.needs_target(card_type) else UiTheme.BLUE
-	var parts := PopupKit.frame(300.0, accent, _card_info)
-	var box: VBoxContainer = parts[1]
-	var head := HBoxContainer.new()
-	head.add_theme_constant_override("separation", 8)
-	var title := UiTheme.mono_label(CardPresets.card_title(card_type), PopupKit.FS_TITLE - 2, UiTheme.TEXT, true)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(title)
-	box.add_child(head)
-	if not effect.is_empty():
-		box.add_child(PopupKit.note(" ".join(effect), UiTheme.TEXT, 276.0))
-	if not usage.is_empty():
-		box.add_child(PopupKit.note(" ".join(usage), UiTheme.HEAD, 276.0))
-	_card_info.show()
-	_card_info.reset_size()
-	var viewport_size := get_viewport_rect().size
-	var info_size := _card_info.get_combined_minimum_size()
-	_card_info.size = info_size
-	_card_info.position = Vector2(
-		clampf(holder.global_position.x + CARD_DISPLAY_SIZE.x * 0.5 - info_size.x * 0.5,
-			LEFT_PANEL_WIDTH, viewport_size.x - RIGHT_COLUMN_WIDTH - info_size.x),
-		viewport_size.y - CARD_PEEK_HEIGHT + CARD_LIFT - 8.0 - info_size.y
-	)
 
 ## Hedef seçme modunda, çalınabilecek partileri vurgular; geçersiz olanları
 ## (kendi partin, tek vekili kalmış partiler) soluklaştırır.
@@ -4149,7 +4108,7 @@ func _build_action_buttons() -> void:
 	_funds_plate.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			_show_toast(_funds_rules))
-	_funds_rules = L.t("PARTİ KASASI: bağış ve aidatlar her sıranda %s (hükümetteysen %s), teşkilatların yerel bağışları ve seçim sonrası hazine yardımı. Kasan yettikçe istediğin kadar hamle yap; para birikir.\nDEVLET HAZİNESİ ayrıdır: onu sadece hükümet, yatırım için kullanır.") % [
+	_funds_rules = L.t("PARTİ KASASI: bağış ve aidatlar her sıranda %s (hükümetteysen %s), son seçimdeki oy oranının beşte biri kadar milyon, teşkilatların yerel bağışları ve seçim sonrası hazine yardımı. Kasan yettikçe istediğin kadar hamle yap; para birikir.\nDEVLET HAZİNESİ ayrıdır: onu sadece hükümet, yatırım için kullanır.") % [
 		GameRules.cost_text(GameRules.FUNDS_PER_ROUND), GameRules.cost_text(GameRules.FUNDS_PER_ROUND_GOVERNMENT)]
 	# HAMLELER: 3 sütun x 2 satır IZGARA. Eskiden her buton tek tek mutlak
 	# konuma oturtuluyordu; uzun bir yazı (TEŞKİLATLANMA) butonun asgari

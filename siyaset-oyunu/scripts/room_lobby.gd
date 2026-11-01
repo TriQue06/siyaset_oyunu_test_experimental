@@ -325,9 +325,8 @@ func _build_rules() -> Control:
 
 	# SÜRELER
 	var time_body := _rule_section(box, "timing", "clock", L.t("Süreler"))
-	for key in ["turn_seconds", "vote", "action_limit"]:
-		var heading: String = {"turn_seconds": L.t("Tur süresi"), "vote": L.t("Meclis oylama süresi"),
-			"action_limit": L.t("Sırada miting / yatırım sınırı")}[key]
+	for key in ["turn_seconds", "vote"]:
+		var heading: String = {"turn_seconds": L.t("Tur süresi"), "vote": L.t("Meclis oylama süresi")}[key]
 		time_body.add_child(_row_name(heading))
 		var row := _seg_row()
 		time_body.add_child(row)

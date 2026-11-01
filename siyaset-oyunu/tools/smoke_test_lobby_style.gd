@@ -26,13 +26,10 @@ func run() -> void:
 	await process_frame
 	check((lobby._sections["timing"]["body"] as Control).visible and not (lobby._sections["map"]["body"] as Control).visible, "accordion switches section")
 	check(not lobby.world_controls.has("turn_seconds") and lobby.world_choice_buttons["turn_seconds"].size() == 5, "turn duration uses buttons (60-120)")
-	check(lobby.world_choice_buttons["action_limit"].size() == 3, "action limit uses buttons (4, 5, 6)")
+	check(not lobby.world_choice_buttons.has("action_limit"), "0.0.323: no action limit setting")
 	for f in 3:
 		await process_frame
 	var turn_buttons: Array = lobby.world_choice_buttons["turn_seconds"]
-	var limit_buttons: Array = lobby.world_choice_buttons["action_limit"]
-	check(is_equal_approx(turn_buttons[0].size.y, limit_buttons[0].size.y), "choice buttons share height")
-	check(turn_buttons[0].size.x < limit_buttons[0].size.x, "more options -> narrower buttons")
 	check(turn_buttons[0].text == "60" and lobby.vote_time_buttons[0].text == "15", "no seconds suffix")
 	check(lobby.world_controls["province_seats"] is HSlider and not (lobby.world_controls["province_seats"] as HSlider).scrollable, "district seats slider ignores wheel")
 	check(lobby.world_controls["national_seats"] is HSlider, "national seats use slider")

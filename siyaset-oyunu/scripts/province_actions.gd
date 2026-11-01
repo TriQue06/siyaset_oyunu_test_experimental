@@ -370,14 +370,13 @@ func _build_header() -> void:
 
 func _build_menu() -> void:
 	var me := multiplayer.get_unique_id()
-	var limit := CardManager.action_limit(me)
 	if not PartyManager.is_independent(me):
 		_body.add_child(_org_row(me))
 	if _page_available("miting"):
-		_body.add_child(_big(L.t("MİTİNG"), L.t("bu sıra %d/%d") % [limit - CardManager.miting_count(me), limit], C_MIT, 70, false,
+		_body.add_child(_big(L.t("MİTİNG"), "", C_MIT, 70, false,
 			func(): open_page("miting")))
 	if _page_available("invest"):
-		_body.add_child(_big(L.t("YATIRIM"), L.t("bu sıra %d/%d") % [limit - CardManager.invest_count(me), limit], C_INV, 70, false,
+		_body.add_child(_big(L.t("YATIRIM"), "", C_INV, 70, false,
 			func(): open_page("invest")))
 	_body.add_child(_spacer())
 	var info := _button()
@@ -565,9 +564,6 @@ func _build_miting() -> void:
 func _do_miting() -> void:
 	var me := multiplayer.get_unique_id()
 	var slots := CardManager.miting_focus_slots(me, province_id)
-	if CardManager.miting_count(me) >= CardManager.action_limit(me):
-		toast_requested.emit(L.t("Bu sıra %d mitingin hepsini yaptın.") % CardManager.action_limit(me))
-		return
 	if _focus.size() != slots:
 		toast_requested.emit(L.t("Mitingi düzenlemek için %d seçmen grubu seç.") % slots)
 		return
@@ -630,9 +626,6 @@ func _build_invest() -> void:
 	var ok := CardManager.can_invest(me, province_id, share, _invest_tier)
 	_body.add_child(_big(L.t("YATIRIM YAP"), Economy.money_full(amount), C_GO, 50, not ok, func():
 		var pay := slider.share
-		if CardManager.invest_count(me) >= CardManager.action_limit(me):
-			toast_requested.emit(L.t("Bu sıra %d yatırımın hepsini yaptın.") % CardManager.action_limit(me))
-			return
 		if not CardManager.can_invest(me, province_id, pay, _invest_tier):
 			var reason := CardManager.funding_block_reason(me, "invest", pay, amount)
 			if reason == "" and lo > hi:

@@ -87,9 +87,7 @@ func _initialize() -> void:
 
 	print("=== 1) ILK SECIM ONCESI: KART CEK, MECLIS YOK, IL HAMLELERI ===")
 	new_game()
-	check("miting / yatirim siniri varsayilan 5 (lobi ayari)", cm.action_limit(1) == 5 and mm.WORLD_OPTIONS["action_limit"] == [4, 5, 6])
-	# Aşağıdaki sınır denemeleri lobide 4 (en küçük seçenek) seçilmiş gibi.
-	mm.world_settings["action_limit"] = 4
+	check("0.0.323: miting / yatirim siniri yok (lobi ayari da yok)", not cm.has_method("action_limit") and not mm.WORLD_OPTIONS.has("action_limit"))
 	check("sira basinda kart cekilmedi, KART CEK bekleniyor", cm.needs_turn_draw(1) and cm.inventories[1].is_empty())
 	var time_before: float = cm._turn_time_left
 	cm.tick(5.0)
@@ -119,29 +117,23 @@ func _initialize() -> void:
 	cm.funds[1] = 200.0
 	cm._apply_organization(1, province)
 	check("il panelinden teskilat kurulur", cm.organization_level(province, 1) == 1)
-	# Çekilen kart "esnek hareket" çıkarsa sınır iki katına çıkar: sınır testi için kapat.
-	cm._flow_for(1)["flex"] = false
 	var before_miting: float = cm.funds_of(1)
 	cm._apply_miting_move(1, province, 0.0, [], 0)
-	check("kucuk miting 10 milyon", is_equal_approx(before_miting - cm.funds_of(1), 10.0) and cm.miting_count(1) == 1)
+	check("kucuk miting 10 milyon", is_equal_approx(before_miting - cm.funds_of(1), 10.0))
 	cm._apply_miting_move(1, province, 0.0, [], 2)
-	check("buyuk miting 25 milyon", is_equal_approx(before_miting - cm.funds_of(1), 35.0) and cm.miting_count(1) == 2)
+	check("buyuk miting 25 milyon", is_equal_approx(before_miting - cm.funds_of(1), 35.0))
 	cm._apply_miting_move(1, province, 0.0, [], 1)
-	check("orta miting 15 milyon, 3. hak", is_equal_approx(before_miting - cm.funds_of(1), 50.0) and cm.miting_count(1) == 3)
-	cm._apply_miting_move(1, province, 0.0, [], 0)
-	check("4. miting (sinir 4)", cm.miting_count(1) == 4)
-	check("5. miting reddedilir", not cm.can_miting(1, province))
-	var after_four: float = cm.funds_of(1)
-	cm._apply_miting_move(1, province, 0.0, [], 1)
-	check("5. miting otorite tarafinda da reddedilir", cm.miting_count(1) == 4 and is_equal_approx(cm.funds_of(1), after_four))
+	check("orta miting 15 milyon", is_equal_approx(before_miting - cm.funds_of(1), 50.0))
+	for extra in 4:
+		cm._apply_miting_move(1, province, 0.0, [], 0)
+	check("para yettikce miting sinirsiz (7 miting)", is_equal_approx(before_miting - cm.funds_of(1), 90.0))
 	cm.funds[2] = 5.0
 	give_turn(2)
 	cm._apply_draw(2)
-	check("yeni sirada miting hakki tazelenir", cm.miting_count(2) == 0)
 	var poor: float = cm.funds_of(2)
 	cm.funds[2] = 9.0
 	cm._apply_miting_move(2, province, 0.0, [], 0)
-	check("para yetmezse miting yok, kasa eksiye dusmez", cm.miting_count(2) == 0 and cm.funds_of(2) >= 0.0)
+	check("para yetmezse miting yok, kasa eksiye dusmez", is_equal_approx(cm.funds_of(2), 9.0))
 	cm.funds[2] = poor
 
 	print("=== 2) ANINDA VE SAKLANABILIR KARTLAR ===")
@@ -180,7 +172,7 @@ func _initialize() -> void:
 	check("popülizm surerken desteden popülizm cikmaz", not cm._draw_weights(3).has(cp.POPULISM_CARD_TYPE))
 	check("popülizm bir donem surer", GameRules.POPULISM_ROUNDS == 1 and cm.populism_rounds_left(3) == 1)
 	cm.populism.erase(cm.party_of(3))
-	# OLUMSUZ / ESNEK ŞANS KARTLARI
+	# OLUMSUZ ŞANS KARTLARI
 	cm.funds[3] = 50.0
 	var fine_entry: Array = []
 	cm._resolve_draw(3, cp.PENALTY_CARD_TYPE, fine_entry, PackedStringArray())
@@ -191,12 +183,8 @@ func _initialize() -> void:
 	cm._resolve_draw(3, cp.SELF_TURMOIL_CARD_TYPE, [], PackedStringArray())
 	check("parti ici karisiklik oyuncunun kendisini vurur", cm.voter_total(3) < national_before
 		and float(cm.turmoil.get(cm.party_of(3), 0.0)) > turmoil_before)
-	give_turn(3)
-	var limit_before: int = cm.action_limit(3)
-	cm._resolve_draw(3, cp.FLEX_CARD_TYPE, [], PackedStringArray())
-	check("esnek hareket o sira siniri iki katina cikarir", cm.action_limit(3) == limit_before * 2)
-	give_turn(3)
-	check("esnek hareket sonraki sirada biter", cm.action_limit(3) == limit_before)
+	check("0.0.323: esnek hareket ve kart calma destede yok", not cm._draw_weights(3).has("esnek_hareket") and not cm._draw_weights(3).has("kart_calma"))
+	check("0.0.323: populizm ele girer", not cm.is_instant_card(cp.POPULISM_CARD_TYPE))
 	check("olumsuz kartlar anindadir, ele girmez", cm.is_instant_card(cp.PENALTY_CARD_TYPE) and cm.is_negative_card(cp.SELF_TURMOIL_CARD_TYPE))
 	cm.inventories[3] = [cp.REPUTATION_CARD_TYPE]
 	var free_funds: float = cm.funds_of(3)
@@ -341,14 +329,12 @@ func _initialize() -> void:
 	cm._apply_miting_move(1, home, 0.0, [], 1, 2)
 	check("karalamali miting: kart dustu, karalamanin bedeli yok", cm.inventories[1].is_empty()
 		and is_equal_approx(smear_funds - cm.funds_of(1), 15.0))
-	check("karalama ayri miting hakki harcamaz", cm.miting_count(1) == 1)
 	cm.inventories[1] = [cp.PROPAGANDA_CARD_TYPE]
 	check("karalama karti tek basina da oynanabilir", cm.can_play_card(1, cp.PROPAGANDA_CARD_TYPE, 2, home))
-	check("iptal edilen hazirlik kart ve hak tuketmez", cm.inventories[1].size() == 1 and cm.miting_count(1) == 1)
+	check("iptal edilen hazirlik kart tuketmez", cm.inventories[1].size() == 1)
 
-	print("=== 10) YATIRIM KADEMELERI VE SINIR ===")
+	print("=== 10) YATIRIM KADEMELERI ===")
 	new_game()
-	mm.world_settings["action_limit"] = 3
 	form_government({1: 300, 2: 120, 3: 80}, all_posts_to(1))
 	cm.funds = {1: 500.0, 2: 200.0, 3: 200.0}
 	cm.economy["treasury"] = 2000.0
@@ -357,20 +343,17 @@ func _initialize() -> void:
 	var quota_before: float = cm.state_quota(1)
 	var treasury_before: float = cm.state_treasury()
 	cm._apply_invest_move(1, province, 1.0, 0)
-	check("kucuk yatirim 50 milyon", is_equal_approx(treasury_before - cm.state_treasury(), 50.0) and cm.invest_count(1) == 1,
+	check("kucuk yatirim 50 milyon", is_equal_approx(treasury_before - cm.state_treasury(), 50.0),
 		"%.1f" % (treasury_before - cm.state_treasury()))
 	var funds_mid: float = cm.funds_of(1)
 	var treasury_mid: float = cm.state_treasury()
 	check("0.0.314: yatirim kasadan da odenebilir (kasa yetiyorsa)", cm.can_invest(1, province, 0.0, 2) == (funds_mid >= 150.0 - 0.001))
 	cm._apply_invest_move(1, province, 1.0, 2)
 	check("buyuk yatirim 150 milyon (hazineden, kasa degismez)", is_equal_approx(treasury_mid - cm.state_treasury(), 150.0)
-		and is_equal_approx(funds_mid, cm.funds_of(1)) and cm.invest_count(1) == 2)
+		and is_equal_approx(funds_mid, cm.funds_of(1)))
 	cm._apply_invest_move(1, province, 1.0, 1)
-	check("3. yatirim", cm.invest_count(1) == 3)
-	check("4. yatirim reddedilir", not cm.can_invest(1, province, 1.0, 0))
-	var treasury_three: float = cm.state_treasury()
 	cm._apply_invest_move(1, province, 1.0, 0)
-	check("4. yatirim otorite tarafinda da reddedilir", cm.invest_count(1) == 3 and is_equal_approx(cm.state_treasury(), treasury_three))
+	check("hazine ve kota yettikce yatirim sinirsiz", cm.can_invest(1, province, 1.0, 0) == (cm.state_quota(1) >= 50.0 and cm.state_treasury() >= 50.0))
 	give_turn(2)
 	cm._apply_draw(2)
 	check("muhalefet yatirim yapamaz", not cm.can_invest(2, province))
@@ -378,24 +361,20 @@ func _initialize() -> void:
 
 	print("=== 11) BOTLAR YENI AKISLA OYNAR ===")
 	new_game()
-	mm.world_settings["action_limit"] = 5
 	for id in [1, 2, 3]:
 		mm.players[id]["bot"] = true
 	var bm = root.get_node("BotManager")
 	var now := 0.0
 	var draws_ok := true
-	var max_mitings := 0
 	for step in 4000:
 		now += 0.5
 		bm.step(now)
 		cm.tick(0.5)
 		gm.tick(0.5)
 		var cur: int = cm.current_turn_peer_id()
-		max_mitings = maxi(max_mitings, cm.miting_count(cur) - cm.action_limit(cur) + 5)
 		if cm.round_number >= 14 or cm.game_finished:
 			break
 	check("botlar turlari oynadi (secim dahil)", cm.round_number >= 12 or cm.game_finished, "tur %d" % cm.round_number)
-	check("botlar sirada siniri asmadi", max_mitings <= 5, str(max_mitings))
 	check("botlar kart cekti", draws_ok and int(cm.turn_flow.get("serial", 0)) > 20)
 
 	print("=== TUR AKISI: %s ===" % ("PASS" if fails == 0 else "%d HATA" % fails))

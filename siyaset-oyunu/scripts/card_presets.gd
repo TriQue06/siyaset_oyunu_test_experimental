@@ -4,12 +4,11 @@ extends Node
 ## KARTLAR (ŞANS KARTLARI): sırası gelen oyuncu bir kart çeker. 0.0.232: kartların
 ## fiyatı yok, kart bozdurma (satma) yok.
 ## YATIRIM ve GENSORU da artık hamle (bkz. CardManager.invest / censure).
-##   - POPÜLİZM BONUSU : POPULISM_ROUNDS tur kendi hamlelerinin iyi etkisi artar, kötüsü azalır.
+##   - POPÜLİZM BONUSU : ele girer; oynanınca POPULISM_ROUNDS tur kendi hamlelerinin
+##     iyi etkisi artar, kötüsü azalır.
 ##   - OLUMSUZ (0.0.232): PARA CEZASI kasanın PENALTY_SHARE'ini siler; PARTİ İÇİ
-##     KARIŞIKLIK oyuncunun kendi partisinde iç karışıklık çıkarır; ESNEK HAREKET
-##     (olumlu) o sıra miting ve yatırım sınırını iki katına çıkarır.
+##     KARIŞIKLIK oyuncunun kendi partisinde iç karışıklık çıkarır.
 ##   - PARA BONUSU     : zayıf +FUNDS_BONUS_WEAK, güçlü +FUNDS_BONUS_STRONG para.
-##   - KART ÇALMA      : seçilen partinin elinden rastgele 1 kart çalınır (eli boşsa boşa gider).
 ## MİTİNG, YATIRIM, GENSORU kart değil, hamle; türleri hamlenin kimliği olarak durur.
 ##   - MİTİNG    : seçilen ilde seçmen kazandırır.
 ##   - YATIRIM   : sadece hükümet partilerine gelir; seçilen ile yatırım.
@@ -32,10 +31,8 @@ const STEAL_CARD_TYPES: Array[String] = [
 ## Kaset: hedefin ulusal desteğini doğrudan düşürür, partide biraz KARIŞIKLIK çıkarır.
 ## İç karışıklık (isyan): hedefin ulusal desteği düşer ve partide çok KARIŞIKLIK
 ## çıkar (gizli değer; çok birikirse parti bölünür, bkz. CardManager.turmoil).
-## Kart çalma: hedefin elinden rastgele bir kart alınır.
 const REPUTATION_CARD_TYPE := "kaset"
 const REBELLION_CARD_TYPE := "isyan"
-const CARD_THEFT_CARD_TYPE := "kart_calma"
 
 ## Hükümeti düşürmek için meclise getirilen teklif.
 const CENSURE_CARD_TYPE := "gensoru"
@@ -46,14 +43,13 @@ const PROPAGANDA_CARD_TYPE := "karalama"
 ## ve seçim takvimi o tarihten itibaren yeniden işler.
 const EARLY_ELECTION_CARD_TYPE := "erken_secim"
 
-## Hedefsiz bonus kartlar: seçip tekrar dokununca oynanır.
+## Hedefsiz kartlar: çift tıkla oynanır (0.0.323).
 const POPULISM_CARD_TYPE := "populizm"
 const FUNDS_BONUS_CARD_TYPE := "bagis_kampanyasi"
 const FUNDS_BONUS_STRONG_CARD_TYPE := "bagis_kampanyasi_guclu"
-## Şans kartının olumsuz ve esnek türleri (çekildiği an uygulanır).
+## Şans kartının olumsuz türleri (çekildiği an uygulanır).
 const PENALTY_CARD_TYPE := "para_cezasi"
 const SELF_TURMOIL_CARD_TYPE := "parti_ici_karisiklik"
-const FLEX_CARD_TYPE := "esnek_hareket"
 ## ANKET (0.0.300): elde bekleyen kart; oynanınca ülke geneli oy oranlarının
 ## anlık görüntüsü. Yalnız oynayan görür ("Son anket"). Seçimde sıfırlanır.
 const POLL_CARD_TYPE := "anket"
@@ -96,8 +92,6 @@ const CARD_TYPES: Array[String] = [
 	"bagis_kampanyasi_guclu",
 	"para_cezasi",
 	"parti_ici_karisiklik",
-	"esnek_hareket",
-	"kart_calma",
 	"anket",
 ]
 
@@ -108,34 +102,26 @@ const TAX_PREFIX := "tax:"
 
 const CARD_NATIVE_SIZE := Vector2(72, 96)
 
-## Vekil çalma kartlarının çaldığı milletvekili aralığı (her değer eşit olası).
-const STEAL_RANGES := {
-	"steal_weak": {"min": 2, "max": 4},
-	"steal_strong": {"min": 10, "max": 16},
-}
+## VEKİL ÇALMA FORMÜLÜ (0.0.323): çalınabilecek en çok vekil meclisin
+## büyüklüğüne ve iki partinin hitap ettiği seçmen gruplarının eşleşmesine
+## (VoterGroups.party_closeness, 0..1) bağlıdır:
+##   en çok = toplam vekil × STEAL_SHARE[kart] × (STEAL_FLOOR + (1 − STEAL_FLOOR) × yakınlık²)
+##   en az  = en çok × STEAL_MIN_RATIO
+## Birebir aynı gruplara hitap eden iki parti arasında GÜÇLÜ kart meclisin
+## beşte birine kadar çalar (300 kişilik mecliste 60). ZAYIF kart aynı mantıkla
+## bunun STEAL_WEAK_SHARE'i kadar. Gruplar hiç uyuşmuyorsa güçlü kart bile,
+## birebir eşleşen iki parti arasındaki zayıf karttan az çalar.
+const STEAL_SHARE := {"steal_weak": 0.06, "steal_strong": 0.2}
+const STEAL_FLOOR := 0.08
+const STEAL_MIN_RATIO := 0.6
 
-## Seçmen grubu yakınlığına göre aralık (bkz. VoterGroups.party_closeness):
-## yukarıdaki STEAL_RANGES NÖTR hâl (orta yakınlık); iki partinin grup
-## yakınlıkları birebir aynıysa STEAL_RANGES_CLOSE (2 kat), çok farklıysa
-## STEAL_RANGES_FAR. Arası doğrusal (bkz. steal_range).
-const STEAL_RANGES_CLOSE := {
-	"steal_weak": {"min": 4, "max": 8},
-	"steal_strong": {"min": 20, "max": 32},
-}
-const STEAL_RANGES_FAR := {
-	"steal_weak": {"min": 1, "max": 2},
-	"steal_strong": {"min": 6, "max": 9},
-}
-
-## closeness: 0 (en uzak) .. 0.5 (nötr) .. 1 (aynı grup profili) -> {"min", "max"}.
-func steal_range(card_type: String, closeness: float) -> Dictionary:
-	var mid: Dictionary = STEAL_RANGES.get(card_type, {})
-	if mid.is_empty():
+## closeness: 0 (hiç uyuşmuyor) .. 1 (birebir aynı) -> {"min", "max"}.
+func steal_range(card_type: String, closeness: float, total_seats: int = 300) -> Dictionary:
+	if not STEAL_SHARE.has(card_type):
 		return {}
-	var other: Dictionary = STEAL_RANGES_CLOSE[card_type] if closeness >= 0.5 else STEAL_RANGES_FAR[card_type]
-	var t: float = absf(closeness - 0.5) * 2.0
-	return {"min": int(round(lerpf(float(mid["min"]), float(other["min"]), t))),
-		"max": int(round(lerpf(float(mid["max"]), float(other["max"]), t)))}
+	var match_factor := STEAL_FLOOR + (1.0 - STEAL_FLOOR) * pow(clampf(closeness, 0.0, 1.0), 2.0)
+	var most := maxi(1, int(round(float(total_seats) * float(STEAL_SHARE[card_type]) * match_factor)))
+	return {"min": maxi(1, int(round(most * STEAL_MIN_RATIO))), "max": most}
 
 ## Kendi görseli olmayan kartlar geçici olarak başka bir kartın görselini kullanır.
 const CARD_ART_ALIAS := {
@@ -145,8 +131,6 @@ const CARD_ART_ALIAS := {
 	"bagis_kampanyasi_guclu": "bagis_kampanyasi",
 	"para_cezasi": "steal_medium",
 	"parti_ici_karisiklik": "gensoru",
-	"esnek_hareket": "anket",
-	"kart_calma": "gozcu",
 }
 
 var _card_textures: Dictionary = {}
@@ -155,7 +139,7 @@ var _card_textures: Dictionary = {}
 ## CardFace yerine bu görsel kartı kaplar; kenar çizgisi görselin ortalama rengi.
 const FULL_ART_PATH := "res://assets/cards/art/card_%s.png"
 ## Kendi tam görseli olmayan yeni kartlar akraba kartın görselini kullanır.
-const FULL_ART_ALIAS := {"parti_ici_karisiklik": "isyan", "para_cezasi": "kart_calma"}
+const FULL_ART_ALIAS := {"parti_ici_karisiklik": "isyan"}
 var _full_art: Dictionary = {}
 var _art_edge: Dictionary = {}
 
@@ -206,9 +190,9 @@ func get_card_texture(card_type: String) -> Texture2D:
 func needs_target(card_type: String) -> bool:
 	return STEAL_CARD_TYPES.has(card_type)
 
-## Hedef parti seçilen TÜM kartlar: vekil çalma + kaset + iç karışıklık + kart çalma.
+## Hedef parti seçilen TÜM kartlar: vekil çalma + kaset + iç karışıklık.
 func needs_party_target(card_type: String) -> bool:
-	return needs_target(card_type) or card_type in [REPUTATION_CARD_TYPE, REBELLION_CARD_TYPE, CARD_THEFT_CARD_TYPE]
+	return needs_target(card_type) or card_type in [REPUTATION_CARD_TYPE, REBELLION_CARD_TYPE]
 
 ## Bu kart oynanırken haritadan İL seçilmesi gerekiyor mu? (Karalamada ilden
 ## sonra hedef parti de seçilir.)
@@ -341,10 +325,6 @@ func card_short_title(card_type: String) -> String:
 			return L.t("PARA\nCEZASI")
 		"parti_ici_karisiklik":
 			return L.t("PARTİ İÇİ\nKARIŞIKLIK")
-		"esnek_hareket":
-			return L.t("ESNEK\nHAREKET")
-		"kart_calma":
-			return L.t("KART\nÇALMA")
 		"anket":
 			return L.t("ANKET")
 		"isyan":
@@ -375,14 +355,10 @@ func card_title(card_type: String) -> String:
 			return L.t("Kaset / İtibar Suikastı")
 		"isyan":
 			return L.t("İç Karışıklık")
-		"kart_calma":
-			return L.t("Kart Çalma")
 		"para_cezasi":
 			return L.t("Para Cezası")
 		"parti_ici_karisiklik":
 			return L.t("Parti İçi Karışıklık")
-		"esnek_hareket":
-			return L.t("Esnek Hareket")
 		"anket":
 			return L.t("Anket")
 		"bagis_kampanyasi_guclu":
@@ -434,11 +410,9 @@ func _card_effect_text(card_type: String) -> String:
 	if is_law_card(card_type):
 		return law_description(card_type)
 	if needs_target(card_type):
-		var r: Dictionary = STEAL_RANGES[card_type]
 		var cost_line := L.t("Bedeli: biraz seçmen kaybedersin.") if card_type == STEAL_STRONG_CARD_TYPE \
 			else L.t("Çalınan parti mağduriyetten biraz destek kazanır.")
-		return L.t("Seçtiğin partiden %d–%d vekil çal; aynı seçmen gruplarına hitap ediyorsanız daha çok.\n%s\nSeç, sonra soldaki bir partiye tıkla.") % [
-			int(r["min"]), int(r["max"]), cost_line]
+		return L.t("Seçtiğin partiden vekil çal: hitap ettiğiniz seçmen grupları ne kadar benzerse o kadar çok.\n%s\nSeç, sonra soldaki bir partiye tıkla.") % cost_line
 	match card_type:
 		REPUTATION_CARD_TYPE:
 			return L.t("Seçtiğin partinin itibarını sarsan bir kaset sızar: %s ve parti içi karışıklık.\nSeç, sonra soldaki bir partiye tıkla.") % \
@@ -446,14 +420,10 @@ func _card_effect_text(card_type: String) -> String:
 		REBELLION_CARD_TYPE:
 			return L.t("Seçtiğin partide iç karışıklık çıkar: %s. Karışıklık birikirse parti bölünebilir.\nSeç, sonra soldaki bir partiye tıkla.") % \
 				EffectWords.change(-PublicOpinion.REBELLION_NATIONAL_DAMAGE)
-		CARD_THEFT_CARD_TYPE:
-			return L.t("Seçtiğin partinin elinden rastgele bir kart çalarsın (eli boşsa kart boşa gider).\nSeç, sonra soldaki bir partiye tıkla.")
 		PENALTY_CARD_TYPE:
 			return L.t("OLUMSUZ, ANINDA ETKİ: para cezası. Parti kasandaki paranın beşte biri hemen silinir.")
 		SELF_TURMOIL_CARD_TYPE:
 			return L.t("OLUMSUZ, ANINDA ETKİ: kendi partinde iç karışıklık çıkar; ulusal desteğin düşer, karışıklık birikirse parti bölünebilir.")
-		FLEX_CARD_TYPE:
-			return L.t("ANINDA ETKİ: esnek hareket. Bu sıra miting ve yatırım sınırın iki katına çıkar.")
 		POLL_CARD_TYPE:
 			return L.t("Ülke geneli anket: kullandığın an partilerin oy oranlarını yalnız sen görürsün; partilere dokunup \"Son anket\"e bak. Seçime kadar kalır.\nSeçmek için dokun, tekrar dokun: kullan.")
 		FUNDS_BONUS_STRONG_CARD_TYPE:
@@ -470,7 +440,7 @@ func _card_effect_text(card_type: String) -> String:
 		PROPAGANDA_CARD_TYPE:
 			return L.t("SAKLANABİLİR: miting hazırlarken kullanılır. Mitingin yapıldığı ilde seçtiğin partiyi karalarsın: ona eksi, sana artı. İlde güçlü olan partiye az işler; ayrı miting hakkı harcamaz, bedeli yok.")
 		POPULISM_CARD_TYPE:
-			return L.t("ANINDA ETKİ: çekildiği an başlar. Bu dönem boyunca hamlelerin çok daha etkili, kötü sonuçlar hafifler.")
+			return L.t("Kullandığın an başlar: bu dönem boyunca hamlelerin çok daha etkili, kötü sonuçlar hafifler.")
 		FUNDS_BONUS_CARD_TYPE:
 			return L.t("ANINDA ETKİ: bağış kampanyası, kasana hemen %s girer.") % GameRules.cost_text(GameRules.FUNDS_BONUS_WEAK)
 	return ""

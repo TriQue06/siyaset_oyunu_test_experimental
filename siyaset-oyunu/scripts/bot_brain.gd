@@ -723,8 +723,6 @@ static func _evaluate(bot: int, card_type: String) -> Dictionary:
 		CardPresets.POLL_CARD_TYPE:
 			# Bilgi kartı: botun işine yaramaz ama eli tıkamasın.
 			return {"score": 0.2, "peer": -1, "province": ""}
-		CardPresets.CARD_THEFT_CARD_TYPE:
-			return _eval_card_theft(bot)
 		CardPresets.PROPAGANDA_CARD_TYPE:
 			return _eval_propaganda(bot)
 	if CardPresets.needs_target(card_type):
@@ -747,20 +745,6 @@ static func _eval_reputation(bot: int) -> Dictionary:
 
 static func hand_size(peer_id: int) -> int:
 	return (CardManager.inventories.get(peer_id, []) as Array).size()
-
-## Kart çalma: eli en dolu rakip (eli boşsa kart boşa gider).
-static func _eval_card_theft(bot: int) -> Dictionary:
-	if hand_size(bot) >= CardManager.MAX_HAND_SIZE:
-		return {}
-	var target := -1
-	for peer_id in CardManager.turn_order:
-		if is_ally(bot, int(peer_id)) or hand_size(peer_id) == 0:
-			continue
-		if target == -1 or hand_size(peer_id) > hand_size(target):
-			target = peer_id
-	if target == -1:
-		return {}
-	return {"score": 1.0 + float(hand_size(target)) * 0.12, "peer": target, "province": ""}
 
 ## İç karışıklık: büyük bir rakibin desteğini düşürür ve partisini sarsar.
 static func _eval_rebellion(bot: int) -> Dictionary:
@@ -1341,6 +1325,10 @@ static func build_government(bot: int) -> Dictionary:
 		var share := float(GovernmentManager.seats_of(peer_id)) / maxf(1.0, float(seats))
 		required[peer_id] = maxf(float(COALITION_MIN_POINTS), float(total_points) * share * COALITION_FAIR_SHARE) * (1.0 + minf(0.35, _distance(bot, peer_id) * 0.2)) \
 			+ COALITION_REFUSAL_POINTS * _refusals(bot, int(peer_id))
+		# Reddettiği tekliften en az bir puan fazlası (aynı teklif tekrar gitmez).
+		var refused := GovernmentManager.coalition_refused_offer(CardManager.party_of(bot), int(peer_id))
+		if refused > 0:
+			required[peer_id] = maxf(float(required[peer_id]), float(refused + 1))
 		given[peer_id] = 0
 	var posts: Array = []
 	for post in GovernmentPresets.POSTS:
@@ -1350,11 +1338,17 @@ static func build_government(bot: int) -> Dictionary:
 	for post in posts:
 		var pick := -1
 		var deficit := 0.01
-		for peer_id in partners:
-			var missing: float = float(required[peer_id]) - float(given[peer_id])
-			if missing > deficit:
-				deficit = missing
-				pick = peer_id
+		# Reddeden ortaklar önce: makamlar bitmeden hakları dolsun.
+		for refusers_only in [true, false]:
+			for peer_id in partners:
+				if refusers_only and _refusals(bot, int(peer_id)) == 0:
+					continue
+				var missing: float = float(required[peer_id]) - float(given[peer_id])
+				if missing > deficit:
+					deficit = missing
+					pick = peer_id
+			if pick != -1:
+				break
 		if pick == -1:
 			break  # herkes hakkını aldı: kalan makamlar kurana
 		assignments[post["id"]] = pick

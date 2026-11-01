@@ -82,8 +82,8 @@ var election_threshold: float = THRESHOLD_DEFAULT
 ## Oyun süresi: seçimler kaç turda bir ve kaç seçim olacak (bkz. GameRules.configure).
 var election_interval: float = GameRules.DEFAULT_ELECTION_INTERVAL
 ## Her oyun için rastgele ülke, il yoğunluğu, vekil sayıları ve tur kuralları.
-const WORLD_DEFAULTS := {"province_scale": 1.0, "province_seats": 300, "national_seats": 0, "turn_seconds": 90, "action_limit": 5}
-const WORLD_OPTIONS := {"province_scale": [0.75, 1.0, 1.25], "province_seats": [150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750], "national_seats": [0, 50, 100, 150, 200, 250, 300], "turn_seconds": [60, 75, 90, 105, 120], "action_limit": [4, 5, 6]}
+const WORLD_DEFAULTS := {"province_scale": 1.0, "province_seats": 300, "national_seats": 0, "turn_seconds": 90}
+const WORLD_OPTIONS := {"province_scale": [0.75, 1.0, 1.25], "province_seats": [150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750], "national_seats": [0, 50, 100, 150, 200, 250, 300], "turn_seconds": [60, 75, 90, 105, 120]}
 var world_settings: Dictionary = WORLD_DEFAULTS.duplicate()
 var vote_timeout: int = 30
 const VOTE_TIME_OPTIONS := [15, 30, 45, 60]

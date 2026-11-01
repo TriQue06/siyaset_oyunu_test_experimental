@@ -216,9 +216,6 @@ msgstr "mid-%d"
 msgid "TUR SÜRESİ"
 msgstr "TURN TIME"
 
-msgid "SIRADA MİTİNG / YATIRIM SINIRI"
-msgstr "RALLY / INVESTMENT LIMIT PER TURN"
-
 msgid "Afet yardımı parti kasasından yapılır; devlet hazinesi yalnız yatırım içindir."
 msgstr "Disaster aid is paid from the party treasury; the state treasury is only for investment."
 
@@ -972,12 +969,6 @@ msgstr "%s DISSOLVED %s and stayed independent. %d MPs went to the Independents,
 msgid "%s, %s'yi kurdu. Bağımsızken kazandığı destek yeni partisine geçti."
 msgstr "%s founded %s. The support it built as an independent carried over to the new party."
 
-msgid "%s, %s'ın elinden bir kart çaldı."
-msgstr "%s stole a card from %s."
-
-msgid "%s, %s'ın elinden kart çalmaya kalktı ama elinde hiç kart yoktu."
-msgstr "%s tried to steal a card from %s, but they had none."
-
 msgid "%s, ana partisi %s'ya geri döndü: %d milletvekili ve bütün teşkilatlarıyla."
 msgstr "%s returned to its parent party %s, with %d MPs and all its organizations."
 
@@ -1400,9 +1391,6 @@ msgstr "Drop: smear in %s — then pick the target party"
 
 msgid "Bırak: %s'da miting · provokasyon: %s"
 msgstr "Drop: rally in %s · provocation: %s"
-
-msgid "Bırak: %s'ın elinden rastgele 1 kart çal"
-msgstr "Drop: steal a random card from %s"
 
 msgid "Bırak: erken seçim önergesi sun (meclis oylar)"
 msgstr "Drop: table an early election motion (parliament votes)"
@@ -1947,9 +1935,6 @@ msgstr "Smears and tapes hurt you less."
 msgid "Kararların yerelde alınmasını isteyen bölgesel seçmen."
 msgstr "Regional voters who want decisions made locally."
 
-msgid "Kart Çalma"
-msgstr "Card Theft"
-
 msgid "Karta dokun, ne yaptığını oku; hedef isterse bir parti ya da il seç. İstemediğin kartı KART BOZDUR yuvasına sürükle: bedelinin yarısı kasana döner."
 msgstr "Tap a card to read what it does; if it needs a target, pick a party or a province. Drag a card you don't want onto the CASH IN CARD slot: half its cost returns to your funds."
 
@@ -2319,9 +2304,6 @@ msgstr "PARTY ACTIVITY"
 msgid "PARTİ KASASI"
 msgstr "PARTY FUNDS"
 
-msgid "PARTİ KASASI: bağış ve aidatlar her sıranda %s (hükümetteysen %s), teşkilatların yerel bağışları ve seçim sonrası hazine yardımı. Kasan yettikçe istediğin kadar hamle yap; para birikir.\nDEVLET HAZİNESİ ayrıdır: onu sadece hükümet, yatırım için kullanır."
-msgstr "PARTY FUNDS: donations and dues of %s each turn (%s if you're in government), local donations from your organizations and state funding after elections. Make as many moves as your funds allow; money carries over.\nThe STATE TREASURY is separate: only the government uses it, for investments."
-
 msgid "PARTİNİ KUR"
 msgstr "FOUND YOUR PARTY"
 
@@ -2600,12 +2582,6 @@ msgstr "%s in the chosen province; your party moves closer to the province's lar
 
 msgid "Seçtiğin partide iç karışıklık çıkar: %s. Karışıklık birikirse parti bölünebilir.\nSeç, sonra soldaki bir partiye tıkla."
 msgstr "Internal turmoil breaks out in the chosen party: %s. If turmoil builds up, the party may split.\nSelect it, then click a party on the left."
-
-msgid "Seçtiğin partiden %d–%d vekil çal; aynı seçmen gruplarına hitap ediyorsanız daha çok.\n%s\nSeç, sonra soldaki bir partiye tıkla."
-msgstr "Steal %d–%d MPs from the chosen party; more if you appeal to the same voter groups.\n%s\nSelect it, then click a party on the left."
-
-msgid "Seçtiğin partinin elinden rastgele bir kart çalarsın (eli boşsa kart boşa gider).\nSeç, sonra soldaki bir partiye tıkla."
-msgstr "You steal a random card from the chosen party's hand (wasted if their hand is empty).\nSelect it, then click a party on the left."
 
 msgid "Seçtiğin partinin itibarını sarsan bir kaset sızar: %s ve parti içi karışıklık.\nSeç, sonra soldaki bir partiye tıkla."
 msgstr "A tape damaging the chosen party's reputation leaks: %s and internal turmoil.\nSelect it, then click a party on the left."
@@ -4362,9 +4338,6 @@ msgstr "INSTANT: a big fundraising drive, %s goes straight into your treasury."
 msgid "SAKLANABİLİR: miting hazırlarken kullanılır. Mitingin yapıldığı ilde seçtiğin partiyi karalarsın: ona eksi, sana artı. İlde güçlü olan partiye az işler; ayrı miting hakkı harcamaz."
 msgstr "KEEPABLE: used while preparing a rally. You smear a party of your choice in the rally's province: minus for them, plus for you. Works less on a party strong there; does not use a separate rally."
 
-msgid "ANINDA ETKİ: çekildiği an başlar. %d dönem boyunca hamlelerin çok daha etkili, kötü sonuçlar hafifler; bu sürede seçim olursa ek ulusal destek."
-msgstr "INSTANT: starts the moment it is drawn. For %d terms your moves are much stronger and bad outcomes softer; an election in that time brings extra national support."
-
 msgid "ANINDA ETKİ: bağış kampanyası, kasana hemen %s girer."
 msgstr "INSTANT: a fundraising drive, %s goes straight into your treasury."
 
@@ -4572,9 +4545,6 @@ msgstr "UPGRADE OFFICE · %s"
 msgid "%s teşkilatı: %s"
 msgstr "%s office: %s"
 
-msgid "Bu sıra %d mitingin hepsini yaptın. Sonraki sıranda yeniden miting yapabilirsin."
-msgstr "You held all %d rallies this turn. You can rally again next turn."
-
 msgid "Miting ilde oy kazandırır ve partini ilin seçmen gruplarına yaklaştırır. Seçmen sana uzaksa provokasyon riski vardır."
 msgstr "A rally wins votes here and brings your party closer to the province's voter groups. If voters are far from you there is a risk of provocation."
 
@@ -4646,9 +4616,6 @@ msgstr "Only parties in government can invest. In opposition you can use offices
 
 msgid "Yatırımı partinin genel başkanı yapar."
 msgstr "The party leader makes investments."
-
-msgid "Bu sıra %d yatırımın hepsini yaptın."
-msgstr "You made all %d investments this turn."
 
 msgid "Devlet hazinesinden il yatırımı: ildeki bütün seçmen memnun olur, ekonomi canlanır. Hazine yetmezse kalanı parti kasasından."
 msgstr "Provincial investment from the state treasury: every voter here is pleased and the economy picks up. If the treasury falls short, the rest comes from the party treasury."
@@ -4743,17 +4710,11 @@ msgstr "%s turned populist: their moves are stronger this term."
 msgid "%s para cezasına çarptırıldı (−%s)."
 msgstr "%s was fined (−%s)."
 
-msgid "%s esnek hareket kartı çekti: bu sıra miting ve yatırım sınırı iki katı."
-msgstr "%s drew a flexible move card: double rally and investment limit this turn."
-
 msgid "PARA\nCEZASI"
 msgstr "FINE"
 
 msgid "PARTİ İÇİ\nKARIŞIKLIK"
 msgstr "INTERNAL\nTURMOIL"
-
-msgid "ESNEK\nHAREKET"
-msgstr "FLEXIBLE\nMOVE"
 
 msgid "Para Cezası"
 msgstr "Fine"
@@ -4761,23 +4722,14 @@ msgstr "Fine"
 msgid "Parti İçi Karışıklık"
 msgstr "Internal Turmoil"
 
-msgid "Esnek Hareket"
-msgstr "Flexible Move"
-
 msgid "OLUMSUZ, ANINDA ETKİ: para cezası. Parti kasandaki paranın beşte biri hemen silinir."
 msgstr "NEGATIVE, INSTANT: a fine. One fifth of the money in your party treasury is wiped out at once."
 
 msgid "OLUMSUZ, ANINDA ETKİ: kendi partinde iç karışıklık çıkar; ulusal desteğin düşer, karışıklık birikirse parti bölünebilir."
 msgstr "NEGATIVE, INSTANT: turmoil breaks out in your own party; your national support drops and if turmoil builds up the party may split."
 
-msgid "ANINDA ETKİ: esnek hareket. Bu sıra miting ve yatırım sınırın iki katına çıkar."
-msgstr "INSTANT: flexible move. Your rally and investment limits double this turn."
-
 msgid "SAKLANABİLİR: miting hazırlarken kullanılır. Mitingin yapıldığı ilde seçtiğin partiyi karalarsın: ona eksi, sana artı. İlde güçlü olan partiye az işler; ayrı miting hakkı harcamaz, bedeli yok."
 msgstr "KEEPABLE: used while preparing a rally. You smear a party of your choice in the rally's province: minus for them, plus for you. Works less on a party strong there; uses no separate rally and costs nothing."
-
-msgid "ANINDA ETKİ: çekildiği an başlar. Bu dönem boyunca hamlelerin çok daha etkili, kötü sonuçlar hafifler; dönem sonunda seçim olursa ek ulusal destek."
-msgstr "INSTANT: starts the moment it is drawn. This term your moves are much stronger and bad outcomes softer; an election at the end of the term brings extra national support."
 
 msgid "Elindeki kartlar saklanabilir kartlardır: karta dokun, ne yaptığını oku; hedef isterse bir parti seç. Karalama kartı miting hazırlarken kullanılır. Kartların fiyatı yok."
 msgstr "Cards in your hand are keepable: tap one to read what it does; pick a party if it needs a target. The smear card is used while preparing a rally. Cards cost nothing."
@@ -4793,9 +4745,6 @@ msgstr "Close (back to map) · tapping the same province again also closes"
 
 msgid "Mitingte bir rakibe yüklenebilirsin: ona eksi, sana artı. Ayrı miting hakkı harcamaz; kart miting yapılınca elinden çıkar."
 msgstr "You can lay into a rival at the rally: minus for them, plus for you. It uses no extra rally; the card leaves your hand when the rally happens."
-
-msgid "Sırada miting / yatırım sınırı"
-msgstr "Rally / investment limit per turn"
 
 msgid "ATLA"
 msgstr "SKIP"
@@ -4874,9 +4823,6 @@ msgstr "BUILD BRANCH"
 
 msgid "TEŞKİLATI GELİŞTİR"
 msgstr "UPGRADE BRANCH"
-
-msgid "bu sıra %d/%d hakkın kaldı"
-msgstr "%d/%d left this turn"
 
 msgid "Miting ve yatırım için önce bu ilde teşkilat kur."
 msgstr "Build a branch here first to hold rallies and invest."
@@ -5174,9 +5120,6 @@ msgstr "Voters attached to you"
 
 msgid "seçmenin %%%s'i senin"
 msgstr "%s%% of voters are yours"
-
-msgid "ANINDA ETKİ: çekildiği an başlar. Bu dönem boyunca hamlelerin çok daha etkili, kötü sonuçlar hafifler."
-msgstr "INSTANT: starts the moment it is drawn. This term your moves are much stronger and bad outcomes are softened."
 
 msgid "%s: miting (%s)%s"
 msgstr "%s: rally (%s)%s"
@@ -5547,9 +5490,6 @@ msgstr "The party leader draws the cards."
 msgid "KART ÇEK · %s"
 msgstr "DRAW CARD · %s"
 
-msgid "bu sıra %d/%d"
-msgstr "this turn %d/%d"
-
 msgid "GELİŞTİR"
 msgstr "UPGRADE"
 
@@ -5564,9 +5504,6 @@ msgstr "Target group"
 
 msgid "MİTİNG YAP"
 msgstr "HOLD RALLY"
-
-msgid "Bu sıra %d mitingin hepsini yaptın."
-msgstr "You've held all %d rallies this turn."
 
 msgid "Yatırım boyu"
 msgstr "Investment size"
@@ -5810,3 +5747,12 @@ msgstr "BACK TO GAME"
 
 msgid "AFET"
 msgstr "DISASTER"
+
+msgid "Kullandığın an başlar: bu dönem boyunca hamlelerin çok daha etkili, kötü sonuçlar hafifler."
+msgstr "Starts the moment you use it: for this term your moves are much more effective and bad outcomes are softened."
+
+msgid "Seçtiğin partiden vekil çal: hitap ettiğiniz seçmen grupları ne kadar benzerse o kadar çok.\n%s\nSeç, sonra soldaki bir partiye tıkla."
+msgstr "Steal MPs from the party you choose: the more alike the voter groups you appeal to, the more you take.\n%s\nSelect, then click a party on the left."
+
+msgid "PARTİ KASASI: bağış ve aidatlar her sıranda %s (hükümetteysen %s), son seçimdeki oy oranının beşte biri kadar milyon, teşkilatların yerel bağışları ve seçim sonrası hazine yardımı. Kasan yettikçe istediğin kadar hamle yap; para birikir.\nDEVLET HAZİNESİ ayrıdır: onu sadece hükümet, yatırım için kullanır."
+msgstr "PARTY FUNDS: donations and dues of %s every turn (%s in government), one fifth of your last election vote share in millions, local donations from your organizations and treasury aid after elections. Make as many moves as your funds allow; money accumulates.\nTHE STATE TREASURY is separate: only the government uses it, for investment."

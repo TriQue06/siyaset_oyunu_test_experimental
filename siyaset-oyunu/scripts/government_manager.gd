@@ -862,21 +862,31 @@ func _resolve_proposal() -> void:
 
 ## 1. aşama (koalisyon görüşmesi) bitti: ortakların hepsi EVET dediyse teklif
 ## meclis oylamasına geçer; biri bile EVET demezse teklif hakkı yanar.
-func note_coalition_refusal(founder: int, partner: int) -> void:
+## Ret kaydı: {"count": kaç kez, "offered": son reddedilen teklifin makam puanı}.
+func note_coalition_refusal(founder: int, partner: int, offered: int = 0) -> void:
 	var refusals: Dictionary = coalition_refusals.get(founder, {})
-	refusals[partner] = int(refusals.get(partner, 0)) + 1
+	var entry: Dictionary = refusals.get(partner, {"count": 0, "offered": 0})
+	refusals[partner] = {"count": int(entry.get("count", 0)) + 1, "offered": maxi(offered, int(entry.get("offered", 0)))}
 	coalition_refusals[founder] = refusals
 
 ## Bu partinin, kuranın tekliflerini bu süreçte kaç kez reddettiği.
 func coalition_refusals_of(founder: int, partner: int) -> int:
-	return int((coalition_refusals.get(founder, {}) as Dictionary).get(partner, 0))
+	return int(((coalition_refusals.get(founder, {}) as Dictionary).get(partner, {}) as Dictionary).get("count", 0))
+
+## Bu partinin reddettiği en yüksek teklifin makam puanı (yoksa 0).
+func coalition_refused_offer(founder: int, partner: int) -> int:
+	return int(((coalition_refusals.get(founder, {}) as Dictionary).get(partner, {}) as Dictionary).get("offered", 0))
 
 func _resolve_coalition_stage() -> void:
 	var proposer := proposal_peer_id
 	for member in eligible_voter_ids():
 		if int(votes.get(member, VOTE_ABSTAIN)) != VOTE_YES:
 			var partner := PartyManager.party_of(int(member))
-			note_coalition_refusal(PartyManager.party_of(proposer), partner)
+			var offered := 0
+			for post in proposal_assignments.keys():
+				if PartyManager.party_of(int(proposal_assignments[post])) == partner:
+					offered += GovernmentPresets.post_points(String(post))
+			note_coalition_refusal(PartyManager.party_of(proposer), partner, offered)
 			last_resolution_reason = L.t("Koalisyon görüşmesi başarısız: %s ortak olmayı kabul etmedi%s.") % [_party_name(partner),
 				"" if int(member) == partner else L.t(" (genel başkan yardımcısı HAYIR dedi)")]
 			_fail_attempt()
@@ -1126,7 +1136,8 @@ func _sync_state(state: Dictionary) -> void:
 	for founder in refusals.keys():
 		var inner := {}
 		for partner in (refusals[founder] as Dictionary).keys():
-			inner[int(partner)] = int(refusals[founder][partner])
+			var entry: Dictionary = refusals[founder][partner]
+			inner[int(partner)] = {"count": int(entry.get("count", 0)), "offered": int(entry.get("offered", 0))}
 		coalition_refusals[int(founder)] = inner
 	proposal_kind = str(state["proposal_kind"])
 	proposal_peer_id = int(state["proposal_peer_id"])

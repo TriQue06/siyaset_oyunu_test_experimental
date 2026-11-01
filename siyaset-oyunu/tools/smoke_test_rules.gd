@@ -186,7 +186,9 @@ func _initialize() -> void:
 		if diff < float(GameRules.ELECTION_FUNDS_BONUS) - 0.01:
 			bonus_ok = false
 	var expected_total := float(cm.turn_order.size()) * float(GameRules.FUNDS_PER_ROUND + GameRules.ELECTION_FUNDS_BONUS)
-	check("secim sonrasi herkese secim parasi, toplam gelir dogru", bonus_ok and is_equal_approx(gained, expected_total),
+	# 0.0.323: her sıra geliri oy gelirini de içerir (oy oranı / 5 milyon).
+	var vote_extra := gained - expected_total
+	check("secim sonrasi herkese secim parasi, toplam gelir dogru", bonus_ok and vote_extra > 0.0 and vote_extra <= 20.0 * cm.turn_order.size() + 0.01,
 		"%s -> %s" % [funds_before_election, cm.funds])
 	check("secimde kazanilan vekiller momentum icin kaydedildi", cm.election_seats == cm.last_seats)
 	check("hukumet kurma asamasi", gm.phase == gm.Phase.FORMING)
@@ -214,8 +216,8 @@ func _initialize() -> void:
 	var gov_funds_before: Dictionary = cm.funds.duplicate()
 	gm._apply_vote(3, false)
 	check("herkes oy verdi -> kabul", gm.has_government() and gm.phase == gm.Phase.GOVERNING)
-	check("yeni hukumetin partilerine +1 milyon, digerlerine yok", cm.funds_of(1) == int(gov_funds_before[1]) + GameRules.GOVERNMENT_FUNDS_BONUS \
-		and cm.funds_of(2) == int(gov_funds_before[2]) + GameRules.GOVERNMENT_FUNDS_BONUS and cm.funds_of(3) == int(gov_funds_before[3]),
+	check("yeni hukumetin partilerine +1 milyon, digerlerine yok", is_equal_approx(cm.funds_of(1), float(gov_funds_before[1]) + GameRules.GOVERNMENT_FUNDS_BONUS) \
+		and is_equal_approx(cm.funds_of(2), float(gov_funds_before[2]) + GameRules.GOVERNMENT_FUNDS_BONUS) and is_equal_approx(cm.funds_of(3), float(gov_funds_before[3])),
 		"%s -> %s" % [gov_funds_before, cm.funds])
 
 	print("")
@@ -279,11 +281,12 @@ func _initialize() -> void:
 	new_game({1: groups(), 2: groups(), 3: groups()})
 	cm.funds = {1: GameRules.FUNDS_START, 2: GameRules.FUNDS_START, 3: GameRules.FUNDS_START}
 	cm._grant_turn_income()
-	check("sirasi gelen +FUNDS_PER_ROUND alir, digerleri almaz", cm.funds_of(1) == GameRules.FUNDS_START + GameRules.FUNDS_PER_ROUND 		and cm.funds_of(2) == GameRules.FUNDS_START, str(cm.funds))
+	check("sirasi gelen +FUNDS_PER_ROUND alir, digerleri almaz", is_equal_approx(cm.funds_of(1), GameRules.FUNDS_START + GameRules.FUNDS_PER_ROUND + cm.vote_income(1)) 		and cm.funds_of(2) == GameRules.FUNDS_START, str(cm.funds))
 	cm.funds[1] = 1
 	cm._apply_pass(1)
 	check("turu bitirmek para vermez: harcanan para geri dolmaz", cm.funds_of(1) == 1, str(cm.funds))
-	check("sirasi gelen 2 gelirini aldi", cm.funds_of(2) == GameRules.FUNDS_START + GameRules.FUNDS_PER_ROUND)
+	check("sirasi gelen 2 gelirini aldi", is_equal_approx(cm.funds_of(2), GameRules.FUNDS_START + GameRules.FUNDS_PER_ROUND + cm.vote_income(2)))
+	check("0.0.323: secim oncesi oy geliri esit pay (3 parti: %33 / 5)", is_equal_approx(cm.vote_income(2), 100.0 / 3.0 / 5.0))
 	var hand3_before: int = cm.inventories[3].size()
 	cm.tick(GameRules.TURN_TIMEOUT + 1.0)
 	check("sure dolunca sira devreder", cm.current_turn_peer_id() == 3)
@@ -293,11 +296,14 @@ func _initialize() -> void:
 	cm.funds[3] = 0
 	check("para yoksa teskilat yok", not cm.can_build_organization(3, TestProvinces.id("ankara")))
 	cm._apply_pass(3)
-	check("tur bitti: 1 birikmis kasasina gelir ekledi (1 + gelir)", cm.round_number == 2 and cm.funds_of(1) == 1 + GameRules.FUNDS_PER_ROUND 		and cm.funds_of(3) == 0, str(cm.funds))
+	check("tur bitti: 1 birikmis kasasina gelir ekledi (1 + gelir)", cm.round_number == 2 and is_equal_approx(cm.funds_of(1), 1 + GameRules.FUNDS_PER_ROUND + cm.vote_income(1)) 		and cm.funds_of(3) == 0, str(cm.funds))
 	var gov_before: Dictionary = gm.government.duplicate()
 	gm.government = {"pm": 1, "ministry_health": 2}
-	check("hukumetteki parti tur basina FUNDS_PER_ROUND_GOVERNMENT alir", cm.turn_income(1) == GameRules.FUNDS_PER_ROUND_GOVERNMENT 		and cm.turn_income(2) == GameRules.FUNDS_PER_ROUND_GOVERNMENT)
-	check("muhalefet normal gelir alir", cm.turn_income(3) == GameRules.FUNDS_PER_ROUND)
+	check("hukumetteki parti tur basina FUNDS_PER_ROUND_GOVERNMENT alir", is_equal_approx(cm.turn_income(1), GameRules.FUNDS_PER_ROUND_GOVERNMENT + cm.vote_income(1)) 		and is_equal_approx(cm.turn_income(2), GameRules.FUNDS_PER_ROUND_GOVERNMENT + cm.vote_income(2)))
+	check("muhalefet normal gelir alir", is_equal_approx(cm.turn_income(3), GameRules.FUNDS_PER_ROUND + cm.vote_income(3)))
+	cm.last_vote_shares = {1: 20.0, 2: 30.0, 3: 50.0}
+	check("0.0.323: oy geliri son secimdeki oy oraninin beste biri (%20 -> 4 milyon)", is_equal_approx(cm.vote_income(1), 4.0) and is_equal_approx(cm.vote_income(3), 10.0))
+	cm.last_vote_shares = {}
 	check("hukumet geliri 10 fazla", GameRules.FUNDS_PER_ROUND_GOVERNMENT == GameRules.FUNDS_PER_ROUND + 10)
 	gm.government = gov_before
 
@@ -658,10 +664,12 @@ func _initialize() -> void:
 
 	print("")
 	print("=== 14) GRUP YAKINLIGINA BAGLI VEKIL CALMA, IL TAVANI, SECIM HEDIYESI ===")
-	check("notr (orta yakinlik) guclu: 10-16", str(cp.steal_range("steal_strong", 0.5)) == str({"min": 10, "max": 16}))
-	check("ayni grup profili guclu: 20-32", str(cp.steal_range("steal_strong", 1.0)) == str({"min": 20, "max": 32}))
-	check("zit uclar: normal 1-2, guclu 6-9", str(cp.steal_range("steal_weak", 0.0)) == str({"min": 1, "max": 2}) \
-		and str(cp.steal_range("steal_strong", 0.0)) == str({"min": 6, "max": 9}))
+	check("0.0.323: birebir eslesen guclu vekil calma meclisin beste biri (300 -> 60)", int(cp.steal_range("steal_strong", 1.0, 300)["max"]) == 60)
+	check("zayif ayni mantikla cok daha zayif", int(cp.steal_range("steal_weak", 1.0, 300)["max"]) < 30
+		and int(cp.steal_range("steal_weak", 0.5, 300)["max"]) < int(cp.steal_range("steal_weak", 1.0, 300)["max"]))
+	check("hic uyusmayan guclu, eslesen zayiftan az calar", int(cp.steal_range("steal_strong", 0.0, 300)["max"]) < int(cp.steal_range("steal_weak", 1.0, 300)["min"]),
+		"%s / %s" % [str(cp.steal_range("steal_strong", 0.0, 300)), str(cp.steal_range("steal_weak", 1.0, 300))])
+	check("meclis buyudukce calinan artar", int(cp.steal_range("steal_strong", 1.0, 600)["max"]) == 120)
 	check("vekil calmanin iki varyanti var", cp.STEAL_CARD_TYPES.size() == 2 and not cp.STEAL_CARD_TYPES.has("steal_medium"))
 	var all_first := {}
 	var all_second := {}

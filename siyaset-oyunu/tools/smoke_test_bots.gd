@@ -185,7 +185,7 @@ func _initialize() -> void:
 	if not first_partners.is_empty():
 		var refuser: int = first_partners[0]
 		gm.coalition_refusals = {}
-		gm.note_coalition_refusal(cm.party_of(ids[1]), refuser)
+		gm.note_coalition_refusal(cm.party_of(ids[1]), refuser, int(first_points[refuser]))
 		var plan2: Dictionary = brain.build_government(ids[1])
 		var refuser_points := 0
 		for post in plan2.keys():

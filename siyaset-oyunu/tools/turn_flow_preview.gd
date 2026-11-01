@@ -149,7 +149,7 @@ func _initialize() -> void:
 	var smears_before: int = cm.my_inventory().count("karalama")
 	scene._province_actions._do_miting()
 	await _wait(0.5)
-	check("arayuzden miting yapildi, karalama karti elde kaldi", cm.miting_count(me) == 1 and cm.my_inventory().count("karalama") == smears_before,
+	check("arayuzden miting yapildi, karalama karti elde kaldi", cm.funds_of(me) < before and cm.my_inventory().count("karalama") == smears_before,
 		"%.0f -> %.0f" % [before, cm.funds_of(me)])
 	scene._province_actions.tab = "invest"
 	scene._province_actions.refresh()

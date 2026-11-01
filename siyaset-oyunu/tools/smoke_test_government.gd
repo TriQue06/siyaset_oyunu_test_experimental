@@ -124,7 +124,7 @@ func _initialize() -> void:
 	cm.election_seats = {1: 0, 3: 110}
 	check("meclis disi parti de calabilir", cm.is_valid_steal_target(1, 3))
 	check("meclis disi yari verim", is_equal_approx(cm.steal_efficiency(1), 0.5), str(cm.steal_efficiency(1)))
-	var full: Dictionary = cp.steal_range("steal_strong", cm.group_closeness(1, 3))
+	var full: Dictionary = cp.steal_range("steal_strong", cm.group_closeness(1, 3), gm.total_seats())
 	var halved: Dictionary = cm.steal_range(1, 3, "steal_strong")
 	check("araliklar yariya indi", int(halved["max"]) <= int(full["max"]) / 2 + 1, "%s vs %s" % [halved, full])
 	cm.election_seats = {1: 150, 3: 110}
@@ -152,10 +152,10 @@ func _initialize() -> void:
 	var pool: Array = cm._draw_pool()
 	check("vekil calma kartlari destede (meclis var)", pool.has("steal_strong"))
 	check("gensoru destede yok (hamle)", not pool.has("gensoru"))
-	check("kart calma destede (meclis var)", pool.has("kart_calma"))
+	check("0.0.323: kart calma destede yok", not pool.has("kart_calma"))
 	var seats_before_pool: Dictionary = cm.last_seats.duplicate()
 	cm.last_seats = {}
-	check("ilk secimden once kart calma destede yok", not cm._draw_pool().has("kart_calma"))
+	check("ilk secimden once vekil calma destede yok", not cm._draw_pool().has("steal_strong"))
 	cm.last_seats = seats_before_pool
 	# Hukumeti azinliga dusur
 	cm.last_seats = {1: 300, 2: 50, 3: 40}

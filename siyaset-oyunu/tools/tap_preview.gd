@@ -53,7 +53,7 @@ func _initialize() -> void:
 	scene._on_hand_card_clicked(0)
 	await _frames(15)
 	check("karta dokununca secildi ve il secme basladi", scene._selected_hand_index == 0 and scene._pending_province_hand_index == 0)
-	check("kart aciklamasi gorunuyor", scene._card_info.visible)
+	check("0.0.323: kart aciklama kutusu yok", not "_card_info" in scene)
 	_shot("tap_card_selected")
 
 	scene._on_province_clicked(TestProvinces.id("ankara"))
@@ -74,7 +74,7 @@ func _initialize() -> void:
 	await _frames(5)
 	scene._on_hand_card_clicked(0)
 	await _frames(5)
-	check("secili karta tekrar dokunmak iptal eder", scene._selected_hand_index == -1 and scene._pending_province_hand_index == -1 and not scene._card_info.visible)
+	check("secili karta tekrar dokunmak iptal eder", scene._selected_hand_index == -1 and scene._pending_province_hand_index == -1)
 
 	scene._on_target_party_clicked(2)
 	await _frames(10)

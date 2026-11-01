@@ -53,7 +53,7 @@ func run() -> void:
 	var rules = load("res://scripts/game_rules.gd")
 	check(rules.TURN_TIMEOUT == 60.0, "turn timeout setting")
 	mm._apply_world_settings({"turn_seconds": 30, "action_limit": 7})
-	check(int(mm.world_settings["turn_seconds"]) == 90 and int(mm.world_settings["action_limit"]) == 5, "old out-of-range values fall back to defaults")
+	check(int(mm.world_settings["turn_seconds"]) == 90 and not mm.world_settings.has("action_limit"), "old out-of-range values fall back to defaults")
 	rules.configure(1, 5)
 	check(rules.ELECTION_INTERVAL == 3, "0.0.300: elections at least every 1.5 years")
 	rules.configure(2.5, 5)

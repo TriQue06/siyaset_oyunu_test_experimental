@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://1qrnd5lryv73"
-path="res://.godot/imported/card_esnek_hareket.png-19faafbe1ea5368182cc2eb0790c6f26.ctex"
+uid="uid://bpx1s2jkuiwlh"
+path="res://.godot/imported/card_para_cezasi.png-fa74bea587258eb4991b516284653188.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/cards/art/card_esnek_hareket.png"
-dest_files=["res://.godot/imported/card_esnek_hareket.png-19faafbe1ea5368182cc2eb0790c6f26.ctex"]
+source_file="res://assets/cards/art/card_para_cezasi.png"
+dest_files=["res://.godot/imported/card_para_cezasi.png-fa74bea587258eb4991b516284653188.ctex"]
 
 [params]
 

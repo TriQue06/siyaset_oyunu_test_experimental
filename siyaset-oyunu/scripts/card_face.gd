@@ -25,8 +25,6 @@ static func kind_of(card_type: String) -> String:
 			return "boost"
 		"bagis_kampanyasi", "bagis_kampanyasi_guclu", "para_cezasi":
 			return "money"
-		"esnek_hareket", "kart_calma":
-			return "cards"
 	if card_type.begins_with("steal_"):
 		return "seats"
 	return "boost"
@@ -90,13 +88,6 @@ static func draw_emblem(canvas: CanvasItem, card_type: String, c: Vector2, s: fl
 				canvas.draw_line(c + Vector2(-s * 0.75, y + s * 0.18), c + Vector2(s * 0.75, y + s * 0.18), dark, w * 0.8, true)
 			canvas.draw_circle(c + Vector2(0, -s * 0.55), s * 0.38, ink)
 			canvas.draw_circle(c + Vector2(0, -s * 0.55), s * 0.2, dark)
-		"esnek_hareket":
-			# İki kart + artı (iki kat hamle).
-			canvas.draw_rect(Rect2(c + Vector2(-s * 0.85, -s * 0.7), Vector2(s * 0.95, s * 1.3)), Color(ink, 0.55), true)
-			canvas.draw_rect(Rect2(c + Vector2(-s * 0.45, -s * 0.5), Vector2(s * 0.95, s * 1.3)), ink, true)
-			canvas.draw_line(c + Vector2(s * 0.03, s * 0.15), c + Vector2(s * 0.03, -s * 0.15) + Vector2(0, -s * 0.0), dark, w, true)
-			canvas.draw_line(c + Vector2(-s * 0.15, 0), c + Vector2(s * 0.21, 0), dark, w, true)
-			canvas.draw_line(c + Vector2(s * 0.03, -s * 0.18), c + Vector2(s * 0.03, s * 0.18), dark, w, true)
 		"para_cezasi":
 			# Para + eksi: kasadan silinen para.
 			canvas.draw_circle(c + Vector2(-s * 0.15, 0), s * 0.75, ink)
@@ -108,12 +99,6 @@ static func draw_emblem(canvas: CanvasItem, card_type: String, c: Vector2, s: fl
 				var hh: float = s * [0.9, 1.5, 1.1][i]
 				canvas.draw_rect(Rect2(c + Vector2(-s * 0.85 + float(i) * s * 0.6, s * 0.75 - hh), Vector2(s * 0.42, hh)), ink, true)
 			canvas.draw_line(c + Vector2(-s, s * 0.85), c + Vector2(s, s * 0.85), ink, w, true)
-		"kart_calma":
-			# Kart + kapan el oku.
-			canvas.draw_rect(Rect2(c + Vector2(-s * 0.2, -s * 0.75), Vector2(s * 0.95, s * 1.3)), ink, true)
-			canvas.draw_line(c + Vector2(-s * 1.0, s * 0.55), c + Vector2(-s * 0.05, s * 0.55), ink, w * 1.4, true)
-			canvas.draw_colored_polygon(PackedVector2Array([c + Vector2(-s * 1.05, s * 0.55), c + Vector2(-s * 0.7, s * 0.25),
-				c + Vector2(-s * 0.7, s * 0.85)]), ink)
 		_:
 			if card_type.begins_with("steal_"):
 				# Vekil silüeti + çeken ok.

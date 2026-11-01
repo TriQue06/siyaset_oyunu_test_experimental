@@ -477,12 +477,7 @@ func _initialize() -> void:
 	cm._apply_card_effect(1, "bagis_kampanyasi_guclu")
 	check("guclu bagis kampanyasi +60", near(cm.funds_of(1), cm.funds_bonus_amount(1, true)) and GameRules.FUNDS_BONUS_STRONG == 60)
 	check("bonus kart oyundan kalkti", not cm._draw_weights(1).has("bonus_kart"))
-	cm.inventories[1] = []
-	cm.inventories[2] = ["karalama"]
-	cm._apply_card_effect(1, "kart_calma", 2)
-	check("kart calma: rakibin kartini alir", cm.inventories[2].is_empty() and cm.inventories[1].size() == 1)
-	cm._apply_card_effect(1, "kart_calma", 2)
-	check("eli bossa kart bosa gider", cm.inventories[1].size() == 1)
+	check("0.0.323: kart calma oyundan kalkti", not cm._draw_weights(1).has("kart_calma"))
 	var bot_name_lengths := {}
 	var name_ok := true
 	for i in 40:

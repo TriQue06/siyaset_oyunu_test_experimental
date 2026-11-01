@@ -89,9 +89,9 @@ func _initialize() -> void:
 	check("ekonomi kutusu görünür (Hükümet sekmesi)", panel != null and panel.is_visible_in_tree())
 	if panel != null:
 		var treasury_text: String = (panel._tiles["treasury"]["value"] as Label).text
-		check("hazine kutusu gerçek bakiyeyi gösterir", treasury_text == Economy.money_text(cm.state_treasury()),
-			"%s / %s" % [treasury_text, Economy.money_text(cm.state_treasury())])
-		check("vergi etkisi satırı görünür", panel._tax_effect.visible and panel._tax_effect.text.contains("vergi"), panel._tax_effect.text)
+		check("hazine kutusu gerçek bakiyeyi gösterir", treasury_text == Economy.money_full(cm.state_treasury()),
+			"%s / %s" % [treasury_text, Economy.money_full(cm.state_treasury())])
+		check("vergi etkisi satırı görünür", panel._tax_effect.visible and panel._tax_effect.text.contains("Seçmene"), panel._tax_effect.text)
 		check("ekonomi kutusu ekrana sığıyor", _inside(panel), str(panel.get_global_rect()))
 		check("yürürlükteki vergi vurgulu", (panel._tax_buttons[Economy.TAX_NORMAL] as Button).get_theme_color("font_color") == UiTheme.INK)
 
@@ -125,7 +125,7 @@ func _initialize() -> void:
 	await _frames(12)
 	_shot("econ_invest_anim")
 	await create_timer(1.2).timeout
-	check("yatırımdan sonra hazine kutusu güncel", (panel._tiles["treasury"]["value"] as Label).text == Economy.money_text(before - Economy.INVEST_COST))
+	check("yatırımdan sonra hazine kutusu güncel", (panel._tiles["treasury"]["value"] as Label).text == Economy.money_full(before - Economy.INVEST_COST))
 
 	# Sandık öncesi özeti (erken seçim kararı).
 	cm.early_election_pending = true

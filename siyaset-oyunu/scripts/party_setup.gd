@@ -629,7 +629,8 @@ func _build_core_buttons() -> void:
 	for child in _core_grid.get_children():
 		_core_grid.remove_child(child)
 		child.queue_free()
-	for group in VoterGroups.stacked_order(_core_grid.columns):
+	# Hazırlıkta zıt gruplar yan yana (işçi | işveren); oyun içinde alt alta.
+	for group in VoterGroups.GROUP_IDS:
 		_core_grid.add_child(_core_button(String(group)))
 
 func _core_button(group: String) -> Button:
@@ -803,8 +804,19 @@ func _refresh_players() -> void:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
 		var color := Color(party.get("bg_color", Color(0.3, 0.3, 0.3)))
-		row.add_child(PoliticianPortrait.make(politician, color, 40.0) if not politician.is_empty() \
-			else _logo(int(party.get("icon_index", -1)), color, 40.0))
+		if politician.is_empty():
+			row.add_child(_logo(int(party.get("icon_index", -1)), color, 40.0))
+		else:
+			# Portrenin sağ altında parti logosu (önceden logo hiç görünmüyordu).
+			var face := Control.new()
+			face.custom_minimum_size = Vector2(48, 44)
+			face.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			face.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			face.add_child(PoliticianPortrait.make(politician, color, 40.0))
+			var badge := _logo(int(party.get("icon_index", -1)), color, 24.0)
+			badge.position = Vector2(24, 20)
+			face.add_child(badge)
+			row.add_child(face)
 		var texts := VBoxContainer.new()
 		texts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		texts.add_theme_constant_override("separation", 0)

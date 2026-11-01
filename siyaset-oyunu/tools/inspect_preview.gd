@@ -36,9 +36,9 @@ func _initialize() -> void:
 	scene._turn_intro.hide()
 	scene._parliament_flow.close_flow()
 	await _wait(0.5)
-	scene._pinned = false
+	# Fare (2,2)'de: canlı fare takibi bilgiyi kapatmasın.
+	scene.set_process(false)
 	scene._show_province_info(province)
-	scene._pinned = true
 	await _wait(0.6)
 	_shot("insp_il")
 	scene._toggle_profile(me)

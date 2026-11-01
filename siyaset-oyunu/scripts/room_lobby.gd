@@ -898,6 +898,9 @@ func _seg_button(text: String) -> Button:
 	button.custom_minimum_size = Vector2(0, 32)
 	button.add_theme_font_override("font", UiTheme.mono(true))
 	button.add_theme_font_size_override("font_size", 14)
+	# 1.5x ölçekte yazı yarım piksele düşünce glif dokusu yumuşak süzülüp
+	# bulanıklaşıyordu (il sayısı düğmeleri); en yakın piksel keskin tutar.
+	button.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	return button
 
 ## Seçili parça hardal, diğerleri krem oyuk (konsept .seg).

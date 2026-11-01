@@ -59,13 +59,13 @@ const BAND_ACTIONS_RATIO := 0.33
 const PLAYER_TAB_TITLES := ["VEKİL", "PUAN"]
 const PLAYER_TAB_TOOLTIPS := [
 	"Partilerin vekil sayısı ve son seçimdeki oy oranı",
-	"Siyasetçilerin puanı ve partilerinin ulusal durumu",
+	"Siyasetçilerin puanı ve partilerinin vekil sayısı",
 ]
 ## Her sekme için [başlık, genişlik] sütunları (soldan sağa, sağa yaslı).
 const PLAYER_TAB_COLUMNS := [
 	[["KASA", 58.0]],
 	[["OY", 56.0], ["VEKİL", 50.0]],
-	[["VEKİL", 46.0], ["ULUSAL", 52.0], ["PUAN", 44.0]],
+	[["VEKİL", 46.0], ["PUAN", 44.0]],
 ]
 ## Sekme yüksekliği (konsept: 44 px).
 const PLAYER_TAB_HEIGHT := 44.0 / 1.5
@@ -1191,7 +1191,6 @@ func _place_parliament_badge() -> void:
 		# Oylama herkesin önüne gelsin: Seçili/Log açıksa Hükümet'e dön.
 		_side_tab = 0
 		if _left_dock != null and _left_dock.visible:
-			_pinned = false
 			_hide_profile()
 			if _province_panel != null and _province_panel.embedded_mode:
 				_province_panel.hide()
@@ -1434,7 +1433,7 @@ func _ensure_board() -> void:
 	box.add_child(_score_scroll)
 
 ## Puan tablosu: siyasetçiler puana göre sıralı; satırda sıra, parti rengi,
-## siyasetçi ve partisi, puan, partinin ulusal puanı (kamuoyu).
+## siyasetçi ve partisi, puan. (0.0.313: ulusal puan oyuncuya gösterilmez.)
 ## Bir durum güncellemesinde birkaç sinyal aynı paneli yeniden kuruyordu
 ## (kare başına 20-35 ms); artık kare sonunda BİR kez kurulur (performans).
 func _refresh_score_table() -> void:
@@ -1453,11 +1452,10 @@ func _refresh_score_table_now() -> void:
 	var title := _section_label(L.t("SİYASETÇİ"))
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title)
-	for column in ["PUAN", L.t("ULUSAL")]:
-		var label := _section_label(column)
-		label.custom_minimum_size = Vector2(46, 0)
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		header.add_child(label)
+	var score_head := _section_label("PUAN")
+	score_head.custom_minimum_size = Vector2(46, 0)
+	score_head.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	header.add_child(score_head)
 	_score_box.add_child(header)
 	var ids: Array = _ordered_peer_ids().duplicate()
 	ids.sort_custom(func(a, b): return GovernmentManager.score_of(int(a)) > GovernmentManager.score_of(int(b)))
@@ -1496,11 +1494,7 @@ func _refresh_score_table_now() -> void:
 		if CardManager.is_party_member(peer_id):
 			party_text += L.t(" · üye")
 		names.add_child(_avatar_label(party_text, 10, UiTheme.TEXT_MUTED))
-		line.add_child(_table_value(str(GovernmentManager.score_of(peer_id)), 40.0, UiTheme.HEAD, 13))
-		var national := CardManager.vote_trend(pid)
-		var trend_value := _table_value(EffectWords.arrows(national), 46.0, ProvincePanel._opinion_color(national), 12)
-		trend_value.mouse_filter = Control.MOUSE_FILTER_PASS
-		line.add_child(trend_value)
+		line.add_child(_table_value(str(GovernmentManager.score_of(peer_id)), 46.0, UiTheme.HEAD, 13))
 		_score_box.add_child(row)
 
 func _on_side_tab(index: int) -> void:
@@ -2067,10 +2061,8 @@ func _player_row_values(peer_id: int, is_self: bool) -> Array:
 			]
 		2:
 			var now: int = int(CardManager.last_seats.get(CardManager.party_of(peer_id), 0))
-			var national: float = CardManager.vote_trend(peer_id)
 			return [
 				_table_value(str(now), 46.0, UiTheme.TEXT_MUTED),
-				_table_value(EffectWords.arrows(national), 52.0, ProvincePanel._opinion_color(national)),
 				_table_value(str(GovernmentManager.score_of(peer_id)), 44.0, UiTheme.TEXT),
 			]
 		_:
@@ -3033,7 +3025,6 @@ func _on_province_clicked(province_id: String) -> void:
 			CardManager.play_card(hand_index, -1, province_id)
 		return
 	_show_province_info(province_id)
-	_pinned = true
 
 ## İL BİLGİSİ sağ sütunda ("Seçili"). Fare haritada dolaşırken canlı olarak
 ## değişir (bkz. _update_live_province); tıklamak da aynı bilgiyi gösterir.
@@ -3043,8 +3034,8 @@ var _live_province := ""
 ## tıklamadan sağda gösterilir. Haritadan çıkınca son il ekranda kalır.
 ## FAREYLE İNCELEME (panel modu): ilin ya da parti plaketinin üstüne gelince
 ## bilgisi sağ panelde GEÇİCİ açılır, fare çekilince kapanır ve en son
-## açık sekmeye dönülür. TIKLAMA kalıcı açar (_pinned): fare gezinse de değişmez.
-var _pinned := false
+## açık sekmeye dönülür. 0.0.313: tıklayınca sabitleme yok, yalnız fare; il
+## işlem menüsü açıkken bilgi o ilde kalır.
 var _hover_info_drag_scroll: ScrollContainer
 
 ## Hovering a province or party scrolls its inspector, before the source list
@@ -3136,7 +3127,7 @@ func _scroll_hover_info(target: ScrollContainer, amount: float, wheel_factor: fl
 func _update_live_province(mouse: Vector2 = Vector2.INF) -> void:
 	if _hover_info_scroll_valid(_hover_info_drag_scroll):
 		return  # Middle-button dragging keeps the original inspector under control.
-	if _window_mode() or _pinned:
+	if _window_mode() or (_province_actions != null and _province_actions.visible):
 		return
 	if _pending_org or _pending_miting or _pending_invest or _pending_province_hand_index != -1 			or _pending_target_hand_index != -1 or _layer_switching or not is_visible_in_tree():
 		return
@@ -3828,14 +3819,12 @@ func _find_avatar_node(peer_id: int) -> Control:
 
 ## Parti kartına dokununca profil açılır; aynı karta tekrar dokununca kapanır.
 func _toggle_profile(peer_id: int) -> void:
-	if _profile_peer_id == peer_id and (_pinned or _window_mode()):
+	if _profile_peer_id == peer_id and _window_mode():
 		_hide_profile()
 		return
 	if _profile_peer_id != peer_id:
 		_profile_peer_id = peer_id
 		_show_tooltip_for(peer_id)
-	# Tıklayınca KALICI: fare çekilince kapanmaz (✕, sekme ya da tekrar tıklama kapatır).
-	_pinned = true
 
 ## Profil kartındaki parti işlemleri (bkz. PartyInfoCard._actions).
 func _on_party_action(kind: String, peer_id: int) -> void:
@@ -3886,8 +3875,6 @@ func _update_left_dock() -> void:
 	if _left_dock == null:
 		return
 	var showing := (_province_panel != null and _province_panel.embedded_mode and _province_panel.visible) or _profile_scroll != null
-	if not showing:
-		_pinned = false
 	_left_dock.visible = showing
 	for node in [government_vbox, _event_log]:
 		if node != null:
@@ -5349,16 +5336,17 @@ func _build_tax_panel() -> void:
 	_tax_panel.hide()
 	add_child(_tax_panel)
 
-## VERGİ POLİTİKASI: ekonomi şeridine ya da yasa panelindeki bağlantıya
-## dokununca açılır (tekrar dokununca kapanır).
-func _open_tax_panel() -> void:
-	if _tax_panel.visible:
+## VERGİ paneli: vergi şeridindeki kademeye dokununca o kademe seçili açılır
+## (yürürlükteki kademe ya da açık paneldeki seçili kademe tekrar: kapanır).
+func _open_tax_panel(level: int = -1) -> void:
+	var pick := level if level != CardManager.tax_level() else -1
+	if _tax_panel.visible and pick == _tax_selected:
 		_tax_panel.hide()
 		return
 	_deselect_hand_card()
 	_close_law_page()
 	_cancel_targeting()
-	_tax_selected = -1
+	_tax_selected = pick
 	_fill_tax_panel()
 	_tax_panel.show()
 	_place_tax_panel.call_deferred()
@@ -6114,9 +6102,7 @@ func _build_turn_flow_ui() -> void:
 	_province_actions = ProvinceActions.new()
 	_province_actions.closed.connect(_on_province_actions_closed)
 	_province_actions.info_requested.connect(func(id: String):
-		_pinned = false
-		_show_province_info(id)
-		_pinned = true)
+		_show_province_info(id))
 	_province_actions.toast_requested.connect(_show_toast)
 	add_child(_province_actions)
 	_parliament_flow = ParliamentFlow.new()
@@ -6172,9 +6158,7 @@ func _open_province_actions(province_id: String) -> void:
 	_province_actions.place_at(get_viewport().get_mouse_position(), board)
 	_province_actions.open(province_id)
 	_highlight_province(province_id)
-	_pinned = false
 	_show_province_info(province_id)
-	_pinned = true
 	# İl bilgisi odak yakınlaşması başlatır; menü açıkken harita yerinde kalır.
 	if _focus_tween != null and _focus_tween.is_running():
 		_focus_tween.kill()

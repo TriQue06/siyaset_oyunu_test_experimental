@@ -138,10 +138,10 @@ func _initialize() -> void:
 		await _button(MOUSE_BUTTON_MIDDLE)
 		_scene.notification(Node.NOTIFICATION_APPLICATION_FOCUS_OUT)
 		_check(_scene._hover_info_drag_scroll == null, "losing focus cancels middle drag")
-		_scene._pinned = true
+		_scene._province_actions.visible = true
 		var other_party: Control = _scene.player_panel_list.get_child(1)
-		_check(_scene._hover_info_scroll_target(other_party.get_global_rect().get_center()) == null, "pinned inspector does not scroll for another party")
-		_scene._pinned = false
+		_check(_scene._hover_info_scroll_target(other_party.get_global_rect().get_center()) == null, "open province menu keeps its inspector")
+		_scene._province_actions.visible = false
 		_scene._pending_org = true
 		_check(_scene._hover_info_scroll_target(party_position) == null, "action targeting keeps its existing input behavior")
 		_scene._pending_org = false

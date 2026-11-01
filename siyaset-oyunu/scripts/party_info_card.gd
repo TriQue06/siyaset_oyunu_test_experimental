@@ -84,9 +84,9 @@ static func build(peer_id: int, my_id: int, on_action: Callable = Callable(), wi
 		box.add_child(PopupKit.note(L.t("Genel başkan: %s  ·  Yardımcı: %s") % [PoliticianPresets.display_name(int(members[0])),
 			PoliticianPresets.display_name(int(members[1]))], color.lightened(0.45), _text_width()))
 
-	# Sayılar: dört eşit kutu (sol panelde 2x2).
+	# Sayılar: üç eşit kutu (0.0.313: ulusal gidişat oyuncuya gösterilmez).
 	var stats := GridContainer.new()
-	stats.columns = 2 if PopupKit.embedded else 4
+	stats.columns = 3
 	stats.add_theme_constant_override("h_separation", 4)
 	stats.add_theme_constant_override("v_separation", 4)
 	stats.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -96,8 +96,6 @@ static func build(peer_id: int, my_id: int, on_action: Callable = Callable(), wi
 	stats.add_child(_stat(str(int(CardManager.last_seats.get(pid, 0))) if has_seats else "—", "vekil", UiTheme.TEXT))
 	stats.add_child(_stat(L.t("%%%.1f") % float(CardManager.last_vote_shares.get(pid, 0.0)) if CardManager.last_vote_shares.has(pid) else "—", "oy", UiTheme.TEXT))
 	stats.add_child(_stat(str(GovernmentManager.score_of(peer_id)), "puan", UiTheme.GOLD))
-	var opinion := CardManager.vote_trend(peer_id)
-	stats.add_child(_stat(EffectWords.standing(opinion), "gidişat", ProvincePanel._opinion_color(opinion)))
 
 	var role := role_text(peer_id)
 	var role_row := HBoxContainer.new()

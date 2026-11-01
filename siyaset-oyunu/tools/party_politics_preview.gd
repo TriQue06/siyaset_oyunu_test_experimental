@@ -91,10 +91,9 @@ func _initialize() -> void:
 	mv.position = root.get_final_transform() * Vector2(640, 90)
 	root.push_input(mv)
 	await _frames(4)
-	print("TIKLAMA KALICI: açık=%s pinned=%s" % [str(scene._left_dock.visible), str(scene._pinned)])
+	print("TIKLAMA: açık=%s" % str(scene._left_dock.visible))
 	scene._hide_profile()
 	await _frames(2)
-	print("KAPATINCA: pinned=%s" % str(scene._pinned))
 	# Profilim: parti işlemleri.
 	scene._toggle_profile(me)
 	await _frames(10)

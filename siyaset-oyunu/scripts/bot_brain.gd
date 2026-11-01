@@ -1034,9 +1034,6 @@ static func _eval_investment(bot: int) -> Dictionary:
 		var req := CardManager.invest_request(String(province_id))
 		var requested := not req.is_empty() and not bool(req.get("done", false)) \
 			and float(req["amount"]) <= CardManager.invest_tier_cost(CardManager.DEFAULT_TIER) + 0.001
-		# 0.0.269: yatırım yalnız teşkilatlı ilde.
-		if CardManager.organization_level(String(province_id), bot) <= 0 and not requested:
-			continue
 		var room := 1.0
 		var value := float(CardManager.province_seat_count(province_id)) \
 			* (0.5 + PublicOpinion.appeal_closeness(CardManager.appeal_of(province_id, bot))) * room

@@ -188,7 +188,8 @@ func _page_available(page: String) -> bool:
 		"miting":
 			return level > 0
 		"invest":
-			return level > 0 and CardManager.is_government_party(me) and not CardManager.is_party_member(me)
+			# 0.0.313: yatırım teşkilat istemez; yalnız hükümette olan parti görür.
+			return CardManager.is_government_party(me) and not CardManager.is_party_member(me)
 	return false
 
 # --- Yapı taşları (konsept sınıfları) ------------------------------------------

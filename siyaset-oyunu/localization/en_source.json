@@ -1975,5 +1975,6 @@
 "Kimden ödenir": "Who pays",
 "KASAN %s": "YOURS %s",
 "DEVLET %s": "STATE %s",
-"Hazine kotan ve kasan birlikte yetmiyor.": "Your treasury quota and party funds together are not enough."
+"Hazine kotan ve kasan birlikte yetmiyor.": "Your treasury quota and party funds together are not enough.",
+"Seçtiğin gruplarda %%%d sadık (3. seviye) seçmenle başlarsın, diğerlerinde %%%d. Zıt iki grup da seçilebilir.": "You start with %%%d loyal (level 3) voters in the groups you pick, %%%d in the others. Opposite groups can be picked together."
 }

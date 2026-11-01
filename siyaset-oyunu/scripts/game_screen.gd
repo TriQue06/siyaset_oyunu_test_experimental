@@ -330,9 +330,6 @@ var _agenda_label: Label
 var _economy_panel: EconomyPanel
 ## HÜKÜMET ONAYI ibresi: meclis diyagramının altında (hükümet varken).
 var _approval_gauge: ApprovalGauge
-var _tax_panel: PanelContainer
-var _tax_box: VBoxContainer
-var _tax_selected: int = -1
 ## AFET YARDIMI paneli (YARDIM hamlesi).
 var _aid_panel: AidPanel
 ## EVRENSEL PARTİ LİSTESİ (karalama hedefi, ittifak daveti...).
@@ -427,7 +424,6 @@ func _ready() -> void:
 	_place_right_column_controls()
 	_build_law_designer()
 	_build_alliance_panel()
-	_build_tax_panel()
 	_build_funding_ui()
 	_build_agenda_banner()
 	_build_propaganda_menu()
@@ -1389,7 +1385,6 @@ func _setup_side_column() -> void:
 		vbox.move_child(_approval_gauge, 2)
 		# EKONOMİ ÖZETİ: onayın altında (sadece Hükümet sekmesinde).
 		_economy_panel = EconomyPanel.new()
-		_economy_panel.tax_policy_requested.connect(_open_tax_panel)
 		vbox.add_child(_economy_panel)
 		vbox.move_child(_economy_panel, 3)
 		_economy_panel.refresh()
@@ -5289,8 +5284,6 @@ func _refresh_economy() -> void:
 	if _economy_panel != null:
 		_economy_panel.refresh()
 	_refresh_approval()
-	if _tax_panel != null and _tax_panel.visible:
-		_fill_tax_panel()
 
 ## Onay ibresi: hükümet varken Hükümet sekmesinde (oylamada meclis büyür, yer açar).
 func _refresh_approval() -> void:
@@ -5301,13 +5294,12 @@ func _refresh_approval() -> void:
 	if CardManager.has_approval():
 		_approval_gauge.set_value(CardManager.approval_value(), CardManager.approval_delta())
 
-## Para hareketi / vergi değişikliği: ekonomi kutusu animasyonu oynatır; vergi
-## değişince açık vergi paneli yeni duruma göre yenilenir.
+## Para hareketi / vergi değişikliği: ekonomi kutusu animasyonu oynatır.
+## 0.0.316: vergi yalnız yasa menüsünün VERGİ sekmesinden değişir.
 func _on_economy_event(data: Dictionary) -> void:
 	if _economy_panel != null:
 		_economy_panel.play_event(data)
 	if String(data.get("kind", "")) == "tax":
-		_tax_selected = -1
 		_refresh_economy()
 
 ## Yatırım önizlemesi (onaydan önce): bedel ve kaynağı, hazinenin önce/sonra
@@ -5322,58 +5314,11 @@ static func _one_decimal(value: float) -> String:
 		return str(int(roundf(value)))
 	return String.num(value, 1).replace(".", ",")
 
-func _build_tax_panel() -> void:
-	_tax_panel = PanelContainer.new()
-	var style := UiSkin.board()
-	style.set_content_margin_all(UiTheme.PAD_M)
-	UiSkin.apply_style(_tax_panel, "panel", style)
-	_tax_panel.z_index = 108
-	_tax_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	_tax_box = VBoxContainer.new()
-	_tax_box.add_theme_constant_override("separation", 6)
-	_tax_box.custom_minimum_size = Vector2(404, 0)
-	_tax_panel.add_child(_tax_box)
-	_tax_panel.hide()
-	add_child(_tax_panel)
-
-## VERGİ paneli: vergi şeridindeki kademeye dokununca o kademe seçili açılır
-## (yürürlükteki kademe ya da açık paneldeki seçili kademe tekrar: kapanır).
-func _open_tax_panel(level: int = -1) -> void:
-	var pick := level if level != CardManager.tax_level() else -1
-	if _tax_panel.visible and pick == _tax_selected:
-		_tax_panel.hide()
-		return
-	_deselect_hand_card()
-	_close_law_page()
-	_cancel_targeting()
-	_tax_selected = pick
-	_fill_tax_panel()
-	_tax_panel.show()
-	_place_tax_panel.call_deferred()
-
-func _fill_tax_panel() -> void:
-	EconomyPanel.fill_policy(_tax_box, multiplayer.get_unique_id(), _tax_selected, _on_tax_selected, _propose_tax, _tax_panel.hide)
-
-func _on_tax_selected(level: int) -> void:
-	_tax_selected = level
-	_fill_tax_panel()
-	_place_tax_panel.call_deferred()
-
-func _place_tax_panel() -> void:
-	if _tax_panel == null or not _tax_panel.visible:
-		return
-	_tax_panel.reset_size()
-	var viewport_size := get_viewport_rect().size
-	_tax_panel.position = Vector2(
-		viewport_size.x - RIGHT_COLUMN_WIDTH - _tax_panel.size.x - 12.0,
-		clampf(_top_area_height() - _tax_panel.size.y, 12.0, maxf(12.0, viewport_size.y - _tax_panel.size.y - 12.0)))
-
 func _propose_tax(law_type: String) -> void:
 	var me := multiplayer.get_unique_id()
 	if not CardManager.can_propose_law(me, law_type):
 		_show_toast(CardManager.tax_law_block_reason(me, CardPresets.tax_law_level(law_type)))
 		return
-	_tax_panel.hide()
 	_close_law_page()
 	CardManager.propose_law(law_type)
 
@@ -5436,8 +5381,6 @@ func _circle_texture(color: Color) -> Texture2D:
 ## Yasa alanını doğrudan açar (önizleme betikleri): meclis penceresinin yasa sayfası.
 func _on_law_button_pressed() -> void:
 	_deselect_hand_card()
-	if _tax_panel != null:
-		_tax_panel.hide()
 	_law_tax_selected = -1
 	_parliament_flow.open_law_page(_law_tab)
 
@@ -6220,8 +6163,6 @@ func _on_parliament_button_pressed() -> void:
 
 ## YASA sekmesinden grup / vergi / anayasa: gömülü yasa alanında o sayfa açılır.
 func _on_flow_law_tab(tab: int) -> void:
-	if _tax_panel != null:
-		_tax_panel.hide()
 	_law_tax_selected = -1
 	_law_tab = tab
 	_select_law_tab(tab)

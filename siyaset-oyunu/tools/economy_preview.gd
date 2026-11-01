@@ -95,22 +95,14 @@ func _initialize() -> void:
 		check("ekonomi kutusu ekrana sığıyor", _inside(panel), str(panel.get_global_rect()))
 		check("yürürlükteki vergi vurgulu", (panel._tax_buttons[Economy.TAX_NORMAL] as Button).get_theme_color("font_color") == UiTheme.INK)
 
-	# Vergi Politikası paneli.
-	scene._open_tax_panel()
+	# 0.0.316: vergi şeridi yalnız gösterge; vergi yasa menüsünün VERGİ sekmesinden.
+	check("vergi şeridi basılamaz", (panel._tax_buttons[Economy.TAX_LOW] as Button).mouse_filter == Control.MOUSE_FILTER_IGNORE)
+	scene._on_flow_law_tab(scene.LawTab.TAX)
 	await _frames(6)
-	_shot("econ_tax_panel")
-	check("vergi paneli ekrana sığıyor", _inside(scene._tax_panel), str(scene._tax_panel.get_global_rect()))
-	scene._on_tax_selected(Economy.TAX_LOW)
+	scene._on_law_tax_selected(Economy.TAX_LOW)
 	await _frames(6)
 	_shot("econ_tax_selected")
-	check("seçili kademeyle panel ekrana sığıyor", _inside(scene._tax_panel), str(scene._tax_panel.get_global_rect()))
-	# Sıra başkasındayken: sunulamaz durumu.
-	cm.current_turn_index = cm.turn_order.find(partner)
-	scene._fill_tax_panel()
-	await _frames(4)
-	_shot("econ_tax_blocked")
-	cm.current_turn_index = cm.turn_order.find(me)
-	scene._tax_panel.hide()
+	scene._close_law_page()
 
 	# Yasa paneli: vergi bağlantısı.
 	scene._on_law_button_pressed()

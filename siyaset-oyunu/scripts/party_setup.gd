@@ -134,6 +134,8 @@ func _restore_own() -> void:
 	else:
 		_politician_from(data)
 	var draft: Dictionary = PartyManager.parties.get(me, {})
+	# 0.0.316: parti adı botlardaki gibi rastgele gelir; oyuncu değiştirir.
+	_party_name = PartyManager.random_party_name(multiplayer.get_unique_id())
 	if PartyManager.is_valid_name(String(draft.get("name", ""))):
 		_party_name = String(draft["name"])
 		_icon_index = PartyPresets.clamp_icon_index(int(draft.get("icon_index", 0)))
@@ -618,14 +620,13 @@ func _build_voters_page() -> Control:
 	_core_grid.add_theme_constant_override("h_separation", 8)
 	_core_grid.add_theme_constant_override("v_separation", 8)
 	page.add_child(_core_grid)
-	page.add_child(PopupKit.note(L.t("Çekirdek gruplarda %%%d, diğerlerinde %%%d hitapla başlarsın; çekirdek gruplarda kazancın %d katıdır. Hitap yasa ve mitingle büyür, rakipler senden seçmen çalabilir.") % [
-		int(VoterGroups.CORE_START), int(VoterGroups.AFFINITY_NEUTRAL), int(VoterGroups.CORE_GAIN_MULT)], UiTheme.TEXT_MUTED))
-	page.add_child(PopupKit.note(L.t("Aynı çiftten iki grup birlikte seçilemez (ör. işçi ve işveren)."), UiTheme.TEXT_DIM))
+	page.add_child(PopupKit.note(L.t("Seçtiğin gruplarda %%%d sadık (3. seviye) seçmenle başlarsın, diğerlerinde %%%d. Zıt iki grup da seçilebilir.") % [
+		int(VoterGroups.CORE_START), int(VoterGroups.AFFINITY_NEUTRAL)], UiTheme.TEXT_MUTED))
 	return built[0]
 
 ## SEKİZ SEÇMEN GRUBU (çiftler yan yana): 2 çekirdek grup. Mitingte grup
 ## seçmekle aynı (0.0.314): seçiliye basınca kalkar, yer varsa eklenir; 2 grup
-## seçiliyken ya da zıttı seçiliyken diğer kartlar soluk ve basılamaz.
+## seçiliyken diğer kartlar soluk ve basılamaz. 0.0.316: zıt gruplar da olur.
 func _build_core_buttons() -> void:
 	for child in _core_grid.get_children():
 		_core_grid.remove_child(child)
@@ -642,7 +643,7 @@ func _core_button(group: String) -> Button:
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.custom_minimum_size = Vector2(0, 58)
 	button.button_pressed = selected
-	var blocked := not selected and (_core.size() >= VoterGroups.CORE_COUNT or _core.has(VoterGroups.opposite(group)))
+	var blocked := not selected and _core.size() >= VoterGroups.CORE_COUNT
 	button.disabled = blocked
 	if blocked:
 		button.modulate.a = 0.5
@@ -1142,7 +1143,7 @@ func _on_color_selected(index: int) -> void:
 func _on_core_pressed(group: String) -> void:
 	if _core.has(group):
 		_core.erase(group)
-	elif _core.size() < VoterGroups.CORE_COUNT and not _core.has(VoterGroups.opposite(group)):
+	elif _core.size() < VoterGroups.CORE_COUNT:
 		_core.append(group)
 	else:
 		return

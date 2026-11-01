@@ -3460,8 +3460,8 @@ func _vb_ensure() -> void:
 			_vb_init_party(pid)
 
 ## Partinin tabanını eski hitap değerinden kurar: her ilde grubun hitap kadarı
-## (kararsızlar yetmezse yettiği kadar). ÇEKİRDEK gruplarının seçmeni 2.
-## seviyeden (partili, sadık), diğerleri 1. seviyeden başlar; memleketinde bir
+## (kararsızlar yetmezse yettiği kadar). ÇEKİRDEK gruplarının seçmeni 3.
+## seviyeden (0.0.316), diğerleri 1. seviyeden başlar; memleketinde bir
 ## seviye daha yüksek. (Hepsi 1. seviye olsaydı tek kaset tabanı silerdi.)
 func _vb_init_party(pid: int) -> void:
 	var arr := PackedFloat32Array()
@@ -3475,7 +3475,7 @@ func _vb_init_party(pid: int) -> void:
 			var group := String(VoterGroups.GROUP_IDS[gi])
 			var want := _vb_count(pi, gi) * clampf(float(groups.get(group, 0.0)) / 100.0, 0.0, 1.0)
 			var take := minf(want, _vb_undecided(pi, gi))
-			var level := (1 if core.has(group) else 0) + (1 if String(_province_ids[pi]) == home else 0)
+			var level := (2 if core.has(group) else 0) + (1 if String(_province_ids[pi]) == home else 0)
 			arr[_vb_i(pi, gi, mini(level, VB_LEVELS - 1))] += take
 			voter_base[pid] = arr
 	_vb_sync_groups(pid)
@@ -3647,9 +3647,11 @@ func _vb_miting(pid: int, province_id: String, focus: Array, mult: float) -> Dic
 		var group := String(VoterGroups.GROUP_IDS[gi])
 		var amount: float = total * float(weights[gi]) / weight_total * PublicOpinion.miting_fatigue_mult(float(fatigue.get(group, 0.0))) \
 			* PoliticianPresets.group_appeal(pid, group)
-		var got := _vb_pull(pid, pi, gi, amount, MITING_STEAL, MITING_DEMOTE)
-		_vb_opposite_loss(pid, pi, gi, got)
-		result[group] = got
+		result[group] = _vb_pull(pid, pi, gi, amount, MITING_STEAL, MITING_DEMOTE)
+	# 0.0.316: önce bütün kazançlar, sonra zıt grup kayıpları: zıt iki grup
+	# birlikte hedeflenince sıra fark etmez (işveren 5 / işçi 5 -> ikisinde +2).
+	for gi in VB_GROUPS:
+		_vb_opposite_loss(pid, pi, gi, float(result[String(VoterGroups.GROUP_IDS[gi])]))
 	var org_level := organization_level(province_id, pid)
 	var promo_mult := 1.0 + 0.3 * float(org_level)
 	# ODAK TOPLAMI DEĞİŞTİRMEZ (0.0.268): grup seçilse de seçilmese de ildeki

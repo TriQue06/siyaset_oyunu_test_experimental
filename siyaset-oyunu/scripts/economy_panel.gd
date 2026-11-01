@@ -1,8 +1,8 @@
 class_name EconomyPanel
 extends VBoxContainer
 ## SAĞ SÜTUN · EKONOMİ ÖZETİ (Hükümet sekmesinde, meclisin altında).
-##   - başlık + VERGİ şeridi (Düşük / Normal / Yüksek; yürürlükteki vurgulu,
-##     dokununca Vergi paneli o kademeyle açılır),
+##   - başlık + VERGİ şeridi (Düşük / Normal / Yüksek; yürürlükteki vurgulu).
+##     0.0.316: yalnız gösterge; vergi yalnız yasa menüsünden değişir,
 ##   - HAZİNE kartı (0.0.313 sade): solda devlet hazinesi, sağda dönem geliri,
 ##     altında tek satır: vergi seçmene olumlu / olumsuz / etkisiz,
 ##   - seçim bu dönemin sonundaysa (erken ya da takvim) kartın yerine
@@ -13,8 +13,6 @@ extends VBoxContainer
 ##
 ## Ayrıca VERGİ panelinin içeriğini kurar (fill_policy): üç kademe kartı
 ## (gelir + seçmene etkisi) ve meclise sunma düğmesi.
-
-signal tax_policy_requested(level: int)
 
 const TILE_BG := UiTheme.PANEL_DARK
 const TILE_BORDER := UiTheme.PANEL_LIGHT
@@ -71,7 +69,7 @@ func _build_header() -> void:
 		button.add_theme_font_override("font", UiTheme.mono(true))
 		button.add_theme_font_size_override("font_size", UiTheme.fs(13))
 		button.custom_minimum_size = Vector2(0, UiTheme.d(30))
-		button.pressed.connect(func(): tax_policy_requested.emit(level))
+		button.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		strip.add_child(button)
 		_tax_buttons.append(button)
 

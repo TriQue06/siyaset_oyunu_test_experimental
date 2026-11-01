@@ -243,6 +243,14 @@ static func _bot_party_name(used: Array) -> String:
 			return candidate
 	return "P%d" % randi_range(10, 99)
 
+## Oyuncunun parti kurma ekranı için rastgele ad (diğer partilerinkinden farklı).
+func random_party_name(except_peer: int) -> String:
+	var used: Array = []
+	for pid in parties:
+		if int(pid) != except_peer:
+			used.append(String(parties[pid].get("name", "")))
+	return _bot_party_name(used)
+
 ## İki rengin algısal mesafesi (0 aynı .. ~1 çok farklı; "redmean" yaklaşımı).
 static func color_distance(a: Color, b: Color) -> float:
 	var rm := (a.r + b.r) * 0.5

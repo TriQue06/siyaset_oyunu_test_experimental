@@ -613,8 +613,8 @@ func _initialize() -> void:
 	cm._apply_miting_move(1, TestProvinces.id("ankara"))
 	cm._decay_opinion()
 	check("miting ve tur sonu il profilini degistirmez", str(cm.province_profiles) == before_profiles)
-	check("cekirdek secimi: farkli ciftten 2 grup", VoterGroups.is_valid_core(["isci", "dindar"]) \
-		and not VoterGroups.is_valid_core(["isci", "isveren"]) and not VoterGroups.is_valid_core(["isci"]) \
+	check("cekirdek secimi: farkli 2 grup, zit gruplar da olur (0.0.316)", VoterGroups.is_valid_core(["isci", "dindar"]) \
+		and VoterGroups.is_valid_core(["isci", "isveren"]) and not VoterGroups.is_valid_core(["isci", "isci"]) and not VoterGroups.is_valid_core(["isci"]) \
 		and VoterGroups.is_valid_core(VoterGroups.random_core()))
 	var start := VoterGroups.start_affinities(["isci", "dindar"])
 	check("cekirdek %10, digerleri %0", near(float(start["isci"]), VoterGroups.CORE_START) \

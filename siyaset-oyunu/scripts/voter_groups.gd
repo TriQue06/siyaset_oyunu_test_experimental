@@ -172,11 +172,11 @@ const AFFINITY_MIN := 0.0
 const AFFINITY_MAX := 100.0
 ## Varsayılan hitap: hiç.
 const AFFINITY_NEUTRAL := 0.0
-## Parti kurulurken 2 ÇEKİRDEK grup seçilir (aynı çiftten olamaz): bu gruplarda
-## CORE_START hitapla başlar ve kalıcı kazançları CORE_GAIN_MULT katıdır.
+## Parti kurulurken 2 ÇEKİRDEK grup seçilir: bu gruplarda CORE_START hitapla
+## (seçmeni 3. seviyeden) başlar. 0.0.316: başka etkisi yok (kazanç çarpanı
+## kalktı); zıt iki grup da seçilebilir.
 const CORE_COUNT := 2
 const CORE_START := 10.0
-const CORE_GAIN_MULT := 2.0
 
 ## Parti yakınlık profilleri arasındaki mesafe ölçeği (bkz. party_distance):
 ## ölçek, eski 3 eksenli modeldeki mesafe eşiklerine denk düşecek şekilde.
@@ -388,18 +388,15 @@ static func start_affinities(core: Array) -> Dictionary:
 			result[group] = CORE_START
 	return result
 
-## Çekirdek seçimi geçerli mi? (CORE_COUNT farklı grup, ikisi aynı çiftten değil.)
+## Çekirdek seçimi geçerli mi? (CORE_COUNT farklı grup; zıt gruplar da olur.)
 static func is_valid_core(core: Array) -> bool:
 	if core.size() != CORE_COUNT:
 		return false
-	var pairs := {}
+	var seen := {}
 	for group in core:
-		if not is_group(String(group)):
+		if not is_group(String(group)) or seen.has(String(group)):
 			return false
-		var pair := pair_of(String(group))
-		if pairs.has(pair):
-			return false
-		pairs[pair] = true
+		seen[String(group)] = true
 	return true
 
 ## Botlar ve rastgele partiler için: farklı çiftlerden 2 çekirdek grup.
@@ -420,15 +417,14 @@ static func ranked_groups(affinities: Dictionary) -> Array:
 	ranked.sort_custom(func(a, b): return float(affinities.get(a, AFFINITY_NEUTRAL)) > float(affinities.get(b, AFFINITY_NEUTRAL)))
 	return ranked
 
-## Kalıcı bir değişikliğin GERÇEKLEŞEN miktarı. Kazanç: çekirdek grupta
-## CORE_GAIN_MULT katı, azalan getiriyle: kalan pay × (1 − e^(−kazanç/100)).
+## Kalıcı bir değişikliğin GERÇEKLEŞEN miktarı. Kazanç azalan getiriyle:
+## kalan pay × (1 − e^(−kazanç/100)) (çekirdek grupta da aynı, 0.0.316).
 ## Üstel biçim: aynı toplam kazanç bir kerede ya da parça parça verilse de
 ## sonuç birebir aynıdır (100 yerine 50 + 50). Kayıp: en çok mevcut hitap kadar.
-static func effective_delta(affinities: Dictionary, group: String, amount: float, core: Array = []) -> float:
+static func effective_delta(affinities: Dictionary, group: String, amount: float, _core: Array = []) -> float:
 	var current := float(affinities.get(group, AFFINITY_NEUTRAL))
 	if amount > 0.0:
-		var mult := CORE_GAIN_MULT if core.has(group) else 1.0
-		return maxf(0.0, AFFINITY_MAX - current) * (1.0 - exp(-amount * mult / AFFINITY_MAX))
+		return maxf(0.0, AFFINITY_MAX - current) * (1.0 - exp(-amount / AFFINITY_MAX))
 	if amount < 0.0:
 		return maxf(amount, AFFINITY_MIN - current)
 	return 0.0

@@ -61,6 +61,15 @@ func run() -> void:
 	print("=== baslangic ===")
 	var groups: Dictionary = pm.groups_of(a)
 	check(absf(float(groups["isveren"]) - 10.0) < 1.5, "cekirdek grup ~%10 ile baslar", "%.2f" % groups["isveren"])
+	var core_l3 := 0.0
+	var core_all := 0.0
+	for p in cm._province_ids.size():
+		var c := cell(a, p, "isveren")
+		core_l3 += float(c[2])
+		core_all += float(c[0]) + float(c[1]) + float(c[2])
+	check(core_all > 0.0 and absf(core_l3 - core_all) < 0.001, "cekirdek grubun secmeni 3. seviyeden baslar (0.0.316)", "%.0f / %.0f" % [core_l3, core_all])
+	check(is_equal_approx(VoterGroups.effective_delta({"isveren": 10.0}, "isveren", 10.0, ["isveren"]),
+		VoterGroups.effective_delta({"isveren": 10.0}, "isveren", 10.0, [])), "cekirdek grupta kazanc carpani yok (0.0.316)")
 
 	print("=== miting: toplam sabit, odak bilesimi degistirir ===")
 	var province: String = String(cm._province_ids[0])
@@ -106,6 +115,17 @@ func run() -> void:
 	cm._vb_pull(a, pi, VoterGroups.GROUP_IDS.find("emekli"), count * 0.2, cm.MITING_STEAL, cm.MITING_DEMOTE)
 	var after_mit := total(b, pi, "emekli")
 	check(after_inv < after_mit, "yatirim 2. seviyeyi mitingten kolay calar", "yatirim %.0f, miting %.0f" % [after_inv, after_mit])
+
+	print("=== zit iki grup birlikte hedeflenir (0.0.316) ===")
+	clear_all()
+	var both: Dictionary = cm._vb_miting(a, province, ["isci", "isveren"], 1.0)
+	var g_isci := float(both["isci"])
+	var g_isveren := float(both["isveren"])
+	check(g_isci > 0.0 and g_isveren > 0.0, "zit iki grup birlikte secilebilir, ikisi de kazanir")
+	check(absf(total(a, pi, "isci") - maxf(0.0, g_isci - g_isveren * 0.6)) < 0.01 * g_isci
+		and absf(total(a, pi, "isveren") - maxf(0.0, g_isveren - g_isci * 0.6)) < 0.01 * g_isveren,
+		"her grup: kendi kazanci - zittin kazancinin 3/5'i (sira farketmez)",
+		"isci %.1f (%.1f), isveren %.1f (%.1f)" % [total(a, pi, "isci"), g_isci - g_isveren * 0.6, total(a, pi, "isveren"), g_isveren - g_isci * 0.6])
 
 	print("=== zit grup (5 kazan 3 kaybet) ===")
 	clear_all()

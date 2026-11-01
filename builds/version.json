@@ -1,9 +1,9 @@
 {
-  "version": "0.0.321",
+  "version": "0.0.322",
   "date": "01.11.2026",
   "exe": {
     "url": "https://raw.githubusercontent.com/TriQue06/siyaset_oyunu_test_experimental/main/builds/SiyasetOyunu-Windows.zip",
-    "size": 82787924,
+    "size": 82788888,
     "zip": true
   }
 }

@@ -69,7 +69,7 @@ func election_share(pid: int) -> float:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 777
 	var result := ElectionModel.compute(cm._group_profiles(), cm._province_seat_counts, cm.province_voters(),
-		0.0, rng, {}, cm.vb_election_state())
+		0.0, rng, cm.vb_election_state())
 	return float(result["vote_shares"].get(pid, 0.0))
 
 func _initialize() -> void:

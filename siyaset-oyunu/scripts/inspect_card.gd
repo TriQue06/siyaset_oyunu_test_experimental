@@ -211,10 +211,6 @@ static func fill_party(box: VBoxContainer, peer_id: int, on_close: Callable) -> 
 	var role := PartyInfoCard.role_text(peer_id)
 	chips.append([role.trim_prefix(L.t("Hükümet: ")) if role.begins_with(L.t("Hükümet: ")) else role,
 		UiTheme.GREEN_DARK if role.begins_with(L.t("Hükümet: ")) else UiTheme.TEXT_MUTED])
-	var alliance_id := CardManager.alliance_of(peer_id)
-	if alliance_id >= 0:
-		var alliance: Dictionary = CardManager.alliances[alliance_id]
-		chips.append([String(alliance.get("name", "")), alliance.get("color", UiTheme.BLUE)])
 	chips.append([L.t("%d puan") % GovernmentManager.score_of(peer_id), UiTheme.GOLD_DIM])
 	box.add_child(_chip_row(chips))
 

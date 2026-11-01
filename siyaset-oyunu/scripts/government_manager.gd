@@ -693,7 +693,6 @@ func _apply_vote(peer_id: int, choice) -> void:
 	if is_coalition_stage() and normalize_vote(choice) == VOTE_ABSTAIN:
 		return
 	votes[peer_id] = normalize_vote(choice)
-	CardManager.note_alliance_vote(peer_id, proposal_peer_id, votes[peer_id] == VOTE_NO)
 	if not _all_voted():
 		_push_state()
 	else:
@@ -767,8 +766,6 @@ func _resolve_proposal() -> void:
 			last_resolution_reason += L.t(" Yeni baraj %%%s, seçimler %s yılda bir, sayım: %s.") % [
 				String.num(MultiplayerManager.election_threshold, 1), GameRules.years_text(MultiplayerManager.election_interval),
 				ElectionModel.method_title(MultiplayerManager.seat_method)]
-			var alliance_status := L.t("açık") if CardManager.alliances_enabled else L.t("kapalı")
-			last_resolution_reason += L.t(" Seçim ittifakları: %s.") % alliance_status
 		_push_state()
 		if not _is_local_only():
 			_notify_resolved.rpc(const_passed, kind, proposer)

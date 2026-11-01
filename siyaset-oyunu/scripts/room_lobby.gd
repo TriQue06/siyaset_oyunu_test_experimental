@@ -49,7 +49,6 @@ var threshold_slider: HSlider
 var threshold_value_label: Label
 var map_seed_edit: LineEdit
 var random_parties_check: CheckButton
-var alliances_check: CheckButton
 var away_bot_check: CheckButton
 var bot_funds_buttons: Array = []
 ## Kaydırıcılı dünya ayarları (il / ulusal milletvekili): ayar -> HSlider.
@@ -323,10 +322,6 @@ func _build_rules() -> Control:
 	threshold_slider.step = MultiplayerManager.THRESHOLD_STEP
 	threshold_slider.value_changed.connect(func(value: float): MultiplayerManager.set_election_threshold(value))
 	vote_body.add_child(threshold_slider)
-	alliances_check = _switch(L.t("İttifaklar açık"),
-		L.t("Açıksa partiler ittifak kurabilir; barajda ortak oy sayılır. Oyun içinde anayasayla değişebilir."))
-	alliances_check.toggled.connect(func(on: bool): MultiplayerManager.set_world_setting("alliances", on))
-	vote_body.add_child(alliances_check)
 
 	# SÜRELER
 	var time_body := _rule_section(box, "timing", "clock", L.t("Süreler"))
@@ -432,7 +427,6 @@ func _refresh() -> void:
 	start_button.disabled = count < MultiplayerManager.MIN_PLAYERS_TO_START
 	threshold_slider.editable = am_owner
 	random_parties_check.disabled = not am_owner
-	alliances_check.disabled = not am_owner
 	away_bot_check.disabled = not am_owner
 	for button in bot_funds_buttons:
 		(button as Button).disabled = not am_owner
@@ -462,9 +456,8 @@ func _refresh_settings_display() -> void:
 		map_seed_edit.text = MultiplayerManager.map_seed
 	_new_map_button.disabled = not owner
 	random_parties_check.set_pressed_no_signal(MultiplayerManager.random_parties)
-	alliances_check.set_pressed_no_signal(bool(settings.get("alliances", true)))
 	away_bot_check.set_pressed_no_signal(MultiplayerManager.away_mode == MultiplayerManager.AWAY_BOT)
-	for check in [random_parties_check, alliances_check, away_bot_check]:
+	for check in [random_parties_check, away_bot_check]:
 		check.queue_redraw()
 
 	var t := MultiplayerManager.election_threshold

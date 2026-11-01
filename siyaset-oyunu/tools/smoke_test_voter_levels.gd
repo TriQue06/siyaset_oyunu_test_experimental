@@ -235,14 +235,6 @@ func run() -> void:
 	cm._vb_scandal(b, "", 0.5)
 	check(absf(float(cell(b, pi, "emekli")[2]) - count * 0.1) < 1.0, "yarim skandal secmenin yarisini dusurur")
 
-	print("=== ittifak ===")
-	clear_all()
-	setc(b, pi, "emekli", count * 0.5, 0.0, 0.0)
-	cm.alliances = {1: {"name": "X", "color": Color.RED, "leader": a, "members": [a, b]}}
-	cm._vb_pull(a, pi, VoterGroups.GROUP_IDS.find("emekli"), count * 0.2, cm.MITING_STEAL, cm.MITING_DEMOTE)
-	check(is_equal_approx(total(b, pi, "emekli"), count * 0.5), "ortaklar birbirinden calmaz")
-	cm.alliances = {}
-
 	print("=== secim ===")
 	clear_all()
 	for g in VoterGroups.GROUP_IDS:

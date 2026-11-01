@@ -194,8 +194,7 @@ static func voter_shares(state: Dictionary, peer_ids: Array, noise: Dictionary) 
 	return raw
 
 static func compute(parties: Dictionary, province_seats: Dictionary, voters: Dictionary,
-		threshold_percent: float, rng: RandomNumberGenerator,
-		alliance_membership: Dictionary = {}, voter_state: Dictionary = {}) -> Dictionary:
+		threshold_percent: float, rng: RandomNumberGenerator, voter_state: Dictionary = {}) -> Dictionary:
 	var vote_shares: Dictionary = {}
 	var seats: Dictionary = {}
 	var province_results: Dictionary = {}
@@ -252,19 +251,11 @@ static func compute(parties: Dictionary, province_seats: Dictionary, voters: Dic
 			national[peer_id] = float(national[peer_id]) + float(shares[peer_id]) * float(voters.get(province_id, {}).get("_electorate", province_seats[province_id]))
 
 	var eligible: Array = []
-	var alliance_totals := {}
 	for peer_id in peer_ids:
 		var percent: float = float(national[peer_id]) / electorate_total * 100.0
 		vote_shares[peer_id] = percent
 		seats[peer_id] = 0
-		var alliance_id := int(alliance_membership.get(peer_id, 0))
-		if alliance_id != 0:
-			alliance_totals[alliance_id] = float(alliance_totals.get(alliance_id, 0.0)) + percent
-		elif percent >= threshold_percent:
-			eligible.append(peer_id)
-	for peer_id in peer_ids:
-		var alliance_id := int(alliance_membership.get(peer_id, 0))
-		if alliance_id != 0 and float(alliance_totals.get(alliance_id, 0.0)) >= threshold_percent:
+		if percent >= threshold_percent:
 			eligible.append(peer_id)
 	if eligible.is_empty():
 		eligible = peer_ids.duplicate()
@@ -272,63 +263,21 @@ static func compute(parties: Dictionary, province_seats: Dictionary, voters: Dic
 
 	for province_id in province_ids:
 		var shares: Dictionary = province_shares[province_id]
-		var groups := _alliance_vote_groups(shares, eligible, alliance_membership)
-		var group_eligible := groups.keys()
-		var group_alloc := allocate(groups, group_eligible, int(province_seats[province_id]))
-		var alloc := {}
-		for peer_id in peer_ids:
-			alloc[peer_id] = 0
-		for entity in group_eligible:
-			var won := int(group_alloc.get(entity, 0))
-			if int(entity) < 0:
-				var alliance_id := -int(entity) - 1
-				var members: Array = []
-				for member in eligible:
-					if int(alliance_membership.get(member, 0)) == alliance_id:
-						members.append(member)
-				var inner := allocate(shares, members, won)
-				for member in members:
-					alloc[member] = int(inner.get(member, 0))
-			else:
-				alloc[entity] = won
+		var alloc := allocate(shares, eligible, int(province_seats[province_id]))
 		var entry: Dictionary = {}
 		for peer_id in peer_ids:
 			var won: int = int(alloc.get(peer_id, 0))
 			entry[peer_id] = {"percent": float(shares[peer_id]) * 100.0, "seats": won}
 			seats[peer_id] = int(seats[peer_id]) + won
 		province_results[province_id] = entry
-	var national_groups := _alliance_vote_groups(vote_shares, eligible, alliance_membership)
-	var national_group_alloc := allocate(national_groups, national_groups.keys(), NATIONAL_LIST_SEATS, true)
+	var national_alloc := allocate(vote_shares, eligible, NATIONAL_LIST_SEATS, true)
 	var national_list := {}
 	for peer_id in peer_ids:
-		national_list[peer_id] = 0
-	for entity in national_groups.keys():
-		var won := int(national_group_alloc.get(entity, 0))
-		if int(entity) < 0:
-			var alliance_id := -int(entity) - 1
-			var members: Array = []
-			for member in eligible:
-				if int(alliance_membership.get(member, 0)) == alliance_id:
-					members.append(member)
-			var inner := allocate(vote_shares, members, won, true)
-			for member in members:
-				national_list[member] = int(inner.get(member, 0))
-		else:
-			national_list[entity] = won
+		national_list[peer_id] = int(national_alloc.get(peer_id, 0))
 	for peer_id in peer_ids:
 		seats[peer_id] = int(seats[peer_id]) + int(national_list[peer_id])
 	result["national_list"] = national_list
 	return result
-
-## İttifaklı partiler seçim çevresinde önce ortak toplam oyla vekil kazanır;
-## bu vekiller sonra aynı çevrede ittifak üyelerinin kendi oylarına göre dağılır.
-static func _alliance_vote_groups(shares: Dictionary, eligible: Array, membership: Dictionary) -> Dictionary:
-	var grouped := {}
-	for peer_id in eligible:
-		var alliance_id := int(membership.get(peer_id, 0))
-		var entity: int = -(alliance_id + 1) if alliance_id != 0 else int(peer_id)
-		grouped[entity] = float(grouped.get(entity, 0.0)) + float(shares.get(peer_id, 0.0))
-	return grouped
 
 ## SAYIM YÖNTEMİ (anayasayla değişir, bkz. MultiplayerManager.seat_method):
 ##   "dhondt" : D'Hondt (büyük partiye hafif avantaj)

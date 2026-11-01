@@ -36,11 +36,8 @@ static func province_name(province_id: String) -> String:
 	var map = Engine.get_main_loop().root.get_node_or_null("GameMap") if Engine.get_main_loop() is SceneTree else null
 	return map.name_of(province_id) if map != null else province_id
 
-## alliances: party -> ittifak kimliği. İttifak üyeleri barajı ORTAK oyla geçer.
-var alliances: Dictionary = {}
-
 func setup(province_results: Dictionary, vote_shares: Dictionary, seats: Dictionary, passed: Array,
-		threshold_percent: float, seed_value: int, duration_seconds: float, alliance_membership: Dictionary = {}) -> void:
+		threshold_percent: float, seed_value: int, duration_seconds: float) -> void:
 	_allocation_cache.clear()
 	_window.clear()
 	_bias.clear()
@@ -48,7 +45,6 @@ func setup(province_results: Dictionary, vote_shares: Dictionary, seats: Diction
 	_progress_time = -1.0
 	_progress_cache.clear()
 	_party_phase.clear()
-	alliances = alliance_membership
 	duration = maxf(1.0, duration_seconds)
 	threshold = threshold_percent
 	_results = province_results
@@ -191,18 +187,11 @@ func sample(t: float) -> Dictionary:
 		provinces[province_id] = {"c": c, "shares": shares, "seats": {}}
 	var eligible: Array = []
 	if weight > 0.0:
-		var totals := {}
 		for peer_id in peer_ids:
 			national[peer_id] = float(national[peer_id]) / weight
 			var settle := clampf((weight / maxf(1, _province_total) - 0.85) / 0.15, 0, 1)
 			national[peer_id] = lerpf(float(national[peer_id]), float(_final_shares.get(peer_id, 0)), settle)
-			var aid := int(alliances.get(peer_id, 0))
-			if aid != 0:
-				totals[aid] = float(totals.get(aid, 0.0)) + float(national[peer_id])
-		for peer_id in peer_ids:
-			var aid := int(alliances.get(peer_id, 0))
-			var share: float = float(totals[aid]) if aid != 0 else float(national[peer_id])
-			if share >= threshold:
+			if float(national[peer_id]) >= threshold:
 				eligible.append(peer_id)
 		if eligible.is_empty():
 			eligible = peer_ids.duplicate()

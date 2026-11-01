@@ -105,8 +105,7 @@ var _paper_started := false
 func _ready() -> void:
 	AudioManager.play_music("election")
 	_sim.setup(CardManager.last_province_results, CardManager.last_vote_shares, CardManager.last_seats,
-		CardManager.passed_threshold, MultiplayerManager.election_threshold, _seed(), DURATION,
-		CardManager.election_alliance_membership())
+		CardManager.passed_threshold, MultiplayerManager.election_threshold, _seed(), DURATION)
 	_party_order = _sim.peer_ids.duplicate()
 	_party_order.sort_custom(func(a, b):
 		var ia: Dictionary = _party(a).get("groups", {})
@@ -258,7 +257,7 @@ func _animate(delta: float) -> void:
 			"name": _party_name(peer_id), "leader": _leader_name(peer_id), "color": _party_color(peer_id),
 			"icon": _party_icon(peer_id),
 			"percent": d["percent"], "rank": target["rank"], "seats": target["seats"], "below": target["below"],
-			"trend": trend, "alliance": _alliance_label(peer_id), "alliance_color": _alliance_color(peer_id),
+			"trend": trend,
 		})
 	_bars.rows = rows
 	_bars.threshold = MultiplayerManager.election_threshold
@@ -384,22 +383,6 @@ func _party(peer_id) -> Dictionary:
 
 func _party_name(peer_id) -> String:
 	return String(_party(peer_id).get("name", MultiplayerManager.players.get(peer_id, {}).get("name", "?")))
-
-## İTTİFAK (0.0.226): seçime ittifakla giren partinin satırında ittifakın adı
-## ve o anki ortak oyu; çubuğun solunda ittifak renginde şerit.
-func _alliance_label(peer_id) -> String:
-	var aid := int(CardManager.election_alliance_membership().get(int(peer_id), 0))
-	if aid == 0:
-		return ""
-	var total := 0.0
-	var national: Dictionary = _sample.get("national", {})
-	for pid in CardManager.last_election_alliances[aid].get("members", []):
-		total += float(national.get(pid, national.get(int(pid), 0.0)))
-	return L.t("%s %%%.1f") % [String(CardManager.last_election_alliances[aid].get("name", "")), total]
-
-func _alliance_color(peer_id) -> Color:
-	var aid := int(CardManager.election_alliance_membership().get(int(peer_id), 0))
-	return Color(CardManager.last_election_alliances[aid].get("color", Color.TRANSPARENT)) if aid != 0 else Color.TRANSPARENT
 
 func _leader_name(peer_id) -> String:
 	return PoliticianPresets.display_name(int(peer_id))
@@ -666,30 +649,11 @@ func _start_paper() -> void:
 		"headline": L.t("SANDIKTAN TEK PARTİ ÇOĞUNLUĞU!") if majority else L.t("SANDIKTAN KOALİSYON MECLİSİ ÇIKTI!"),
 		"subtitle": L.t("%s seçimi: %s %d vekille birinci (oy oranı %s).") % [
 			GameRules.election_label(CardManager.last_election_round), _party_name(winner), seats,
-			L.pct(float(CardManager.last_vote_shares.get(winner, 0.0)))] + _alliance_paper_line(),
+			L.pct(float(CardManager.last_vote_shares.get(winner, 0.0)))],
 		"party": winner, "accent": GOLD, "stamp": L.t("BİRİNCİ PARTİ"), "sound": "law_passed",
 		"status": L.t("%d VEKİL") % seats})
 	if not shown:
 		_leave()
-
-## Gazetede seçime giren ittifakların ortak oyu ve vekili (en büyükten).
-func _alliance_paper_line() -> String:
-	var parts: Array = []
-	for aid in CardManager.last_election_alliances:
-		var alliance: Dictionary = CardManager.last_election_alliances[aid]
-		var votes := 0.0
-		var seats := 0
-		for pid in alliance.get("members", []):
-			votes += float(CardManager.last_vote_shares.get(int(pid), 0.0))
-			seats += int(CardManager.last_seats.get(int(pid), 0))
-		parts.append([seats, L.t("%s %s · %d vekil") % [String(alliance.get("name", "")), L.pct(votes), seats]])
-	if parts.is_empty():
-		return ""
-	parts.sort_custom(func(a, b): return int(a[0]) > int(b[0]))
-	var texts: Array[String] = []
-	for p in parts:
-		texts.append(String(p[1]))
-	return " " + "; ".join(PackedStringArray(texts)) + "."
 
 ## SON DAKİKA kutusu: kırmızı etiket yazısı kadar geniş, metin kalan alana sarılır.
 func _layout_flash() -> void:

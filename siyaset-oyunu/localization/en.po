@@ -138,23 +138,8 @@ msgstr "YES %d · NO %d"
 msgid "teşkilat, miting, yatırım: haritada bir ile dokun"
 msgstr "organization, rally, investment: tap a province on the map"
 
-msgid "İTTİFAKLAR"
-msgstr "ALLIANCES"
-
-msgid "YENİ İTTİFAK"
-msgstr "NEW ALLIANCE"
-
-msgid "İttifakı sen kurarsan lideri olursun: diğer partileri sen davet edersin."
-msgstr "If you found the alliance you lead it: you invite the other parties."
-
-msgid "İTTİFAK ADI"
-msgstr "ALLIANCE NAME"
-
 msgid "RENK"
 msgstr "COLOR"
-
-msgid "İTTİFAKI KUR"
-msgstr "FOUND ALLIANCE"
 
 msgid "toplantı"
 msgstr "meeting"
@@ -312,62 +297,11 @@ msgstr "Writes every event, election and player and bot decision to a text file.
 msgid "LOG İNDİR"
 msgstr "DOWNLOAD LOG"
 
-msgid "%s, ortağı %s tarafından verilen önergeye HAYIR dedi; %s ittifakında gerginlik var."
-msgstr "%s voted NO on a motion by its ally %s; there is tension in the %s alliance."
-
-msgid "%s ittifakı %%%.1f"
-msgstr "%s alliance %%%.1f"
-
-msgid "%s ittifakı %s · %d vekil"
-msgstr "%s alliance %s · %d seats"
-
-msgid "İttifak hitabını şekillendiriyor: %s"
-msgstr "The alliance shapes your appeal: %s"
-
 msgid "Katılırsan: %s"
 msgstr "If you join: %s"
 
-msgid "%s ittifakta: %s"
-msgstr "%s in the alliance: %s"
-
-msgid "%s ittifakı kuruldu; %s ittifakın lideri oldu."
-msgstr "The %s alliance was founded; %s leads it."
-
-msgid "%s, %s ittifakına katılmak istiyor; bütün üyelerin onayı bekleniyor."
-msgstr "%s wants to join the %s alliance; every member must approve."
-
-msgid "%s ile %s ittifakı arasındaki başvuru reddedildi (%s)."
-msgstr "The application between %s and the %s alliance was rejected (%s)."
-
-msgid "%s ile %s ittifakı arasındaki başvuru yanıtsız kaldığı için düştü."
-msgstr "The application between %s and the %s alliance lapsed without an answer."
-
-msgid "%s, %s ittifakından ayrıldı."
-msgstr "%s left the %s alliance."
-
-msgid "Tek parti kaldı; ittifak sona erdi."
-msgstr "Only one party remained; the alliance ended."
-
-msgid "%s seçim arifesinde %s ittifakından ayrıldı; seçmen bunu affetmedi."
-msgstr "%s left the %s alliance on the eve of the election; voters did not forgive it."
-
-msgid "Seçim bitti: bütün seçim ittifakları dağıldı."
-msgstr "The election is over: all electoral alliances dissolved."
-
-msgid "%s ittifakında tek parti kaldı; ittifak sona erdi."
-msgstr "Only one party remained in the %s alliance; it ended."
-
 msgid "%d karar bekliyor"
 msgstr "%d decisions waiting"
-
-msgid "Barajda ortak oy sayılır; her ilde ittifakın vekilleri üyelerin oyuna göre paylaşılır. Katılmak için bütün üyeler onaylamalı, davet yalnız liderden (•) gelir. İttifaklar seçimden sonra dağılır."
-msgstr "Combined votes count for the threshold; in each province the alliance's seats are shared by the members' votes. Joining needs every member's approval, only the leader (•) invites. Alliances dissolve after the election."
-
-msgid "İttifak kurmak, davet etmek, katılmak istemek ya da ayrılmak için sıranı bekle. Onay ve davet yanıtları her an verilebilir."
-msgstr "Wait for your turn to found, invite, apply or leave. Approvals and invitation answers can be given any time."
-
-msgid "İttifaktan ayrıl. Seçim turunda ayrılmak ulusal destek kaybettirir."
-msgstr "Leave the alliance. Leaving in an election round costs national support."
 
 msgid "BAŞVURU BEKLİYOR"
 msgstr "APPLICATION PENDING"
@@ -393,15 +327,6 @@ msgstr "awaiting answer …"
 msgid "onaylar: %s"
 msgstr "approvals: %s"
 
-msgid "%s ittifakı seni davet ediyor. Katılman için diğer üyelerin de onayı gerekir."
-msgstr "The %s alliance invites you. The other members must also approve."
-
-msgid "Lider %s partisini %s ittifakına davet etti. Onayın gerekiyor."
-msgstr "The leader invited %s to the %s alliance. Your approval is needed."
-
-msgid "%s, %s ittifakına katılmak istiyor. Onayın gerekiyor."
-msgstr "%s wants to join the %s alliance. Your approval is needed."
-
 msgid "Yanıt vermezsen %d tur sonra ret sayılır."
 msgstr "No answer counts as a rejection after %d rounds."
 
@@ -419,15 +344,6 @@ msgstr "Your application is already waiting for approval."
 
 msgid "Davet edilebilecek parti yok."
 msgstr "No party can be invited."
-
-msgid "İttifak kararı bekleniyor: İTTİFAK panelinden yanıtla."
-msgstr "An alliance decision is waiting: answer it in the ALLIANCE panel."
-
-msgid "Açıksa partiler ittifak kurabilir; barajda ortak oy sayılır. Oyun içinde anayasayla değişebilir."
-msgstr "If on, parties can form alliances; combined votes count for the threshold. The constitution can change it in game."
-
-msgid "İttifaklar açık"
-msgstr "Alliances on"
 
 msgid "Seçim bu dönemin sonunda"
 msgstr "Election at the end of this term"
@@ -3882,9 +3798,6 @@ msgstr "Party leader"
 msgid "MECLİS OYLAMA SÜRESİ"
 msgstr "PARLIAMENT VOTING TIME"
 
-msgid "İTTİFAKA DAVET ET"
-msgstr "INVITE TO ALLIANCE"
-
 msgid "Seçilebilecek parti yok."
 msgstr "There are no eligible parties."
 
@@ -4107,32 +4020,11 @@ msgstr "Your personal settings will return to their defaults."
 msgid "Gizli hamle uygulandı. Haber tur sonunda yayınlanacak."
 msgstr "Secret action applied. The news will be published at the end of the round."
 
-msgid "%s ittifakı kuruldu; %s ittifakın kurucu partisi oldu."
-msgstr "The %s alliance was founded; %s is its founding party."
-
-msgid "%s, %s ittifakına katıldı."
-msgstr "%s joined the %s alliance."
-
-msgid "%s, %s ittifakına davet edildi."
-msgstr "%s was invited to the %s alliance."
-
-msgid "%s, %s ittifakına katılma davetini reddetti."
-msgstr "%s declined the invitation to join the %s alliance."
-
 msgid "odak: %s"
 msgstr "focus: %s"
 
 msgid "SANDIKTA GÜÇLER BİRLEŞİYOR!"
 msgstr "FORCES UNITE AT THE BALLOT BOX!"
-
-msgid "İTTİFAK KURULDU"
-msgstr "ALLIANCE FOUNDED"
-
-msgid "İTTİFAK GENİŞLİYOR!"
-msgstr "THE ALLIANCE GROWS!"
-
-msgid "İTTİFAKA KATILDI"
-msgstr "JOINED THE ALLIANCE"
 
 msgid "MİTİNG ODAĞI · %s"
 msgstr "RALLY FOCUS · %s"
@@ -4155,53 +4047,11 @@ msgstr "CONFIRM · %s"
 msgid "%s: odak gruplarını seç, ONAYLA'ya bas (ya da ile tekrar dokun)  ·  Butona tekrar dokun: iptal"
 msgstr "%s: pick focus groups, press CONFIRM (or tap the province again)  ·  Tap the button again: cancel"
 
-msgid "İTTİFAK"
-msgstr "ALLIANCE"
-
 msgid "görüntüle"
 msgstr "view"
 
-msgid "İttifakları görüntüle, kur veya partileri davet et ve katıl."
-msgstr "View alliances, found one, invite parties or join."
-
-msgid "SEÇİM İTTİFAKLARI"
-msgstr "ELECTION ALLIANCES"
-
-msgid "Barajda ortak oy sayılır. Her ilde ittifakın vekilleri, üyelerin oy oranına göre paylaşılır."
-msgstr "Votes count jointly for the threshold. In each province the alliance's seats are shared by members' vote shares."
-
-msgid "YENİ İTTİFAK KUR"
-msgstr "FOUND NEW ALLIANCE"
-
-msgid "İttifak adı"
-msgstr "Alliance name"
-
 msgid "KUR"
 msgstr "FOUND"
-
-msgid "İttifaka bir ad ver."
-msgstr "Give the alliance a name."
-
-msgid "Anayasa seçim ittifaklarını devre dışı bıraktı."
-msgstr "The constitution has disabled election alliances."
-
-msgid "Bağımsız siyasetçiler ittifaka katılamaz."
-msgstr "Independent politicians cannot join an alliance."
-
-msgid "İttifak kararını partinin genel başkanı verir."
-msgstr "The party leader decides on alliances."
-
-msgid "İttifaka katılmak veya davet göndermek için sıranı bekle."
-msgstr "Wait for your turn to join an alliance or send invitations."
-
-msgid "Anayasa ittifakları devre dışı bıraktı. Yeni seçim ittifakı kurulamaz ve ittifak hesabı yapılmaz."
-msgstr "The constitution has disabled alliances. No new election alliance can be founded and alliances are not counted."
-
-msgid "Henüz kurulmuş bir seçim ittifakı yok."
-msgstr "No election alliance has been founded yet."
-
-msgid "İttifak"
-msgstr "Alliance"
 
 msgid "Üyeler: %s"
 msgstr "Members: %s"
@@ -4215,20 +4065,11 @@ msgstr "INVITE"
 msgid "KATIL"
 msgstr "JOIN"
 
-msgid "Seçim ittifakları açık"
-msgstr "Election alliances enabled"
-
-msgid "Meclisin 2/3'ü (%d vekil) EVET derse yürürlüğe girer, yoksa reddedilir. İttifaklar baraj için ortak sayılır; seçim çevresinde vekiller önce ittifaka, sonra üyelere dağıtılır."
-msgstr "Takes effect if 2/3 of parliament (%d MPs) vote YES, otherwise rejected. Alliances count jointly for the threshold; in each district seats go first to the alliance, then to its members."
-
 msgid "açık"
 msgstr "on"
 
 msgid "kapalı"
 msgstr "off"
-
-msgid " Seçim ittifakları: %s."
-msgstr " Election alliances: %s."
 
 msgid "Çekirdek gruplarda %%%d, diğerlerinde %%%d hitapla başlarsın; çekirdek gruplarda kazancın %d katıdır. Hitap yasa, miting ve toplantıyla büyür, rakipler senden seçmen çalabilir."
 msgstr "You start with %%%d appeal in your core groups and %%%d in the others; gains in core groups are %dx. Appeal grows with laws, rallies and meetings, and rivals can steal voters from you."
@@ -4634,9 +4475,6 @@ msgstr "As government, change the tax level: it affects the treasury and voters'
 
 msgid "ANAYASA DEĞİŞİKLİĞİ"
 msgstr "CONSTITUTIONAL AMENDMENT"
-
-msgid "Baraj, seçim sıklığı, sayım yöntemi ve ittifak kuralı. Üçte iki çoğunluk gerekir."
-msgstr "Threshold, election frequency, counting method and the alliance rule. Needs a two-thirds majority."
 
 msgid "ERKEN SEÇİM ÖNERGESİ"
 msgstr "EARLY ELECTION MOTION"
@@ -5942,3 +5780,21 @@ msgstr "You start with %%%d loyal (level 3) voters in the groups you pick, %%%d 
 
 msgid "bu sıra çektin"
 msgstr "drawn this turn"
+
+msgid "BİR KART DAHA ÇEK"
+msgstr "DRAW ONE MORE"
+
+msgid "GERİ DÖN"
+msgstr "BACK"
+
+msgid "AYARLAR"
+msgstr "SETTINGS"
+
+msgid "OYUNDAN ÇIK"
+msgstr "QUIT GAME"
+
+msgid "TEKRAR BAS · ÇIK"
+msgstr "PRESS AGAIN · QUIT"
+
+msgid "GERİ · ESC"
+msgstr "BACK · ESC"

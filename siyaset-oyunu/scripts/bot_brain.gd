@@ -78,6 +78,39 @@ static func skill(bot: int) -> float:
 ## Yeni oyunda beceriler yeniden dağıtılır.
 static func reset_skills() -> void:
 	_skills.clear()
+	_leanings.clear()
+
+# --- BOT İDEOLOJİSİ (0.0.320) ------------------------------------------------------
+## Her bot partisi dört eksenin her birinde bir taraf tutar: parti kurulumunda
+## seçilen iki çekirdek grup + kalan iki eksende rastgele seçilen birer grup.
+## Kararların IDEOLOGY_RATE kadarı (hangi yasa, yasa oyu, miting odağı) bu
+## gruplar doğrultusunda verilir; kalanı serbest hesapla (gündem, kriz...).
+## Böylece kriz zıt gruptaysa bot o yönde nadiren oy kullanır.
+const IDEOLOGY_RATE := 0.75
+static var _leanings: Dictionary = {}
+
+## Partinin tuttuğu dört grup (her eksenden bir). Partinin adı ve çekirdeğiyle
+## sabit tohumlanır: kayıttan dönünce de aynı kalır.
+static func leaning(peer_id: int) -> Array:
+	var pid := CardManager.party_of(peer_id)
+	var data := PartyManager.data_of(pid)
+	var core: Array = data.get("core", [])
+	var key := "%d|%s|%s" % [pid, String(data.get("name", "")), ",".join(PackedStringArray(core))]
+	if _leanings.has(key):
+		return _leanings[key]
+	var result: Array = core.duplicate()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(key)
+	for group in VoterGroups.GROUP_IDS:
+		if result.has(group) or result.has(VoterGroups.opposite(group)):
+			continue
+		result.append(String(group) if rng.randf() < 0.5 else VoterGroups.opposite(String(group)))
+	_leanings[key] = result
+	return result
+
+## Bu karar ideolojiye göre mi verilecek? (IDEOLOGY_RATE ihtimalle.)
+static func _follows_ideology() -> bool:
+	return randf() < IDEOLOGY_RATE
 
 ## Beceriye göre puan gürültüsü (usta bot ~0).
 static func _jitter(bot: int, scale: float = 1.0) -> float:
@@ -141,15 +174,6 @@ static func _groups(peer_id: int) -> Dictionary:
 ## İki partinin seçmen grubu profilleri arasındaki mesafe.
 static func _distance(a: int, b: int) -> float:
 	return VoterGroups.party_distance(_groups(a), _groups(b))
-
-## İTTİFAK DOSTLUĞU (0.0.227): şu anki ya da son seçimdeki ittifak ortağı
-## seçmen grupları açısından olduğundan YAKIN görülür (koalisyon, güvenoyu).
-const FORMER_ALLY_DISTANCE_MULT := 0.6
-static func _friend_distance(a: int, b: int) -> float:
-	var d := _distance(a, b)
-	if CardManager.are_allies(a, b) or CardManager.were_allies(a, b):
-		d *= FORMER_ALLY_DISTANCE_MULT
-	return d
 
 static func _seats() -> Dictionary:
 	return CardManager._province_seat_counts
@@ -335,183 +359,6 @@ static func _eval_propaganda(bot: int) -> Dictionary:
 	best["score"] = best_value * 0.45
 	return best
 
-## İTTİFAK BAŞVURUSUNA YANIT (0.0.225). Davet edilen bot: barajda zorlanıyorsa
-## neredeyse her zaman, ortak oy barajı aşıyorsa çoğunlukla kabul eder.
-## Oylayan üye bot: ittifakı barajdan kurtaracak ya da güçlendirecek partiyi
-## çoğunlukla onaylar; eski ortağa daha sıcak bakar.
-static func alliance_answer(bot: int, request_id: int) -> bool:
-	var req: Dictionary = CardManager.alliance_requests.get(request_id, {})
-	if req.is_empty():
-		return false
-	var pid := CardManager.party_of(bot)
-	var alliance_id := int(req["alliance"])
-	var threshold := MultiplayerManager.election_threshold
-	if String(req["kind"]) == "invite" and int(req["party"]) == pid:
-		if _alliance_distance(bot, alliance_id) >= ALLIANCE_PARTNER_DISTANCE:
-			return false
-		var own_share := _vote_share(pid)
-		var struggling := threshold > 0.0 and own_share < threshold + 2.0
-		var helps := threshold > 0.0 and own_share + _alliance_share(alliance_id) >= threshold
-		var affinity := clampf(1.0 - _alliance_distance(bot, alliance_id) / ALLIANCE_PARTNER_DISTANCE, 0.0, 1.0)
-		return (struggling and randf() < lerpf(0.4, 0.98, affinity)) or (helps and randf() < lerpf(0.25, 0.85, affinity))
-	var candidate := int(req["party"])
-	var pooled := _alliance_share(alliance_id)
-	# 0.0.254: seçmeni uzak partiyi onaylamaz; ittifak 3 partiyi geçmez (ortak
-	# oy hâlâ barajın altındaysa hariç).
-	if _friend_distance(bot, candidate) >= ALLIANCE_PARTNER_DISTANCE and not CardManager.were_allies(pid, candidate):
-		return false
-	var size: int = (CardManager.alliances.get(alliance_id, {}).get("members", []) as Array).size()
-	if size >= ALLIANCE_MAX_BOT_SIZE and (threshold <= 0.0 or pooled >= threshold):
-		return false
-	var chance := lerpf(0.9, 0.35, clampf(_distance(bot, candidate) / ALLIANCE_PARTNER_DISTANCE, 0.0, 1.0))
-	if threshold > 0.0 and pooled < threshold:
-		chance = minf(0.98, chance + 0.15)
-	if CardManager.were_allies(pid, candidate):
-		chance += 0.15
-	return randf() < chance
-
-## Bot kendi sırasında katılma isteği gönderir mi? (Barajda zorlanıyor ve ortak
-## oy barajı aşıyorsa.) İttifak kimliği ya da -1.
-static func _alliance_distance(bot: int, alliance_id: int) -> float:
-	var total := 0.0
-	var count := 0
-	for member in CardManager.alliances.get(alliance_id, {}).get("members", []):
-		if int(member) != CardManager.party_of(bot):
-			total += _distance(bot, int(member))
-			count += 1
-	return total / maxf(1.0, count)
-
-static func choose_alliance_request(bot: int) -> int:
-	if not CardManager.can_manage_alliance(bot) or CardManager.alliance_of(bot) >= 0:
-		return -1
-	var pid := CardManager.party_of(bot)
-	var threshold := MultiplayerManager.election_threshold
-	var own_share := _vote_share(pid)
-	if threshold <= 0.0 or own_share >= threshold + 2.0:
-		return -1
-	var best_id := -1
-	var best_share := own_share
-	for alliance_id in CardManager.alliances:
-		if CardManager.pending_alliance_request(int(alliance_id), pid) >= 0:
-			return -1
-		if CardManager.recently_refused(int(alliance_id), pid):
-			continue
-		var combined := own_share + _alliance_share(int(alliance_id))
-		var distance := _alliance_distance(bot, int(alliance_id))
-		if distance >= ALLIANCE_PARTNER_DISTANCE:
-			continue
-		combined -= distance * 5.0
-		if own_share + _alliance_share(int(alliance_id)) >= threshold and (best_id == -1 or combined > best_share):
-			best_id = int(alliance_id)
-			best_share = combined
-	return best_id
-
-## BOTUN İTTİFAK HAMLESİ (0.0.227), kendi sırasında, öncelik sırasıyla:
-##   ayrıl  : ortakları önergelerine HAYIR dediyse (küskünlük) ve seçim turu
-##            değilse (seçim turunda ayrılmak cezalı).
-##   iste   : barajda zorlanıyor ve bir ittifak onu barajın üstüne çıkarıyor.
-##   davet  : liderse ve ittifak barajın yakınındaysa ya da küçükse, seçmen
-##            grupları yakın (ideoloji karışımı çekirdeğini sulandırmayan)
-##            partileri davet eder.
-##   kur    : barajda zorlanıyor, katılacak ittifak yok, yakın bir parti var.
-## 0.0.254: 3.0 → 1.5. Parti çiftlerinin uzaklığı pratikte 0–1,8 arası: 3.0 hiç
-## kimseyi elemiyordu (bütün botlar tek ittifakta toplanıyordu).
-const ALLIANCE_PARTNER_DISTANCE := 1.5
-## Botların kendi isteğiyle büyüttüğü ittifakın en fazla parti sayısı.
-const ALLIANCE_MAX_BOT_SIZE := 3
-const ALLIANCE_NAMES := [["Halk Cephesi", "People's Front"], ["Ulusal Birlik", "National Union"],
-	["Demokrasi Bloku", "Democracy Bloc"], ["Emek Birliği", "Labour Union"], ["Ortak Gelecek", "Common Future"],
-	["Anadolu Birliği", "Anatolian Union"], ["Özgürlük Cephesi", "Freedom Front"], ["Yeni Başlangıç", "New Beginning"]]
-
-static func choose_alliance_move(bot: int) -> Dictionary:
-	if not CardManager.can_manage_alliance(bot):
-		return {}
-	# 0.0.254: ilk seçimden önce kimse kimsenin gücünü bilmez: bot ittifak
-	# kurmaz, davet etmez, başvurmaz (gelen daveti yine yanıtlar).
-	if CardManager.last_seats.is_empty():
-		return {}
-	var pid := CardManager.party_of(bot)
-	var alliance_id := CardManager.alliance_of(bot)
-	if alliance_id >= 0:
-		if CardManager.alliance_grievance(pid) >= CardManager.ALLIANCE_GRIEVANCE_LEAVE and not CardManager.election_this_round():
-			return {"type": "leave"}
-		if CardManager.alliance_leader(alliance_id) == pid:
-			var target := _alliance_invite_target(bot, alliance_id)
-			if target >= 0:
-				return {"type": "invite", "alliance_id": alliance_id, "party": target}
-		return {}
-	var join := choose_alliance_request(bot)
-	if join >= 0:
-		return {"type": "request", "alliance_id": join}
-	var threshold := MultiplayerManager.election_threshold
-	if threshold <= 0.0 or _vote_share(pid) >= threshold + 2.0 or not CardManager.alliances_enabled:
-		return {}
-	for other in CardManager.party_ids():
-		if _alliance_candidate(bot, int(other)):
-			var name := _free_alliance_name()
-			var color := _free_alliance_color()
-			if name != "" and color != Color.TRANSPARENT:
-				return {"type": "create", "name": name, "color": color}
-			break
-	return {}
-
-static func _alliance_candidate(bot: int, other: int) -> bool:
-	return other != CardManager.party_of(bot) and CardManager.party_ids().has(other) 		and not PartyManager.is_independent(other) and CardManager.alliance_of(other) < 0 		and _friend_distance(bot, other) < ALLIANCE_PARTNER_DISTANCE
-
-## Lider bot kimi davet eder? İttifak barajın 3 puan yakınındaysa ya da 3'ten az
-## üyeliyse, en yakın uygun parti (açık başvurusu olmayan).
-static func _alliance_invite_target(bot: int, alliance_id: int) -> int:
-	var members: Array = CardManager.alliances[alliance_id].get("members", [])
-	var threshold := MultiplayerManager.election_threshold
-	if members.size() >= ALLIANCE_MAX_BOT_SIZE or (members.size() >= 2 and _alliance_share(alliance_id) >= threshold + 3.0):
-		return -1
-	var best := -1
-	var best_d := INF
-	for other in CardManager.party_ids():
-		if not _alliance_candidate(bot, int(other)) or CardManager.pending_alliance_request(alliance_id, int(other)) >= 0 				or CardManager.recently_refused(alliance_id, int(other)):
-			continue
-		var d := _friend_distance(bot, int(other))
-		if d < best_d:
-			best_d = d
-			best = int(other)
-	return best
-
-static func _free_alliance_name() -> String:
-	var used := {}
-	for alliance in CardManager.alliances.values():
-		used[String(alliance.get("name", ""))] = true
-	for pair in ALLIANCE_NAMES:
-		var name: String = pair[1] if L.is_en() else pair[0]
-		if not used.has(name):
-			return name
-	return ""
-
-static func _free_alliance_color() -> Color:
-	for color in PartyPresets.COLORS:
-		var taken := false
-		for alliance in CardManager.alliances.values():
-			if Color(alliance.get("color", Color.WHITE)).is_equal_approx(color):
-				taken = true
-		if not taken:
-			return color
-	return Color.TRANSPARENT
-
-## Partinin oy oranı (%): son seçim; seçim yoksa (ilk seçimden önce ya da
-## yeni parti) "şimdi seçim olsa" beklenen ulusal oy. Eskiden kamuoyu puanına
-## düşüyordu (~0): her bot kendini barajın altında sanıp ittifaka koşuyordu.
-static func _vote_share(pid: int) -> float:
-	if CardManager.last_vote_shares.has(pid):
-		return float(CardManager.last_vote_shares[pid])
-	var expected: Dictionary = CardManager._expected_national()
-	return float(expected.get(pid, 0.0)) * 100.0
-
-static func _alliance_share(alliance_id: int) -> float:
-	var alliance: Dictionary = CardManager.alliances.get(alliance_id, {})
-	var total := 0.0
-	for member in alliance.get("members", []):
-		total += _vote_share(int(member))
-	return total
-
 ## En iyi hamle (gürültülü puanlarla). Geçerli seçenekler candidates'e eklenir.
 static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 	var best := {"type": "pass"}
@@ -633,8 +480,13 @@ static func _law_changes(law_type: String, gain: float) -> Array:
 static func _best_law(bot: int) -> Dictionary:
 	var in_parliament := not CardManager.last_seats.is_empty()
 	var best := {}
+	# 0.0.320: çoğunlukla yalnız tuttuğu grupların yasası (bkz. leaning).
+	var ideological := _follows_ideology()
+	var lean := leaning(bot)
 	# 0.0.182: her grup için yasa sunulabilir; gündemdeki grup daha güçlü.
 	for group in VoterGroups.GROUP_IDS:
+		if ideological and not lean.has(group):
+			continue
 		var law_type := CardPresets.law_type(String(group))
 		var pass_chance := _law_pass_chance(bot, law_type) if in_parliament else 0.0
 		var expected_gain := pass_chance * PublicOpinion.LAW_GROUP_GAIN_PASSED \
@@ -744,7 +596,7 @@ static func _law_pass_chance(bot: int, law_type: String) -> float:
 	for peer_id in GovernmentManager.voter_ids():
 		if peer_id == bot:
 			continue
-		match _best_law_vote(peer_id, law_type, bot, gov_ids):
+		match _best_law_vote(peer_id, law_type, bot, gov_ids, false):
 			GovernmentManager.VOTE_YES:
 				yes += GovernmentManager.seats_of(peer_id)
 			GovernmentManager.VOTE_NO:
@@ -787,9 +639,18 @@ const REQUEST_VALUE := 12.0
 ## Onay değişiminin bot hesabında kaç turluk ulusal puan sayıldığı.
 const APPROVAL_TURNS := 4.0
 
-static func _best_law_vote(voter: int, law_type: String, proposer: int, gov_ids: Array) -> int:
+## roll=false: ideolojik oy kesin sayılır (geçme ihtimali tahmininde).
+static func _best_law_vote(voter: int, law_type: String, proposer: int, gov_ids: Array, roll: bool = true) -> int:
 	if CardPresets.is_tax_law(law_type):
 		return _tax_law_vote(voter, law_type, proposer, gov_ids)
+	# 0.0.320: çoğunlukla tuttuğu grubun yasasına EVET, karşıtınınkine HAYIR.
+	var law := CardPresets.law_data(law_type)
+	if not law.is_empty() and (not roll or _follows_ideology()):
+		var lean := leaning(voter)
+		if lean.has(String(law["group"])):
+			return GovernmentManager.VOTE_YES
+		if lean.has(String(law["opposite"])):
+			return GovernmentManager.VOTE_NO
 	var best := GovernmentManager.VOTE_ABSTAIN
 	var best_value := 0.0
 	for choice in [GovernmentManager.VOTE_YES, GovernmentManager.VOTE_NO]:
@@ -958,8 +819,10 @@ static func _eval_miting(bot: int) -> Dictionary:
 	return {"score": score, "peer": -1, "province": best_province, "focus": best_focus}
 
 ## İlin partinin ideolojisine uygunluğu (0..1 civarı): çekirdek grupların ildeki
-## payı, diğerlerinin dörtte biri, çekirdeğin zıtları eksi yarısı.
+## payı, tuttuğu diğer iki grubun (bkz. leaning) %40'ı, kalanların onda biri,
+## çekirdeğin zıtları eksi yarısı.
 static func _ideology_fit(bot: int, province_id: String, core: Array) -> float:
+	var lean := leaning(bot)
 	var profile := CardManager.province_profile(province_id)
 	var electorate := 0.0
 	var counts := {}
@@ -976,8 +839,10 @@ static func _ideology_fit(bot: int, province_id: String, core: Array) -> float:
 			fit += share
 		elif core.has(VoterGroups.opposite(group)):
 			fit -= share * 0.5
+		elif lean.has(group):
+			fit += share * 0.4
 		else:
-			fit += share * 0.25
+			fit += share * 0.1
 	return maxf(0.05, fit)
 
 ## Partinin ildeki bağlı seçmen oranı (0..1).
@@ -996,13 +861,18 @@ static func miting_focus(bot: int, province_id: String, slots: int) -> Array:
 		return []
 	# 0.0.228: önce çekirdek gruplar (ildeki seçmen sayısıyla), sonra diğerleri;
 	# çekirdeğin zıt grubu hiç seçilmez.
+	# 0.0.320: çoğunlukla yalnız tuttuğu dört grup (bkz. leaning).
 	var core: Array = PartyManager.data_of(CardManager.party_of(bot)).get("core", [])
+	var lean := leaning(bot)
+	var ideological := _follows_ideology()
 	var profile := CardManager.province_profile(province_id)
 	var ranked: Array = []
 	for group in VoterGroups.GROUP_IDS:
 		if core.has(VoterGroups.opposite(group)):
 			continue
-		var value := VoterGroups.group_count(profile, group) * (3.0 if core.has(group) else 1.0)
+		if ideological and not lean.has(group):
+			continue
+		var value := VoterGroups.group_count(profile, group) * (3.0 if core.has(group) else (2.0 if lean.has(group) else 1.0))
 		ranked.append({"group": String(group), "value": value})
 	ranked.sort_custom(func(a, b): return float(a["value"]) > float(b["value"]))
 	var focus: Array = []
@@ -1351,9 +1221,6 @@ static func _coalition_offer_vote(bot: int) -> int:
 	# Hakkının en az COALITION_FAIR_SHARE'i teklif edilmeli; küçük ortak bile
 	# sembolik bir bakanlıkla yetinmez (en az COALITION_MIN_POINTS puan).
 	var required: float = maxf(float(COALITION_MIN_POINTS), float(total_points) * share * COALITION_FAIR_SHARE)
-	# Eski ittifak ortağının hükümetine daha az makamla da girer.
-	if CardManager.were_allies(bot, GovernmentManager.proposal_peer_id) or CardManager.are_allies(bot, GovernmentManager.proposal_peer_id):
-		required = maxf(float(COALITION_MIN_POINTS), required * 0.75)
 	required *= 1.0 + minf(0.35, _distance(bot, GovernmentManager.proposal_peer_id) * 0.2)
 	if float(offered) + 0.01 < required:
 		return GovernmentManager.VOTE_NO
@@ -1364,7 +1231,7 @@ static func _coalition_offer_vote(bot: int) -> int:
 ## hükümeti ise durduramayacağı için grup yakınlığına göre oylar.
 static func _government_confidence_vote(bot: int) -> int:
 	var pm := int(GovernmentManager.proposal_assignments.get(GovernmentPresets.POST_PM, GovernmentManager.proposal_peer_id))
-	var d := _friend_distance(bot, pm)
+	var d := _distance(bot, pm)
 	var gov_seats := GovernmentManager.seats_of(GovernmentManager.proposal_peer_id)
 	for peer_id in GovernmentManager.proposal_partner_ids():
 		gov_seats += GovernmentManager.seats_of(peer_id)
@@ -1428,9 +1295,7 @@ static func build_government(bot: int) -> Dictionary:
 			return MultiplayerManager.is_bot(a)
 		if not is_equal_approx(_distance(bot, a), _distance(bot, b)):
 			return _distance(bot, a) < _distance(bot, b)
-		if is_ally(bot, a) != is_ally(bot, b):
-			return is_ally(bot, a)
-		return _friend_distance(bot, a) < _friend_distance(bot, b))
+		return is_ally(bot, a) and not is_ally(bot, b))
 	var similar := 0
 	for candidate in candidates:
 		if bloc and MultiplayerManager.is_bot(candidate) != MultiplayerManager.is_bot(candidates[0]):

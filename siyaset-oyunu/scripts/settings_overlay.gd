@@ -1,7 +1,12 @@
 extends CanvasLayer
 ## HTML Konsept A'nın ölçüleri, kategorileri ve satır düzeni.
+## 0.0.320: ESC (ya da sağ üstteki Menü) önce DURAKLATMA MENÜSÜNÜ açar: arka
+## plan kararır, üst üste GERİ DÖN · AYARLAR · OYUNDAN ÇIK. AYARLAR bu gelişmiş
+## ayarlar ekranını açar; ayarlardayken ESC duraklatma menüsüne, oradayken ESC
+## oyuna döner. Ayarlarda açıklama metinleri yok.
 const FPS_OPTIONS := [30, 48, 60, 120, 144, 165, 240, 0]
-const CATEGORIES := [["game", "Oyun menüsü", "Oyuna devam et, kaydet veya oturumdan ayrıl."], ["display", "Görüntü", "Ekran modu ve performans tercihleri."], ["sound", "Ses", "Müzik ve efektleri ayrı ayrı ayarla."], ["play", "Oynanış", "Bilgi panelleri ve olay gösterimleri."], ["language", "Dil", "Arayüzün dilini seç."]]
+const CATEGORIES := [["game", "Oyun menüsü"], ["display", "Görüntü"], ["sound", "Ses"], ["play", "Oynanış"], ["language", "Dil"]]
+const PAUSE_BUTTON_SIZE := Vector2(380, 72)
 const ART := "res://assets/ui/settings/"
 const MUTED := UiTheme.TEXT_MUTED
 const FONT := preload("res://assets/fonts/body.tres")
@@ -27,12 +32,16 @@ var _display_buttons: Array[Button] = []
 var _rows: Array[BoxContainer] = []
 var _nav_panel: PanelContainer
 var _content_margin: MarginContainer
+var _pause: Control
+var _quit_button: Button
+var _quit_armed := false
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_menu = panel
 	_build_menu()
 	panel.hide()
+	_build_pause_menu()
 	open_settings_button.pressed.connect(_on_menu_button_pressed)
 	# Konsept .menu: deniz yeşili, iki kat koyu kalınlık, beyaz yazı.
 	UiSkin.skin_menu_button(open_settings_button)
@@ -114,7 +123,7 @@ func _build_menu() -> void:
 	_status = _label("", 12, UiTheme.WOOD_TEXT)
 	_status.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	heading.add_child(_status)
-	heading.add_child(_button("DEVAM ET · ESC", close_menu, "gold"))
+	heading.add_child(_button("GERİ · ESC", _back_to_pause, "gold"))
 	var body := HBoxContainer.new()
 	body.add_theme_constant_override("separation", 3)
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -166,9 +175,6 @@ func _build_menu() -> void:
 		words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		words.add_theme_constant_override("separation", 7)
 		words.add_child(_label(entry[1], 17, UiTheme.TEXT, true))
-		var description := _label(entry[2], 11, MUTED)
-		description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		words.add_child(description)
 		page_heading.add_child(words)
 		var tag := _label("OTURUM" if key == "game" else "KİŞİSEL AYARLAR", 10, UiTheme.HEAD)
 		tag.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
@@ -188,19 +194,12 @@ func _build_menu() -> void:
 		_gap(card_content, 18)
 		_build_category(key, card_content)
 		_gap(page, 28)
-		var end := _label("Ayarlar için soldaki kategorileri kullan." if key == "game" else "Tercihler değiştirildiğinde anında uygulanır.", 10, MUTED)
-		end.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		end.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		page.add_child(end)
-	_gap(nav, 14)
-	var shortcuts := _label("ESC · Oyuna dön\n\nF11 · Tam ekran", 10, MUTED)
-	_margin(nav, 8, 0).add_child(shortcuts)
 	var footer := _surface(UiTheme.WOOD)
 	shell.add_child(footer)
 	var footer_row := HBoxContainer.new()
 	footer_row.add_theme_constant_override("separation", 12)
 	_margin(footer, 24, 12).add_child(footer_row)
-	_notice = _label("Tercihler değiştirildiğinde anında uygulanır.", 12, UiTheme.WOOD_TEXT_MUTED)
+	_notice = _label("", 12, UiTheme.WOOD_TEXT_MUTED)
 	_notice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	footer_row.add_child(_notice)
@@ -218,7 +217,7 @@ func _gap(parent: Node, height: int) -> void:
 	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(gap)
 
-func _row(box: VBoxContainer, title: String, help: String, control: Control) -> BoxContainer:
+func _row(box: VBoxContainer, title: String, control: Control) -> BoxContainer:
 	var index: int = int(box.get_meta("row_count", 0))
 	if index > 0:
 		_gap(box, 17)
@@ -237,9 +236,6 @@ func _row(box: VBoxContainer, title: String, help: String, control: Control) -> 
 	var name_label := _label(title, 12, UiTheme.TEXT, true)
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	words.add_child(name_label)
-	var help_label := _label(help, 10, MUTED)
-	help_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	words.add_child(help_label)
 	row.add_child(words)
 	control.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(control)
@@ -318,38 +314,38 @@ func _range(value: float, minimum: float, maximum: float, step: float, formatter
 func _build_category(key: String, box: VBoxContainer) -> void:
 	match key:
 		"game":
-			_row(box, "Oyuna dön", "Kaldığın yerden devam et. Kısayol: ESC", _button("DEVAM ET", close_menu, "gold"))
+			_row(box, "Oyuna dön", _button("DEVAM ET", close_menu, "gold"))
 			_save_button = _button("OYUNU KAYDET", _save_game)
-			_row(box, "Oyun kaydı", "Çevrim dışı oyunun ilerlemesini kaydet.", _save_button)
+			_row(box, "Oyun kaydı", _save_button)
 			_seed_copy = _button("— · KOPYALA", func():
 				DisplayServer.clipboard_set(str(GameMap.seed_value()))
 				_notice.text = L.t("Kopyalandı!"))
-			_row(box, "Harita tohumu", "Aynı ülke haritasını yeniden oluşturmak için.", _seed_copy)
-			_row(box, "Oyun günlüğü", "Bütün olayları, seçimleri, oyuncu ve bot kararlarını bir metin dosyasına yazar.", _button("LOG İNDİR", func():
+			_row(box, "Harita tohumu", _seed_copy)
+			_row(box, "Oyun günlüğü", _button("LOG İNDİR", func():
 				var path: String = GameLog.export_file()
 				_notice.text = (L.t("Günlük kaydedildi: %s") % path) if path != "" else L.t("Günlük yazılamadı.")))
 			_tutorial_button = _button("REHBERİ AÇ", _restart_tutorial)
-			_row(box, "İlk oyun rehberi", "Oynanışı anlatan rehberi yeniden başlat.", _tutorial_button)
+			_row(box, "İlk oyun rehberi", _tutorial_button)
 			_leave_button = _button("OYUNDAN AYRIL", _on_leave_pressed, "danger")
-			_row(box, "Oyundan ayrıl", "Ayrılmadan önce onay istenir.", _leave_button)
+			_row(box, "Oyundan ayrıl", _leave_button)
 		"display":
-			_row(box, "Ekran modu", "F11 ile de değiştirebilirsin.", _segments(["Pencereli", "Tam ekran"], GameSettings.display_mode, GameSettings.set_display_mode, true))
+			_row(box, "Ekran modu", _segments(["Pencereli", "Tam ekran"], GameSettings.display_mode, GameSettings.set_display_mode, true))
 			var index := FPS_OPTIONS.find(GameSettings.fps_limit)
-			_row(box, "FPS sınırı", "Saniyedeki en fazla kare sayısı; düşük değer pil ve ısı kazandırır.", _range(maxi(index, 0), 0, 7, 1, func(v): return L.t("Sınırsız") if FPS_OPTIONS[int(v)] == 0 else str(FPS_OPTIONS[int(v)]) + " FPS", func(v): GameSettings.set_fps_limit(FPS_OPTIONS[int(v)])))
-			_row(box, "Dikey eşitleme", "Görüntü yırtılmasını azaltır.", _toggle(GameSettings.vsync_enabled, GameSettings.set_vsync_enabled))
+			_row(box, "FPS sınırı", _range(maxi(index, 0), 0, 7, 1, func(v): return L.t("Sınırsız") if FPS_OPTIONS[int(v)] == 0 else str(FPS_OPTIONS[int(v)]) + " FPS", func(v): GameSettings.set_fps_limit(FPS_OPTIONS[int(v)])))
+			_row(box, "Dikey eşitleme", _toggle(GameSettings.vsync_enabled, GameSettings.set_vsync_enabled))
 		"sound":
-			for entry in [["master", "Ana ses", "Tüm seslerin genel seviyesi."], ["music", "Müzik", "Oyun ve seçim gecesi müzikleri."], ["sfx", "Efektler", "Butonlar, kartlar ve oylama sesleri."]]:
+			for entry in [["master", "Ana ses"], ["music", "Müzik"], ["sfx", "Efektler"]]:
 				var kind: String = entry[0]
 				var value: float = GameSettings.get(kind + "_volume")
-				_row(box, entry[1], entry[2], _range(value * 100, 0, 100, 5, func(v): return str(int(v)) + "%", func(v):
+				_row(box, entry[1], _range(value * 100, 0, 100, 5, func(v): return str(int(v)) + "%", func(v):
 					GameSettings.set_volume(kind, v / 100.0)
 					if kind != "music": AudioManager.play("ui_click")))
 		"play":
-			_row(box, "İl inceleme", "İl ayrıntılarının nasıl açılacağını seç.", _segments(["Panel", "Pencere"], GameSettings.province_view, GameSettings.set_province_view))
-			_row(box, "Olay animasyonları", "Gazete ve haber manşeti gösterimleri.", _toggle(GameSettings.event_fx, GameSettings.set_event_fx))
-			_row(box, "Yayıncı modu", "Yayın sırasında gizlilik tercihi.", _toggle(GameSettings.streamer_mode, GameSettings.set_streamer_mode))
+			_row(box, "İl inceleme", _segments(["Panel", "Pencere"], GameSettings.province_view, GameSettings.set_province_view))
+			_row(box, "Olay animasyonları", _toggle(GameSettings.event_fx, GameSettings.set_event_fx))
+			_row(box, "Yayıncı modu", _toggle(GameSettings.streamer_mode, GameSettings.set_streamer_mode))
 		"language":
-			_row(box, "Oyun dili", "Arayüzde kullanılacak dil.", _segments([L.t("Türkçe"), L.t("İngilizce")], L.LOCALES.find(GameSettings.language), func(i):
+			_row(box, "Oyun dili", _segments([L.t("Türkçe"), L.t("İngilizce")], L.LOCALES.find(GameSettings.language), func(i):
 				if GameSettings.language != L.LOCALES[i]:
 					GameSettings.set_language(L.LOCALES[i])
 					get_tree().reload_current_scene()
@@ -386,7 +382,7 @@ func open_menu() -> void:
 	_reset_armed = false
 	_leave_button.text = L.t("OYUNDAN AYRIL")
 	_reset_button.text = L.t("AYARLARI SIFIRLA")
-	_notice.text = L.t("Tercihler değiştirildiğinde anında uygulanır.")
+	_notice.text = ""
 	var path := _scene_path()
 	var in_game := path in ["res://scenes/GameScreen.tscn", "res://scenes/GovernmentFormation.tscn", "res://scenes/ElectionResults.tscn"]
 	_leave_button.disabled = MultiplayerManager.room_code == "" and not in_game and path != "res://scenes/PartySetup.tscn"
@@ -396,11 +392,17 @@ func open_menu() -> void:
 	_tutorial_button.disabled = path != "res://scenes/GameScreen.tscn"
 	_status.text = L.t("Çevrim dışı · Oyun duraklatıldı") if MultiplayerManager.offline_mode and in_game else L.t("Çevrim içi · Oyun devam ediyor") if in_game else L.t("SİYASET OYUNU")
 	_select_category("game")
+	_pause.hide()
 	panel.show()
+	# Ayarlar başlığındaki GERİ düğmesinin üstüne binmesin.
+	open_settings_button.hide()
 	_sync_pause()
 
+## Her şeyi kapatıp oyuna döner.
 func close_menu() -> void:
 	panel.hide()
+	_pause.hide()
+	open_settings_button.show()
 	_sync_pause()
 
 func open() -> void:
@@ -410,20 +412,92 @@ func open() -> void:
 func close() -> void:
 	close_menu()
 
+# --- DURAKLATMA MENÜSÜ (0.0.320) ----------------------------------------------------
+
+func _build_pause_menu() -> void:
+	_pause = Control.new()
+	_pause.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_pause.mouse_filter = Control.MOUSE_FILTER_STOP
+	_pause.theme = panel.theme
+	_pause.hide()
+	add_child(_pause)
+	var dim := ColorRect.new()
+	dim.color = Color(0.0, 0.0, 0.0, 0.6)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	dim.gui_input.connect(func(event: InputEvent):
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			close_menu())
+	_pause.add_child(dim)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_pause.add_child(center)
+	var stack := VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 22)
+	center.add_child(stack)
+	stack.add_child(_pause_button("GERİ DÖN", UiTheme.GOLD, close_menu))
+	stack.add_child(_pause_button("AYARLAR", UiTheme.TEAL, open_menu))
+	_quit_button = _pause_button("OYUNDAN ÇIK", UiTheme.RED, _on_quit_pressed)
+	stack.add_child(_quit_button)
+	# Menü düğmesi kararan zeminin üstünde kalsın (tekrar basınca kapanır).
+	move_child(open_settings_button, get_child_count() - 1)
+
+func _pause_button(text: String, color: Color, callback: Callable) -> Button:
+	var button := Button.new()
+	button.text = L.t(text)
+	button.focus_mode = Control.FOCUS_NONE
+	button.custom_minimum_size = PAUSE_BUTTON_SIZE
+	button.add_theme_font_override("font", BOLD)
+	button.add_theme_font_size_override("font_size", 28)
+	UiSkin.skin_color_button(button, color)
+	var font_color := UiSkin.text_on(color)
+	for prop in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		button.add_theme_color_override(prop, font_color)
+	button.pressed.connect(callback)
+	return button
+
+func open_pause() -> void:
+	_quit_armed = false
+	_quit_button.text = L.t("OYUNDAN ÇIK")
+	panel.hide()
+	_pause.show()
+	open_settings_button.show()
+	_sync_pause()
+
+func _back_to_pause() -> void:
+	open_pause()
+
+## Ana menüde oyun kapanır; başka her yerde oyundan (odadan) ayrılınır.
+## İki aşamalı: ilk basış onay ister.
+func _on_quit_pressed() -> void:
+	if not _quit_armed:
+		_quit_armed = true
+		_quit_button.text = L.t("TEKRAR BAS · ÇIK")
+		return
+	var at_main_menu := _scene_path() == "res://scenes/Lobby.tscn" and MultiplayerManager.room_code == ""
+	close_menu()
+	if at_main_menu:
+		get_tree().quit()
+	else:
+		MultiplayerManager.leave_game()
+
 func _on_menu_button_pressed() -> void:
-	if panel.visible: close_menu()
-	else: open_menu()
+	if panel.visible or _pause.visible: close_menu()
+	else: open_pause()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
-		_on_menu_button_pressed()
+		if panel.visible: open_pause()
+		elif _pause.visible: close_menu()
+		else: open_pause()
 		get_viewport().set_input_as_handled()
 	elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F11:
 		GameSettings.toggle_display_mode()
 		get_viewport().set_input_as_handled()
 
 func _sync_pause() -> void:
-	get_tree().paused = MultiplayerManager.offline_mode and _scene_path() in ["res://scenes/GameScreen.tscn", "res://scenes/GovernmentFormation.tscn", "res://scenes/ElectionResults.tscn"] and panel.visible
+	get_tree().paused = MultiplayerManager.offline_mode and _scene_path() in ["res://scenes/GameScreen.tscn", "res://scenes/GovernmentFormation.tscn", "res://scenes/ElectionResults.tscn"] and (panel.visible or _pause.visible)
 
 func _save_game() -> void:
 	var err := SaveGame.save(SaveGame.MANUAL_SLOT)

@@ -16,12 +16,6 @@ static func note_election() -> void:
 	for pid in ids:
 		lines.append("  %s  %%%.2f  %d vekil%s" % [_party(int(pid)), float(cm.last_vote_shares[pid]), int(cm.last_seats.get(pid, 0)),
 			"" if cm.passed_threshold.has(pid) else "  (baraj altı)"])
-	for aid in cm.last_election_alliances:
-		var a: Dictionary = cm.last_election_alliances[aid]
-		var names := PackedStringArray()
-		for pid in a.get("members", []):
-			names.append(_party(int(pid)))
-		lines.append("  İttifak %s: %s" % [String(a.get("name", "")), ", ".join(names)])
 	for line in lines:
 		cm.full_log.append(line)
 
@@ -40,7 +34,7 @@ static func build() -> String:
 	out.append("Harita: %s · tohum %d · il %d" % [CountryGenerator.KIND, GameMap.seed_value(), GameMap.province_ids().size()])
 	out.append("Baraj %%%s · seçim %s yılda bir · %d seçim · meclis %d (ulusal liste %d) · sayım %s" % [String.num(mm.election_threshold, 1),
 		GameRules.years_text(mm.election_interval), mm.election_count, cm.TOTAL_SEATS, ElectionModel.NATIONAL_LIST_SEATS, ElectionModel.method_title(mm.seat_method)])
-	out.append("İttifaklar: %s · tur süresi %d sn" % ["açık" if cm.alliances_enabled else "kapalı", int(mm.world_settings.get("turn_seconds", 90))])
+	out.append("Tur süresi %d sn" % int(mm.world_settings.get("turn_seconds", 90)))
 	out.append("")
 	out.append("--- PARTİLER ---")
 	for pid in cm.party_ids():

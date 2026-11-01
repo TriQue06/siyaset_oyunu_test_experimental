@@ -300,7 +300,7 @@ func _build_law() -> void:
 		group_ok, func(): open_law_page(0)))
 	_content.add_child(_option(L.t("VERGİ YASASI"), L.t("Vergi kademesini değiştir: hazineyi ve seçmenin ruh hâlini etkiler."),
 		not _view_only and CardManager.tax_law_block_reason(me) == "", func(): open_law_page(1)))
-	_content.add_child(_option(L.t("ANAYASA DEĞİŞİKLİĞİ"), L.t("Baraj, seçim sıklığı, sayım yöntemi ve ittifak kuralı. Üçte iki çoğunluk gerekir."),
+	_content.add_child(_option(L.t("ANAYASA DEĞİŞİKLİĞİ"), L.t("Baraj, seçim sıklığı ve sayım yöntemi. Üçte iki çoğunluk gerekir."),
 		not _view_only and CardManager.can_propose_constitution(me), func(): open_law_page(2)))
 	if not CardManager.is_government_party(me) or CardManager.can_early_election(me):
 		_content.add_child(_option(L.t("ERKEN SEÇİM ÖNERGESİ"), L.t("Kabul edilirse bu dönemin sonunda sandık kurulur."),

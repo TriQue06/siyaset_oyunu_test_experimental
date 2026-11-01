@@ -22,7 +22,6 @@ var _vote_key := ""
 var _vote_due: Dictionary = {}
 var _form_key := ""
 var _form_due := 0.0
-var _alliance_due: Dictionary = {}
 
 func _ready() -> void:
 	_rng.randomize()
@@ -44,7 +43,6 @@ func step(now: float) -> void:
 		_vote_key = ""
 		_form_key = ""
 		return
-	_handle_alliance_invitations(now)
 	if GovernmentManager.phase == GovernmentManager.Phase.VOTING:
 		_handle_votes(now)
 	else:
@@ -87,19 +85,6 @@ func _handle_turn(now: float) -> void:
 			CardManager._apply_aid_move(bot, float(aid["party"]), float(aid["state"]))
 			if CardManager.aid_pending(bot):
 				CardManager._apply_skip_aid(bot)  # reddedildiyse karar yine kapanır
-		_turn_due = now + _delay(PLAY_SECONDS)
-		return
-	var alliance_move := BotBrain.choose_alliance_move(bot)
-	if not alliance_move.is_empty():
-		match String(alliance_move["type"]):
-			"request":
-				CardManager._apply_request_alliance(bot, int(alliance_move["alliance_id"]))
-			"create":
-				CardManager._apply_create_alliance(bot, String(alliance_move["name"]), alliance_move["color"])
-			"invite":
-				CardManager._apply_invite_alliance_party(bot, int(alliance_move["alliance_id"]), int(alliance_move["party"]))
-			"leave":
-				CardManager._apply_leave_alliance(bot)
 		_turn_due = now + _delay(PLAY_SECONDS)
 		return
 	# Hamle sınırı yok: bot her hamleden sonra biraz düşünüp devam eder,
@@ -214,30 +199,3 @@ func _handle_formation(now: float) -> void:
 		# bot bir daha denemez ve kurma süresi boşuna yanar.
 		_form_due = INF if GovernmentManager.phase == GovernmentManager.Phase.VOTING \
 			else now + _delay(FORM_SECONDS)
-
-## İTTİFAK BAŞVURULARI (0.0.225): bot olan davet edilen parti ya da oylayan
-## üye, düşünme süresinden sonra sıra beklemeden yanıt verir.
-func _handle_alliance_invitations(now: float) -> void:
-	var pending := {}
-	for rid in CardManager.alliance_requests.keys():
-		var req: Dictionary = CardManager.alliance_requests.get(rid, {})
-		var waiting: Array = []
-		if String(req.get("kind", "")) == "invite" and not bool(req.get("accepted", false)):
-			waiting.append(int(req["party"]))
-		for voter in req.get("voters", []):
-			if not (req.get("votes", {}) as Dictionary).has(int(voter)):
-				waiting.append(int(voter))
-		for pid in waiting:
-			if not MultiplayerManager.is_ai_controlled(pid):
-				continue
-			var key := "%d:%d" % [int(rid), pid]
-			pending[key] = true
-			if not _alliance_due.has(key):
-				_alliance_due[key] = now + _delay(VOTE_SECONDS)
-			elif now >= float(_alliance_due[key]):
-				_alliance_due.erase(key)
-				CardManager._apply_answer_alliance(pid, int(rid), BotBrain.alliance_answer(pid, int(rid)))
-				return
-	for key in _alliance_due.keys():
-		if not pending.has(key):
-			_alliance_due.erase(key)

@@ -6,6 +6,11 @@ extends Control
 ## taşar gibi oturur); partinin logosu sağ altta küçük pul. Parti listesi,
 ## üst banttaki sıra kartı, hükümet paneli ve puan tablosunda logonun yerini alır.
 
+## AVATARLAR GEÇİCİ OLARAK GİZLİ (0.0.315): kod ve görseller duruyor ama
+## oyuncu hiçbir yerde avatar görmez. Kapalıyken madalyon yerine aynı boyda
+## parti logosu (pul) çizilir; avatar düzenleyici ve portreler de gizlenir.
+const ENABLED := false
+
 ## Logo pulunun madalyona oranı (konsept 20/44; 0.0.302 isteği: bir iki px büyük).
 const BADGE_RATIO := 0.52
 ## Halka kalınlığı ve alt kalınlık (konsept: inset 3 px, alt gölge 3 px).
@@ -15,6 +20,7 @@ const LIP := 3.0
 const FACE_ZOOM := 1.2
 
 var _color := Color.GRAY
+var _plain := false
 
 ## politician: PoliticianPresets verisi; party: PartyManager.data_of(...).
 static func make(politician: Dictionary, party: Dictionary, side: float, with_badge: bool = true) -> AvatarMedal:
@@ -24,6 +30,17 @@ static func make(politician: Dictionary, party: Dictionary, side: float, with_ba
 
 func _build(politician: Dictionary, party: Dictionary, side: float, with_badge: bool) -> void:
 	_color = party.get("bg_color", Color.GRAY)
+	if not ENABLED:
+		_plain = true
+		custom_minimum_size = Vector2(side, side)
+		size = Vector2(side, side)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		var logo := PartyBadge.build(party, Vector2(side, side), 128 if side > 60.0 else 64)
+		logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(logo)
+		return
 	# Siyasetçi verisi yoksa (eski kayıt, test) yüz parti adından üretilir.
 	if String(politician.get("name", "")) == "" and not politician.has("appearance"):
 		politician = {"name": String(party.get("name", "?")), "gender": "m", "portrait": ""}
@@ -65,6 +82,8 @@ func _build(politician: Dictionary, party: Dictionary, side: float, with_badge: 
 		holder.add_child(badge)
 
 func _draw() -> void:
+	if _plain:
+		return
 	# Alt kalınlık: madalyonun altında parti renginin koyusu.
 	var r := minf(size.x, size.y) * 0.5
 	draw_circle(size * 0.5 + Vector2(0, LIP), r, _color.lerp(Color.BLACK, 0.5), true, -1.0, true)

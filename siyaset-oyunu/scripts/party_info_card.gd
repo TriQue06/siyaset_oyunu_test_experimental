@@ -67,7 +67,7 @@ static func build(peer_id: int, my_id: int, on_action: Callable = Callable(), wi
 		var note := PopupKit.note(line, color.lightened(0.45), _text_width())
 		# Portresi olan siyasetçide (bkz. ContentPacks) resim satırın solunda.
 		var portrait := PoliticianPresets.portrait_of(leader_id)
-		if ContentPacks.has_portrait(portrait):
+		if ContentPacks.has_portrait(portrait) and AvatarMedal.ENABLED:
 			var row := HBoxContainer.new()
 			row.add_theme_constant_override("separation", 8)
 			row.mouse_filter = Control.MOUSE_FILTER_IGNORE

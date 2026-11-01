@@ -315,6 +315,7 @@ func _build_politician_page() -> Control:
 	profile_button.custom_minimum_size = Vector2(0, 52)
 	UiSkin.skin_color_button(profile_button, UiTheme.GOLD)
 	profile_button.pressed.connect(_open_avatar_editor)
+	profile_button.visible = AvatarMedal.ENABLED
 	page.add_child(profile_button)
 
 	page.add_child(PopupKit.section(L.t("Ad ve soyad"), L.t("zarla değiştir ya da kendin yaz")))
@@ -719,7 +720,8 @@ func _refresh_card() -> void:
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 12)
 	_card_box.add_child(head)
-	head.add_child(PoliticianPortrait.make(_draft_politician(), _bg_color, PORTRAIT_SIZE))
+	if AvatarMedal.ENABLED:
+		head.add_child(PoliticianPortrait.make(_draft_politician(), _bg_color, PORTRAIT_SIZE))
 	var who := VBoxContainer.new()
 	who.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	who.add_theme_constant_override("separation", 2)
@@ -809,7 +811,7 @@ func _refresh_players() -> void:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
 		var color := Color(party.get("bg_color", Color(0.3, 0.3, 0.3)))
-		if politician.is_empty():
+		if politician.is_empty() or not AvatarMedal.ENABLED:
 			row.add_child(_logo(int(party.get("icon_index", -1)), color, 40.0))
 		else:
 			# Portrenin sağ altında parti logosu (önceden logo hiç görünmüyordu).

@@ -71,7 +71,7 @@ signal congress_started(data: Dictionary)
 ## hazine/gösterge animasyonlarını oynatır (değerler zaten durumda).
 signal economy_event(data: Dictionary)
 
-const MAX_HAND_SIZE := 9
+const MAX_HAND_SIZE := 7  # 0.0.328
 ## Olay logunda tutulan en fazla kayıt.
 const EVENT_LOG_LIMIT := 80
 const HEARTBEAT_INTERVAL := 5.0
@@ -414,57 +414,80 @@ func _apply_draw(peer_id: int, automatic: bool = false) -> void:
 		event["message"] = " ".join(messages)
 	_push_state(event)
 
-## EK ŞANS KARTI (0.0.301): ücretsiz çekimden (ya da ATLA'dan) sonra sırada
-## bir kez daha, EXTRA_DRAW_COST karşılığında kart çekilebilir.
-const EXTRA_DRAW_COST := 20.0
+## KART PAZARI (0.0.328, "bir kart daha çek"in yerine): sırası gelen oyuncu
+## ele giren kartları parti kasasından satın alır; sırada adet sınırı yok, el
+## sınırı (MAX_HAND_SIZE) geçerli. Fiyat = taban + tur başına zam × (tur − 1);
+## zam lobi ayarıdır (world_settings "card_price_step": 0 / 2,5 / 5).
+const SHOP_PRICES := {"karalama": 15.0, "kaset": 40.0, "isyan": 25.0, "steal_weak": 10.0,
+	"steal_strong": 45.0, "populizm": 15.0, "anket": 10.0}
+const SHOP_ORDER := ["karalama", "kaset", "isyan", "steal_weak", "steal_strong", "populizm", "anket"]
 
-func can_extra_draw(peer_id: int) -> bool:
-	return extra_draw_block_reason(peer_id) == ""
+func card_price_step() -> float:
+	return float(MultiplayerManager.world_settings.get("card_price_step", MultiplayerManager.WORLD_DEFAULTS["card_price_step"]))
 
-## Ek çekim neden yapılamıyor ("" = yapılabilir).
-func extra_draw_block_reason(peer_id: int) -> String:
+func shop_price(card_type: String) -> float:
+	return float(SHOP_PRICES.get(card_type, 0.0)) + card_price_step() * float(maxi(0, round_number - 1))
+
+## Pazarda şu an satılan kartlar: meclis gerektirenler (vekil çalma, iç
+## karışıklık) ilk seçimden sonra, popülizm sürerken popülizm satılmaz.
+func shop_cards(peer_id: int) -> Array:
+	var result: Array = []
+	for card_type in SHOP_ORDER:
+		if card_type in ["steal_weak", "steal_strong", "isyan"] and last_seats.is_empty():
+			continue
+		if card_type == "populizm" and populism_rounds_left(peer_id) > 0:
+			continue
+		result.append(card_type)
+	return result
+
+## Satın alma neden yapılamıyor ("" = yapılabilir). card_type boşsa yalnız
+## pazarın açık olup olmadığına bakılır.
+func buy_block_reason(peer_id: int, card_type: String = "") -> String:
 	if peer_id != current_turn_peer_id() or is_turn_blocked() or game_finished:
 		return L.t("Sıra sende değil.")
 	if is_party_member(peer_id):
-		return L.t("Kartları partinin genel başkanı çeker.")
+		return L.t("Kartları partinin genel başkanı alır.")
 	if needs_turn_draw(peer_id):
 		return L.t("Önce bu sıranın kartını çek.")
-	if bool(_flow_value(peer_id, "extra_draw", false)):
-		return L.t("Bu sıra ek kartını çektin.")
 	if (inventories.get(peer_id, []) as Array).size() >= MAX_HAND_SIZE:
 		return L.t("Elin dolu.")
-	if funds_of(peer_id) < EXTRA_DRAW_COST:
-		return L.t("Parti kasası yetmiyor (%s gerekir).") % GameRules.cost_text(EXTRA_DRAW_COST)
+	if card_type == "":
+		return ""
+	if not shop_cards(peer_id).has(card_type):
+		return L.t("Bu kart şu an pazarda yok.")
+	if funds_of(peer_id) + 0.001 < shop_price(card_type):
+		return L.t("Parti kasası yetmiyor (%s gerekir).") % GameRules.cost_text(shop_price(card_type))
 	return ""
 
-func extra_draw() -> void:
+func can_buy_card(peer_id: int, card_type: String) -> bool:
+	return buy_block_reason(peer_id, card_type) == ""
+
+func buy_card(card_type: String) -> void:
 	var me := multiplayer.get_unique_id()
-	if not can_extra_draw(me):
+	if not can_buy_card(me, card_type):
 		return
 	if _is_authority():
-		_apply_extra_draw(me)
+		_apply_buy(me, card_type)
 	else:
-		_request_extra_draw.rpc_id(1)
+		_request_buy.rpc_id(1, card_type)
 
 @rpc("any_peer", "reliable")
-func _request_extra_draw() -> void:
+func _request_buy(card_type: String) -> void:
 	if MultiplayerManager.is_host:
-		_apply_extra_draw(multiplayer.get_remote_sender_id())
+		_apply_buy(multiplayer.get_remote_sender_id(), card_type)
 
-func _apply_extra_draw(peer_id: int) -> void:
-	if not can_extra_draw(peer_id):
+func _apply_buy(peer_id: int, card_type: String) -> void:
+	if not can_buy_card(peer_id, card_type):
 		return
+	var price := shop_price(card_type)
 	_note_main_action(peer_id)
-	funds[peer_id] = funds_of(peer_id) - EXTRA_DRAW_COST
-	_flow_for(peer_id)["extra_draw"] = true
-	var draws: Array = []
-	var messages: PackedStringArray = []
-	_resolve_draw(peer_id, CardPresets.weighted_pick(_draw_weights(peer_id), _rng), draws, messages)
-	_turn_time_left += DRAW_GRACE_SECONDS
-	var event := {"type": "draw", "peer_id": peer_id, "draws": draws, "extra": true}
-	if not messages.is_empty():
-		event["message"] = " ".join(messages)
-	_push_state(event)
+	funds[peer_id] = funds_of(peer_id) - price
+	if not inventories.has(peer_id):
+		inventories[peer_id] = []
+	(inventories[peer_id] as Array).append(card_type)
+	stat_add(peer_id, "bought")
+	_push_state({"type": "buy", "peer_id": peer_id, "card": card_type,
+		"message": L.t("%s pazardan bir kart aldı.") % _party_name(peer_id)})
 
 ## Çekilen kartı sınıfına göre işler: anında kart uygulanır, saklanabilir kart ele girer.
 func _resolve_draw(peer_id: int, card_type: String, draws: Array, messages: PackedStringArray) -> void:

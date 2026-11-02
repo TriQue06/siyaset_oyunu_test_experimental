@@ -29,6 +29,7 @@ const ICON_PATHS := {
 	"ballot": '<rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V5h8v6M10 8h4"/>',
 	"clock": '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/>',
 	"dice": '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h.01M15 15h.01M15 9h.01M9 15h.01M12 12h.01"/>',
+	"cards": '<rect x="4" y="6" width="10" height="14" rx="2" transform="rotate(-10 9 13)"/><rect x="10" y="4" width="10" height="14" rx="2" transform="rotate(8 15 11)"/>',
 }
 
 # Testlerin ve önizlemelerin eriştiği denetimler.
@@ -346,6 +347,20 @@ func _build_rules() -> Control:
 			row.add_child(button)
 			buttons.append(button)
 		world_choice_buttons[key] = buttons
+
+	# KART PAZARI (0.0.328): kart fiyatları her tur bu kadar milyon zamlanır.
+	var shop_body := _rule_section(box, "shop", "cards", L.t("Kart pazarı"))
+	shop_body.add_child(_row_name(L.t("Tur başına zam (milyon)")))
+	var shop_row := _seg_row()
+	shop_body.add_child(shop_row)
+	var step_buttons: Array = []
+	for value in MultiplayerManager.WORLD_OPTIONS["card_price_step"]:
+		var button := _seg_button(L.dec(float(value), 0 if is_equal_approx(fmod(float(value), 1.0), 0.0) else 1))
+		button.set_meta("value", value)
+		button.pressed.connect(func(): MultiplayerManager.set_world_setting("card_price_step", button.get_meta("value")))
+		shop_row.add_child(button)
+		step_buttons.append(button)
+	world_choice_buttons["card_price_step"] = step_buttons
 
 	# BOTLAR VE ODA
 	var bot_body := _rule_section(box, "bots", "bot", L.t("Botlar ve oda"))

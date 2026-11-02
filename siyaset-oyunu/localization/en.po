@@ -5771,3 +5771,30 @@ msgstr "A level 2 organization (%s) reveals the poll and your strength and makes
 
 msgid "Teşkilat etkisi"
 msgstr "Organization effect"
+
+msgid "KART PAZARI"
+msgstr "CARD MARKET"
+
+msgid "%d kart"
+msgstr "%d cards"
+
+msgid "Kartları partinin genel başkanı alır."
+msgstr "The party leader buys the cards."
+
+msgid "Bu kart şu an pazarda yok."
+msgstr "This card is not on the market right now."
+
+msgid "%s pazardan bir kart aldı."
+msgstr "%s bought a card at the market."
+
+msgid "ELİN"
+msgstr "HAND"
+
+msgid "AL · %s"
+msgstr "BUY · %s"
+
+msgid "Kart pazarı"
+msgstr "Card market"
+
+msgid "Tur başına zam (milyon)"
+msgstr "Price increase per round (million)"

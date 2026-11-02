@@ -641,12 +641,13 @@ static func _section_label(text: String) -> Label:
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return label
 
-## EK KART ÇEK (0.0.301): sırada ücretsiz çekimden sonra bir kez, ücretli.
-## 0.0.317: hamle alanında, MECLİS'in solunda yarım genişlik hamle düğmesi;
-## hep görünür, yapılamıyorsa sönük ve basınca nedeni yazar.
-var _extra_draw_button: Button
+## KART PAZARI (0.0.328, "bir kart daha çek"in yerine): hamle alanında,
+## MECLİS'in solunda yarım genişlik düğme; basınca pazar (CardShop) açılır.
+## Pazar kapalıysa (sıra sende değil, el dolu...) sönük, basınca nedeni yazar.
+var _shop_button: Button
+var _shop: CardShop
 
-func _build_extra_draw_button() -> Button:
+func _build_shop_button() -> Button:
 	var button := Button.new()
 	button.focus_mode = Control.FOCUS_NONE
 	button.custom_minimum_size = Vector2(0, ACTION_BUTTON_HEIGHT)
@@ -655,23 +656,31 @@ func _build_extra_draw_button() -> Button:
 	button.set_meta("action_color", ACTION_COLOR_DRAW)
 	button.add_theme_font_override("font", UiTheme.mono(true))
 	button.add_theme_font_size_override("font_size", ACTION_FONT_SIZE)
-	button.pressed.connect(func():
-		var reason := CardManager.extra_draw_block_reason(multiplayer.get_unique_id())
-		if reason != "":
-			_show_toast(reason)
-			return
-		CardManager.extra_draw())
+	button.pressed.connect(_open_shop)
 	return button
 
-func _refresh_extra_draw_button() -> void:
-	if _extra_draw_button == null:
+func _open_shop() -> void:
+	var reason := CardManager.buy_block_reason(multiplayer.get_unique_id())
+	if reason != "":
+		_show_toast(reason)
+		return
+	if is_instance_valid(_shop):
+		return
+	_deselect_hand_card()
+	_shop = CardShop.new()
+	_shop.hand_rect = func() -> Rect2: return hand_container.get_global_rect()
+	_shop.toast_requested.connect(_show_toast)
+	add_child(_shop)
+
+func _refresh_shop_button() -> void:
+	if _shop_button == null:
 		return
 	var me := multiplayer.get_unique_id()
-	var sub := GameRules.cost_text(CardManager.EXTRA_DRAW_COST)
-	if CardManager.current_turn_peer_id() == me and bool(CardManager._flow_value(me, "extra_draw", false)):
-		sub = L.t("bu sıra çektin")
-	_set_action_available(_extra_draw_button, CardManager.can_extra_draw(me))
-	_set_action_text(_extra_draw_button, L.t("BİR KART DAHA ÇEK"), sub)
+	_set_action_available(_shop_button, CardManager.buy_block_reason(me) == "")
+	_set_action_text(_shop_button, L.t("KART PAZARI"), L.t("%d kart") % CardManager.shop_cards(me).size())
+	# Sıra bitince ya da akış kilitlenince pazar kendiliğinden kapanır.
+	if is_instance_valid(_shop) and CardManager.current_turn_peer_id() != me:
+		_shop.close()
 
 ## Masanın bölüm başlıkları: ELİM · HAMLELER · SIRA.
 func _place_desk_labels() -> void:
@@ -714,7 +723,7 @@ func _refresh_desk_labels() -> void:
 	if _desk_labels.is_empty():
 		return
 	(_desk_labels["hand"] as Label).text = L.t("ELİM · %d KART") % CardManager.my_inventory().size()
-	_refresh_extra_draw_button()
+	_refresh_shop_button()
 	var peer_id := CardManager.current_turn_peer_id()
 	var turn_text := ""
 	if peer_id == multiplayer.get_unique_id():
@@ -4131,8 +4140,8 @@ func _build_action_buttons() -> void:
 	var top_row := HBoxContainer.new()
 	top_row.add_theme_constant_override("separation", ACTION_BUTTON_GAP)
 	actions_vbox.add_child(top_row)
-	_extra_draw_button = _build_extra_draw_button()
-	top_row.add_child(_extra_draw_button)
+	_shop_button = _build_shop_button()
+	top_row.add_child(_shop_button)
 	top_row.add_child(_parl_button)
 	_action_grid = GridContainer.new()
 	_action_grid.columns = 2
@@ -4292,7 +4301,7 @@ func _refresh_action_buttons() -> void:
 		_set_action_available(_aid_button, CardManager.can_aid(me))
 		_set_action_text(_aid_button, L.t("YARDIM"), L.t("afet var") if CardManager.has_disaster() else "")
 	_refresh_parliament_button()
-	_refresh_extra_draw_button()
+	_refresh_shop_button()
 
 func _build_agenda_banner() -> void:
 	_agenda_banner = PanelContainer.new()

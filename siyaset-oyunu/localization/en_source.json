@@ -1919,5 +1919,14 @@
 "Anket ve güç için 2. seviye teşkilat gerekli": "Polls and strength require a level 2 organization",
 "Burada teşkilatın yok. Kurmak %s: seçmen gruplarını gösterir, ildeki her şeyi ×1,5 güçlendirir.": "You have no organization here. Building one (%s) reveals the voter groups and makes everything in the province ×1.5 stronger.",
 "2. seviye teşkilat (%s) anketi ve gücünü gösterir, ildeki her şeyi ×3 güçlendirir.": "A level 2 organization (%s) reveals the poll and your strength and makes everything in the province ×3 stronger.",
-"Teşkilat etkisi": "Organization effect"
+"Teşkilat etkisi": "Organization effect",
+"KART PAZARI": "CARD MARKET",
+"%d kart": "%d cards",
+"Kartları partinin genel başkanı alır.": "The party leader buys the cards.",
+"Bu kart şu an pazarda yok.": "This card is not on the market right now.",
+"%s pazardan bir kart aldı.": "%s bought a card at the market.",
+"ELİN": "HAND",
+"AL · %s": "BUY · %s",
+"Kart pazarı": "Card market",
+"Tur başına zam (milyon)": "Price increase per round (million)"
 }

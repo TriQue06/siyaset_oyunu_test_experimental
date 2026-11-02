@@ -29,7 +29,11 @@ static func kind_of(card_type: String) -> String:
 		return "seats"
 	return "boost"
 
+## 0.0.328: kartın rengi kendi görselinden (bkz. CardPresets.art_color);
+## görseli olmayan kart için eski tür rengi.
 static func color_of(card_type: String) -> Color:
+	if CardPresets.has_full_art(card_type):
+		return CardPresets.art_color(card_type)
 	return KIND_COLORS.get(kind_of(card_type), Color("#8a8aa8"))
 
 func _draw() -> void:

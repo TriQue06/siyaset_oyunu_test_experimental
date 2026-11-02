@@ -82,8 +82,8 @@ var election_threshold: float = THRESHOLD_DEFAULT
 ## Oyun süresi: seçimler kaç turda bir ve kaç seçim olacak (bkz. GameRules.configure).
 var election_interval: float = GameRules.DEFAULT_ELECTION_INTERVAL
 ## Her oyun için rastgele ülke, il yoğunluğu, vekil sayıları ve tur kuralları.
-const WORLD_DEFAULTS := {"province_scale": 1.0, "province_seats": 300, "national_seats": 0, "turn_seconds": 90}
-const WORLD_OPTIONS := {"province_scale": [0.75, 1.0, 1.25], "province_seats": [150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750], "national_seats": [0, 50, 100, 150, 200, 250, 300], "turn_seconds": [60, 75, 90, 105, 120]}
+const WORLD_DEFAULTS := {"province_scale": 1.0, "province_seats": 300, "national_seats": 0, "turn_seconds": 90, "card_price_step": 2.5}
+const WORLD_OPTIONS := {"province_scale": [0.75, 1.0, 1.25], "province_seats": [150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750], "national_seats": [0, 50, 100, 150, 200, 250, 300], "turn_seconds": [60, 75, 90, 105, 120], "card_price_step": [0.0, 2.5, 5.0]}
 var world_settings: Dictionary = WORLD_DEFAULTS.duplicate()
 var vote_timeout: int = 30
 const VOTE_TIME_OPTIONS := [15, 30, 45, 60]
@@ -1081,6 +1081,9 @@ func _world_with(key: String, value: Variant) -> Dictionary:
 func _apply_world_settings(values: Dictionary) -> void:
 	for key in WORLD_DEFAULTS:
 		var value = values.get(key, WORLD_DEFAULTS[key])
+		# Kart pazarı zammı ondalıklıdır: JSON / ağdan tam sayı gelse de eşleşsin.
+		if WORLD_DEFAULTS[key] is float and (value is int or value is float):
+			value = float(value)
 		world_settings[key] = value if (WORLD_OPTIONS[key] as Array).has(value) else WORLD_DEFAULTS[key]
 	GameRules.TURN_TIMEOUT = float(world_settings["turn_seconds"])
 	ElectionModel.NATIONAL_LIST_SEATS = int(world_settings["national_seats"])

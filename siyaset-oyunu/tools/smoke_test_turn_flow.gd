@@ -98,15 +98,45 @@ func _initialize() -> void:
 	check("kart cekildi", not cm.needs_turn_draw(1) and not draws.is_empty(), str(draws))
 	cm._apply_draw(1)
 	check("ayni sirada ikinci cekim yok", cm.turn_draws(1) == draws)
-	# 0.0.301: ücretli EK kart (sırada bir kez, 20 M).
+	# 0.0.328: KART PAZARI (ek kart çekme yerine): taban fiyat + tur başına zam.
+	check("ek kart cekme kalkti", not cm.has_method("extra_draw") and not cm.has_method("can_extra_draw"))
+	check("el en fazla 7 kart", cm.MAX_HAND_SIZE == 7)
+	check("lobi zammi 0 / 2,5 / 5, varsayilan 2,5", mm.WORLD_OPTIONS["card_price_step"] == [0.0, 2.5, 5.0]
+		and is_equal_approx(float(mm.WORLD_DEFAULTS["card_price_step"]), 2.5))
+	check("taban fiyatlar", is_equal_approx(cm.SHOP_PRICES["anket"], 10.0) and is_equal_approx(cm.SHOP_PRICES["populizm"], 15.0)
+		and is_equal_approx(cm.SHOP_PRICES["steal_strong"], 45.0) and is_equal_approx(cm.SHOP_PRICES["steal_weak"], 10.0)
+		and is_equal_approx(cm.SHOP_PRICES["isyan"], 25.0) and is_equal_approx(cm.SHOP_PRICES["kaset"], 40.0)
+		and is_equal_approx(cm.SHOP_PRICES["karalama"], 15.0))
+	var hold_round: int = cm.round_number
+	cm.round_number = 5
+	check("her tur 2,5 milyon zam (5. tur: 15 + 4 x 2,5)", is_equal_approx(cm.shop_price("karalama"), 25.0), str(cm.shop_price("karalama")))
+	mm.world_settings["card_price_step"] = 5.0
+	check("zam 5 secilince 5. tur: 15 + 20", is_equal_approx(cm.shop_price("karalama"), 35.0))
+	mm.world_settings["card_price_step"] = 0.0
+	check("zam 0: fiyat sabit", is_equal_approx(cm.shop_price("karalama"), 15.0))
+	mm.world_settings["card_price_step"] = 2.5
+	cm.round_number = hold_round
+	check("ilk secimden once vekil calma ve ic karisiklik pazarda yok", not cm.shop_cards(1).has("steal_strong")
+		and not cm.shop_cards(1).has("isyan") and cm.shop_cards(1).has("karalama"))
 	var hold_funds: float = cm.funds_of(1)
 	var hold_hand: Array = (cm.inventories.get(1, []) as Array).duplicate()
-	cm.funds[1] = 25.0
-	check("ek kart cekilebilir", cm.can_extra_draw(1), cm.extra_draw_block_reason(1))
-	cm._apply_extra_draw(1)
-	check("ek kart 20 M", is_equal_approx(cm.funds_of(1), 5.0), str(cm.funds_of(1)))
+	cm.inventories[1] = []
 	cm.funds[1] = 100.0
-	check("ek kart sirada bir kez", not cm.can_extra_draw(1))
+	var price: float = cm.shop_price("anket")
+	cm._apply_buy(1, "anket")
+	cm._apply_buy(1, "anket")
+	check("pazardan kart alinir, kasadan duser, sirada adet siniri yok", cm.inventories[1].count("anket") == 2
+		and is_equal_approx(cm.funds_of(1), 100.0 - 2.0 * price), str(cm.funds_of(1)))
+	cm.funds[1] = 1.0
+	check("para yetmezse alinmaz", not cm.can_buy_card(1, "karalama"))
+	cm.funds[1] = 1000.0
+	for k in cm.MAX_HAND_SIZE:
+		cm._apply_buy(1, "karalama")
+	check("el dolunca alinmaz (7)", cm.inventories[1].size() == cm.MAX_HAND_SIZE and not cm.can_buy_card(1, "anket"))
+	give_turn(2)
+	check("sira baskasindayken pazar kapali", cm.buy_block_reason(1) != "")
+	give_turn(1)
+	cm._flow_for(1)["drawn"] = true
 	cm.funds[1] = hold_funds
 	cm.inventories[1] = hold_hand
 	# Yeniden bağlanma: durum paketlenip geri uygulanınca çekim hakkı geri gelmez.

@@ -142,6 +142,7 @@ const FULL_ART_PATH := "res://assets/cards/art/card_%s.png"
 const FULL_ART_ALIAS := {"parti_ici_karisiklik": "isyan"}
 var _full_art: Dictionary = {}
 var _art_edge: Dictionary = {}
+var _art_color: Dictionary = {}
 
 func _ready() -> void:
 	for card_type in CARD_TYPES:
@@ -151,6 +152,7 @@ func _ready() -> void:
 			_full_art[card_type] = tex
 			_card_textures[card_type] = tex
 			_art_edge[card_type] = _average_color(tex)
+			_art_color[card_type] = _vivid_color(tex)
 			continue
 		var path := "res://assets/cards/politic_card_%s.png" % String(CARD_ART_ALIAS.get(card_type, card_type))
 		if ResourceLoader.exists(path):
@@ -161,6 +163,35 @@ func _ready() -> void:
 ## Kartın tam görseli var mı? (Varsa kart yüzü görselin kendisidir.)
 func has_full_art(card_type: String) -> bool:
 	return _full_art.has(card_type)
+
+## KART RENGİ (0.0.328): kartın kendi görselinin baskın canlı tonu. Kurdele,
+## köşe taşları ve simge pulu bu renkte; tür (saldırı / destek...) ayrımı yok.
+func art_color(card_type: String) -> Color:
+	return _art_color.get(card_type, Color("#8a8aa8"))
+
+## Görselin baskın tonu: pikseller doygunluk × parlaklıkla ağırlıklanır (gri
+## ve karanlık alanlar rengi bulandırmasın); sonuç okunaklı bir doygunluk ve
+## parlaklığa getirilir (beyaz yazı üstünde okunur).
+static func _vivid_color(tex: Texture2D) -> Color:
+	var img := tex.get_image()
+	if img == null or img.is_empty():
+		return Color("#8a8aa8")
+	img = img.duplicate()
+	if img.is_compressed():
+		img.decompress()
+	img.resize(24, 36, Image.INTERPOLATE_BILINEAR)
+	var sum := Vector3.ZERO
+	var weight := 0.0
+	for y in img.get_height():
+		for x in img.get_width():
+			var c := img.get_pixel(x, y)
+			var w := c.s * c.s * c.v
+			sum += Vector3(c.r, c.g, c.b) * w
+			weight += w
+	if weight <= 0.0001:
+		return Color("#8a8aa8")
+	var avg := Color(sum.x / weight, sum.y / weight, sum.z / weight)
+	return Color.from_hsv(avg.h, clampf(avg.s * 1.25, 0.55, 0.85), clampf(avg.v, 0.6, 0.78))
 
 ## Kart kenar çizgisinin rengi: görselin ortalama rengi (biraz açılmış).
 func art_edge_color(card_type: String) -> Color:

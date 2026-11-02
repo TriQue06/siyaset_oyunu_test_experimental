@@ -6,7 +6,9 @@ extends Control
 ## ayrılır (köşelerde bölge adları); parti logoları kayar, arkalarında solan
 ## iz kalır. 0.0.325: bütün partiler AYNI ANDA hareket eder (adımlar tura göre
 ## birleşir, sıra sıra gösterilmez); eksen uçlarında grup pulu yok, bölgeler
-## sol üst kırmızı, sağ üst mavi, sol alt yeşil, sağ alt sarı. Sağda partiler ve bulundukları
+## sol üst kırmızı, sağ üst mavi, sol alt yeşil, sağ alt sarı. 0.0.326: yalnız
+## eksen panosu; yanında parti listesi ve düğme yok (kendi başına açıldığında
+## herhangi bir yere tıklamak kapatır). Sağda partiler ve bulundukları
 ## bölge. Veri: CardManager.axis_history.
 ## 0.0.314: oy grafiğiyle aynı oynatma: tek bir akan konum (kesirli adım),
 ## köşesiz (Catmull-Rom) yollar, durmadan ve daha kısa sürede.
@@ -38,8 +40,6 @@ var _rounds: Array = []
 var _turns: Dictionary = {}     # adım -> tur numarası
 var _map: _Map
 var _pawns: Dictionary = {}     # pid -> Control
-var _legend: VBoxContainer
-var _legend_rows: Dictionary = {}   # pid -> {"card", "where", "move"}
 var _round_label: Label
 var _p := 0.0                   # akan konum (adım indeksi, kesirli)
 var _speed := 1.0               # adım / sn
@@ -54,17 +54,20 @@ func _ready() -> void:
 		var shade := ColorRect.new()
 		shade.color = Color(UiTheme.FELT_DARK, 0.94)
 		shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(shade)
+		gui_input.connect(func(event: InputEvent):
+			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+				closed.emit()
+				queue_free())
 	_load_history()
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(center)
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 26)
-	center.add_child(row)
-	# Pano.
+	# Pano (tek başına; tıklama alttaki kapatma yüzeyine geçer).
 	var board := PanelContainer.new()
+	board.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var style := BoardBox.new()
 	style.fill = Color("f7eed8")
 	style.fill_bottom = Color("efe2c0")
@@ -76,11 +79,13 @@ func _ready() -> void:
 	style.shadow_size = 16
 	style.set_content_margin_all(18)
 	board.add_theme_stylebox_override("panel", style)
-	row.add_child(board)
+	center.add_child(board)
 	var col := VBoxContainer.new()
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_theme_constant_override("separation", 10)
 	board.add_child(col)
 	var head := HBoxContainer.new()
+	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	head.add_theme_constant_override("separation", 10)
 	col.add_child(head)
 	head.add_child(_text(L.t("Siyasi yolculuk"), true, 24, C_INK))
@@ -88,6 +93,7 @@ func _ready() -> void:
 	_round_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	head.add_child(_round_label)
 	_map = _Map.new()
+	_map.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_map.custom_minimum_size = Vector2(MAP + MARGIN * 2.0, MAP + MARGIN * 2.0)
 	_map.replay = self
 	col.add_child(_map)
@@ -98,37 +104,6 @@ func _ready() -> void:
 		pawn.hide()
 		_map.add_child(pawn)
 		_pawns[p["pid"]] = pawn
-	# Sağda partiler.
-	var side := VBoxContainer.new()
-	side.add_theme_constant_override("separation", 8)
-	side.custom_minimum_size.x = 250
-	side.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(side)
-	_legend = VBoxContainer.new()
-	_legend.add_theme_constant_override("separation", 7)
-	side.add_child(_legend)
-	var buttons := HBoxContainer.new()
-	buttons.add_theme_constant_override("separation", 8)
-	buttons.visible = not embedded
-	side.add_child(buttons)
-	var again := Button.new()
-	again.text = L.t("Yeniden oynat")
-	again.focus_mode = Control.FOCUS_NONE
-	UiSkin.skin_button(again)
-	again.pressed.connect(func():
-		_p = 0.0
-		_shown_step = -1
-		_playing = true)
-	buttons.add_child(again)
-	var close := Button.new()
-	close.text = L.t("Kapat")
-	close.focus_mode = Control.FOCUS_NONE
-	UiSkin.skin_color_button(close, UiTheme.GREEN_DARK)
-	close.pressed.connect(func():
-		closed.emit()
-		queue_free())
-	buttons.add_child(close)
-	_build_legend()
 	if _rounds.is_empty():
 		_round_label.text = L.t("kayıt yok")
 		_playing = false
@@ -241,7 +216,6 @@ func _process(delta: float) -> void:
 func _show_step(i: int) -> void:
 	var round_value := int(_rounds[i])
 	_round_label.text = L.t("%d. tur") % int(_turns.get(round_value, round_value))
-	_refresh_legend(i)
 
 ## İz: son TRAIL_STEPS adımın yolu, eskisi solarak (harita koordinatında örnekler).
 func trail_points(p: Dictionary) -> Array:
@@ -252,56 +226,6 @@ func trail_points(p: Dictionary) -> Array:
 		var t := lerpf(from, _p, float(k) / float(count))
 		points.append(_map_at(p["values"], t))
 	return points
-
-func _build_legend() -> void:
-	for p in _parties:
-		var card := PanelContainer.new()
-		var box := BoardBox.new()
-		box.fill = Color("fffaf0")
-		box.set_radius(12)
-		box.rings = [[0.0, 1.5, Color("e3d5b0")]]
-		box.lips = [[3.0, Color("c9b689")]]
-		box.set_content_margin_all(7)
-		card.add_theme_stylebox_override("panel", box)
-		card.hide()
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 9)
-		card.add_child(row)
-		var logo := PartyBadge.build(p["data"], Vector2(28, 28), 64)
-		logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_child(logo)
-		var texts := VBoxContainer.new()
-		texts.add_theme_constant_override("separation", 1)
-		row.add_child(texts)
-		texts.add_child(_text(String(p["name"]), true, 15, C_INK))
-		var where := _text("", false, 11, C_MUTED)
-		texts.add_child(where)
-		var spacer := Control.new()
-		spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(spacer)
-		var move_label := _text("", false, 12, C_MUTED)
-		move_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		row.add_child(move_label)
-		_legend.add_child(card)
-		_legend_rows[p["pid"]] = {"card": card, "where": where, "move": move_label}
-
-func _refresh_legend(i: int) -> void:
-	for p in _parties:
-		var row: Dictionary = _legend_rows[p["pid"]]
-		var shown := i >= int(p["start"])
-		(row["card"] as Control).visible = shown
-		if not shown:
-			continue
-		var v: Vector2 = p["values"][i]
-		(row["where"] as Label).text = "%s %s" % [L.t("Muhafazakâr") if v.y >= 0.0 else L.t("İlerici"), L.t("sağ") if v.x >= 0.0 else L.t("sol")]
-		# Bu adımdaki kayma (konsept: "↑ muhafazakâr").
-		var move := "—"
-		if i > int(p["start"]):
-			var d: Vector2 = v - (p["values"][i - 1] as Vector2)
-			if d.length() >= 0.02:
-				move = ("↑ " + L.t("muhafazakâr") if d.y > 0.0 else "↓ " + L.t("ilerici")) if absf(d.y) > absf(d.x) \
-					else ("→ " + L.t("sağ") if d.x > 0.0 else "← " + L.t("sol"))
-		(row["move"] as Label).text = move
 
 static func _text(text: String, display: bool, size_px: int, color: Color) -> Label:
 	var label := Label.new()

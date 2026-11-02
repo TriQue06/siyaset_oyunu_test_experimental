@@ -3,8 +3,10 @@ extends Control
 ## SİYASİ YOLCULUK (0.0.304, politik eksen konsepti A "Masa haritası", bkz.
 ## konseptler/politik_eksen_konseptleri.html): oyun sonunda partilerin
 ## politik eksendeki yolu tur tur oynatılır. Kareli pano dört renkli bölgeye
-## ayrılır (köşelerde bölge adları), eksen uçlarında grup pulları; parti
-## logoları kayar, arkalarında solan iz kalır. Sağda partiler ve bulundukları
+## ayrılır (köşelerde bölge adları); parti logoları kayar, arkalarında solan
+## iz kalır. 0.0.325: bütün partiler AYNI ANDA hareket eder (adımlar tura göre
+## birleşir, sıra sıra gösterilmez); eksen uçlarında grup pulu yok, bölgeler
+## sol üst kırmızı, sağ üst mavi, sol alt yeşil, sağ alt sarı. Sağda partiler ve bulundukları
 ## bölge. Veri: CardManager.axis_history.
 ## 0.0.314: oy grafiğiyle aynı oynatma: tek bir akan konum (kesirli adım),
 ## köşesiz (Catmull-Rom) yollar, durmadan ve daha kısa sürede.
@@ -28,11 +30,12 @@ const PAWN := 34.0
 const C_TEAL := Color("1f6e70")
 const C_MUTED := Color("7a7166")
 const C_INK := Color("2d2a26")
-const QUADS := [[Color("e8f3e8"), "MUHAFAZAKÂR SOL"], [Color("e6eef8"), "MUHAFAZAKÂR SAĞ"],
-	[Color("fbe9ee"), "İLERİCİ SOL"], [Color("f3eafa"), "İLERİCİ SAĞ"]]
+const QUADS := [[Color("f2b8b0"), "MUHAFAZAKÂR SOL"], [Color("b9cff0"), "MUHAFAZAKÂR SAĞ"],
+	[Color("bfe1c0"), "İLERİCİ SOL"], [Color("f5df98"), "İLERİCİ SAĞ"]]
 
 var _parties: Array = []        # [{pid, name, color, data, path: [[round, Vector2]], values: [Vector2 her adımda], start}]
 var _rounds: Array = []
+var _turns: Dictionary = {}     # adım -> tur numarası
 var _map: _Map
 var _pawns: Dictionary = {}     # pid -> Control
 var _legend: VBoxContainer
@@ -88,11 +91,6 @@ func _ready() -> void:
 	_map.custom_minimum_size = Vector2(MAP + MARGIN * 2.0, MAP + MARGIN * 2.0)
 	_map.replay = self
 	col.add_child(_map)
-	for spec in [["dindar", Vector2(0.5, 0.0)], ["ilerici", Vector2(0.5, 1.0)], ["isci", Vector2(0.0, 0.5)], ["isveren", Vector2(1.0, 0.5)]]:
-		var icon := VoterGroupIcon.make(String(spec[0]), 34.0)
-		var at: Vector2 = spec[1]
-		icon.position = Vector2(MARGIN, MARGIN) + at * MAP - Vector2(17, 17) + (at - Vector2(0.5, 0.5)) * 2.0 * Vector2(MARGIN - 6.0, MARGIN - 6.0)
-		_map.add_child(icon)
 	for p in _parties:
 		var pawn := PartyBadge.build(p["data"], Vector2(PAWN, PAWN), 64)
 		pawn.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -155,6 +153,19 @@ func _load_history() -> void:
 				"icon_color": entry.get("icon_color", Color.WHITE)}})
 	_rounds = rounds.keys()
 	_rounds.sort()
+	# EŞZAMANLI (0.0.325): kayıt her sıradan sonra alınır; aynı turun adımları
+	# tek adımda birleşir (turun son kaydı), bütün partiler birlikte kayar.
+	var turn_of := {}
+	for s in CardManager.game_stats.get("steps", []):
+		turn_of[int(s[0])] = int(s[1])
+	var last_of_turn := {}
+	for r in _rounds:
+		last_of_turn[int(turn_of.get(int(r), int(r)))] = int(r)
+	_rounds = last_of_turn.values()
+	_rounds.sort()
+	_turns = {}
+	for t in last_of_turn.keys():
+		_turns[int(last_of_turn[t])] = int(t)
 	# Her adımda konum: eksik adım bir öncekiyle dolar; start = ilk kayıt.
 	for p in _parties:
 		var values: Array = []
@@ -229,18 +240,7 @@ func _process(delta: float) -> void:
 ## Tur yazısı ve sağdaki partiler (adım değişince).
 func _show_step(i: int) -> void:
 	var round_value := int(_rounds[i])
-	# Adım: [adım, tur, sırası biten parti] (game_stats.steps).
-	var actor := -1
-	var turn_no := round_value
-	for s in CardManager.game_stats.get("steps", []):
-		if int(s[0]) == round_value:
-			turn_no = int(s[1])
-			actor = int(s[2])
-	var actor_name := ""
-	for p in _parties:
-		if int(p["pid"]) == actor:
-			actor_name = String(p["name"])
-	_round_label.text = (L.t("%d. tur · %s") % [turn_no, actor_name]) if actor_name != "" else L.t("%d. tur") % turn_no
+	_round_label.text = L.t("%d. tur") % int(_turns.get(round_value, round_value))
 	_refresh_legend(i)
 
 ## İz: son TRAIL_STEPS adımın yolu, eskisi solarak (harita koordinatında örnekler).

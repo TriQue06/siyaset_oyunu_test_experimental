@@ -36,7 +36,8 @@ const LAND_FRACTION := 0.5
 ## Kırpılan haritada karanın çevresinde kalan deniz payı.
 const CROP_PAD := SPACING * 2.5
 ## Varsayılan il sayısı (province_scale 1); her 0.25 ölçek adımı 15 il.
-const PROVINCES := 50
+## 0.0.329: az 30, orta 45, çok 60 il.
+const PROVINCES := 45
 const PROVINCE_STEP := 60.0
 const MIN_PROVINCE_CELLS := 20
 ## Bu kadar hücreden büyük ada kendi ilidir; daha küçükleri en yakın ile bağlanır.
@@ -70,7 +71,7 @@ static func _generate(seed_value: int, province_scale: float = 1.0, seat_total: 
 	var open_sea := _open_sea(points, land, topo)
 	# 0.0.269: her il sayısı ayarında ortalama 5 il daha az; 0.0.276: bir il daha az.
 	# 0.0.279: ölçek ÇARPAN (Fazla 1.25 = daha çok il); önceden bölüyordu, ters çalışıyordu.
-	# 0.0.300: az 35, orta 50, çok 65 il (ölçek 0.75 / 1.0 / 1.25).
+	# 0.0.329: az 30, orta 45, çok 60 il (ölçek 0.75 / 1.0 / 1.25).
 	var count := maxi(6, int(roundf(PROVINCES + (province_scale - 1.0) * PROVINCE_STEP)))
 	# Büyüme bazı illeri yutabilir: sayı tutmazsa fark kadar düzeltilmiş
 	# tohumla yeniden büyütülür (en çok 5 deneme); hedefe en yakın sonuç kalır.

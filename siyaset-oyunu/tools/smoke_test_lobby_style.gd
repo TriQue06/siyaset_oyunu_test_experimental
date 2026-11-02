@@ -17,7 +17,7 @@ func run() -> void:
 	for i in 5:
 		await process_frame
 	check(lobby._sections.size() == 5, "five rule sections (0.0.328: card market)")
-	check(lobby.world_choice_buttons["card_price_step"].size() == 3 and lobby.world_choice_buttons["card_price_step"][1].text == "2,5", "card price step buttons (0 / 2,5 / 5)")
+	check(lobby.world_choice_buttons["card_price_step"].size() == 5 and lobby.world_choice_buttons["card_price_step"][2].text == "20", "card price step buttons (0 / 10 / 20 / 30 / 40)")
 	var open := 0
 	for id in lobby._sections:
 		if (lobby._sections[id]["body"] as Control).visible:

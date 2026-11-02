@@ -5798,3 +5798,6 @@ msgstr "Card market"
 
 msgid "Tur başına zam (milyon)"
 msgstr "Price increase per round (million)"
+
+msgid "Seçim başına zam (milyon)"
+msgstr "Price increase per election (million)"

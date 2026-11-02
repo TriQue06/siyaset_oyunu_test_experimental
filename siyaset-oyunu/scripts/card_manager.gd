@@ -156,6 +156,8 @@ var national_list: Dictionary = {}
 var round_number: int = 1
 ## Son seçimin yapıldığı tur (0 = henüz seçim yok) ve erken seçim olup olmadığı.
 var last_election_round: int = 0
+## Bu oyunda yapılmış seçim sayısı (kart pazarı zammı için, 0.0.329).
+var elections_held: int = 0
 var last_election_was_early: bool = false
 # peer_id -> float (yüzde, toplamı 100). Son seçimin sonucu.
 var last_vote_shares: Dictionary = {}
@@ -416,8 +418,9 @@ func _apply_draw(peer_id: int, automatic: bool = false) -> void:
 
 ## KART PAZARI (0.0.328, "bir kart daha çek"in yerine): sırası gelen oyuncu
 ## ele giren kartları parti kasasından satın alır; sırada adet sınırı yok, el
-## sınırı (MAX_HAND_SIZE) geçerli. Fiyat = taban + tur başına zam × (tur − 1);
-## zam lobi ayarıdır (world_settings "card_price_step": 0 / 2,5 / 5).
+## sınırı (MAX_HAND_SIZE) geçerli. Fiyat = taban + SEÇİM başına zam × yapılmış
+## seçim sayısı (0.0.329); zam lobi ayarıdır (world_settings "card_price_step":
+## 0 / 10 / 20 / 30 / 40 milyon, varsayılan 20).
 const SHOP_PRICES := {"karalama": 15.0, "kaset": 40.0, "isyan": 25.0, "steal_weak": 10.0,
 	"steal_strong": 45.0, "populizm": 15.0, "anket": 10.0}
 const SHOP_ORDER := ["karalama", "kaset", "isyan", "steal_weak", "steal_strong", "populizm", "anket"]
@@ -426,7 +429,7 @@ func card_price_step() -> float:
 	return float(MultiplayerManager.world_settings.get("card_price_step", MultiplayerManager.WORLD_DEFAULTS["card_price_step"]))
 
 func shop_price(card_type: String) -> float:
-	return float(SHOP_PRICES.get(card_type, 0.0)) + card_price_step() * float(maxi(0, round_number - 1))
+	return float(SHOP_PRICES.get(card_type, 0.0)) + card_price_step() * float(elections_held)
 
 ## Pazarda şu an satılan kartlar: meclis gerektirenler (vekil çalma, iç
 ## karışıklık) ilk seçimden sonra, popülizm sürerken popülizm satılmaz.
@@ -1945,6 +1948,7 @@ func init_game() -> void:
 	national_list = {}
 	round_number = 1
 	last_election_round = 0
+	elections_held = 0
 	last_election_was_early = false
 	last_vote_shares = {}
 	last_seats = {}
@@ -2058,6 +2062,7 @@ func abandon_game() -> void:
 	current_turn_index = 0
 	round_number = 1
 	last_election_round = 0
+	elections_held = 0
 	last_election_was_early = false
 	last_vote_shares = {}
 	last_seats = {}
@@ -4153,6 +4158,7 @@ func _hold_election(finished_round: int, early: bool) -> void:
 	for pid in party_ids():
 		election_groups[pid] = PartyManager.groups_of(pid).duplicate()
 	last_election_round = finished_round
+	elections_held += 1
 	# Anketler seçimle sıfırlanır: yeni anket yaptırılana kadar boş.
 	polls = {}
 	# Geçici partiler: süresi dolan fesheder; sonra
@@ -5268,6 +5274,7 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"round": round_number,
 		"turn_time_left": _turn_time_left,
 		"last_election_round": last_election_round,
+		"elections_held": elections_held,
 		"early": last_election_was_early,
 		"vote_shares": last_vote_shares,
 		"credibility": credibility,
@@ -5339,6 +5346,7 @@ func _apply_state(state: Dictionary) -> void:
 	_turn_deadline_ms = Time.get_ticks_msec() + int(float(state["turn_time_left"]) * 1000.0)
 	_turn_time_synced = float(state["turn_time_left"])
 	last_election_round = int(state["last_election_round"])
+	elections_held = int(state.get("elections_held", 0))
 	last_election_was_early = bool(state["early"])
 	last_vote_shares = state["vote_shares"]
 	credibility = state.get("credibility", {})

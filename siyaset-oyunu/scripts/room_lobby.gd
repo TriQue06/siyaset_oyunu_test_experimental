@@ -348,9 +348,9 @@ func _build_rules() -> Control:
 			buttons.append(button)
 		world_choice_buttons[key] = buttons
 
-	# KART PAZARI (0.0.328): kart fiyatları her tur bu kadar milyon zamlanır.
+	# KART PAZARI (0.0.329): kart fiyatları her SEÇİMDE bu kadar milyon zamlanır.
 	var shop_body := _rule_section(box, "shop", "cards", L.t("Kart pazarı"))
-	shop_body.add_child(_row_name(L.t("Tur başına zam (milyon)")))
+	shop_body.add_child(_row_name(L.t("Seçim başına zam (milyon)")))
 	var shop_row := _seg_row()
 	shop_body.add_child(shop_row)
 	var step_buttons: Array = []

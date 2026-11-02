@@ -101,21 +101,23 @@ func _initialize() -> void:
 	# 0.0.328: KART PAZARI (ek kart çekme yerine): taban fiyat + tur başına zam.
 	check("ek kart cekme kalkti", not cm.has_method("extra_draw") and not cm.has_method("can_extra_draw"))
 	check("el en fazla 7 kart", cm.MAX_HAND_SIZE == 7)
-	check("lobi zammi 0 / 2,5 / 5, varsayilan 2,5", mm.WORLD_OPTIONS["card_price_step"] == [0.0, 2.5, 5.0]
-		and is_equal_approx(float(mm.WORLD_DEFAULTS["card_price_step"]), 2.5))
+	check("0.0.329: lobi zammi secim basina 0 / 10 / 20 / 30 / 40, varsayilan 20", mm.WORLD_OPTIONS["card_price_step"] == [0.0, 10.0, 20.0, 30.0, 40.0]
+		and is_equal_approx(float(mm.WORLD_DEFAULTS["card_price_step"]), 20.0))
 	check("taban fiyatlar", is_equal_approx(cm.SHOP_PRICES["anket"], 10.0) and is_equal_approx(cm.SHOP_PRICES["populizm"], 15.0)
 		and is_equal_approx(cm.SHOP_PRICES["steal_strong"], 45.0) and is_equal_approx(cm.SHOP_PRICES["steal_weak"], 10.0)
 		and is_equal_approx(cm.SHOP_PRICES["isyan"], 25.0) and is_equal_approx(cm.SHOP_PRICES["kaset"], 40.0)
 		and is_equal_approx(cm.SHOP_PRICES["karalama"], 15.0))
-	var hold_round: int = cm.round_number
-	cm.round_number = 5
-	check("her tur 2,5 milyon zam (5. tur: 15 + 4 x 2,5)", is_equal_approx(cm.shop_price("karalama"), 25.0), str(cm.shop_price("karalama")))
-	mm.world_settings["card_price_step"] = 5.0
-	check("zam 5 secilince 5. tur: 15 + 20", is_equal_approx(cm.shop_price("karalama"), 35.0))
+	var hold_elections: int = cm.elections_held
+	cm.elections_held = 0
+	check("secim olmadan taban fiyat", is_equal_approx(cm.shop_price("karalama"), 15.0))
+	cm.elections_held = 2
+	check("her secim 20 milyon zam (2 secim: 15 + 40)", is_equal_approx(cm.shop_price("karalama"), 55.0), str(cm.shop_price("karalama")))
+	mm.world_settings["card_price_step"] = 40.0
+	check("zam 40 secilince 2 secim: 15 + 80", is_equal_approx(cm.shop_price("karalama"), 95.0))
 	mm.world_settings["card_price_step"] = 0.0
 	check("zam 0: fiyat sabit", is_equal_approx(cm.shop_price("karalama"), 15.0))
-	mm.world_settings["card_price_step"] = 2.5
-	cm.round_number = hold_round
+	mm.world_settings["card_price_step"] = 20.0
+	cm.elections_held = hold_elections
 	check("ilk secimden once vekil calma ve ic karisiklik pazarda yok", not cm.shop_cards(1).has("steal_strong")
 		and not cm.shop_cards(1).has("isyan") and cm.shop_cards(1).has("karalama"))
 	var hold_funds: float = cm.funds_of(1)

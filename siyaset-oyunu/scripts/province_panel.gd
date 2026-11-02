@@ -142,7 +142,8 @@ func _build_sections() -> void:
 			closed.emit())
 		return
 	var me := multiplayer.get_unique_id()
-	_build_profile()
+	if CardManager.sees_province_groups(me, province_id):
+		_build_profile()
 	if PartyManager.parties.has(CardManager.party_of(me)):
 		_build_appeal(me)
 		_build_intel(me)
@@ -161,7 +162,10 @@ func _build_intel(me: int) -> void:
 	_body.add_child(PopupKit.section(L.t("Senin teşkilatın"), L.t("sadece sen görürsün")))
 	_body.add_child(_level_row(level))
 	if level == 0:
-		_body.add_child(PopupKit.note(L.t("Burada teşkilatın yok. Kurmak %s: anketi açar, oy kazandırır. Miting ve karalama teşkilat ister.") % GameRules.cost_text(CardManager.org_cost_for(multiplayer.get_unique_id(), province_id))))
+		_body.add_child(PopupKit.note(L.t("Burada teşkilatın yok. Kurmak %s: seçmen gruplarını gösterir, ildeki her şeyi ×1,5 güçlendirir.") % GameRules.cost_text(CardManager.org_cost_for(multiplayer.get_unique_id(), province_id))))
+		return
+	if level < 2:
+		_body.add_child(PopupKit.note(L.t("2. seviye teşkilat (%s) anketi ve gücünü gösterir, ildeki her şeyi ×3 güçlendirir.") % GameRules.cost_text(CardManager.org_cost_for(me, province_id)), UiTheme.TEXT_DIM))
 		return
 	_build_poll(me, level)
 
@@ -215,7 +219,7 @@ func _build_poll(me: int, level: int) -> void:
 	var poll := CardManager.province_poll(me, province_id)
 	if poll.is_empty():
 		return
-	var accuracy := L.t("%90 doğru") if level >= 2 else L.t("yaklaşık")
+	var accuracy := L.t("%90 doğru")
 	_body.add_child(PopupKit.section(L.t("Anket · şimdi seçim olsa"), "%s ±%%%d" % [accuracy,
 		int(round(CardManager.poll_error(me, province_id) * 100.0))]))
 	var ids: Array = poll.keys()
@@ -238,8 +242,6 @@ func _build_poll(me: int, level: int) -> void:
 		var entry: Dictionary = poll[peer_id]
 		_body.add_child(PopupKit.party_row(PartyManager.data_of(peer_id), int(peer_id) == CardManager.party_of(me),
 			[L.t("%%%.0f") % float(entry["percent"]), str(int(entry["seats"]))], [44, 30]))
-	if level < 2:
-		_body.add_child(PopupKit.note(L.t("2. seviye teşkilat (%s) çok daha isabetli anket verir.") % GameRules.cost_text(CardManager.org_cost_for(me, province_id)), UiTheme.TEXT_DIM))
 
 func _columns_header() -> Control:
 	var row := HBoxContainer.new()
@@ -257,11 +259,10 @@ func _columns_header() -> Control:
 func _build_own(me: int) -> void:
 	var level := CardManager.organization_level(province_id, me)
 	_body.add_child(PopupKit.section(L.t("Sen bu ilde")))
-	_body.add_child(PopupKit.kv(L.t("Sana bağlı seçmen"), L.t("%%%s") % L.dec(CardManager.attached_share(me, province_id), 0), UiTheme.HEAD))
+	if level >= 2:
+		_body.add_child(PopupKit.kv(L.t("Sana bağlı seçmen"), L.t("%%%s") % L.dec(CardManager.attached_share(me, province_id), 0), UiTheme.HEAD))
 	if level > 0:
-		var mult := PublicOpinion.org_action_mult(level)
-		if not is_equal_approx(mult, 1.0):
-			_body.add_child(PopupKit.kv(L.t("Miting / karalama"), EffectWords.multiplier(mult), UiTheme.GREEN))
+		_body.add_child(PopupKit.kv(L.t("Teşkilat etkisi"), EffectWords.multiplier(PublicOpinion.org_action_mult(level)), UiTheme.GREEN))
 	else:
 		_body.add_child(PopupKit.kv(L.t("Miting / karalama"), L.t("teşkilat gerekli"), UiTheme.RED))
 	if level < GameRules.ORG_MAX_LEVEL:

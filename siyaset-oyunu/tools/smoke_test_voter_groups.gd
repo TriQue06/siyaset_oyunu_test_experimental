@@ -223,7 +223,7 @@ func _initialize() -> void:
 	cm.organizations[game_map.ids[4]] = {1: 2}
 	var g2 := float(cm.miting_group_gains(1, game_map.ids[4])[0]["gain"])
 	cm.organizations.erase(game_map.ids[4])
-	check("teskilat 0 / 1 / 2: etki 1x / 2x / 3,5x", g0 > 0.0 and near(g1, 2.0 * g0) and near(g2, 3.5 * g0), "%.3f / %.3f / %.3f" % [g0, g1, g2])
+	check("0.0.327 teskilat 0 / 1 / 2: etki 1x / 1,5x / 3x", g0 > 0.0 and near(g1, 1.5 * g0) and near(g2, 3.0 * g0), "%.3f / %.3f / %.3f" % [g0, g1, g2])
 	# 0.0.282: hedef grup sayısı teşkilattan bağımsız: ortalamanın altında vekil 1, üstünde 2.
 	var slots_ok := true
 	for pid in game_map.ids:

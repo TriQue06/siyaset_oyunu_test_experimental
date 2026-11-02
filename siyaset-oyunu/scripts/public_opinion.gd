@@ -30,7 +30,9 @@ const VOTER_LOSS := 0.02
 # --- Miting -----------------------------------------------------------------
 ## TEŞKİLAT (0.0.213): miting teşkilat istemez ama teşkilatsız miting az getirir.
 ## Seviye 0 / 1 / 2 → etki 1x / 2x / 3x; seviye kadar grup ODAĞI seçilebilir.
-const MITING_ORG_MULT := [1.0, 2.0, 3.5]  # 0.0.227: 2. seviye 3 -> 3,5
+## 0.0.327: TEŞKİLAT ÇARPANI tek tablo — ildeki BÜTÜN olaylara (miting,
+## karalama, yatırım, afet yardımı...) 1. seviye ×1,5, 2. seviye ×3 (ORG_ACTION_MULT).
+const MITING_ORG_MULT := [1.0, 1.5, 3.0]
 ## ULUSAL HİTAP: miting ildeki HER grubun bir kısmını kazanır, il nüfusuyla
 ## orantılı: gruptaki kazanç (yüzde puan) = MITING_CONVERT × teşkilat çarpanı ×
 ## ildeki grup seçmeni / ülkedeki grup seçmeni × 100. Odak gruplarda
@@ -110,7 +112,7 @@ const ORG_ACTIVITY_BY_LEVEL := [0.0, 2.5, 8.0]  # 0.0.227: 2. seviye 6 -> 8
 ## 2. seviye teşkilatın olduğu ilde miting ve karalama biraz daha vurur.
 ## (Seviye 0 zaten hamle yapamaz; çarpanı 1.0 bırakıyoruz ki kural tek yerde
 ## dursun ve yanlışlıkla "etkisiz miting" oluşmasın.)
-const ORG_ACTION_MULT := [1.0, 1.0, 1.5]  # 0.0.227: 2. seviye 1,3 -> 1,5
+const ORG_ACTION_MULT := [1.0, 1.5, 3.0]  # 0.0.327: ildeki bütün olaylar
 
 # --- Yasalar ------------------------------------------------------------------
 ## Yasa bir SEÇMEN GRUBUNU hedefler (gündemdeki çiftten). Etki ULUSALDIR ve

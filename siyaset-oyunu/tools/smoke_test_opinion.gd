@@ -294,7 +294,10 @@ func _initialize() -> void:
 	var org_before: float = cm.voter_total(3, ank)
 	cm._apply_organization(3, TestProvinces.id("ankara"))
 	check("teskilat kurulunca ilde secmen kazanilir", cm.voter_total(3, ank) > org_before)
-	check("teskilat: anket (sadece kurana)", not cm.province_poll(3, TestProvinces.id("ankara")).is_empty() and cm.province_poll(1, TestProvinces.id("ankara")).is_empty())
+	check("0.0.327 teskilat 1: anket yok, secmen gruplari (sadece kurana)", cm.province_poll(3, ank).is_empty() and cm.sees_province_groups(3, ank) and not cm.sees_province_groups(1, ank))
+	cm.funds[3] = 100.0
+	cm._apply_organization(3, ank)
+	check("0.0.327 teskilat 2: anket (sadece kurana)", not cm.province_poll(3, ank).is_empty() and cm.province_poll(1, ank).is_empty())
 	# Karalama artık teşkilat ister; 3 numaranın Ankara teşkilatı dursun.
 	cm.organizations = {TestProvinces.id("ankara"): {3: 1}}
 	# 0.0.237: karalama yine tek başına oynanır (il + parti).

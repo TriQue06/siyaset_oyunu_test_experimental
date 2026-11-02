@@ -43,17 +43,23 @@ static func fill_province(box: VBoxContainer, province_id: String, on_close: Cal
 	box.add_child(_chip_row(chips))
 
 	# 0.0.300: seçmen grupları anketin (sandık) üstünde.
+	# 0.0.327: seçmen grupları 1. seviye, anket ve kendi gücün 2. seviye teşkilatla.
 	box.add_child(_section(L.t("Seçmen grupları"), L.t("ilin nüfusu")))
-	var profile := CardManager.province_profile(province_id)
-	var shares := {}
-	for group in VoterGroups.GROUP_IDS:
-		shares[group] = VoterGroups.share(profile, group) * 100.0
-	box.add_child(_tokens(shares, shares))
+	if CardManager.sees_province_groups(me, province_id):
+		var profile := CardManager.province_profile(province_id)
+		var shares := {}
+		for group in VoterGroups.GROUP_IDS:
+			shares[group] = VoterGroups.share(profile, group) * 100.0
+		box.add_child(_tokens(shares, shares))
+	else:
+		box.add_child(_locked(L.t("1. seviye teşkilat gerekli")))
 
 	box.add_child(_section(L.t("Sandık")))
 	box.add_child(_province_ballot(province_id, me, results))
 
-	if PartyManager.parties.has(CardManager.party_of(me)):
+	if not CardManager.sees_province_strength(me, province_id):
+		box.add_child(_locked(L.t("Anket ve güç için 2. seviye teşkilat gerekli")))
+	elif PartyManager.parties.has(CardManager.party_of(me)):
 		box.add_child(_section(L.t("Bu ilde sen")))
 		box.add_child(_standing(province_id, me))
 	box.add_child(_section(L.t("Son olaylar")))
@@ -138,6 +144,14 @@ static func _ballot_row() -> HBoxContainer:
 	return row
 
 ## BU İLDE SEN: ildeki seçmenin ne kadarının sana bağlı olduğu.
+## Teşkilat yetmediği için kapalı bilgi: kısa, soluk bir satır.
+static func _locked(text: String) -> Control:
+	var card := _card()
+	var label := _lbl(text, 13, UiTheme.TEXT_MUTED, false, true)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	card.add_child(label)
+	return card
+
 static func _standing(province_id: String, me: int) -> Control:
 	var card := _card()
 	var row := HBoxContainer.new()

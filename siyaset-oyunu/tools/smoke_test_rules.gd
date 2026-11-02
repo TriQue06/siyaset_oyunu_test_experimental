@@ -347,14 +347,14 @@ func _initialize() -> void:
 	cm._apply_organization(1, TestProvinces.id("ankara"))
 	check("teskilat kuruldu, para harcandi; para bitti -> sira devretmez", cm.organization_level(TestProvinces.id("ankara"), 1) == 1 		and cm.funds_of(1) == 0 and cm.current_turn_peer_id() == 1)
 	cm.current_turn_index = cm.turn_order.find(1)
-	check("teskilat 1: ilde secmen + yaklasik anket (sadece kurana)", cm.voter_total(1, TestProvinces.id("ankara")) > org_voters \
-		and cm.poll_error(1, TestProvinces.id("ankara")) == GameRules.POLL_ERROR_LOW \
-		and not cm.province_poll(1, TestProvinces.id("ankara")).is_empty() and cm.province_poll(2, TestProvinces.id("ankara")).is_empty())
+	check("0.0.327 teskilat 1: ilde secmen + secmen gruplari gorunur, anket yok", cm.voter_total(1, TestProvinces.id("ankara")) > org_voters
+		and cm.sees_province_groups(1, TestProvinces.id("ankara")) and not cm.sees_province_groups(2, TestProvinces.id("ankara"))
+		and not cm.sees_province_strength(1, TestProvinces.id("ankara")) and cm.province_poll(1, TestProvinces.id("ankara")).is_empty())
 	check("para yetmezse kurulamaz", not cm.can_build_organization(1, TestProvinces.id("izmir")))
 	cm.funds[1] = 50
 	for i in 5:
 		cm._apply_organization(1, TestProvinces.id("izmir"))
-	check("en fazla ORG_MAX_LEVEL (10 + 30 milyon)", cm.organization_level(TestProvinces.id("izmir"), 1) == GameRules.ORG_MAX_LEVEL and cm.funds_of(1) == 50 - GameRules.ORG_FUNDS_COST - GameRules.ORG_UPGRADE_FUNDS_COST,
+	check("en fazla ORG_MAX_LEVEL (5 + 20 milyon)", cm.organization_level(TestProvinces.id("izmir"), 1) == GameRules.ORG_MAX_LEVEL and cm.funds_of(1) == 50 - GameRules.ORG_FUNDS_COST - GameRules.ORG_UPGRADE_FUNDS_COST,
 		"seviye %d, para %d" % [cm.organization_level(TestProvinces.id("izmir"), 1), cm.funds_of(1)])
 	check("seviye arttikca secmen kazanci artar", PublicOpinion.org_activity(1) < PublicOpinion.org_activity(2))
 	var poll3: Dictionary = cm.province_poll(1, TestProvinces.id("izmir"))
@@ -365,8 +365,9 @@ func _initialize() -> void:
 		and poll_seats == cm.province_seat_count(TestProvinces.id("izmir")), str(poll3))
 	check("anket ayni turda degismez", str(cm.province_poll(1, TestProvinces.id("izmir"))) == str(poll3))
 	cm.organizations[TestProvinces.id("izmir")][1] = 1
-	check("teskilat 1: yaklasik anket (2. seviyeden az isabetli)", cm.poll_error(1, TestProvinces.id("izmir")) == GameRules.POLL_ERROR_LOW \
-		and GameRules.POLL_ERROR_LOW > GameRules.POLL_ERROR_HIGH and cm.poll_error(2, TestProvinces.id("izmir")) < 0.0)
+	check("teskilat 1: anket yok, guc gorunmez", cm.poll_error(1, TestProvinces.id("izmir")) < 0.0 and not cm.sees_province_strength(1, TestProvinces.id("izmir")))
+	check("0.0.327 teskilat degerleri: 5 / 20 milyon, gelir 1 / 5, etki x1,5 / x3", GameRules.ORG_FUNDS_COST == 5 and GameRules.ORG_UPGRADE_FUNDS_COST == 20
+		and str(GameRules.ORG_INCOME) == str([0.0, 1.0, 5.0]) and is_equal_approx(PublicOpinion.org_action_mult(1), 1.5) and is_equal_approx(PublicOpinion.org_action_mult(2), 3.0))
 	cm.organizations[TestProvinces.id("izmir")][1] = GameRules.ORG_MAX_LEVEL
 	cm.funds[1] = 1
 	check("para yetmezse miting yapilamaz", not cm.can_miting(1, TestProvinces.id("izmir")))

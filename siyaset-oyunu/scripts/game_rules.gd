@@ -135,11 +135,8 @@ static func money_text(value: float) -> String:
 const LAW_FUNDS_COST := 0
 const LAWS_PER_ROUND := 1
 ## Teşkilat anketinin sapması (her partinin oyu en fazla bu oranda sapar):
-## 1. seviye YAKLAŞIK oy (±%35), 2. seviye %90 doğruluk (±%10).
-const POLL_ERROR_LOW := 0.35
+## 0.0.327: yalnız 2. seviye teşkilat anket verir, %90 doğruluk (±%10).
 const POLL_ERROR_HIGH := 0.10
-## Teşkilatsız ilde il kartının kaba anketi (0.0.272).
-const POLL_ERROR_ROUGH := 0.5
 const MITING_FUNDS_COST := 15
 ## Yatırım (sadece hükümet partileri) ve gensoru (sadece muhalefet, hükümet
 ## azınlıktayken) hamleleri. Yatırımın asıl bedeli DEVLET HAZİNESİNDEN
@@ -176,11 +173,11 @@ const LAW_PASS_SCORE_GOV := 5
 const GOVERNMENT_FUNDS_BONUS := 10
 ## Teşkilat (0.0.227): kurmak (1. seviye) SABİT ORG_FUNDS_COST, geliştirmek
 ## (2. seviye) ORG_UPGRADE_FUNDS_COST. Kademeli artan fiyat kaldırıldı.
-const ORG_FUNDS_COST := 10
+const ORG_FUNDS_COST := 5
 ## TEŞKİLAT GELİRİ: her ildeki teşkilat tur başında yerel bağış getirir
-## (1. seviye +2,5, 2. seviye +8 milyon ¤). Üst sınır yok (0.0.227).
-const ORG_INCOME := [0.0, 2.5, 8.0]
-const ORG_UPGRADE_FUNDS_COST := 30
+## (0.0.327: 1. seviye +1, 2. seviye +5 milyon ¤). Üst sınır yok.
+const ORG_INCOME := [0.0, 1.0, 5.0]
+const ORG_UPGRADE_FUNDS_COST := 20
 
 ## Bu ildeki teşkilatı bir seviye ilerletmenin bedeli (current_level: şu anki
 ## seviye, owned: partinin teşkilatlı il sayısı). Tek doğru kaynak budur;

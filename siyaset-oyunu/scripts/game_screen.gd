@@ -5029,13 +5029,18 @@ func _apply_map_layer_colors() -> void:
 		for province_id in map_holder.get_all_province_ids():
 			match _map_layer:
 				MapLayer.GROUPS:
+					# 0.0.327: seçmen haritası yalnız teşkilatlı illerde (1. seviye).
+					if not CardManager.sees_province_groups(me, province_id):
+						colors[province_id] = MAP_UNKNOWN_COLOR
+						continue
 					var pct := float(VoterGroups.percent(CardManager.province_profile(province_id), _map_group))
 					var t := clampf((pct - span.x) / maxf(1.0, span.y - span.x), 0.0, 1.0)
 					colors[province_id] = _group_layer_tint(t)
 				MapLayer.ORGANIZATION:
 					colors[province_id] = _map_tint(mine, float(CardManager.organization_level(province_id, me)) / GameRules.ORG_MAX_LEVEL)
 				MapLayer.STRENGTH:
-					if projection.has(province_id):
+					# 0.0.327: güç haritası yalnız 2. seviye teşkilatlı illerde.
+					if projection.has(province_id) and CardManager.sees_province_strength(me, province_id):
 						colors[province_id] = gradient.sample((_strength_t(projection[province_id], me) + 1.0) * 0.5)
 					else:
 						colors[province_id] = MAP_UNKNOWN_COLOR

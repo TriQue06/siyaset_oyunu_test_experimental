@@ -538,14 +538,9 @@ func national_poll_snapshot(peer_id: int) -> Dictionary:
 func my_poll(peer_id: int) -> Dictionary:
 	return polls.get(peer_id, {})
 
-## İL KARTI ANKETİ (0.0.272): her ilde görünür; teşkilat isabeti artırır
-## (teşkilatsız: kaba tahmin, POLL_ERROR_ROUGH).
+## İL KARTI ANKETİ: 0.0.327'den beri yalnız 2. seviye teşkilatla (yoksa boş).
 func province_card_poll(peer_id: int, province_id: String) -> Dictionary:
-	var poll := province_poll(peer_id, province_id)
-	if not poll.is_empty():
-		return poll
-	return _noisy_poll(province_projection(province_id), GameRules.POLL_ERROR_ROUGH,
-		"%s:%d:%d:kaba" % [province_id, party_of(peer_id), round_number], province_seat_count(province_id), projected_eligible())
+	return province_poll(peer_id, province_id)
 
 ## AFET SAHNESİ bekleniyor mu? (Kart çekildikten sonra bir kez açılır; yardım
 ## ya da "şimdilik atla" ile kapanır. Sonra YARDIM hamlesi tur boyunca açık.)
@@ -1147,7 +1142,8 @@ func _apply_aid_move(peer_id: int, party_m: float, state_m: float) -> void:
 	active["aid"] = aid_map
 	var gain := Disaster.local_gain(prev, prev + total, provinces.size())
 	for province_id in provinces:
-		_add_local(String(province_id), peer_id, gain)
+		# 0.0.327: ildeki teşkilat yardımın etkisini büyütür (×1,5 / ×3).
+		_add_local(String(province_id), peer_id, gain * PublicOpinion.org_action_mult(organization_level(String(province_id), peer_id)))
 		_log_province(String(province_id), L.t("%s yardımı — %s getirdi (%s)") % [
 			Disaster.title(String(active["kind"])), _party_name(peer_id), Economy.money_full(total)])
 	_add_national(peer_id, Disaster.national_gain(prev, prev + total))
@@ -1638,17 +1634,19 @@ func group_closeness(a: int, b: int) -> float:
 func organization_level(province_id: String, peer_id: int) -> int:
 	return int(organizations.get(province_id, {}).get(party_of(peer_id), 0))
 
-## Teşkilat anketi (sadece o partinin arayüzü gösterir):
-##   1. seviye: YAKLAŞIK oy (±%35), 2. seviye: %90 doğrulukla oy (±%10).
+## İL BİLGİSİ TEŞKİLATA BAĞLI (0.0.327; sadece o partinin arayüzü gösterir):
+##   1. seviye: ilin SEÇMEN GRUPLARI görünür (seçmen haritası, profil),
+##   2. seviye: GÜÇ de görünür — partilerin ve kendi oy oranın (anket, güç
+##   haritası). Teşkilatsız ilde ikisi de kapalı.
+func sees_province_groups(peer_id: int, province_id: String) -> bool:
+	return organization_level(province_id, peer_id) >= 1 or PartyManager.is_independent(peer_id)
 
-## Anket sapması (−1: anket yok).
+func sees_province_strength(peer_id: int, province_id: String) -> bool:
+	return organization_level(province_id, peer_id) >= 2
+
+## Anket sapması (−1: anket yok). Yalnız 2. seviye teşkilat anket verir.
 func poll_error(peer_id: int, province_id: String) -> float:
-	match organization_level(province_id, peer_id):
-		1:
-			return GameRules.POLL_ERROR_LOW
-		2:
-			return GameRules.POLL_ERROR_HIGH
-	return -1.0
+	return GameRules.POLL_ERROR_HIGH if sees_province_strength(peer_id, province_id) else -1.0
 
 ## Teşkilat anketi: gerçek tahmin, seviyeye göre gürültülü. Aynı turda aynı
 ## sonucu verir (her bakışta değişmez). Anket yoksa boş sözlük.
@@ -2488,7 +2486,8 @@ func _apply_investment(peer_id: int, province_id: String, amount: float = Econom
 		share_total += float(shares[pid])
 	var later := {}
 	for pid in shares.keys():
-		parts[int(pid)] = float(shares[pid]) / maxf(0.0001, share_total)
+		# 0.0.327: her partinin ildeki teşkilatı payını büyütür (×1,5 / ×3).
+		parts[int(pid)] = float(shares[pid]) / maxf(0.0001, share_total) 			* PublicOpinion.org_action_mult(organization_level(province_id, int(pid)))
 		later[pid] = float(parts[int(pid)]) * scale * (1.0 - Economy.INVEST_IMMEDIATE) / float(Economy.INVEST_DELAY_ROUNDS)
 	_vb_invest(province_id, parts, scale * Economy.INVEST_IMMEDIATE)
 	if Economy.INVEST_IMMEDIATE < 1.0:

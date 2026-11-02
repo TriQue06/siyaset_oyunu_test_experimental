@@ -432,13 +432,13 @@ func _initialize() -> void:
 	check("ilk teşkilat sabit bedel", near(cm.org_cost_for(1), float(GameRules.ORG_FUNDS_COST)))
 	for i in 12:
 		cm.organizations[String(cm._province_ids[i])] = {cm.party_of(1): 1}
-	check("12 teşkilatlı partiye de yeni teşkilat 10", near(cm.org_cost_for(1), float(GameRules.ORG_FUNDS_COST)), str(cm.org_cost_for(1)))
+	check("12 teşkilatlı partiye de yeni teşkilat aynı bedel", near(cm.org_cost_for(1), float(GameRules.ORG_FUNDS_COST)), str(cm.org_cost_for(1)))
 	give_turn(1)
-	cm.funds[1] = 9.0
+	cm.funds[1] = GameRules.ORG_FUNDS_COST - 1.0
 	check("bedel yetmezse teşkilat kurulamaz", not cm.can_build_organization(1, String(cm._province_ids[20])))
 	cm.funds[1] = 50.0
 	cm._apply_organization(1, String(cm._province_ids[20]))
-	check("kurulunca sabit bedel (10) düşer", near(cm.funds_of(1), 50.0 - 10.0), str(cm.funds_of(1)))
+	check("kurulunca sabit bedel düşer", near(cm.funds_of(1), 50.0 - GameRules.ORG_FUNDS_COST), str(cm.funds_of(1)))
 
 	print("")
 	if fails == 0:

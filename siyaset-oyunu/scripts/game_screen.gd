@@ -3858,10 +3858,6 @@ func _refresh_proposer_chip() -> void:
 		_proposer_chip = _corner_chip()
 		_proposer_row = _proposer_chip.get_child(0)
 		_proposer_stack.add_child(_proposer_chip)
-		# 0.0.268: yasanın seçmen grubu, getiren partinin kartının altında
-		# birebir aynı kartta.
-		_law_group_chip = _corner_chip()
-		_proposer_stack.add_child(_law_group_chip)
 	var peer_id := GovernmentManager.proposal_peer_id
 	var active: bool = GovernmentManager.is_voting() and peer_id != -1
 	_proposer_stack.visible = active
@@ -3871,126 +3867,164 @@ func _refresh_proposer_chip() -> void:
 	# yer bırakıyor, daha yükseği koltukların üstüne biniyor.
 	_fill_corner_chip(_proposer_chip, PartyBadge.build(PartyManager.data_of(peer_id),
 		Vector2(22, 22), BADGE_ICON_PIXEL_SIZE), _party_name_of(peer_id))
-	var law := CardPresets.law_data(GovernmentManager.proposal_law) 		if GovernmentManager.proposal_kind == GovernmentManager.KIND_LAW else {}
-	_law_group_chip.visible = not law.is_empty()
-	if not law.is_empty():
-		_fill_corner_chip(_law_group_chip, VoterGroupIcon.make(String(law["group"]), 22.0), String(law["group_title"]))
 	_proposer_stack.reset_size()
 	_refresh_change_stack()
 
 var _proposer_stack: VBoxContainer
-var _law_group_chip: PanelContainer
 
-## DEĞİŞİKLİK DETAYI (0.0.300): vergi ya da anayasa oylamasında meclis
-## diyagramının SAĞ ÜST köşesinde, soldaki parti ve grup kartlarıyla aynı
-## oyuk kartlarda: başlık kartı ve her değişen kural için "eski » yeni" kartı.
-var _change_stack: VBoxContainer
+## OYLAMA ŞERİDİ (0.0.330): anayasa, vergi ve grup yasası oylamasında meclis
+## panelinin EN ÜSTÜNDE boydan boya şerit: solda teal başlık (tür + getiren),
+## sağında her değişen kural kendi oyuğunda ("eski → yeni"). Yalnız neyin
+## oylandığı yazar; etki bilgisi yok. Meclis başlığı şerit varken gizlenir.
+var _change_band: HBoxContainer
 var _change_key := ""
 
 func _refresh_change_stack() -> void:
-	if _change_stack == null:
-		_change_stack = VBoxContainer.new()
-		_change_stack.add_theme_constant_override("separation", 4)
-		_change_stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		parliament_diagram.add_child(_change_stack)
-		# Sağ üst köşeye bağlı, sola doğru büyür (diyagram boyu değişse de yerinde).
-		_change_stack.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-		_change_stack.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-		_change_stack.offset_right = -6.0
-		_change_stack.offset_top = 6.0
-	# Yalnız büyük oylama görünümünde: sağ sütundaki küçük diyagramın üstünü örtmesin.
-	var rows := _proposal_change_rows() if _vote_swapped else []
-	_change_stack.visible = not rows.is_empty()
-	if rows.is_empty():
+	if _change_band == null:
+		var vbox := _parl_title.get_parent() if _parl_title != null else null
+		if vbox == null:
+			return
+		_change_band = HBoxContainer.new()
+		_change_band.add_theme_constant_override("separation", 6)
+		_change_band.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		vbox.add_child(_change_band)
+		vbox.move_child(_change_band, _parl_title.get_index() + 1)
+	# Yalnız büyük oylama görünümünde: sağ sütundaki küçük meclise şerit sığmaz.
+	var band := _proposal_band() if _vote_swapped else {}
+	_change_band.visible = not band.is_empty()
+	_parl_title.visible = band.is_empty()
+	if band.is_empty():
 		_change_key = ""
 		return
-	var key := str(rows)
-	if key != _change_key:
-		_change_key = key
-		for child in _change_stack.get_children():
-			_change_stack.remove_child(child)
-			child.queue_free()
-		for row in rows:
-			_change_stack.add_child(_change_chip(row))
-	_place_change_stack()
-	_place_change_stack.call_deferred()
-
-func _place_change_stack() -> void:
-	if _change_stack == null:
+	var key := str(band)
+	if key == _change_key:
 		return
-	var size := _change_stack.get_combined_minimum_size()
-	_change_stack.offset_left = _change_stack.offset_right - size.x
-	_change_stack.offset_bottom = _change_stack.offset_top + size.y
+	_change_key = key
+	for child in _change_band.get_children():
+		_change_band.remove_child(child)
+		child.queue_free()
+	_change_band.add_child(_band_title_cell(String(band["title"]), String(band["by"])))
+	for cell in band["cells"]:
+		_change_band.add_child(_band_cell(cell))
 
-## [başlık, eski, yeni] satırları; ilk satır yalnız başlık ([başlık]).
-func _proposal_change_rows() -> Array:
-	if not GovernmentManager.is_voting():
-		return []
-	var rows: Array = []
-	if GovernmentManager.proposal_kind == GovernmentManager.KIND_LAW and CardPresets.is_tax_law(GovernmentManager.proposal_law):
-		var old := CardManager.tax_level()
-		var level := CardPresets.tax_law_level(GovernmentManager.proposal_law)
-		rows.append([L.t("VERGİ YASASI")])
-		rows.append([L.t("Vergi"), Economy.tax_title(old), Economy.tax_title(level)])
-		rows.append([L.t("Tur geliri"), Economy.money_full(CardManager.expected_revenue(old)), Economy.money_full(CardManager.expected_revenue(level))])
-	elif GovernmentManager.proposal_kind == GovernmentManager.KIND_CONSTITUTION:
-		var payload := GovernmentManager.proposal_assignments
-		rows.append([L.t("ANAYASA")])
-		var threshold := MultiplayerManager.snap_threshold(float(payload.get("threshold", MultiplayerManager.election_threshold)))
-		if not is_equal_approx(threshold, MultiplayerManager.election_threshold):
-			rows.append([L.t("Baraj"), "%%%s" % L.dec(MultiplayerManager.election_threshold, 1), "%%%s" % L.dec(threshold, 1)])
-		var interval := GameRules.snap_interval(float(payload.get("interval", MultiplayerManager.election_interval)))
-		if not is_equal_approx(interval, MultiplayerManager.election_interval):
-			rows.append([L.t("Seçim"), L.t("%s yılda") % GameRules.years_text(MultiplayerManager.election_interval),
-				L.t("%s yılda") % GameRules.years_text(interval)])
-		var method := String(payload.get("seat_method", MultiplayerManager.seat_method))
-		if method != MultiplayerManager.seat_method:
-			rows.append([L.t("Sayım"), ElectionModel.method_title(MultiplayerManager.seat_method), ElectionModel.method_title(method)])
-		if rows.size() == 1:
-			rows.append([L.t("Kurallar"), L.t("aynı"), L.t("aynı")])
-	return rows
+## {"title", "by", "cells"}; hücre: {"key", "old", "new"} (değişen kural) ya da
+## {"key", "text", "group"?, "ratio"?} (grup yasası: ad ve seçmen grubu).
+func _proposal_band() -> Dictionary:
+	if not GovernmentManager.is_voting() or GovernmentManager.proposal_peer_id == -1:
+		return {}
+	var by := L.t("%s getirdi") % _party_name_of(GovernmentManager.proposal_peer_id)
+	var cells: Array = []
+	if GovernmentManager.proposal_kind == GovernmentManager.KIND_LAW:
+		if CardPresets.is_tax_law(GovernmentManager.proposal_law):
+			cells.append({"key": L.t("Vergi"), "old": Economy.tax_title(CardManager.tax_level()),
+				"new": Economy.tax_title(CardPresets.tax_law_level(GovernmentManager.proposal_law))})
+			return {"title": L.t("VERGİ YASASI"), "by": by, "cells": cells}
+		var law := CardPresets.law_data(GovernmentManager.proposal_law)
+		if law.is_empty():
+			return {}
+		cells.append({"key": L.t("Yasa"), "text": L.t(String(law["title"])), "ratio": 2.6})
+		cells.append({"key": L.t("Seçmen grubu"), "text": String(law["group_title"]), "group": String(law["group"])})
+		return {"title": L.t("GRUP YASASI"), "by": by, "cells": cells}
+	if GovernmentManager.proposal_kind != GovernmentManager.KIND_CONSTITUTION:
+		return {}
+	var payload := GovernmentManager.proposal_assignments
+	var threshold := MultiplayerManager.snap_threshold(float(payload.get("threshold", MultiplayerManager.election_threshold)))
+	if not is_equal_approx(threshold, MultiplayerManager.election_threshold):
+		cells.append({"key": L.t("Baraj"), "old": "%%%s" % L.dec(MultiplayerManager.election_threshold, 1),
+			"new": "%%%s" % L.dec(threshold, 1)})
+	var interval := GameRules.snap_interval(float(payload.get("interval", MultiplayerManager.election_interval)))
+	if not is_equal_approx(interval, MultiplayerManager.election_interval):
+		cells.append({"key": L.t("Seçim sıklığı"), "old": L.t("%s yılda bir") % GameRules.years_text(MultiplayerManager.election_interval),
+			"new": L.t("%s yılda bir") % GameRules.years_text(interval)})
+	var method := String(payload.get("seat_method", MultiplayerManager.seat_method))
+	if method != MultiplayerManager.seat_method:
+		cells.append({"key": L.t("Sayım yöntemi"), "old": ElectionModel.method_title(MultiplayerManager.seat_method),
+			"new": ElectionModel.method_title(method)})
+	if cells.is_empty():
+		cells.append({"key": L.t("Kurallar"), "text": L.t("değişmiyor")})
+	return {"title": L.t("ANAYASA"), "by": by, "cells": cells}
 
-func _change_chip(row: Array) -> PanelContainer:
-	var chip := _corner_chip()
-	var line := chip.get_child(0) as HBoxContainer
-	if row.size() == 1:
-		var title := Label.new()
-		title.text = String(row[0])
-		title.add_theme_font_override("font", UiTheme.mono(true))
-		title.add_theme_font_size_override("font_size", 11)
-		title.add_theme_color_override("font_color", UiTheme.HEAD)
-		title.custom_minimum_size = Vector2(0, 22)
-		title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		line.add_child(title)
-		return chip
+func _band_title_cell(title: String, by: String) -> PanelContainer:
+	var cell := PanelContainer.new()
+	cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := UiSkin.chip_box(UiTheme.TEAL)
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 5
+	style.content_margin_bottom = 7
+	UiSkin.apply_style(cell, "panel", style)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 1)
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cell.add_child(box)
+	var head := Label.new()
+	head.text = title
+	head.add_theme_font_override("font", UiTheme.mono(true))
+	head.add_theme_font_size_override("font_size", 15)
+	head.add_theme_color_override("font_color", UiTheme.ON_COLOR)
+	box.add_child(head)
+	var sub := Label.new()
+	sub.text = by
+	sub.add_theme_font_size_override("font_size", 10)
+	sub.add_theme_color_override("font_color", Color(1, 1, 1, 0.85))
+	box.add_child(sub)
+	return cell
+
+func _band_cell(cell_data: Dictionary) -> PanelContainer:
+	var cell := PanelContainer.new()
+	cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cell.size_flags_stretch_ratio = float(cell_data.get("ratio", 1.0))
+	var style := UiSkin.groove()
+	style.content_margin_left = 10
+	style.content_margin_right = 10
+	style.content_margin_top = 5
+	style.content_margin_bottom = 5
+	UiSkin.apply_style(cell, "panel", style)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 2)
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cell.add_child(box)
 	var key := Label.new()
-	key.text = String(row[0])
-	key.add_theme_font_override("font", UiTheme.mono_regular())
-	key.add_theme_font_size_override("font_size", 10)
+	key.text = String(cell_data["key"]).to_upper()
+	key.add_theme_font_override("font", UiTheme.body_black())
+	key.add_theme_font_size_override("font_size", 9)
 	key.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
-	key.custom_minimum_size = Vector2(0, 22)
-	key.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	line.add_child(key)
-	var old := Label.new()
-	old.text = String(row[1])
-	old.add_theme_font_size_override("font_size", 11)
-	old.add_theme_color_override("font_color", UiTheme.TEXT_MUTED)
-	old.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	line.add_child(old)
-	var arrow := Label.new()
-	arrow.text = "»"
-	arrow.add_theme_font_size_override("font_size", 11)
-	arrow.add_theme_color_override("font_color", UiTheme.GOLD_DIM)
-	arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	line.add_child(arrow)
-	var new := Label.new()
-	new.text = String(row[2])
-	new.add_theme_font_override("font", UiTheme.mono(true))
-	new.add_theme_font_size_override("font_size", 11)
-	new.add_theme_color_override("font_color", UiTheme.TEXT)
-	new.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	line.add_child(new)
-	return chip
+	box.add_child(key)
+	var value := RichTextLabel.new()
+	value.bbcode_enabled = true
+	value.fit_content = true
+	value.scroll_active = false
+	value.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	value.add_theme_font_override("normal_font", UiTheme.body_black())
+	value.add_theme_font_size_override("normal_font_size", 12)
+	value.add_theme_color_override("default_color", UiTheme.TEXT)
+	var big := "[font=%s][font_size=15][color=#%s]%%s[/color][/font_size][/font]" % [UiTheme.FONT_MONO_BOLD, UiTheme.TEAL.to_html(false)]
+	if cell_data.has("old"):
+		value.autowrap_mode = TextServer.AUTOWRAP_OFF
+		value.text = "[color=#%s][s]%s[/s][/color]  [color=#%s]→[/color]  %s" % [UiTheme.TEXT_MUTED.to_html(false),
+			_bb_safe(String(cell_data["old"])), UiTheme.GOLD_DIM.to_html(false), big % _bb_safe(String(cell_data["new"]))]
+		box.add_child(value)
+		return cell
+	value.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	value.text = big % _bb_safe(String(cell_data["text"]))
+	if cell_data.has("group"):
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 5)
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(VoterGroupIcon.make(String(cell_data["group"]), 20.0))
+		value.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		value.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(value)
+		box.add_child(row)
+	else:
+		box.add_child(value)
+	return cell
+
+static func _bb_safe(text: String) -> String:
+	return text.replace("[", "[lb]")
 
 func _corner_chip() -> PanelContainer:
 	var chip := PanelContainer.new()

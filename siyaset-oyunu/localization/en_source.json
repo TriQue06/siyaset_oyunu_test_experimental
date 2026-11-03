@@ -1929,5 +1929,12 @@
 "AL · %s": "BUY · %s",
 "Kart pazarı": "Card market",
 "Tur başına zam (milyon)": "Price increase per round (million)",
-"Seçim başına zam (milyon)": "Price increase per election (million)"
+"Seçim başına zam (milyon)": "Price increase per election (million)",
+"%s getirdi": "proposed by %s",
+"Seçmen grubu": "Voter group",
+"Seçim sıklığı": "Election cycle",
+"Sayım yöntemi": "Seat method",
+"değişmiyor": "unchanged",
+"%s yılda bir": "every %s years",
+"EVET %d / gereken %d (2/3) · %s kaldı%s": "YES %d / needed %d (2/3) · %s left%s"
 }

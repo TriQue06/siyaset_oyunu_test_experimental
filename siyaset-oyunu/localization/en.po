@@ -5801,3 +5801,24 @@ msgstr "Price increase per round (million)"
 
 msgid "Seçim başına zam (milyon)"
 msgstr "Price increase per election (million)"
+
+msgid "%s getirdi"
+msgstr "proposed by %s"
+
+msgid "Seçmen grubu"
+msgstr "Voter group"
+
+msgid "Seçim sıklığı"
+msgstr "Election cycle"
+
+msgid "Sayım yöntemi"
+msgstr "Seat method"
+
+msgid "değişmiyor"
+msgstr "unchanged"
+
+msgid "%s yılda bir"
+msgstr "every %s years"
+
+msgid "EVET %d / gereken %d (2/3) · %s kaldı%s"
+msgstr "YES %d / needed %d (2/3) · %s left%s"

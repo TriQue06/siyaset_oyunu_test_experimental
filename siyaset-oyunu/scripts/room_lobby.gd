@@ -364,18 +364,14 @@ func _build_rules() -> Control:
 
 	# BOTLAR VE ODA
 	var bot_body := _rule_section(box, "bots", "bot", L.t("Botlar ve oda"))
-	random_parties_check = _switch(L.t("Yeni partiler katılabilir"),
-		L.t("Açıksa seçimlerden sonra arada bir yeni bir parti (bot) kurulur; bir iki seçim sonra kendini fesheder."))
+	random_parties_check = _switch(L.t("Yeni partiler katılabilir"))
 	random_parties_check.toggled.connect(func(on: bool): MultiplayerManager.set_random_parties(on))
 	bot_body.add_child(random_parties_check)
-	away_bot_check = _switch(L.t("Yerine bot oynasın"),
-		L.t("Bağlantısı kopan oyuncunun yerine bot oynar ya da dönene kadar pasif kalır (sırası geçer, oylarda çekimser). Aynı cihazdan odaya yeniden katılınca kaldığı yerden devam eder."))
+	away_bot_check = _switch(L.t("Yerine bot oynasın"))
 	away_bot_check.toggled.connect(func(on: bool): MultiplayerManager.set_away_mode(
 		MultiplayerManager.AWAY_BOT if on else MultiplayerManager.AWAY_PASSIVE))
 	bot_body.add_child(away_bot_check)
 	var funds_name := _row_name(L.t("Bot gelir zayıflatması"))
-	funds_name.tooltip_text = L.t("Botların dönemlik geliri ve bağış kampanyaları seçilen tutar kadar (¤ M) azalır. 0 = zayıflatma yok.")
-	funds_name.mouse_filter = Control.MOUSE_FILTER_PASS
 	bot_body.add_child(funds_name)
 	var funds_row := _seg_row()
 	bot_body.add_child(funds_row)
@@ -934,10 +930,9 @@ func _mark_seg(button: Button, on: bool, locked: bool) -> void:
 func _slider() -> HSlider:
 	return VectorSlider.new()
 
-func _switch(text: String, tip: String) -> CheckButton:
+func _switch(text: String) -> CheckButton:
 	var check := VectorSwitch.new()
 	check.text = text
-	check.tooltip_text = tip
 	check.focus_mode = Control.FOCUS_NONE
 	check.add_theme_font_override("font", UiTheme.mono(true))
 	check.add_theme_font_size_override("font_size", 15)

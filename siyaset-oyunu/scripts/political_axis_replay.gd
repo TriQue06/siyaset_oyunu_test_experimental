@@ -105,6 +105,7 @@ func _ready() -> void:
 		_map.add_child(pawn)
 		_pawns[p["pid"]] = pawn
 	if _rounds.is_empty():
+		set_process(false)
 		_round_label.text = L.t("kayıt yok")
 		_playing = false
 		if embedded:
@@ -197,6 +198,7 @@ func _process(delta: float) -> void:
 	if _playing:
 		_p = minf(_p + delta * _speed, float(_rounds.size() - 1))
 		if _p >= float(_rounds.size() - 1):
+			set_process(false)
 			_playing = false
 			if embedded:
 				get_tree().create_timer(2.0).timeout.connect(func():

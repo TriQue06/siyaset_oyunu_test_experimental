@@ -143,15 +143,15 @@ func _process(delta: float) -> void:
 		return
 	if not _finished:
 		_t = minf(_t + delta, DURATION)
-	# Her karede: sayım, harita ve meclis kare hızında akar.
-	_refresh_left -= delta
-	_map_refresh_left -= delta
-	if _refresh_left <= 0.0:
-		_refresh_left = REFRESH_INTERVAL
-		_refresh()
-	if _map_refresh_left <= 0.0:
-		_map_refresh_left = 0.18
-		_refresh_map()
+		# Her karede: sayım, harita ve meclis kare hızında akar.
+		_refresh_left -= delta
+		_map_refresh_left -= delta
+		if _refresh_left <= 0.0:
+			_refresh_left = REFRESH_INTERVAL
+			_refresh()
+		if _map_refresh_left <= 0.0 or _finished:
+			_map_refresh_left = 0.18
+			_refresh_map()
 	_animate(delta)
 
 	if _finished and not _leaving:
@@ -174,22 +174,18 @@ func _refresh() -> void:
 	_clock.text = "%02d:%02d" % [(minutes / 60) % 24, minutes % 60]
 
 	var national: Dictionary = _sample["national"]
-	var ranked: Array = _sim.peer_ids.duplicate()
+	var ranked: Array = _party_order.duplicate() if _targets.is_empty() else _targets.keys()
 	if counted > 0.0:
-		# HİSTEREZİS: oyları neredeyse eşit iki parti her karede yer değiştirip
-		# satırları yarı yolda bırakıyordu; fark RANK_HYSTERESIS'i geçmedikçe
-		# önceki sıra korunur.
-		ranked.sort_custom(func(a, b):
-			var diff := float(national[a]) - float(national[b])
-			if absf(diff) > (0.0 if _finished else RANK_HYSTERESIS):
-				return diff > 0.0
-			var ra := float(_targets.get(a, {}).get("rank", 0.0))
-			var rb := float(_targets.get(b, {}).get("rank", 0.0))
-			if ra != rb:
-				return ra < rb
-			return int(a) < int(b))
-	else:
-		ranked = _party_order.duplicate()
+		# Önceki sıradan başla. İki komşu ancak fark eşiğini aşınca yer değiştirir.
+		var margin := 0.0 if _t >= DURATION else RANK_HYSTERESIS
+		for i in range(1, ranked.size()):
+			var peer = ranked[i]
+			var j := i
+			while j > 0 and float(national[peer]) > float(national[ranked[j - 1]]) + margin:
+				ranked[j] = ranked[j - 1]
+				j -= 1
+			ranked[j] = peer
+	_targets.clear()
 	var seats: Dictionary = _sample["seats"]
 	var eligible: Array = _sample["eligible"]
 	for i in ranked.size():
@@ -222,7 +218,6 @@ func _refresh_parliament() -> void:
 	_parliament.set_results(entries)
 	_parliament._count_plate.hide()
 	_meclis_count.text = "%d / %d" % [assigned, _sim.total_seats]
-	_refresh_province_cards()
 
 func _refresh_map() -> void:
 	if _map == null or _sample.is_empty():
@@ -256,7 +251,7 @@ func _animate(delta: float) -> void:
 		rows.append({
 			"name": _party_name(peer_id), "leader": _leader_name(peer_id), "color": _party_color(peer_id),
 			"icon": _party_icon(peer_id),
-			"percent": d["percent"], "rank": target["rank"], "seats": target["seats"], "below": target["below"],
+			"percent": d["percent"], "rank": d["rank"], "seats": target["seats"], "below": target["below"],
 			"trend": trend,
 		})
 	_bars.rows = rows

@@ -32,12 +32,14 @@ var _path := PackedVector2Array()
 var _lengths := PackedFloat32Array()
 var _total := 0.0
 var _path_size := Vector2.ZERO
+static var _phase := 0.0
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	z_index = 1
 
 func _process(_delta: float) -> void:
+	_phase = fposmod(float(Time.get_ticks_msec()) / 1000.0 / PERIOD, 1.0)
 	queue_redraw()
 
 func _frame_rect() -> Rect2:
@@ -92,10 +94,9 @@ func _draw() -> void:
 		return
 	if _path.is_empty() or _path_size != size:
 		_build_path()
-	var phase := fposmod(float(Time.get_ticks_msec()) / 1000.0 / PERIOD, 1.0)
 	# Desen çevre boyunca tekrar eder (22 + 28 = %50): her renkten iki yılan.
 	for k in 2:
-		var base := phase + float(k) * (DASH + GAP)
+		var base := _phase + float(k) * (DASH + GAP)
 		_draw_dash(base, DASH, UiTheme.GOLD)
 		_draw_dash(base + OFFSET, DASH, party_color)
 	# 0.0.305: "SIRA" etiketi kalktı; yılan animasyonu yeterli.

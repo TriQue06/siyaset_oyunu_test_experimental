@@ -37,6 +37,7 @@ const GREEN_TEXT := Color("1F8A4C")
 const INK := Color("2D2A26")
 
 var _t := 0.0
+var _had_requests := false
 ## province_id -> yerel saat (yapıldı animasyonu ilk görüldüğü an).
 var _done_at: Dictionary = {}
 
@@ -47,9 +48,11 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_t += delta
-	if _visible_to_me() and not CardManager.invest_requests.is_empty():
+	if not CardManager.invest_requests.is_empty() and _visible_to_me():
+		_had_requests = true
 		queue_redraw()
-	elif not _done_at.is_empty():
+	elif _had_requests:
+		_had_requests = false
 		_done_at.clear()
 		queue_redraw()
 
@@ -78,6 +81,7 @@ func _draw() -> void:
 			if dt < DONE_SECONDS:
 				_draw_done(pos, dt, screen_scale)
 			continue
+		_done_at.erase(id)
 		_draw_request(pos, float(req["amount"]), left, total, screen_scale)
 
 func _draw_request(pos: Vector2, amount: float, left: int, total: int, screen_scale: float) -> void:

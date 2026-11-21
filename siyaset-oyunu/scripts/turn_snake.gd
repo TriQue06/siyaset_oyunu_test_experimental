@@ -23,6 +23,8 @@ const OUT := -WIDTH * 0.5
 const RADIUS := 16.0
 
 var party_color := Color.WHITE
+## İlk yılanın rengi (sıra vurgusunda altın; hedef yardımcısında beyaz).
+var lead_color := UiTheme.GOLD
 ## Kartın köşe yarıçapı (0.0.317: plaketin kutusundan gelir; yılan kartın
 ## şeklini birebir izler).
 var radius := RADIUS
@@ -97,7 +99,7 @@ func _draw() -> void:
 	# Desen çevre boyunca tekrar eder (22 + 28 = %50): her renkten iki yılan.
 	for k in 2:
 		var base := _phase + float(k) * (DASH + GAP)
-		_draw_dash(base, DASH, UiTheme.GOLD)
+		_draw_dash(base, DASH, lead_color)
 		_draw_dash(base + OFFSET, DASH, party_color)
 	# 0.0.305: "SIRA" etiketi kalktı; yılan animasyonu yeterli.
 

@@ -1936,5 +1936,17 @@
 "Sayım yöntemi": "Seat method",
 "değişmiyor": "unchanged",
 "%s yılda bir": "every %s years",
-"EVET %d / gereken %d (2/3) · %s kaldı%s": "YES %d / needed %d (2/3) · %s left%s"
+"EVET %d / gereken %d (2/3) · %s kaldı%s": "YES %d / needed %d (2/3) · %s left%s",
+"HEDEF": "TARGET",
+"HEDEF · %d": "TARGET · %d",
+"HEDEF YARDIMCISI": "TARGET HELPER",
+"Hedeflediğin seçmen gruplarını seç; istediğin kadar seçebilirsin. Grup yasasında, seçmen haritasında (grubun %50'yi aştığı illerde) ve mitingte işaretlenirler.": "Pick the voter groups you are targeting; choose as many as you like. They are highlighted on group laws, on the voter map (provinces where the group is above 50%) and at rallies.",
+"Hedefleri temizle": "Clear targets",
+"TAMAM": "OK",
+"hedefle": "target",
+"karşı": "vs",
+"EMEK": "LABOUR",
+"KUŞAK": "GENERATION",
+"İNANÇ": "FAITH",
+"YÖNETİM": "GOVERNANCE"
 }

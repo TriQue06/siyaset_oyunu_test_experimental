@@ -5822,3 +5822,39 @@ msgstr "every %s years"
 
 msgid "EVET %d / gereken %d (2/3) · %s kaldı%s"
 msgstr "YES %d / needed %d (2/3) · %s left%s"
+
+msgid "HEDEF"
+msgstr "TARGET"
+
+msgid "HEDEF · %d"
+msgstr "TARGET · %d"
+
+msgid "HEDEF YARDIMCISI"
+msgstr "TARGET HELPER"
+
+msgid "Hedeflediğin seçmen gruplarını seç; istediğin kadar seçebilirsin. Grup yasasında, seçmen haritasında (grubun %50'yi aştığı illerde) ve mitingte işaretlenirler."
+msgstr "Pick the voter groups you are targeting; choose as many as you like. They are highlighted on group laws, on the voter map (provinces where the group is above 50%) and at rallies."
+
+msgid "Hedefleri temizle"
+msgstr "Clear targets"
+
+msgid "TAMAM"
+msgstr "OK"
+
+msgid "hedefle"
+msgstr "target"
+
+msgid "karşı"
+msgstr "vs"
+
+msgid "EMEK"
+msgstr "LABOUR"
+
+msgid "KUŞAK"
+msgstr "GENERATION"
+
+msgid "İNANÇ"
+msgstr "FAITH"
+
+msgid "YÖNETİM"
+msgstr "GOVERNANCE"

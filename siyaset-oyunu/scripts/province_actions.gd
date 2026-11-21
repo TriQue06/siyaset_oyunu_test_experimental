@@ -547,6 +547,9 @@ func _build_miting() -> void:
 			var selected := _focus.has(group)
 			var full := _focus.size() >= slots and not selected
 			var token := _group_token(group, int(roundf(VoterGroups.share(profile, group) * 100.0)), selected, full)
+			# HEDEF YARDIMCISI (0.0.334): hedef grup bu ilde %50'yi aşıyorsa yılan.
+			if TargetHelper.strong_in(profile, group):
+				TargetHelper.attach_snake(token, group)
 			token.pressed.connect(func():
 				if _focus.has(group):
 					_focus.erase(group)

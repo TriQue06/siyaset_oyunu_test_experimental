@@ -206,6 +206,12 @@ var _layer_buttons: Array = []
 var _layer_legend: Control
 ## Seçmen katmanında gösterilen grup ve grup seçici düğmeler.
 var _map_group: String = "isci"
+## HEDEF YARDIMCISI (0.0.334): harita köşesindeki düğme, pencere, şeritler.
+var _target_button: Button
+var _target_panel: PanelContainer
+var _target_backdrop: ColorRect
+var _target_stripes: TargetStripes
+var _target_rev := -1
 var _group_picker: GridContainer
 var _game_over_overlay: Control
 ## Sol paneldeki canlı olay logu ve harita odak animasyonu.
@@ -331,6 +337,8 @@ func _ready() -> void:
 	TableSurface.cover(self)
 	AudioManager.play_game_music()
 	map_holder.province_clicked.connect(_on_province_clicked)
+	# Parti kurulurken seçilen iki çekirdek grup hedefli başlar.
+	TargetHelper.reset(PartyManager.data_of(multiplayer.get_unique_id()).get("core", []))
 	_refresh_game_settings_label()
 	MultiplayerManager.settings_updated.connect(_refresh_game_settings_label)
 
@@ -2439,6 +2447,9 @@ var _live_wait := 0.0
 
 func _process(delta: float) -> void:
 	_refresh_countdowns()
+	if _target_rev != TargetHelper.revision:
+		_target_rev = TargetHelper.revision
+		_on_targets_changed()
 	_update_vote_swap(delta)
 	_sync_parliament_to_slot()
 	_refresh_timer_bar()
@@ -3821,6 +3832,33 @@ func _style_vote_button(button: Button, title: String, subtitle: String, color: 
 	button.set_meta("action_color", color)
 	UiSkin.skin_action_button(button, color, true)
 
+## HEDEF YARDIMCISI (0.0.334): hedef grubun yasası oylanırken EVET, karşıt
+## grubunki oylanırken HAYIR düğmesinde yılan (beyaz + grubun rengi).
+var _vote_target_key := ""
+
+func _refresh_vote_targets(can_vote: bool) -> void:
+	var yes_group := ""
+	var no_group := ""
+	if can_vote and GovernmentManager.proposal_kind == GovernmentManager.KIND_LAW 			and not CardPresets.is_tax_law(GovernmentManager.proposal_law):
+		var law := CardPresets.law_data(GovernmentManager.proposal_law)
+		var group := String(law.get("group", ""))
+		if VoterGroups.is_group(group):
+			var rival := VoterGroups.opposite(group)
+			if TargetHelper.has(group):
+				yes_group = group
+			if TargetHelper.has(rival):
+				no_group = rival
+	var key := yes_group + "|" + no_group
+	if key == _vote_target_key:
+		return
+	_vote_target_key = key
+	TargetHelper.set_snake(vote_yes_button, false, "")
+	TargetHelper.set_snake(vote_no_button, false, "")
+	if yes_group != "":
+		TargetHelper.set_snake(vote_yes_button, true, yes_group)
+	if no_group != "":
+		TargetHelper.set_snake(vote_no_button, true, no_group)
+
 ## Oylama butonları: teklif yokken (ya da oyumu kullandıysam) koyu ve
 ## tıklanamaz, oylama açıkken renkli.
 func _refresh_vote_ui() -> void:
@@ -3832,6 +3870,7 @@ func _refresh_vote_ui() -> void:
 	vote_no_button.disabled = not can_vote
 	# Koalisyon teklifinde ortak çekimser kalamaz: ya EVET ya HAYIR.
 	_abstain_button.disabled = not can_vote or GovernmentManager.is_coalition_stage()
+	_refresh_vote_targets(can_vote)
 
 	proposal_label.text = GovernmentHud.proposal_status_text(multiplayer.get_unique_id())
 	proposal_label.visible = GovernmentManager.is_voting() and GovernmentManager.proposal_kind != GovernmentManager.KIND_LAW
@@ -4917,7 +4956,239 @@ func _build_layer_bar() -> void:
 			_refresh_layer_bar()
 			_apply_map_layer_colors())
 		_group_picker.add_child(pick)
+	_build_target_button()
 	_refresh_layer_bar()
+
+# --- HEDEF YARDIMCISI (0.0.334) ----------------------------------------------------
+## Harita panosunun sağ üstünde "HEDEF" düğmesi; basınca hedef grup penceresi.
+func _build_target_button() -> void:
+	_target_button = Button.new()
+	_target_button.text = L.t("HEDEF")
+	_target_button.focus_mode = Control.FOCUS_NONE
+	_target_button.z_index = 6
+	_target_button.pressed.connect(_toggle_target_panel)
+	add_child(_target_button)
+	_refresh_target_button()
+
+func _refresh_target_button() -> void:
+	if _target_button == null:
+		return
+	var open := _target_panel != null and _target_panel.visible
+	_target_button.text = L.t("HEDEF") if TargetHelper.groups.is_empty() else L.t("HEDEF · %d") % TargetHelper.groups.size()
+	_style_tab_button(_target_button, open, true)
+	# Yeniden kurulur: ilk hedef grubun rengi değişmiş olabilir.
+	TargetHelper.set_snake(_target_button, false, "")
+	if not TargetHelper.groups.is_empty() and not open:
+		TargetHelper.set_snake(_target_button, true, String(TargetHelper.groups[0]))
+
+## Karşıt çiftlerin başlıkları (pencerede iki grubun arasında).
+const TARGET_PAIR_TITLES := {"emek": "EMEK", "kusak": "KUŞAK", "inanc": "İNANÇ", "yonetim": "YÖNETİM"}
+
+func _toggle_target_panel() -> void:
+	if _target_panel != null and _target_panel.visible:
+		_target_panel.hide()
+		_target_backdrop.hide()
+		_refresh_target_button()
+		return
+	if _target_panel == null:
+		# Arkadaki karartma: tıklayınca pencere kapanır.
+		_target_backdrop = ColorRect.new()
+		_target_backdrop.color = Color(0.04, 0.06, 0.1, 0.45)
+		_target_backdrop.z_index = 107
+		_target_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+		_target_backdrop.gui_input.connect(func(event: InputEvent):
+			if event is InputEventMouseButton and event.pressed:
+				_toggle_target_panel())
+		add_child(_target_backdrop)
+		_target_panel = PanelContainer.new()
+		var style := UiSkin.board()
+		style.set_content_margin_all(UiTheme.d(22))
+		_target_panel.add_theme_stylebox_override("panel", style)
+		_target_panel.z_index = 108
+		_target_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		add_child(_target_panel)
+	_fill_target_panel()
+	_target_backdrop.show()
+	_target_panel.show()
+	_refresh_target_button()
+	_place_target_panel.call_deferred()
+
+func _fill_target_panel() -> void:
+	if _target_panel == null:
+		return
+	for child in _target_panel.get_children():
+		_target_panel.remove_child(child)
+		child.queue_free()
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", UiTheme.d(12))
+	box.custom_minimum_size = Vector2(UiTheme.d(860), 0)
+	_target_panel.add_child(box)
+	# Başlık: ad + sayaç + kapat.
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 10)
+	box.add_child(header)
+	var names := VBoxContainer.new()
+	names.add_theme_constant_override("separation", 2)
+	names.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(names)
+	names.add_child(UiTheme.mono_label(L.t("HEDEF YARDIMCISI"), UiTheme.fs(28), UiTheme.HEAD, true))
+	var sub := PopupKit.note(L.t("Hedeflediğin seçmen gruplarını seç; istediğin kadar seçebilirsin. Grup yasasında, seçmen haritasında (grubun %50'yi aştığı illerde) ve mitingte işaretlenirler."), UiTheme.TEXT_MUTED, UiTheme.d(700))
+	sub.add_theme_font_size_override("font_size", UiTheme.fs(15))
+	names.add_child(sub)
+	var count := PopupKit.chip(L.t("%d / %d grup") % [TargetHelper.groups.size(), VoterGroups.GROUP_IDS.size()], UiTheme.GOLD)
+	count.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	header.add_child(count)
+	var close := Button.new()
+	close.text = "X"
+	close.focus_mode = Control.FOCUS_NONE
+	close.custom_minimum_size = Vector2(UiTheme.d(36), UiTheme.d(36))
+	close.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	UiSkin.skin_button(close)
+	close.pressed.connect(_toggle_target_panel)
+	header.add_child(close)
+	# Her satır bir karşıt çift: sol grup · çift adı · sağ grup (karşı karşıya).
+	var rows := VBoxContainer.new()
+	rows.add_theme_constant_override("separation", UiTheme.d(14))
+	box.add_child(rows)
+	for pair in VoterGroups.PAIR_IDS:
+		var groups: Array = VoterGroups.PAIRS[pair]
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", UiTheme.d(10))
+		rows.add_child(row)
+		row.add_child(_target_group_button(String(groups[0]), true))
+		var mid := VBoxContainer.new()
+		mid.alignment = BoxContainer.ALIGNMENT_CENTER
+		mid.custom_minimum_size = Vector2(UiTheme.d(110), 0)
+		mid.add_theme_constant_override("separation", 0)
+		row.add_child(mid)
+		var pair_label := UiTheme.mono_label(L.t(String(TARGET_PAIR_TITLES[pair])), UiTheme.fs(15), UiTheme.TEXT_MUTED, true)
+		pair_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		mid.add_child(pair_label)
+		var vs := UiTheme.mono_label(L.t("karşı"), UiTheme.fs(13), UiTheme.GOLD_DIM, false)
+		vs.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		mid.add_child(vs)
+		row.add_child(_target_group_button(String(groups[1]), false))
+	var footer := HBoxContainer.new()
+	footer.add_theme_constant_override("separation", UiTheme.d(10))
+	box.add_child(footer)
+	var clear := Button.new()
+	clear.text = L.t("Hedefleri temizle")
+	clear.focus_mode = Control.FOCUS_NONE
+	clear.custom_minimum_size = Vector2(0, UiTheme.d(48))
+	clear.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	clear.disabled = TargetHelper.groups.is_empty()
+	UiSkin.skin_button(clear)
+	clear.pressed.connect(TargetHelper.clear)
+	footer.add_child(clear)
+	var done := Button.new()
+	done.text = L.t("TAMAM")
+	done.focus_mode = Control.FOCUS_NONE
+	done.custom_minimum_size = Vector2(0, UiTheme.d(48))
+	done.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	UiSkin.skin_color_button(done, UiTheme.GREEN_DARK)
+	done.pressed.connect(_toggle_target_panel)
+	footer.add_child(done)
+
+## Grup kartı: simge + ad (karşıt çiftte sol kart sola, sağ kart sağa yaslı);
+## hedefliyse grup renginde, yılanlı ve "HEDEF" etiketli.
+func _target_group_button(group: String, left: bool) -> Button:
+	var selected := TargetHelper.has(group)
+	var button := Button.new()
+	button.focus_mode = Control.FOCUS_NONE
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.custom_minimum_size = Vector2(0, UiTheme.d(80))
+	if selected:
+		UiSkin.skin_color_button(button, VoterGroups.color(group).darkened(0.2))
+	else:
+		UiSkin.skin_button(button)
+	var row := HBoxContainer.new()
+	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	row.offset_left = UiTheme.d(14)
+	row.offset_right = -UiTheme.d(14)
+	row.alignment = BoxContainer.ALIGNMENT_BEGIN if left else BoxContainer.ALIGNMENT_END
+	row.add_theme_constant_override("separation", UiTheme.d(10))
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(row)
+	var icon := VoterGroupIcon.make(group, UiTheme.d(48))
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var texts := VBoxContainer.new()
+	texts.alignment = BoxContainer.ALIGNMENT_CENTER
+	texts.add_theme_constant_override("separation", 0)
+	texts.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var label := Label.new()
+	label.text = VoterGroups.title(group)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if left else HORIZONTAL_ALIGNMENT_RIGHT
+	label.add_theme_font_override("font", UiTheme.mono(true))
+	label.add_theme_font_size_override("font_size", UiTheme.fs(21))
+	label.add_theme_color_override("font_color", UiTheme.ON_COLOR if selected else UiTheme.TEXT)
+	if selected:
+		UiSkin._text_shadow(label, true)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	texts.add_child(label)
+	var state := Label.new()
+	state.text = L.t("HEDEF") if selected else L.t("hedefle")
+	state.horizontal_alignment = label.horizontal_alignment
+	state.add_theme_font_override("font", UiTheme.body())
+	state.add_theme_font_size_override("font_size", UiTheme.fs(13))
+	state.add_theme_color_override("font_color", Color(1, 1, 1, 0.85) if selected else UiTheme.TEXT_MUTED)
+	state.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	texts.add_child(state)
+	# Karşı karşıya: soldaki kartta simge dışta solda, sağdakinde dışta sağda.
+	if left:
+		row.add_child(icon)
+		row.add_child(texts)
+	else:
+		row.add_child(texts)
+		row.add_child(icon)
+	button.pressed.connect(TargetHelper.toggle.bind(group))
+	if selected:
+		TargetHelper.attach_snake(button, group)
+	return button
+
+## Pencere ekranın tam ortasında; karartma bütün ekranı örter.
+func _place_target_panel() -> void:
+	if _target_panel == null or not _target_panel.visible:
+		return
+	var view := get_viewport_rect().size
+	_target_backdrop.position = Vector2.ZERO
+	_target_backdrop.size = view
+	_target_panel.reset_size()
+	_target_panel.position = ((view - _target_panel.size) * 0.5).round()
+
+## Hedefler değişti: pencere, harita seçicisi, şeritler ve açık yasa sayfası tazelenir.
+func _on_targets_changed() -> void:
+	if _target_panel != null and _target_panel.visible:
+		_fill_target_panel()
+		_place_target_panel.call_deferred()
+	_refresh_target_button()
+	if _group_picker != null:
+		_refresh_layer_bar()
+	_refresh_target_stripes()
+	if _law_rows != null and _law_rows.is_visible_in_tree():
+		_refresh_law_designer()
+	if _province_actions != null and _province_actions.visible:
+		_province_actions.refresh()
+	_vote_target_key = "?"
+	if _abstain_button != null:
+		_refresh_vote_ui()
+
+## Seçmen katmanında seçili grup hedefliyse, grubun %50'yi aştığı (ve
+## oyuncunun gördüğü) iller şeritlenir.
+func _refresh_target_stripes() -> void:
+	if map_holder == null:
+		return
+	if _target_stripes == null:
+		_target_stripes = TargetStripes.new()
+		_target_stripes.name = "TargetStripes"
+		map_holder.add_child(_target_stripes)
+	var ids: Array = []
+	var me := multiplayer.get_unique_id()
+	if _map_layer == MapLayer.GROUPS and TargetHelper.has(_map_group):
+		for province_id in map_holder.get_all_province_ids():
+			if CardManager.sees_province_groups(me, province_id) \
+					and TargetHelper.strong_in(CardManager.province_profile(province_id), _map_group):
+				ids.append(province_id)
+	_target_stripes.set_targets(ids, VoterGroups.color(_map_group))
 
 func _place_layer_bar() -> void:
 	if _layer_bar == null:
@@ -4927,6 +5198,10 @@ func _place_layer_bar() -> void:
 	# Orta panonun sol üstünde (konsept: 22, 20).
 	_layer_bar.position = rect.position + Vector2(UiTheme.d(22), UiTheme.d(20))
 	_layer_bar.z_index = 6
+	if _target_button != null:
+		_target_button.reset_size()
+		_target_button.position = Vector2(rect.end.x - UiTheme.d(22) - _target_button.size.x, _layer_bar.position.y)
+		_place_target_panel()
 	_layer_legend.reset_size()
 	# Gösterge düğmelerin sağında, aynı satırda ortalı.
 	_layer_legend.position = Vector2(_layer_bar.position.x + _layer_bar.size.x + 12.0,
@@ -4963,6 +5238,7 @@ func _refresh_layer_bar() -> void:
 			# 0.0.244: seçili olsa da yalnız simge (ad genişlemesi yok; ad ipucunda).
 			var title: Label = pick.get_node("Title")
 			title.visible = false
+			TargetHelper.set_snake(pick, TargetHelper.has(group), group)
 			var width := 34.0
 			(pick as Button).custom_minimum_size = Vector2(width, 34)
 			(pick as Button).size = Vector2(width, 34)
@@ -5089,6 +5365,7 @@ func _apply_map_layer_colors() -> void:
 						colors[province_id] = MAP_UNKNOWN_COLOR
 	_province_base_colors = colors
 	map_holder.replace_province_colors(colors)
+	_refresh_target_stripes()
 	var seat_markers := map_holder.get_node_or_null("SeatMarkers")
 	if seat_markers != null:
 		seat_markers.visible = _map_layer == MapLayer.SEATS

@@ -283,6 +283,9 @@ static func group_grid(on_pick: Callable, available: Callable = func(_group: Str
 		row.add_child(label)
 		button.pressed.connect(func(): on_pick.call(group))
 		grid.add_child(button)
+		# HEDEF YARDIMCISI (0.0.334): hedef grubun düğmesinde sıra yılanı.
+		if TargetHelper.has(group):
+			TargetHelper.attach_snake(button, group)
 	return grid
 
 ## Meclis penceresindeki açıklama satırı (yasa sayfası da kullanır).

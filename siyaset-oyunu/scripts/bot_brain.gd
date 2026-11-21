@@ -131,6 +131,15 @@ static func _jitter(bot: int, scale: float = 1.0) -> float:
 const BLOC_STEAL_BONUS := 2.5
 const BLOC_OVERTAKE_BONUS := 3.0
 static var _bloc_forming := false
+## Blok hangi seçim döneminde kuruldu (0.0.336): seçim yapılınca blok biter.
+## Önceden bayrak yalnız hükümet varken SORULURSA iniyordu; gensorudan sonra
+## kurulan hükümet döneminde kimse sormazsa bir sonraki seçimin hükümet
+## kurmasına taşınıyor, botlar insan oyuncuyu hiç ortak seçmiyordu.
+static var _bloc_election := -1
+
+static func _set_bloc(on: bool) -> void:
+	_bloc_forming = on
+	_bloc_election = CardManager.elections_held
 
 ## Blok şu an hedefte mi (insan hükümeti var)?
 static func bloc_active() -> bool:
@@ -157,7 +166,7 @@ static func bloc_leader() -> int:
 
 ## Gensoru sonrası kurma sürecinde blok dayanışması sürüyor mu?
 static func _bloc_solidarity() -> bool:
-	if GovernmentManager.has_government() or CardManager.round_number <= 1:
+	if GovernmentManager.has_government() or CardManager.round_number <= 1 			or CardManager.elections_held != _bloc_election:
 		_bloc_forming = false
 	return _bloc_forming
 
@@ -265,7 +274,7 @@ static func _choose_parliament(bot: int, stage: String) -> Dictionary:
 	match stage:
 		"censure":
 			if CardManager.can_censure(bot) and _censure_worth_it(bot):
-				_bloc_forming = bloc_active()
+				_set_bloc(bloc_active())
 				return {"type": "censure"}
 		"law":
 			var best := {}
@@ -438,7 +447,7 @@ static func _choose_action_best(bot: int, candidates: Array) -> Dictionary:
 		var censure_score := 7.0 if bloc_active() else 4.0
 		if censure_score - GameRules.CENSURE_FUNDS_COST * funds_value > best_score:
 			best = {"type": "censure"}
-			_bloc_forming = bloc_active()
+			_set_bloc(bloc_active())
 			best_score = censure_score - GameRules.CENSURE_FUNDS_COST * funds_value
 
 	# ERKEN SEÇİM: kamuoyu bot lehineyse ve hükümette değilse sandığı ister.
@@ -1037,7 +1046,7 @@ static func choose_vote(bot: int) -> int:
 			if CardManager.is_government_party(bot):
 				return GovernmentManager.VOTE_NO
 			if bloc_active():
-				_bloc_forming = true
+				_set_bloc(true)
 				return GovernmentManager.VOTE_YES
 			return _censure_vote(bot)
 		GovernmentManager.KIND_LAW:

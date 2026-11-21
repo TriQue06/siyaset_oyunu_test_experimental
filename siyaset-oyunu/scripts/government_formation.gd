@@ -35,6 +35,7 @@ const ICON_PATHS := {
 	"ministry_education": '<path d="M3 9l9-5 9 5-9 5z"/><path d="M7 11v5c3 2 7 2 10 0v-5"/>',
 	"ministry_health": '<path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/>',
 	"ministry_defense": '<path d="M12 3l8 3v6c0 4-3 7-8 9-5-2-8-5-8-9V6z"/><path d="M12 7v10M8 11h8"/>',
+	"ministry_agriculture": '<path d="M12 21V9"/><path d="M12 9c-3 0-5-2-5-5 3 0 5 2 5 5zM12 9c3 0 5-2 5-5-3 0-5 2-5 5z"/><path d="M12 15c-3 0-5-2-5-5 3 0 5 2 5 5zM12 15c3 0 5-2 5-5-3 0-5 2-5 5z"/>',
 	"clock": '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/>',
 }
 ## Görev kartındaki kısa ad (dar kart).
@@ -42,6 +43,7 @@ const SHORT_TITLES := {
 	"pm": "Başbakanlık", "deputy_pm": "Başbakan Yardımcılığı", "ministry_interior": "İçişleri",
 	"ministry_foreign": "Dışişleri", "ministry_finance": "Maliye", "ministry_justice": "Adalet",
 	"ministry_education": "Milli Eğitim", "ministry_health": "Sağlık", "ministry_defense": "Milli Savunma",
+	"ministry_agriculture": "Tarım",
 }
 
 ## Hükümete girecek partiler (peer_id); ilki her zaman görevli parti.

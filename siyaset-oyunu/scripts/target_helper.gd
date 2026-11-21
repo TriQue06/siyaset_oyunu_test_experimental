@@ -22,7 +22,19 @@ static func toggle(group: String) -> void:
 		groups.append(group)
 	revision += 1
 
-## Oyun açılışı: hedefler partinin çekirdek grupları (parti kurma ekranı).
+## Hangi oyun için hedefler kuruldu (oyun ekranı her seçimden sonra yeniden açılır).
+static var _game_key := ""
+
+## Oyun ekranı açılışı: yeni oyunsa hedefler çekirdek gruplarla başlar, aynı
+## oyunsa oyuncunun seçimi korunur.
+static func start_game(key: String, core: Array) -> void:
+	if key == _game_key:
+		revision += 1
+		return
+	_game_key = key
+	reset(core)
+
+## Hedefler partinin çekirdek grupları (parti kurma ekranı).
 static func reset(core: Array) -> void:
 	groups = []
 	for group in core:

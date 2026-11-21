@@ -337,8 +337,11 @@ func _ready() -> void:
 	TableSurface.cover(self)
 	AudioManager.play_game_music()
 	map_holder.province_clicked.connect(_on_province_clicked)
-	# Parti kurulurken seçilen iki çekirdek grup hedefli başlar.
-	TargetHelper.reset(PartyManager.data_of(multiplayer.get_unique_id()).get("core", []))
+	# Parti kurulurken seçilen iki çekirdek grup hedefli başlar. Ekran seçimden /
+	# hükümet kurulumundan sonra yeniden açılır: aynı oyunda hedefler korunur.
+	var my_party := PartyManager.data_of(multiplayer.get_unique_id())
+	TargetHelper.start_game(str([my_party.get("name", ""), my_party.get("core", []), CardManager._province_ids.hash()]),
+		my_party.get("core", []))
 	_refresh_game_settings_label()
 	MultiplayerManager.settings_updated.connect(_refresh_game_settings_label)
 

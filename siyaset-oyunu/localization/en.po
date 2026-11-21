@@ -5858,3 +5858,9 @@ msgstr "FAITH"
 
 msgid "YÖNETİM"
 msgstr "GOVERNANCE"
+
+msgid "Tarım Bakanlığı"
+msgstr "Ministry of Agriculture"
+
+msgid "Tarım"
+msgstr "Agriculture"

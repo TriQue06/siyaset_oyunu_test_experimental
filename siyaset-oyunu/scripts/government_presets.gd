@@ -1,7 +1,8 @@
 extends Node
 ## Autoload. Hükümet görevlerinin (koltukların) katalogu ve puan değerleri.
 ##
-## Toplam 9 görev: 1 başbakanlık, 1 başbakan yardımcılığı, 7 bakanlık.
+## Toplam 10 görev: 1 başbakanlık, 1 başbakan yardımcılığı, 8 bakanlık
+## (0.0.336: Tarım Bakanlığı eklendi).
 ## Hükümetin BAŞI başbakanlıktır — birinci parti başbakanlığı ortağına
 ## verirse, ANA İKTİDAR PARTİSİ o ortak sayılır (bkz.
 ## GovernmentManager.main_gov_peer_id).
@@ -32,6 +33,7 @@ const POSTS: Array[Dictionary] = [
 	{"id": "ministry_education", "title": "Milli Eğitim Bakanlığı", "points": MINISTRY_POINTS},
 	{"id": "ministry_health", "title": "Sağlık Bakanlığı", "points": MINISTRY_POINTS},
 	{"id": "ministry_defense", "title": "Milli Savunma Bakanlığı", "points": MINISTRY_POINTS},
+	{"id": "ministry_agriculture", "title": "Tarım Bakanlığı", "points": MINISTRY_POINTS},
 ]
 
 func post_ids() -> Array:

@@ -70,6 +70,8 @@ func set_targets(ids: Array, party: Color) -> void:
 	set_process(not _ids.is_empty())
 	_unit = -1.0
 	queue_redraw()
+	# Şerit kalkınca il çerçeveleri de silinsin (vekil haritasında iz kalmasın).
+	_outline.queue_redraw()
 
 ## Şerit kalınlığı ekran pikseline göre: haritaya yakınlaşınca da aynı kalır.
 func _process(_delta: float) -> void:

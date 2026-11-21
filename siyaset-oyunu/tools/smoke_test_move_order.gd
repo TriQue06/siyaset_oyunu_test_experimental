@@ -138,7 +138,6 @@ func _initialize() -> void:
 	cm = root.get_node("CardManager")
 	gm = root.get_node("GovernmentManager")
 	root.get_node("BotManager").set_process(false)
-	cm.allow_temporary_parties = false
 	cm.fixed_map_seed = 1950
 	mm.room_code = ""
 	gm.result_hold_seconds = 0.0
@@ -147,9 +146,9 @@ func _initialize() -> void:
 	P = String(ids[0])
 	new_game(777)
 	print("İl: %s" % P)
-	print("Sabitler: kaset seviye düşürme %%%.0f + ülke geneli −%.1f puan, karışıklık: kaset +%.1f / miting −%.1f (0'ın altına inmez), bölünme eşiği %.1f" % [
+	print("Sabitler: kaset seviye düşürme %%%.0f + ülke geneli −%.1f puan, karışıklık: kaset +%.1f / miting −%.1f (0'ın altına inmez)" % [
 		PublicOpinion.KASET_DEMOTE * 100.0, PublicOpinion.REPUTATION_NATIONAL_DAMAGE, PublicOpinion.TURMOIL_REPUTATION,
-		PublicOpinion.TURMOIL_EASE_MITING, PublicOpinion.SPLIT_TURMOIL])
+		PublicOpinion.TURMOIL_EASE_MITING])
 
 	print("\n=== 0) KONTROL: aynı senaryo üç kez ===")
 	for i in 3:

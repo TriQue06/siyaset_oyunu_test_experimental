@@ -45,7 +45,7 @@ func _initialize() -> void:
 	check("baslat butonu ekranda", start.visible and bottom <= root.get_visible_rect().size.y, "alt kenar %.0f / %.0f" % [bottom, root.get_visible_rect().size.y])
 
 	# Lobi ayarları: oyun süresi (4 turda bir, 7 seçim) ve artırma.
-	check("varsayilan: 4 yilda bir, 5 secim, 40 tur (20 yil), rastgele parti kapali", mm.election_interval == 4 and mm.election_count == 5 and GameRules.MAX_ROUNDS == 40 and not mm.random_parties)
+	check("varsayilan: 4 yilda bir, 5 secim, 40 tur (20 yil)", mm.election_interval == 4 and mm.election_count == 5 and GameRules.MAX_ROUNDS == 40)
 	scene._on_section_pressed("elections")
 	for i in 5:
 		await process_frame

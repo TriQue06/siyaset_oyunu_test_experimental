@@ -11,7 +11,6 @@ func _initialize() -> void:
 	var pm = root.get_node("PartyManager")
 	var cm = root.get_node("CardManager")
 	root.get_node("BotManager").set_process(false)
-	cm.allow_temporary_parties = false
 	cm.fixed_map_seed = 1950
 	for count in [2, 5, 8]:
 		mm.players = {}

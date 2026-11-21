@@ -16,7 +16,6 @@ func _initialize() -> void:
 	var cm = root.get_node("CardManager")
 	var gm = root.get_node("GovernmentManager")
 	root.get_node("BotManager").set_process(false)
-	cm.allow_temporary_parties = false
 	cm.fixed_map_seed = 1950
 	cm.set_rng_seed(4242)
 	mm.start_offline("Barış")

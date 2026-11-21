@@ -187,7 +187,6 @@ func _initialize() -> void:
 
 	# 2) OYUN EKRANI
 	bm.set_process(false)
-	cm.allow_temporary_parties = false
 	mm.start_offline("Barış")
 	for i in 3:
 		mm.add_bot()

@@ -344,38 +344,6 @@ func add_bot_party(peer_id: int) -> void:
 		_broadcast_parties()
 	parties_updated.emit()
 
-## BÖLÜNEN PARTİ: ana partiyle BİREBİR aynı grup yakınlıkları ve logo, BENZER (aynı değil)
-## renk. Host çağırır (bkz. CardManager._split_party).
-func add_splinter_party(peer_id: int, parent_id: int, party_name: String) -> void:
-	var parent: Dictionary = parties.get(parent_id, {})
-	parties[peer_id] = {
-		"name": party_name,
-		"icon_index": int(parent.get("icon_index", 0)),
-		"icon_color": Color.WHITE,
-		"bg_color": similar_color(Color(parent.get("bg_color", Color(0.5, 0.5, 0.5)))),
-		"core": (parent.get("core", []) as Array).duplicate(),
-		"groups": (parent.get("groups", VoterGroups.neutral_affinities()) as Dictionary).duplicate(),
-		"ready": true,
-		"splinter_of": parent_id,
-	}
-	if MultiplayerManager.room_code != "":
-		_broadcast_parties()
-	parties_updated.emit()
-
-## Ana rengin "akrabası": tonu biraz kayık, açıklığı belirgin farklı.
-static func similar_color(base: Color) -> Color:
-	var value := base.v * 0.62 if base.get_luminance() > 0.45 else minf(1.0, base.v * 1.25 + 0.15)
-	return Color.from_hsv(fposmod(base.h + 0.04, 1.0), clampf(base.s * 0.85, 0.25, 1.0), clampf(value, 0.25, 1.0))
-
-## Host: oyundan çıkan (ana partisine dönen) partiyi siler.
-func remove_party(peer_id: int) -> void:
-	if not parties.has(peer_id):
-		return
-	parties.erase(peer_id)
-	if MultiplayerManager.room_code != "":
-		_broadcast_parties()
-	parties_updated.emit()
-
 ## Partinin 8 seçmen grubundaki ulusal yakınlığı (yoksa nötr).
 func groups_of(peer_id: int) -> Dictionary:
 	return data_of(peer_id).get("groups", VoterGroups.neutral_affinities())

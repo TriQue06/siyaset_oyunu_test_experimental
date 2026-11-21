@@ -209,21 +209,6 @@ const TURMOIL_EASE_ORG := 0.2
 const TURMOIL_EASE_INVEST := 0.5
 const TURMOIL_EASE_LAW := 0.8
 const TURMOIL_EASE_GOVERNMENT := 1.5
-## Karışıklık bunu aşan (ve en az SPLIT_MIN_SEATS vekili olan) parti tur sonunda
-## BÖLÜNÜR: vekillerinin SPLIT_SEAT_SHARE_MIN..MAX'ı aynı grup yakınlıklarıyla yeni partiye
-## geçer, teşkilatlarının bir kısmı (SPLIT_ORG_CHANCE) onunla gider.
-const SPLIT_TURMOIL := 7.0
-const SPLIT_MIN_SEATS := 8
-const SPLIT_SEAT_SHARE_MIN := 0.35
-const SPLIT_SEAT_SHARE_MAX := 0.5
-const SPLIT_ORG_CHANCE := 0.4
-const SPLIT_NATIONAL_DAMAGE := -1.0
-const SPLIT_AFTER_TURMOIL := 4.0
-## Ayrılan parti en erken SPLIT_MIN, en geç SPLIT_MAX seçim atlattıktan sonra
-## döner; erken dönüş için ana partinin karışıklığı REUNION_TURMOIL'e inmeli.
-const SPLIT_MIN_ELECTIONS := 1
-const SPLIT_MAX_ELECTIONS := 4
-const REUNION_TURMOIL := 2.0
 
 ## Grup uyumunun (0..100) 0..1 karşılığı (il menüsü ve güç hesabı için).
 static func appeal_closeness(appeal: float) -> float:

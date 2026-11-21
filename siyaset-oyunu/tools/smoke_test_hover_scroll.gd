@@ -85,7 +85,6 @@ func _initialize() -> void:
 	root.get_node("GameSettings").province_view = 0
 	cm.fixed_map_seed = 1950
 	cm.set_rng_seed(4242)
-	cm.allow_temporary_parties = false
 	mm.start_offline("Barış")
 	for i in 7:
 		mm.add_bot()

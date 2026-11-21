@@ -119,11 +119,7 @@ var constitution_rounds: Dictionary = {}
 var populism: Dictionary = {}
 ## KARIŞIKLIK (GİZLİ, sadece host; oyunculara hiç gösterilmez): peer_id -> puan.
 ## Kaset ve iç karışıklık kartları büyütür; olumlu hamleler ve zaman söndürür.
-## PublicOpinion.SPLIT_TURMOIL'i aşan parti BÖLÜNÜR (bkz. _check_splits).
 var turmoil: Dictionary = {}
-## BÖLÜNEN PARTİLER: ayrılan (yapay zekâ) partinin peer_id -> {"parent": ana parti,
-## "elections": ayrıldıktan sonra atlattığı seçim, "since": ayrıldığı tur}.
-var splinters: Dictionary = {}
 ## ERKEN SEÇİM önergesi bedelsiz (0.0.182): parti başına bir seçim aralığında
 ## (GameRules.ELECTION_INTERVAL tur) bir önerge. parti -> önerge turu.
 var early_requests: Dictionary = {}
@@ -1947,7 +1943,6 @@ func init_game() -> void:
 	_congress_time_left = 0.0
 	populism = {}
 	turmoil = {}
-	splinters = {}
 	agenda = {}
 	crisis = {}
 	_agenda_pairs = []
@@ -2097,7 +2092,6 @@ func abandon_game() -> void:
 	economy = Economy.start_state()
 	organizations = {}
 	turmoil = {}
-	splinters = {}
 	credibility = {}
 	funds = {}
 	game_finished = false
@@ -3357,22 +3351,6 @@ func _vb_scandal(target: int, province_id: String = "", frac: float = 1.0) -> vo
 			_vb_demote_fraction(pid, pi, gi, frac)
 	_vb_sync_groups(pid)
 
-## Bölünme / birleşme: from'un tabanının frac'ı to'ya geçer (aynı seviyeyle).
-func _vb_transfer(from_pid: int, to_pid: int, frac: float) -> void:
-	_vb_check()
-	if not voter_base.has(from_pid):
-		return
-	var src: PackedFloat32Array = voter_base[from_pid]
-	var dst := _vb_arr(to_pid)
-	for i in src.size():
-		var moved := src[i] * frac
-		src[i] -= moved
-		dst[i] += moved
-	voter_base[from_pid] = src
-	voter_base[to_pid] = dst
-	_vb_sync_groups(from_pid)
-	_vb_sync_groups(to_pid)
-
 ## İldeki bağlı seçmen (parti -> sayı) ve kararsızlar: seçim modelinin girdisi.
 func vb_province_state(province_id: String) -> Dictionary:
 	_vb_ensure()
@@ -3504,139 +3482,6 @@ func _add_turmoil(peer_id: int, amount: float) -> void:
 func _ease_turmoil(peer_id: int, amount: float) -> void:
 	_add_turmoil(peer_id, -amount)
 
-func is_splinter(peer_id: int) -> bool:
-	return splinters.has(peer_id)
-
-## Sonradan katılan geçici bot partisi mi? (Sıralamaya girmez.)
-func is_temporary(peer_id: int) -> bool:
-	return bool(PartyManager.data_of(peer_id).get("temporary", false)) and MultiplayerManager.is_bot(peer_id)
-
-## Bu partiden ayrılmış (henüz geri dönmemiş) parti; yoksa -1.
-func splinter_of(parent: int) -> int:
-	for splinter in splinters.keys():
-		if int(splinters[splinter].get("parent", -1)) == parent:
-			return int(splinter)
-	return -1
-
-## Tur sonu: karışıklık söner; çok karışan parti bölünür. Ayrılmış bir parti
-## bir daha bölünemez, ana partinin de aynı anda tek ayrılanı olabilir.
-func _check_splits() -> void:
-	for peer_id in party_ids():
-		var parent := int(peer_id)
-		if PartyManager.is_independent(parent) or turmoil_of(parent) < PublicOpinion.SPLIT_TURMOIL or is_splinter(parent) or splinter_of(parent) != -1:
-			continue
-		if int(last_seats.get(parent, 0)) < PublicOpinion.SPLIT_MIN_SEATS:
-			continue
-		_split_party(parent)
-		return  # turda en fazla bir bölünme
-
-## Ayrılan partinin adı: "Yeni X" (sığmazsa kısaltılır), benzersiz.
-func _splinter_name(parent_name: String) -> String:
-	var used: Array = []
-	for party in PartyManager.parties.values():
-		used.append(String(party.get("name", "")))
-	for prefix in ["Yeni ", L.t("Öz "), L.t("Gerçek "), L.t("Hür ")]:
-		var candidate := (String(prefix) + parent_name).left(PartyManager.NAME_MAX_LENGTH).strip_edges()
-		if not used.has(candidate):
-			return candidate
-	return ("Y" + parent_name).left(PartyManager.NAME_MAX_LENGTH)
-
-## BÖLÜNME: ana partiyle BİREBİR aynı grup yakınlıklarıyla, benzer renkte yeni bir parti
-## doğar ve yapay zekâ yönetir. Ana partinin vekillerinin ciddi bir bölümü ve
-## bazı il teşkilatları ona geçer.
-func _split_party(parent: int) -> void:
-	var parent_name := _party_name(parent)
-	# Ayrılanların başında YENİ bir siyasetçi var (ana partinin adamı değil).
-	var bot_name := PoliticianPresets.random_name(PoliticianPresets.used_surnames())
-	var splinter := MultiplayerManager.add_splinter_bot("%s %s" % [bot_name["first_name"], bot_name["surname"]])
-	PartyManager.add_splinter_party(splinter, parent, _splinter_name(parent_name))
-	PartyManager.set_politician_host(splinter, PoliticianPresets.make(bot_name["first_name"], bot_name["surname"],
-		PoliticianPresets.random_background(), bot_name["gender"], "", AvatarCatalog.random(bot_name["gender"], _rng.randi())))
-	turn_order.append(splinter)
-	# Ayrılan parti sırada (ve soldaki listede) ana partinin hemen altında.
-	var anchor := parent
-	for member in PartyManager.members_of(parent):
-		if turn_order.find(int(member)) > turn_order.find(anchor):
-			anchor = int(member)
-	if turn_order.has(anchor):
-		_place_after(splinter, anchor)
-	inventories[splinter] = []
-	funds[splinter] = float(GameRules.FUNDS_PER_ROUND)
-	var seats_before := int(last_seats.get(parent, 0))
-	var share := _rng.randf_range(PublicOpinion.SPLIT_SEAT_SHARE_MIN, PublicOpinion.SPLIT_SEAT_SHARE_MAX)
-	var moved := _move_seats(parent, splinter, maxi(1, int(round(seats_before * share))))
-	_vb_transfer(parent, splinter, share)
-	election_seats[splinter] = mini(moved, int(election_seats.get(parent, 0)))
-	election_seats[parent] = maxi(0, int(election_seats.get(parent, 0)) - int(election_seats[splinter]))
-	# Oy oranı son seçimin statik sonucudur: bölünmede paylaştırılmaz, ayrılan
-	# parti ilk seçimine kadar oy oranı göstermez.
-	if passed_threshold.has(parent):
-		passed_threshold.append(splinter)
-	_add_national(parent, PublicOpinion.SPLIT_NATIONAL_DAMAGE)
-	for province_id in organizations.keys():
-		var entry: Dictionary = organizations[province_id]
-		if int(entry.get(parent, 0)) > 0 and _rng.randf() < PublicOpinion.SPLIT_ORG_CHANCE:
-			entry[splinter] = 1
-	turmoil[parent] = PublicOpinion.SPLIT_AFTER_TURMOIL
-	splinters[splinter] = {"parent": parent, "elections": 0, "since": round_number}
-	_push_state({"type": "party_split", "peer_id": parent, "message":
-		L.t("%s BÖLÜNDÜ! Parti içi karışıklık sonunda %d milletvekili %s önderliğinde ayrılıp %s'yi kurdu.") % [
-		parent_name, moved, PoliticianPresets.display_name(splinter), _party_name(splinter)]}, true)
-
-## Tur sonu: ayrılan parti en erken 1, en geç 4 seçim atlattıktan sonra ana
-## partisine BÜTÜN vekilleri ve teşkilatlarıyla geri döner. Erken dönüş için
-## ana partinin karışıklığı yatışmış olmalı.
-func _check_reunions() -> void:
-	for splinter in splinters.keys().duplicate():
-		var info: Dictionary = splinters[splinter]
-		var parent := int(info.get("parent", -1))
-		if not party_ids().has(parent) or PartyManager.is_independent(parent):
-			splinters.erase(splinter)  # ana parti oyundan çıktı / feshedildi: bağımsız kalır
-			continue
-		var elections := int(info.get("elections", 0))
-		if elections >= PublicOpinion.SPLIT_MAX_ELECTIONS \
-				or (elections >= PublicOpinion.SPLIT_MIN_ELECTIONS and turmoil_of(parent) <= PublicOpinion.REUNION_TURMOIL):
-			_merge_splinter(int(splinter))
-
-func _merge_splinter(splinter: int) -> void:
-	var parent := int(splinters[splinter]["parent"])
-	var splinter_name := _party_name(splinter)
-	var moved := _move_seats(splinter, parent, int(last_seats.get(splinter, 0)))
-	_vb_transfer(splinter, parent, 1.0)
-	voter_base.erase(splinter)
-	election_seats[parent] = int(election_seats.get(parent, 0)) + int(election_seats.get(splinter, 0))
-	last_vote_shares.erase(splinter)  # birleşmede oy oranı eklenmez (son seçim sonucu statik)
-	for province_id in organizations.keys():
-		var entry: Dictionary = organizations[province_id]
-		var level := int(entry.get(splinter, 0))
-		if level > int(entry.get(parent, 0)):
-			entry[parent] = level
-		entry.erase(splinter)
-	var hand: Array = inventories.get(parent, [])
-	for card in inventories.get(splinter, []):
-		if hand.size() < MAX_HAND_SIZE:
-			hand.append(card)
-	inventories[parent] = hand
-	for table in [inventories, funds, populism, law_rounds, national_list, last_seats, election_seats, last_vote_shares, turmoil, credibility]:
-		table.erase(splinter)
-	passed_threshold.erase(splinter)
-	for province_id in last_province_results.keys():
-		last_province_results[province_id].erase(splinter)
-	var idx := turn_order.find(splinter)
-	if idx != -1:
-		turn_order.remove_at(idx)
-		if idx < current_turn_index:
-			current_turn_index -= 1
-		current_turn_index = clampi(current_turn_index, 0, maxi(0, turn_order.size() - 1))
-	splinters.erase(splinter)
-	turmoil.erase(parent)
-	GovernmentManager.merge_party(splinter, parent)
-	_push_state({"type": "party_merge", "peer_id": parent, "message":
-		L.t("%s, ana partisi %s'ya geri döndü: %d milletvekili ve bütün teşkilatlarıyla.") % [
-		splinter_name, _party_name(parent), moved]}, true)
-	PartyManager.remove_party(splinter)
-	MultiplayerManager.remove_splinter_bot(splinter)
-
 ## Tur sonu: puanlar sıfıra doğru söner; neredeyse sıfır olanlar silinir.
 ## (İl başkanlıkları sönmez.)
 func _decay_opinion() -> void:
@@ -3764,9 +3609,7 @@ func _advance_turn() -> bool:
 	var wrapped: bool = (current_turn_index + 1) >= size
 	current_turn_index = (current_turn_index + 1) % size
 	_turn_time_left = GameRules.TURN_TIMEOUT
-	if not wrapped:
-		_retire_due_temporary_parties()
-	else:
+	if wrapped:
 		# Tur kapandı: yeni turun ilk oyuncusu seçimden sonra (sıralama
 		# değişebilir) belli olur; geliri ve kartı _begin_round_turn verir.
 		_income_deferred = true
@@ -4056,9 +3899,6 @@ func _finish_round() -> void:
 	var finished_round := round_number
 	round_number += 1
 
-	# Ayrılan partiler dönebilir, çok karışan parti bölünür; sonra karışıklık söner.
-	_check_reunions()
-	_check_splits()
 	# Tur sonu: ham karışıklık 0'a kırpılır (turmoil_of) ve söner.
 	for peer_id in turmoil.keys():
 		turmoil[peer_id] = turmoil_of(int(peer_id)) * PublicOpinion.TURMOIL_DECAY
@@ -4175,14 +4015,7 @@ func _hold_election(finished_round: int, early: bool) -> void:
 	elections_held += 1
 	# Anketler seçimle sıfırlanır: yeni anket yaptırılana kadar boş.
 	polls = {}
-	# Geçici partiler: süresi dolan fesheder; sonra
-	# belki yeni bir parti katılır. (Hükümet kurma bundan sonra başlar: ayrılan
-	# kardeş partiler ayrı ayrı makam alabilir.)
-	_retire_temporary_parties()
 	_count_congress_elections()
-	_maybe_add_temporary_party()
-	for splinter in splinters.keys():
-		splinters[splinter]["elections"] = int(splinters[splinter].get("elections", 0)) + 1
 	last_election_was_early = early
 	_order_turns_by_votes()
 	_begin_round_turn()
@@ -4266,12 +4099,8 @@ func _end_game(reason: String) -> void:
 	game_finished = true
 	game_end_reason = reason
 	final_ranking = []
-	# SİYASETÇİ TABANLI sıralama: her oyuncu ayrı satır; bölünen ve geçici
-	# (sonradan katılan) bot partileri sıralamaya girmez.
-	var ids: Array = []
-	for peer_id in turn_order:
-		if not is_splinter(party_of(int(peer_id))) and not is_temporary(int(peer_id)):
-			ids.append(peer_id)
+	# SİYASETÇİ TABANLI sıralama: her oyuncu ayrı satır.
+	var ids: Array = turn_order.duplicate()
 	ids.sort_custom(func(a, b):
 		var sa := ranking_score(a)
 		var sb := ranking_score(b)
@@ -4297,15 +4126,9 @@ func _end_game(reason: String) -> void:
 	GovernmentManager.end_game()
 	_push_state({"type": "game_over"})
 
-## Sıralama puanı: ayrılmış (henüz dönmemiş) partinin puanı ana partiye sayılır.
+## Sıralama puanı.
 func ranking_score(peer_id: int) -> int:
-	var score := GovernmentManager.score_of(peer_id)
-	if not PartyManager.is_leader(peer_id):
-		return score
-	for splinter in splinters.keys():
-		if int(splinters[splinter].get("parent", -1)) == peer_id:
-			score += GovernmentManager.score_of(int(splinter))
-	return score
+	return GovernmentManager.score_of(peer_id)
 
 ## GovernmentManager, tur akışını engelleyen bir aşamadan (kurma/oylama)
 ## çıkıldığında çağırır: sıradaki oyuncunun süresi baştan başlar ve ertelenmiş
@@ -4368,7 +4191,6 @@ func remove_player(peer_id: int) -> void:
 	last_vote_shares.erase(peer_id)
 	passed_threshold.erase(peer_id)
 	turmoil.erase(peer_id)
-	splinters.erase(peer_id)
 	for province_id in last_province_results.keys():
 		last_province_results[province_id].erase(peer_id)
 	for province_id in organizations.keys():
@@ -4615,9 +4437,6 @@ func _apply_dissolve(peer_id: int) -> void:
 	populism.erase(pid)
 	turmoil.erase(pid)
 	party_congress.erase(pid)
-	for splinter in splinters.keys():
-		if int(splinters[splinter].get("parent", -1)) == pid:
-			splinters.erase(splinter)
 	_make_independent(peer_id, groups)
 	PartyManager.broadcast()
 	var gov_note := GovernmentManager.party_dissolved(pid)
@@ -4681,93 +4500,6 @@ func _random_party_info(peer_id: int) -> Dictionary:
 		"founded_round": round_number,
 	}
 
-# Geçici (rastgele katılan) partiler ---------------------------------------------------
-## Lobide açıksa (MultiplayerManager.random_parties) her seçimden sonra
-## TEMP_PARTY_CHANCE olasılıkla yeni bir bot partisi kurulur: sandalyesiz,
-## biraz ulusal destekle başlar, oyun sonu sıralamasına girmez. Kendini
-## feshetmek üzere kurulur: ilk seçimde barajı geçemezse ya da
-## TEMP_PARTY_ELECTIONS seçim atlattıktan sonra feshedip oyundan çıkar.
-const TEMP_PARTY_CHANCE := 0.3
-const TEMP_PARTY_ELECTIONS := 2
-const TEMP_PARTY_NATIONAL := 2.0
-
-## Testler kapatır (rastgele katılan parti test beklentilerini bozmasın).
-var allow_temporary_parties: bool = true
-
-func _maybe_add_temporary_party() -> void:
-	if not allow_temporary_parties or not MultiplayerManager.random_parties or game_finished:
-		return
-	if MultiplayerManager.players.size() >= MultiplayerManager.MAX_PLAYERS:
-		return
-	if _rng.randf() >= TEMP_PARTY_CHANCE:
-		return
-	var bot := MultiplayerManager.add_splinter_bot(L.t("Yeni Parti"))
-	PartyManager.add_bot_party(bot)
-	PartyManager.parties[bot]["temporary"] = true
-	PartyManager.parties[bot]["temp_elections"] = 0
-	PartyManager.broadcast()
-	turn_order.append(bot)
-	inventories[bot] = []
-	funds[bot] = float(GameRules.FUNDS_PER_ROUND)
-	credibility[bot] = CREDIBILITY_START
-	_add_national(bot, TEMP_PARTY_NATIONAL)
-	_pending_log.append({"text": L.t("YENİ PARTİ: %s, %s'yi kurdu.") % [PoliticianPresets.display_name(bot), _party_name(bot)],
-		"peer_id": bot, "province": "", "kind": "party_change"})
-
-## Seçimden sonra: geçici partiler seçim sayar; süresi dolan ya da barajı
-## geçemeyen fesheder ve oyundan çıkar.
-func _retire_temporary_parties() -> void:
-	for bot in turn_order.duplicate():
-		var pid := int(bot)
-		if not PartyManager.is_leader(pid) or not bool(PartyManager.parties[pid].get("temporary", false)):
-			continue
-		var elections := int(PartyManager.parties[pid].get("temp_elections", 0)) + 1
-		PartyManager.parties[pid]["temp_elections"] = elections
-		if elections < TEMP_PARTY_ELECTIONS and passed_threshold.has(pid):
-			continue
-		# Hemen değil: yeni turun ORTASINDA (ne başında ne sonunda) fesheder.
-		var size := turn_order.size()
-		PartyManager.parties[pid]["retire_at"] = _rng.randi_range(1, maxi(1, size - 2))
-
-## Feshi bekleyen geçici partiler, sıra hedef konuma gelince dağılır.
-func _retire_due_temporary_parties() -> void:
-	for bot in turn_order.duplicate():
-		var pid := int(bot)
-		if not PartyManager.parties.has(pid) or not PartyManager.parties[pid].has("retire_at"):
-			continue
-		if current_turn_index < int(PartyManager.parties[pid]["retire_at"]):
-			continue
-		_dissolve_temporary_party(pid)
-
-func _dissolve_temporary_party(pid: int) -> void:
-	var party_name := _party_name(pid)
-	var scattered := _scatter_seats(pid)
-	var deputy := PartyManager.deputy_of(pid)
-	if deputy != -1:
-		# Yardımcısı (bir oyuncu) varsa parti feshedilince o bağımsız kalır.
-		var temp_orgs := {}
-		for province_id in organizations.keys():
-			if int(organizations[province_id].get(pid, 0)) > 0:
-				temp_orgs[province_id] = int(organizations[province_id][pid])
-		_remember_former_party(deputy, pid, temp_orgs)
-		_make_independent(deputy, PartyManager.groups_of(pid).duplicate())
-	for table in [populism, turmoil, law_rounds, congress_rounds,
-			miting_fatigue, election_groups,
-			national_list, last_seats, election_seats, last_vote_shares, previous_vote_shares, inventories, funds, credibility]:
-		table.erase(pid)
-	passed_threshold.erase(pid)
-	for nested in [last_province_results, organizations]:
-		for province_id in nested.keys():
-			nested[province_id].erase(pid)
-	var idx := turn_order.find(pid)
-	if idx != -1:
-		_remove_from_turn_order(idx)
-	PartyManager.parties.erase(pid)
-	PartyManager.politicians.erase(pid)
-	MultiplayerManager.remove_splinter_bot(pid)
-	PartyManager.broadcast()
-	_pending_log.append({"text": L.t("%s kendini feshetti (%d vekil dağıldı).") % [party_name, int(scattered[0]) + int(scattered[1])],
-		"peer_id": -1, "province": "", "kind": "party_change"})
 
 ## Siyasetçiyi bağımsız kayda çevirir (gri, kullanıcı simgeli, adıyla).
 func _make_independent(peer_id: int, groups: Dictionary) -> void:
@@ -4903,7 +4635,7 @@ func elections_since_congress(pid: int) -> int:
 ## bir seçim geçmiş olmalı.)
 func can_hold_congress(peer_id: int) -> bool:
 	return congress_enabled and can_choose_main_action(peer_id) and PartyManager.is_leader(peer_id) and not PartyManager.is_independent(peer_id) \
-		and not is_splinter(peer_id) and elections_since_congress(peer_id) >= 1 and funds_of(peer_id) >= CONGRESS_COST
+		and elections_since_congress(peer_id) >= 1 and funds_of(peer_id) >= CONGRESS_COST
 
 ## Üye (eski başkan) kongre isteyebilir mi? Son kongreden beri bir seçim
 ## geçmiş olmalı VE bot başkanın döneminde partinin oyu DÜŞMÜŞ olmalı.
@@ -5057,7 +4789,7 @@ func _maybe_mandatory_congress() -> void:
 	var peer_id := current_turn_peer_id()
 	if not congress_enabled or peer_id == -1 or game_finished or congress_active or not PartyManager.is_leader(peer_id):
 		return
-	if PartyManager.is_independent(peer_id) or is_splinter(peer_id) or bool(PartyManager.data_of(peer_id).get("temporary", false)):
+	if PartyManager.is_independent(peer_id):
 		return
 	if elections_since_congress(peer_id) >= CONGRESS_MAX_ELECTIONS:
 		_run_congress(peer_id, "mandatory")
@@ -5101,7 +4833,7 @@ func _run_congress(pid: int, kind: String, requester: int = -1) -> void:
 			text = L.t("%s KONGRESİ: %s yeni genel başkan seçildi.") % [party_name, PoliticianPresets.display_name(old_leader)]
 		else:
 			# Oyuncu başkanlığı kaybetti: yeni bot başkan gelir, oyuncu ÜYE olur.
-			var bot := MultiplayerManager.add_splinter_bot(String(winner["name"]))
+			var bot := MultiplayerManager.add_leader_bot(String(winner["name"]))
 			PartyManager.set_politician_host(bot, new_politician)
 			turn_order.append(bot)
 			_place_after(bot, old_leader)
@@ -5171,7 +4903,7 @@ func _remove_bot_leader(bot: int) -> void:
 	if idx != -1:
 		_remove_from_turn_order(idx)
 	PartyManager.politicians.erase(bot)
-	MultiplayerManager.remove_splinter_bot(bot)
+	MultiplayerManager.remove_leader_bot(bot)
 
 ## Seçimden sonra: her partinin son kongreden beri geçen seçim sayısı artar.
 func _count_congress_elections() -> void:
@@ -5240,9 +4972,6 @@ func _rekey_party(old_id: int, new_id: int, new_member: int) -> void:
 			if entry.has(old_id):
 				entry[new_id] = entry[old_id]
 				entry.erase(old_id)
-	if splinters.has(old_id):
-		splinters[new_id] = splinters[old_id]
-		splinters.erase(old_id)
 	for politician in former_parties.keys():
 		if int(former_parties[politician].get("party", -1)) == old_id:
 			former_parties[politician]["party"] = new_id
@@ -5253,9 +4982,6 @@ func _rekey_party(old_id: int, new_id: int, new_member: int) -> void:
 		if amounts.has(old_id):
 			amounts[new_id] = amounts[old_id]
 			amounts.erase(old_id)
-	for splinter in splinters.keys():
-		if int(splinters[splinter].get("parent", -1)) == old_id:
-			splinters[splinter]["parent"] = new_id
 	GovernmentManager.rekey_party(old_id, new_id)
 
 # --- Senkronizasyon ---------------------------------------------------------
@@ -5273,7 +4999,6 @@ func _pack_state(include_results: bool) -> Dictionary:
 		"tax_rounds": tax_rounds,
 		"constitution_rounds": constitution_rounds,
 		"populism": populism,
-		"splinters": splinters,
 		"early_requests": early_requests,
 		"congress_rounds": congress_rounds,
 		"previous_vote_shares": previous_vote_shares,
@@ -5344,7 +5069,6 @@ func _apply_state(state: Dictionary) -> void:
 	tax_rounds = state.get("tax_rounds", {})
 	constitution_rounds = state.get("constitution_rounds", {})
 	populism = state.get("populism", {})
-	splinters = state.get("splinters", {})
 	early_requests = state.get("early_requests", {})
 	congress_rounds = state.get("congress_rounds", {})
 	previous_vote_shares = state.get("previous_vote_shares", {})
@@ -5440,7 +5164,7 @@ func _push_state(event: Dictionary, include_results: bool = false) -> void:
 		_pending_econ = {}
 	state_version += 1
 	if not _is_local_only():
-		var full: bool = include_results or event.get("type", "") in ["full", "election", "player_left", "player_away", "player_back", "party_split", "party_merge", "party_change"]
+		var full: bool = include_results or event.get("type", "") in ["full", "election", "player_left", "player_away", "player_back", "party_change"]
 		var state := _pack_state(full)
 		if full or _broadcast_snapshot.is_empty() or int(_broadcast_snapshot["version"]) != state_version - 1:
 			_receive_state.rpc(state, event)
@@ -5467,7 +5191,7 @@ func _emit_post_event(event: Dictionary) -> void:
 	if type == "congress":
 		congress_started.emit(event.get("congress", {}))
 	inventories_updated.emit()
-	if type in ["full", "player_left", "player_away", "player_back", "party_split", "party_merge", "party_change"]:
+	if type in ["full", "player_left", "player_away", "player_back", "party_change"]:
 		turn_order_updated.emit()
 	turn_changed.emit(current_turn_peer_id())
 	opinion_changed.emit()
@@ -5476,7 +5200,7 @@ func _emit_post_event(event: Dictionary) -> void:
 			round_advanced.emit()
 		"game_over":
 			game_over.emit()
-		"full", "player_left", "party_split", "party_merge", "party_change":
+		"full", "player_left", "party_change":
 			seats_changed.emit()
 		"played":
 			if bool(event.get("seats_changed", false)):

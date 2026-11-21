@@ -81,7 +81,7 @@ static func _collect() -> Dictionary:
 			"players": mm.players, "owner_id": me, "local_player_name": mm.local_player_name,
 			"election_threshold": mm.election_threshold, "election_interval": mm.election_interval,
 			"world_settings": mm.world_settings, "vote_timeout": mm.vote_timeout, "election_count": mm.election_count, "map_seed": mm.map_seed, "game_map_seed": mm.game_map_seed,
-			"random_parties": mm.random_parties, "away_mode": mm.away_mode,
+			"away_mode": mm.away_mode,
 			"bot_funds_penalty": mm.bot_funds_penalty, "seat_method": mm.seat_method,
 		},
 		"rules": {"election_anchor": GameRules.ELECTION_ANCHOR},
@@ -95,7 +95,7 @@ static func _collect() -> Dictionary:
 			"rng_state": cm._rng.state, "rng_seed": cm._rng.seed,
 			"crisis_rng_state": cm._crisis_rng.state, "crisis_rng_seed": cm._crisis_rng.seed,
 			"congress_time_left": cm._congress_time_left,
-			"allow_temporary_parties": cm.allow_temporary_parties, "event_log": cm.event_log,
+			"event_log": cm.event_log,
 		},
 		"gm": GovernmentManager._pack_state(),
 		"gm_host": {"formed_round": GovernmentManager.formed_round, "censure_round": GovernmentManager.censure_round,
@@ -162,7 +162,6 @@ static func apply(data: Dictionary) -> void:
 	mm.election_count = int(saved_mm.get("election_count", mm.election_count))
 	mm.map_seed = String(saved_mm.get("map_seed", ""))
 	mm.game_map_seed = int(saved_mm.get("game_map_seed", 0))
-	mm.random_parties = bool(saved_mm.get("random_parties", true))
 	mm.away_mode = String(saved_mm.get("away_mode", mm.away_mode))
 	mm.bot_funds_penalty = float(saved_mm.get("bot_funds_penalty", mm.bot_funds_penalty))
 	mm.seat_method = String(saved_mm.get("seat_method", mm.seat_method))
@@ -189,7 +188,6 @@ static func apply(data: Dictionary) -> void:
 	CardManager._crisis_rng.seed = int(host.get("crisis_rng_seed", CardManager._crisis_rng.seed))
 	CardManager._crisis_rng.state = int(host.get("crisis_rng_state", CardManager._crisis_rng.state))
 	CardManager._congress_time_left = float(host.get("congress_time_left", 0.0))
-	CardManager.allow_temporary_parties = bool(host.get("allow_temporary_parties", true))
 	CardManager.event_log = host.get("event_log", [])
 	GovernmentManager._sync_state(data["gm"])
 	var gm_host: Dictionary = data.get("gm_host", {})

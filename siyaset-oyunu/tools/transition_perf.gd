@@ -40,7 +40,6 @@ func _initialize() -> void:
 	var cm = root.get_node("CardManager")
 	var gm = root.get_node("GovernmentManager")
 	root.get_node("BotManager").set_process(false)
-	cm.allow_temporary_parties = false
 	mm.start_offline("Barış")
 	for i in 4:
 		mm.add_bot()

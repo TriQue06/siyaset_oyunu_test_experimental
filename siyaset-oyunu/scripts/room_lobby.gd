@@ -49,7 +49,6 @@ var game_length_summary: Label
 var threshold_slider: HSlider
 var threshold_value_label: Label
 var map_seed_edit: LineEdit
-var random_parties_check: CheckButton
 var away_bot_check: CheckButton
 var bot_funds_buttons: Array = []
 ## Kaydırıcılı dünya ayarları (il / ulusal milletvekili): ayar -> HSlider.
@@ -364,9 +363,6 @@ func _build_rules() -> Control:
 
 	# BOTLAR VE ODA
 	var bot_body := _rule_section(box, "bots", "bot", L.t("Botlar ve oda"))
-	random_parties_check = _switch(L.t("Yeni partiler katılabilir"))
-	random_parties_check.toggled.connect(func(on: bool): MultiplayerManager.set_random_parties(on))
-	bot_body.add_child(random_parties_check)
 	away_bot_check = _switch(L.t("Yerine bot oynasın"))
 	away_bot_check.toggled.connect(func(on: bool): MultiplayerManager.set_away_mode(
 		MultiplayerManager.AWAY_BOT if on else MultiplayerManager.AWAY_PASSIVE))
@@ -436,7 +432,6 @@ func _refresh() -> void:
 	start_button.visible = am_owner
 	start_button.disabled = count < MultiplayerManager.MIN_PLAYERS_TO_START
 	threshold_slider.editable = am_owner
-	random_parties_check.disabled = not am_owner
 	away_bot_check.disabled = not am_owner
 	for button in bot_funds_buttons:
 		(button as Button).disabled = not am_owner
@@ -465,9 +460,8 @@ func _refresh_settings_display() -> void:
 	if not map_seed_edit.has_focus():
 		map_seed_edit.text = MultiplayerManager.map_seed
 	_new_map_button.disabled = not owner
-	random_parties_check.set_pressed_no_signal(MultiplayerManager.random_parties)
 	away_bot_check.set_pressed_no_signal(MultiplayerManager.away_mode == MultiplayerManager.AWAY_BOT)
-	for check in [random_parties_check, away_bot_check]:
+	for check in [away_bot_check]:
 		check.queue_redraw()
 
 	var t := MultiplayerManager.election_threshold

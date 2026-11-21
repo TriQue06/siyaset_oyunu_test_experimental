@@ -10,7 +10,7 @@ extends RefCounted
 ## Biçim:
 ##   {"format": FORMAT, "title": "...", "requires": [mod id],
 ##    "lobby": {threshold, interval, count, vote_seconds, map_seed,
-##              random_parties, away_mode, bot_funds_penalty, world: {...}}}
+##              away_mode, bot_funds_penalty, world: {...}}}
 ## Bilinmeyen ya da geçersiz alanlar sessizce atlanır (eski/yeni sürüm uyumu).
 
 const FORMAT := 1
@@ -21,7 +21,7 @@ static func capture(title: String = "") -> Dictionary:
 	return {"format": FORMAT, "title": title, "requires": [],
 		"lobby": {"threshold": mm.election_threshold, "interval": mm.election_interval,
 			"count": mm.election_count, "vote_seconds": mm.vote_timeout, "map_seed": mm.map_seed,
-			"random_parties": mm.random_parties, "away_mode": mm.away_mode,
+			"away_mode": mm.away_mode,
 			"bot_funds_penalty": mm.bot_funds_penalty, "world": mm.world_settings.duplicate()}}
 
 static func to_json(pack: Dictionary) -> String:
@@ -63,8 +63,6 @@ static func apply(pack: Dictionary) -> bool:
 		mm.set_vote_timeout(int(lobby["vote_seconds"]))
 	if lobby.has("map_seed"):
 		mm.set_map_seed(String(lobby["map_seed"]))
-	if lobby.has("random_parties"):
-		mm.set_random_parties(bool(lobby["random_parties"]))
 	if lobby.has("away_mode"):
 		mm.set_away_mode(String(lobby["away_mode"]))
 	if lobby.has("bot_funds_penalty"):

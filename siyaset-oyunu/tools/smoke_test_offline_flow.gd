@@ -148,7 +148,6 @@ func _initialize() -> void:
 	await process_frame
 	mm = root.get_node("MultiplayerManager")
 	cm = root.get_node("CardManager")
-	cm.allow_temporary_parties = false
 	gm = root.get_node("GovernmentManager")
 	pm = root.get_node("PartyManager")
 	bm = root.get_node("BotManager")

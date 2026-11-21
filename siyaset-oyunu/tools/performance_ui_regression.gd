@@ -17,7 +17,6 @@ func _initialize() -> void:
 	gm.set_process(false)
 	cm.fixed_map_seed = 1950
 	cm.set_rng_seed(4242)
-	cm.allow_temporary_parties = false
 	mm.start_offline("Barış")
 	for i in 7:
 		mm.add_bot()

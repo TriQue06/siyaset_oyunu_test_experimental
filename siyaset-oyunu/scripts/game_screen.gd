@@ -1649,12 +1649,6 @@ func _headline_for_event(event: Dictionary, version: int) -> void:
 						"subtitle": message if message != "" else L.t("%s büyük bir bağış kampanyası düzenledi.") % _fx_party_name(actor),
 						"art": CardPresets.get_card_texture(card), "party": actor, "accent": UiTheme.GREEN_DARK,
 						"stamp": "+" + GameRules.cost_text(GameRules.FUNDS_BONUS_STRONG)})
-		"party_split":
-			var parent := int(event.get("peer_id", -1))
-			_event_fx.present(key, {"headline": L.t("PARTİ İKİYE BÖLÜNDÜ!"), "subtitle": message,
-				"art": CardPresets.get_card_texture(CardPresets.REBELLION_CARD_TYPE), "party": parent,
-				"accent": PartyManager.data_of(parent).get("bg_color", UiTheme.RED), "style": "conflict",
-				"stamp": L.t("BÖLÜNDÜ")})
 
 ## Meclis oylamalarının büyük sonuçları (gensoru, erken seçim, güvenoyu, anayasa).
 func _headline_for_proposal(accepted: bool, kind: String, proposer_id: int) -> void:

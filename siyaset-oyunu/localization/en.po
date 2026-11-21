@@ -5870,3 +5870,6 @@ msgstr "%s investment request: %s / %s met."
 
 msgid "%s / %s karşılandı"
 msgstr "%s / %s met"
+
+msgid "PAYIN"
+msgstr "YOUR SHARE"

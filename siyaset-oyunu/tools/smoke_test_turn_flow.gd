@@ -79,7 +79,6 @@ func _initialize() -> void:
 	cp = root.get_node("CardPresets")
 	root.get_node("BotManager").set_process(false)
 	mm.room_code = ""
-	cm.allow_temporary_parties = false
 	cm.fixed_map_seed = 1950
 	gm.result_hold_seconds = 0.0
 	mm.election_threshold = 0.0

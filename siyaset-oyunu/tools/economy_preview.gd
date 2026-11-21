@@ -49,7 +49,6 @@ func _initialize() -> void:
 	var bm = root.get_node("BotManager")
 	var cp = root.get_node("CardPresets")
 	bm.set_process(false)
-	cm.allow_temporary_parties = false
 	mm.start_offline("Barış")
 	for i in 5:
 		mm.add_bot()

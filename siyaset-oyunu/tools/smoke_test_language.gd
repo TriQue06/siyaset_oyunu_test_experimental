@@ -24,7 +24,6 @@ func _initialize() -> void:
 	var bm = root.get_node("BotManager")
 	var brain = load("res://scripts/bot_brain.gd")
 	bm.set_process(false)
-	cm.allow_temporary_parties = true
 	cm.set_rng_seed(777)
 	seed(777)
 	gm.result_hold_seconds = 0.0

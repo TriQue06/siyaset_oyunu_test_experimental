@@ -29,6 +29,11 @@ var _summary_key: String = ""
 ## Hazine kutusunda gösterilen değer (sayaç animasyonu bunu kaydırır).
 var _shown_treasury: float = NAN
 var _treasury_tween: Tween
+## HAZİNE PAYLARI (0.0.339): hükümet partilerinin bu tur harcayabileceği
+## miktar (kalan / tur başı payı); oyuncunun kendi payı vurgulu. Her karede
+## değişiklik denetlenir, değişince satır yeniden kurulur (canlı).
+var _shares_box: HFlowContainer
+var _shares_key := ""
 
 func _init() -> void:
 	add_theme_constant_override("separation", 4)
@@ -99,9 +104,22 @@ func _make_treasury_row() -> Control:
 	(right[0] as Control).size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	line.add_child(right[0])
 	_income_label = right[1]
-	_tax_effect = UiTheme.mono_label("", UiTheme.fs(14), UiTheme.TEXT_MUTED, true)
+	# Hükümet partilerinin hazine payları (alt satır).
+	var bottom := HBoxContainer.new()
+	bottom.add_theme_constant_override("separation", int(UiTheme.d(6)))
+	bottom.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rows.add_child(bottom)
+	_shares_box = HFlowContainer.new()
+	_shares_box.add_theme_constant_override("h_separation", int(UiTheme.d(6)))
+	_shares_box.add_theme_constant_override("v_separation", int(UiTheme.d(4)))
+	_shares_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_shares_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bottom.add_child(_shares_box)
+	# Seçmen etkisi gelirin altında (sağ üst köşe boş kalıyordu).
+	_tax_effect = UiTheme.mono_label("", UiTheme.fs(12), UiTheme.TEXT_MUTED, true)
 	_tax_effect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	rows.add_child(_tax_effect)
+	_tax_effect.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	(right[0] as VBoxContainer).add_child(_tax_effect)
 	_tiles["treasury"] = {"panel": panel, "style": style, "value": left[1]}
 	return panel
 
@@ -150,6 +168,84 @@ func refresh() -> void:
 	_tax_effect.text = effect[0]
 	_tax_effect.add_theme_color_override("font_color", effect[1])
 	_refresh_summary()
+	_refresh_shares()
+
+func _process(_delta: float) -> void:
+	if is_visible_in_tree():
+		_refresh_shares()
+		# Hazinenin kendisi de canlı (animasyon oynamıyorsa).
+		if (_treasury_tween == null or not _treasury_tween.is_running()) 				and not is_equal_approx(_shown_treasury, CardManager.state_treasury()):
+			_shown_treasury = CardManager.state_treasury()
+			_show_treasury(_shown_treasury)
+
+## Hükümet partilerinin hazine payları: [renk noktası] ad  kalan / pay.
+func _refresh_shares() -> void:
+	if _shares_box == null:
+		return
+	var me := CardManager.party_of(multiplayer.get_unique_id())
+	var ids: Array = GovernmentManager.government_party_ids() if GovernmentManager.has_government() else []
+	var entries: Array = []
+	var base := CardManager.quota_base()
+	for pid in ids:
+		var full := base * CardManager.quota_share(int(pid))
+		entries.append([int(pid), CardManager.state_quota(int(pid)), full])
+	# Oyuncunun payı önde.
+	entries.sort_custom(func(a, b): return int(a[0]) == me and int(b[0]) != me)
+	var key := str(entries) + str(me)
+	if key == _shares_key:
+		return
+	_shares_key = key
+	for child in _shares_box.get_children():
+		_shares_box.remove_child(child)
+		child.queue_free()
+	_shares_box.visible = not entries.is_empty()
+	for entry in entries:
+		_shares_box.add_child(_share_chip(int(entry[0]), float(entry[1]), float(entry[2]), int(entry[0]) == me))
+
+## Pay kutucuğu. Oyuncunun kendi payı parti renginde dolu ve kalın; diğerleri
+## sade (renk noktası + ad).
+func _share_chip(pid: int, left: float, full: float, mine: bool) -> Control:
+	var data := PartyManager.data_of(pid)
+	var color: Color = data.get("bg_color", UiTheme.TEAL)
+	color.a = 1.0
+	var chip := PanelContainer.new()
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := StyleBoxFlat.new()
+	style.set_corner_radius_all(int(UiTheme.d(7)))
+	style.content_margin_left = UiTheme.d(6)
+	style.content_margin_right = UiTheme.d(6)
+	style.content_margin_top = UiTheme.d(3)
+	style.content_margin_bottom = UiTheme.d(4)
+	if mine:
+		style.bg_color = color.darkened(0.1)
+		style.border_color = color.darkened(0.45)
+		style.border_width_bottom = int(UiTheme.d(3))
+	else:
+		style.bg_color = UiTheme.SLOT
+	chip.add_theme_stylebox_override("panel", style)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", int(UiTheme.d(5)))
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.add_child(row)
+	if not mine:
+		var dot := ColorRect.new()
+		dot.color = color
+		dot.custom_minimum_size = Vector2(UiTheme.d(10), UiTheme.d(10))
+		dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(dot)
+	# Dar sütun: ortaklarda ad yerine renk noktası ve kalan (ad ipucunda).
+	chip.tooltip_text = "%s: %s / %s" % [String(data.get("name", "?")), GameRules.amount(left), GameRules.amount(full)]
+	chip.mouse_filter = Control.MOUSE_FILTER_PASS
+	if mine:
+		var name_label := UiTheme.mono_label(L.t("PAYIN"), UiTheme.fs(12), UiTheme.ON_COLOR, true)
+		name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(name_label)
+	var value := UiTheme.mono_label("%s / %s" % [GameRules.amount(left).trim_suffix(" M"), GameRules.amount(full)] if mine else GameRules.amount(left),
+		UiTheme.fs(15 if mine else 13), UiTheme.ON_COLOR if mine else UiTheme.TEXT, true)
+	value.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(value)
+	return chip
 
 ## Yürürlükteki verginin seçmene etkisi: [metin, renk]. Hükümet yoksa etkisiz.
 static func tax_effect_text() -> Array:

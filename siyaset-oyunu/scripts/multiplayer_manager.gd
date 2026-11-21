@@ -95,35 +95,6 @@ const MAP_SEED_MAX_DIGITS := 9
 var map_seed: String = ""
 ## Bu oyunun kesinleşmiş harita tohumu (oyun başlarken belirlenir; 0 = henüz yok).
 var game_map_seed: int = 0
-## RASTGELE PARTİLER (lobi ayarı, varsayılan KAPALI (0.0.186)): seçimlerden sonra arada
-## bir yeni bir bot partisi katılır (bkz. CardManager._maybe_add_temporary_party).
-var random_parties: bool = false
-
-func set_random_parties(value: bool) -> void:
-	if not is_local_owner():
-		return
-	if is_host:
-		random_parties = value
-		if room_code != "":
-			_sync_random_parties.rpc(random_parties)
-			_sync_bot_funds_penalty.rpc(bot_funds_penalty)
-		settings_updated.emit()
-	else:
-		_request_set_random_parties.rpc_id(1, value)
-
-@rpc("any_peer", "reliable")
-func _request_set_random_parties(value: bool) -> void:
-	if not is_host or multiplayer.get_remote_sender_id() != owner_id:
-		return
-	random_parties = value
-	_sync_random_parties.rpc(random_parties)
-	_sync_bot_funds_penalty.rpc(bot_funds_penalty)
-	settings_updated.emit()
-
-@rpc("authority", "reliable")
-func _sync_random_parties(value: bool) -> void:
-	random_parties = value
-	settings_updated.emit()
 
 ## OYUNDAN DÜŞEN OYUNCU: "bot" (varsayılan) yerine bot oynar, "passive" ise
 ## sırası kendiliğinden geçer, oylarda çekimser kalır. Lobi sahibi değiştirir.
@@ -328,7 +299,6 @@ func start_offline(player_name: String, notify: bool = true) -> void:
 	is_host = true
 	room_code = ""
 	map_seed = ""
-	random_parties = false
 	game_map_seed = 0
 	reset_seat_method()
 	election_threshold = THRESHOLD_DEFAULT
@@ -500,15 +470,15 @@ func _apply_remove_bot(peer_id: int) -> void:
 	_renumber_bots()
 	_broadcast_player_list()
 
-## OYUN İÇİ BÖLÜNME: karışıklıktan doğan parti oyuna yapay zekâ (bot) olarak
-## girer; ana partisine dönünce çıkar (bkz. CardManager._split_party).
-func add_splinter_bot(leader_name: String) -> int:
+## KONGRE: başkanlığı kaybeden oyuncunun yerine partiyi yönetecek bot başkan
+## oyuna girer (bkz. CardManager kongre sonucu).
+func add_leader_bot(leader_name: String) -> int:
 	var id := _free_bot_id()
-	players[id] = {"name": leader_name, "bot": true, "splinter": true}
+	players[id] = {"name": leader_name, "bot": true}
 	_broadcast_player_list()
 	return id
 
-func remove_splinter_bot(peer_id: int) -> void:
+func remove_leader_bot(peer_id: int) -> void:
 	if not is_bot(peer_id):
 		return
 	players.erase(peer_id)
@@ -582,7 +552,6 @@ func _broadcast_player_list() -> void:
 		_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
 		_sync_world_settings.rpc(world_settings)
 		_sync_map_seed.rpc(map_seed)
-		_sync_random_parties.rpc(random_parties)
 		_sync_bot_funds_penalty.rpc(bot_funds_penalty)
 	player_list_updated.emit()
 
@@ -612,7 +581,6 @@ func transfer_ownership(new_owner_id: int) -> void:
 		_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
 		_sync_world_settings.rpc(world_settings)
 		_sync_map_seed.rpc(map_seed)
-		_sync_random_parties.rpc(random_parties)
 		_sync_bot_funds_penalty.rpc(bot_funds_penalty)
 		player_list_updated.emit()
 	else:
@@ -760,7 +728,6 @@ func _on_peer_disconnected(id: int) -> void:
 	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
 	_sync_world_settings.rpc(world_settings)
 	_sync_map_seed.rpc(map_seed)
-	_sync_random_parties.rpc(random_parties)
 	_sync_bot_funds_penalty.rpc(bot_funds_penalty)
 	player_list_updated.emit()
 	if not was_player:
@@ -852,7 +819,6 @@ func _request_join(code: String, player_name: String, signature: String, uid: St
 	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
 	_sync_world_settings.rpc(world_settings)
 	_sync_map_seed.rpc(map_seed)
-	_sync_random_parties.rpc(random_parties)
 	_sync_bot_funds_penalty.rpc(bot_funds_penalty)
 	player_list_updated.emit()
 
@@ -881,7 +847,6 @@ func _rejoin(old_id: int, new_id: int, player_name: String) -> void:
 	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
 	_sync_world_settings.rpc(world_settings)
 	_sync_map_seed.rpc_id(new_id, map_seed)
-	_sync_random_parties.rpc_id(new_id, random_parties)
 	_sync_away_mode.rpc_id(new_id, away_mode)
 	_sync_bot_funds_penalty.rpc_id(new_id, bot_funds_penalty)
 	_sync_seat_method.rpc_id(new_id, seat_method)
@@ -935,7 +900,6 @@ func _request_transfer_ownership(new_owner_id: int) -> void:
 	_sync_player_list.rpc(players, owner_id, election_threshold, election_interval, election_count, vote_timeout)
 	_sync_world_settings.rpc(world_settings)
 	_sync_map_seed.rpc(map_seed)
-	_sync_random_parties.rpc(random_parties)
 	_sync_bot_funds_penalty.rpc(bot_funds_penalty)
 	player_list_updated.emit()
 
@@ -982,7 +946,6 @@ func set_map_seed(text: String) -> void:
 		map_seed = clean
 		if room_code != "":
 			_sync_map_seed.rpc(map_seed)
-			_sync_random_parties.rpc(random_parties)
 			_sync_bot_funds_penalty.rpc(bot_funds_penalty)
 		settings_updated.emit()
 	else:
@@ -1002,7 +965,6 @@ func _request_set_map_seed(text: String) -> void:
 		return
 	map_seed = clean_map_seed(text)
 	_sync_map_seed.rpc(map_seed)
-	_sync_random_parties.rpc(random_parties)
 	_sync_bot_funds_penalty.rpc(bot_funds_penalty)
 	settings_updated.emit()
 

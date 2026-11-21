@@ -59,7 +59,6 @@ func _initialize() -> void:
 	cm = root.get_node("CardManager")
 	# Eski serbest akış: bu test mekanikleri sınar (tur akışı: smoke_test_turn_flow).
 	cm.enforce_turn_flow = false
-	cm.allow_temporary_parties = false
 	gm = root.get_node("GovernmentManager")
 	game_map = root.get_node("GameMap")
 	cm.fixed_map_seed = 1950
@@ -398,7 +397,7 @@ func _initialize() -> void:
 	check("log siniri asilmaz", cm.event_log.size() == cm.EVENT_LOG_LIMIT)
 
 	print("")
-	print("=== 9) KARISIKLIK, BOLUNME VE GERI DONUS ===")
+	print("=== 9) KARISIKLIK: PARTI BOLUNMESI YOK (0.0.339) ===")
 	new_game({1: groups(["isveren", "dindar"]), 2: groups(["isci", "ilerici"]), 3: groups(["genc", "milliyetci"])})
 	mm.players[2]["bot"] = true
 	cm.last_seats = {1: 200, 2: 150, 3: 150}
@@ -406,12 +405,11 @@ func _initialize() -> void:
 	cm.national_list = {1: 80, 2: 60, 3: 60}
 	cm.last_election_round = 4
 	cm.round_number = 5
-	var kid: String = game_map.ids[5]
-	cm.organizations[kid] = {1: 2}
 	cm._apply_card_effect(2, "isyan", 1)
-	check("tek ic karisiklik bolmez", cm.turmoil_of(1) < PublicOpinion.SPLIT_TURMOIL)
 	cm._apply_card_effect(2, "isyan", 1)
+	cm.turmoil[1] = 99.0
 	var turn_size: int = cm.turn_order.size()
+	var party_count: int = pm.parties.size()
 	cm.current_turn_index = 0
 	gm.government = {"pm": 3}  # hükümet var: tur sonunda erken seçim olmasın
 	gm.main_gov_peer_id = 3
@@ -420,51 +418,7 @@ func _initialize() -> void:
 	GameRules.set_election_anchor(0)
 	cm.round_number = 5  # seçim turu değil
 	cm._finish_round()
-	check("karisiklik esigi asildi: parti bolundu", cm.splinters.size() == 1 and cm.turn_order.size() == turn_size + 1,
-		str(cm.splinters))
-	var sid: int = int(cm.splinters.keys()[0]) if not cm.splinters.is_empty() else -1
-	# 0.0.228: ayrılan parti ana partinin seçmen tabanından pay alır: grup profili
-	# aynı oranlarda (her grupta ayrılan / ana oranı aynı).
-	var ratio := -1.0
-	var same_profile := true
-	for g in VoterGroups.GROUP_IDS:
-		var parent_v := float(pm.parties[1]["groups"][g])
-		var split_v := float(pm.parties[sid]["groups"][g])
-		if parent_v <= 0.001:
-			same_profile = same_profile and split_v <= 0.001
-			continue
-		if ratio < 0.0:
-			ratio = split_v / parent_v
-		same_profile = same_profile and absf(split_v / parent_v - ratio) < 0.01
-	check("ayrilan parti yapay zeka, ayni grup profili, benzer renk", mm.is_bot(sid) \
-		and same_profile \
-		and not Color(pm.parties[sid]["bg_color"]).is_equal_approx(Color(pm.parties[1]["bg_color"])))
-	var split_seats := int(cm.last_seats.get(sid, 0))
-	check("vekillerin ciddi bolumu gecti", split_seats >= int(200 * PublicOpinion.SPLIT_SEAT_SHARE_MIN) - 1 \
-		and cm.last_seats[1] + split_seats == 200, "%d / %d" % [split_seats, cm.last_seats[1]])
-	check("ayrilan parti bir daha bolunemez", true)
-	cm.turmoil[sid] = 99.0
-	cm._check_splits()
-	check("ayrilan parti tekrar bolunmez", cm.splinters.size() == 1)
-	cm.turmoil[1] = 99.0
-	cm._check_splits()
-	check("ana partinin ayni anda ikinci ayriligi yok", cm.splinters.size() == 1)
-	cm.organizations[kid][sid] = 2
-	cm.organizations[kid][1] = 1
-	cm.turmoil[1] = 0.5
-	cm._check_reunions()
-	check("secim atlatmadan geri donmez", cm.splinters.has(sid))
-	cm.splinters[sid]["elections"] = 1
-	cm.turmoil[1] = 5.0
-	cm._check_reunions()
-	check("karisiklik surerken 1 secimden sonra donmez", cm.splinters.has(sid))
-	gm.scores[sid] = 7
-	gm.scores[1] = 3
-	cm.splinters[sid]["elections"] = PublicOpinion.SPLIT_MAX_ELECTIONS
-	cm._check_reunions()
-	check("en gec 4 secimden sonra doner", not cm.splinters.has(sid) and not cm.turn_order.has(sid) and not pm.parties.has(sid))
-	check("vekilleri ve teskilatlariyla doner, puan birlesir", cm.last_seats[1] == 200 and cm.organization_level(kid, 1) == 2 \
-		and gm.score_of(1) == 10, "%d mv, puan %d" % [cm.last_seats[1], gm.score_of(1)])
+	check("cok karisiklik partiyi bolmez, yeni parti dogmaz", cm.turn_order.size() == turn_size and pm.parties.size() == party_count 		and int(cm.last_seats[1]) == 200, "%d sira, %d parti, %d mv" % [cm.turn_order.size(), pm.parties.size(), int(cm.last_seats[1])])
 
 	print("")
 	print("=== 10) YENI KARTLAR VE KURALLAR ===")

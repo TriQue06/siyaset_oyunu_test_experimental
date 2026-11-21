@@ -25,7 +25,6 @@ func _initialize() -> void:
 			seed(925731)
 			cm.set_rng_seed(925731)
 			cm.fixed_map_seed = 1950
-			cm.allow_temporary_parties = false
 			mm.room_code = ""
 			mm.players = {}
 			pm.parties = {}

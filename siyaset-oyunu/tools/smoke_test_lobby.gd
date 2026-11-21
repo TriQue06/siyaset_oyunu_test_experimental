@@ -29,7 +29,6 @@ func _initialize() -> void:
 	await process_frame
 	mm = root.get_node("MultiplayerManager")
 	cm = root.get_node("CardManager")
-	cm.allow_temporary_parties = false
 
 	print("=== 1) CEVRIM DISI MOD ===")
 	mm.start_offline("Barış")

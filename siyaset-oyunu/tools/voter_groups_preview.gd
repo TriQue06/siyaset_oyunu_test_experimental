@@ -20,7 +20,6 @@ func _initialize() -> void:
 	var gm = root.get_node("GovernmentManager")
 	var bm = root.get_node("BotManager")
 	bm.set_process(false)
-	cm.allow_temporary_parties = false
 	mm.start_offline("Barış")
 	for i in 5:
 		mm.add_bot()

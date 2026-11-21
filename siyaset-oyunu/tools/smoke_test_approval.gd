@@ -59,7 +59,6 @@ func _initialize() -> void:
 	cm.enforce_turn_flow = false
 	gm = root.get_node("GovernmentManager")
 	cp = root.get_node("CardPresets")
-	cm.allow_temporary_parties = false
 	cm.fixed_map_seed = 1950
 	mm.room_code = ""
 	gm.result_hold_seconds = 0.0

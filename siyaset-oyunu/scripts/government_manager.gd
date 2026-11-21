@@ -907,29 +907,6 @@ func _resolve_coalition_stage() -> void:
 		_notify_coalition.rpc(text)
 	coalition_changed.emit(text)
 
-## Host: oyun sırasında ayrılan oyuncuyu hükümet süreçlerinden çıkarır.
-## CardManager.remove_player, oyuncunun vekillerini meclisten sildikten SONRA
-## çağırır (voter_ids/total_seats zaten güncel).
-## BÖLÜNEN PARTİ ana partisine döndü: görevleri ve puanı ana partiye geçer.
-func merge_party(old_id: int, new_id: int) -> void:
-	if not _is_authority():
-		return
-	scores[new_id] = score_of(new_id) + score_of(old_id)
-	scores.erase(old_id)
-	for post_id in government.keys():
-		if int(government[post_id]) == old_id:
-			government[post_id] = new_id
-	if main_gov_peer_id == old_id:
-		main_gov_peer_id = new_id
-	votes.erase(old_id)
-	proposal_gov_ids.erase(old_id)
-	var idx := mandate_order.find(old_id)
-	if idx != -1:
-		mandate_order.remove_at(idx)
-		if idx < mandate_index:
-			mandate_index -= 1
-	_push_state()
-
 ## Parti anahtarı değişti (genel başkan değişti): hükümet ve teklif kayıtları
 ## yeni anahtara taşınır. Oylar oyuncu tabanlı olduğu için dokunulmaz.
 func rekey_party(old_id: int, new_id: int) -> void:

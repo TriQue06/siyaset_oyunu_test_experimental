@@ -15,7 +15,6 @@ func _initialize() -> void:
 	var pm = root.get_node("PartyManager")
 	var cm = root.get_node("CardManager")
 	root.get_node("BotManager").set_process(false)
-	cm.allow_temporary_parties = false
 	mm.start_offline("Barış")
 	for i in 3:
 		mm.add_bot()

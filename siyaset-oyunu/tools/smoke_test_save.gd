@@ -63,7 +63,6 @@ func _initialize() -> void:
 	bm.set_process(false)
 	brain = load("res://scripts/bot_brain.gd")
 	save_game = load("res://scripts/save_game.gd")
-	cm.allow_temporary_parties = false
 	cm.set_rng_seed(424242)
 	seed(424242)
 	gm.result_hold_seconds = 0.0

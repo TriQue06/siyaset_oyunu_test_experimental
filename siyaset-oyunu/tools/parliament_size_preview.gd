@@ -30,7 +30,6 @@ func _initialize() -> void:
 	var gp = root.get_node("GovernmentPresets")
 	root.get_node("GameMap").generate_new(4242)
 	bm.set_process(false)
-	cm.allow_temporary_parties = false
 	mm.start_offline("Barış")
 	for i in 3:
 		mm.add_bot()

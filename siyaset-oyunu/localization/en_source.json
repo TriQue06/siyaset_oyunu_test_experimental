@@ -1950,5 +1950,7 @@
 "İNANÇ": "FAITH",
 "YÖNETİM": "GOVERNANCE",
 "Tarım Bakanlığı": "Ministry of Agriculture",
-"Tarım": "Agriculture"
+"Tarım": "Agriculture",
+"%s yatırım isteği: %s / %s karşılandı.": "%s investment request: %s / %s met.",
+"%s / %s karşılandı": "%s / %s met"
 }

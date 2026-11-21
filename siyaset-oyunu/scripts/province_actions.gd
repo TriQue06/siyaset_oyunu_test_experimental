@@ -594,8 +594,10 @@ func _build_invest() -> void:
 	if not req.is_empty():
 		_sec(L.t("İlin isteği"))
 		var done := bool(req.get("done", false))
-		var amount_label := _text(L.t("karşılandı") if done else Economy.money_full(float(req["amount"])), _font_display(), 18,
-			C_GO if done else C_INK)
+		var paid := float(req.get("paid", 0.0))
+		var want := Economy.money_full(float(req["amount"]))
+		var amount_label := _text(L.t("karşılandı") if done else (want if paid <= 0.0 else L.t("%s / %s karşılandı") % [Economy.money_full(paid), want]),
+			_font_display(), 18, C_GO if done else C_INK)
 		_body.add_child(amount_label)
 	# KİMDEN ÖDENİR (0.0.314): devlet hazinesi ile parti kasası arasında
 	# kaydırıcı; varsayılan en çok devlet payı, sola çekince kasan da katılır.

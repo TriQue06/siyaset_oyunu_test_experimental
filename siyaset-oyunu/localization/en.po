@@ -5864,3 +5864,9 @@ msgstr "Ministry of Agriculture"
 
 msgid "Tarım"
 msgstr "Agriculture"
+
+msgid "%s yatırım isteği: %s / %s karşılandı."
+msgstr "%s investment request: %s / %s met."
+
+msgid "%s / %s karşılandı"
+msgstr "%s / %s met"

@@ -897,9 +897,18 @@ static func _choose_invest_request(bot: int) -> Dictionary:
 			continue
 		var cost := CardManager.invest_tier_cost(tier)
 		for province_id: String in CardManager.invest_requests:
-			var request := CardManager.invest_request(province_id)
-			if not bool(request["done"]) and float(request["amount"]) <= cost and CardManager.has_province(province_id):
+			var left := CardManager.invest_request_remaining(province_id)
+			if left > 0.0 and left <= cost + 0.001 and CardManager.has_province(province_id):
 				return {"type": "invest", "province": province_id, "tier": tier}
+	# Hiçbir kademe kalanı tek seferde karşılayamıyorsa en büyük karşılanabilir
+	# kademeyle kısmen öde (0.0.338: yatırımlar birikir).
+	for tier in range(CardManager.INVEST_TIERS.size() - 1, -1, -1):
+		if not CardManager.can_invest(bot, "", -1.0, tier):
+			continue
+		for province_id: String in CardManager.invest_requests:
+			if CardManager.invest_request_remaining(province_id) > 0.0 and CardManager.has_province(province_id):
+				return {"type": "invest", "province": province_id, "tier": tier}
+		break
 	return {}
 
 static func _eval_investment(bot: int) -> Dictionary:

@@ -82,7 +82,7 @@ func _draw() -> void:
 				_draw_done(pos, dt, screen_scale)
 			continue
 		_done_at.erase(id)
-		_draw_request(pos, float(req["amount"]), left, total, screen_scale)
+		_draw_request(pos, CardManager.invest_request_remaining(String(id)), left, total, screen_scale)
 
 func _draw_request(pos: Vector2, amount: float, left: int, total: int, screen_scale: float) -> void:
 	var urgent := left <= 1

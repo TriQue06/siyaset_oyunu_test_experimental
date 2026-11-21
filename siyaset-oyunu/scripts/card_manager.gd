@@ -977,6 +977,14 @@ func start_approval() -> void:
 func invest_request(province_id: String) -> Dictionary:
 	return invest_requests.get(province_id, {})
 
+## İsteğin karşılanmamış kısmı (0.0.338: yatırımlar birikir; 100'lük isteği
+## iki 50'lik yatırım da, farklı partilerden gelse de, tamamlar).
+func invest_request_remaining(province_id: String) -> float:
+	var req: Dictionary = invest_requests.get(province_id, {})
+	if req.is_empty() or bool(req.get("done", false)):
+		return 0.0
+	return maxf(0.0, float(req["amount"]) - float(req.get("paid", 0.0)))
+
 ## Yatırım isteklerini yalnız HÜKÜMET partileri görür (0.0.321): muhalefet ve
 ## koalisyondan düşen parti haritada ve il menüsünde görmez.
 func sees_invest_requests(peer_id: int) -> bool:
@@ -1011,7 +1019,13 @@ func _ensure_invest_requests() -> void:
 
 func _fulfil_invest_request(province_id: String, amount: float) -> void:
 	var req: Dictionary = invest_requests.get(province_id, {})
-	if req.is_empty() or bool(req.get("done", false)) or amount + 0.001 < float(req["amount"]):
+	if req.is_empty() or bool(req.get("done", false)) or amount <= 0.0:
+		return
+	req["paid"] = float(req.get("paid", 0.0)) + amount
+	if float(req["paid"]) + 0.001 < float(req["amount"]):
+		_pending_log.append({"text": L.t("%s yatırım isteği: %s / %s karşılandı.") % [_province_name(province_id),
+			Economy.money_full(float(req["paid"])), Economy.money_full(float(req["amount"]))],
+			"peer_id": -1, "province": province_id, "kind": "invest"})
 		return
 	req["done"] = true
 	_approval_add(L.t("%s yatırım isteği karşılandı") % _province_name(province_id), PublicOpinion.APPROVAL_REQUEST_DONE)

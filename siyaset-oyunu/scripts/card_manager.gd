@@ -420,7 +420,7 @@ func _apply_draw(peer_id: int, automatic: bool = false) -> void:
 ## ele giren kartları parti kasasından satın alır; sırada adet sınırı yok, el
 ## sınırı (MAX_HAND_SIZE) geçerli. Fiyat = taban + SEÇİM başına zam × yapılmış
 ## seçim sayısı (0.0.329); zam lobi ayarıdır (world_settings "card_price_step":
-## 0 / 10 / 20 / 30 / 40 milyon, varsayılan 20).
+## 0 / 10 / 20 milyon, varsayılan 10; 0.0.335).
 const SHOP_PRICES := {"karalama": 15.0, "kaset": 40.0, "isyan": 25.0, "steal_weak": 10.0,
 	"steal_strong": 45.0, "populizm": 15.0, "anket": 10.0}
 const SHOP_ORDER := ["karalama", "kaset", "isyan", "steal_weak", "steal_strong", "populizm", "anket"]

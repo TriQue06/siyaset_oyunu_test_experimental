@@ -241,6 +241,9 @@ static func choose_action(bot: int) -> Dictionary:
 	var pid := CardManager.party_of(bot)
 	if CardManager.can_hold_congress(bot) and CardManager.bot_congress_due(pid):
 		return {"type": "congress"}
+	var request := _choose_invest_request(bot)
+	if not request.is_empty():
+		return request
 	var candidates: Array = []
 	var best := _choose_action_best(bot, candidates)
 	var miss := 1.0 - skill(bot)
@@ -642,7 +645,6 @@ static func _law_vote_value(voter: int, law_type: String, choice: int, proposer:
 ## Bir mitingin il etkisinin eski puan ölçeğindeki karşılığı (afet yardımını mitingle kıyaslamak için).
 const MITING_POINTS := 2.5
 ## Yatırım isteğinin bot gözündeki değeri (il değeriyle aynı ölçek: vekil sayısı).
-const REQUEST_VALUE := 12.0
 ## Onay değişiminin bot hesabında kaç turluk ulusal puan sayıldığı.
 const APPROVAL_TURNS := 4.0
 
@@ -877,6 +879,20 @@ static func miting_focus(bot: int, province_id: String, slots: int) -> Array:
 ## tavana dayanmamış il (azalan getiri: il puanı LIMIT'te durur).
 ## HAZİNE: seçim uzaksa bir yatırımlık yedek bırakır (hepsini harcamaz);
 ## yatırımın kalan dilimleri seçimden sonraya kalacaksa değeri düşer.
+## Bekleyen görev için karşılanabilir en düşük kademe, normal hamlelerden önce gelir.
+static func _choose_invest_request(bot: int) -> Dictionary:
+	if CardManager.invest_requests.is_empty() or not CardManager.sees_invest_requests(bot):
+		return {}
+	for tier in CardManager.INVEST_TIERS.size():
+		if not CardManager.can_invest(bot, "", -1.0, tier):
+			continue
+		var cost := CardManager.invest_tier_cost(tier)
+		for province_id: String in CardManager.invest_requests:
+			var request := CardManager.invest_request(province_id)
+			if not bool(request["done"]) and float(request["amount"]) <= cost and CardManager.has_province(province_id):
+				return {"type": "invest", "province": province_id, "tier": tier}
+	return {}
+
 static func _eval_investment(bot: int) -> Dictionary:
 	# Yatırım tamamen hazine kotasından (can_invest kotayı denetler).
 	if not CardManager.is_government_party(bot) or not CardManager.can_invest(bot):
@@ -890,15 +906,9 @@ static func _eval_investment(bot: int) -> Dictionary:
 	var best_province := ""
 	var best_value := -INF
 	for province_id in _seats().keys():
-		# YATIRIM İSTEĞİ: karşılanmazsa onay ve il puanı gider; teşkilat şartı aranmaz.
-		var req := CardManager.invest_request(String(province_id))
-		var requested := not req.is_empty() and not bool(req.get("done", false)) \
-			and float(req["amount"]) <= CardManager.invest_tier_cost(CardManager.DEFAULT_TIER) + 0.001
 		var room := 1.0
 		var value := float(CardManager.province_seat_count(province_id)) \
 			* (0.5 + PublicOpinion.appeal_closeness(CardManager.appeal_of(province_id, bot))) * room
-		if requested:
-			value += REQUEST_VALUE
 		if value > best_value:
 			best_value = value
 			best_province = province_id

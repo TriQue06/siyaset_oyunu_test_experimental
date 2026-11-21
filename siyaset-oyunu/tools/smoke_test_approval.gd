@@ -194,5 +194,14 @@ func _initialize() -> void:
 	check("onay durumla taşınır", near(cm.approval_value(), 57.0, 0.001))
 	check("istekler durumla taşınır", cm.invest_requests == req_before)
 
+	new_game(true)
+	mm.players[2]["bot"] = true
+	cm.current_turn_index = 1
+	var target: String = cm.invest_requests.keys()[0]
+	cm.invest_requests = {target: {"amount": 150.0, "done": false}}
+	var action: Dictionary = root.get_node("BotManager").do_action(2)
+	check("koalisyon botu 150 milyonluk görevi tamamlar",
+		action.get("type") == "invest" and bool(cm.invest_requests[target]["done"]), str(action))
+
 	print("SONUC: %s (%d hata)" % ["TAMAM" if fails == 0 else "HATA", fails])
 	quit(1 if fails > 0 else 0)
